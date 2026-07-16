@@ -41,7 +41,7 @@ const dependencies = {
 const releaseManifest = {
   version: 1,
   sourceCommit: candidate.commit,
-  sourceRepository: candidate.repository,
+  sourceRepository: "git+https://github.com/jonathan-vella/apex-vnext.git",
   toolchain: { node: "24.18.0" },
   packages: [
     {
@@ -95,15 +95,48 @@ test("parses bounded live qualification commands", () => {
   assert.throws(() => parseLiveQualificationArguments(["validate", "--unknown", "value"]), /Unknown/);
 });
 
-test("requires clean source and a same-commit release manifest", () => {
+test("requires clean source and a same-candidate release manifest", () => {
   assert.doesNotThrow(() => assertCleanGitStatus(""));
   assert.throws(() => assertCleanGitStatus(" M packages/cli/src/cli.ts"), /clean Git worktree/);
-  assert.doesNotThrow(() => assertReleaseManifest(releaseManifest, candidate.commit));
+  assert.doesNotThrow(() => assertReleaseManifest(releaseManifest, candidate.commit, candidate.repository));
+  assert.doesNotThrow(() =>
+    assertReleaseManifest(
+      { ...releaseManifest, sourceRepository: "git+ssh://git@github.com/jonathan-vella/apex-vnext.git" },
+      candidate.commit,
+      candidate.repository,
+    ),
+  );
   assert.throws(
-    () => assertReleaseManifest({ ...releaseManifest, sourceCommit: "e".repeat(40) }, candidate.commit),
+    () =>
+      assertReleaseManifest(
+        { ...releaseManifest, sourceCommit: "e".repeat(40) },
+        candidate.commit,
+        candidate.repository,
+      ),
     /does not match/,
   );
-  assert.throws(() => assertReleaseManifest({ ...releaseManifest, packages: [] }, candidate.commit), /invalid/);
+  assert.throws(
+    () =>
+      assertReleaseManifest(
+        { ...releaseManifest, sourceRepository: "https://github.com/owner/repo" },
+        candidate.commit,
+        "https://github.com/owner/repo",
+      ),
+    /destination repository/,
+  );
+  assert.throws(
+    () =>
+      assertReleaseManifest(
+        { ...releaseManifest, sourceRepository: "https://github.com/owner/repo" },
+        candidate.commit,
+        candidate.repository,
+      ),
+    /does not match/,
+  );
+  assert.throws(
+    () => assertReleaseManifest({ ...releaseManifest, packages: [] }, candidate.commit, candidate.repository),
+    /invalid/,
+  );
 });
 
 test("template is unavailable by default and renders deterministically", () => {

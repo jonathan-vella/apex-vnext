@@ -29,6 +29,10 @@ GitHub accepts `workflow_dispatch` only when the workflow file exists on the def
 dispatch-only workflow and candidate both live on `main`. The launcher verifies that the default-branch, requested-ref,
 and local workflow blobs are byte-identical before dispatching the exact candidate SHA.
 
+The launcher and workflow validation job also require repository `jonathan-vella/apex-vnext`. The evidence command
+normalizes Git transport URL forms and requires the release manifest repository to match the candidate repository.
+An identical workflow or manifest in another repository fails before any cloud mutation.
+
 The repository currently has a single-maintainer reviewer limitation. The sandbox Environment permits self-review so
 the ceremony can run, but that does not demonstrate independent approval or separation of duties. Record this limitation
 in retained evidence; production qualification requires an independently authorized reviewer.

@@ -29,6 +29,11 @@ function rejectsMutation(name, mutate, expected) {
 test("baseline live workflow passes", () => assert.deepEqual(validateWorkflowText(baseline), []));
 
 rejectsMutation(
+  "missing destination repository guard fails",
+  (text) => text.replace('          test "$GITHUB_REPOSITORY" = "jonathan-vella/apex-vnext"\n', ""),
+  "destination repository guard",
+);
+rejectsMutation(
   "missing protected environment fails",
   (text) => text.replace("    environment: vnext-qualification\n", ""),
   "preview environment",
@@ -435,7 +440,7 @@ test("launcher recognizes only the exact accepted local return owner", () => {
 });
 
 test("launcher requires the workflow file on the default branch before dispatch", () => {
-  const repository = { nameWithOwner: "owner/repo", defaultBranchRef: { name: "main" } };
+  const repository = { nameWithOwner: "jonathan-vella/apex-vnext", defaultBranchRef: { name: "main" } };
   const sha = "a".repeat(40);
   const workflow = {
     type: "file",
@@ -443,9 +448,13 @@ test("launcher requires the workflow file on the default branch before dispatch"
     sha,
   };
   assert.deepEqual(validateWorkflowBootstrap(repository, workflow, workflow, sha), {
-    repository: "owner/repo",
+    repository: "jonathan-vella/apex-vnext",
     defaultBranch: "main",
   });
+  assert.throws(
+    () => validateWorkflowBootstrap({ ...repository, nameWithOwner: "owner/repo" }, workflow, workflow, sha),
+    /destination repository/,
+  );
   assert.throws(
     () => validateWorkflowBootstrap(repository, { ...workflow, path: ".github/workflows/other.yml" }, workflow, sha),
     /reviewed onto main/,
