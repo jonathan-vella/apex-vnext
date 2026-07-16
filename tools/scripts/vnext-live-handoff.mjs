@@ -212,11 +212,26 @@ async function json(file, args, options) {
   }
 }
 
-async function gitState(directory) {
+export function validateGitStatus(status, allowApexState = false) {
+  const changes = status.split("\n").filter(Boolean);
+  if (
+    changes.length > 0 &&
+    (!allowApexState ||
+      changes.some((change) => {
+        const path = change.slice(3);
+        return !path.startsWith(".apex/") || path.includes(" -> ");
+      }))
+  ) {
+    throw new Error("Checkout contains changes outside the permitted APEX state boundary");
+  }
+}
+
+async function gitState(directory, allowApexState = false) {
   const head = await run("git", ["rev-parse", "HEAD"], { cwd: directory });
   const branch = await run("git", ["branch", "--show-current"], { cwd: directory });
   const status = await run("git", ["status", "--porcelain"], { cwd: directory });
-  if (!SHA_PATTERN.test(head) || status !== "") throw new Error("Checkout must be clean at an exact lowercase commit");
+  if (!SHA_PATTERN.test(head)) throw new Error("Checkout must be at an exact lowercase commit");
+  validateGitStatus(status, allowApexState);
   return { head, branch };
 }
 
@@ -595,7 +610,7 @@ async function preview(args) {
 
 async function dispatch(args) {
   validateTransportKey(process.env.APEX_PLAN_TRANSPORT_KEY);
-  const checkout = await gitState(process.cwd());
+  const checkout = await gitState(process.cwd(), true);
   if (checkout.branch !== BRANCH || args.ref !== BRANCH) throw new Error(`Checkout and --ref must be ${BRANCH}`);
   const status = await json("node", [SOURCE_CLI, "status", "--json"]);
   await run("az", ["account", "get-access-token", "--resource", "https://management.azure.com/", "--output", "none"]);
