@@ -707,6 +707,22 @@ test("architecture requires current scope-bound availability evidence", async ()
   await service.completeTaskOutputs(replacementTask.task.taskId, architectureOutputs);
 });
 
+test("authorized capability adapter accepts native architecture availability evidence", async () => {
+  const root = await tempRoot();
+  let acceptedTarget: string | undefined;
+  const service = new ApexService(root, {
+    architectureAvailabilityAdapter: async (evidence) => {
+      acceptedTarget = evidence.targetScope;
+    },
+  });
+  const { runId } = await service.init({ projectId: "demo", targetScope: "resource-group:test" });
+
+  const hash = await acceptAvailabilityEvidence(service, runId, "demo", "resource-group:test", { mode: "native" });
+
+  assert.match(hash, /^[0-9a-f]{64}$/);
+  assert.equal(acceptedTarget, "resource-group:test");
+});
+
 for (const track of ["bicep", "terraform"] as const) {
   test(`full logical ${track} workflow reaches fake deploy and quality`, async () => {
     const root = await tempRoot();

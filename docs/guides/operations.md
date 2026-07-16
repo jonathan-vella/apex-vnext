@@ -163,7 +163,20 @@ authorization in provider configuration.
 
 ## Preview and Apply Locally
 
-Complete required tasks and gates first, then configure the selected run's provider:
+For the repository-owned live qualification sandbox, prepare a strict journaled run before preview:
+
+```bash
+npm run prepare:vnext-live -- --yes \
+  --track bicep --actor local-maintainer \
+  --subscription <subscription-id>
+```
+
+The command accepts only a clean exact `main` checkout, current native Azure availability evidence, the committed
+qualification IaC and governance contract, and an explicit Gate 1–3 actor. It cannot create a preview or decide Gate 4.
+Commit the resulting repository-backed `.apex` state through review, then create the preview from the merged exact `main`
+candidate.
+
+For other workflows, complete required tasks and gates first, then configure the selected run's provider:
 
 ```bash
 apex preview --operation apply --provider bicep \

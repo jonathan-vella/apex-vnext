@@ -77,6 +77,8 @@ the original APEX repository. See [docs/MIGRATION.md](docs/MIGRATION.md) for pro
 - feat(vnext): allow a newly validated deployment preview to reopen Gate 4 on the same run, preserving prior evidence
   while requiring a fresh exact approval. This supports expired-preview refresh and sequential apply/destroy without
   promotion.
+- feat(vnext): add a bounded live-qualification preparation command that derives strict artifacts from the exact
+  repository candidate, records native availability and validation evidence, and stops before preview with Gate 4 closed.
 - feat(vnext): prepare the manual exact-head Bicep/Terraform live qualification workflow, default-deny encrypted handoff
   storage, local dispatch/retrieval launcher, and structural mutation validator. The workflow separates preview and
   Environment-approved apply authority, uses refreshed OIDC tokens, binds exact governance inputs, returns authority to

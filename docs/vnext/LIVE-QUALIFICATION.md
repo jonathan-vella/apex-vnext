@@ -39,10 +39,21 @@ human deployment decision and must be approved locally against the exact native 
 
 ## Dispatch
 
-Build the vNext CLI locally, initialize or select the candidate state, and set `APEX_PLAN_TRANSPORT_KEY` in the current
-process. First create the native preview locally. Terraform preview opens a bounded backend network session; Bicep
-preview remains management-plane only. The launcher returns the handoff ID, stable CI recipient, preview hash, rendered
-preview, and exact approval command.
+Prepare the selected track from the exact clean `main` candidate. The command queries current Azure Storage quota,
+regional availability, and retail pricing; derives strict vNext artifacts from the committed qualification IaC and live
+governance snapshot; runs native validators; records Gates 1–3 under the named local actor; and stops with Gate 4 closed.
+
+```bash
+npm run prepare:vnext-live -- --yes \
+  --track bicep --actor <maintainer> \
+  --subscription <subscription-id>
+```
+
+Review and merge the resulting repository-backed `.apex` state. Use a fresh exact `main` checkout for preview so the
+candidate commit includes the journaled artifacts, validation evidence, and Gate 1–3 decisions. Set
+`APEX_PLAN_TRANSPORT_KEY` in the current process, then create the native preview locally. Terraform preview opens a
+bounded backend network session; Bicep preview remains management-plane only. The launcher returns the handoff ID, stable
+CI recipient, preview hash, rendered preview, and exact approval command.
 
 ```bash
 npm run build:vnext
