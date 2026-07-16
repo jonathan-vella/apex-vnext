@@ -63,6 +63,14 @@ test("prepare arguments require explicit actor, track, subscription, and confirm
   );
 });
 
+test("package command stages bundled runtime assets before live preparation", async () => {
+  const packageJson = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8"));
+  assert.equal(
+    packageJson.scripts["prepare:vnext-live"],
+    "npm run prepare:vnext-assets && npm run build:vnext && node tools/scripts/vnext-live-prepare.mjs",
+  );
+});
+
 test("qualification pricing rejects unrelated LRS products and selects the base Hot LRS capacity tier", () => {
   const expected = {
     productName: "General Block Blob v2",
