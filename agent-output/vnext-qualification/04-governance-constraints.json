@@ -2,12 +2,12 @@
   "schema_version": "governance-constraints-v1",
   "project": "vnext-qualification",
   "subscription_id": "00858ffc-dded-4f0f-8bbf-e17fff0d47d9",
-  "discovered_at": "2026-07-15T19:48:47Z",
+  "discovered_at": "2026-07-16T17:00:23Z",
   "source": "azure-policy-rest-api",
   "discovery_status": "COMPLETE",
   "discovery_metadata": {
     "discovery_status": "COMPLETE",
-    "discovered_at": "2026-07-15T19:48:47Z",
+    "discovered_at": "2026-07-16T17:00:23Z",
     "scope": {
       "subscription_id": "00858ffc-dded-4f0f-8bbf-e17fff0d47d9",
       "management_groups": [
@@ -10250,11 +10250,11 @@
     {
       "id": "vnext-qualification-backend-runner-ip",
       "control": "public-network-access",
-      "requested_at": "2026-07-15T12:50:34Z",
+      "requested_at": "2026-07-16T17:02:23Z",
       "requested_by": "jonathan-vella",
-      "expires_at": "2026-07-16T12:50:34Z",
+      "expires_at": "2026-07-17T17:02:23Z",
       "reason": "Permit one ephemeral GitHub-hosted runner /32 to access non-production Terraform state during bounded live qualification.",
-      "issue_link": "https://github.com/jonathan-vella/apex/issues/543",
+      "issue_link": "https://github.com/jonathan-vella/apex-vnext/issues/9",
       "scope": {
         "environment": "vnext-qualification",
         "workload": "terraform-backend",
