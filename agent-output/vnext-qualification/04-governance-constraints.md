@@ -219,10 +219,10 @@ diagnostic review.
 | Control | `public-network-access` |
 | Environment | `vnext-qualification` |
 | Workload | `terraform-backend` |
-| Requested | `2026-07-15T12:50:34Z` |
-| Expires | `2026-07-16T12:50:34Z` |
+| Requested | `2026-07-16T17:02:23Z` |
+| Expires | `2026-07-17T17:02:23Z` |
 | Maximum lifetime | 24 hours |
-| Tracking issue | [#543](https://github.com/jonathan-vella/apex/issues/543) |
+| Tracking issue | [#9](https://github.com/jonathan-vella/apex-vnext/issues/9) |
 
 Compensating controls:
 
