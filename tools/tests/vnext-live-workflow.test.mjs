@@ -375,6 +375,7 @@ test("launcher binds local approval to the stable handoff recipient", () => {
 
 test("dispatch permits only repository-backed APEX state drift", () => {
   assert.doesNotThrow(() => validateGitStatus(" M .apex/config.json\n?? .apex/objects/sha256/ab/object\n", true));
+  assert.doesNotThrow(() => validateGitStatus("M .apex/config.json\n?? .apex/objects/sha256/ab/object", true));
   assert.throws(() => validateGitStatus(" M .apex/config.json\n"), /permitted APEX state boundary/);
   assert.throws(
     () => validateGitStatus(" M .apex/config.json\n M .github/workflows/vnext-live-qualification.yml\n", true),
