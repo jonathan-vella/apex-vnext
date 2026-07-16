@@ -1,0 +1,103 @@
+---
+description: "Scan for stale docs, instruction drift, quality score degradation, and tech debt. Updates QUALITY_SCORE.md and tech-debt-tracker.md."
+agent: agent
+model: "Claude Opus 4.7"
+tools: [vscode, execute, read, agent, browser, edit, search, web, azure-mcp/search, todo]
+---
+
+# Doc Gardening
+
+Scan the repository for entropy and update health metrics. All counts cited in outputs
+must come from `tools/registry/count-manifest.json` — never hard-code numbers.
+
+<investigate_before_answering>
+
+- Doc gardening is investigative work. Before producing recommendations,
+  confirm that the source-of-truth files exist (see Pre-flight) and that
+  the user wants a full sweep vs. a single area (freshness, drift, counts,
+   documentation, quality score, or tech-debt).
+- If freshness baseline (`freshness-report.json`) is missing, note that the
+  first run will create it and flag files relative to current mtime only.
+  </investigate_before_answering>
+
+<context>
+- Required source-of-truth files: `QUALITY_SCORE.md`,
+  `tools/tests/exec-plans/tech-debt-tracker.md`,
+  `tools/registry/count-manifest.json`. Optional:
+  `freshness-report.json`.
+- Validators run by this prompt:
+  `tools/scripts/check-docs-freshness.mjs`,
+  `tools/scripts/validate-instruction-checks.mjs`,
+  `tools/scripts/validate-no-deprecated-refs.mjs`,
+  `tools/scripts/validate-skills.mjs`,
+  `tools/scripts/validate-agents.mjs`,
+  `tools/scripts/validate-no-hardcoded-counts.mjs`.
+</context>
+
+<task>
+Execute the gardening tasks in order. Stop and
+ask if any required source-of-truth file is missing (do not create
+silently). Produce the outputs listed below.
+</task>
+
+<rules>
+- Do NOT hard-code counts in any output — reference
+  `tools/registry/count-manifest.json`.
+- Do NOT silently create missing source-of-truth files; ask the user.
+- Validator runs are read-only — do not auto-fix findings (just report).
+- Quality-score and tech-debt updates require human review of each change.
+</rules>
+
+<output_contract>
+
+- Updated `QUALITY_SCORE.md` with revised grades and change-log entries.
+- Updated `tools/tests/exec-plans/tech-debt-tracker.md` with new and
+  resolved items.
+- Summary report to the user covering freshness diff totals,
+  count-manifest conflicts, validator results, and prioritised follow-ups.
+  </output_contract>
+
+## Pre-flight
+
+Before running tasks, verify target files exist. If any of the following are missing,
+stop and ask the user (do not create them silently):
+
+- `QUALITY_SCORE.md`
+- `tools/tests/exec-plans/tech-debt-tracker.md`
+- `tools/registry/count-manifest.json`
+- `freshness-report.json` (optional — first-run gardening will create it)
+
+## Tasks
+
+1. **Stale documentation** — run `node tools/scripts/check-docs-freshness.mjs` and flag files
+   not updated in >90 days. Diff the resulting `freshness-report.json` against the
+   previous committed version (if any) and summarise files that became stale, were
+   refreshed, or were added since the last run.
+
+2. **Instruction/skill drift** — run `node tools/scripts/validate-instruction-checks.mjs` to
+   find orphaned references from deleted/renamed instructions, plus
+   `node tools/scripts/validate-no-deprecated-refs.mjs` to catch stale script/module refs.
+
+3. **Cross-reference integrity** — run `node tools/scripts/validate-skills.mjs` (covers format
+   and size; replaces the historical `validate-skills-format.mjs`) and
+   `node tools/scripts/validate-agents.mjs` (covers frontmatter; replaces the historical
+   `validate-agent-frontmatter.mjs`).
+
+4. **Count-manifest alignment** — run `node tools/scripts/validate-no-hardcoded-counts.mjs`.
+   Additionally, scan `docs/**/*.md`, `README.md`, `AGENTS.md`,
+   and `QUALITY_SCORE.md` for numeric entity counts (e.g., "15 agents", "41 skills")
+   that conflict with `count-manifest.json` computed values. Report each conflict with
+   the exact file + line.
+
+5. **Quality score review** — read `QUALITY_SCORE.md`, compare grades against current
+   state, propose updates.
+
+6. **Tech debt inventory** — read `tools/tests/exec-plans/tech-debt-tracker.md`, verify items
+   still relevant, add new discoveries.
+
+## Output
+
+- Update `QUALITY_SCORE.md` with revised grades and change log entries.
+- Update `tools/tests/exec-plans/tech-debt-tracker.md` with new/resolved items.
+- Report freshness diffs, count-manifest conflicts, validator results, and prioritised follow-ups.
+- Do NOT hard-code counts in any output — reference `tools/registry/count-manifest.json`.

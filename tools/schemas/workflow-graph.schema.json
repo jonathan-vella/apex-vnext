@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jonathan-vella/apex-vnext/schemas/workflow-graph.schema.json",
+  "title": "APEX Workflow Graph",
+  "description": "Shape of the workflow DAG in .github/skills/workflow-engine/templates/workflow-graph.json. Defines the multi-step agent pipeline with typed nodes, conditional edges, and challenger configuration. Enforced by scripts/validate-workflow-graph.mjs.",
+  "type": "object",
+  "required": ["$schema", "description", "nodes", "edges"],
+  "additionalProperties": true,
+  "properties": {
+    "$schema": { "type": "string" },
+    "description": { "type": "string" },
+    "nodes": {
+      "type": "object",
+      "description": "Map of node IDs to node definitions.",
+      "patternProperties": {
+        ".*": {
+          "type": "object",
+          "required": ["id", "type", "name"],
+          "additionalProperties": true,
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Must match the object key."
+            },
+            "type": {
+              "type": "string",
+              "enum": ["agent-step", "gate", "subagent-fan-out", "validation"]
+            },
+            "name": { "type": "string", "minLength": 1 },
+            "agent": {
+              "type": "string",
+              "description": "Agent name (must match an existing .agent.md file)."
+            },
+            "requires": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Node IDs that must complete before this node."
+            },
+            "produces": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Artifact filenames produced by this step."
+            },
+            "gate": {
+              "type": "string",
+              "description": "Gate type (e.g. 'approval')."
+            },
+            "challenger": {
+              "type": "object",
+              "description": "Adversarial review configuration.",
+              "properties": {
+                "passes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Number of review passes (legacy format)."
+                },
+                "lenses": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Review lens names (legacy format)."
+                },
+                "default_passes": { "type": "integer", "minimum": 1 },
+                "default_lenses": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "opt_in_multi_pass": { "type": "boolean" },
+                "opt_in_matrix": {
+                  "type": "object",
+                  "description": "Per-tier opt-in challenger config. MAY contain a subset of {simple, standard, complex} — opt-in semantics mean a tier without an entry simply has no recommended multi-pass shape. Never auto-fires by tier.",
+                  "properties": {
+                    "simple": { "$ref": "#/$defs/challengerTier" },
+                    "standard": { "$ref": "#/$defs/challengerTier" },
+                    "complex": { "$ref": "#/$defs/challengerTier" }
+                  }
+                },
+                "skip_condition": { "type": "string" }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "to", "condition"],
+        "additionalProperties": true,
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "Source node ID."
+          },
+          "to": {
+            "type": "string",
+            "description": "Target node ID."
+          },
+          "condition": {
+            "description": "Edge condition. May be a single string or array of strings (each from the same enum) so a single from/to pair can express multiple semantics (e.g. ['on_fail', 'on_refine']).",
+            "oneOf": [
+              { "$ref": "#/$defs/edgeCondition" },
+              {
+                "type": "array",
+                "items": { "$ref": "#/$defs/edgeCondition" },
+                "minItems": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    "return_edges": {
+      "type": "array",
+      "description": "Backward / refinement edges that complement edges[]. Sources/targets are step IDs (not gates). Allowed by handoff validators when handoffs[].agent matches a return target.",
+      "items": {
+        "type": "object",
+        "required": ["from", "to", "condition", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "condition": {
+            "oneOf": [
+              { "$ref": "#/$defs/edgeCondition" },
+              {
+                "type": "array",
+                "items": { "$ref": "#/$defs/edgeCondition" },
+                "minItems": 1
+              }
+            ]
+          },
+          "reason": { "type": "string", "minLength": 1 },
+          "ui_label_pattern": {
+            "type": "string",
+            "description": "Regex (anchored or unanchored) matching the handoff button label that produces this return."
+          }
+        }
+      }
+    },
+    "challenger": {
+      "type": "object",
+      "description": "Top-level challenger config. wrapper_agent is the legal handoffs[] target (UI button); review_subagent is the legal agents[] dispatch entry. They are NOT interchangeable.",
+      "required": ["wrapper_agent", "review_subagent"],
+      "additionalProperties": false,
+      "properties": {
+        "wrapper_agent": { "type": "string", "minLength": 1 },
+        "review_subagent": { "type": "string", "minLength": 1 }
+      }
+    },
+    "orchestrator_targets": {
+      "type": "array",
+      "description": "Agent names that may be handed off to from anywhere as legal 'return to orchestrator' targets.",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "ui_pseudo_targets": {
+      "type": "array",
+      "description": "Non-agent UI hooks that may appear in handoffs[].agent (e.g. the literal `agent: agent` 'Open in Editor' sentinel).",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "version": {
+          "type": "string",
+          "enum": ["2.1", "2.2", "2.3"],
+          "description": "Workflow graph schema version. Validators refuse unknown majors per D2 (graceful degradation)."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "edgeCondition": {
+      "type": "string",
+      "enum": [
+        "on_complete",
+        "on_skip",
+        "on_fail",
+        "on_refine",
+        "on_architecture_must_fix",
+        "on_must_fix_governance_conflict"
+      ]
+    },
+    "challengerTier": {
+      "type": "object",
+      "required": ["passes", "lenses"],
+      "properties": {
+        "passes": { "type": "integer", "minimum": 1 },
+        "lenses": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

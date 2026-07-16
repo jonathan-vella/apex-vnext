@@ -1,0 +1,204 @@
+{
+  // Markdownlint configuration for APEX
+  // Documentation: https://github.com/DavidAnson/markdownlint
+  "config": {
+    "default": true,
+
+    // Line length configuration - 120 chars for modern displays
+    "MD013": {
+      "line_length": 120,
+      "heading_line_length": 120,
+      "code_block_line_length": 120,
+      "code_blocks": false,
+      "tables": false,
+      "headings": true,
+      "strict": false,
+      "stern": false,
+    },
+
+    // === STRUCTURAL RULES (disabled for agent-generated content flexibility) ===
+
+    // MD001: Heading levels should increment by one
+    // Disabled: Agent outputs may skip heading levels for visual hierarchy
+    "MD001": false,
+
+    // MD022: Headings should be surrounded by blank lines
+    // Disabled: Compact formatting in generated artifacts
+    "MD022": false,
+
+    // MD024: No duplicate heading text
+    // Disabled: CHANGELOG has duplicate version entries, instruction files have repeated sections
+    "MD024": false,
+
+    // MD025: Single H1 per document
+    // Disabled: Some artifacts use attribution headers before main H1
+    "MD025": false,
+
+    // MD041: First line should be H1
+    // Disabled: Files may start with YAML front matter or attribution
+    "MD041": false,
+
+    // === FORMATTING RULES (disabled for flexibility) ===
+
+    // MD009: No trailing spaces
+    // Use <br> for intentional line breaks instead of trailing spaces
+    "MD009": true,
+
+    // MD026: No trailing punctuation in headings
+    // Disabled: Headings like "Requirements Validation ✅" use emoji
+    "MD026": false,
+
+    // MD028: Blank line inside blockquote
+    // Disabled: Multi-paragraph blockquotes in documentation
+    "MD028": false,
+
+    // MD029: Ordered list item prefix — sequential numbering (1. 2. 3.)
+    "MD029": { "style": "ordered" },
+
+    // MD030: Spaces after list markers
+    // Disabled: Flexible list formatting
+    "MD030": false,
+
+    // MD031: Fenced code blocks should be surrounded by blank lines
+    "MD031": true,
+
+    // MD032: Lists should be surrounded by blank lines
+    "MD032": true,
+
+    // MD036: No emphasis used instead of heading
+    // Disabled: **Bold** used for inline emphasis in tables
+    "MD036": false,
+
+    // MD037: No spaces inside emphasis markers
+    // Disabled: Edge cases in generated content
+    "MD037": false,
+
+    // MD046: Code block style (fenced vs indented)
+    // Disabled: Both styles used depending on context
+    "MD046": false,
+
+    // MD058: Tables should be surrounded by blank lines
+    // Disabled: Compact table formatting
+    "MD058": false,
+
+    // MD060: Table column style (spacing around pipes)
+    // Disabled: Mixed table styles across hand-authored and generated content
+    "MD060": false,
+
+    // === HTML & RAW CONTENT (disabled intentionally) ===
+
+    // MD033: No inline HTML
+    // Disabled: HTML used for badges, anchors, and advanced formatting
+    "MD033": false,
+
+    // MD034: No bare URLs
+    // Disabled: URLs in code comments and examples
+    "MD034": false,
+
+    // MD035: Horizontal rule style
+    // Disabled: grid cards in docs/ use *** as card separators
+    "MD035": false,
+
+    // === CONSISTENCY RULES (enforced for hand-authored docs) ===
+
+    // MD003: Heading style — enforce ATX style (# headings)
+    "MD003": { "style": "atx" },
+
+    // MD004: Unordered list style — enforce consistent dashes
+    "MD004": { "style": "dash" },
+
+    // MD040: Fenced code blocks should have a language specifier
+    "MD040": true,
+
+    // MD047: Files should end with a single newline character
+    "MD047": true,
+
+    // MD051: Link fragments should be valid
+    // Disabled: Dynamic links in templates
+    "MD051": false,
+  },
+
+  // Glob pattern for files to lint
+  "globs": ["**/*.md"],
+
+  // Directories and files to ignore
+  // Note: .markdownlintignore is NOT used - all ignores defined here
+  "ignores": [
+    // Package managers and dependencies
+    "node_modules/**",
+    "**/node_modules/**",
+
+    // Temporary working files (gitignored)
+    "Copilot-Processing.md",
+    "tmp/**",
+
+    // Python virtual environments
+    ".venv/**",
+    "venv/**",
+    "**/venv/**",
+    "**/.venv/**",
+
+    // Build outputs
+    "dist/**",
+    "build/**",
+    "**/.terraform/**",
+    "**/*.egg-info/**",
+    "__pycache__/**",
+    ".pytest_cache/**",
+    "coverage/**",
+
+    // Archived content
+    "tools/mcp-servers/azure-pricing/.archive/**",
+
+    // Vendored MCP server (external fork — not hand-authored)
+    "tools/mcp-servers/drawio/**",
+
+    // Upstream vendored files (not hand-authored)
+    "tools/mcp-servers/azure-pricing/CHANGELOG.md",
+    "tools/mcp-servers/azure-pricing/README.md",
+    "tools/mcp-servers/azure-pricing/CONTRIBUTING.md",
+    "tools/mcp-servers/azure-pricing/INSTALL.md",
+    "tools/mcp-servers/azure-pricing/docs/**",
+
+    // pytest cache (auto-generated, not hand-authored)
+    "tools/mcp-servers/azure-pricing/.pytest_cache/**",
+
+    // Presenter/demo content and planning docs (intentionally less strict)
+    "docs/audit-checklists/**",
+    "docs/presenter/**",
+    "docs/tf-support/**",
+
+    // Planning prompts (long inline examples, not production code)
+    "tools/apex-prompts/**",
+
+    // Agent-generated output (validated by artifact-templates validator)
+    "agent-output/**",
+
+    // All skill content is excluded from markdown linting:
+    //  - SKILL.md files are validated structurally by validate:skills-format
+    //    (frontmatter, body sections, cross-references), not by markdownlint.
+    //  - references/ are MCP-fetched or hand-authored long-form prose where
+    //    120-char line-length and other style rules don't apply uniformly.
+    //  - templates/ are example/sample content.
+    //  - SKILL.digest.md / SKILL.minimal.md are auto-generated.
+    //  - Plugin skills imported from VS Code extensions and MCP tools are
+    //    not hand-authored.
+    // When adding a new hand-authored skill whose SKILL.md should be linted,
+    // either narrow this glob or add a targeted include.
+    ".github/skills/**",
+
+    // Archived content (deprecated skills moved out of the active tree).
+    // Read-only history; not subject to lint rules.
+    ".archive/**",
+
+    // E2E test input documents (long-form RFQ/RFP prose, not production docs)
+    "tools/tests/e2e-inputs/**",
+
+    // Test prompt files (long-form examples, not production docs)
+    "tools/tests/prompts/**",
+
+    // Reproducible package assets are validated against canonical source by
+    // validate:vnext and pack tests; lint customizations/ instead.
+    "packages/cli/assets/**",
+  ],
+}

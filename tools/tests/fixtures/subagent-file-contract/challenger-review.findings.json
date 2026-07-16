@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0",
+  "challenged_artifact": "agent-output/sample/02-architecture-assessment.md",
+  "artifact_type": "architecture",
+  "review_focus": "security-governance",
+  "pass_number": 1,
+  "challenge_summary": "Storage account allows public blob access; missing diagnostic settings on Key Vault; SQL admin auth not Entra-only.",
+  "compact_for_parent": "Pass 1 (security-governance) | MEDIUM | 1 must_fix, 2 should_fix | Key: [Storage public blob]; [KV diagnostics]; [SQL Entra-only]",
+  "risk_level": "medium",
+  "must_fix_count": 1,
+  "should_fix_count": 2,
+  "suggestion_count": 3,
+  "findings": [
+    {
+      "id": "a1b2c3d4",
+      "severity": "must_fix",
+      "category": "governance_gap",
+      "claim": "Storage account allows public blob access",
+      "evidence": "allowBlobPublicAccess is true; violates baseline.",
+      "impact": "Azure Policy Deny will block deployment.",
+      "artifact_section": "## Storage",
+      "suggested_fix": {
+        "artifact_path": "agent-output/sample/02-architecture-assessment.md",
+        "line_range": [120, 122],
+        "proposed_edit": "Set allowBlobPublicAccess: false on all storage accounts."
+      },
+      "traces_to": [],
+      "requires_step": "step-2"
+    },
+    {
+      "id": "e5f6a7b8",
+      "severity": "should_fix",
+      "category": "waf_blind_spot",
+      "claim": "Key Vault missing diagnostic settings",
+      "evidence": "No audit log retention defined.",
+      "impact": "Loss of audit visibility for secrets access.",
+      "artifact_section": "## Key Vault",
+      "suggested_fix": {
+        "artifact_path": "agent-output/sample/02-architecture-assessment.md",
+        "proposed_edit": "Add diagnosticSettings module with 90-day retention."
+      },
+      "traces_to": []
+    },
+    {
+      "id": "c9d0e1f2",
+      "severity": "should_fix",
+      "category": "governance_gap",
+      "claim": "SQL admin auth not Entra-only",
+      "evidence": "SQL still allows username/password auth.",
+      "impact": "Credential leak risk.",
+      "artifact_section": "## SQL Database",
+      "suggested_fix": {
+        "artifact_path": "agent-output/sample/02-architecture-assessment.md",
+        "proposed_edit": "Set azureADOnlyAuthentication: true."
+      },
+      "traces_to": []
+    }
+  ],
+  "cache_inputs": {
+    "artifact_sha": "0000000000000000000000000000000000000000000000000000000000000000",
+    "checklists_sha": "1111111111111111111111111111111111111111111111111111111111111111",
+    "protocol_sha": "2222222222222222222222222222222222222222222222222222222222222222",
+    "subagent_sha": "3333333333333333333333333333333333333333333333333333333333333333",
+    "model": "Claude Opus 4.7",
+    "artifact_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  }
+}

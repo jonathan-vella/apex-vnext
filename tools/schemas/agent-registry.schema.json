@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jonathan-vella/apex-vnext/schemas/agent-registry.schema.json",
+  "title": "APEX Agent Registry",
+  "description": "Shape of tools/registry/agent-registry.json. Maps agent role keys to {agent path, model, step, invokable}. Skills are wired by the agent body's `Read .github/skills/{name}/...` line (discovered at runtime via the orphan-content validator regex), not by an entry in this registry.",
+  "type": "object",
+  "required": ["$schema", "description", "agents"],
+  "additionalProperties": true,
+  "properties": {
+    "$schema": { "type": "string" },
+    "description": { "type": "string" },
+    "agents": {
+      "type": "object",
+      "description": "Map of agent role keys to agent entries.",
+      "patternProperties": {
+        ".*": { "$ref": "#/$defs/agentEntryOrIacConditional" }
+      }
+    },
+    "subagents": {
+      "type": "object",
+      "description": "Map of subagent role keys to agent entries.",
+      "patternProperties": {
+        ".*": { "$ref": "#/$defs/agentEntryOrIacConditional" }
+      }
+    }
+  },
+  "$defs": {
+    "agentEntry": {
+      "type": "object",
+      "required": ["agent", "model"],
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "type": "string",
+          "description": "Relative path to the .agent.md file.",
+          "pattern": "\\.agent\\.md$"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Model name. Must equal the `model` field in the agent's YAML frontmatter (validated by validate-models.mjs --only=consistency). Catalog entry is documentation only and is not enforced."
+        },
+        "invokable": {
+          "type": "boolean",
+          "description": "Whether the agent can be directly invoked by users."
+        },
+        "step": {
+          "type": ["number", "null"],
+          "description": "Workflow step number (null for orchestrators and cross-cutting agents)."
+        }
+      }
+    },
+    "skillName": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Reserved for future use (currently unreferenced after skill arrays were removed). Skill names are kebab-case and must match a directory under .github/skills/."
+    },
+    "agentEntryOrIacConditional": {
+      "oneOf": [
+        { "$ref": "#/$defs/agentEntry" },
+        {
+          "type": "object",
+          "description": "IaC-conditional entry with bicep/terraform variants.",
+          "properties": {
+            "bicep": { "$ref": "#/$defs/agentEntry" },
+            "terraform": { "$ref": "#/$defs/agentEntry" }
+          },
+          "anyOf": [{ "required": ["bicep"] }, { "required": ["terraform"] }],
+          "additionalProperties": true
+        }
+      ]
+    }
+  }
+}

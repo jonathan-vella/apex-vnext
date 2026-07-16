@@ -1,0 +1,114 @@
+{
+  "$id": "https://schemas.apexops.dev/quality-report-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "checks": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "evidenceRefs": {
+            "items": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "samples": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "scenario": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "const": "pass",
+                "type": "string"
+              },
+              {
+                "const": "fail",
+                "type": "string"
+              },
+              {
+                "const": "omitted",
+                "type": "string"
+              }
+            ]
+          },
+          "value": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "scenario",
+          "status",
+          "samples",
+          "evidenceRefs",
+          "detail"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "evaluatedAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "measurementsHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "projectId": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "runId": {
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "scorecardHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "status": {
+      "anyOf": [
+        {
+          "const": "pass",
+          "type": "string"
+        },
+        {
+          "const": "fail",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "runId",
+    "evaluatedAt",
+    "scorecardHash",
+    "measurementsHash",
+    "status",
+    "checks"
+  ],
+  "type": "object"
+}

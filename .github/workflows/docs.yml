@@ -1,0 +1,50 @@
+# Markdown Documentation Workflow
+# Validates repository documentation without building or publishing a website.
+
+name: docs
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "README.md"
+      - "CONTRIBUTING.md"
+      - "CHANGELOG.md"
+      - ".markdown-link-check.json"
+      - ".markdownlint-cli2.jsonc"
+      - "package.json"
+      - "package-lock.json"
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "README.md"
+      - "CONTRIBUTING.md"
+      - "CHANGELOG.md"
+      - ".markdown-link-check.json"
+      - ".markdownlint-cli2.jsonc"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Markdown docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: ./.github/actions/setup-node-repo
+
+      - name: Validate Markdown documentation
+        run: npm run validate:docs
