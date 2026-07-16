@@ -29,12 +29,12 @@ interactive path; higher-tier work uses a direct handoff instead.
 
 The kernel opens gates only after required artifacts, validation, and review results are accepted:
 
-| Gate | Decision | What approval binds |
-| ---- | -------- | ------------------- |
-| Requirements | Confirm the workload contract | Requirements, SKU decisions, review, and accepted-risk scope |
-| Architecture and Cost | Confirm the proposed design | Architecture, cost, governance reconciliation, and review |
-| Implementation Plan | Confirm the delivery contract | Intent, IaC binding, environment inputs, and review |
-| Deployment Preview | Authorize the exact operation | Current preview, validation, target, head, and writer epoch |
+| Gate                  | Decision                      | What approval binds                                          |
+| --------------------- | ----------------------------- | ------------------------------------------------------------ |
+| Requirements          | Confirm the workload contract | Requirements, SKU decisions, review, and accepted-risk scope |
+| Architecture and Cost | Confirm the proposed design   | Architecture, cost, governance reconciliation, and review    |
+| Implementation Plan   | Confirm the delivery contract | Intent, IaC binding, environment inputs, and review          |
+| Deployment Preview    | Authorize the exact operation | Current preview, validation, target, head, and writer epoch  |
 
 Rejecting or invalidating an input returns the run to the earliest affected work. Deployment Preview is the approval
 ceremony for the exact preview; there is no second generic confirmation after it.
