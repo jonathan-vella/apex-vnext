@@ -46,22 +46,6 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **State:** Blocked
 - **Closure proof:** Project URL and verified field and view inventory.
 
-### RISK-004: Required Environment Reviewers Are Unavailable On The Current GitHub Plan
-
-- **Type:** `RISK`
-- **Owner:** Repository maintainer
-- **Impact:** The GitHub approval and local-to-CI writer-transfer scenario cannot satisfy live qualification while the
-  destination repository remains private on a plan without required Environment reviewers.
-- **Evidence:** On 2026-07-16, the GitHub Environment API returned HTTP 422 when creating the required-reviewer rule.
-  The partial `vnext-qualification` Environment has no protection rules, variables, or secrets.
-- **Related issue:** Destination issue `#9`.
-- **Mitigation:** Upgrade or move the private repository to a plan supporting required Environment reviewers, then
-  configure the reviewer and `main`-only branch policy before installing any credentials. Do not substitute an
-  unprotected Environment or claim its execution as approval evidence.
-- **State:** Blocked
-- **Closure proof:** Environment API evidence showing the required-reviewer rule and `main` branch policy, followed by a
-  protected-job approval record bound to the exact candidate.
-
 ### ASSUMPTION-001: VS Code Handoff Topology Is Supported
 
 - **Type:** `ASSUMPTION`
@@ -151,15 +135,14 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 
 - **Type:** `ISSUE`
 - **Owner:** Release qualification
-- **Impact:** VS Code, GitHub approval, Azure Bicep, and Azure Terraform release claims remain unavailable.
-- **Evidence:** Azure bootstrap resources and secretless destination OIDC federation are deployed. GitHub created an
-  empty `vnext-qualification` Environment, but required-reviewer protection is unavailable on the current private-repo
-  plan. No Environment variables or secrets were installed, and no exact-head live evidence satisfies
-  [PRD.md](PRD.md) cutover acceptance.
+- **Impact:** VS Code, GitHub OIDC/transfer, Azure Bicep, and Azure Terraform release claims remain unavailable.
+- **Evidence:** Azure bootstrap resources and secretless destination OIDC federation are deployed. The unprotected
+  `vnext-qualification` Environment intentionally scopes OIDC/configuration only. Local exact-preview Gate 4 approval
+  and imported CI apply are implemented but have no accepted exact-head live evidence.
 - **Related issue:** Destination issue `#9`.
-- **Mitigation:** Resolve [RISK-004](#risk-004-required-environment-reviewers-are-unavailable-on-the-current-github-plan),
-  configure the remaining destination controls, and follow [LIVE-QUALIFICATION.md](LIVE-QUALIFICATION.md). Record that
-  the sandbox permits maintainer self-review; require independent approval before production qualification.
+- **Mitigation:** Configure the remaining destination controls and follow
+  [LIVE-QUALIFICATION.md](LIVE-QUALIFICATION.md). Record local approval, OIDC, one-hop authority transfer, exact apply,
+  cleanup, and return evidence without claiming Environment review.
 - **State:** Open
 - **Closure proof:** Evidence index with candidate and dependency hashes for every required scenario.
 
@@ -176,6 +159,16 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Closure proof:** Scorecard artifacts satisfying every minimum-sample and unavailable-data rule.
 
 ## Closed Or Historical Entries
+
+### RISK-004: Required Environment Reviewers Were Unavailable On The Current GitHub Plan
+
+- **Type:** `RISK`
+- **Owner:** Repository maintainer
+- **Evidence:** GitHub returned HTTP 422 for required-reviewer protection on the private repository.
+- **Disposition:** Closed by [DECISION-010](DECISIONS.md#decision-010-keep-deployment-approval-in-apex-gate-4).
+  External Environment review is not an APEX requirement; local Gate 4 owns exact-preview approval.
+- **State:** Closed
+- **Closure proof:** ADR-0002, rejection of CI-created approval, and exact post-approval transfer tests.
 
 The approved v1 defect ledger remains in [phase-0a/v1-known-defects.md](phase-0a/v1-known-defects.md). Do not duplicate
 or renumber those historical entries here. New vNext defects use this register and a linked GitHub issue.

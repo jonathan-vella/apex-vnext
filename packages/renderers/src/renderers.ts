@@ -139,25 +139,6 @@ export function renderApprovalEvidence(approval: ApprovalEvidenceV1): string {
       ["Expires", optional(approval.expiresAt)],
     ]),
   ];
-  if (approval.mechanism === "github-environment") {
-    summary.push(
-      "",
-      "## GitHub Environment Context",
-      "",
-      fieldList([
-        ["Repository", approval.githubContext.repository],
-        ["Ref", approval.githubContext.ref],
-        ["Commit", approval.githubContext.sha],
-        ["Workflow ref", approval.githubContext.workflowRef],
-        ["Run", `${approval.githubContext.runId} (attempt ${approval.githubContext.runAttempt})`],
-        ["Job", approval.githubContext.job],
-        ["Environment", approval.githubContext.environment],
-        ["Workflow actor", approval.githubContext.actor],
-        ["Workflow actor ID", approval.githubContext.actorId],
-        ["Recipient identity", approval.githubContext.recipientIdentity],
-      ]),
-    );
-  }
   return summary.join("\n");
 }
 

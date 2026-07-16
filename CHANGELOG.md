@@ -87,6 +87,9 @@ the original APEX repository. See [docs/MIGRATION.md](docs/MIGRATION.md) for pro
 
 ### Fixed (APEX vNext security)
 
+- fix(vnext): make local APEX Gate 4 the sole deployment approval and bind it to the intended CI recipient before one
+  encrypted writer/provider handoff. The unprotected GitHub Environment scopes OIDC and configuration only; CI can no
+  longer create previews or approvals.
 - fix(vnext): bind live qualification launch, dispatch, and release evidence to `jonathan-vella/apex-vnext`. Copied
   workflows and manifests from another repository now fail closed before cloud mutation.
 - fix(vnext): replaced polynomial storage-security regular expressions over generated Bicep and Terraform source with

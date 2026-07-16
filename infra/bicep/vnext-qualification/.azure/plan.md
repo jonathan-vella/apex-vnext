@@ -1,9 +1,10 @@
 # Azure Deployment Plan
 
-> **Status:** Validated
+> **Status:** Planning
 >
-> **Deployment state:** Blocked - GitHub required-reviewer protection is unavailable for this private repository on
-> the current billing plan. The partial Environment has no secrets or variables and cannot satisfy live qualification.
+> **Architecture change:** GitHub Environment reviewer protection is no longer part of the APEX approval model. APEX
+> Gate 4 remains the sole human approval and must be recorded locally against the exact rendered preview before CI
+> handoff. The unprotected Environment scopes OIDC, variables, and secrets only.
 
 Generated: 2026-07-16 UTC
 
@@ -31,7 +32,8 @@ qualification workload, publish packages, or authorize production Terraform CI a
 | **Location**     | `swedencentral` - approved                                            |
 | Repository       | `jonathan-vella/apex-vnext`                                           |
 | Candidate base   | `436f3359f324400d3288b6b844ecb6b5a0e7e445`                            |
-| GitHub boundary  | Environment `vnext-qualification`; single-maintainer self-review only |
+| GitHub boundary  | Unprotected Environment `vnext-qualification` for OIDC/config only    |
+| Approval boundary | Local APEX Gate 4 decision bound to the exact preview                 |
 
 The location supports Storage Accounts and Log Analytics, both providers are registered, and the inherited allowed
 locations policy includes `swedencentral`.
@@ -72,7 +74,7 @@ No `azure.yaml` is required because the qualification runtime intentionally uses
 | Bicep workload marker      | StorageV2                             | Standard LRS, deployment-stack ownership |
 | Terraform workload marker  | StorageV2                             | Standard LRS, exact saved-plan ownership |
 | Deployment identity        | Microsoft Entra service principal     | GitHub OIDC only; no client secret        |
-| Approval boundary          | GitHub Environment                    | Required reviewer; sandbox self-review    |
+| Approval boundary          | APEX Gate 4                            | Local exact-preview approval              |
 
 ### Supporting Services
 
@@ -81,7 +83,7 @@ No `azure.yaml` is required because the qualification runtime intentionally uses
 | Blob container `tfstate`        | Entra-authenticated Terraform state and lease locking                        |
 | Blob container `handoff`        | Encrypted local-to-CI and CI-to-local authority envelopes                    |
 | Azure Monitor diagnostics       | Account and Blob logs/metrics without local authentication                   |
-| GitHub Actions artifact service | Encrypted preview-to-apply provider authority and exact Terraform plan       |
+| GitHub Actions artifact service | Encrypted imported provider authority and exact Terraform plan               |
 | Federated identity credential   | Trust `repo:jonathan-vella/apex-vnext:environment:vnext-qualification`        |
 
 ### Security Contract
@@ -91,6 +93,12 @@ No `azure.yaml` is required because the qualification runtime intentionally uses
 - The GitHub identity receives Contributor only on the two workload resource groups, Log Analytics Reader on the
   qualification workspace, and storage roles at the backend account or container scopes defined by the template.
 - The local uploader receives only backend firewall management and `handoff` container data access.
+- Local APEX creates the native Bicep/Terraform preview, renders it for the maintainer, and records Gate 4 through the
+  existing `tty` mechanism. The approval binds the preview hash, dependency revision, writer epoch, recipient, and
+  expiry before any state or provider authority is exported to CI.
+- CI is not permitted to create or replace Gate 4 approval. It imports the already-approved state and exact provider
+  authority, accepts the one-hop writer transfer, and deploys only the imported approved preview.
+- The GitHub Environment does not attest human review. It is only an OIDC subject and a scope for variables and secrets.
 - The exact ten-tag qualification contract is used for every resource group and resource.
 - The current transient public-endpoint exception expired at `2026-07-16T12:50:34Z`. Bootstrap preparation may proceed,
   but workflow dispatch remains blocked until Governance Discovery records a newly authorized, active exception with at
@@ -151,6 +159,21 @@ Official limit references:
 - [x] Review the committed templates against governance, AVM, identity, network, and secret-handling controls
 - [x] Update this plan to `Ready for Validation`
 
+### Phase 2B: Approval Model Replacement
+
+- [x] Confirm that GitHub independent-reviewer protection is not required for APEX
+- [x] Select local APEX Gate 4 as the sole human deployment approval
+- [x] Allow real apply/destroy only in the isolated non-production qualification sandbox
+- [x] Record the replacement in the append-only decision index and a superseding ADR
+- [x] Move native preview creation and rendering to the local launcher
+- [x] Require local Gate 4 approval before dispatch and bind the intended CI apply recipient
+- [x] Export already-approved state and exact provider authority directly to the CI apply recipient
+- [x] Remove in-workflow approval creation and the preview-to-apply writer hop
+- [x] Make structural validation reject any CI-created Gate 4 approval
+- [x] Add mutation tests for missing imported approval, changed preview, recipient mismatch, stale epoch, and expiry
+- [x] Update workflow, security, testing, CLI, and live-qualification documentation
+- [ ] Re-run `azure-validate` and return this plan to `Validated`
+
 ### Phase 3: Validation
 
 - [x] Invoke `azure-validate`
@@ -172,7 +195,7 @@ Official limit references:
 - [x] Run subscription-scope Bicep what-if with the exact principals and ten-tag contract
 - [x] Deploy the reviewed qualification bootstrap only after a clean what-if
 - [x] Verify resource outputs, default-deny storage state, containers, diagnostics, and scoped RBAC
-- [ ] Create the `vnext-qualification` GitHub Environment with the disclosed sandbox reviewer policy
+- [ ] Configure the existing unprotected `vnext-qualification` Environment for OIDC, variables, and secrets only
 - [ ] Generate one mode-0600 transport key outside Git and install the same value as an Environment secret
 - [ ] Configure the remaining Environment secrets and nonsecret variables from verified deployment outputs
 - [ ] Verify Environment names only; never read back or print secret values
@@ -216,7 +239,8 @@ The `azure-validate` workflow must populate this section before the plan can be 
 | Azure resources | Three resource groups, workspace, backend account, containers, diagnostics, and RBAC verified | 2026-07-16 UTC |
 | Backend posture | Public access Disabled, firewall Deny, no IP rules, shared key off, TLS 1.2, HTTPS only | 2026-07-16 UTC |
 | GitHub protection | HTTP 422: current billing plan does not support required reviewers for this private repository | 2026-07-16 UTC |
-| Partial GitHub state | Environment exists with zero protection rules, zero variables, and zero secrets | 2026-07-16 UTC |
+| Approval decision | Required-reviewer protection deliberately removed from the APEX model; local Gate 4 retained | 2026-07-16 UTC |
+| Partial GitHub state | Unprotected Environment exists with zero variables and zero secrets | 2026-07-16 UTC |
 
 ## 9. Files to Generate or Update
 
@@ -227,7 +251,7 @@ The `azure-validate` workflow must populate this section before the plan can be 
 | `infra/bicep/vnext-qualification/main.bicep` | Bicep lifecycle workload | Existing; no change expected |
 | `infra/terraform/vnext-qualification/` | Terraform lifecycle workload | Existing; no change expected |
 | Local mode-0600 transport key outside Git | Shared encrypted-envelope key material | Create only after approval |
-| GitHub Environment configuration | Reviewer, secrets, and variables | Blocked before credentials |
+| GitHub Environment configuration | OIDC subject, secrets, and variables; no reviewer rule | Pending implementation |
 | Entra application and federated credential | Destination repository OIDC trust | Created and verified |
 | Azure bootstrap resources | Backend, workspace, resource groups, diagnostics, and RBAC | Deployed and verified |
 
@@ -241,11 +265,29 @@ The `azure-validate` workflow must populate this section before the plan can be 
 - A failed firewall session must remove the exact `/32`, restore public network access to `Disabled`, remove
   `SecurityControl=Ignore`, and verify both final states before the run can be accepted.
 
-## 11. Next Steps
+## 11. Replacement Approval Flow
 
-> Current: GitHub billing-plan blocker
+```text
+clean exact-head local checkout
+  -> native preview under bounded backend firewall session
+  -> deterministic preview rendering
+  -> maintainer runs local APEX Gate 4 approve/reject
+  -> approved state + exact provider authority encrypted for CI apply recipient
+  -> unprotected GitHub Environment supplies OIDC/config only
+  -> CI imports approval and authority; CI cannot create approval
+  -> exact approved apply or destroy
+  -> inventory, cleanup, evidence, and authority return
+```
 
-1. Upgrade the GitHub account or move the private repository to a plan that supports required Environment reviewers.
-2. Reapply the required reviewer and `main`-only deployment branch policy; verify the rule before installing credentials.
-3. Generate the mode-0600 transport key and configure Environment secrets and variables from verified outputs.
-4. Refresh the expired governance exception before dispatching any live ceremony.
+The local approval is valid only while the preview, writer lease, dependency revision, intended recipient, and transport
+envelopes remain current. Any change requires a new preview and Gate 4 decision. A GitHub workflow dispatch is not itself
+approval, and CI execution must fail when imported Gate 4 approval is missing or stale.
+
+## 12. Next Steps
+
+> Current: Approval-model replacement
+
+1. Record the local-Gate-4 decision and superseding ADR.
+2. Refactor launcher/workflow so local preview and approval precede direct CI apply handoff.
+3. Validate the replacement and configure the unprotected Environment variables and secrets.
+4. Refresh the expired governance exception before dispatching sandbox apply/destroy ceremonies.

@@ -107,9 +107,9 @@ which may differ from the current preview writer:
 apex preview --operation apply --provider terraform --recipient "$RECIPIENT" --json
 ```
 
-After preview completes, create exactly one writer-transfer claim from the preview writer to that recipient, then export
-only the binding for the preview. Terraform also includes the exact encrypted saved-plan artifact referenced by that
-binding. A transfer claim created before preview cannot authorize the preview.
+After preview completes, render and review it, then approve Gate 4 locally for the intended CI recipient. Create exactly
+one writer-transfer claim only after approval, then export the approved state and exact provider binding. Terraform also
+includes the encrypted saved-plan artifact referenced by that binding.
 
 ```bash
 apex provider transfer-export \
@@ -121,7 +121,7 @@ apex provider transfer-export \
   --yes --json
 ```
 
-In the separate apply job, supply the same external key and import before Gate 4 approval and deployment:
+In the apply job, supply the same external key and import before writer acceptance and deployment:
 
 ```bash
 apex provider transfer-import \
@@ -132,41 +132,30 @@ apex provider transfer-import \
 
 The import accepts only the exact hash-derived binding path and optional Terraform artifact path. It rejects changed
 destinations and symlinked runtime ancestors, while allowing byte-identical retries. It never transfers or creates the
-transport key, approves Gate 4, or invokes a provider. Keep production CI apply blocked until a live separate-job proof
-qualifies the complete repository-state and provider-authority sequence.
+transport key, approval, or provider operation. Keep production CI apply blocked until live proof qualifies the complete
+repository-state and provider-authority sequence.
 
-## Approve Gate 4 in a Protected Workflow
+## Approve Gate 4 Before CI Handoff
 
-Configure the apply job with a protected GitHub Environment and set `APEX_GITHUB_ENVIRONMENT` to that environment's
-exact name. Create the writer-transfer claim with that same name in `--environment`; the claim, encrypted state handoff,
-accepted ownership, and approval must agree. GitHub supplies the remaining context variables. After importing state and
-provider authority, accept the writer transfer with the canonical recipient for the current run, attempt, and job. Then
-approve Gate 4 without an `--actor` flag:
+Create the native preview locally for the intended CI recipient, render it, and approve Gate 4 before relinquishing local
+writer authority:
 
 ```bash
 apex gate decide \
   --gate 4 \
   --decision approved \
-  --mechanism github-environment \
+  --actor local-maintainer \
+  --recipient "$RECIPIENT" \
   --json
 ```
 
-The CLI derives the evidence actor as `github:<actor-id>:<actor>` and the recipient as
-`github-actions:<repository>:<run-id>:<run-attempt>:<job>`. It rejects local invocation, pull-request refs, missing or
-malformed variables, stale ownership, and any repository, branch, commit, workflow, recipient, or owner-epoch mismatch
-against the accepted writer-transfer claim. The approval expires no later than its exact deployment preview.
+The recipient is stable for the handoff ID. Approval expires at the earlier of the preview and current writer lease. The
+accepted transfer advances the approved writer epoch exactly once. Deploy proves journal order `preview.created`,
+`gate.decided`, `transfer-requested`, and `transfer-accepted`. A missing approval, second transfer, changed recipient,
+superseded preview, expired lease, or changed dependency revision fails before provider execution.
 
-The accepted transfer must advance the preview owner epoch by exactly one. Gate 4 records the authenticated claim hash,
-and deploy recomputes the same proof from ownership, claim bytes, and journal order. A second transfer, changed claim,
-superseded preview, expired writer lease, or changed dependency revision fails before approval or provider execution.
-Approval expires at the earlier of the preview and current writer lease.
-
-GitHub Environment evidence records the workflow actor, not the identity of a required reviewer. In a repository where
-one maintainer can trigger the workflow and approve its environment, this does not prove independent review. Configure
-reviewer separation and environment protection outside APEX when separation of duties is required.
-
-Production CI remains blocked until the protected-environment ceremony and the complete separate-job transfer path have
-live proof on the exact release candidate.
+The GitHub Environment scopes OIDC, variables, and secrets only. It is not approval evidence. Production CI remains
+blocked until the complete local-approval and CI-apply transfer path has live proof on the exact release candidate.
 
 Bicep defaults to `detachAll`. Set `ownershipAuthorizesDeleteResources: true` only when the stack exclusively owns every
 resource it may delete. `deleteAll` additionally requires an explicitly dedicated sandbox resource group and separate

@@ -117,7 +117,13 @@ export function authorizeDeploymentPreview(context: PreviewAuthorizationContext)
     authority.previousOwnerEpoch === preview.ownerEpoch &&
     authority.writerTransferClaimHash !== undefined &&
     approval.writerTransferClaimHash === authority.writerTransferClaimHash;
-  if (!sameWriter && !transferredWriter) {
+  const approvedBeforeTransfer =
+    preview.ownerEpoch + 1 === authority.ownerEpoch &&
+    authority.previousOwnerEpoch === preview.ownerEpoch &&
+    authority.writerTransferClaimHash !== undefined &&
+    approval.writerEpoch === preview.ownerEpoch &&
+    approval.writerTransferClaimHash === undefined;
+  if (!sameWriter && !transferredWriter && !approvedBeforeTransfer) {
     throw new IacProviderError("PREVIEW_OWNER_EPOCH_MISMATCH", "Preview owner epoch is stale");
   }
   if (approval.decision !== "approved") {
@@ -132,7 +138,7 @@ export function authorizeDeploymentPreview(context: PreviewAuthorizationContext)
       "Approval gate dependency hash is not bound to this preview",
     );
   }
-  if (approval.writerEpoch !== authority.ownerEpoch) {
+  if (approval.writerEpoch !== authority.ownerEpoch && !approvedBeforeTransfer) {
     throw new IacProviderError("APPROVAL_WRITER_EPOCH_MISMATCH", "Approval writer epoch is stale");
   }
   if (approval.recipientIdentity !== authority.recipientIdentity) {

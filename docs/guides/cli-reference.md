@@ -54,9 +54,10 @@ Run `apex <command> --json` for automation. Success is written to stdout as
 | `apex task stage-file`          | `--task --path --file`; optional `--sha`                      | Stage an allowed code-generation file.                                   |
 | `apex task generate-iac`        | `--task`                                                      | Generate the selected IaC track in the bounded staging tree.             |
 | `apex review resolve`           | `--file`                                                      | Record a review-finding resolution from JSON.                            |
-| `apex gate decide`              | `--gate --decision`; see mechanism flags below                | Approve or reject an open gate.                                          |
+| `apex gate decide`              | `--gate --decision --actor`; optional Gate 4 `--recipient`    | Approve or reject an open gate.                                          |
 | `apex validate`                 | None                                                          | Validate and cache the current journal/runtime-lock result.              |
 | `apex preview`                  | `--operation --provider`; optional `--recipient`              | Create a bound preview and open Gate 4.                                  |
+| `apex approval show`            | None                                                          | Read the current Gate 4 approval as structured JSON.                     |
 | `apex deploy`                   | Optional `--preview`                                          | Execute the current approved preview and collect inventory.              |
 | `apex reconcile`                | None                                                          | Reconcile the recorded deployment from inventory.                        |
 | `apex inventory`                | None                                                          | Read the latest deployment inventory.                                    |
@@ -82,9 +83,7 @@ The compact rows above expand to these exact accepted flags and values:
 init: --project; optional --name, --environment, --target, --iac, --customizations-source
 task complete: --task, --file; single output also needs --kind; optional --summary
 review resolve: --file
-gate decide: --gate --decision; optional --mechanism tty|github-environment (default tty)
-gate decide with tty: --actor is required
-gate decide with github-environment: --actor is forbidden; Gate 4 approved decisions only
+gate decide: --gate --decision --actor; optional --mechanism tty and Gate 4 --recipient
 preview: --operation apply|destroy --provider fake|bicep|terraform; optional --recipient
 render: --kind status|requirements|preview|approval|inventory
 capability install/update: --pack --yes; optional --manifest, --cache
@@ -113,23 +112,20 @@ unrelated runtime files. Import validates the authenticated envelope, exact auth
 binding/artifact cross-links before atomic mode-`0600` writes under `.apex/local/provider-runtime/`. It does not approve
 Gate 4 or deploy. Production CI remains blocked until the transfer has live proof across separate preview and apply jobs.
 
-GitHub Environment approval derives its complete context from `GITHUB_ACTIONS`, `GITHUB_REPOSITORY`, `GITHUB_REF`,
-`GITHUB_SHA`, `GITHUB_WORKFLOW_REF`, `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT`, `GITHUB_JOB`, `GITHUB_ACTOR`,
-`GITHUB_ACTOR_ID`, and `APEX_GITHUB_ENVIRONMENT`. It accepts no context JSON, file override, arbitrary actor, or
-arbitrary recipient. The accepted writer-transfer recipient must equal
-`github-actions:<repository>:<run-id>:<run-attempt>:<job>`.
+Gate 4 is approved locally for the exact intended execution recipient before writer transfer:
 
 ```bash
 apex gate decide \
   --gate 4 \
   --decision approved \
-  --mechanism github-environment \
+  --actor local-maintainer \
+  --recipient "$RECIPIENT" \
   --json
 ```
 
-The command is valid only inside GitHub Actions after the current writer transfer has been accepted. GitHub Environment
-approval additionally requires the transfer claim's `--environment` to exactly match `APEX_GITHUB_ENVIRONMENT`. It is a
-CLI ceremony and is not exposed through the `gateDecide` MCP tool.
+CI imports this approval with state and exact provider authority. `apex approval show --json` verifies the imported
+decision, preview, recipient, epoch, and expiry. CI does not expose a command path that creates or replaces approval in
+the qualification workflow.
 
 For separate Terraform preview and apply writers, pass the intended apply identity during preview:
 
@@ -137,8 +133,8 @@ For separate Terraform preview and apply writers, pass the intended apply identi
 apex preview --operation apply --provider terraform --recipient "$APPLY_RECIPIENT" --json
 ```
 
-The preview writer may create one transfer claim only after that preview. The recipient accepts it at the next owner
-epoch, and Gate 4 binds both the exact preview hash and transfer claim hash. A claim created before preview, a second
+The preview writer may create one transfer claim only after local approval. The recipient accepts it at the next owner
+epoch, and deploy proves the exact preview, approval, and one-hop lineage. A claim created before approval, a second
 transfer, a nonconsecutive epoch, or a different claim remains stale. Ownership-only transfer does not change the
 dependency revision; target, runtime lock, or accepted artifact changes do.
 

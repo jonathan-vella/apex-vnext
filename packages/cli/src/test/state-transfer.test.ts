@@ -340,6 +340,12 @@ test("post-preview state transfer resumes in a fresh workspace and deploys the e
   const initialized = await source.init({ projectId: "demo" });
   await prepareValidatedRun(source, initialized.runId, "bicep");
   const preview = await source.preview({ operation: "apply", provider: "fake" });
+  const approval = await source.decideGateNumber(4, "approved", "local-maintainer", {
+    recipientIdentity: "ci",
+  });
+  assert.equal(approval.mechanism, "tty");
+  assert.equal(approval.writerEpoch, 1);
+  assert.equal(approval.recipientIdentity, "ci");
   const transfer = (await source.createWriterTransfer({
     repository: "owner/repository",
     branch: "qualification",
@@ -368,8 +374,6 @@ test("post-preview state transfer resumes in a fresh workspace and deploys the e
   );
   const resumed = new ApexService(destination, { clock: () => instant });
   await resumed.acceptWriterTransfer(transfer.hash, "ci", "candidate-commit");
-  const approval = await resumed.decideGateNumber(4, "approved", "tester");
-  assert.equal(approval.writerTransferClaimHash, transfer.hash);
   const deployed = await resumed.deploy(preview.previewHash);
   assert.equal((deployed.operation as { previewHash?: unknown }).previewHash, preview.previewHash);
 });

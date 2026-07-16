@@ -22,9 +22,8 @@ Issue `#9` is the active dependency-ready workstream. Its destination-readiness 
 dispatch workflow, and release evidence to this repository. The secretless Entra application, destination Environment
 federation, and Azure qualification bootstrap are deployed and verified.
 
-GitHub required-reviewer protection is unavailable for this private repository on the current billing plan. The partial
-`vnext-qualification` Environment has no protection rules, variables, or secrets. Live workflow dispatch remains
-blocked; an unprotected Environment cannot substitute for approval evidence.
+The Environment is intentionally unprotected and scopes OIDC, variables, and secrets only. Local APEX Gate 4 is the sole
+human approval and binds the exact preview before CI handoff. The workflow imports that approval and cannot create one.
 
 ## Validation State
 
@@ -41,9 +40,9 @@ blocked; an unprotected Environment cannot substitute for approval evidence.
 | Destination CI               | Pass     | Branch, docs, and CI checks passed for PR `#14`.                              |
 | Markdown docs (CI)           | Pass     | Workflow run `29495046638` on `099616a6`.                                     |
 | IaC checks                   | Pass     | Workflow run `29495064776` on `099616a6`.                                     |
-| Entra OIDC federation        | Pass     | Destination Environment subject exists; no client secret or API permission.  |
+| Entra OIDC federation        | Pass     | Destination Environment subject exists; no client secret or API permission.   |
 | Azure bootstrap              | Pass     | Deployment `vnext-qualification-bootstrap` and security checks succeeded.     |
-| GitHub required reviewer     | Blocked  | Environment API returned HTTP 422 for the private-repository billing plan.    |
+| Local Gate 4 transfer design | Pass     | Package and workflow mutation tests cover exact post-approval transfer.       |
 | Devcontainer CI              | Disabled | Workflow is disabled and is not a migration or release gate.                  |
 | Dependency audit             | External | Public npm audit endpoint returned a TLS handshake failure during extraction. |
 
@@ -64,8 +63,7 @@ bind to an exact commit in this repository after the last dependency hash change
 
 ## Resume Pointer
 
-1. Resolve `RISK-004` by using a GitHub plan that supports required Environment reviewers for this private repository.
-2. Apply the reviewer and `main`-only deployment branch policy before installing Environment credentials.
-3. Configure secrets and variables from verified bootstrap outputs without printing secret values.
-4. Refresh the expired governance firewall exception before any workflow dispatch.
-5. Run exact-head Bicep and Terraform apply, recovery, and separately approved destroy ceremonies.
+1. Merge the local-Gate-4 workflow and runtime changes through the open issue branch.
+2. Configure Environment secrets and variables from verified bootstrap outputs without printing secret values.
+3. Refresh the expired governance firewall exception before any workflow dispatch.
+4. Run exact-head Bicep and Terraform apply, recovery, and separately approved destroy ceremonies.

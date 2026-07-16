@@ -147,3 +147,26 @@ when a decision has lasting architectural consequences that need alternatives an
   explicit maintainer decision. Local devcontainer configuration and non-CI validation remain available.
 - **ADR:** Not required; this is a repository validation-policy decision.
 - **Issue/PR:** Not applicable.
+
+## DECISION-010: Keep Deployment Approval In APEX Gate 4
+
+- **Date:** 2026-07-16
+- **Owner:** `@jonathan-vella`
+- **Context:** Required GitHub Environment reviewers are unavailable for the private destination repository on the
+  current billing plan. More importantly, external reviewer protection is not a product requirement for APEX. The
+  approved preview still needs one explicit human decision before a state-changing sandbox operation.
+- **Options:** Upgrade GitHub solely for Environment reviewers; add a second manually dispatched apply workflow; let CI
+  create its own approval; keep local APEX Gate 4 as the approval and use the Environment only for OIDC/configuration;
+  remove deployment approval entirely.
+- **Choice:** Keep local APEX Gate 4 as the sole human deployment approval. The maintainer reviews and approves the exact
+  native preview locally before writer and provider authority transfer. The unprotected GitHub Environment scopes OIDC,
+  variables, and secrets only and does not attest human review. CI imports the existing approval and cannot create or
+  replace it.
+- **Rationale:** This preserves exact-preview authorization and stale/substitution defenses without a paid GitHub
+  control or a second approval workflow. It also keeps approval ownership inside the deterministic APEX runtime.
+- **Consequences:** Approval evidence identifies the local actor rather than a GitHub reviewer. A single approved
+  one-hop transfer may move the exact preview and approval to the intended CI recipient. Missing, stale, expired,
+  changed-recipient, changed-preview, or second-hop authority fails closed. Real apply/destroy remains limited to the
+  isolated non-production qualification sandbox until live evidence is accepted.
+- **ADR:** [ADR-0002](../../agent-output/vnext-qualification/03-des-adr-0002-use-local-gate-4-before-ci-handoff.md).
+- **Issue/PR:** Destination issue `#9`.
