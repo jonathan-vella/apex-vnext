@@ -1,0 +1,386 @@
+# lefthook.yml - Git hooks configuration
+# Replaces Husky with a faster, dependency-free alternative
+# https://github.com/evilmartians/lefthook
+
+pre-commit:
+  # SAFETY: serial because two commands now use stage_fixed (markdown-lint
+  # touches *.md; model-catalog-sync touches .github/model-catalog.json).
+  # Although their file sets are disjoint today, parallel + stage_fixed
+  # races on git index lock when both try to re-stage. Keep serial unless
+  # an explicit file-lock coordination layer is introduced.
+  parallel: false
+  commands:
+    markdown-lint:
+      glob: "*.md"
+      run: |
+        # Get staged markdown files
+        STAGED_MD=$(git diff --cached --name-only --diff-filter=ACM | grep '\.md$' || true)
+        if [ -n "$STAGED_MD" ]; then
+          COUNT=$(echo "$STAGED_MD" | wc -l | tr -d ' ')
+          echo "📝 Validating $COUNT markdown file(s)..."
+          # Lint staged files only, suppress verbose Finding: output
+          RESULT=$(echo "$STAGED_MD" | xargs markdownlint-cli2 --no-globs 2>&1)
+          # Show only Summary and errors, skip Finding/Linting lines
+          echo "$RESULT" | grep -v -E '^(Finding:|Linting:)' || true
+        else
+          echo "ℹ️  No markdown files to validate"
+        fi
+      stage_fixed: true
+
+    link-check:
+      glob: "docs/guides/**/*.md"
+      run: |
+        # Get staged user-guide Markdown files
+        STAGED_DOCS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^docs/guides/.*\.md$' || true)
+        if [ -n "$STAGED_DOCS" ]; then
+          echo "🔗 Checking links in $(echo "$STAGED_DOCS" | wc -l | tr -d ' ') doc file(s)..."
+          # Use npx to run from local node_modules (avoids Node.js 24 global install bug)
+          echo "$STAGED_DOCS" | xargs -I {} npx markdown-link-check {} --config .markdown-link-check.json --quiet
+        else
+          echo "ℹ️  No docs to check links"
+        fi
+
+    h2-sync:
+      glob: "{.github/skills/azure-artifacts/SKILL.md,.github/instructions/azure-artifacts*,tools/scripts/validate-artifacts*}"
+      run: |
+        STAGED_SYNC=$(git diff --cached --name-only --diff-filter=ACM | grep -E '(SKILL\.md|azure-artifacts|validate-artifacts)' || true)
+        if [ -n "$STAGED_SYNC" ]; then
+          echo "🔄 Checking H2 heading sync across sources..."
+          npm run validate:artifacts
+        else
+          echo "ℹ️  No H2-source files to sync-check"
+        fi
+      fail_text: |
+        ❌ H2 heading sync failed!
+
+        Sources must match: SKILL.md ↔ azure-artifacts ↔ validator
+        🔧 Run: npm run lint:h2-sync
+
+    artifact-validation:
+      glob: "{agent-output,.github/skills/azure-artifacts/templates}/**/*.md"
+      run: |
+        # Check if any agent-output artifacts are staged
+        STAGED_ARTIFACTS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^agent-output/.*\.md$' || true)
+        if [ -n "$STAGED_ARTIFACTS" ]; then
+          COUNT=$(echo "$STAGED_ARTIFACTS" | wc -l | tr -d ' ')
+          echo "📋 Validating $COUNT artifact(s) against templates..."
+          # Run full artifact validation - blocks on any H2 mismatch
+          if ! npm run validate:artifacts; then
+            echo ""
+            echo "❌ Artifact template validation failed!"
+            echo ""
+            echo "🔧 To fix:"
+            echo "   1. Check .github/instructions/azure-artifacts.instructions.md"
+            echo "   2. Use EXACT H2 headings from that file"
+            echo "   3. Run: npm run fix:artifacts -- <file> --apply"
+            echo "   4. Re-stage and commit"
+            echo ""
+            exit 1
+          fi
+          # Mandatory challenger-findings presence gate (Steps 1, 2, 3.5, 4).
+          # Primary enforcement is at runtime via `apex-recall complete-step`;
+          # this is the commit-time fallback so the same drift cannot land
+          # via direct edits.
+          if ! npm run validate:challenger-presence --silent; then
+            echo ""
+            echo "❌ Mandatory challenger review missing for one or more steps."
+            echo "   Run the challenger-review-subagent against the gating"
+            echo "   artifact, or record an audited skip via:"
+            echo "   apex-recall complete-step <project> <step> \\"
+            echo "       --allow-missing-challenger --challenger-skip-reason \"...\""
+            exit 1
+          fi
+        else
+          echo "ℹ️  No agent-output artifacts to validate"
+        fi
+      fail_text: |
+        ❌ Artifact H2 structure or challenger-review presence check failed!
+
+        📚 References:
+        - .github/instructions/azure-artifacts.instructions.md
+        - AGENTS.md "Agent Workflow" (mandatory challenger reviews)
+        🔧 Auto-fix H2: npm run fix:artifacts -- <file> --apply
+        🔧 Challenger:  re-run challenger-review-subagent or 10-Challenger
+
+    agents:
+      glob: "**/*.agent.md,**/*.prompt.md"
+      run: |
+        STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(agent|prompt)\.md$' || true)
+        if [ -n "$STAGED" ]; then
+          COUNT=$(echo "$STAGED" | wc -l | tr -d ' ')
+          echo "🤖 Validating $COUNT agent/prompt file(s)..."
+          npm run validate:agents
+          # Guard the family classifier that drives every vendor-prompting rule's
+          # severity routing. Cheap (~100ms, 13 unit tests) and catches silent
+          # rule-downgrade regressions in classifyModel().
+          npm run test:classify-model
+          # /clear-handoff contract: orchestrator (strict) + every step agent
+          # (verbatim resume line). Direct-invocation flow depends on this; see
+          # tools/scripts/validate_orchestrator_handoff.py STEP_AGENTS.
+          npm run validate:orchestrator-handoff
+        else
+          echo "ℹ️  No agent/prompt files to validate"
+        fi
+      fail_text: |
+        ❌ Agent validation failed!
+
+        Checks: frontmatter syntax, model-prompt alignment, body size (<500 lines),
+        language density (<5 absolute terms per 100 lines), classifier unit tests,
+        /clear-handoff contract (verbatim resume line in every step agent)
+        📚 Reference: .github/instructions/agent-authoring.instructions.md
+
+    model-catalog-sync:
+      glob: ".github/agents/**/*.agent.md"
+      run: |
+        STAGED_AGENTS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^\.github/agents/.*\.agent\.md$' || true)
+        if [ -n "$STAGED_AGENTS" ]; then
+          echo "🔄 Regenerating model-catalog assignments from frontmatter..."
+          node tools/scripts/generate-model-catalog.mjs
+          # Re-stage the catalog if the generator changed it
+          if ! git diff --quiet .github/model-catalog.json 2>/dev/null; then
+            git add .github/model-catalog.json
+            echo "  ↳ Re-staged .github/model-catalog.json"
+          fi
+        else
+          echo "ℹ️  No agent frontmatter staged — catalog regeneration skipped"
+        fi
+      stage_fixed: true
+      fail_text: |
+        ❌ Model catalog regeneration failed!
+
+        🔧 Manually run: node tools/scripts/generate-model-catalog.mjs
+        📚 Reference: .github/model-catalog.json governance block
+
+    instructions:
+      glob: "**/*.instructions.md,{.github/agents/**,.github/skills/**,.github/instructions/**}"
+      run: |
+        STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(instructions|agent)\.md$|SKILL\.md$' || true)
+        if [ -n "$STAGED" ]; then
+          COUNT=$(echo "$STAGED" | wc -l | tr -d ' ')
+          echo "📋 Validating $COUNT instruction/reference file(s)..."
+          npm run validate:instruction-checks
+        else
+          echo "ℹ️  No instruction files to validate"
+        fi
+      fail_text: |
+        ❌ Instruction validation failed!
+
+        Checks: frontmatter syntax (description, applyTo only), cross-reference integrity
+        📚 Run: npm run validate:instruction-checks
+
+    skill-references:
+      # Catch missing canary markers (`<!-- ref:{slug}-v1 -->`) on skill
+      # references/*.md before they reach main. CI runs the same validator
+      # globally; this hook gives same-PR feedback when a new reference
+      # file is added.
+      glob: ".github/skills/*/references/*.md,.github/skills/*/SKILL.md"
+      run: |
+        STAGED_REFS=$(git diff --cached --name-only --diff-filter=ACM \
+          | grep -E '^\.github/skills/[^/]+/(references/.*\.md|SKILL\.md)$' || true)
+        if [ -n "$STAGED_REFS" ]; then
+          COUNT=$(echo "$STAGED_REFS" | wc -l | tr -d ' ')
+          echo "🔖 Validating $COUNT skill reference/SKILL file(s) (canary markers + size)..."
+          npm run validate:skill-checks
+        else
+          echo "ℹ️  No skill references/SKILL files staged"
+        fi
+      fail_text: |
+        ❌ Skill-references validation failed!
+
+        Every `.github/skills/*/references/*.md` must start with
+        `<!-- ref:{slug}-v1 -->` on the first non-blank line so
+        docs-freshness can detect stale references.
+        🔧 Run: npm run validate:skill-checks
+
+    sku-manifest-render:
+      glob: "agent-output/*/sku-manifest.json"
+      run: |
+        STAGED_SKU=$(git diff --cached --name-only --diff-filter=ACM \
+          | grep -E '^agent-output/[^/]+/sku-manifest\.json$' || true)
+        if [ -n "$STAGED_SKU" ]; then
+          COUNT=$(echo "$STAGED_SKU" | wc -l | tr -d ' ')
+          echo "📦 Re-rendering $COUNT SKU manifest MD view(s) from JSON..."
+          echo "$STAGED_SKU" | while IFS= read -r json_path; do
+            project=$(basename "$(dirname "$json_path")")
+            node tools/scripts/render-sku-manifest-md.mjs "$project" || exit 1
+          done
+          # Re-stage rendered MD if changed
+          echo "$STAGED_SKU" | while IFS= read -r json_path; do
+            md_path="${json_path%.json}.md"
+            if [ -f "$md_path" ]; then
+              git add "$md_path"
+            fi
+          done
+        else
+          echo "ℹ️  No SKU manifest JSON staged — MD render skipped"
+        fi
+      stage_fixed: true
+      fail_text: |
+        ❌ SKU manifest MD render failed!
+
+        The MD view is rendered deterministically from JSON. Fix the JSON
+        (current_revision mismatch is the usual cause) and re-stage.
+        🔧 Run manually: node tools/scripts/render-sku-manifest-md.mjs <project>
+
+    secrets-baseline:
+      run: |
+        if command -v gitleaks >/dev/null 2>&1; then
+          gitleaks protect --staged --redact --no-banner
+        else
+          echo "⚠️  gitleaks not installed — secret scan skipped. Install gitleaks (see .devcontainer/post-create.sh) to enable."
+        fi
+      fail_text: |
+        ❌ Secrets detected in staged files!
+        🔧 Remove secrets before committing. See AGENTS.md for gitleaks setup.
+
+    python-lint:
+      glob: "tools/mcp-servers/**/*.py"
+      run: |
+        STAGED_PY=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^tools/mcp-servers/.*\.py$' || true)
+        if [ -n "$STAGED_PY" ]; then
+          COUNT=$(echo "$STAGED_PY" | wc -l | tr -d ' ')
+          echo "🐍 Linting $COUNT Python file(s) with ruff..."
+          cd tools/mcp-servers/azure-pricing && python -m ruff check src/ tests/
+        else
+          echo "ℹ️  No Python files to lint"
+        fi
+      fail_text: |
+        ❌ Python lint failed!
+
+        🔧 Fix: cd tools/mcp-servers/azure-pricing && python -m ruff check --fix src/ tests/
+
+    terraform-fmt:
+      glob: "*.tf"
+      run: |
+        STAGED_TF=$(git diff --cached --name-only --diff-filter=ACM | grep '\.tf$' || true)
+        if [ -n "$STAGED_TF" ]; then
+          echo "🔧 Checking Terraform formatting..."
+          terraform fmt -check -recursive infra/terraform/ || {
+            echo "❌ terraform fmt failed. Run: terraform fmt -recursive infra/terraform/"
+            exit 1
+          }
+        else
+          echo "ℹ️  No Terraform files to format-check"
+        fi
+
+    terraform-validate:
+      glob: "*.tf"
+      run: |
+        STAGED_TF=$(git diff --cached --name-only --diff-filter=ACM | grep '\.tf$' || true)
+        if [ -n "$STAGED_TF" ]; then
+          echo "🔧 Validating Terraform..."
+          for dir in infra/terraform/*/; do
+            if [ -f "$dir/main.tf" ]; then
+              echo "  Validating $dir..."
+              (cd "$dir" && terraform init -backend=false -input=false -no-color > /dev/null 2>&1 \
+                && terraform validate -no-color) || { echo "❌ Validation failed in $dir"; exit 1; }
+            fi
+          done
+        else
+          echo "ℹ️  No Terraform project to validate"
+        fi
+
+    iac-security-baseline:
+      glob: "{infra/bicep/**/*.bicep,infra/terraform/**/*.tf}"
+      run: |
+        STAGED_IAC=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(bicep|tf)$' || true)
+        if [ -n "$STAGED_IAC" ]; then
+          echo "🔒 Checking IaC security baseline..."
+          npm run validate:iac-security-baseline
+        else
+          echo "ℹ️  No IaC files to security-check"
+        fi
+      fail_text: |
+        ❌ IaC security baseline violation!
+
+        🔧 Fix: TLS 1.2+, HTTPS-only, no public blob access, managed identity
+        📚 Reference: AGENTS.md Security Baseline section
+
+    js-lint:
+      glob: "**/*.{js,mjs,cjs}"
+      run: |
+        STAGED_JS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(js|mjs|cjs)$' || true)
+        # Adopt-narrow scope: skip site/ until reassessment.
+        STAGED_JS=$(echo "$STAGED_JS" | grep -vE '^site/' || true)
+        if [ -n "$STAGED_JS" ]; then
+          COUNT=$(echo "$STAGED_JS" | wc -l | tr -d ' ')
+          echo "🧹 Linting $COUNT JS/MJS file(s) (--max-warnings=0)..."
+          echo "$STAGED_JS" | xargs npx eslint --cache --cache-location node_modules/.cache/eslint/ --quiet --format=compact --max-warnings=0
+        else
+          echo "ℹ️  No JS/MJS files to lint"
+        fi
+      fail_text: |
+        ❌ ESLint failed!
+
+        🔧 Fix: npm run lint:js -- --fix <files>
+        📚 Reference: eslint.config.mjs
+
+    js-format:
+      glob: "**/*.{js,mjs,cjs}"
+      run: |
+        STAGED_FMT=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(js|mjs|cjs)$' || true)
+        STAGED_FMT=$(echo "$STAGED_FMT" | grep -vE '^site/' || true)
+        if [ -n "$STAGED_FMT" ]; then
+          echo "💅 Checking Prettier on $(echo "$STAGED_FMT" | wc -l | tr -d ' ') file(s)..."
+          echo "$STAGED_FMT" | xargs npx prettier --check --log-level warn
+        else
+          echo "ℹ️  No JS/MJS files to format-check"
+        fi
+      fail_text: |
+        ❌ Prettier check failed!
+
+        🔧 Fix: npm run format
+
+commit-msg:
+  commands:
+    commitlint:
+      run: npx --no -- commitlint --edit {1}
+      fail_text: |
+        ❌ Commit message validation failed!
+
+        📖 Conventional Commits format required:
+           <type>[optional scope]: <description>
+
+           Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+
+           Examples:
+             feat: add new Azure App Service module
+             fix(bicep): correct storage account naming
+             docs: update README with deployment steps
+
+# Diff-based pre-push validation — runs only matching domain validators in parallel
+pre-push:
+  parallel: true
+  commands:
+    branch-naming:
+      run: bash tools/scripts/validate-branch-naming.sh
+      fail_text: |
+        ❌ Branch naming convention violated!
+
+        🔧 Rename your branch using an approved prefix:
+           docs/, agents/, skills/, infra/, tools/scripts/, instructions/,
+           fix/, feat/, chore/, ci/, refactor/, perf/, test/, build/, revert/
+
+    branch-scope:
+      run: bash tools/scripts/validate-branch-scope.sh
+      fail_text: |
+        ❌ Branch scope violation!
+
+        Domain-scoped branches (docs/, agents/, skills/, etc.) should only
+        modify files within their domain. Use feat/ or fix/ for cross-cutting changes.
+
+    diff-based-check:
+      run: bash tools/scripts/diff-based-push-check.sh
+      fail_text: |
+        ❌ Pre-push validation failed!
+
+        🔧 Run the failing validator manually to see details.
+        Only validators for changed file types were executed.
+
+# Stamp commit_sha onto sku-manifest revisions touched in the latest commit.
+# Best-effort: never blocks a commit. The stamped file is left modified in
+# the working tree for the user/CI to stage in a follow-up commit.
+post-commit:
+  commands:
+    stamp-sku-manifest:
+      run: node tools/scripts/stamp-sku-manifest-commit.mjs || true

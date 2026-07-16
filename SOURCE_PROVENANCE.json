@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "source": {
+    "repository": "https://github.com/jonathan-vella/apex",
+    "branch": "feat/apex-vnext-rewrite",
+    "commit": "60d96d5a46ff534069c58275cfd32cb8d4490971"
+  },
+  "extracted_at": "2026-07-16T10:08:23Z",
+  "history_strategy": "clean-snapshot",
+  "excluded_paths": ["site/"],
+  "documentation": {
+    "format": "markdown",
+    "user_guides_root": "docs/guides",
+    "project_controls_root": "docs/vnext"
+  }
+}

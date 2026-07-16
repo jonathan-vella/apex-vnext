@@ -1,0 +1,84 @@
+# Auto normalize line endings for all text files
+* text=auto
+
+# Explicitly declare text files to always use LF
+*.md text eol=lf
+*.bicep text eol=lf
+*.sh text eol=lf
+*.ps1 text eol=lf
+*.psm1 text eol=lf
+*.psd1 text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.xml text eol=lf
+*.py text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.rb text eol=lf
+*.java text eol=lf
+*.c text eol=lf
+*.h text eol=lf
+*.cpp text eol=lf
+*.cs text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.txt text eol=lf
+
+# PowerShell scripts with BOM (UTF-8 with BOM for compatibility)
+*.ps1 text working-tree-encoding=UTF-8 eol=lf
+*.psm1 text working-tree-encoding=UTF-8 eol=lf
+
+# Terraform / HCL
+*.tf      text eol=lf linguist-language=HCL
+*.tfvars  text eol=lf linguist-language=HCL
+*.hcl     text eol=lf linguist-language=HCL
+*.psd1 text working-tree-encoding=UTF-8 eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.tar binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+
+# Draw.io diagram files
+*.drawio text eol=lf
+assets/drawio-libraries/**/*.xml binary
+
+# Phase 0A terminal transcripts are byte-for-byte evidence captures.
+docs/vnext/phase-0a/evidence/*.log binary
+
+# GitHub specific files
+.gitattributes text eol=lf
+.gitignore text eol=lf
+.editorconfig text eol=lf
+
+# Copilot instructions (file-type specific guidance)
+.github/instructions/*.instructions.md linguist-documentation
+docs/**/*.md linguist-documentation
+
+# Docker files
+Dockerfile text eol=lf
+docker-compose*.yml text eol=lf
+
+# CI/CD files
+.github/** text eol=lf
+azure-pipelines*.yml text eol=lf
+
+# Binary archives under .github/** (override the .github/** text rule above)
+.github/**/*.gz binary
+.github/**/*.tgz binary
+.github/**/*.tar binary
+.github/**/*.zip binary
+
+# Git hooks (husky)
+.husky/* text eol=lf

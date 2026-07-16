@@ -1,0 +1,145 @@
+#!/usr/bin/env node
+/**
+ * Fetches GitHub Actions workflow files from the upstream repository.
+ *
+ * The weekly-upstream-sync workflow excludes .github/workflows/ because
+ * GITHUB_TOKEN cannot push workflow file changes. This script provides
+ * a local alternative: it downloads workflow files from upstream and
+ * places them in .github/workflows/, skipping the sync workflow itself
+ * (which is accelerator-specific).
+ *
+ * @example
+ * npm run sync:workflows
+ * npm run sync:workflows -- --dry-run
+ */
+
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+const UPSTREAM_OWNER = "jonathan-vella";
+const UPSTREAM_REPO = "apex";
+const UPSTREAM_REF = "main";
+const WORKFLOWS_DIR = ".github/workflows";
+
+// Workflows that should NOT be synced from upstream into accelerator-derived
+// repositories. Two categories:
+//   1. Accelerator-only — exists in accelerator, never overwrite from upstream
+//      (e.g. the sync workflow itself).
+//   2. Upstream-only — relevant only to the upstream repo's own infrastructure
+//      (docs site deploy, link-check, e2e validation, sensei-branch maintenance);
+//      consumer projects should not run them.
+const SKIP_FILES = new Set([
+  // Accelerator-only
+  "weekly-upstream-sync.yml",
+  // Upstream-only (docs site, link-check, e2e tests, sensei branch lifecycle).
+  // The accelerator sync excludes site/, so every docs-site workflow would fail
+  // in consumer repos that do not carry this repository's docs/ tree.
+  "docs.yml",
+  "docs-checks.yml",
+  "docs-gardening.yml",
+  "link-check.yml",
+  "e2e-validation.yml",
+  "sensei-branch-maintenance.yml",
+]);
+
+const args = process.argv.slice(2);
+const dryRun = args.includes("--dry-run") || args.includes("--dry");
+const showHelp = args.includes("--help") || args.includes("-h");
+
+if (showHelp) {
+  console.log(`
+Usage: npm run sync:workflows [-- --dry-run]
+
+Fetches GitHub Actions workflow files from the upstream repository
+(${UPSTREAM_OWNER}/${UPSTREAM_REPO}) into ${WORKFLOWS_DIR}/.
+
+Options:
+  --dry-run   Show what would be fetched without writing files
+  --help      Show this help message
+
+Skipped files (accelerator-only or upstream-only — not relevant to consumer projects):
+  ${[...SKIP_FILES].join(", ")}
+`);
+  process.exit(0);
+}
+
+console.log(`\n🔄 Sync Workflows from ${UPSTREAM_OWNER}/${UPSTREAM_REPO}@${UPSTREAM_REF}\n`);
+
+async function fetchJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch ${url}: ${res.status} ${res.statusText}`);
+  }
+  return res.json();
+}
+
+async function fetchText(url) {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch ${url}: ${res.status} ${res.statusText}`);
+  }
+  return res.text();
+}
+
+async function main() {
+  // List workflow files from upstream via GitHub API (no auth required for public repos)
+  const apiUrl = `https://api.github.com/repos/${UPSTREAM_OWNER}/${UPSTREAM_REPO}/contents/${WORKFLOWS_DIR}?ref=${UPSTREAM_REF}`;
+  let files;
+  try {
+    files = await fetchJSON(apiUrl);
+  } catch (err) {
+    console.error(`❌ Could not list upstream workflows: ${err.message}`);
+    process.exit(1);
+  }
+
+  if (!Array.isArray(files)) {
+    console.error("❌ Unexpected API response (not an array). Check the upstream repo path.");
+    process.exit(1);
+  }
+
+  const ymlFiles = files.filter((f) => f.type === "file" && (f.name.endsWith(".yml") || f.name.endsWith(".yaml")));
+
+  if (ymlFiles.length === 0) {
+    console.log("No workflow files found in upstream.");
+    process.exit(0);
+  }
+
+  // Ensure local workflows directory exists
+  if (!dryRun) {
+    mkdirSync(WORKFLOWS_DIR, { recursive: true });
+  }
+
+  let synced = 0;
+  let skipped = 0;
+
+  for (const file of ymlFiles) {
+    if (SKIP_FILES.has(file.name)) {
+      console.log(`  ⏭️  ${file.name} (skipped — not synced to consumer projects)`);
+      skipped++;
+      continue;
+    }
+
+    if (dryRun) {
+      console.log(`  📋 ${file.name} (would fetch)`);
+      synced++;
+      continue;
+    }
+
+    try {
+      const content = await fetchText(file.download_url);
+      const dest = join(WORKFLOWS_DIR, file.name);
+      writeFileSync(dest, content, "utf8");
+      console.log(`  ✅ ${file.name}`);
+      synced++;
+    } catch (err) {
+      console.error(`  ❌ ${file.name}: ${err.message}`);
+    }
+  }
+
+  console.log(`\n${dryRun ? "Dry run: " : ""}${synced} synced, ${skipped} skipped\n`);
+}
+
+main().catch((err) => {
+  console.error(`❌ ${err.message}`);
+  process.exit(1);
+});

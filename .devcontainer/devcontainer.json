@@ -1,0 +1,203 @@
+{
+  "name": "APEX",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu26.04",
+
+  "features": {
+    "ghcr.io/devcontainers/features/azure-cli:1": {
+      "installBicep": true,
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/powershell:2": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.14",
+      "installTools": false
+    },
+    "ghcr.io/devcontainers/features/node:": {
+      "version": "lts",
+      "pnpmVersion": "none"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "version": "latest"
+    },
+    "./features/terraform": {},
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.26"
+    },
+    "ghcr.io/devcontainers-community/features/deno": {
+      "version": "latest"
+    },
+    "ghcr.io/azure/azure-dev/azd:latest": {}
+  },
+
+  // Lifecycle commands - chain apt operations to avoid lock conflicts
+  // Lifecycle: onCreateCommand runs first (system packages + uv), then postCreateCommand (tools), then postStartCommand (updates)
+  "onCreateCommand": "set -e; sudo rm -f /etc/apt/sources.list.d/yarn.list 2>/dev/null; sudo apt-get update; sudo apt-get install -y graphviz dos2unix bats; sudo install -d -m 0755 -o vscode -g vscode \"$HOME/.cache\" \"$HOME/.local/bin\"; dos2unix .devcontainer/*.sh 2>/dev/null || true; curl -LsSf https://astral.sh/uv/install.sh | sh",
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postStartCommand": "bash .devcontainer/post-start.sh && (npx lefthook install 2>/dev/null || true)",
+
+  // Environment variables for Python optimization
+  "containerEnv": {
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONUNBUFFERED": "1",
+    "UV_CACHE_DIR": "/home/vscode/.cache/uv",
+    "TF_PLUGIN_CACHE_DIR": "/home/vscode/.terraform.d/plugin-cache",
+    "DENO_DIR": "/home/vscode/.cache/deno"
+  },
+
+  "remoteEnv": {
+    "PATH": "/home/vscode/.local/bin:${containerEnv:PATH}",
+    "AZURE_DEFAULTS_LOCATION": "swedencentral",
+    // Pass GH_TOKEN from host → container. gh CLI uses it automatically, no `gh auth login` needed.
+    // Each user sets this once in VS Code User Settings (Ctrl+,):
+    //   "terminal.integrated.env.linux": { "GH_TOKEN": "ghp_yourTokenHere" }
+    // This is the ONLY supported method — shell exports (.bashrc/.profile) do NOT propagate reliably.
+    // Value is empty string if not set — gh CLI falls back to its normal auth flow.
+    "GH_TOKEN": "${localEnv:GH_TOKEN}"
+  },
+
+  "customizations": {
+    "vscode": {
+      // Curated for minimal Copilot context bloat. Do NOT add extensions that
+      // contribute chatSkills / chatAgents / chatPromptFiles (notably the
+      // Azure GH Copilot helper `ms-azuretools.vscode-azure-github-copilot`,
+      // AI Toolkit `ms-windows-ai-studio`, AI Foundry
+      // `teamsdevapp.vscode-ai-foundry`) — they inflate per-turn input tokens
+      // by ~5-7k and APEX's own agent set already covers their scope. Those
+      // extensions are listed in `.vscode/extensions.json`
+      // `unwantedRecommendations` and rejected by
+      // `npm run validate:extension-bloat`. See `docs/devcontainer-hygiene.md`
+      // for the full rationale and per-developer cleanup checklist.
+      //
+      // `ms-vscode.vscode-node-azure-pack` (Azure Tools) is included below for
+      // convenience. Its `extensionPack` transitively installs
+      // `ms-azuretools.vscode-azure-github-copilot` and
+      // `ms-windows-ai-studio.windows-ai-studio` — the two banned extensions
+      // above — because `validate-extension-bloat.mjs` only scans the literal
+      // `extensions` array here, not a pack's transitive members. After the
+      // pack installs, manually disable both in the Extensions view. The pack
+      // also covers `ms-azuretools.vscode-azure-mcp-server`,
+      // `vscode-azurecontainerapps`, `vscode-azurestaticwebapps`, and
+      // `azure-dev` — those are intentionally NOT listed individually below
+      // to avoid duplication.
+      "extensions": [
+        "GitHub.copilot-chat",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-azuretools.vscode-azureresourcegroups",
+        "ms-azuretools.vscode-bicep",
+        "ms-vscode.powershell",
+        "bierner.markdown-mermaid",
+        "bierner.markdown-preview-github-styles",
+        "DavidAnson.vscode-markdownlint",
+        "ms-vscode.azurecli",
+        "ms-azuretools.vscode-containers",
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "ms-kubernetes-tools.vscode-aks-tools",
+        "github.vscode-github-actions",
+        "github.vscode-pull-request-github",
+        "esbenp.prettier-vscode",
+        "mechatroner.rainbow-csv",
+        "redhat.vscode-yaml",
+        "mutantdino.resourcemonitor",
+        "HashiCorp.terraform",
+        "ms-azuretools.vscode-azureterraform",
+        "hediet.vscode-drawio",
+        "denoland.vscode-deno",
+        "ms-vscode.vscode-node-azure-pack"
+      ],
+      "settings": {
+        "chat.useAgentsMdFile": true,
+        "chat.useNestedAgentsMdFiles": true,
+        "chat.useClaudeMdFile": false,
+        "chat.customAgentInSubagent.enabled": true,
+        "chat.agentFilesLocations": {
+          ".github/agents": true,
+          ".github/agents/_subagents": true,
+          "~/.copilot/agents": false,
+          "~/.claude/agents": false
+        },
+        "chat.agentSkillsLocations": {
+          ".github/skills": true,
+          "~/.copilot/skills": false,
+          "~/.claude/skills": false
+        },
+        "chat.instructionsFilesLocations": {
+          ".github/instructions": true,
+          "~/.copilot/instructions": false,
+          "~/.claude/rules": false
+        },
+        "chat.hookFilesLocations": {
+          ".github/hooks/tool-guardian": true,
+          ".github/hooks/subagent-validation": true
+        },
+        "chat.useCustomAgentHooks": true,
+        "chat.useAgentSkills": true,
+        "github.copilot.chat.agentDebugLog.fileLogging.enabled": true,
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.rulers": [120],
+        "editor.wordWrap": "wordWrapColumn",
+        "editor.wordWrapColumn": 120,
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "files.eol": "\n",
+        "editor.tabSize": 2,
+        "[markdown]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode",
+          "editor.rulers": [120],
+          "editor.wordWrap": "wordWrapColumn",
+          "editor.wordWrapColumn": 120
+        },
+        "[bicep]": {
+          "editor.tabSize": 2
+        },
+        "[terraform]": {
+          "editor.tabSize": 2,
+          "editor.formatOnSave": true,
+          "editor.defaultFormatter": "hashicorp.terraform"
+        },
+        "[powershell]": {
+          "editor.tabSize": 4
+        },
+        "[python]": {
+          "editor.tabSize": 4
+        },
+        "python.defaultInterpreterPath": "/usr/local/python/current/bin/python3",
+        "python.analysis.typeCheckingMode": "basic",
+        "markdownlint.config": {
+          "extends": "${workspaceFolder}/.markdownlint-cli2.jsonc"
+        },
+        "markdownlint.run": "onSave",
+        "deno.enable": false,
+        "deno.enablePaths": ["tools/mcp-servers/drawio"],
+        "deno.lint": true,
+        "deno.unstable": []
+      }
+    }
+  },
+
+  // Mounts for credential/cache persistence across rebuilds
+  // - Azure CLI: Host's ~/.azure (Linux/macOS) or %USERPROFILE%\.azure (Windows)
+  // - GitHub CLI: Docker volume (Windows uses keyring, can't be mounted; Linux/macOS use files)
+  // - UV cache: Docker volume for Python package cache
+  "mounts": [
+    {
+      "source": "${localEnv:USERPROFILE}${localEnv:HOME}/.azure",
+      "target": "/home/vscode/.azure",
+      "type": "bind"
+    },
+    {
+      "source": "devcontainer-gh-config-${devcontainerId}",
+      "target": "/home/vscode/.config/gh",
+      "type": "volume"
+    },
+    {
+      "source": "devcontainer-uv-cache-${devcontainerId}",
+      "target": "/home/vscode/.cache/uv",
+      "type": "volume"
+    }
+  ],
+
+  "remoteUser": "vscode"
+}
