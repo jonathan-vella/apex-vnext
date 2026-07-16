@@ -180,6 +180,28 @@ test("one-hop writer authority accepts only the exact approval claim", async () 
   );
 });
 
+test("one-hop writer authority accepts an exact local approval created before transfer", async () => {
+  const { instance } = provider("bicep");
+  const preview = await instance.previewApply(request());
+  const claimHash = "9".repeat(64);
+  const localApproval = approval(preview, {
+    writerEpoch: 3,
+    recipientIdentity: "ci",
+  });
+  const ciAuthority = authority({
+    ownerEpoch: 4,
+    previousOwnerEpoch: 3,
+    writerTransferClaimHash: claimHash,
+    recipientIdentity: "ci",
+  });
+  assert.equal((await instance.apply(preview, localApproval, ciAuthority)).state, "succeeded");
+
+  await assert.rejects(
+    instance.apply(preview, { ...localApproval, recipientIdentity: "other" }, ciAuthority),
+    iacError("APPROVAL_RECIPIENT_MISMATCH"),
+  );
+});
+
 test("destroy requires a separately approved destructive preview", async () => {
   const { instance } = provider("bicep");
   const applyPreview = await instance.previewApply(request());

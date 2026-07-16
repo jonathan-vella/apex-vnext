@@ -1,7 +1,7 @@
 # ADR-0001: Use Split Encrypted CI Transport
 
 ![Step](https://img.shields.io/badge/Step-3-blue?style=for-the-badge)
-![Status](https://img.shields.io/badge/Status-Accepted-brightgreen?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Superseded-lightgrey?style=for-the-badge)
 ![Type](https://img.shields.io/badge/Type-ADR-purple?style=for-the-badge)
 
 <details open>
@@ -17,9 +17,13 @@
 
 </details>
 
-> Status: Accepted
+> Status: Superseded by ADR-0002
 > Date: 2026-07-15
 > Deciders: jonathan-vella
+>
+> [ADR-0002](03-des-adr-0002-use-local-gate-4-before-ci-handoff.md) supersedes the approval boundary and incoming
+> transport route below. Its separate encrypted envelopes, exact-plan, network, cleanup, and production constraints
+> remain accepted.
 
 ## 🔍 Context
 
@@ -91,7 +95,7 @@ Use two encrypted transports with distinct ownership boundaries:
 ### Neutral
 
 - The Terraform backend remains Azure Blob and uses its lease for state locking.
-- Human GitHub Environment approval remains separate from APEX Gate 4 approval evidence.
+- Human approval is owned by local APEX Gate 4; the GitHub Environment scopes OIDC/configuration only (ADR-0002).
 - The decision does not authorize deployment, production apply, publication, or merge to `main`.
 
 ## 🏛️ WAF Pillar Analysis
@@ -111,7 +115,7 @@ Use two encrypted transports with distinct ownership boundaries:
    allows `swedencentral`.
 - Shared-key authorization and anonymous blob access remain disabled.
 - Raw chat history, credentials, Terraform state, and plaintext plans are excluded from retained evidence.
-- Evidence records the self-review limitation of this single-maintainer sandbox.
+- Evidence records the local Gate 4 actor and must not claim GitHub Environment review.
 
 ## 📝 Implementation Notes
 
@@ -136,6 +140,6 @@ Use two encrypted transports with distinct ownership boundaries:
 
 | ⬅️ Previous ADR | 🏠 [Project Index](README.md) | Next ADR ➡️ |
 | --- | --- | --- |
-| None | [README](README.md) | None |
+| None | [README](README.md) | [ADR-0002](03-des-adr-0002-use-local-gate-4-before-ci-handoff.md) |
 
 </div>

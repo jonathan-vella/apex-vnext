@@ -644,24 +644,11 @@ describe("target family contracts", () => {
       gate: 4,
       decision: "approved",
       actor: "release-manager",
-      mechanism: "github-environment",
+      mechanism: "tty",
       dependencyHash: hash,
       previewHash: hash,
       writerEpoch: 1,
       recipientIdentity: "deploy-prod",
-      githubContext: {
-        repository: "owner/repo",
-        ref: "refs/heads/main",
-        sha: "a".repeat(40),
-        workflowRef: "owner/repo/.github/workflows/deploy.yml@refs/heads/main",
-        runId: "123",
-        runAttempt: 1,
-        job: "deploy",
-        environment: "production",
-        actor: "octocat",
-        actorId: "1",
-        recipientIdentity: "deploy-prod",
-      },
       decidedAt: timestamp,
       expiresAt: expiry,
     };
@@ -692,14 +679,14 @@ describe("target family contracts", () => {
     );
   });
 
-  it("requires strict GitHub context only for GitHub Environment approvals", () => {
+  it("permits only local and inherited approval mechanisms", () => {
     const base = {
       schemaVersion: CONTRACT_VERSION,
       projectId: "example-project",
       runId: "run-1",
       gate: 4,
       decision: "approved" as const,
-      actor: "github:1:octocat",
+      actor: "maintainer",
       dependencyHash: hash,
       previewHash: hash,
       writerEpoch: 2,
@@ -707,29 +694,10 @@ describe("target family contracts", () => {
       decidedAt: timestamp,
       expiresAt: expiry,
     };
-    const githubContext = {
-      repository: "owner/repo",
-      ref: "refs/heads/main",
-      sha: "a".repeat(40),
-      workflowRef: "owner/repo/.github/workflows/deploy.yml@refs/heads/main",
-      runId: "123",
-      runAttempt: 1,
-      job: "deploy",
-      environment: "production",
-      actor: "octocat",
-      actorId: "1",
-      recipientIdentity: "github-actions:owner/repo:123:1:deploy",
-    };
-
-    assert.equal(
-      Value.Check(ApprovalEvidenceV1Schema, { ...base, mechanism: "github-environment", githubContext }),
-      true,
-    );
     assert.equal(
       Value.Check(ApprovalEvidenceV1Schema, {
         ...base,
-        mechanism: "github-environment",
-        githubContext,
+        mechanism: "tty",
         writerTransferClaimHash: "b".repeat(64),
       }),
       true,
@@ -742,17 +710,14 @@ describe("target family contracts", () => {
       }),
       false,
     );
-    assert.equal(Value.Check(ApprovalEvidenceV1Schema, { ...base, mechanism: "github-environment" }), false);
     assert.equal(
       Value.Check(ApprovalEvidenceV1Schema, {
         ...base,
         mechanism: "github-environment",
-        githubContext: { ...githubContext, unexpected: true },
       }),
       false,
     );
-    assert.equal(Value.Check(ApprovalEvidenceV1Schema, { ...base, mechanism: "tty", githubContext }), false);
-    assert.equal(Value.Check(ApprovalEvidenceV1Schema, { ...base, mechanism: "inherited", githubContext }), false);
+    assert.equal(Value.Check(ApprovalEvidenceV1Schema, { ...base, mechanism: "tty", githubContext: {} }), false);
   });
 
   it("provides complete metadata and lookup coverage for every schema", () => {

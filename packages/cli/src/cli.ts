@@ -7,7 +7,6 @@ import { evaluateQualityScorecard, renderQualityScorecardEvaluation, type Scorec
 import { join, resolve } from "node:path";
 import { ApexError, EXIT_CODES, normalizeError } from "./errors.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
-import { githubApprovalContext } from "./github-approval.js";
 import { resolveBundledAssets } from "./assets.js";
 import { serveMcp } from "./mcp.js";
 import { createFileProviderRuntime, hashTerraformConfiguration, hashTerraformLockFile } from "./provider-runtime.js";
@@ -559,25 +558,17 @@ export async function execute(argv: string[], root = process.cwd()): Promise<unk
       return service.resolveReview(JSON.parse(await readFile(required(flags, "file"), "utf8")));
     case "gate decide": {
       const mechanism = flags.mechanism ?? "tty";
-      if (mechanism !== "tty" && mechanism !== "github-environment") {
-        throw new ApexError("APEX_USAGE", "--mechanism must be tty or github-environment", EXIT_CODES.usage);
+      if (mechanism !== "tty") {
+        throw new ApexError("APEX_USAGE", "--mechanism must be tty", EXIT_CODES.usage);
       }
-      if (mechanism === "tty") {
-        return service.decideGateNumber(
-          Number(required(flags, "gate")),
-          required(flags, "decision") as "approved" | "rejected",
-          required(flags, "actor"),
-        );
+      if (flags.recipient === true || Array.isArray(flags.recipient) || flags.recipient === "") {
+        throw new ApexError("APEX_USAGE", "--recipient must be a nonempty identity", EXIT_CODES.usage);
       }
-      if (flags.actor !== undefined) {
-        throw new ApexError("APEX_USAGE", "--actor is not accepted for github-environment", EXIT_CODES.usage);
-      }
-      const githubContext = githubApprovalContext(process.env);
       return service.decideGateNumber(
         Number(required(flags, "gate")),
         required(flags, "decision") as "approved" | "rejected",
-        `github:${githubContext.actorId}:${githubContext.actor}`,
-        { mechanism, githubContext },
+        required(flags, "actor"),
+        typeof flags.recipient === "string" ? { recipientIdentity: flags.recipient } : {},
       );
     }
     case "validate":
@@ -593,6 +584,8 @@ export async function execute(argv: string[], root = process.cwd()): Promise<unk
           ? { recipientIdentity: flags.recipient }
           : {}),
       });
+    case "approval show":
+      return service.currentApproval();
     case "deploy":
       return service.deploy(typeof flags.preview === "string" ? flags.preview : undefined);
     case "reconcile":

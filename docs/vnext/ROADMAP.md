@@ -92,14 +92,15 @@ or live and has a prepared procedure.
 
 - Fresh supported VS Code discovery, direct handoffs, questions, hidden workers, and MCP startup.
 - Restart and cross-device resume with one-writer and transfer enforcement.
-- GitHub Environment reviewer approval, OIDC, and local-to-CI ownership transfer.
+- Local exact-preview Gate 4 approval, GitHub OIDC, and local-to-CI ownership transfer.
 - Bicep deployment-stack preview, apply, inventory, diagnosis, destroy, and recovery.
 - Terraform backend, protected exact plan, approval, apply, inventory, diagnosis, destroy, and recovery.
 - Promotion to a linked environment with Gate 4 refresh.
 
 The manual workflow, encrypted local handoff launcher, bootstrap resources, and structural mutation tests are prepared.
-See [LIVE-QUALIFICATION.md](LIVE-QUALIFICATION.md). Live proof remains outstanding; sandbox self-review must be disclosed,
-and production qualification requires independent approval.
+See [LIVE-QUALIFICATION.md](LIVE-QUALIFICATION.md). Live proof remains outstanding. The GitHub Environment scopes OIDC
+and configuration but is not an approval authority; the exact preview must be approved locally through APEX Gate 4
+before CI handoff.
 The dispatch-only workflow is part of this repository's default branch. Each ceremony still binds checkout, workflow,
 packages, state, preview, and evidence to one exact `main` commit.
 

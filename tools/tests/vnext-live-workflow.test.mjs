@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
+  approvedDispatchState,
   canonicalRecipient,
+  handoffRecipient,
   isAcceptedLocalOwnership,
   parseArgs,
   validateDispatchRunState,
@@ -28,6 +30,10 @@ function rejectsMutation(name, mutate, expected) {
 
 test("baseline live workflow passes", () => assert.deepEqual(validateWorkflowText(baseline), []));
 
+test("live workflow imports approval and cannot decide Gate 4 in CI", () => {
+  assert.doesNotMatch(baseline, /\bgate decide\b/);
+});
+
 rejectsMutation(
   "missing destination repository guard fails",
   (text) => text.replace('          test "$GITHUB_REPOSITORY" = "jonathan-vella/apex-vnext"\n', ""),
@@ -36,7 +42,7 @@ rejectsMutation(
 rejectsMutation(
   "missing protected environment fails",
   (text) => text.replace("    environment: vnext-qualification\n", ""),
-  "preview environment",
+  "apply environment",
 );
 rejectsMutation(
   "missing id-token permission fails",
@@ -49,19 +55,24 @@ rejectsMutation(
   "workflow permissions must be contents read only",
 );
 rejectsMutation(
-  "missing authority digest output fails",
-  (text) => text.replace("      artifact_digest: ${{ steps.authority_upload.outputs.artifact-digest }}\n", ""),
-  "artifact digest output",
+  "missing preview hash input fails",
+  (text) => text.replace("      preview_hash:\n", "      ignored_preview_hash:\n"),
+  "exact dispatch input set",
 );
 rejectsMutation(
-  "missing preview lock hash output fails",
-  (text) => text.replace("      terraform_lock_hash: ${{ steps.provider.outputs.lock_hash }}\n", ""),
-  "preview Terraform lock hash output",
+  "extra dispatch input fails",
+  (text) => text.replace("      preview_hash:\n", "      unexpected:\n        required: false\n      preview_hash:\n"),
+  "exact dispatch input set",
 );
 rejectsMutation(
-  "missing preview runner IP cleanup fails",
-  (text) => text.replace("      - name: Clear preview firewall rule", "      - name: Missing preview firewall cleanup"),
-  "clear the preview runner rule",
+  "old preview job fails",
+  (text) => text.replace("  apply:\n", "  preview:\n    runs-on: ubuntu-latest\n    steps: []\n\n  apply:\n"),
+  "exact validate_dispatch and apply jobs",
+);
+rejectsMutation(
+  "apply without validation dependency fails",
+  (text) => text.replace("    needs: validate_dispatch\n", ""),
+  "apply must need validate_dispatch",
 );
 rejectsMutation(
   "job-wide transport key fails",
@@ -78,8 +89,8 @@ rejectsMutation(
   "masked step output",
 );
 rejectsMutation(
-  "missing refreshed preview ARM token fails",
-  (text) => text.replace("      - name: Refresh ARM OIDC token for preview", "      - name: Missing preview token"),
+  "missing refreshed deploy ARM token fails",
+  (text) => text.replace("      - name: Refresh ARM OIDC token for deploy", "      - name: Missing deploy token"),
   "refreshed ARM token",
 );
 rejectsMutation(
@@ -100,7 +111,7 @@ rejectsMutation(
       '          az storage account network-rule add --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --account-name "$APEX_BACKEND_STORAGE_ACCOUNT" --ip-address "${{ steps.ip.outputs.address }}/32" --only-show-errors --output none\n';
     return text.replace(validation, "").replace(firewall, `${firewall}${validation}`);
   },
-  "preview security exception validation must precede firewall add",
+  "apply security exception validation must precede firewall add",
 );
 rejectsMutation(
   "missing firewall boundary exception recheck fails",
@@ -109,7 +120,7 @@ rejectsMutation(
       "          node tools/scripts/validate-vnext-qualification-context.mjs --security-exception-only\n",
       "",
     ),
-  "preview firewall boundary transaction",
+  "apply firewall boundary transaction",
 );
 rejectsMutation(
   "missing transient policy exclusion fails",
@@ -118,7 +129,7 @@ rejectsMutation(
       '          az storage account update --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --set tags.SecurityControl=Ignore --only-show-errors --output none\n',
       "",
     ),
-  "preview firewall boundary transaction",
+  "apply firewall boundary transaction",
 );
 rejectsMutation(
   "missing endpoint disable cleanup fails",
@@ -127,7 +138,7 @@ rejectsMutation(
       '          az storage account update --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --public-network-access Disabled --only-show-errors --output none\n',
       "",
     ),
-  "preview unconditional cleanup",
+  "apply unconditional cleanup",
 );
 rejectsMutation(
   "missing policy exclusion cleanup fails",
@@ -136,12 +147,7 @@ rejectsMutation(
       '          az storage account update --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --remove tags.SecurityControl --only-show-errors --output none\n',
       "",
     ),
-  "preview unconditional cleanup",
-);
-rejectsMutation(
-  "apply skip after preview cleanup failure fails",
-  (text) => text.replace("    if: ${{ always() && needs.preview.outputs.artifact_digest != '' }}\n", ""),
-  "apply must continue",
+  "apply unconditional cleanup",
 );
 rejectsMutation(
   "missing unconditional cleanup fails",
@@ -153,47 +159,87 @@ rejectsMutation(
   "unconditional cleanup",
 );
 rejectsMutation(
-  "late preview acceptance signal fails",
-  (text) =>
-    text.replace(
-      /(^\s+printf 'accepted=true\\ninitial_claim_hash=%s\\n'.*\n)([\s\S]*?^\s+az storage blob delete.*\n)/m,
-      "$2$1",
-    ),
-  "acceptance must be durable",
+  "missing stale rule cleanup fails",
+  (text) => text.replace("      - name: Ensure no stale runner firewall rule", "      - name: Skip stale runner check"),
+  "clear a stale runner rule",
 );
 rejectsMutation(
   "deploy without exact preview fails",
-  (text) => text.replace('deploy --preview "${{ needs.preview.outputs.preview_hash }}"', "deploy"),
-  "exact preview",
+  (text) => text.replace('deploy --preview "${{ inputs.preview_hash }}"', "deploy"),
+  "exact dispatch preview hash",
 );
 rejectsMutation(
-  "wrong Gate mechanism fails",
-  (text) => text.replace("--mechanism github-environment", "--mechanism tty"),
-  "Gate 4 mechanism",
-);
-rejectsMutation(
-  "missing preview recipient fails",
+  "CI Gate decision fails",
   (text) =>
     text.replace(
-      ' --recipient "$APPLY_RECIPIENT" --provider-config apex-live/provider-config.json',
-      " --provider-config apex-live/provider-config.json",
+      "npm run build:vnext",
+      "npm run build:vnext\n          node packages/cli/dist/cli.js gate decide --gate 4",
     ),
-  "preview recipient binding",
+  "forbidden direct mutation",
 );
 rejectsMutation(
-  "missing preview hash guard fails",
-  (text) => text.replace('          test -n "$PREVIEW_HASH"\n', ""),
-  "preview hash handoff guard",
+  "workflow preview creation fails",
+  (text) => text.replace("npm run build:vnext", "npm run build:vnext\n          apex preview"),
+  "forbidden direct mutation",
+);
+rejectsMutation(
+  "wrong stable recipient fails",
+  (text) => text.replace(":handoff:${HANDOFF_ID}:apply", ":${GITHUB_RUN_ID}:1:apply"),
+  "stable handoff apply recipient",
+);
+rejectsMutation(
+  "wrong incoming blob path fails",
+  (text) => text.replace("incoming/${{ inputs.handoff_id }}/${object}.json", "incoming/${{ inputs.handoff_id }}.json"),
+  "exact incoming state/provider downloads",
+);
+rejectsMutation(
+  "missing provider import fails",
+  (text) => text.replace("provider transfer-import", "provider inspect"),
+  "apply imports",
+);
+rejectsMutation(
+  "missing writer acceptance fails",
+  (text) => text.replace("writer transfer-accept", "writer inspect"),
+  "import, accept, approval, and deletion order",
+);
+rejectsMutation(
+  "missing approval show fails",
+  (text) => text.replace("approval show --json", "approval inspect --json"),
+  "import, accept, approval, and deletion order",
+);
+rejectsMutation(
+  "missing Gate 4 approval binding fails",
+  (text) => text.replace("gate:4,decision", "gate:3,decision"),
+  "imported tty approval validation",
+);
+rejectsMutation(
+  "wrong approval mechanism fails",
+  (text) => text.replace('mechanism:"tty"', 'mechanism:"github-environment"'),
+  "imported tty approval validation",
+);
+rejectsMutation(
+  "missing prior writer epoch check fails",
+  (text) => text.replace("run?.ownerEpoch!==approval.writerEpoch+1", "run?.ownerEpoch!==approval.writerEpoch"),
+  "imported tty approval validation",
+);
+rejectsMutation(
+  "early incoming deletion fails",
+  (text) =>
+    text.replace(
+      "          node packages/cli/dist/cli.js approval show --json",
+      "          az storage blob delete --name early\n          node packages/cli/dist/cli.js approval show --json",
+    ),
+  "import, accept, approval, and deletion order",
+);
+rejectsMutation(
+  "missing provider preview binding fails",
+  (text) => text.replace(".result.previewHash", ".result.unboundHash"),
+  "imported provider binding validation",
 );
 rejectsMutation(
   "missing apply lock binding fails",
-  (text) => text.replace('            test "$lock_hash" = "$PREVIEW_LOCK_HASH"\n', ""),
-  "exact preview Terraform lock hash",
-);
-rejectsMutation(
-  "missing provider transfer fails",
-  (text) => text.replace("provider transfer-export", "provider authority-export"),
-  "encrypted authority exports",
+  (text) => text.replace('            test "$lock_hash" = "$attested_lock_hash"\n', ""),
+  "current Terraform lock hash",
 );
 rejectsMutation(
   "direct terraform apply fails",
@@ -205,37 +251,39 @@ rejectsMutation(
   "forbidden direct mutation",
 );
 rejectsMutation(
+  "direct Azure deployment fails",
+  (text) => text.replace("npm run build:vnext", "az stack group create --name bypass"),
+  "forbidden direct mutation",
+);
+rejectsMutation(
   "key path artifact fails",
-  (text) =>
-    text.replace(
-      "apex-live/provider-authority.json\n          retention-days",
-      "apex-live/provider-authority.json\n            .apex/local/provider-runtime/plan-transport.key\n          retention-days",
-    ),
+  (text) => text.replace("          path: apex-live/evidence/", "          path: plan-transport.key"),
   "plaintext/key path",
 );
 rejectsMutation(
   "state path artifact fails",
-  (text) =>
-    text.replace(
-      "apex-live/provider-authority.json\n          retention-days",
-      "apex-live/provider-authority.json\n            terraform.tfstate\n          retention-days",
-    ),
+  (text) => text.replace("          path: apex-live/evidence/", "          path: terraform.tfstate"),
   "plaintext/key path",
 );
 rejectsMutation(
   "plain plan path artifact fails",
-  (text) =>
-    text.replace(
-      "apex-live/provider-authority.json\n          retention-days",
-      "apex-live/provider-authority.json\n            qualification.tfplan\n          retention-days",
-    ),
+  (text) => text.replace("          path: apex-live/evidence/", "          path: qualification.tfplan"),
   "plaintext/key path",
 );
 rejectsMutation(
   "hidden artifact parent fails",
-  (text) =>
-    text.replace("            apex-live/provider-authority.json", "            .apex-live/provider-authority.json"),
+  (text) => text.replace("          path: apex-live/evidence/", "          path: .apex-live/evidence/"),
   "hidden path segment",
+);
+rejectsMutation(
+  "wrong upload action version fails",
+  (text) => text.replace("actions/upload-artifact@v4", "actions/upload-artifact@v3"),
+  "apply artifacts invalid",
+);
+rejectsMutation(
+  "unsafe return fallback settings fail",
+  (text) => text.replace("          compression-level: 0", "          compression-level: 6"),
+  "encrypted return fallback artifact",
 );
 rejectsMutation(
   "wrong checkout action version fails",
@@ -265,6 +313,63 @@ test("launcher derives canonical GitHub identities", () => {
     "owner/repo/.github/workflows/vnext-live-qualification.yml@refs/heads/main",
   );
   assert.throws(() => canonicalRecipient("owner/repo", "42", 2, "preview"));
+});
+
+test("launcher binds local approval to the stable handoff recipient", () => {
+  const handoffId = "123e4567-e89b-42d3-a456-426614174000";
+  const recipient = handoffRecipient("jonathan-vella/apex-vnext", handoffId);
+  assert.equal(recipient, `github-actions:jonathan-vella/apex-vnext:handoff:${handoffId}:apply`);
+  assert.equal(
+    approvedDispatchState(
+      {
+        result: {
+          run: {
+            iacTool: "bicep",
+            ownerEpoch: 3,
+            gates: [
+              { gate: 3, state: "approved" },
+              { gate: 4, state: "approved" },
+            ],
+          },
+        },
+      },
+      {
+        result: {
+          gate: 4,
+          decision: "approved",
+          mechanism: "tty",
+          writerEpoch: 3,
+          recipientIdentity: recipient,
+          previewHash: "a".repeat(64),
+          expiresAt: "2099-01-01T00:00:00.000Z",
+        },
+      },
+      "bicep",
+      recipient,
+    ),
+    "a".repeat(64),
+  );
+  assert.throws(
+    () =>
+      approvedDispatchState(
+        {
+          result: {
+            run: {
+              iacTool: "bicep",
+              ownerEpoch: 3,
+              gates: [
+                { gate: 3, state: "approved" },
+                { gate: 4, state: "approved" },
+              ],
+            },
+          },
+        },
+        { result: {} },
+        "bicep",
+        recipient,
+      ),
+    /approved local Gate 4/,
+  );
 });
 
 test("launcher validates the exception before opening its local firewall rule", () => {
@@ -467,6 +572,7 @@ test("launcher requires the workflow file on the default branch before dispatch"
 });
 
 test("launcher strictly parses dispatch and retrieve arguments", () => {
+  const handoffId = "123e4567-e89b-42d3-a456-426614174000";
   const common = [
     "--yes",
     "--track",
@@ -478,16 +584,16 @@ test("launcher strictly parses dispatch and retrieve arguments", () => {
     "--storage-account",
     "storage",
   ];
-  assert.equal(parseArgs(["dispatch", ...common, "--ref", "main"]).container, "handoff");
-  const retrieved = parseArgs([
-    "retrieve",
-    ...common,
-    "--handoff-id",
-    "123e4567-e89b-42d3-a456-426614174000",
-    "--destination",
-    "/tmp/candidate",
-  ]);
+  assert.equal(parseArgs(["preview", ...common]).container, "handoff");
+  assert.equal(parseArgs(["preview", ...common, "--handoff-id", handoffId]).handoff_id, handoffId);
+  assert.equal(parseArgs(["dispatch", ...common, "--ref", "main", "--handoff-id", handoffId]).container, "handoff");
+  const retrieved = parseArgs(["retrieve", ...common, "--handoff-id", handoffId, "--destination", "/tmp/candidate"]);
   assert.equal(retrieved.stage, "apply");
-  assert.throws(() => parseArgs(["dispatch", ...common, "--ref", "feat/apex-vnext-rewrite"]), /must be main/);
-  assert.throws(() => parseArgs(["dispatch", ...common, "--ref", "main", "--extra", "x"]));
+  assert.throws(() => parseArgs(["preview", ...common, "--handoff-id", "not-a-uuid"]), /UUID/);
+  assert.throws(() => parseArgs(["dispatch", ...common, "--ref", "main"]), /requires --handoff-id UUID/);
+  assert.throws(
+    () => parseArgs(["dispatch", ...common, "--ref", "feat/apex-vnext-rewrite", "--handoff-id", handoffId]),
+    /must be main/,
+  );
+  assert.throws(() => parseArgs(["dispatch", ...common, "--ref", "main", "--handoff-id", handoffId, "--extra", "x"]));
 });

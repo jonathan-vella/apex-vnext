@@ -91,6 +91,42 @@ test("writer transfer proves exact one-hop post-preview lineage", async () => {
   assert.equal(await transfers.proveOneHopPostPreviewLineage(previewHash, 2), null);
 });
 
+test("writer transfer proves exact one-hop post-approval lineage", async () => {
+  const { transfers, runDirectory } = await fixture();
+  const journal = new EventJournal(join(runDirectory, "journal"));
+  const previewHash = "b".repeat(64);
+  const approvalHash = "c".repeat(64);
+  await journal.append({
+    eventId: "preview-approved-1",
+    projectId: "demo",
+    runId: "run-1",
+    type: "preview.created",
+    timestamp: "2026-01-01T00:00:00.000Z",
+    ownerEpoch: 1,
+    expectedHead: await journal.head(),
+    payload: { previewHash },
+  });
+  await journal.append({
+    eventId: "gate-approved-1",
+    projectId: "demo",
+    runId: "run-1",
+    type: "gate.decided",
+    timestamp: "2026-01-01T00:00:00.000Z",
+    ownerEpoch: 1,
+    expectedHead: await journal.head(),
+    payload: { gate: 4, approvalHash, previewHash },
+  });
+  const created = await transfers.create(request);
+  await transfers.accept({
+    claimHash: created.hash,
+    recipient: "bob",
+    currentGitHead: "abc123",
+    eventId: "accepted-approved-lineage",
+  });
+  assert.equal(await transfers.proveOneHopPostApprovalLineage(previewHash, 1, approvalHash), created.hash);
+  assert.equal(await transfers.proveOneHopPostApprovalLineage(previewHash, 1, "d".repeat(64)), null);
+});
+
 test("writer transfer lineage expires and is superseded by a later request", async () => {
   const expiring = await fixture();
   const previewHash = "b".repeat(64);

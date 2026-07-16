@@ -62,7 +62,7 @@ export interface WorkflowGateValidatorContext {
   readonly expectedDependencyHash?: string;
   readonly currentDependencyRevision: string;
   readonly legacyRequirements: boolean;
-  readonly currentRecipientIdentity: string;
+  readonly expectedApprovalRecipientIdentity: string;
   readonly provedPreviewTransferClaimHash?: string;
   readonly preview?: DeploymentPreviewV1;
 }
@@ -476,7 +476,7 @@ function gateApprovalBindingComplete(value: unknown): ValidationIssue[] {
     approval.dependencyHash === preview.previewHash &&
     approval.writerEpoch === context.run.ownerEpoch &&
     approval.writerTransferClaimHash === context.provedPreviewTransferClaimHash &&
-    approval.recipientIdentity === context.currentRecipientIdentity &&
+    approval.recipientIdentity === context.expectedApprovalRecipientIdentity &&
     approval.expiresAt !== undefined &&
     Date.parse(approval.expiresAt) > Date.parse(context.now);
   return valid ? [] : issue("/approval", "Approval does not completely bind the current preview and writer");
@@ -617,14 +617,24 @@ function deployStaleWriterRejection(value: unknown): ValidationIssue[] {
   const preview = context.preview;
   const approval = context.approval;
   const now = Date.parse(context.now);
-  const valid =
-    ((preview.ownerEpoch === context.run.ownerEpoch &&
-      context.provedPreviewTransferClaimHash === undefined &&
-      approval.writerTransferClaimHash === undefined) ||
-      (preview.ownerEpoch + 1 === context.run.ownerEpoch &&
-        context.provedPreviewTransferClaimHash !== undefined &&
-        approval.writerTransferClaimHash === context.provedPreviewTransferClaimHash)) &&
+  const sameWriter =
+    preview.ownerEpoch === context.run.ownerEpoch &&
     approval.writerEpoch === context.run.ownerEpoch &&
+    context.provedPreviewTransferClaimHash === undefined &&
+    approval.writerTransferClaimHash === undefined;
+  const approvedAfterTransfer =
+    preview.ownerEpoch + 1 === context.run.ownerEpoch &&
+    approval.writerEpoch === context.run.ownerEpoch &&
+    context.provedPreviewTransferClaimHash !== undefined &&
+    approval.writerTransferClaimHash === context.provedPreviewTransferClaimHash;
+  const approvedBeforeTransfer =
+    preview.ownerEpoch + 1 === context.run.ownerEpoch &&
+    approval.writerEpoch === preview.ownerEpoch &&
+    context.provedPreviewTransferClaimHash !== undefined &&
+    approval.writerTransferClaimHash === undefined &&
+    approval.recipientIdentity !== undefined;
+  const valid =
+    (sameWriter || approvedAfterTransfer || approvedBeforeTransfer) &&
     preview.commit === context.currentDependencyRevision &&
     preview.dependencyRevision === context.currentDependencyRevision &&
     Date.parse(preview.expiresAt) > now &&

@@ -3,19 +3,18 @@
 
 import { execFile as execFileCallback } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { chmod, mkdtemp, rm, stat } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { isIPv4 } from "node:net";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { VNEXT_QUALIFICATION_REPOSITORY } from "./_lib/vnext-qualification.mjs";
-import { validateQualificationSecurityException } from "./validate-vnext-qualification-context.mjs";
+import { EXPECTED_TAGS, validateQualificationSecurityException } from "./validate-vnext-qualification-context.mjs";
 
 const execFile = promisify(execFileCallback);
 const BRANCH = "main";
 const WORKFLOW = "vnext-live-qualification.yml";
-const ENVIRONMENT = "vnext-qualification";
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TRACKS = new Set(["bicep", "terraform"]);
@@ -30,6 +29,13 @@ export function canonicalRecipient(repository, runId, attempt, job) {
     throw new Error("Invalid canonical GitHub Actions recipient input");
   }
   return `github-actions:${repository}:${runId}:${attempt}:${job}`;
+}
+
+export function handoffRecipient(repository, handoffId) {
+  if (!repository || !UUID_PATTERN.test(handoffId ?? "")) {
+    throw new Error("Invalid GitHub Actions handoff recipient input");
+  }
+  return `github-actions:${repository}:handoff:${handoffId}:apply`;
 }
 
 export function workflowRef(repository, ref = BRANCH) {
@@ -60,6 +66,28 @@ export function validateDispatchRunState(status, track) {
     throw new Error("Selected APEX run has an unsupported Gate 4 state");
   }
   return true;
+}
+
+export function approvedDispatchState(status, approval, track, recipient, now = new Date()) {
+  validateDispatchRunState(status, track);
+  const run = status?.result?.run;
+  const gate4 = run?.gates?.find((gate) => gate.gate === 4);
+  const value = approval?.result;
+  if (
+    gate4?.state !== "approved" ||
+    value?.gate !== 4 ||
+    value?.decision !== "approved" ||
+    value?.mechanism !== "tty" ||
+    value?.writerEpoch !== run?.ownerEpoch ||
+    value?.recipientIdentity !== recipient ||
+    !/^[0-9a-f]{64}$/.test(value?.previewHash ?? "") ||
+    !Number.isFinite(Date.parse(value?.expiresAt ?? "")) ||
+    Date.parse(value.expiresAt) <= now.getTime() ||
+    value?.writerTransferClaimHash !== undefined
+  ) {
+    throw new Error("Dispatch requires an approved local Gate 4 decision for the exact handoff recipient");
+  }
+  return value.previewHash;
 }
 
 export function isAcceptedLocalOwnership(ownership, recipient, head) {
@@ -99,7 +127,9 @@ export function validateWorkflowBootstrap(repository, defaultWorkflow, candidate
 
 export function parseArgs(argv) {
   const command = argv[0];
-  if (!new Set(["dispatch", "retrieve"]).has(command)) throw new Error("Expected dispatch or retrieve subcommand");
+  if (!new Set(["preview", "dispatch", "retrieve"]).has(command)) {
+    throw new Error("Expected preview, dispatch, or retrieve subcommand");
+  }
   const values = { command };
   for (let index = 1; index < argv.length; index += 1) {
     const name = argv[index];
@@ -115,7 +145,11 @@ export function parseArgs(argv) {
   }
   const common = new Set(["yes", "track", "operation", "resource_group", "storage_account", "container"]);
   const allowed =
-    command === "dispatch" ? new Set([...common, "ref"]) : new Set([...common, "handoff_id", "destination", "stage"]);
+    command === "preview"
+      ? new Set([...common, "handoff_id"])
+      : command === "dispatch"
+        ? new Set([...common, "ref", "handoff_id"])
+        : new Set([...common, "handoff_id", "destination", "stage"]);
   for (const key of Object.keys(values)) {
     if (key !== "command" && !allowed.has(key)) throw new Error(`Unknown argument: --${key.replaceAll("_", "-")}`);
   }
@@ -126,8 +160,15 @@ export function parseArgs(argv) {
   if (!TRACKS.has(values.track)) throw new Error("--track must be bicep or terraform");
   if (!OPERATIONS.has(values.operation)) throw new Error("--operation must be apply or destroy");
   values.container ??= "handoff";
-  if (command === "dispatch") {
+  if (command === "preview") {
+    if (values.handoff_id !== undefined && !UUID_PATTERN.test(values.handoff_id)) {
+      throw new Error("--handoff-id must be a UUID");
+    }
+  } else if (command === "dispatch") {
     if (values.ref !== BRANCH) throw new Error(`--ref must be ${BRANCH}`);
+    if (typeof values.handoff_id !== "string" || !UUID_PATTERN.test(values.handoff_id)) {
+      throw new Error("dispatch requires --handoff-id UUID from the approved local preview");
+    }
   } else {
     for (const key of ["handoff_id", "destination"]) {
       if (typeof values[key] !== "string") throw new Error(`Missing --${key.replaceAll("_", "-")}`);
@@ -377,11 +418,186 @@ async function discoverRun(handoffId, candidateSha) {
   throw new Error("Dispatched workflow run was not discoverable within the retry window");
 }
 
+async function localProviderConfig(args, temporary, account) {
+  const workspace =
+    `/subscriptions/${account.id}/resourceGroups/${args.resource_group}/` +
+    "providers/Microsoft.OperationalInsights/workspaces/log-vnext-qualification";
+  const environment = {
+    ...process.env,
+    AZURE_SUBSCRIPTION_ID: account.id,
+    APEX_PROJECT_NAME: "vnext",
+    APEX_LOCATION: "swedencentral",
+    APEX_CONTROL_RESOURCE_GROUP: args.resource_group,
+    APEX_BICEP_RESOURCE_GROUP: "rg-vnext-qualification-bicep",
+    APEX_TERRAFORM_RESOURCE_GROUP: "rg-vnext-qualification-terraform",
+    APEX_BACKEND_STORAGE_ACCOUNT: args.storage_account,
+    APEX_LOG_ANALYTICS_WORKSPACE_RESOURCE_ID: workspace,
+    APEX_QUALIFICATION_TAGS_JSON: JSON.stringify(EXPECTED_TAGS),
+  };
+  await run("node", ["tools/scripts/validate-vnext-qualification-context.mjs"], {
+    cwd: SCRIPT_ROOT,
+    env: environment,
+  });
+  const providerConfig = join(temporary, "provider-config.json");
+  if (args.track === "bicep") {
+    const parametersFile = join(temporary, "main.parameters.json");
+    await writeFile(
+      parametersFile,
+      `${JSON.stringify(
+        {
+          $schema: "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+          contentVersion: "1.0.0.0",
+          parameters: {
+            projectName: { value: "vnext" },
+            environment: { value: "qualification" },
+            location: { value: "swedencentral" },
+            tags: { value: EXPECTED_TAGS },
+            logAnalyticsWorkspaceResourceId: { value: workspace },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    await writeFile(
+      providerConfig,
+      `${JSON.stringify(
+        {
+          bicep: {
+            resourceGroup: "rg-vnext-qualification-bicep",
+            deploymentName: "vnext-qualification",
+            stackName: "vnext-qualification",
+            templateFile: join(SCRIPT_ROOT, "infra/bicep/vnext-qualification/main.bicep"),
+            parametersFile,
+            actionOnUnmanage: "deleteResources",
+            ownershipAuthorizesDeleteResources: true,
+            dedicatedSandboxResourceGroup: true,
+            denySettingsMode: "denyDelete",
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    return { providerConfig, environment };
+  }
+  const terraformRoot = join(SCRIPT_ROOT, "infra/terraform/vnext-qualification");
+  const backendFile = join(temporary, "backend.hcl");
+  const planDirectory = join(temporary, "plans");
+  await mkdir(planDirectory, { recursive: true });
+  await writeFile(
+    backendFile,
+    [
+      `resource_group_name = "${args.resource_group}"`,
+      `storage_account_name = "${args.storage_account}"`,
+      'container_name = "tfstate"',
+      'key = "vnext-qualification.tfstate"',
+      "use_cli = true",
+      "use_oidc = false",
+      "use_azuread_auth = true",
+      "",
+    ].join("\n"),
+  );
+  const lockOutput = await run("sha256sum", [join(terraformRoot, ".terraform.lock.hcl")]);
+  const lockfileHash = lockOutput.split(/\s+/, 1)[0];
+  await writeFile(
+    providerConfig,
+    `${JSON.stringify(
+      {
+        terraform: {
+          cwd: terraformRoot,
+          target: "rg-vnext-qualification-terraform",
+          planDirectory,
+          lockfileHash,
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  for (const name of ["ARM_CLIENT_ID", "ARM_OIDC_TOKEN", "ARM_TENANT_ID"]) delete environment[name];
+  Object.assign(environment, {
+    ARM_SUBSCRIPTION_ID: account.id,
+    ARM_USE_AZUREAD: "true",
+    ARM_USE_CLI: "true",
+    ARM_USE_OIDC: "false",
+    TF_CLI_ARGS_init: `-backend-config=${backendFile}`,
+    TF_VAR_project_name: "vnext",
+    TF_VAR_environment: "qualification",
+    TF_VAR_location: "swedencentral",
+    TF_VAR_resource_group_name: "rg-vnext-qualification-terraform",
+    TF_VAR_log_analytics_workspace_resource_id: workspace,
+    TF_VAR_tags: JSON.stringify(EXPECTED_TAGS),
+  });
+  return { providerConfig, environment };
+}
+
+async function preview(args) {
+  validateTransportKey(process.env.APEX_PLAN_TRANSPORT_KEY);
+  const checkout = await gitState(process.cwd());
+  if (checkout.branch !== BRANCH) throw new Error(`Checkout must be ${BRANCH}`);
+  validateDispatchRunState(await json("node", [SOURCE_CLI, "status", "--json"]), args.track);
+  await run("az", ["account", "get-access-token", "--resource", "https://management.azure.com/", "--output", "none"]);
+  const repositoryMetadata = await json("gh", ["repo", "view", "--json", "nameWithOwner,defaultBranchRef"]);
+  if (repositoryMetadata.nameWithOwner !== VNEXT_QUALIFICATION_REPOSITORY) {
+    throw new Error(`Live qualification requires destination repository ${VNEXT_QUALIFICATION_REPOSITORY}`);
+  }
+  const handoffId = args.handoff_id ?? randomUUID();
+  const recipient = handoffRecipient(repositoryMetadata.nameWithOwner, handoffId);
+  const temporary = await mkdtemp(join(tmpdir(), "apex-vnext-preview-"));
+  const persistedProviderConfig = join(process.cwd(), ".apex", "provider-config.json");
+  let previousProviderConfig;
+  try {
+    try {
+      previousProviderConfig = await readFile(persistedProviderConfig);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+    const account = await json("az", ["account", "show", "--query", "{id:id,tenantId:tenantId}", "--output", "json"]);
+    const config = await localProviderConfig(args, temporary, account);
+    const action = () =>
+      json(
+        "node",
+        [
+          SOURCE_CLI,
+          "preview",
+          "--operation",
+          args.operation,
+          "--provider",
+          args.track,
+          "--recipient",
+          recipient,
+          "--provider-config",
+          config.providerConfig,
+          "--json",
+        ],
+        { cwd: process.cwd(), env: config.environment, timeout: 20 * 60_000 },
+      );
+    const created = args.track === "terraform" ? await withFirewall(args, action) : await action();
+    const rendered = await json("node", [SOURCE_CLI, "render", "--kind", "preview", "--json"]);
+    return {
+      command: "preview",
+      handoffId,
+      recipient,
+      candidateSha: checkout.head,
+      previewHash: created.result.previewHash,
+      preview: rendered.result,
+      approvalCommand:
+        `node packages/cli/dist/cli.js gate decide --gate 4 --decision approved ` +
+        `--actor <maintainer> --recipient ${recipient} --json`,
+    };
+  } finally {
+    if (previousProviderConfig === undefined) await rm(persistedProviderConfig, { force: true });
+    else await writeFile(persistedProviderConfig, previousProviderConfig);
+    await rm(temporary, { recursive: true, force: true });
+  }
+}
+
 async function dispatch(args) {
   validateTransportKey(process.env.APEX_PLAN_TRANSPORT_KEY);
   const checkout = await gitState(process.cwd());
   if (checkout.branch !== BRANCH || args.ref !== BRANCH) throw new Error(`Checkout and --ref must be ${BRANCH}`);
-  validateDispatchRunState(await json("node", [SOURCE_CLI, "status", "--json"]), args.track);
+  const status = await json("node", [SOURCE_CLI, "status", "--json"]);
   await run("az", ["account", "get-access-token", "--resource", "https://management.azure.com/", "--output", "none"]);
   const repositoryMetadata = await json("gh", ["repo", "view", "--json", "nameWithOwner,defaultBranchRef"]);
   const defaultBranch = repositoryMetadata.defaultBranchRef?.name;
@@ -408,8 +624,11 @@ async function dispatch(args) {
     candidateWorkflow,
     localBlobSha,
   );
+  const recipient = handoffRecipient(repository, args.handoff_id);
+  const approval = await json("node", [SOURCE_CLI, "approval", "show", "--json"]);
+  const previewHash = approvedDispatchState(status, approval, args.track, recipient);
   await withFirewall(args, async () => undefined);
-  const handoffId = randomUUID();
+  const handoffId = args.handoff_id;
   await run("gh", [
     "workflow",
     "run",
@@ -424,15 +643,17 @@ async function dispatch(args) {
     `handoff_id=${handoffId}`,
     "-f",
     `candidate_sha=${checkout.head}`,
+    "-f",
+    `preview_hash=${previewHash}`,
   ]);
   const runSummary = await discoverRun(handoffId, checkout.head);
   const details = await json("gh", ["api", `repos/${repository}/actions/runs/${runSummary.databaseId}`]);
   if (details.run_attempt !== 1 || details.head_branch !== BRANCH || details.head_sha !== checkout.head) {
     throw safeError("Dispatched run binding verification failed", { runId: runSummary.databaseId, handoffId });
   }
-  const recipient = canonicalRecipient(repository, runSummary.databaseId, 1, "preview");
   const temporary = await mkdtemp(join(tmpdir(), "apex-vnext-handoff-"));
-  const envelope = join(temporary, "incoming.json");
+  const stateEnvelope = join(temporary, "state.json");
+  const providerEnvelope = join(temporary, "provider.json");
   let claimHash;
   try {
     const shown = await json("node", [SOURCE_CLI, "writer", "show", "--json"]);
@@ -453,8 +674,6 @@ async function dispatch(args) {
       sender,
       "--recipient",
       recipient,
-      "--environment",
-      ENVIRONMENT,
       "--head",
       checkout.head,
       "--ttl",
@@ -473,33 +692,55 @@ async function dispatch(args) {
       "--ttl-seconds",
       "3600",
       "--file",
-      envelope,
+      stateEnvelope,
       "--yes",
       "--json",
     ]);
-    await chmod(envelope, 0o600);
-    await withFirewall(args, () =>
-      run("az", [
-        "storage",
-        "blob",
-        "upload",
-        "--auth-mode",
-        "login",
-        "--account-name",
-        args.storage_account,
-        "--container-name",
-        args.container,
-        "--name",
-        `incoming/${handoffId}.json`,
-        "--file",
-        envelope,
-        "--overwrite",
-        "false",
-        "--only-show-errors",
-        "--output",
-        "none",
-      ]),
-    );
+    await json("node", [
+      SOURCE_CLI,
+      "provider",
+      "transfer-export",
+      "--preview",
+      previewHash,
+      "--provider",
+      args.track,
+      "--recipient",
+      recipient,
+      "--ttl-seconds",
+      "3600",
+      "--file",
+      providerEnvelope,
+      "--yes",
+      "--json",
+    ]);
+    await Promise.all([chmod(stateEnvelope, 0o600), chmod(providerEnvelope, 0o600)]);
+    await withFirewall(args, async () => {
+      for (const [name, file] of [
+        [`incoming/${handoffId}/state.json`, stateEnvelope],
+        [`incoming/${handoffId}/provider.json`, providerEnvelope],
+      ]) {
+        await run("az", [
+          "storage",
+          "blob",
+          "upload",
+          "--auth-mode",
+          "login",
+          "--account-name",
+          args.storage_account,
+          "--container-name",
+          args.container,
+          "--name",
+          name,
+          "--file",
+          file,
+          "--overwrite",
+          "false",
+          "--only-show-errors",
+          "--output",
+          "none",
+        ]);
+      }
+    });
   } catch {
     throw safeError("Encrypted handoff preparation failed after dispatch", {
       runId: runSummary.databaseId,
@@ -515,7 +756,9 @@ async function dispatch(args) {
     runId: runSummary.databaseId,
     runUrl: runSummary.url,
     candidateSha: checkout.head,
-    instruction: `Manually approve the ${ENVIRONMENT} Environment when GitHub requests review.`,
+    previewHash,
+    recipient,
+    instruction: `The workflow will import the existing local Gate 4 approval and cannot create approval.`,
   };
 }
 
@@ -660,7 +903,12 @@ async function retrieve(args) {
 async function main() {
   try {
     const args = parseArgs(process.argv.slice(2));
-    const result = args.command === "dispatch" ? await dispatch(args) : await retrieve(args);
+    const result =
+      args.command === "preview"
+        ? await preview(args)
+        : args.command === "dispatch"
+          ? await dispatch(args)
+          : await retrieve(args);
     process.stdout.write(`${JSON.stringify(result)}\n`);
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : "vNext handoff failed"}\n`);

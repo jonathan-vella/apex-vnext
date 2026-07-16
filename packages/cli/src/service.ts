@@ -31,7 +31,6 @@ import {
   type CostEstimateV1,
   type DeploymentPreviewV1,
   type EnvironmentInputsV1,
-  type GitHubApprovalContext,
   type IacBindingV1,
   type LogicalResourceManifestV1,
   type ImplementationIntentV1,
@@ -117,8 +116,7 @@ interface Selection {
 }
 
 export interface GateDecisionOptions {
-  mechanism?: "tty" | "github-environment";
-  githubContext?: GitHubApprovalContext;
+  recipientIdentity?: string;
 }
 
 interface ManagedFile {
@@ -1022,19 +1020,15 @@ export class ApexService {
     if (gateNumber === 4 && previewHash === undefined) {
       throw new ApexError("APEX_VALIDATION", "Gate 4 requires a deployment preview", EXIT_CODES.validation);
     }
-    const mechanism = options.mechanism ?? "tty";
-    if (mechanism !== "tty" && mechanism !== "github-environment") {
-      throw new ApexError("APEX_USAGE", "Unsupported gate approval mechanism", EXIT_CODES.usage);
-    }
-    if (mechanism === "tty" && options.githubContext !== undefined) {
-      throw new ApexError("APEX_VALIDATION", "TTY approval cannot include GitHub context", EXIT_CODES.validation);
-    }
-    if (mechanism === "github-environment" && (gateNumber !== 4 || decision !== "approved")) {
+    if (options.recipientIdentity !== undefined && gateNumber !== 4) {
       throw new ApexError(
-        "APEX_AUTHORIZATION",
-        "GitHub Environment approval is limited to approved Gate 4 decisions",
-        EXIT_CODES.authorization,
+        "APEX_VALIDATION",
+        "An explicit approval recipient is limited to TTY Gate 4 decisions",
+        EXIT_CODES.validation,
       );
+    }
+    if (options.recipientIdentity !== undefined && options.recipientIdentity.trim().length === 0) {
+      throw new ApexError("APEX_VALIDATION", "Approval recipient must be nonempty", EXIT_CODES.validation);
     }
     const previewObjectHash =
       gateNumber === 4 ? this.latestPayloadHash(events, "preview.created", "previewObjectHash") : undefined;
@@ -1046,7 +1040,6 @@ export class ApexService {
     if (preview !== undefined && Date.parse(preview.expiresAt) <= this.clock().getTime()) {
       throw new ApexError("APEX_STALE", "Deployment preview has expired", EXIT_CODES.stale);
     }
-    const githubContext = options.githubContext;
     const transferStore = new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock);
     if (gateNumber === 4) await this.assertCurrentWriterAuthority(run, transferStore);
     const writerLease = gateNumber === 4 ? await transferStore.leaseStore().current() : null;
@@ -1057,7 +1050,8 @@ export class ApexService {
     if (preview !== undefined && preview.ownerEpoch !== run.ownerEpoch && writerTransferClaimHash === null) {
       throw new ApexError("APEX_STALE", "Preview writer transfer lineage is invalid", EXIT_CODES.stale);
     }
-    const recipientIdentity = await this.currentRecipientIdentity(run);
+    const currentRecipientIdentity = await this.currentRecipientIdentity(run);
+    const approvalRecipientIdentity = options.recipientIdentity ?? currentRecipientIdentity;
     const decidedAt = this.clock().toISOString();
     const approvalExpiresAt =
       preview === undefined
@@ -1082,58 +1076,16 @@ export class ApexService {
       decidedAt,
       ...(approvalExpiresAt === undefined ? {} : { expiresAt: approvalExpiresAt }),
     };
-    let approval: ApprovalEvidenceV1;
-    if (mechanism === "github-environment") {
-      if (githubContext === undefined) {
-        throw new ApexError("APEX_VALIDATION", "GitHub Environment approval requires context", EXIT_CODES.validation);
-      }
-      approval = {
-        ...commonApproval,
-        mechanism,
-        recipientIdentity: githubContext.recipientIdentity,
-        githubContext,
-      };
-    } else {
-      approval = { ...commonApproval, mechanism: "tty", recipientIdentity };
-    }
+    const approval: ApprovalEvidenceV1 = {
+      ...commonApproval,
+      mechanism: "tty",
+      recipientIdentity: approvalRecipientIdentity,
+    };
     this.assertValid("approval", approval);
-    if (approval.mechanism === "github-environment") {
-      const context = approval.githubContext;
-      const expectedActor = `github:${context.actorId}:${context.actor}`;
-      const expectedRecipient = `github-actions:${context.repository}:${context.runId}:${context.runAttempt}:${context.job}`;
-      if (actor !== expectedActor) {
-        throw new ApexError(
-          "APEX_AUTHORIZATION",
-          "GitHub approval actor does not match context",
-          EXIT_CODES.authorization,
-        );
-      }
-      const ownership = await transferStore.currentActiveOwnership();
-      if (ownership === null || ownership.ownerEpoch !== run.ownerEpoch) {
-        throw new ApexError("APEX_STALE", "Current writer ownership is missing or stale", EXIT_CODES.stale);
-      }
-      if (
-        context.recipientIdentity !== expectedRecipient ||
-        recipientIdentity !== expectedRecipient ||
-        ownership.ownerId !== expectedRecipient
-      ) {
-        throw new ApexError(
-          "APEX_AUTHORIZATION",
-          "GitHub approval recipient is not the current writer",
-          EXIT_CODES.authorization,
-        );
-      }
-      if (
-        ownership.repository !== context.repository ||
-        context.ref !== `refs/heads/${ownership.branch}` ||
-        ownership.commit !== context.sha ||
-        ownership.workflowId !== context.workflowRef ||
-        ownership.approvalEnvironment !== context.environment
-      ) {
-        throw new ApexError("APEX_STALE", "GitHub approval context does not match writer ownership", EXIT_CODES.stale);
-      }
-    }
-    const validatorIds = decision === "approved" ? await this.validateGateValidators(run, gate, events, approval) : [];
+    const validatorIds =
+      decision === "approved"
+        ? await this.validateGateValidators(run, gate, events, approval, approvalRecipientIdentity)
+        : [];
     if (gateNumber === 4) {
       await this.assertCurrentWriterAuthority(run, transferStore);
       if (approval.expiresAt === undefined || Date.parse(approval.expiresAt) <= this.clock().getTime()) {
@@ -1318,6 +1270,20 @@ export class ApexService {
     return this.render("preview");
   }
 
+  async currentApproval(): Promise<ApprovalEvidenceV1> {
+    const run = await this.currentRun();
+    const approvalHash = this.latestPayloadHash(
+      await this.journal(run).replay(),
+      "gate.decided",
+      "approvalHash",
+      (payload) => payload.gate === 4,
+    );
+    if (approvalHash === undefined) {
+      throw new ApexError("APEX_NOT_FOUND", "No Gate 4 approval exists for this run", EXIT_CODES.notFound);
+    }
+    return this.objects.getJson<ApprovalEvidenceV1>(approvalHash);
+  }
+
   async deploy(expectedPreviewHash?: string): Promise<{ operation: unknown; inventory: ResourceInventoryV1 }> {
     const run = await this.currentRun();
     const transferStore = new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock);
@@ -1375,11 +1341,22 @@ export class ApexService {
     const writerTransferClaimHash =
       preview.ownerEpoch === run.ownerEpoch
         ? undefined
-        : await transferStore.proveOneHopPostPreviewLineage(preview.previewHash, preview.ownerEpoch);
+        : approval.writerEpoch === preview.ownerEpoch
+          ? await transferStore.proveOneHopPostApprovalLineage(preview.previewHash, preview.ownerEpoch, approvalHash)
+          : await transferStore.proveOneHopPostPreviewLineage(preview.previewHash, preview.ownerEpoch);
+    const approvalAfterTransfer =
+      approval.writerEpoch === run.ownerEpoch &&
+      approval.writerTransferClaimHash === (writerTransferClaimHash ?? undefined);
+    const approvalBeforeTransfer =
+      preview.ownerEpoch + 1 === run.ownerEpoch &&
+      approval.writerEpoch === preview.ownerEpoch &&
+      approval.writerTransferClaimHash === undefined &&
+      writerTransferClaimHash !== null &&
+      writerTransferClaimHash !== undefined &&
+      approval.recipientIdentity === (await this.currentRecipientIdentity(run));
     if (
-      approval.writerEpoch !== run.ownerEpoch ||
       (preview.ownerEpoch !== run.ownerEpoch && writerTransferClaimHash === null) ||
-      approval.writerTransferClaimHash !== (writerTransferClaimHash ?? undefined)
+      (!approvalAfterTransfer && !approvalBeforeTransfer)
     )
       throw new ApexError("APEX_STALE", "Owner epoch changed", EXIT_CODES.stale);
     const dependencyRevision = this.dependencyRevision(run, events);
@@ -2734,6 +2711,7 @@ export class ApexService {
     gate: RunConfigV1["gates"][number],
     events: Awaited<ReturnType<EventJournal["replay"]>>,
     approval: ApprovalEvidenceV1,
+    expectedApprovalRecipientIdentity: string,
   ): Promise<string[]> {
     const workflow = await this.lockedWorkflowEngine(run);
     const nodeId = `gate-${gate.gate}`;
@@ -2807,7 +2785,7 @@ export class ApexService {
       reviewBlockers: reviewNodes.flatMap((reviewNode) => this.reviewBlockers(events, reviewNode)),
       currentDependencyRevision: this.dependencyRevision(run, events),
       legacyRequirements,
-      currentRecipientIdentity: await this.currentRecipientIdentity(run),
+      expectedApprovalRecipientIdentity,
       ...(provedPreviewTransferClaimHash === undefined ? {} : { provedPreviewTransferClaimHash }),
       ...(expectedDependencyHash === undefined ? {} : { expectedDependencyHash }),
       ...(preview === undefined ? {} : { preview }),
