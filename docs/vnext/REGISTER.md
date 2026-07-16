@@ -136,11 +136,13 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Type:** `ISSUE`
 - **Owner:** Release qualification
 - **Impact:** VS Code, GitHub approval, Azure Bicep, and Azure Terraform release claims remain unavailable.
-- **Evidence:** The bootstrap, manual workflow, encrypted handoff launcher, and structural tests are prepared, but no
+- **Evidence:** The bootstrap, manual workflow, encrypted handoff launcher, and structural tests are destination-bound,
+  but the destination has no qualification Environment, variables, secrets, OIDC federation, or Azure resources. No
   exact-head live evidence satisfies [PRD.md](PRD.md) cutover acceptance.
 - **Related issue:** Destination issue `#9`.
-- **Mitigation:** Follow [LIVE-QUALIFICATION.md](LIVE-QUALIFICATION.md) after automated gates are green. Record that the
-  sandbox permits maintainer self-review; require independent approval before production qualification.
+- **Mitigation:** After explicit maintainer approval, configure the destination controls and follow
+  [LIVE-QUALIFICATION.md](LIVE-QUALIFICATION.md). Record that the sandbox permits maintainer self-review; require
+  independent approval before production qualification.
 - **State:** Open
 - **Closure proof:** Evidence index with candidate and dependency hashes for every required scenario.
 

@@ -12,6 +12,10 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import {
+  VNEXT_QUALIFICATION_REPOSITORY,
+  VNEXT_QUALIFICATION_REPOSITORY_IDENTITY,
+} from "./_lib/vnext-qualification.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const COMMAND_OPTIONS = {
@@ -266,7 +270,24 @@ export function assertCleanGitStatus(status) {
   if (status.trim().length > 0) throw new Error("Live qualification requires a clean Git worktree");
 }
 
-export function assertReleaseManifest(manifest, commit) {
+function repositoryIdentity(value) {
+  if (typeof value !== "string" || value.length === 0) return null;
+  const remote = value.replace(/^git\+/, "");
+  const normalized = /^git@[^:]+:/.test(remote) ? remote.replace(/^git@([^:]+):/, "ssh://git@$1/") : remote;
+  try {
+    const url = new URL(normalized);
+    const path = url.pathname.replace(/^\/+|\/+$/g, "").replace(/\.git$/, "");
+    return path.length > 0 ? `${url.hostname.toLowerCase()}/${path.toLowerCase()}` : null;
+  } catch {
+    return null;
+  }
+}
+
+export function assertReleaseManifest(manifest, commit, repository) {
+  const candidateRepository = repositoryIdentity(repository);
+  if (candidateRepository !== VNEXT_QUALIFICATION_REPOSITORY_IDENTITY) {
+    throw new Error(`Live qualification requires destination repository ${VNEXT_QUALIFICATION_REPOSITORY}`);
+  }
   const validPackage = (entry) =>
     entry !== null &&
     typeof entry === "object" &&
@@ -291,8 +312,7 @@ export function assertReleaseManifest(manifest, commit) {
   if (
     manifest?.version !== 1 ||
     manifest.sourceCommit !== commit ||
-    typeof manifest.sourceRepository !== "string" ||
-    manifest.sourceRepository.length === 0 ||
+    repositoryIdentity(manifest.sourceRepository) !== candidateRepository ||
     manifest.toolchain === null ||
     typeof manifest.toolchain !== "object" ||
     !Array.isArray(manifest.packages) ||
@@ -303,7 +323,7 @@ export function assertReleaseManifest(manifest, commit) {
     !validSecurityEntry(manifest.security?.sbom) ||
     !validSecurityEntry(manifest.security?.provenance)
   ) {
-    throw new Error("Release manifest is invalid or does not match the current commit");
+    throw new Error("Release manifest is invalid or does not match the current candidate");
   }
 }
 
@@ -312,6 +332,7 @@ async function currentCandidate(options) {
   const runtimeBundlePath = resolve(options["runtime-bundle"] ?? join(ROOT, "config", "runtime-bundle.v1.json"));
   const releaseManifestPath = resolve(required(options, "release-manifest"));
   const packageMetadata = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8"));
+  const repository = packageMetadata.repository.url.replace(/^git\+/, "").replace(/\.git$/, "");
   const detectedBranch = gitValue(["rev-parse", "--abbrev-ref", "HEAD"]);
   const branch = detectedBranch === "HEAD" ? required(options, "branch") : detectedBranch;
   if (options.branch !== undefined && options.branch !== branch)
@@ -319,9 +340,9 @@ async function currentCandidate(options) {
   const commit = gitValue(["rev-parse", "HEAD"]);
   const releaseManifestBytes = await readFile(releaseManifestPath);
   const releaseManifest = JSON.parse(releaseManifestBytes.toString("utf8"));
-  assertReleaseManifest(releaseManifest, commit);
+  assertReleaseManifest(releaseManifest, commit, repository);
   return {
-    repository: packageMetadata.repository.url.replace(/^git\+/, "").replace(/\.git$/, ""),
+    repository,
     branch,
     commit,
     packageLockHash: sha256(await readFile(packageLockPath)),

@@ -20,6 +20,11 @@ npm run pack:vnext
 Create the template only from a clean Git worktree. The command rejects tracked or untracked files because they are not
 represented by the candidate commit.
 
+Candidate repository identity is immutable too. The release manifest must name the same repository as the package
+metadata, allowing equivalent HTTPS and SSH Git URL forms. For this release, the live launcher and workflow accept only
+`jonathan-vella/apex-vnext`; copying the workflow or a release manifest into another repository does not produce valid
+qualification evidence.
+
 When the public npm registry is unavailable locally, use an approved registry proxy as a process-scoped override:
 
 ```bash
