@@ -16,6 +16,9 @@
 | [`vnext-live-qualification.yml`](vnext-live-qualification.yml)     | Manual only; default-branch bootstrap required | Run an exact integration-head Bicep or Terraform preview and protected Gate 4 apply/destroy ceremony.                    | Opens a bounded backend network session and mutates qualification resources after Environment approval. |
 | [`weekly-maintenance.yml`](weekly-maintenance.yml)                 | Weekly Mon 06:00 UTC + manual | Consolidated data-refresh + audit umbrella — see [Weekly Maintenance](#weekly-maintenance) below.                          | Opens PRs (refresh jobs, manual merge) + GitHub issues (audit jobs). |
 
+`validate-devcontainer-base.yml` is retained for reference but disabled in GitHub Actions. Do not dispatch or use it as
+a validation gate unless the maintainer records a new explicit decision.
+
 ## Weekly Maintenance
 
 `weekly-maintenance.yml` is the umbrella workflow for low-frequency

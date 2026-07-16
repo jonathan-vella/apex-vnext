@@ -26,6 +26,10 @@ The Astro documentation site was intentionally excluded. Its vNext user pages
 were migrated into `docs/guides/` as ordinary Markdown, and documentation CI was
 replaced with Markdown lint, link, and freshness validation.
 
+Devcontainer CI is disabled in the destination repository and is not an
+acceptance gate. Re-enabling or dispatching it requires a new explicit
+maintainer decision.
+
 ## Ongoing Work
 
 All new vNext implementation, qualification, documentation, issue tracking, and

@@ -29,7 +29,7 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Impact:** Production Terraform CI apply cannot be enabled.
 - **Evidence:** [Security documentation](../guides/security.md) limits support to local exact-plan
   operation; `REQ-TERRAFORM-001` requires recipient-bound encrypted transport.
-- **Related issue:** [#544](https://github.com/jonathan-vella/apex/issues/544)
+- **Related issue:** Destination issue `#10`.
 - **Mitigation:** Prove encrypted, expiring, recipient-bound plan transport and exact-plan apply in GitHub Actions.
 - **State:** Open
 - **Closure proof:** Live CI evidence bound to the approved preview, head, lineage, serial, and recipient.
@@ -53,7 +53,7 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Impact:** Failure would require more agents to remain picker-visible and would change the intended user experience.
 - **Evidence:** The managed customization manifest validates invocation edges, but no fresh supported VS Code evidence is
   bound to the current candidate.
-- **Related issue:** [#543](https://github.com/jonathan-vella/apex/issues/543)
+- **Related issue:** Destination issue `#9`.
 - **Mitigation:** Run direct handoff, hidden worker, model-tier, and `askQuestions` scenarios in a clean supported VS Code.
 - **State:** Open
 - **Closure proof:** Versioned manual qualification evidence on the exact candidate head.
@@ -138,7 +138,7 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Impact:** VS Code, GitHub approval, Azure Bicep, and Azure Terraform release claims remain unavailable.
 - **Evidence:** The bootstrap, manual workflow, encrypted handoff launcher, and structural tests are prepared, but no
   exact-head live evidence satisfies [PRD.md](PRD.md) cutover acceptance.
-- **Related issue:** [#543](https://github.com/jonathan-vella/apex/issues/543)
+- **Related issue:** Destination issue `#9`.
 - **Mitigation:** Follow [LIVE-QUALIFICATION.md](LIVE-QUALIFICATION.md) after automated gates are green. Record that the
   sandbox permits maintainer self-review; require independent approval before production qualification.
 - **State:** Open
