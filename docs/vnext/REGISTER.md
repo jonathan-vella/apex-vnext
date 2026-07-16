@@ -46,6 +46,22 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **State:** Blocked
 - **Closure proof:** Project URL and verified field and view inventory.
 
+### RISK-004: Required Environment Reviewers Are Unavailable On The Current GitHub Plan
+
+- **Type:** `RISK`
+- **Owner:** Repository maintainer
+- **Impact:** The GitHub approval and local-to-CI writer-transfer scenario cannot satisfy live qualification while the
+  destination repository remains private on a plan without required Environment reviewers.
+- **Evidence:** On 2026-07-16, the GitHub Environment API returned HTTP 422 when creating the required-reviewer rule.
+  The partial `vnext-qualification` Environment has no protection rules, variables, or secrets.
+- **Related issue:** Destination issue `#9`.
+- **Mitigation:** Upgrade or move the private repository to a plan supporting required Environment reviewers, then
+  configure the reviewer and `main`-only branch policy before installing any credentials. Do not substitute an
+  unprotected Environment or claim its execution as approval evidence.
+- **State:** Blocked
+- **Closure proof:** Environment API evidence showing the required-reviewer rule and `main` branch policy, followed by a
+  protected-job approval record bound to the exact candidate.
+
 ### ASSUMPTION-001: VS Code Handoff Topology Is Supported
 
 - **Type:** `ASSUMPTION`
@@ -136,13 +152,14 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Type:** `ISSUE`
 - **Owner:** Release qualification
 - **Impact:** VS Code, GitHub approval, Azure Bicep, and Azure Terraform release claims remain unavailable.
-- **Evidence:** The bootstrap, manual workflow, encrypted handoff launcher, and structural tests are destination-bound,
-  but the destination has no qualification Environment, variables, secrets, OIDC federation, or Azure resources. No
-  exact-head live evidence satisfies [PRD.md](PRD.md) cutover acceptance.
+- **Evidence:** Azure bootstrap resources and secretless destination OIDC federation are deployed. GitHub created an
+  empty `vnext-qualification` Environment, but required-reviewer protection is unavailable on the current private-repo
+  plan. No Environment variables or secrets were installed, and no exact-head live evidence satisfies
+  [PRD.md](PRD.md) cutover acceptance.
 - **Related issue:** Destination issue `#9`.
-- **Mitigation:** After explicit maintainer approval, configure the destination controls and follow
-  [LIVE-QUALIFICATION.md](LIVE-QUALIFICATION.md). Record that the sandbox permits maintainer self-review; require
-  independent approval before production qualification.
+- **Mitigation:** Resolve [RISK-004](#risk-004-required-environment-reviewers-are-unavailable-on-the-current-github-plan),
+  configure the remaining destination controls, and follow [LIVE-QUALIFICATION.md](LIVE-QUALIFICATION.md). Record that
+  the sandbox permits maintainer self-review; require independent approval before production qualification.
 - **State:** Open
 - **Closure proof:** Evidence index with candidate and dependency hashes for every required scenario.
 

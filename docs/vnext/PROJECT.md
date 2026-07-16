@@ -1,10 +1,10 @@
 ## APEX vNext Checkpoint
 
 - **Updated:** 2026-07-16 UTC
-- **Milestone:** Dedicated repository extraction
+- **Milestone:** Live qualification setup
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
-- **Verified destination head:** `86fb94514665337a0d9e6a6e6cae6a4c2d0aa7c7`
+- **Verified destination head:** `436f3359f324400d3288b6b844ecb6b5a0e7e445`
 - **Source repository:** `jonathan-vella/apex`
 - **Source commit:** `60d96d5a46ff534069c58275cfd32cb8d4490971`
 - **History strategy:** Clean snapshot
@@ -19,8 +19,12 @@ The original APEX `main` branch was not modified. The old rolling integration an
 source-provenance records only and close unmerged after migration receipts are posted.
 
 Issue `#9` is the active dependency-ready workstream. Its destination-readiness slice binds the live launcher,
-dispatch workflow, and release evidence to this repository. The GitHub Environment, variables, secrets, Azure OIDC
-federation, and Azure resources remain unavailable and require separate maintainer approval before mutation.
+dispatch workflow, and release evidence to this repository. The secretless Entra application, destination Environment
+federation, and Azure qualification bootstrap are deployed and verified.
+
+GitHub required-reviewer protection is unavailable for this private repository on the current billing plan. The partial
+`vnext-qualification` Environment has no protection rules, variables, or secrets. Live workflow dispatch remains
+blocked; an unprotected Environment cannot substitute for approval evidence.
 
 ## Validation State
 
@@ -32,11 +36,14 @@ federation, and Azure resources remain unavailable and require separate maintain
 | Live workflow structure      | Pass     | `npm run validate:vnext-live-workflow`.                                       |
 | Live workflow mutation tests | Pass     | `npm run test:vnext-live-workflow`.                                           |
 | Repository mutation tests    | Pass     | `npm run test:vnext-validator`.                                               |
-| Full vNext qualification     | Pass     | `npm run qualify:vnext` on destination commit `86fb945`.                      |
-| Full repository validation   | Pass     | `npm run validate:all` on destination commit `86fb945`.                       |
-| Destination CI               | Pass     | Workflow run `29497516303` on `86fb945`.                                      |
+| Full vNext qualification     | Pass     | PR workflow run `29505179368` on `9086c00`.                                   |
+| Full repository validation   | Pass     | `npm run validate:all` before PR `#14`.                                       |
+| Destination CI               | Pass     | Branch, docs, and CI checks passed for PR `#14`.                              |
 | Markdown docs (CI)           | Pass     | Workflow run `29495046638` on `099616a6`.                                     |
 | IaC checks                   | Pass     | Workflow run `29495064776` on `099616a6`.                                     |
+| Entra OIDC federation        | Pass     | Destination Environment subject exists; no client secret or API permission.  |
+| Azure bootstrap              | Pass     | Deployment `vnext-qualification-bootstrap` and security checks succeeded.     |
+| GitHub required reviewer     | Blocked  | Environment API returned HTTP 422 for the private-repository billing plan.    |
 | Devcontainer CI              | Disabled | Workflow is disabled and is not a migration or release gate.                  |
 | Dependency audit             | External | Public npm audit endpoint returned a TLS handshake failure during extraction. |
 
@@ -57,7 +64,8 @@ bind to an exact commit in this repository after the last dependency hash change
 
 ## Resume Pointer
 
-1. Confirm the new repository `main` checks are green.
-2. Open the first dependency-ready transferred issue.
-3. Create a short-lived issue branch from `origin/main` and target its pull request to `main`.
-4. Continue with `/apex-vnext-continue` using repository and issue state as authority.
+1. Resolve `RISK-004` by using a GitHub plan that supports required Environment reviewers for this private repository.
+2. Apply the reviewer and `main`-only deployment branch policy before installing Environment credentials.
+3. Configure secrets and variables from verified bootstrap outputs without printing secret values.
+4. Refresh the expired governance firewall exception before any workflow dispatch.
+5. Run exact-head Bicep and Terraform apply, recovery, and separately approved destroy ceremonies.
