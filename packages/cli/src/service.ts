@@ -108,7 +108,7 @@ import {
 const ZERO_HASH = "0".repeat(64);
 const TASK_TTL_MS = 24 * 60 * 60 * 1000;
 const PREVIEW_TTL_MS = 24 * 60 * 60 * 1000;
-const APEX_GITIGNORE = "/cache/\n/local/\n/work/\n";
+const APEX_GITIGNORE = "/cache/\n/local/\n/work/\n/runtime/capability-packs/\n";
 
 interface Selection {
   projectId: ProjectId;
