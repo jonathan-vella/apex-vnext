@@ -6,13 +6,12 @@
 
 **Status:** Unreleased — development in progress on `main`
 
-**Last Content Update:** 2026-03-15
+**Last Content Update:** 2026-07-16
 
-**Build:** quality-improvements
+**Build:** standalone-vnext
 
-> Consumers tracking stable releases should pin to the most recent tag in
-> [GitHub Releases](https://github.com/jonathan-vella/apex/releases)
-> rather than the `Current Version` above.
+> Consumers tracking stable releases should pin to the most recent tag in this
+> repository's **Releases** tab rather than the `Current Version` above.
 
 ## Version History
 
