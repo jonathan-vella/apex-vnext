@@ -1,0 +1,42 @@
+# branch.oid 117c8b84458c25be11add709e84ad365acfeffbe
+# branch.head feat/vnext-live-cloud-qualification
+1 .M N... 100644 100644 100644 5b9d2fd50ae8b5b2b5a8561d5637ea7d5eb265c6 5b9d2fd50ae8b5b2b5a8561d5637ea7d5eb265c6 CHANGELOG.md
+1 .M N... 100644 100644 100644 1fec077fa36d5743932e8973ab01f0f160144ab3 1fec077fa36d5743932e8973ab01f0f160144ab3 packages/capabilities/src/test/iac.test.ts
+1 .M N... 100644 100644 100644 77740b1d05e923ab5c292c3bcbf030d800f0a4a0 77740b1d05e923ab5c292c3bcbf030d800f0a4a0 packages/capabilities/src/test/native-iac-providers.test.ts
+1 .M N... 100644 100644 100644 b96386b2bf02ba71e272f0ba9752fed935ea0aee b96386b2bf02ba71e272f0ba9752fed935ea0aee packages/cli/src/cli.ts
+1 .M N... 100644 100644 100644 bebd4d1bd448da8f6400e18c6b65130b9b2c4c52 bebd4d1bd448da8f6400e18c6b65130b9b2c4c52 packages/cli/src/index.ts
+1 .M N... 100644 100644 100644 e5eddaa64e263346ca51f14ef7e7ef00a881d513 e5eddaa64e263346ca51f14ef7e7ef00a881d513 packages/cli/src/service.ts
+1 .M N... 100644 100644 100644 fa931018737dbea4bc21e2fedfe09d28dc3f90c0 fa931018737dbea4bc21e2fedfe09d28dc3f90c0 packages/cli/src/state-transfer.ts
+1 .M N... 100644 100644 100644 0c61fdfae57db606c59a110fe765648ade9877d8 0c61fdfae57db606c59a110fe765648ade9877d8 packages/cli/src/test/state-transfer.test.ts
+1 .M N... 100644 100644 100644 9009380944b8886c4208ca278a39111624f09468 9009380944b8886c4208ca278a39111624f09468 packages/cli/src/test/workflow.test.ts
+1 .M N... 100644 100644 100644 4e9c6863426784f57bc3a734723631482750e1a2 4e9c6863426784f57bc3a734723631482750e1a2 packages/contracts/schemas/approval-evidence-v1.schema.json
+1 .M N... 100644 100644 100644 78ed3528ca853e3311bd9f5ea17c538d13b70c4c 78ed3528ca853e3311bd9f5ea17c538d13b70c4c packages/contracts/src/deployment.ts
+1 .M N... 100644 100644 100644 0a0be9b867604936e9cb671602ee65c2de9b7f80 0a0be9b867604936e9cb671602ee65c2de9b7f80 packages/contracts/src/test/contracts.test.ts
+1 .M N... 100644 100644 100644 a73ea29b9966e006011b26a9cf51eda0cba3e528 a73ea29b9966e006011b26a9cf51eda0cba3e528 packages/kernel/src/test/writer-transfer.test.ts
+1 .M N... 100644 100644 100644 13550a8965d0f9501f0bada4b4e6d45de5979238 13550a8965d0f9501f0bada4b4e6d45de5979238 packages/kernel/src/writer-transfer.ts
+1 .M N... 100644 100644 100644 1934028a752398585b47547510f35188aba11ee1 1934028a752398585b47547510f35188aba11ee1 packages/renderers/src/renderers.ts
+1 .M N... 100644 100644 100644 f37a38b3ad7e6bc40c3dd264a75da046a6f09784 f37a38b3ad7e6bc40c3dd264a75da046a6f09784 packages/renderers/src/test/renderers.test.ts
+1 .M N... 100644 100644 100644 254d87eac2129a3f8335437fe1e994e20523a9f8 254d87eac2129a3f8335437fe1e994e20523a9f8 packages/testkit/src/fixtures.ts
+1 .M N... 100644 100644 100644 727ce5b1d72585b6417ffb08480bdcd767dd9419 727ce5b1d72585b6417ffb08480bdcd767dd9419 site/src/content/docs/vnext/cli-reference.md
+1 .M N... 100644 100644 100644 4e97221ae881c352f58af99500766c467b58a332 4e97221ae881c352f58af99500766c467b58a332 site/src/content/docs/vnext/operations.md
+1 .M N... 100644 100644 100644 6b15b03ea1e8cfd8026cde4701bfffd4f5c5c477 6b15b03ea1e8cfd8026cde4701bfffd4f5c5c477 site/src/content/docs/vnext/security.md
+1 .M N... 100644 100644 100644 5c69e1b9fecd36443b2e3750a2df456ae2210a87 5c69e1b9fecd36443b2e3750a2df456ae2210a87 site/src/content/docs/vnext/testing.md
+1 .M N... 100644 100644 100644 ce8c90c6dcd032670ad8aec8103544a4b81c45c0 ce8c90c6dcd032670ad8aec8103544a4b81c45c0 tools/scripts/validate-iac-security-baseline.mjs
+? agent-output/vnext-qualification/03-des-adr-0001-use-split-encrypted-ci-transport.md
+? agent-output/vnext-qualification/04-governance-constraints.json
+? agent-output/vnext-qualification/04-governance-constraints.md
+? agent-output/vnext-qualification/04-governance-constraints.preview.md
+? agent-output/vnext-qualification/README.md
+? infra/bicep/vnext-qualification/bootstrap.bicep
+? infra/bicep/vnext-qualification/main.bicep
+? infra/terraform/vnext-qualification/.terraform.lock.hcl
+? infra/terraform/vnext-qualification/backend.tf
+? infra/terraform/vnext-qualification/main.tf
+? infra/terraform/vnext-qualification/outputs.tf
+? infra/terraform/vnext-qualification/providers.tf
+? infra/terraform/vnext-qualification/variables.tf
+? infra/terraform/vnext-qualification/versions.tf
+? packages/cli/src/github-approval.ts
+? packages/cli/src/test/github-approval.test.ts
+? tools/scripts/_lib/security-exceptions.mjs
+? tools/tests/security-exceptions.test.mjs

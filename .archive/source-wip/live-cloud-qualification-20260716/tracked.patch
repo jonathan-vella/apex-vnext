@@ -1,0 +1,1328 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 5b9d2fd50ae8b5b2b5a8561d5637ea7d5eb265c6..a5aa8a8cae563ee8d32a14acad0000e87b3b70e3 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -64,6 +64,11 @@ for full details on this and all prior releases.
+   binding and its referenced encrypted Terraform plan, validate all authority and file cross-links before restrictive
+   atomic import, and exclude local keys, latest pointers, unrelated runtime files, and plaintext plans. Production CI
+   remains blocked pending live separate-job proof.
++- feat(vnext): added truthful GitHub Environment Gate 4 approval evidence derived only from strict GitHub Actions
++  context, bound to the accepted writer-transfer owner, repository, branch, commit, workflow, run, job, and canonical
++  recipient. The protected environment is bound through the encrypted state handoff and accepted ownership. Approval
++  expiry is bounded by the exact preview. Evidence identifies the workflow actor rather than an environment reviewer,
++  and production CI remains blocked pending live protected-environment proof.
+ 
+ ### Fixed (APEX vNext security)
+ 
+diff --git a/packages/capabilities/src/test/iac.test.ts b/packages/capabilities/src/test/iac.test.ts
+index 1fec077fa36d5743932e8973ab01f0f160144ab3..9fcbf2d75b14de3884d983d50c9e67fd2c45726a 100644
+--- a/packages/capabilities/src/test/iac.test.ts
++++ b/packages/capabilities/src/test/iac.test.ts
+@@ -52,7 +52,10 @@ function authority(overrides: Partial<CurrentDeploymentAuthority> = {}): Current
+   };
+ }
+ 
+-function approval(preview: DeploymentPreviewV1, overrides: Partial<ApprovalEvidenceV1> = {}): ApprovalEvidenceV1 {
++function approval(
++  preview: DeploymentPreviewV1,
++  overrides: Partial<Extract<ApprovalEvidenceV1, { mechanism: "tty" }>> = {},
++): ApprovalEvidenceV1 {
+   return {
+     schemaVersion: "1.0.0",
+     projectId: preview.projectId,
+@@ -60,7 +63,7 @@ function approval(preview: DeploymentPreviewV1, overrides: Partial<ApprovalEvide
+     gate: 4,
+     decision: "approved",
+     actor: "approver@example.com",
+-    mechanism: "github-environment",
++    mechanism: "tty",
+     dependencyHash: preview.previewHash,
+     previewHash: preview.previewHash,
+     writerEpoch: 3,
+diff --git a/packages/capabilities/src/test/native-iac-providers.test.ts b/packages/capabilities/src/test/native-iac-providers.test.ts
+index 77740b1d05e923ab5c292c3bcbf030d800f0a4a0..a6b3c508226ea57bd6f3ee885874ec55f562efb3 100644
+--- a/packages/capabilities/src/test/native-iac-providers.test.ts
++++ b/packages/capabilities/src/test/native-iac-providers.test.ts
+@@ -68,7 +68,7 @@ function approval(preview: DeploymentPreviewV1): ApprovalEvidenceV1 {
+     gate: 4,
+     decision: "approved",
+     actor: "approver@example.com",
+-    mechanism: "github-environment",
++    mechanism: "tty",
+     dependencyHash: preview.previewHash,
+     previewHash: preview.previewHash,
+     writerEpoch: authority.ownerEpoch,
+diff --git a/packages/cli/src/cli.ts b/packages/cli/src/cli.ts
+index b96386b2bf02ba71e272f0ba9752fed935ea0aee..c9901a2fbf043e819c77bf3d43f97216af75cbe9 100644
+--- a/packages/cli/src/cli.ts
++++ b/packages/cli/src/cli.ts
+@@ -6,6 +6,7 @@ import { EventJournal, ValidatorRegistry, atomicWriteJson, sha256Json } from "@a
+ import { evaluateQualityScorecard, renderQualityScorecardEvaluation, type ScorecardMeasurement } from "@apex/renderers";
+ import { join, resolve } from "node:path";
+ import { ApexError, EXIT_CODES, normalizeError } from "./errors.js";
++import { githubApprovalContext } from "./github-approval.js";
+ import { resolveBundledAssets } from "./assets.js";
+ import { serveMcp } from "./mcp.js";
+ import { createFileProviderRuntime, hashTerraformConfiguration, hashTerraformLockFile } from "./provider-runtime.js";
+@@ -551,12 +552,29 @@ export async function execute(argv: string[], root = process.cwd()): Promise<unk
+       return service.generateIac(required(flags, "task"));
+     case "review resolve":
+       return service.resolveReview(JSON.parse(await readFile(required(flags, "file"), "utf8")));
+-    case "gate decide":
++    case "gate decide": {
++      const mechanism = flags.mechanism ?? "tty";
++      if (mechanism !== "tty" && mechanism !== "github-environment") {
++        throw new ApexError("APEX_USAGE", "--mechanism must be tty or github-environment", EXIT_CODES.usage);
++      }
++      if (mechanism === "tty") {
++        return service.decideGateNumber(
++          Number(required(flags, "gate")),
++          required(flags, "decision") as "approved" | "rejected",
++          required(flags, "actor"),
++        );
++      }
++      if (flags.actor !== undefined) {
++        throw new ApexError("APEX_USAGE", "--actor is not accepted for github-environment", EXIT_CODES.usage);
++      }
++      const githubContext = githubApprovalContext(process.env);
+       return service.decideGateNumber(
+         Number(required(flags, "gate")),
+         required(flags, "decision") as "approved" | "rejected",
+-        required(flags, "actor"),
++        `github:${githubContext.actorId}:${githubContext.actor}`,
++        { mechanism, githubContext },
+       );
++    }
+     case "validate":
+       return service.validate();
+     case "preview":
+@@ -588,6 +606,7 @@ export async function execute(argv: string[], root = process.cwd()): Promise<unk
+         workflowId: required(flags, "workflow"),
+         sender: required(flags, "sender"),
+         recipient: required(flags, "recipient"),
++        ...(typeof flags.environment === "string" ? { approvalEnvironment: flags.environment } : {}),
+         currentHead: required(flags, "head"),
+         ttlMs: Number(required(flags, "ttl")),
+       });
+diff --git a/packages/cli/src/index.ts b/packages/cli/src/index.ts
+index bebd4d1bd448da8f6400e18c6b65130b9b2c4c52..87617775ec0bf93a1ae1a053487fc88f365a1e11 100644
+--- a/packages/cli/src/index.ts
++++ b/packages/cli/src/index.ts
+@@ -1,6 +1,7 @@
+ export * from "./assets.js";
+ export * from "./cli.js";
+ export * from "./errors.js";
++export * from "./github-approval.js";
+ export * from "./mcp.js";
+ export * from "./provider-transfer.js";
+ export * from "./service.js";
+diff --git a/packages/cli/src/service.ts b/packages/cli/src/service.ts
+index e5eddaa64e263346ca51f14ef7e7ef00a881d513..ac7880558a6ce12f7fa335d759213523f5fb686f 100644
+--- a/packages/cli/src/service.ts
++++ b/packages/cli/src/service.ts
+@@ -31,6 +31,7 @@ import {
+   type CostEstimateV1,
+   type DeploymentPreviewV1,
+   type EnvironmentInputsV1,
++  type GitHubApprovalContext,
+   type IacBindingV1,
+   type LogicalResourceManifestV1,
+   type ImplementationIntentV1,
+@@ -114,6 +115,11 @@ interface Selection {
+   runId: RunId;
+ }
+ 
++export interface GateDecisionOptions {
++  mechanism?: "tty" | "github-environment";
++  githubContext?: GitHubApprovalContext;
++}
++
+ interface ManagedFile {
+   path: string;
+   sourceHash: string;
+@@ -1004,6 +1010,7 @@ export class ApexService {
+     gateNumber: number,
+     decision: "approved" | "rejected",
+     actor: string,
++    options: GateDecisionOptions = {},
+   ): Promise<ApprovalEvidenceV1> {
+     const run = await this.currentRun();
+     const gate = run.gates.find(({ gate }) => gate === gateNumber);
+@@ -1013,24 +1020,99 @@ export class ApexService {
+     if (gateNumber === 4 && previewHash === undefined) {
+       throw new ApexError("APEX_VALIDATION", "Gate 4 requires a deployment preview", EXIT_CODES.validation);
+     }
++    const mechanism = options.mechanism ?? "tty";
++    if (mechanism !== "tty" && mechanism !== "github-environment") {
++      throw new ApexError("APEX_USAGE", "Unsupported gate approval mechanism", EXIT_CODES.usage);
++    }
++    if (mechanism === "tty" && options.githubContext !== undefined) {
++      throw new ApexError("APEX_VALIDATION", "TTY approval cannot include GitHub context", EXIT_CODES.validation);
++    }
++    if (mechanism === "github-environment" && (gateNumber !== 4 || decision !== "approved")) {
++      throw new ApexError(
++        "APEX_AUTHORIZATION",
++        "GitHub Environment approval is limited to approved Gate 4 decisions",
++        EXIT_CODES.authorization,
++      );
++    }
++    const previewObjectHash =
++      gateNumber === 4 ? this.latestPayloadHash(events, "preview.created", "previewObjectHash") : undefined;
++    if (gateNumber === 4 && previewObjectHash === undefined) {
++      throw new ApexError("APEX_VALIDATION", "Gate 4 preview evidence is incomplete", EXIT_CODES.validation);
++    }
++    const preview =
++      previewObjectHash === undefined ? undefined : await this.objects.getJson<DeploymentPreviewV1>(previewObjectHash);
++    if (preview !== undefined && Date.parse(preview.expiresAt) <= this.clock().getTime()) {
++      throw new ApexError("APEX_STALE", "Deployment preview has expired", EXIT_CODES.stale);
++    }
++    const githubContext = options.githubContext;
++    if (mechanism === "github-environment" && githubContext === undefined) {
++      throw new ApexError("APEX_VALIDATION", "GitHub Environment approval requires context", EXIT_CODES.validation);
++    }
+     const recipientIdentity = await this.currentRecipientIdentity(run);
+     const decidedAt = this.clock().toISOString();
+-    const approval: ApprovalEvidenceV1 = {
++    const commonApproval = {
+       schemaVersion: CONTRACT_VERSION,
+       projectId: run.projectId,
+       runId: run.runId,
+       gate: gateNumber,
+       decision,
+       actor,
+-      mechanism: "tty",
+-      recipientIdentity,
+       dependencyHash: gate.dependencyHash,
+       ...(previewHash === undefined ? {} : { previewHash }),
+       writerEpoch: run.ownerEpoch,
+       decidedAt,
+-      ...(gateNumber === 4 ? { expiresAt: new Date(this.clock().getTime() + PREVIEW_TTL_MS).toISOString() } : {}),
++      ...(preview === undefined ? {} : { expiresAt: preview.expiresAt }),
+     };
++    const approval = (
++      mechanism === "github-environment"
++        ? {
++            ...commonApproval,
++            mechanism,
++            recipientIdentity: githubContext.recipientIdentity,
++            githubContext,
++          }
++        : { ...commonApproval, mechanism: "tty", recipientIdentity }
++    ) as ApprovalEvidenceV1;
+     this.assertValid("approval", approval);
++    if (approval.mechanism === "github-environment") {
++      const context = approval.githubContext;
++      const expectedActor = `github:${context.actorId}:${context.actor}`;
++      const expectedRecipient = `github-actions:${context.repository}:${context.runId}:${context.runAttempt}:${context.job}`;
++      if (actor !== expectedActor) {
++        throw new ApexError(
++          "APEX_AUTHORIZATION",
++          "GitHub approval actor does not match context",
++          EXIT_CODES.authorization,
++        );
++      }
++      const ownership = await new WriterTransferStore(
++        this.projects.runDirectory(run.projectId, run.runId),
++        this.clock,
++      ).currentOwnership();
++      if (ownership === null || ownership.ownerEpoch !== run.ownerEpoch) {
++        throw new ApexError("APEX_STALE", "Current writer ownership is missing or stale", EXIT_CODES.stale);
++      }
++      if (
++        context.recipientIdentity !== expectedRecipient ||
++        recipientIdentity !== expectedRecipient ||
++        ownership.ownerId !== expectedRecipient
++      ) {
++        throw new ApexError(
++          "APEX_AUTHORIZATION",
++          "GitHub approval recipient is not the current writer",
++          EXIT_CODES.authorization,
++        );
++      }
++      if (
++        ownership.repository !== context.repository ||
++        context.ref !== `refs/heads/${ownership.branch}` ||
++        ownership.commit !== context.sha ||
++        ownership.workflowId !== context.workflowRef ||
++        ownership.approvalEnvironment !== context.environment
++      ) {
++        throw new ApexError("APEX_STALE", "GitHub approval context does not match writer ownership", EXIT_CODES.stale);
++      }
++    }
+     const validatorIds = decision === "approved" ? await this.validateGateValidators(run, gate, events, approval) : [];
+     const approvalHash = await this.objects.putJson(approval);
+     const updated = {
+@@ -1666,6 +1748,7 @@ export class ApexService {
+     workflowId: string;
+     sender: string;
+     recipient: string;
++    approvalEnvironment?: string;
+     currentHead: string;
+     ttlMs: number;
+   }): Promise<unknown> {
+@@ -1684,6 +1767,7 @@ export class ApexService {
+       workflowId: input.workflowId,
+       sender: input.sender,
+       recipient: input.recipient,
++      ...(input.approvalEnvironment === undefined ? {} : { approvalEnvironment: input.approvalEnvironment }),
+       currentEpoch: run.ownerEpoch,
+       currentGitHead: input.currentHead,
+       ttlMs: input.ttlMs,
+diff --git a/packages/cli/src/state-transfer.ts b/packages/cli/src/state-transfer.ts
+index fa931018737dbea4bc21e2fedfe09d28dc3f90c0..bf141489b3b4250599444ff8a9708fff0aef1980 100644
+--- a/packages/cli/src/state-transfer.ts
++++ b/packages/cli/src/state-transfer.ts
+@@ -43,6 +43,7 @@ export interface StateTransferBindings extends EnvelopeBindings {
+   readonly workflowId: string;
+   readonly journalHead: string;
+   readonly claimExpiresAt: string;
++  readonly approvalEnvironment?: string;
+ }
+ 
+ export interface StateTransferBundle {
+@@ -309,6 +310,9 @@ export async function createStateTransferBundle(
+     workflowId: state.claim.workflowId,
+     journalHead: state.journalHead,
+     claimExpiresAt: state.claim.expiresAt,
++    ...(state.claim.approvalEnvironment === undefined
++      ? {}
++      : { approvalEnvironment: state.claim.approvalEnvironment }),
+   };
+   const bundle: StateTransferBundle = { implementation: "apex-state-transfer", version: 1, bindings, files };
+   if (canonicalJsonBytes(bundle).byteLength > STATE_TRANSFER_MAX_BUNDLE_BYTES) {
+@@ -453,6 +457,12 @@ function requireBindings(value: unknown): StateTransferBindings {
+   if (typeof bindings.claimExpiresAt !== "string" || !Number.isFinite(Date.parse(bindings.claimExpiresAt))) {
+     throw new Error("State transfer claim expiry is invalid");
+   }
++  if (
++    bindings.approvalEnvironment !== undefined &&
++    (typeof bindings.approvalEnvironment !== "string" || bindings.approvalEnvironment.trim().length === 0)
++  ) {
++    throw new Error("State transfer approval environment is invalid");
++  }
+   if (!Number.isInteger(bindings.ownerEpoch) || (bindings.ownerEpoch ?? 0) < 1)
+     throw new Error("State transfer owner epoch is invalid");
+   for (const key of ["recipient", "repository", "branch", "commit", "workflowId"] as const) {
+@@ -461,6 +471,7 @@ function requireBindings(value: unknown): StateTransferBindings {
+     }
+   }
+   const expected = [
++    ...(bindings.approvalEnvironment === undefined ? [] : ["approvalEnvironment"]),
+     "branch",
+     "claimExpiresAt",
+     "claimHash",
+@@ -603,7 +614,8 @@ export async function importStateTransfer(
+     claim.repository !== bindings.repository ||
+     claim.branch !== bindings.branch ||
+     claim.commit !== bindings.commit ||
+-    claim.workflowId !== bindings.workflowId
++    claim.workflowId !== bindings.workflowId ||
++    claim.approvalEnvironment !== bindings.approvalEnvironment
+   ) {
+     throw new Error("State transfer claim does not match bindings");
+   }
+diff --git a/packages/cli/src/test/state-transfer.test.ts b/packages/cli/src/test/state-transfer.test.ts
+index 0c61fdfae57db606c59a110fe765648ade9877d8..9c2a0e2985ea272da861829e77976aaf8f6e2790 100644
+--- a/packages/cli/src/test/state-transfer.test.ts
++++ b/packages/cli/src/test/state-transfer.test.ts
+@@ -43,6 +43,7 @@ async function sourceState(clock = instant): Promise<SourceState> {
+     branch: "qualification",
+     commit: "candidate-commit",
+     workflowId: "qualification.yml",
++    approvalEnvironment: "vnext-qualification",
+     sender: "local",
+     recipient: "ci",
+     currentHead: "candidate-commit",
+@@ -100,6 +101,7 @@ test("state export is deterministic and includes only selected state plus recurs
+     instant,
+   );
+   const paths = bundle.files.map(({ path }) => path);
++  assert.equal(bundle.bindings.approvalEnvironment, "vnext-qualification");
+   assert.deepEqual(paths, [...paths].sort());
+   assert(paths.includes(`objects/sha256/${parentHash.slice(0, 2)}/${parentHash.slice(2)}`));
+   assert(paths.includes(`objects/sha256/${leafHash.slice(0, 2)}/${leafHash.slice(2)}`));
+@@ -301,8 +303,10 @@ test("state import preflights conflicts, permits idempotence, and preserves writ
+   const accepted = (await destinationService.acceptWriterTransfer(source.claimHash, "ci", "candidate-commit")) as {
+     ownerId: string;
+     ownerEpoch: number;
++    approvalEnvironment?: string;
+   };
+   assert.deepEqual({ ownerId: accepted.ownerId, ownerEpoch: accepted.ownerEpoch }, { ownerId: "ci", ownerEpoch: 2 });
++  assert.equal(accepted.approvalEnvironment, "vnext-qualification");
+ 
+   const conflictDestination = await tempRoot();
+   await mkdir(join(conflictDestination, ".apex"), { recursive: true });
+diff --git a/packages/cli/src/test/workflow.test.ts b/packages/cli/src/test/workflow.test.ts
+index 9009380944b8886c4208ca278a39111624f09468..c7e3c0dd494c35aa682081e260b4da6fc46175f2 100644
+--- a/packages/cli/src/test/workflow.test.ts
++++ b/packages/cli/src/test/workflow.test.ts
+@@ -146,7 +146,7 @@ test("Gate 4 approval rejects an expired preview before changing gate state", as
+   await prepareValidatedRun(service, initialized.runId, "bicep");
+   await service.preview({ operation: "apply", provider: "fake", expiresInMs: 1 });
+   now += 2;
+-  await assert.rejects(service.decideGateNumber(4, "approved", "tester"), /gate:preview-current/);
++  await assert.rejects(service.decideGateNumber(4, "approved", "tester"), /preview has expired/);
+   assert.equal((await service.status()).run.gates[3]?.state, "open");
+ });
+ 
+diff --git a/packages/contracts/schemas/approval-evidence-v1.schema.json b/packages/contracts/schemas/approval-evidence-v1.schema.json
+index 4e9c6863426784f57bc3a734723631482750e1a2..9833c1c0731b21b6327d203d6938726b51827d5d 100644
+--- a/packages/contracts/schemas/approval-evidence-v1.schema.json
++++ b/packages/contracts/schemas/approval-evidence-v1.schema.json
+@@ -1,93 +1,308 @@
+ {
+   "$id": "https://schemas.apexops.dev/approval-evidence-v1.json",
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+-  "additionalProperties": false,
+-  "properties": {
+-    "actor": {
+-      "minLength": 1,
+-      "type": "string"
+-    },
+-    "decidedAt": {
+-      "format": "date-time",
+-      "type": "string"
+-    },
+-    "decision": {
+-      "anyOf": [
+-        {
+-          "const": "approved",
++  "anyOf": [
++    {
++      "additionalProperties": false,
++      "properties": {
++        "actor": {
++          "minLength": 1,
++          "type": "string"
++        },
++        "decidedAt": {
++          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
++          "type": "string"
++        },
++        "decision": {
++          "anyOf": [
++            {
++              "const": "approved",
++              "type": "string"
++            },
++            {
++              "const": "rejected",
++              "type": "string"
++            }
++          ]
++        },
++        "dependencyHash": {
++          "pattern": "^[0-9a-f]{64}$",
++          "type": "string"
++        },
++        "expiresAt": {
++          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
++          "type": "string"
++        },
++        "gate": {
++          "maximum": 4,
++          "minimum": 1,
++          "type": "integer"
++        },
++        "mechanism": {
++          "const": "tty",
++          "type": "string"
++        },
++        "previewHash": {
++          "pattern": "^[0-9a-f]{64}$",
++          "type": "string"
++        },
++        "projectId": {
++          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
++          "type": "string"
++        },
++        "recipientIdentity": {
++          "minLength": 1,
+           "type": "string"
+         },
+-        {
+-          "const": "rejected",
++        "runId": {
++          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+           "type": "string"
++        },
++        "schemaVersion": {
++          "const": "1.0.0",
++          "type": "string"
++        },
++        "writerEpoch": {
++          "minimum": 1,
++          "type": "integer"
+         }
+-      ]
+-    },
+-    "dependencyHash": {
+-      "pattern": "^[0-9a-f]{64}$",
+-      "type": "string"
+-    },
+-    "expiresAt": {
+-      "format": "date-time",
+-      "type": "string"
++      },
++      "required": [
++        "schemaVersion",
++        "projectId",
++        "runId",
++        "gate",
++        "decision",
++        "actor",
++        "dependencyHash",
++        "writerEpoch",
++        "decidedAt",
++        "mechanism"
++      ],
++      "type": "object"
+     },
+-    "gate": {
+-      "maximum": 4,
+-      "minimum": 1,
+-      "type": "integer"
+-    },
+-    "mechanism": {
+-      "anyOf": [
+-        {
+-          "const": "tty",
++    {
++      "additionalProperties": false,
++      "properties": {
++        "actor": {
++          "minLength": 1,
+           "type": "string"
+         },
+-        {
+-          "const": "github-environment",
++        "decidedAt": {
++          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
++          "type": "string"
++        },
++        "decision": {
++          "anyOf": [
++            {
++              "const": "approved",
++              "type": "string"
++            },
++            {
++              "const": "rejected",
++              "type": "string"
++            }
++          ]
++        },
++        "dependencyHash": {
++          "pattern": "^[0-9a-f]{64}$",
+           "type": "string"
+         },
+-        {
++        "expiresAt": {
++          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
++          "type": "string"
++        },
++        "gate": {
++          "maximum": 4,
++          "minimum": 1,
++          "type": "integer"
++        },
++        "mechanism": {
+           "const": "inherited",
+           "type": "string"
++        },
++        "previewHash": {
++          "pattern": "^[0-9a-f]{64}$",
++          "type": "string"
++        },
++        "projectId": {
++          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
++          "type": "string"
++        },
++        "recipientIdentity": {
++          "minLength": 1,
++          "type": "string"
++        },
++        "runId": {
++          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
++          "type": "string"
++        },
++        "schemaVersion": {
++          "const": "1.0.0",
++          "type": "string"
++        },
++        "writerEpoch": {
++          "minimum": 1,
++          "type": "integer"
+         }
+-      ]
+-    },
+-    "previewHash": {
+-      "pattern": "^[0-9a-f]{64}$",
+-      "type": "string"
+-    },
+-    "projectId": {
+-      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+-      "type": "string"
+-    },
+-    "recipientIdentity": {
+-      "minLength": 1,
+-      "type": "string"
++      },
++      "required": [
++        "schemaVersion",
++        "projectId",
++        "runId",
++        "gate",
++        "decision",
++        "actor",
++        "dependencyHash",
++        "writerEpoch",
++        "decidedAt",
++        "mechanism"
++      ],
++      "type": "object"
+     },
+-    "runId": {
+-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+-      "type": "string"
+-    },
+-    "schemaVersion": {
+-      "const": "1.0.0",
+-      "type": "string"
+-    },
+-    "writerEpoch": {
+-      "minimum": 1,
+-      "type": "integer"
++    {
++      "additionalProperties": false,
++      "properties": {
++        "actor": {
++          "minLength": 1,
++          "type": "string"
++        },
++        "decidedAt": {
++          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
++          "type": "string"
++        },
++        "decision": {
++          "anyOf": [
++            {
++              "const": "approved",
++              "type": "string"
++            },
++            {
++              "const": "rejected",
++              "type": "string"
++            }
++          ]
++        },
++        "dependencyHash": {
++          "pattern": "^[0-9a-f]{64}$",
++          "type": "string"
++        },
++        "expiresAt": {
++          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
++          "type": "string"
++        },
++        "gate": {
++          "maximum": 4,
++          "minimum": 1,
++          "type": "integer"
++        },
++        "githubContext": {
++          "additionalProperties": false,
++          "properties": {
++            "actor": {
++              "minLength": 1,
++              "type": "string"
++            },
++            "actorId": {
++              "pattern": "^[0-9]+$",
++              "type": "string"
++            },
++            "environment": {
++              "minLength": 1,
++              "type": "string"
++            },
++            "job": {
++              "minLength": 1,
++              "type": "string"
++            },
++            "recipientIdentity": {
++              "minLength": 1,
++              "type": "string"
++            },
++            "ref": {
++              "pattern": "^refs/heads/[^\\s]+$",
++              "type": "string"
++            },
++            "repository": {
++              "pattern": "^[^/\\s]+/[^/\\s]+$",
++              "type": "string"
++            },
++            "runAttempt": {
++              "minimum": 1,
++              "type": "integer"
++            },
++            "runId": {
++              "pattern": "^[0-9]+$",
++              "type": "string"
++            },
++            "sha": {
++              "pattern": "^[0-9a-f]{40}$",
++              "type": "string"
++            },
++            "workflowRef": {
++              "minLength": 1,
++              "type": "string"
++            }
++          },
++          "required": [
++            "repository",
++            "ref",
++            "sha",
++            "workflowRef",
++            "runId",
++            "runAttempt",
++            "job",
++            "environment",
++            "actor",
++            "actorId",
++            "recipientIdentity"
++          ],
++          "type": "object"
++        },
++        "mechanism": {
++          "const": "github-environment",
++          "type": "string"
++        },
++        "previewHash": {
++          "pattern": "^[0-9a-f]{64}$",
++          "type": "string"
++        },
++        "projectId": {
++          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
++          "type": "string"
++        },
++        "recipientIdentity": {
++          "minLength": 1,
++          "type": "string"
++        },
++        "runId": {
++          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
++          "type": "string"
++        },
++        "schemaVersion": {
++          "const": "1.0.0",
++          "type": "string"
++        },
++        "writerEpoch": {
++          "minimum": 1,
++          "type": "integer"
++        }
++      },
++      "required": [
++        "schemaVersion",
++        "projectId",
++        "runId",
++        "gate",
++        "decision",
++        "actor",
++        "dependencyHash",
++        "writerEpoch",
++        "decidedAt",
++        "mechanism",
++        "recipientIdentity",
++        "githubContext"
++      ],
++      "type": "object"
+     }
+-  },
+-  "required": [
+-    "schemaVersion",
+-    "projectId",
+-    "runId",
+-    "gate",
+-    "decision",
+-    "actor",
+-    "mechanism",
+-    "dependencyHash",
+-    "writerEpoch",
+-    "decidedAt"
+-  ],
+-  "type": "object"
++  ]
+ }
+diff --git a/packages/contracts/src/deployment.ts b/packages/contracts/src/deployment.ts
+index 78ed3528ca853e3311bd9f5ea17c538d13b70c4c..4d3fad290d2377b830623746be906b4c709d873d 100644
+--- a/packages/contracts/src/deployment.ts
++++ b/packages/contracts/src/deployment.ts
+@@ -55,23 +55,72 @@ export const DeploymentPreviewV1Schema = Type.Object(
+   { $id: "https://schemas.apexops.dev/deployment-preview-v1.json", additionalProperties: false },
+ );
+ 
+-export const ApprovalEvidenceV1Schema = Type.Object(
++export const GitHubApprovalContextSchema = Type.Object(
+   {
+-    schemaVersion: ContractVersionSchema,
+-    projectId: ProjectIdSchema,
+-    runId: RunIdSchema,
+-    gate: Type.Integer({ minimum: 1, maximum: 4 }),
+-    decision: Type.Union([Type.Literal("approved"), Type.Literal("rejected")]),
++    repository: Type.String({ pattern: "^[^/\\s]+/[^/\\s]+$" }),
++    ref: Type.String({ pattern: "^refs/heads/[^\\s]+$" }),
++    sha: Type.String({ pattern: "^[0-9a-f]{40}$" }),
++    workflowRef: NonEmptyStringSchema,
++    runId: Type.String({ pattern: "^[0-9]+$" }),
++    runAttempt: Type.Integer({ minimum: 1 }),
++    job: NonEmptyStringSchema,
++    environment: NonEmptyStringSchema,
+     actor: NonEmptyStringSchema,
+-    mechanism: Type.Union([Type.Literal("tty"), Type.Literal("github-environment"), Type.Literal("inherited")]),
+-    dependencyHash: Sha256Schema,
+-    previewHash: Type.Optional(Sha256Schema),
+-    writerEpoch: Type.Integer({ minimum: 1 }),
+-    recipientIdentity: Type.Optional(NonEmptyStringSchema),
+-    decidedAt: IsoDateTimeSchema,
+-    expiresAt: Type.Optional(IsoDateTimeSchema),
++    actorId: Type.String({ pattern: "^[0-9]+$" }),
++    recipientIdentity: NonEmptyStringSchema,
+   },
+-  { $id: "https://schemas.apexops.dev/approval-evidence-v1.json", additionalProperties: false },
++  { additionalProperties: false },
++);
++
++const approvalEvidenceProperties = {
++  schemaVersion: ContractVersionSchema,
++  projectId: ProjectIdSchema,
++  runId: RunIdSchema,
++  gate: Type.Integer({ minimum: 1, maximum: 4 }),
++  decision: Type.Union([Type.Literal("approved"), Type.Literal("rejected")]),
++  actor: NonEmptyStringSchema,
++  dependencyHash: Sha256Schema,
++  previewHash: Type.Optional(Sha256Schema),
++  writerEpoch: Type.Integer({ minimum: 1 }),
++  decidedAt: Type.String({
++    pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
++  }),
++  expiresAt: Type.Optional(
++    Type.String({
++      pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$",
++    }),
++  ),
++};
++
++export const ApprovalEvidenceV1Schema = Type.Union(
++  [
++    Type.Object(
++      {
++        ...approvalEvidenceProperties,
++        mechanism: Type.Literal("tty"),
++        recipientIdentity: Type.Optional(NonEmptyStringSchema),
++      },
++      { additionalProperties: false },
++    ),
++    Type.Object(
++      {
++        ...approvalEvidenceProperties,
++        mechanism: Type.Literal("inherited"),
++        recipientIdentity: Type.Optional(NonEmptyStringSchema),
++      },
++      { additionalProperties: false },
++    ),
++    Type.Object(
++      {
++        ...approvalEvidenceProperties,
++        mechanism: Type.Literal("github-environment"),
++        recipientIdentity: NonEmptyStringSchema,
++        githubContext: GitHubApprovalContextSchema,
++      },
++      { additionalProperties: false },
++    ),
++  ],
++  { $id: "https://schemas.apexops.dev/approval-evidence-v1.json" },
+ );
+ 
+ export const OperationStateSchema = Type.Union([
+@@ -128,6 +177,7 @@ export const ResourceInventoryV1Schema = Type.Object(
+ );
+ 
+ export type DeploymentPreviewV1 = Static<typeof DeploymentPreviewV1Schema>;
++export type GitHubApprovalContext = Static<typeof GitHubApprovalContextSchema>;
+ export type ApprovalEvidenceV1 = Static<typeof ApprovalEvidenceV1Schema>;
+ export type OperationRecordV1 = Static<typeof OperationRecordV1Schema>;
+ export type ResourceInventoryV1 = Static<typeof ResourceInventoryV1Schema>;
+diff --git a/packages/contracts/src/test/contracts.test.ts b/packages/contracts/src/test/contracts.test.ts
+index 0a0be9b867604936e9cb671602ee65c2de9b7f80..4e12466b2db0fe8c747c953f4d147c9afba02a1f 100644
+--- a/packages/contracts/src/test/contracts.test.ts
++++ b/packages/contracts/src/test/contracts.test.ts
+@@ -201,7 +201,13 @@ describe("persisted contract schemas", () => {
+       const sourceSchema = contractSchemas.find((schema) => schema.$id === generated.schema.$id);
+       assert.ok(sourceSchema);
+       assert.equal(generated.schema.$schema, JSON_SCHEMA_DIALECT);
+-      assert.equal(generated.schema.additionalProperties, false);
++      const union = (generated.schema as { anyOf?: Array<{ additionalProperties?: unknown }> }).anyOf;
++      if (union === undefined) assert.equal(generated.schema.additionalProperties, false);
++      else
++        assert.equal(
++          union.every((branch) => branch.additionalProperties === false),
++          true,
++        );
+       assert.equal(Value.Check(generated.schema, {}), Value.Check(sourceSchema, {}));
+     }
+   });
+@@ -643,6 +649,19 @@ describe("target family contracts", () => {
+       previewHash: hash,
+       writerEpoch: 1,
+       recipientIdentity: "deploy-prod",
++      githubContext: {
++        repository: "owner/repo",
++        ref: "refs/heads/main",
++        sha: "a".repeat(40),
++        workflowRef: "owner/repo/.github/workflows/deploy.yml@refs/heads/main",
++        runId: "123",
++        runAttempt: 1,
++        job: "deploy",
++        environment: "production",
++        actor: "octocat",
++        actorId: "1",
++        recipientIdentity: "deploy-prod",
++      },
+       decidedAt: timestamp,
+       expiresAt: expiry,
+     };
+@@ -654,6 +673,52 @@ describe("target family contracts", () => {
+     assert.equal(hasValidPreviewApprovalBinding(attestation, preview, { ...approval, previewHash: otherHash }), false);
+   });
+ 
++  it("requires strict GitHub context only for GitHub Environment approvals", () => {
++    const base = {
++      schemaVersion: CONTRACT_VERSION,
++      projectId: "example-project",
++      runId: "run-1",
++      gate: 4,
++      decision: "approved" as const,
++      actor: "github:1:octocat",
++      dependencyHash: hash,
++      previewHash: hash,
++      writerEpoch: 2,
++      recipientIdentity: "github-actions:owner/repo:123:1:deploy",
++      decidedAt: timestamp,
++      expiresAt: expiry,
++    };
++    const githubContext = {
++      repository: "owner/repo",
++      ref: "refs/heads/main",
++      sha: "a".repeat(40),
++      workflowRef: "owner/repo/.github/workflows/deploy.yml@refs/heads/main",
++      runId: "123",
++      runAttempt: 1,
++      job: "deploy",
++      environment: "production",
++      actor: "octocat",
++      actorId: "1",
++      recipientIdentity: "github-actions:owner/repo:123:1:deploy",
++    };
++
++    assert.equal(
++      Value.Check(ApprovalEvidenceV1Schema, { ...base, mechanism: "github-environment", githubContext }),
++      true,
++    );
++    assert.equal(Value.Check(ApprovalEvidenceV1Schema, { ...base, mechanism: "github-environment" }), false);
++    assert.equal(
++      Value.Check(ApprovalEvidenceV1Schema, {
++        ...base,
++        mechanism: "github-environment",
++        githubContext: { ...githubContext, unexpected: true },
++      }),
++      false,
++    );
++    assert.equal(Value.Check(ApprovalEvidenceV1Schema, { ...base, mechanism: "tty", githubContext }), false);
++    assert.equal(Value.Check(ApprovalEvidenceV1Schema, { ...base, mechanism: "inherited", githubContext }), false);
++  });
++
+   it("provides complete metadata and lookup coverage for every schema", () => {
+     assert.equal(hasCompleteContractMetadata(), true);
+     assert.equal(Object.keys(schemaById).length, contractSchemas.length);
+diff --git a/packages/kernel/src/test/writer-transfer.test.ts b/packages/kernel/src/test/writer-transfer.test.ts
+index a73ea29b9966e006011b26a9cf51eda0cba3e528..8355ea27cb427ea0981a993ed3b1ff97aad13b92 100644
+--- a/packages/kernel/src/test/writer-transfer.test.ts
++++ b/packages/kernel/src/test/writer-transfer.test.ts
+@@ -29,6 +29,7 @@ const request = {
+   branch: "main",
+   commit: "abc123",
+   workflowId: "workflow-v1",
++  approvalEnvironment: "vnext-qualification",
+   sender: "alice",
+   recipient: "bob",
+   currentEpoch: 1,
+@@ -48,6 +49,7 @@ test("writer transfer binds head and recipient, releases sender, and atomically
+     eventId: "accepted-1",
+   });
+   assert.equal(ownership.ownerEpoch, 2);
++  assert.equal(ownership.approvalEnvironment, "vnext-qualification");
+   assert.equal((await transfers.currentOwnership())?.ownerId, "bob");
+ });
+ 
+diff --git a/packages/kernel/src/writer-transfer.ts b/packages/kernel/src/writer-transfer.ts
+index 13550a8965d0f9501f0bada4b4e6d45de5979238..db1c420ac7cf3c7606970686a3fa981b969e2198 100644
+--- a/packages/kernel/src/writer-transfer.ts
++++ b/packages/kernel/src/writer-transfer.ts
+@@ -16,6 +16,7 @@ export interface WriterTransferClaim {
+   workflowId: string;
+   sender: string;
+   recipient: string;
++  approvalEnvironment?: string;
+   nextEpoch: number;
+   expiresAt: string;
+ }
+@@ -41,6 +42,7 @@ export interface WriterOwnership {
+   branch: string;
+   commit: string;
+   workflowId: string;
++  approvalEnvironment?: string;
+   acceptedAt: string;
+ }
+ 
+@@ -71,6 +73,9 @@ export class WriterTransferStore {
+   async create(input: CreateTransferInput): Promise<{ claim: WriterTransferClaim; hash: string }> {
+     if (input.commit !== input.currentGitHead) throw new Error("Transfer commit does not match current Git head");
+     if (!Number.isFinite(input.ttlMs) || input.ttlMs <= 0) throw new Error("Transfer TTL must be positive");
++    if (input.approvalEnvironment !== undefined && input.approvalEnvironment.trim().length === 0) {
++      throw new Error("Transfer approval environment must be nonempty");
++    }
+     const run = await this.runs.read();
+     if (run.projectId !== input.projectId || run.runId !== input.runId || run.ownerEpoch !== input.currentEpoch)
+       throw new Error("Stale transfer epoch or run identity");
+@@ -83,6 +88,7 @@ export class WriterTransferStore {
+       workflowId: input.workflowId,
+       sender: input.sender,
+       recipient: input.recipient,
++      ...(input.approvalEnvironment === undefined ? {} : { approvalEnvironment: input.approvalEnvironment }),
+       nextEpoch: input.currentEpoch + 1,
+       expiresAt: new Date(this.clock().getTime() + input.ttlMs).toISOString(),
+     };
+@@ -141,6 +147,7 @@ export class WriterTransferStore {
+       branch: claim.branch,
+       commit: claim.commit,
+       workflowId: claim.workflowId,
++      ...(claim.approvalEnvironment === undefined ? {} : { approvalEnvironment: claim.approvalEnvironment }),
+       acceptedAt: this.clock().toISOString(),
+     };
+     await atomicWriteJson(this.ownershipPath, ownership);
+diff --git a/packages/renderers/src/renderers.ts b/packages/renderers/src/renderers.ts
+index 1934028a752398585b47547510f35188aba11ee1..0d0ec83f0a9ab4815dedb8ff5485485f0b33e522 100644
+--- a/packages/renderers/src/renderers.ts
++++ b/packages/renderers/src/renderers.ts
+@@ -120,7 +120,7 @@ export function renderDeploymentPreview(preview: DeploymentPreviewV1): string {
+ }
+ 
+ export function renderApprovalEvidence(approval: ApprovalEvidenceV1): string {
+-  return [
++  const summary = [
+     "# Approval Evidence",
+     "",
+     fieldList([
+@@ -137,7 +137,27 @@ export function renderApprovalEvidence(approval: ApprovalEvidenceV1): string {
+       ["Decided", approval.decidedAt],
+       ["Expires", optional(approval.expiresAt)],
+     ]),
+-  ].join("\n");
++  ];
++  if (approval.mechanism === "github-environment") {
++    summary.push(
++      "",
++      "## GitHub Environment Context",
++      "",
++      fieldList([
++        ["Repository", approval.githubContext.repository],
++        ["Ref", approval.githubContext.ref],
++        ["Commit", approval.githubContext.sha],
++        ["Workflow ref", approval.githubContext.workflowRef],
++        ["Run", `${approval.githubContext.runId} (attempt ${approval.githubContext.runAttempt})`],
++        ["Job", approval.githubContext.job],
++        ["Environment", approval.githubContext.environment],
++        ["Workflow actor", approval.githubContext.actor],
++        ["Workflow actor ID", approval.githubContext.actorId],
++        ["Recipient identity", approval.githubContext.recipientIdentity],
++      ]),
++    );
++  }
++  return summary.join("\n");
+ }
+ 
+ export function renderResourceInventory(inventory: ResourceInventoryV1): string {
+diff --git a/packages/renderers/src/test/renderers.test.ts b/packages/renderers/src/test/renderers.test.ts
+index f37a38b3ad7e6bc40c3dd264a75da046a6f09784..f9826fb6850e75809112d5a4cdc21ffe838503f8 100644
+--- a/packages/renderers/src/test/renderers.test.ts
++++ b/packages/renderers/src/test/renderers.test.ts
+@@ -119,12 +119,25 @@ test("approval evidence renders supplied timestamps and optional binding fields"
+     runId: "prod-run",
+     gate: 4,
+     decision: "approved",
+-    actor: "release-manager",
++    actor: "github:42:octocat",
+     mechanism: "github-environment",
+     dependencyHash: hash("a"),
+     previewHash: hash("b"),
+     writerEpoch: 4,
+-    recipientIdentity: "deployment-service",
++    recipientIdentity: "github-actions:owner/repo:123:2:deploy",
++    githubContext: {
++      repository: "owner/repo",
++      ref: "refs/heads/main",
++      sha: "a".repeat(40),
++      workflowRef: "owner/repo/.github/workflows/deploy.yml@refs/heads/main",
++      runId: "123",
++      runAttempt: 2,
++      job: "deploy",
++      environment: "production",
++      actor: "octocat",
++      actorId: "42",
++      recipientIdentity: "github-actions:owner/repo:123:2:deploy",
++    },
+     decidedAt: "2026-07-01T11:00:00Z",
+     expiresAt: "2026-07-01T12:00:00Z",
+   };
+@@ -133,6 +146,9 @@ test("approval evidence renders supplied timestamps and optional binding fields"
+   assert.equal(rendered, renderApprovalEvidence(approval));
+   assert.match(rendered, /\*\*Decision:\*\* APPROVED/);
+   assert.match(rendered, /2026-07-01T11:00:00Z/);
++  assert.match(rendered, /GitHub Environment Context/);
++  assert.match(rendered, /owner\/repo\/\.github\/workflows\/deploy\.yml@refs\/heads\/main/);
++  assert.match(rendered, /github-actions:owner\/repo:123:2:deploy/);
+ });
+ 
+ test("resource inventory sorts resources and property keys", () => {
+diff --git a/packages/testkit/src/fixtures.ts b/packages/testkit/src/fixtures.ts
+index 254d87eac2129a3f8335437fe1e994e20523a9f8..ab1588ca7f3220cc0fc58d4f034f105fcb7f717c 100644
+--- a/packages/testkit/src/fixtures.ts
++++ b/packages/testkit/src/fixtures.ts
+@@ -167,7 +167,9 @@ export function previewFixture(overrides: Partial<DeploymentPreviewV1> = {}): De
+   return { ...body, previewHash: overrides.previewHash ?? sha256(body) };
+ }
+ 
+-export function approvalFixture(overrides: Partial<ApprovalEvidenceV1> = {}): ApprovalEvidenceV1 {
++export function approvalFixture(
++  overrides: Partial<Extract<ApprovalEvidenceV1, { mechanism: "tty" }>> = {},
++): ApprovalEvidenceV1 {
+   const previewHash = overrides.previewHash ?? fixtureHash("preview");
+   return {
+     schemaVersion: CONTRACT_VERSION,
+diff --git a/site/src/content/docs/vnext/cli-reference.md b/site/src/content/docs/vnext/cli-reference.md
+index 727ce5b1d72585b6417ffb08480bdcd767dd9419..0bc9cc3fb3059f4243b10f7655fb5d6798620be0 100644
+--- a/site/src/content/docs/vnext/cli-reference.md
++++ b/site/src/content/docs/vnext/cli-reference.md
+@@ -56,7 +56,7 @@ Run `apex <command> --json` for automation. Success is written to stdout as
+ | `apex task stage-file` | `--task --path --file`; optional `--sha` | Stage an allowed code-generation file. |
+ | `apex task generate-iac` | `--task` | Generate the selected IaC track in the bounded staging tree. |
+ | `apex review resolve` | `--file` | Record a review-finding resolution from JSON. |
+-| `apex gate decide` | `--gate --decision --actor` | Approve or reject an open gate. |
++| `apex gate decide` | `--gate --decision`; see mechanism flags below | Approve or reject an open gate. |
+ | `apex validate` | None | Validate and cache the current journal/runtime-lock result. |
+ | `apex preview` | `--operation --provider`; see values below | Create a bound preview and open Gate 4. |
+ | `apex deploy` | Optional `--preview` | Execute the current approved preview and collect inventory. |
+@@ -84,13 +84,16 @@ The compact rows above expand to these exact accepted flags and values:
+ init: --project; optional --name, --environment, --target, --iac, --customizations-source
+ task complete: --task, --file; single output also needs --kind; optional --summary
+ review resolve: --file
++gate decide: --gate --decision; optional --mechanism tty|github-environment (default tty)
++gate decide with tty: --actor is required
++gate decide with github-environment: --actor is forbidden; Gate 4 approved decisions only
+ preview: --operation apply|destroy --provider fake|bicep|terraform
+ render: --kind status|requirements|preview|approval|inventory
+ capability install/update: --pack --yes; optional --manifest, --cache
+ capability status/verify: --pack; optional --manifest
+ capability rollback/uninstall: --pack --yes; optional --manifest
+ quality evaluate: --measurements; optional --scorecard
+-writer transfer-create: --repo --branch --commit --workflow --sender --recipient --head --ttl
++writer transfer-create: --repo --branch --commit --workflow --sender --recipient --head --ttl; optional --environment
+ state transfer-export: --claim --file --recipient --ttl-seconds --yes
+ state transfer-import: --file --recipient --yes
+ provider transfer-export: --preview --provider bicep|terraform --file --recipient --ttl-seconds --yes
+@@ -112,6 +115,24 @@ unrelated runtime files. Import validates the authenticated envelope, exact auth
+ binding/artifact cross-links before atomic mode-`0600` writes under `.apex/local/provider-runtime/`. It does not approve
+ Gate 4 or deploy. Production CI remains blocked until the transfer has live proof across separate preview and apply jobs.
+ 
++GitHub Environment approval derives its complete context from `GITHUB_ACTIONS`, `GITHUB_REPOSITORY`, `GITHUB_REF`,
++`GITHUB_SHA`, `GITHUB_WORKFLOW_REF`, `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT`, `GITHUB_JOB`, `GITHUB_ACTOR`,
++`GITHUB_ACTOR_ID`, and `APEX_GITHUB_ENVIRONMENT`. It accepts no context JSON, file override, arbitrary actor, or
++arbitrary recipient. The accepted writer-transfer recipient must equal
++`github-actions:<repository>:<run-id>:<run-attempt>:<job>`.
++
++```bash
++apex gate decide \
++  --gate 4 \
++  --decision approved \
++  --mechanism github-environment \
++  --json
++```
++
++The command is valid only inside GitHub Actions after the current writer transfer has been accepted. GitHub Environment
++approval additionally requires the transfer claim's `--environment` to exactly match `APEX_GITHUB_ENVIRONMENT`. It is a
++CLI ceremony and is not exposed through the `gateDecide` MCP tool.
++
+ ## Use Narrow MCP Tools
+ 
+ The managed agents receive only tools declared in their definitions. The MCP server implements these exact names:
+diff --git a/site/src/content/docs/vnext/operations.md b/site/src/content/docs/vnext/operations.md
+index 4e97221ae881c352f58af99500766c467b58a332..665d2b4460cd04f74242600d27a717a674c31d2f 100644
+--- a/site/src/content/docs/vnext/operations.md
++++ b/site/src/content/docs/vnext/operations.md
+@@ -125,6 +125,34 @@ destinations and symlinked runtime ancestors, while allowing byte-identical retr
+ transport key, approves Gate 4, or invokes a provider. Keep production CI apply blocked until a live separate-job proof
+ qualifies the complete repository-state and provider-authority sequence.
+ 
++## Approve Gate 4 in a Protected Workflow
++
++Configure the apply job with a protected GitHub Environment and set `APEX_GITHUB_ENVIRONMENT` to that environment's
++exact name. Create the writer-transfer claim with that same name in `--environment`; the claim, encrypted state handoff,
++accepted ownership, and approval must agree. GitHub supplies the remaining context variables. After importing state and
++provider authority, accept the writer transfer with the canonical recipient for the current run, attempt, and job. Then
++approve Gate 4 without an `--actor` flag:
++
++```bash
++apex gate decide \
++  --gate 4 \
++  --decision approved \
++  --mechanism github-environment \
++  --json
++```
++
++The CLI derives the evidence actor as `github:<actor-id>:<actor>` and the recipient as
++`github-actions:<repository>:<run-id>:<run-attempt>:<job>`. It rejects local invocation, pull-request refs, missing or
++malformed variables, stale ownership, and any repository, branch, commit, workflow, recipient, or owner-epoch mismatch
++against the accepted writer-transfer claim. The approval expires no later than its exact deployment preview.
++
++GitHub Environment evidence records the workflow actor, not the identity of a required reviewer. In a repository where
++one maintainer can trigger the workflow and approve its environment, this does not prove independent review. Configure
++reviewer separation and environment protection outside APEX when separation of duties is required.
++
++Production CI remains blocked until the protected-environment ceremony and the complete separate-job transfer path have
++live proof on the exact release candidate.
++
+ Bicep defaults to `detachAll`. Set `ownershipAuthorizesDeleteResources: true` only when the stack exclusively owns every
+ resource it may delete. `deleteAll` additionally requires an explicitly dedicated sandbox resource group and separate
+ authorization in provider configuration.
+diff --git a/site/src/content/docs/vnext/security.md b/site/src/content/docs/vnext/security.md
+index 6b15b03ea1e8cfd8026cde4701bfffd4f5c5c477..d2534edf9ae97506622b3814d3b5105a49b394b7 100644
+--- a/site/src/content/docs/vnext/security.md
++++ b/site/src/content/docs/vnext/security.md
+@@ -26,13 +26,25 @@ current Git head, and expiry. A stale epoch or mismatched head cannot authorize
+ 
+ Repository-state transfer uses a separate AES-256-GCM envelope from encrypted Terraform plan transport. Authenticated
+ metadata binds the envelope implementation and version, kind, plaintext digest, recipient, timestamps, claim, selected
+-project/run, writer epoch, journal head, repository, branch, commit, and workflow. Import authenticates and validates the
+-complete bundle before atomic mode-`0600` writes. It refuses path traversal, symlinks, secret-bearing JSON, oversized
+-files, unreferenced objects, changed existing state, and any attempt to include `.apex/local/`.
++project/run, writer epoch, journal head, repository, branch, commit, workflow, and optional approval environment. Import
++authenticates and validates the complete bundle before atomic mode-`0600` writes. It refuses path traversal, symlinks,
++secret-bearing JSON, oversized files, unreferenced objects, changed existing state, and any attempt to include
++`.apex/local/`.
+ 
+ State import is not writer acceptance. The protected recipient must run the existing `writer transfer-accept` command
+ after import so approval and authority transfer remain separate operations.
+ 
++GitHub Environment Gate 4 approval is authorized only after that accepted ownership exists at the run's current epoch.
++The CLI derives context exclusively from GitHub Actions process variables and binds repository, full branch ref, commit,
++workflow ref, run and attempt, job, environment, workflow actor, and canonical recipient into approval evidence. It
++accepts no caller-supplied context document. The service compares every source-control field and recipient back to the
++accepted ownership record before recording approval.
++
++The evidence actor `github:<actor-id>:<actor>` identifies the workflow actor. APEX does not infer or attest the identity
++of a GitHub Environment reviewer because GitHub does not expose that identity through these process variables. A
++single-maintainer repository can therefore permit trigger-and-approve self-review unless its environment protection
++rules enforce separation. Treat reviewer independence as an external repository governance control.
++
+ The current preview exposes writer transfer primitives, but production CI operation remains subject to release
+ qualification and provider-specific evidence. Do not simulate transfer by editing run files.
+ 
+diff --git a/site/src/content/docs/vnext/testing.md b/site/src/content/docs/vnext/testing.md
+index 5c69e1b9fecd36443b2e3750a2df456ae2210a87..35db5bf40f394821c614d16777ce53a864515517 100644
+--- a/site/src/content/docs/vnext/testing.md
++++ b/site/src/content/docs/vnext/testing.md
+@@ -38,6 +38,12 @@ a clean npm project, runs `apex version`, initializes a project, and verifies ma
+ The package test suite also exercises deterministic fake-provider scenarios for both Bicep and Terraform tracks. Use
+ the fake provider for repeatable preview, approval, apply, destroy, restart, and inventory checks without Azure access.
+ 
++GitHub Environment approval tests cover process-context derivation, local and malformed input rejection, canonical
++recipient construction, default TTY compatibility, strict approval schemas, accepted writer-transfer success, preview
++expiry bounds, encrypted approval-environment handoff, and adversarial actor, owner, epoch, repository, ref, commit,
++workflow, environment, and recipient mismatches. These tests do not constitute live proof of GitHub Environment
++protection or reviewer behavior.
++
+ ## Bind Live Evidence
+ 
+ After deterministic qualification passes, create an unavailable-by-default record with `npm run live:vnext`. The record
+@@ -77,7 +83,8 @@ rejection, managed-file conflict refusal, fake dual-track completion, and succes
+ 
+ - vNext is a preview and does not import v1 sessions or artifacts.
+ - Production CI encrypted Terraform saved-plan transport is not qualified; local exact-plan operation is the supported
+-  preview path.
++  preview path. GitHub Environment Gate 4 evidence is implemented and deterministically tested, but production CI stays
++  blocked until the protected-environment and separate-job transfer sequence has live proof on the release candidate.
+ - The optional VS Code agent-plugin distribution path is not required or qualified for this preview.
+ - Kernel authority does not extend to VS Code conversation history or system context.
+ - Real Azure tests may incur cost and require sandbox governance, credentials, quotas, and cleanup ownership.
+diff --git a/tools/scripts/validate-iac-security-baseline.mjs b/tools/scripts/validate-iac-security-baseline.mjs
+index ce8c90c6dcd032670ad8aec8103544a4b81c45c0..4e38f8c149c5ac14e2dda0a67b0113178b1230f8 100644
+--- a/tools/scripts/validate-iac-security-baseline.mjs
++++ b/tools/scripts/validate-iac-security-baseline.mjs
+@@ -30,9 +30,15 @@ import path from "node:path";
+ import { Reporter } from "./_lib/reporter.mjs";
+ import { walkFiles } from "./_lib/glob-helpers.mjs";
+ import { findAllMatches } from "./_lib/regex-helpers.mjs";
++import {
++  collectSecurityExceptions,
++  securityExceptionId,
++  securityExceptionIssues,
++} from "./_lib/security-exceptions.mjs";
+ 
+ const ROOT = process.cwd();
+ const r = new Reporter("IaC Security Baseline");
++const securityExceptions = collectSecurityExceptions(ROOT);
+ 
+ // --- Bicep security anti-patterns ---
+ // Each entry: [regex, description]
+@@ -43,7 +49,11 @@ const BICEP_VIOLATIONS = [
+   [/minTlsVersion\s*:\s*'TLS1_1'/i, "TLS 1.1 is NOT allowed — MUST be TLS1_2 or higher"],
+   [/supportsHttpsTrafficOnly\s*:\s*false/i, "HTTPS-only traffic MUST be true"],
+   [/allowBlobPublicAccess\s*:\s*true/i, "Public blob access MUST be disabled (false)"],
+-  [/publicNetworkAccess\s*:\s*'Enabled'/i, "Public network access SHOULD be disabled for production data services"],
++  [
++    /publicNetworkAccess\s*:\s*'Enabled'/i,
++    "Public network access SHOULD be disabled for production data services",
++    "public-network-access",
++  ],
+   [/httpsOnly\s*:\s*false/i, "HTTPS-only MUST be enabled"],
+   // --- MUST-FAIL: SQL Entra-only auth ---
+   [/azureADOnlyAuthentication\s*:\s*false/i, "SQL Entra-only auth required (azureADOnlyAuthentication must be true)"],
+@@ -93,6 +103,7 @@ const TERRAFORM_VIOLATIONS = [
+   [
+     /public_network_access_enabled\s*=\s*true/i,
+     "Public network access SHOULD be disabled for production data services",
++    "public-network-access",
+   ],
+   [/allow_blob_public_access\s*=\s*true/i, "Public blob access MUST be disabled (legacy attribute)"],
+   [/https_only\s*=\s*false/i, "HTTPS-only MUST be enabled"],
+@@ -146,8 +157,19 @@ function scanFile(filePath, violations, warningPatterns = []) {
+ 
+   for (let i = 0; i < lines.length; i++) {
+     const line = lines[i];
+-    for (const [pattern, message] of violations) {
++    for (const [pattern, message, exceptionControl] of violations) {
+       if (pattern.test(line)) {
++        const exceptionId = securityExceptionId(line);
++        if (exceptionControl !== undefined && exceptionId !== undefined) {
++          const issues = securityExceptionIssues(securityExceptions, exceptionId, exceptionControl);
++          if (issues.length === 0) {
++            r.warn(`${relPath}:${i + 1}`, `Approved security exception ${exceptionId}: ${message}`);
++            continue;
++          }
++          r.error(`${relPath}:${i + 1}`, `${message}; exception ${exceptionId} is invalid: ${issues.join(", ")}`);
++          fileHasViolation = true;
++          continue;
++        }
+         r.error(`${relPath}:${i + 1}`, message);
+         fileHasViolation = true;
+       }

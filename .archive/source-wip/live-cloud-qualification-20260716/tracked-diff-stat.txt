@@ -1,0 +1,23 @@
+ CHANGELOG.md                                       |   5 +
+ packages/capabilities/src/test/iac.test.ts         |   7 +-
+ .../src/test/native-iac-providers.test.ts          |   2 +-
+ packages/cli/src/cli.ts                            |  23 +-
+ packages/cli/src/index.ts                          |   1 +
+ packages/cli/src/service.ts                        |  92 +++++-
+ packages/cli/src/state-transfer.ts                 |  14 +-
+ packages/cli/src/test/state-transfer.test.ts       |   4 +
+ packages/cli/src/test/workflow.test.ts             |   2 +-
+ .../schemas/approval-evidence-v1.schema.json       | 365 ++++++++++++++++-----
+ packages/contracts/src/deployment.ts               |  78 ++++-
+ packages/contracts/src/test/contracts.test.ts      |  67 +++-
+ packages/kernel/src/test/writer-transfer.test.ts   |   2 +
+ packages/kernel/src/writer-transfer.ts             |   7 +
+ packages/renderers/src/renderers.ts                |  24 +-
+ packages/renderers/src/test/renderers.test.ts      |  20 +-
+ packages/testkit/src/fixtures.ts                   |   4 +-
+ site/src/content/docs/vnext/cli-reference.md       |  25 +-
+ site/src/content/docs/vnext/operations.md          |  28 ++
+ site/src/content/docs/vnext/security.md            |  18 +-
+ site/src/content/docs/vnext/testing.md             |   9 +-
+ tools/scripts/validate-iac-security-baseline.mjs   |  26 +-
+ 22 files changed, 709 insertions(+), 114 deletions(-)
