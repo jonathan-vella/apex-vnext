@@ -5,6 +5,7 @@ node_modules/
 # so formatting site/ would hard-error. Mirror the eslint ignore here.
 site/
 agent-output/
+.apex/
 tmp/
 infra/
 logs/
