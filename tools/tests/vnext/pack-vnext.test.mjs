@@ -472,7 +472,10 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
   assert.equal(uninstall.ok, true);
   assert.deepEqual(uninstall.result.conflicts, []);
   await assert.rejects(readFile(join(project, ".github", "agents", "apex.agent.md")), { code: "ENOENT" });
-  assert.equal(await readFile(join(project, ".apex", ".gitignore"), "utf8"), "/cache/\n/local/\n/work/\n");
+  assert.equal(
+    await readFile(join(project, ".apex", ".gitignore"), "utf8"),
+    "/cache/\n/local/\n/work/\n/runtime/capability-packs/\n",
+  );
   await assert.rejects(readFile(join(project, ".apex", "customizations.lock.json")), { code: "ENOENT" });
   assert.equal(await readFile(join(project, "keep.txt"), "utf8"), "preserve me\n");
   await readFile(join(project, ".apex", "runtime", "workflow.v1.json"));

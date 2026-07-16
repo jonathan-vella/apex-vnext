@@ -54,7 +54,10 @@ test("init installs bundled customizations and runtime config by default", async
       },
     },
   });
-  assert.equal(await readFile(join(root, ".apex", ".gitignore"), "utf8"), "/cache/\n/local/\n/work/\n");
+  assert.equal(
+    await readFile(join(root, ".apex", ".gitignore"), "utf8"),
+    "/cache/\n/local/\n/work/\n/runtime/capability-packs/\n",
+  );
   assert.match(await readFile(join(root, ".apex", "runtime", "workflow.v1.json"), "utf8"), /apex-workflow-v1/);
   const registry = JSON.parse(
     await readFile(join(root, ".apex", "runtime", "capability-packs.registry.json"), "utf8"),
@@ -229,7 +232,7 @@ test("update rejects and doctor repairs a modified local Git boundary", async ()
   assert.match(boundaryCheck?.value ?? "", /^[0-9a-f]{64}$/);
   assert.notEqual(boundaryCheck?.value, "/local/\n");
   await service.doctor(true, true);
-  assert.equal(await readFile(boundary, "utf8"), "/cache/\n/local/\n/work/\n");
+  assert.equal(await readFile(boundary, "utf8"), "/cache/\n/local/\n/work/\n/runtime/capability-packs/\n");
 });
 
 test("init writes a real runtime lock and doctor detects managed tampering", async () => {
