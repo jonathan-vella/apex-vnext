@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -120,6 +120,8 @@ for (const track of ["bicep", "terraform"]) {
 test("preparation creates a validated run with Gates 1-3 approved and Gate 4 closed", async () => {
   const stateRoot = await mkdtemp(join(tmpdir(), "apex-vnext-live-prepare-"));
   try {
+    await mkdir(join(stateRoot, ".github"), { recursive: true });
+    await writeFile(join(stateRoot, ".github/copilot-instructions.md"), "source-owned\n", "utf8");
     const result = await prepareQualificationState(
       { yes: true, track: "bicep", actor: "maintainer", subscription: SUBSCRIPTION },
       {
@@ -145,6 +147,10 @@ test("preparation creates a validated run with Gates 1-3 approved and Gate 4 clo
     const selection = JSON.parse(await readFile(join(stateRoot, ".apex/config.json"), "utf8"));
     assert.equal(selection.projectId, "vnext-qualification");
     assert.equal(selection.runId, result.runId);
+    assert.equal(await readFile(join(stateRoot, ".github/copilot-instructions.md"), "utf8"), "source-owned\n");
+    const customizationLock = JSON.parse(await readFile(join(stateRoot, ".apex/customizations.lock.json"), "utf8"));
+    assert.deepEqual(customizationLock.files, []);
+    assert.ok(customizationLock.runtime.length > 0);
   } finally {
     await rm(stateRoot, { recursive: true, force: true });
   }
