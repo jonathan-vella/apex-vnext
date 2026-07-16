@@ -87,6 +87,8 @@ the original APEX repository. See [docs/MIGRATION.md](docs/MIGRATION.md) for pro
 
 ### Fixed (APEX vNext security)
 
+- fix(vnext): bind live qualification launch, dispatch, and release evidence to `jonathan-vella/apex-vnext`. Copied
+  workflows and manifests from another repository now fail closed before cloud mutation.
 - fix(vnext): replaced polynomial storage-security regular expressions over generated Bicep and Terraform source with
   a bounded line-oriented assignment scan. Adversarial dual-track coverage protects the fix in
   [#537](https://github.com/jonathan-vella/apex/issues/537).

@@ -4,7 +4,7 @@
 - **Milestone:** Dedicated repository extraction
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
-- **Verified destination head:** `099616a6dcbca3286d74bf3e6b7a47aaad031cdc`
+- **Verified destination head:** `86fb94514665337a0d9e6a6e6cae6a4c2d0aa7c7`
 - **Source repository:** `jonathan-vella/apex`
 - **Source commit:** `60d96d5a46ff534069c58275cfd32cb8d4490971`
 - **History strategy:** Clean snapshot
@@ -18,6 +18,10 @@ user documentation now lives under `docs/guides/` and validates as repository-na
 The original APEX `main` branch was not modified. The old rolling integration and workflow-bootstrap pull requests are
 source-provenance records only and close unmerged after migration receipts are posted.
 
+Issue `#9` is the active dependency-ready workstream. Its destination-readiness slice binds the live launcher,
+dispatch workflow, and release evidence to this repository. The GitHub Environment, variables, secrets, Azure OIDC
+federation, and Azure resources remain unavailable and require separate maintainer approval before mutation.
+
 ## Validation State
 
 | Check                        | Result   | Evidence                                                                      |
@@ -28,9 +32,9 @@ source-provenance records only and close unmerged after migration receipts are p
 | Live workflow structure      | Pass     | `npm run validate:vnext-live-workflow`.                                       |
 | Live workflow mutation tests | Pass     | `npm run test:vnext-live-workflow`.                                           |
 | Repository mutation tests    | Pass     | `npm run test:vnext-validator`.                                               |
-| Full vNext qualification     | Pass     | `npm run qualify:vnext` on destination root commit.                           |
-| Full repository validation   | Pass     | `npm run validate:all` on destination root commit.                            |
-| Destination CI               | Pass     | Workflow run `29495046605` on `099616a6`.                                     |
+| Full vNext qualification     | Pass     | `npm run qualify:vnext` on destination commit `86fb945`.                      |
+| Full repository validation   | Pass     | `npm run validate:all` on destination commit `86fb945`.                       |
+| Destination CI               | Pass     | Workflow run `29497516303` on `86fb945`.                                      |
 | Markdown docs (CI)           | Pass     | Workflow run `29495046638` on `099616a6`.                                     |
 | IaC checks                   | Pass     | Workflow run `29495064776` on `099616a6`.                                     |
 | Devcontainer CI              | Disabled | Workflow is disabled and is not a migration or release gate.                  |

@@ -1,0 +1,2 @@
+export const VNEXT_QUALIFICATION_REPOSITORY = "jonathan-vella/apex-vnext";
+export const VNEXT_QUALIFICATION_REPOSITORY_IDENTITY = `github.com/${VNEXT_QUALIFICATION_REPOSITORY}`;

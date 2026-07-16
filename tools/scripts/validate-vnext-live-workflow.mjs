@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as yaml from "js-yaml";
+import { VNEXT_QUALIFICATION_REPOSITORY } from "./_lib/vnext-qualification.mjs";
 
 const WORKFLOW = ".github/workflows/vnext-live-qualification.yml";
 const PROTECTED = ["preview", "apply"];
@@ -111,6 +112,10 @@ export function validateWorkflowText(text) {
     );
   }
   const validation = runs(jobs.validate_dispatch);
+  fail(
+    validation.includes(`test "$GITHUB_REPOSITORY" = "${VNEXT_QUALIFICATION_REPOSITORY}"`),
+    "destination repository guard missing",
+  );
   fail(validation.includes("refs/heads/main"), "branch guard missing");
   fail(validation.includes('GITHUB_RUN_ATTEMPT" = "1'), "attempt-one guard missing");
   fail(

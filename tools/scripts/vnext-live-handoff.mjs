@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { VNEXT_QUALIFICATION_REPOSITORY } from "./_lib/vnext-qualification.mjs";
 import { validateQualificationSecurityException } from "./validate-vnext-qualification-context.mjs";
 
 const execFile = promisify(execFileCallback);
@@ -75,6 +76,9 @@ export function validateWorkflowBootstrap(repository, defaultWorkflow, candidate
   const defaultBranch = repository?.defaultBranchRef?.name;
   if (typeof repository?.nameWithOwner !== "string" || typeof defaultBranch !== "string") {
     throw new Error("Repository default branch metadata is unavailable");
+  }
+  if (repository.nameWithOwner !== VNEXT_QUALIFICATION_REPOSITORY) {
+    throw new Error(`Live qualification requires destination repository ${VNEXT_QUALIFICATION_REPOSITORY}`);
   }
   const expectedPath = `.github/workflows/${WORKFLOW}`;
   if (defaultWorkflow?.type !== "file" || defaultWorkflow?.path !== expectedPath) {
