@@ -1,0 +1,186 @@
+{
+  "schemaVersion": "1.0.0",
+  "protocolVersion": "1.0.0",
+  "installationPolicy": {
+    "mode": "lazy",
+    "coreRemainsUsableWhenOptionalPackAbsent": true,
+    "exactLocksRequired": true,
+    "transitiveLocksRequired": true,
+    "installOnlyForDeclaredWorkflow": true
+  },
+  "packs": [
+    {
+      "id": "azure-pricing",
+      "availability": "optional",
+      "implementation": "python",
+      "source": "tools/mcp-servers/azure-pricing",
+      "lazyInstall": true,
+      "requiredWorkflows": [
+        "architecture"
+      ],
+      "lockOwnership": {
+        "manifest": "config/capability-packs.v1.json",
+        "runtimeVersion": "pack-lock",
+        "directDependencies": "pack-lock",
+        "transitiveDependencies": "pack-lock",
+        "resolvedArtifactDigest": "runtime-bundle-build"
+      },
+      "absentBehavior": {
+        "affectedWorkflow": "blocked-capability-unavailable",
+        "unaffectedWorkflows": "continue",
+        "projectStatus": "available"
+      },
+      "replacementCriteria": {
+        "minimumMeasuredRuns": 100,
+        "candidateFailureRateMustBeNoGreaterThanCurrent": true,
+        "candidateP95LatencyMustBeNoGreaterThanCurrent": true,
+        "securityFindingsMustNotIncrease": true,
+        "maintenanceBurdenReductionEvidenceRequired": true,
+        "owner": "capabilities"
+      },
+      "version": "5.4.0",
+      "runtime": "python",
+      "artifact": {
+        "type": "local-directory",
+        "spec": "capability-packs/azure-pricing/source",
+        "digest": "536a5d49d75f212592491584b9297647f04326fb12abd227064b4ec985b52b82"
+      },
+      "lock": {
+        "installer": "uv",
+        "path": "capability-packs/azure-pricing/source/uv.lock",
+        "digest": "0742864ac2edded0876d5055b94bb201162ae5c3bbdda64d6e61ccebbf6cda72",
+        "directDigest": "0742864ac2edded0876d5055b94bb201162ae5c3bbdda64d6e61ccebbf6cda72",
+        "transitiveDigest": "0742864ac2edded0876d5055b94bb201162ae5c3bbdda64d6e61ccebbf6cda72"
+      },
+      "executable": {
+        "command": "uv",
+        "args": [
+          "run",
+          "--frozen",
+          "--no-dev",
+          "azure-pricing-mcp"
+        ]
+      },
+      "capabilities": [
+        "azure-pricing"
+      ]
+    },
+    {
+      "id": "azure-governance-discovery",
+      "availability": "optional-required-by-workflow",
+      "implementation": "python",
+      "source": ".github/skills/azure-governance-discovery",
+      "lazyInstall": true,
+      "requiredWorkflows": [
+        "governance-discovery",
+        "governance-reconciliation",
+        "preview-bicep",
+        "preview-terraform"
+      ],
+      "lockOwnership": {
+        "manifest": "config/capability-packs.v1.json",
+        "runtimeVersion": "pack-lock",
+        "directDependencies": "pack-lock",
+        "transitiveDependencies": "pack-lock",
+        "resolvedArtifactDigest": "runtime-bundle-build"
+      },
+      "absentBehavior": {
+        "affectedWorkflow": "blocked-capability-unavailable",
+        "unaffectedWorkflows": "continue",
+        "projectStatus": "available",
+        "emptyGovernanceResultAllowed": false
+      },
+      "replacementCriteria": {
+        "minimumMeasuredRuns": 100,
+        "candidateCompletenessMustBeNoLessThanCurrent": true,
+        "candidateFailureRateMustBeNoGreaterThanCurrent": true,
+        "candidateP95LatencyMustBeNoGreaterThanCurrent": true,
+        "securityFindingsMustNotIncrease": true,
+        "maintenanceBurdenReductionEvidenceRequired": true,
+        "owner": "governance"
+      },
+      "version": "1.0.0",
+      "runtime": "python",
+      "artifact": {
+        "type": "local-directory",
+        "spec": "capability-packs/azure-governance-discovery/source",
+        "digest": "e8b097a5664f9651ee55d6d2e64d733b797decb32b6a309fdbf489fcd65a8b70"
+      },
+      "lock": {
+        "installer": "pip-hashes",
+        "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "directDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "transitiveDigest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "executable": {
+        "command": "python",
+        "args": [
+          "scripts/discover.py"
+        ]
+      },
+      "dependencyFree": true,
+      "script": "scripts/discover.py",
+      "scriptDigest": "e14cd39d279f75d353a0578928004cdfc2c7a98c43a0ba9b111332603b9829e2",
+      "capabilities": [
+        "governance-discovery"
+      ]
+    },
+    {
+      "id": "drawio",
+      "availability": "optional",
+      "implementation": "deno",
+      "source": "tools/mcp-servers/drawio",
+      "lazyInstall": true,
+      "requiredWorkflows": [],
+      "lockOwnership": {
+        "manifest": "config/capability-packs.v1.json",
+        "runtimeVersion": "pack-lock",
+        "directDependencies": "pack-lock",
+        "transitiveDependencies": "pack-lock",
+        "resolvedArtifactDigest": "runtime-bundle-build"
+      },
+      "absentBehavior": {
+        "affectedWorkflow": "skip-optional-diagram-output",
+        "unaffectedWorkflows": "continue",
+        "projectStatus": "available"
+      },
+      "replacementCriteria": {
+        "minimumMeasuredRuns": 50,
+        "candidateRenderSuccessRateMustBeNoLessThanCurrent": true,
+        "candidateP95LatencyMustBeNoGreaterThanCurrent": true,
+        "outputCompatibilityEvidenceRequired": true,
+        "securityFindingsMustNotIncrease": true,
+        "maintenanceBurdenReductionEvidenceRequired": true,
+        "owner": "documentation-tooling"
+      },
+      "version": "3.0.1",
+      "runtime": "deno",
+      "artifact": {
+        "type": "local-directory",
+        "spec": "capability-packs/drawio/source",
+        "digest": "ef07257ae866f8622ff29595ae268e6c2babfe280e69725a7a5a5066d455a2fb"
+      },
+      "lock": {
+        "installer": "deno",
+        "path": "capability-packs/drawio/source/deno.lock",
+        "digest": "0ef8677b044cec4ba0f22d0cf3079adcc325453fcfc6761982ce628ca023f9f8",
+        "directDigest": "0ef8677b044cec4ba0f22d0cf3079adcc325453fcfc6761982ce628ca023f9f8",
+        "transitiveDigest": "0ef8677b044cec4ba0f22d0cf3079adcc325453fcfc6761982ce628ca023f9f8"
+      },
+      "executable": {
+        "command": "deno",
+        "args": [
+          "run",
+          "--frozen",
+          "-P",
+          "src/index.ts",
+          "--transport",
+          "stdio"
+        ]
+      },
+      "capabilities": [
+        "drawio"
+      ]
+    }
+  ]
+}
