@@ -8,6 +8,7 @@ import {
   isAcceptedLocalOwnership,
   parseArgs,
   validateDispatchRunState,
+  validateGitStatus,
   validateTransportKey,
   validateWorkflowBootstrap,
   withFirewall,
@@ -370,6 +371,16 @@ test("launcher binds local approval to the stable handoff recipient", () => {
       ),
     /approved local Gate 4/,
   );
+});
+
+test("dispatch permits only repository-backed APEX state drift", () => {
+  assert.doesNotThrow(() => validateGitStatus(" M .apex/config.json\n?? .apex/objects/sha256/ab/object\n", true));
+  assert.throws(() => validateGitStatus(" M .apex/config.json\n"), /permitted APEX state boundary/);
+  assert.throws(
+    () => validateGitStatus(" M .apex/config.json\n M .github/workflows/vnext-live-qualification.yml\n", true),
+    /permitted APEX state boundary/,
+  );
+  assert.throws(() => validateGitStatus("R  .apex/old -> .apex/new\n", true), /permitted APEX state boundary/);
 });
 
 test("launcher validates the exception before opening its local firewall rule", () => {

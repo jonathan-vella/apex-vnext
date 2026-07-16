@@ -154,6 +154,9 @@ accepted transfer advances the approved writer epoch exactly once. Deploy proves
 `gate.decided`, `transfer-requested`, and `transfer-accepted`. A missing approval, second transfer, changed recipient,
 superseded preview, expired lease, or changed dependency revision fails before provider execution.
 
+Dispatch permits only the `.apex/**` state changes produced by preview and local approval. It still requires the exact
+`main` commit and rejects changes to source, workflows, configuration, or any other workspace path.
+
 The GitHub Environment scopes OIDC, variables, and secrets only. It is not approval evidence. Production CI remains
 blocked until the complete local-approval and CI-apply transfer path has live proof on the exact release candidate.
 

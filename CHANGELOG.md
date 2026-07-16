@@ -89,6 +89,8 @@ the original APEX repository. See [docs/MIGRATION.md](docs/MIGRATION.md) for pro
 
 ### Fixed (APEX vNext security)
 
+- fix(vnext): allow dispatch to carry only repository-backed `.apex/**` preview and approval drift while retaining exact
+  `main` binding and rejecting every source, workflow, rename, or non-APEX workspace change.
 - fix(vnext): exclude reproducible capability source packs from repository-backed `.apex` state, matching the existing
   encrypted state-transfer allowlist while retaining locked runtime manifests and authoritative journal state.
 - fix(vnext): make local APEX Gate 4 the sole deployment approval and bind it to the intended CI recipient before one

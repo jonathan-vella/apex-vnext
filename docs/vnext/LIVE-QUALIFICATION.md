@@ -71,6 +71,8 @@ apex gate decide --gate 4 --decision approved \
 
 Dispatch with the same handoff ID. Dispatch verifies the current local TTY approval, creates one writer-transfer claim,
 encrypts the already-approved run state and exact provider authority, uploads both envelopes, and starts the apply job.
+The checkout must remain at exact `main`; only repository-backed `.apex/**` changes created by preview and approval are
+permitted. Any source, workflow, or other workspace drift blocks dispatch.
 
 ```bash
 node tools/scripts/vnext-live-handoff.mjs dispatch --yes \
