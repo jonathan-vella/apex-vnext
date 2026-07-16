@@ -218,8 +218,10 @@ export function validateGitStatus(status, allowApexState = false) {
     changes.length > 0 &&
     (!allowApexState ||
       changes.some((change) => {
-        const path = change.slice(3);
-        return !path.startsWith(".apex/") || path.includes(" -> ");
+        const canonical = change.match(/^[ MADRCU?!]{2} (.+)$/);
+        const trimmedFirstLine = change.match(/^[MADRCU?!] (.+)$/);
+        const path = canonical?.[1] ?? trimmedFirstLine?.[1];
+        return path === undefined || !path.startsWith(".apex/") || path.includes(" -> ");
       }))
   ) {
     throw new Error("Checkout contains changes outside the permitted APEX state boundary");

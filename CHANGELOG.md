@@ -89,6 +89,8 @@ the original APEX repository. See [docs/MIGRATION.md](docs/MIGRATION.md) for pro
 
 ### Fixed (APEX vNext security)
 
+- fix(vnext): parse both canonical two-column Git porcelain and the command wrapper's first-line trimmed form when
+  enforcing dispatch-only `.apex/**` drift, without permitting source changes or renames.
 - fix(vnext): request Azure what-if with `--no-pretty-print` so the native Bicep provider receives strict JSON instead
   of the human diff formatter; stderr warnings remain separate and exact-preview normalization stays fail-closed.
 - fix(vnext): allow dispatch to carry only repository-backed `.apex/**` preview and approval drift while retaining exact
