@@ -91,7 +91,7 @@ body:
     attributes:
       label: Manual Or Live Qualification
       description: Identify user-owned or cloud-backed evidence and its target. Write "None" when fully deterministic.
-      placeholder: "Run in a clean supported devcontainer on the exact pull-request head."
+      placeholder: "Run in a clean supported VS Code workspace on the exact pull-request head."
     validations:
       required: true
 
@@ -104,7 +104,7 @@ body:
         - Regression test fails before and passes after the fix.
         - Focused and repository validation pass.
         - Register entry links closure proof.
-        - Pull request targets feat/apex-vnext-rewrite.
+        - Pull request targets main.
     validations:
       required: true
 
