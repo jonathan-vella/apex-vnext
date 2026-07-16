@@ -34,6 +34,7 @@ test("Bicep and Azure read adapters generate safe argv arrays", () => {
   assert.equal(preview.executable, "az");
   assert.equal(preview.args[4], "rg; echo unsafe");
   assert.equal(preview.args.includes("what-if"), true);
+  assert.equal(preview.args.includes("--no-pretty-print"), true);
   assert.equal(bicep.apply(target).args.includes("create"), true);
 
   const azure = new AzureCliReadAdapter();
