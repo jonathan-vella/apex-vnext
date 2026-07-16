@@ -51,7 +51,7 @@ when a decision has lasting architectural consequences that need alternatives an
 - **Consequences:** Unrelated cleanup cannot be bundled into a slice; a worsened release gate requires revert or explicit
   acceptance with owner and expiry.
 - **ADR:** Create ADRs only for consequential canonical-ownership decisions.
-- **Issue/PR:** [#545](https://github.com/jonathan-vella/apex/issues/545)
+- **Issue/PR:** Destination issue `#11`.
 
 ## DECISION-004: Keep Improvement Observe-And-Propose Only
 
@@ -68,7 +68,7 @@ when a decision has lasting architectural consequences that need alternatives an
 - **Consequences:** MCP may submit bounded observations or read proposals, but cannot decide, apply, edit, create pull
   requests, approve gates, publish, or deploy. Automated issue creation needs a later decision.
 - **ADR:** Required before implementing the improvement subsystem; compare the referenced upstream design and provenance.
-- **Issue/PR:** [#546](https://github.com/jonathan-vella/apex/issues/546)
+- **Issue/PR:** Destination issue `#12`.
 
 ## DECISION-005: Keep VS Code As The Only First-Release Agent Runtime
 
@@ -82,7 +82,7 @@ when a decision has lasting architectural consequences that need alternatives an
 - **Consequences:** GitHub Copilot CLI and other agent runtimes are out of scope. Runtime expansion requires a new decision
   and qualification plan.
 - **ADR:** Not required until runtime expansion is proposed.
-- **Issue/PR:** [#543](https://github.com/jonathan-vella/apex/issues/543)
+- **Issue/PR:** Destination issue `#9`.
 
 ## DECISION-006: Extend The Existing Bug Form For Regressions
 
@@ -133,3 +133,17 @@ when a decision has lasting architectural consequences that need alternatives an
   requests close unmerged with migration receipts.
 - **ADR:** Not required; this is a repository and release-governance decision.
 - **Issue/PR:** See [repository migration](../MIGRATION.md).
+
+## DECISION-009: Do Not Run Devcontainer CI
+
+- **Date:** 2026-07-16
+- **Owner:** `@jonathan-vella`
+- **Context:** The dedicated repository already has runtime, package, Markdown, IaC, and aggregate validation gates.
+- **Options:** Require the multi-architecture devcontainer workflow; keep it advisory; disable it.
+- **Choice:** Disable `validate-devcontainer-base.yml` in GitHub Actions and exclude devcontainer CI from migration and
+  release acceptance.
+- **Rationale:** The maintainer explicitly declined devcontainer CI for ongoing vNext work.
+- **Consequences:** Agents must not dispatch, rerun, or treat this workflow as a gate. Re-enabling it requires another
+  explicit maintainer decision. Local devcontainer configuration and non-CI validation remain available.
+- **ADR:** Not required; this is a repository validation-policy decision.
+- **Issue/PR:** Not applicable.
