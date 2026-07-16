@@ -15,7 +15,6 @@ import { EXPECTED_TAGS, validateQualificationSecurityException } from "./validat
 const execFile = promisify(execFileCallback);
 const BRANCH = "main";
 const WORKFLOW = "vnext-live-qualification.yml";
-const ENVIRONMENT = "vnext-qualification";
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TRACKS = new Set(["bicep", "terraform"]);
