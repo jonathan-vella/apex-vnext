@@ -201,6 +201,23 @@ export class WriterTransferStore {
   }
 
   async proveOneHopPostPreviewLineage(previewHash: string, previewOwnerEpoch: number): Promise<string | null> {
+    return this.proveOneHopLineage(previewHash, previewOwnerEpoch);
+  }
+
+  async proveOneHopPostApprovalLineage(
+    previewHash: string,
+    previewOwnerEpoch: number,
+    approvalHash: string,
+  ): Promise<string | null> {
+    if (!/^[0-9a-f]{64}$/.test(approvalHash)) return null;
+    return this.proveOneHopLineage(previewHash, previewOwnerEpoch, approvalHash);
+  }
+
+  private async proveOneHopLineage(
+    previewHash: string,
+    previewOwnerEpoch: number,
+    approvalHash?: string,
+  ): Promise<string | null> {
     try {
       if (!/^[0-9a-f]{64}$/.test(previewHash)) return null;
       const run = await this.runs.read();
@@ -245,9 +262,23 @@ export class WriterTransferStore {
           event.ownerEpoch === previewOwnerEpoch &&
           (event.payload as { previewHash?: unknown }).previewHash === previewHash,
       );
+      const approvalIndex =
+        approvalHash === undefined
+          ? previewIndex
+          : events.findIndex(
+              (event, index) =>
+                index > previewIndex &&
+                event.type === "gate.decided" &&
+                event.ownerEpoch === previewOwnerEpoch &&
+                (event.payload as { gate?: unknown; approvalHash?: unknown; previewHash?: unknown }).gate === 4 &&
+                (event.payload as { gate?: unknown; approvalHash?: unknown; previewHash?: unknown }).approvalHash ===
+                  approvalHash &&
+                (event.payload as { gate?: unknown; approvalHash?: unknown; previewHash?: unknown }).previewHash ===
+                  previewHash,
+            );
       const requestedIndex = events.findIndex(
         (event, index) =>
-          index > previewIndex &&
+          index > approvalIndex &&
           event.type === "transfer-requested" &&
           event.projectId === claim.projectId &&
           event.runId === claim.runId &&
@@ -267,6 +298,7 @@ export class WriterTransferStore {
       );
       if (
         previewIndex < 0 ||
+        approvalIndex < 0 ||
         requestedIndex < 0 ||
         acceptedIndex < 0 ||
         ownership.acceptedAt !== events[acceptedIndex]!.timestamp ||
@@ -295,4 +327,5 @@ export type WriterTransferProtocol = Pick<
   | "currentActiveOwnership"
   | "hasPendingTransfer"
   | "proveOneHopPostPreviewLineage"
+  | "proveOneHopPostApprovalLineage"
 >;

@@ -23,7 +23,7 @@
 | Property | Value |
 | --- | --- |
 | **Created** | 2026-07-15 |
-| **Last Updated** | 2026-07-15 |
+| **Last Updated** | 2026-07-16 |
 | **Region** | `swedencentral` |
 | **Environment** | `vnext-qualification` sandbox |
 | **Estimated Cost** | Ephemeral pay-as-you-go usage; final live cost not yet measured |
@@ -54,8 +54,9 @@
 ## 🏛️ Architecture
 
 No diagram is generated yet. The current design isolates a control resource group, Bicep workload resource group, and
-Terraform workload resource group. Azure Blob carries encrypted local-to-CI state, while immutable GitHub Actions
-artifacts carry encrypted Terraform plans between CI jobs.
+Terraform workload resource group. Azure Blob carries the approved encrypted state and exact provider-authority
+envelopes from local preview to CI apply. GitHub Actions artifacts carry nonsecret evidence and provide a bounded return
+fallback only.
 
 ### Key Resources
 
@@ -65,7 +66,8 @@ artifacts carry encrypted Terraform plans between CI jobs.
 | Bicep workload marker | Azure Storage | Standard LRS GPv2 | Deployment-stack lifecycle proof |
 | Terraform workload marker | Azure Storage | Standard LRS GPv2 | Saved-plan lifecycle proof |
 | Qualification logs | Log Analytics | PerGB2018 | Diagnostics and read-only evidence |
-| Approval boundary | GitHub Environment | Required reviewer | Human approval and OIDC subject binding |
+| Approval boundary | APEX Gate 4 | Local exact preview | Human approval before CI handoff |
+| OIDC/configuration boundary | GitHub Environment | Unprotected | OIDC subject, variables, and secrets only |
 
 ## 📄 Generated Artifacts
 
@@ -74,7 +76,8 @@ artifacts carry encrypted Terraform plans between CI jobs.
 
 | File | Description | Status | Created |
 | --- | --- | :---: | --- |
-| [03-des-adr-0001-use-split-encrypted-ci-transport.md](./03-des-adr-0001-use-split-encrypted-ci-transport.md) | Split encrypted transport decision | Accepted | 2026-07-15 |
+| [03-des-adr-0001-use-split-encrypted-ci-transport.md](./03-des-adr-0001-use-split-encrypted-ci-transport.md) | Split encrypted transport decision | Superseded | 2026-07-15 |
+| [03-des-adr-0002-use-local-gate-4-before-ci-handoff.md](./03-des-adr-0002-use-local-gate-4-before-ci-handoff.md) | Local exact-preview approval before CI handoff | Accepted | 2026-07-16 |
 | [04-governance-constraints.json](./04-governance-constraints.json) | Live Azure Policy constraints | Complete | 2026-07-15 |
 | [04-governance-constraints.md](./04-governance-constraints.md) | Human-readable governance and exception record | Complete | 2026-07-15 |
 | [sku-manifest.json](./sku-manifest.json) | Canonical Standard LRS dual-track SKU decision | Locked | 2026-07-15 |

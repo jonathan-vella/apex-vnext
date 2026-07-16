@@ -23,11 +23,9 @@ Transfer to CI binds an ownership epoch to the project, run, repository, branch,
 current Git head, and expiry. A stale epoch or mismatched head cannot authorize an operation.
 
 Transfer creation requires the sender's current unexpired lease before any claim or journal event is written. Accepted
-ownership records the authenticated claim hash, previous owner, and previous epoch. A transferred preview is authorized
-only when the journal proves `preview.created`, then `transfer-requested`, then `transfer-accepted` for the same claim,
-recipient, project, run, and consecutive epoch. Missing, malformed, tampered, expired, or superseded lineage fails closed.
-Preview, approval, and deploy also require the accepted owner to hold the current unexpired lease. Creating another
-transfer relinquishes that lease immediately, so a pending transfer cannot approve or execute the prior preview.
+ownership records the authenticated claim hash, previous owner, and previous epoch. CI deployment is authorized only
+when the journal proves `preview.created`, `gate.decided`, `transfer-requested`, then `transfer-accepted` for the same
+preview, recipient, project, run, and consecutive epoch. Missing, tampered, expired, or superseded lineage fails closed.
 
 Repository-state transfer uses a separate AES-256-GCM envelope from encrypted Terraform plan transport. Authenticated
 metadata binds the envelope implementation and version, kind, plaintext digest, recipient, timestamps, claim, selected
@@ -36,19 +34,9 @@ authenticates and validates the complete bundle before atomic mode-`0600` writes
 secret-bearing JSON, oversized files, unreferenced objects, changed existing state, and any attempt to include
 `.apex/local/`.
 
-State import is not writer acceptance. The protected recipient must run the existing `writer transfer-accept` command
-after import so approval and authority transfer remain separate operations.
-
-GitHub Environment Gate 4 approval is authorized only after that accepted ownership exists at the run's current epoch.
-The CLI derives context exclusively from GitHub Actions process variables and binds repository, full branch ref, commit,
-workflow ref, run and attempt, job, environment, workflow actor, and canonical recipient into approval evidence. It
-accepts no caller-supplied context document. The service compares every source-control field and recipient back to the
-accepted ownership record before recording approval.
-
-The evidence actor `github:<actor-id>:<actor>` identifies the workflow actor. APEX does not infer or attest the identity
-of a GitHub Environment reviewer because GitHub does not expose that identity through these process variables. A
-single-maintainer repository can therefore permit trigger-and-approve self-review unless its environment protection
-rules enforce separation. Treat reviewer independence as an external repository governance control.
+State import is not writer acceptance. The CI recipient must run `writer transfer-accept` after import. It cannot create
+or replace approval. APEX Gate 4 is approved locally against the exact native preview and intended CI recipient before
+the transfer claim is created. The GitHub Environment scopes OIDC, variables, and secrets only.
 
 The current preview exposes writer transfer primitives, but production CI operation remains subject to release
 qualification and provider-specific evidence. Do not simulate transfer by editing run files.
@@ -61,7 +49,7 @@ substituted approval and preview data.
 
 The dependency revision intentionally excludes owner epoch. It represents semantic deployment content and changes when
 the target, IaC track, runtime lock, or accepted artifact hashes change. Authority remains independently bound by the
-preview owner epoch, approval writer epoch, current recipient, and exact one-hop transfer claim hash.
+preview owner epoch, approval epoch, intended/current recipient, and exact one-hop transfer claim hash.
 Approval evidence cannot outlive either its preview or the current writer lease.
 
 - **Bicep:** native operations use Azure deployment stacks for apply and destroy ownership semantics. There is no
@@ -81,7 +69,7 @@ Provider-authority transfer uses the generic recipient-bound encrypted envelope 
 and, for Terraform, its exact encrypted saved-plan artifact. Authenticated bindings include provider, operation,
 project/run, owner epoch, preview hash, recipient, and Terraform artifact reference and digest. Import validates the
 complete envelope and bundle before writing only hash-derived paths beneath `.apex/local/provider-runtime/`. It cannot
-transfer `plan-transport.key`, latest pointers, unrelated previews, or plaintext plans, and it does not approve Gate 4 or
+transfer `plan-transport.key`, latest pointers, unrelated previews, or plaintext plans, and it cannot create approval or
 deploy.
 
 :::caution[Terraform CI limitation]

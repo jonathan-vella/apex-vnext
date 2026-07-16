@@ -64,7 +64,7 @@ Update one scenario only after its evidence has been captured and hashed into `e
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `vscode-experience`           | A maintainer uses a supported VS Code release to verify discovery, handoffs, questions, hidden workers, and MCP startup.                 |
 | `restart-cross-device`        | The user restarts and resumes on another device, then explicitly accepts writer transfer.                                                |
-| `github-oidc-writer-transfer` | A GitHub Environment reviewer approves the job before OIDC and CI writer acceptance.                                                     |
+| `github-oidc-writer-transfer` | A maintainer approves the exact preview locally before OIDC CI writer acceptance and apply.                                              |
 | `bicep-lifecycle`             | An authorized maintainer approves an isolated sandbox before preview, apply, inventory, diagnosis, recovery, and destroy.                |
 | `terraform-lifecycle`         | An authorized maintainer approves the backend and sandbox before exact-plan preview, apply, inventory, diagnosis, recovery, and destroy. |
 | `promotion`                   | A reviewer approves the linked environment run and its refreshed Deployment Preview gate.                                                |
@@ -73,9 +73,9 @@ For `pass` or `fail`, provide at least one `evidenceRefs[]` hash that exists in 
 `unavailable`, retain `reason`, `owner`, and `nextAction`. Record actual start/completion timestamps and tool versions.
 Never place credentials, tokens, state, saved plans, or raw secret-bearing logs in either JSON file.
 
-The GitHub scenario must prove separate writers: writer A creates the exact preview at epoch $N$, then creates one
-transfer claim; writer B accepts at epoch $N+1$, obtains claim-bound Gate 4 approval, and deploys that preview. Capture
-the preview hash, transfer claim hash, both epochs, approval hash, recipient-bound provider transfer, and operation
+The GitHub scenario must prove separate writers: writer A creates and approves the exact preview at epoch $N$, then
+creates one transfer claim; writer B accepts at epoch $N+1$ and deploys only that imported approved preview. Capture the
+preview hash, transfer claim hash, both epochs, approval hash, recipient-bound provider transfer, and operation
 result. A deterministic test pass does not qualify this live boundary, and production workflow enablement remains
 blocked until this scenario passes on the release candidate.
 

@@ -8,7 +8,7 @@ import * as yaml from "js-yaml";
 import { VNEXT_QUALIFICATION_REPOSITORY } from "./_lib/vnext-qualification.mjs";
 
 const WORKFLOW = ".github/workflows/vnext-live-qualification.yml";
-const PROTECTED = ["preview", "apply"];
+const PROTECTED = ["apply"];
 const REQUIRED_VARS = [
   "APEX_CONTROL_RESOURCE_GROUP",
   "APEX_BACKEND_STORAGE_ACCOUNT",
@@ -58,6 +58,10 @@ export function validateWorkflowText(text) {
   const triggers = value?.on;
   fail(triggers && Object.keys(triggers).length === 1 && triggers.workflow_dispatch, "workflow must be dispatch-only");
   const inputs = triggers?.workflow_dispatch?.inputs ?? {};
+  fail(
+    Object.keys(inputs).join() === "track,operation,handoff_id,candidate_sha,preview_hash",
+    "exact dispatch input set required",
+  );
   fail(inputs.track?.type === "choice" && inputs.track.options?.join() === "bicep,terraform", "track choices invalid");
   fail(
     inputs.operation?.type === "choice" && inputs.operation.options?.join() === "apply,destroy",
@@ -67,7 +71,8 @@ export function validateWorkflowText(text) {
     inputs.track?.required === true &&
       inputs.operation?.required === true &&
       inputs.handoff_id?.required === true &&
-      inputs.candidate_sha?.required === true,
+      inputs.candidate_sha?.required === true &&
+      inputs.preview_hash?.required === true,
     "required dispatch inputs missing",
   );
   fail(
@@ -76,32 +81,14 @@ export function validateWorkflowText(text) {
   );
   fail(value?.concurrency?.["cancel-in-progress"] === false, "authority ceremony must not be cancelled in progress");
   const jobs = value?.jobs ?? {};
-  fail(
-    Object.keys(jobs).join() === "validate_dispatch,preview,apply",
-    "exact validate_dispatch, preview, apply jobs required",
-  );
+  fail(Object.keys(jobs).join() === "validate_dispatch,apply", "exact validate_dispatch and apply jobs required");
   fail(
     hasExactPermissions(jobs.validate_dispatch?.permissions, { contents: "read" }),
     "validate_dispatch permissions must be contents read only",
   );
-  fail(jobs.preview?.needs === "validate_dispatch", "preview must need validation");
-  fail(jobs.apply?.needs === "preview", "apply must need preview");
-  fail(
-    jobs.apply?.if === "${{ always() && needs.preview.outputs.artifact_digest != '' }}",
-    "apply must continue only after encrypted authority upload",
-  );
-  fail(
-    jobs.preview?.outputs?.artifact_digest === "${{ steps.authority_upload.outputs.artifact-digest }}",
-    "authority artifact digest output missing",
-  );
-  fail(
-    jobs.preview?.outputs?.terraform_lock_hash === "${{ steps.provider.outputs.lock_hash }}",
-    "preview Terraform lock hash output missing",
-  );
-  fail(
-    jobs.preview?.outputs?.preview_runner_ip === "${{ steps.ip.outputs.address }}",
-    "preview runner IP output missing",
-  );
+  fail(jobs.validate_dispatch?.["runs-on"] === "ubuntu-latest", "validate_dispatch runner must be ubuntu-latest");
+  fail(jobs.apply?.needs === "validate_dispatch", "apply must need validate_dispatch");
+  fail(jobs.apply?.if === undefined, "apply must not bypass dispatch validation");
   for (const name of ["validate_dispatch", ...PROTECTED]) {
     const checkoutSteps = steps(jobs[name]).filter((step) => step.uses === "actions/checkout@v6");
     fail(
@@ -119,9 +106,12 @@ export function validateWorkflowText(text) {
   fail(validation.includes("refs/heads/main"), "branch guard missing");
   fail(validation.includes('GITHUB_RUN_ATTEMPT" = "1'), "attempt-one guard missing");
   fail(
-    validation.includes("^[0-9a-f]{40}$") && validation.includes("git rev-parse HEAD"),
-    "exact lowercase SHA guard missing",
+    validation.includes("^[0-9a-f]{40}$") &&
+      validation.includes("^[0-9a-f]{64}$") &&
+      validation.includes("git rev-parse HEAD"),
+    "exact lowercase SHA or preview hash guard missing",
   );
+  fail(validation.includes("[0-9a-f]{8}-[0-9a-f]{4}-4"), "handoff UUID guard missing");
   fail(uses(jobs.validate_dispatch).includes("actions/checkout@v6"), "validation checkout must use v6");
 
   for (const name of PROTECTED) {
@@ -133,6 +123,7 @@ export function validateWorkflowText(text) {
       `${name} permissions must be contents read and id-token write only`,
     );
     fail(job?.environment === "vnext-qualification", `${name} environment missing`);
+    fail(job?.["runs-on"] === "ubuntu-latest", `${name} runner must be ubuntu-latest`);
     fail(job?.env?.APEX_PLAN_TRANSPORT_KEY === undefined, `${name} transport key must not be job-wide`);
     fail(job?.env?.ARM_OIDC_TOKEN === undefined, `${name} ARM token must not be job-wide`);
     fail(job?.["timeout-minutes"] > 0, `${name} timeout missing`);
@@ -160,7 +151,7 @@ export function validateWorkflowText(text) {
     );
     fail(
       script.includes("sha256sum infra/terraform/vnext-qualification/.terraform.lock.hcl") &&
-        (script.includes('= "$lock_hash"') || script.includes('= "$PREVIEW_LOCK_HASH"')),
+        script.includes('= "$attested_lock_hash"'),
       `${name} exact Terraform lockfile binding missing`,
     );
     const cleanup = steps(job).find((step) => step.name === "Remove temporary firewall rule");
@@ -212,11 +203,8 @@ export function validateWorkflowText(text) {
         !oidc.with?.script?.includes("exportVariable"),
       `${name} ARM token must be a masked step output`,
     );
-    const refreshedOidc = steps(job).find(
-      (step) =>
-        step.name === (name === "preview" ? "Refresh ARM OIDC token for preview" : "Refresh ARM OIDC token for deploy"),
-    );
-    const refreshedId = name === "preview" ? "preview_oidc" : "deploy_oidc";
+    const refreshedOidc = steps(job).find((step) => step.name === "Refresh ARM OIDC token for deploy");
+    const refreshedId = "deploy_oidc";
     fail(
       refreshedOidc?.id === refreshedId &&
         refreshedOidc.uses === "actions/github-script@v8" &&
@@ -234,125 +222,123 @@ export function validateWorkflowText(text) {
           `${name} APEX command lacks step-scoped transport key`,
         );
       }
-      if (/terraform -chdir=|\bpreview --operation\b|\bdeploy --preview\b/.test(command)) {
+      if (/terraform -chdir=|\bdeploy --preview\b/.test(command)) {
         const expectedToken =
-          step.name === "Create exact preview"
-            ? "${{ steps.preview_oidc.outputs.result }}"
-            : step.name === "Deploy exact preview"
-              ? "${{ steps.deploy_oidc.outputs.result }}"
-              : "${{ steps.arm_oidc.outputs.result }}";
+          step.name === "Deploy exact preview"
+            ? "${{ steps.deploy_oidc.outputs.result }}"
+            : "${{ steps.arm_oidc.outputs.result }}";
         fail(step.env?.ARM_OIDC_TOKEN === expectedToken, `${name} Terraform operation lacks step-scoped ARM token`);
       }
     }
   }
 
-  const preview = runs(jobs.preview);
   const apply = runs(jobs.apply);
-  const previewJob = JSON.stringify(jobs.preview);
   const applyJob = JSON.stringify(jobs.apply);
-  const previewCommand = preview.split("\n").find((line) => line.includes(" preview --operation")) ?? "";
-  const previewRecipient = "github-actions:${GITHUB_REPOSITORY}:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}:preview";
-  const applyRecipient = "github-actions:${GITHUB_REPOSITORY}:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}:apply";
-  fail(preview.includes(previewRecipient) && preview.includes(applyRecipient), "canonical recipients missing");
-  fail(
-    preview.includes("state transfer-import") && preview.includes("writer transfer-accept"),
-    "preview import/accept missing",
-  );
-  fail(
-    index(preview, "state transfer-import") < index(preview, "writer transfer-accept"),
-    "preview must import before accept",
-  );
-  fail(
-    index(preview, "accepted=true") < index(preview, "storage blob delete"),
-    "preview acceptance must be durable before incoming blob deletion",
-  );
-  fail(previewCommand.includes('--recipient "$APPLY_RECIPIENT"'), "preview recipient binding missing");
-  fail(preview.includes('test -n "$PREVIEW_HASH"'), "preview hash handoff guard missing");
-  fail(
-    index(preview, "preview --operation") < index(preview, "writer transfer-create"),
-    "writer transfer must follow preview",
-  );
-  fail(
-    preview.includes("provider transfer-export") && preview.includes("state transfer-export"),
-    "encrypted authority exports missing",
-  );
-  fail(
-    preview.includes("incoming/${{ inputs.handoff_id }}.json") && preview.includes("storage blob delete"),
-    "incoming handoff lifecycle missing",
-  );
-  fail(
-    preview.includes("preview-failure") && previewJob.includes("local:${{ inputs.handoff_id }}"),
-    "preview recovery transfer missing",
-  );
-  const authorityUpload = steps(jobs.preview).find((step) => step.name === "Upload encrypted apply authority");
-  const authorityPath = authorityUpload?.with?.path ?? "";
-  fail(
-    authorityUpload?.uses === "actions/upload-artifact@v4" &&
-      authorityPath.includes("authority-state.json") &&
-      authorityPath.includes("provider-authority.json") &&
-      authorityUpload.with["retention-days"] === 1 &&
-      authorityUpload.with["compression-level"] === 0 &&
-      authorityUpload.with["include-hidden-files"] === false &&
-      authorityUpload.with["if-no-files-found"] === "error",
-    "encrypted-only authority artifact invalid",
-  );
-
-  fail(apply.includes("state transfer-import") && apply.includes("provider transfer-import"), "apply imports missing");
   const applySteps = steps(jobs.apply);
-  const staleRuleCleanup = applySteps.find((step) => step.name === "Clear preview firewall rule");
+  const staleRuleCleanup = applySteps.find((step) => step.name === "Ensure no stale runner firewall rule");
   fail(
-    staleRuleCleanup?.env?.PREVIEW_RUNNER_IP === "${{ needs.preview.outputs.preview_runner_ip }}" &&
+    staleRuleCleanup?.env?.RUNNER_IP === "${{ steps.ip.outputs.address }}" &&
       staleRuleCleanup.run?.includes("network-rule remove") &&
       staleRuleCleanup.run?.includes("networkRuleSet.ipRules") &&
       applySteps.indexOf(staleRuleCleanup) <
         applySteps.findIndex((step) => step.name === "Open temporary firewall rule"),
-    "apply must clear the preview runner rule before opening its own",
+    "apply must clear a stale runner rule before opening its own",
   );
+  const stableRecipient = 'apply_recipient="github-actions:${GITHUB_REPOSITORY}:handoff:${HANDOFF_ID}:apply"';
+  fail(apply.includes(stableRecipient), "stable handoff apply recipient missing");
+  fail(
+    !apply.includes("GITHUB_RUN_ID") && !apply.includes("GITHUB_RUN_ATTEMPT}:apply"),
+    "run-scoped recipient forbidden",
+  );
+  const stateBlob = "incoming/${{ inputs.handoff_id }}/${object}.json";
+  const authorityDownload = applySteps.find((step) => step.name === "Download encrypted local authority");
+  fail(
+    authorityDownload?.run?.includes(stateBlob) &&
+      authorityDownload.run.includes("for object in state provider") &&
+      authorityDownload.run.includes("storage blob download"),
+    "exact incoming state/provider downloads missing",
+  );
+  fail(apply.includes("state transfer-import") && apply.includes("provider transfer-import"), "apply imports missing");
   fail(
     index(apply, "state transfer-import") < index(apply, "provider transfer-import") &&
-      index(apply, "provider transfer-import") < index(apply, "writer transfer-accept"),
-    "apply import/accept order invalid",
+      index(apply, "provider transfer-import") < index(apply, "writer transfer-accept") &&
+      index(apply, "writer transfer-accept") < index(apply, "approval show --json") &&
+      index(apply, "approval show --json") < index(apply, "run?.ownerEpoch!==approval.writerEpoch+1") &&
+      index(apply, "run?.ownerEpoch!==approval.writerEpoch+1") < index(apply, "storage blob delete"),
+    "apply import, accept, approval, and deletion order invalid",
   );
   fail(
-    apply.includes("gate decide --gate 4 --decision approved --mechanism github-environment"),
-    "Gate 4 mechanism invalid",
+    apply.includes(".result.previewHash") &&
+      apply.includes('= "$PREVIEW_HASH"') &&
+      apply.includes(".result.provider") &&
+      apply.includes('= "$TRACK"'),
+    "imported provider binding validation missing",
   );
-  fail(!preview.includes("gate decide --gate 4"), "Gate 4 must only run in apply");
   fail(
-    apply.includes('deploy --preview "${{ needs.preview.outputs.preview_hash }}"'),
-    "deploy must use exact preview output",
+    apply.includes("gate:4") &&
+      apply.includes('decision:"approved"') &&
+      apply.includes('mechanism:"tty"') &&
+      apply.includes("previewHash:process.env.PREVIEW_HASH") &&
+      apply.includes("recipientIdentity:process.env.APPLY_RECIPIENT") &&
+      apply.includes("run?.ownerEpoch!==approval.writerEpoch+1"),
+    "imported tty approval validation missing",
   );
+  fail(apply.includes('deploy --preview "${{ inputs.preview_hash }}"'), "deploy must use exact dispatch preview hash");
   fail(
     apply.includes("terraform -chdir=infra/terraform/vnext-qualification init"),
     "fresh apply runner Terraform init missing",
   );
   fail(
-    applyJob.includes("PREVIEW_LOCK_HASH") &&
-      applyJob.includes("needs.preview.outputs.terraform_lock_hash") &&
-      apply.includes('test "$lock_hash" = "$PREVIEW_LOCK_HASH"') &&
-      apply.includes('= "$PREVIEW_LOCK_HASH"'),
-    "apply must bind the exact preview Terraform lock hash",
+    apply.includes(".apex/local/provider-runtime/bindings/${PREVIEW_HASH}.json") &&
+      apply.includes(".attestation.lockfileHash") &&
+      apply.includes('test "$lock_hash" = "$attested_lock_hash"') &&
+      apply.includes('= "$attested_lock_hash"'),
+    "apply must bind the current Terraform lock hash to imported attestation",
   );
   fail(
     applyJob.includes("local:${{ inputs.handoff_id }}") && apply.includes("return-authority.json"),
     "return authority transfer missing",
   );
-  fail(uses(jobs.apply).includes("actions/download-artifact@v4"), "authority download version invalid");
+  fail(
+    !uses(jobs.apply).some((action) => action.startsWith("actions/download-artifact@")),
+    "artifact authority download forbidden",
+  );
+  const returnFallback = applySteps.find((step) => step.name === "Upload encrypted return fallback");
+  fail(
+    returnFallback?.uses === "actions/upload-artifact@v4" &&
+      returnFallback.with?.path === "apex-live/return-authority.json" &&
+      returnFallback.with?.["retention-days"] === 1 &&
+      returnFallback.with?.["compression-level"] === 0 &&
+      returnFallback.with?.["include-hidden-files"] === false &&
+      returnFallback.with?.["if-no-files-found"] === "error",
+    "encrypted return fallback artifact invalid",
+  );
+  const evidence = applySteps.find((step) => step.name === "Upload apply evidence");
+  fail(
+    evidence?.uses === "actions/upload-artifact@v4" &&
+      evidence.with?.path === "apex-live/evidence/" &&
+      evidence.with?.["retention-days"] === 1 &&
+      evidence.with?.["compression-level"] === 0 &&
+      evidence.with?.["include-hidden-files"] === false &&
+      evidence.with?.["if-no-files-found"] === "error",
+    "apply evidence artifact invalid",
+  );
   fail(
     uses(jobs.apply).filter((action) => action === "actions/upload-artifact@v4").length >= 2,
     "apply artifacts invalid",
   );
 
-  const combined = `${preview}\n${apply}`;
+  const combined = text;
   const forbidden = [
     /terraform\s+(?:-chdir=\S+\s+)?(?:apply|destroy)\b/,
     /az\s+stack\s+group\s+(?:create|delete)\b/,
     /az\s+deployment\s+(?:group|sub)\s+create\b/,
-    /gate decide[^\n]*--actor\b/,
+    /\bgate decide\b/,
+    /\b(?:apex|cli\.js)\s+preview\b/,
+    /github-environment/,
   ];
   for (const pattern of forbidden) fail(!pattern.test(combined), `forbidden direct mutation found: ${pattern}`);
-  const artifactPaths = steps(jobs.preview)
-    .concat(steps(jobs.apply))
+  const artifactPaths = steps(jobs.apply)
     .filter((step) => step.uses === "actions/upload-artifact@v4")
     .map((step) => String(step.with?.path ?? ""))
     .join("\n");
@@ -361,6 +347,11 @@ export function validateWorkflowText(text) {
     "plaintext/key path in artifacts",
   );
   fail(!hasHiddenPathSegment(artifactPaths), "artifact upload path contains a hidden path segment");
+  fail(
+    Object.values(jobs).filter((job) => job.environment !== undefined).length === 1 &&
+      jobs.apply?.environment === "vnext-qualification",
+    "Environment must exist only on apply",
+  );
   fail(
     !combined.includes("GITHUB_RUN_ATTEMPT -gt") && !combined.includes("GITHUB_RUN_ATTEMPT != 1"),
     "retry rollover allowed",

@@ -135,14 +135,14 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 
 - **Type:** `ISSUE`
 - **Owner:** Release qualification
-- **Impact:** VS Code, GitHub approval, Azure Bicep, and Azure Terraform release claims remain unavailable.
-- **Evidence:** The bootstrap, manual workflow, encrypted handoff launcher, and structural tests are destination-bound,
-  but the destination has no qualification Environment, variables, secrets, OIDC federation, or Azure resources. No
-  exact-head live evidence satisfies [PRD.md](PRD.md) cutover acceptance.
+- **Impact:** VS Code, GitHub OIDC/transfer, Azure Bicep, and Azure Terraform release claims remain unavailable.
+- **Evidence:** Azure bootstrap resources and secretless destination OIDC federation are deployed. The unprotected
+  `vnext-qualification` Environment intentionally scopes OIDC/configuration only. Local exact-preview Gate 4 approval
+  and imported CI apply are implemented but have no accepted exact-head live evidence.
 - **Related issue:** Destination issue `#9`.
-- **Mitigation:** After explicit maintainer approval, configure the destination controls and follow
-  [LIVE-QUALIFICATION.md](LIVE-QUALIFICATION.md). Record that the sandbox permits maintainer self-review; require
-  independent approval before production qualification.
+- **Mitigation:** Configure the remaining destination controls and follow
+  [LIVE-QUALIFICATION.md](LIVE-QUALIFICATION.md). Record local approval, OIDC, one-hop authority transfer, exact apply,
+  cleanup, and return evidence without claiming Environment review.
 - **State:** Open
 - **Closure proof:** Evidence index with candidate and dependency hashes for every required scenario.
 
@@ -159,6 +159,16 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Closure proof:** Scorecard artifacts satisfying every minimum-sample and unavailable-data rule.
 
 ## Closed Or Historical Entries
+
+### RISK-004: Required Environment Reviewers Were Unavailable On The Current GitHub Plan
+
+- **Type:** `RISK`
+- **Owner:** Repository maintainer
+- **Evidence:** GitHub returned HTTP 422 for required-reviewer protection on the private repository.
+- **Disposition:** Closed by [DECISION-010](DECISIONS.md#decision-010-keep-deployment-approval-in-apex-gate-4).
+  External Environment review is not an APEX requirement; local Gate 4 owns exact-preview approval.
+- **State:** Closed
+- **Closure proof:** ADR-0002, rejection of CI-created approval, and exact post-approval transfer tests.
 
 The approved v1 defect ledger remains in [phase-0a/v1-known-defects.md](phase-0a/v1-known-defects.md). Do not duplicate
 or renumber those historical entries here. New vNext defects use this register and a linked GitHub issue.

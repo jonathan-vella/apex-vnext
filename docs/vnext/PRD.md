@@ -88,7 +88,8 @@ qualified.
 
 Deployment Preview is the production approval ceremony. Approval must bind actor and run identity, target, operation,
 inputs, IaC tree, policy envelope, preview, commit, owner epoch, recipient, and expiry. Stale, substituted, incomplete,
-or rejected evidence must fail closed.
+or rejected evidence must fail closed. APEX Gate 4 owns this decision; external CI environment protection is not an
+approval authority.
 
 ### REQ-OPS-001: Operations, Promotion, And Diagnosis
 
@@ -182,7 +183,7 @@ Cutover requires all of the following on the exact candidate head:
 - Clean install, update, rollback, uninstall, package reproducibility, SBOM, provenance, and publication dry run pass.
 - Supported VS Code handoffs, questions, hidden workers, MCP startup, restart, and cross-device resume are qualified.
 - Bicep and Terraform preview, approval, apply, inventory, diagnosis, destroy, and recovery scenarios are qualified.
-- GitHub Environment/OIDC approval and local-to-CI writer transfer are proven.
+- Local APEX Gate 4 approval, GitHub OIDC, and local-to-CI writer transfer are proven.
 - Scorecard sample requirements and unavailable-data dispositions are satisfied.
 - Release and rollback rehearsals, documentation audit, v1 critical-fix sync, and `npm run validate:all` pass.
 - Every open risk has an owner and acceptable release disposition.
