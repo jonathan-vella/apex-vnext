@@ -569,13 +569,20 @@ export async function prepareQualificationState(args, dependencies = {}) {
       }
     },
   });
-  const { runId } = await service.init({
-    projectId: PROJECT_ID,
-    displayName: "APEX vNext Live Qualification",
-    environment: ENVIRONMENT,
-    targetScope,
-    iacTool: args.track,
-  });
+  const emptyCustomizations = await mkdtemp(join(tmpdir(), "apex-vnext-empty-customizations-"));
+  let runId;
+  try {
+    ({ runId } = await service.init({
+      projectId: PROJECT_ID,
+      displayName: "APEX vNext Live Qualification",
+      environment: ENVIRONMENT,
+      targetScope,
+      iacTool: args.track,
+      customizationsSource: emptyCustomizations,
+    }));
+  } finally {
+    await rm(emptyCustomizations, { recursive: true, force: true });
+  }
   await service.recordRequirementsInput({
     workload: "vnext qualification marker",
     requirements: "exact native lifecycle proof in the isolated sandbox",
