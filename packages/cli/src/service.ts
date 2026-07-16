@@ -202,6 +202,7 @@ export interface ServiceOptions {
   clock?: () => Date;
   idSource?: () => string;
   providers?: Partial<Record<"fake" | "bicep" | "terraform", IacProvider>>;
+  architectureAvailabilityAdapter?: (evidence: ArchitectureAvailabilityV1) => Promise<void>;
   executableChecker?: (executable: string) => Promise<boolean>;
   azureAuthStatus?: (live: boolean) => Promise<{ authenticated: boolean; detail: string }>;
   customizationFailureInjector?: (index: number, destination: string) => void | Promise<void>;
@@ -299,6 +300,7 @@ export class ApexService {
   private readonly cache: ContentCache;
   private readonly validators = new ValidatorRegistry();
   private readonly providers: Partial<Record<"fake" | "bicep" | "terraform", IacProvider>>;
+  private readonly architectureAvailabilityAdapter?: ServiceOptions["architectureAvailabilityAdapter"];
   private readonly executableChecker: (executable: string) => Promise<boolean>;
   private readonly azureAuthStatus: (live: boolean) => Promise<{ authenticated: boolean; detail: string }>;
   private readonly customizationFailureInjector?: ServiceOptions["customizationFailureInjector"];
@@ -321,6 +323,7 @@ export class ApexService {
       fake: new FakeIaCProvider({ track: "bicep", now: this.clock, nextId: this.idSource }),
       ...options.providers,
     };
+    this.architectureAvailabilityAdapter = options.architectureAvailabilityAdapter;
     this.executableChecker = options.executableChecker ?? (async (executable) => this.pathExecutableExists(executable));
     this.azureAuthStatus =
       options.azureAuthStatus ?? (async () => ({ authenticated: false, detail: "not-checked; run setup --live" }));
@@ -1904,11 +1907,14 @@ export class ApexService {
       this.assertValid("architecture-availability", parsed);
       const availability = parsed as ArchitectureAvailabilityV1;
       if (availability.mode === "native") {
-        throw new ApexError(
-          "APEX_AUTHORIZATION",
-          "Native architecture availability evidence requires an authorized capability adapter",
-          EXIT_CODES.authorization,
-        );
+        if (this.architectureAvailabilityAdapter === undefined) {
+          throw new ApexError(
+            "APEX_AUTHORIZATION",
+            "Native architecture availability evidence requires an authorized capability adapter",
+            EXIT_CODES.authorization,
+          );
+        }
+        await this.architectureAvailabilityAdapter(availability);
       }
       for (const check of Object.values(availability.checks)) {
         try {

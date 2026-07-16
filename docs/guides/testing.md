@@ -36,6 +36,10 @@ a clean npm project, runs `apex version`, initializes a project, and verifies ma
 The package test suite also exercises deterministic fake-provider scenarios for both Bicep and Terraform tracks. Use
 the fake provider for repeatable preview, approval, apply, destroy, restart, and inventory checks without Azure access.
 
+Live-preparation tests derive strict qualification artifacts from the committed Bicep/Terraform and governance sources,
+exercise the production task and gate APIs in an isolated workspace, and prove the command ends with Gates 1–3 approved
+and Gate 4 closed. Native quota, availability, pricing, and provider validation still require the live sandbox ceremony.
+
 Approval tests cover local actor and intended-recipient binding, strict schemas, preview expiry, exact one-hop transfer
 after approval, and adversarial owner, epoch, preview, claim, and recipient mismatches. Workflow mutation tests prove CI
 cannot create a preview or Gate 4 decision. These deterministic tests do not constitute live OIDC or Azure proof.
