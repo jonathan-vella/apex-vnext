@@ -49,6 +49,7 @@ export class BicepCommandAdapter {
         target.deploymentName,
         "--template-file",
         target.templateFile,
+        "--no-pretty-print",
         "--output",
         "json",
       ],
