@@ -17,6 +17,11 @@ import {
   ExecutionPlanAttestationV1Schema,
   GovernanceConstraintsV1Schema,
   IacHandoffV1Schema,
+  ImprovementDecisionV1Schema,
+  ImprovementObservationV1Schema,
+  ImprovementPolicyV1Schema,
+  ImprovementProposalV1Schema,
+  ImprovementRecurrenceV1Schema,
   LogicalResourceManifestV1Schema,
   LiveQualificationV1Schema,
   LIVE_QUALIFICATION_SCENARIO_IDS,
@@ -78,6 +83,7 @@ describe("Wave 1 contracts", () => {
       defaultsHash: "b".repeat(64),
       validatorHash: "c".repeat(64),
       qualityScorecardHash: "d".repeat(64),
+      improvementPolicyHash: "e".repeat(64),
       requiredCapabilityPacks: [],
     };
 
@@ -171,6 +177,86 @@ describe("Wave 1 contracts", () => {
     for (const schema of contractSchemas) {
       assert.match(schema.$id ?? "", /^https:\/\/schemas\.apexops\.dev\//);
     }
+  });
+
+  it("validates bounded improvement contracts", () => {
+    const observation = {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: "example-project",
+      runId: "run-1",
+      taskId: "task-1",
+      observationId: hash,
+      patternKey: otherHash,
+      observedAt: timestamp,
+      source: "validation-failure",
+      category: "correctness",
+      severity: "medium",
+      statement: "A deterministic validator failed.",
+      evidenceRefs: [hash],
+      disposition: "active",
+      redactionCount: 0,
+    };
+    const recurrence = {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: "example-project",
+      patternKey: otherHash,
+      category: "correctness",
+      detectedAt: completion,
+      firstSeenAt: timestamp,
+      lastSeenAt: expiry,
+      occurrenceCount: 2,
+      distinctRunCount: 2,
+      runIds: ["run-1", "run-2"],
+      observationIds: [hash, otherHash],
+      evidenceRefs: [hash],
+      confidence: "medium",
+    };
+    const proposal = {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: "example-project",
+      proposalId: hash,
+      patternKey: otherHash,
+      generatedAt: completion,
+      target: "validator",
+      title: "Review recurring validator failure",
+      summary: "Inspect the recurring deterministic evidence through the normal change workflow.",
+      occurrenceCount: 2,
+      runIds: ["run-1", "run-2"],
+      evidenceRefs: [hash],
+      confidence: "medium",
+      status: "pending",
+      inert: true,
+    };
+    const decision = {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: "example-project",
+      proposalId: hash,
+      decidedAt: completion,
+      actor: "maintainer",
+      decision: "accepted",
+      rationale: "Track through a normal reviewed issue.",
+      externalRef: "https://github.com/owner/repo/issues/12",
+    };
+    const policy = {
+      schemaVersion: CONTRACT_VERSION,
+      allowedSources: ["validation-failure", "explicit-correction"],
+      allowedCategories: ["correctness", "security"],
+      recurrence: { threshold: 2, windowDays: 30 },
+      retention: { observationDays: 90, decisionDays: 365 },
+      limits: { statementCharacters: 1024, evidenceRefs: 32, observations: 10000 },
+      proposalTargets: ["documentation", "validator", "backlog"],
+      humanDecisionRequired: true,
+      automatedIssueCreation: false,
+      contextInjection: false,
+    };
+
+    assert.equal(Value.Check(ImprovementObservationV1Schema, observation), true);
+    assert.equal(Value.Check(ImprovementRecurrenceV1Schema, recurrence), true);
+    assert.equal(Value.Check(ImprovementProposalV1Schema, proposal), true);
+    assert.equal(Value.Check(ImprovementDecisionV1Schema, decision), true);
+    assert.equal(Value.Check(ImprovementPolicyV1Schema, policy), true);
+    assert.equal(Value.Check(ImprovementProposalV1Schema, { ...proposal, inert: false }), false);
+    assert.equal(Value.Check(ImprovementPolicyV1Schema, { ...policy, automatedIssueCreation: true }), false);
   });
 });
 

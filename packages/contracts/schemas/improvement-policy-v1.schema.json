@@ -1,0 +1,204 @@
+{
+  "$id": "https://schemas.apexops.dev/improvement-policy-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "allowedCategories": {
+      "items": {
+        "anyOf": [
+          {
+            "const": "correctness",
+            "type": "string"
+          },
+          {
+            "const": "security",
+            "type": "string"
+          },
+          {
+            "const": "reliability",
+            "type": "string"
+          },
+          {
+            "const": "performance",
+            "type": "string"
+          },
+          {
+            "const": "usability",
+            "type": "string"
+          },
+          {
+            "const": "documentation",
+            "type": "string"
+          },
+          {
+            "const": "capability-gap",
+            "type": "string"
+          }
+        ]
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "allowedSources": {
+      "items": {
+        "anyOf": [
+          {
+            "const": "task-completion",
+            "type": "string"
+          },
+          {
+            "const": "deterministic-test",
+            "type": "string"
+          },
+          {
+            "const": "validation-failure",
+            "type": "string"
+          },
+          {
+            "const": "capability-execution",
+            "type": "string"
+          },
+          {
+            "const": "cache-check",
+            "type": "string"
+          },
+          {
+            "const": "explicit-correction",
+            "type": "string"
+          }
+        ]
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "automatedIssueCreation": {
+      "const": false,
+      "type": "boolean"
+    },
+    "contextInjection": {
+      "const": false,
+      "type": "boolean"
+    },
+    "humanDecisionRequired": {
+      "const": true,
+      "type": "boolean"
+    },
+    "limits": {
+      "additionalProperties": false,
+      "properties": {
+        "evidenceRefs": {
+          "maximum": 32,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "observations": {
+          "maximum": 100000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "statementCharacters": {
+          "maximum": 1024,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "statementCharacters",
+        "evidenceRefs",
+        "observations"
+      ],
+      "type": "object"
+    },
+    "proposalTargets": {
+      "items": {
+        "anyOf": [
+          {
+            "const": "documentation",
+            "type": "string"
+          },
+          {
+            "const": "validator",
+            "type": "string"
+          },
+          {
+            "const": "instruction",
+            "type": "string"
+          },
+          {
+            "const": "skill",
+            "type": "string"
+          },
+          {
+            "const": "architecture",
+            "type": "string"
+          },
+          {
+            "const": "backlog",
+            "type": "string"
+          }
+        ]
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "recurrence": {
+      "additionalProperties": false,
+      "properties": {
+        "threshold": {
+          "minimum": 2,
+          "type": "integer"
+        },
+        "windowDays": {
+          "maximum": 365,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "threshold",
+        "windowDays"
+      ],
+      "type": "object"
+    },
+    "retention": {
+      "additionalProperties": false,
+      "properties": {
+        "decisionDays": {
+          "maximum": 3650,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "observationDays": {
+          "maximum": 3650,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "observationDays",
+        "decisionDays"
+      ],
+      "type": "object"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "allowedSources",
+    "allowedCategories",
+    "recurrence",
+    "retention",
+    "limits",
+    "proposalTargets",
+    "humanDecisionRequired",
+    "automatedIssueCreation",
+    "contextInjection"
+  ],
+  "type": "object"
+}

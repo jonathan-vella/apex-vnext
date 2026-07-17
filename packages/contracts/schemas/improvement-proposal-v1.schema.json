@@ -1,0 +1,144 @@
+{
+  "$id": "https://schemas.apexops.dev/improvement-proposal-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "confidence": {
+      "anyOf": [
+        {
+          "const": "low",
+          "type": "string"
+        },
+        {
+          "const": "medium",
+          "type": "string"
+        },
+        {
+          "const": "high",
+          "type": "string"
+        }
+      ]
+    },
+    "evidenceRefs": {
+      "items": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "generatedAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "inert": {
+      "const": true,
+      "type": "boolean"
+    },
+    "occurrenceCount": {
+      "minimum": 2,
+      "type": "integer"
+    },
+    "patternKey": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "projectId": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "proposalId": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "runIds": {
+      "items": {
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+        "type": "string"
+      },
+      "minItems": 2,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "status": {
+      "anyOf": [
+        {
+          "const": "pending",
+          "type": "string"
+        },
+        {
+          "const": "accepted",
+          "type": "string"
+        },
+        {
+          "const": "rejected",
+          "type": "string"
+        },
+        {
+          "const": "deferred",
+          "type": "string"
+        }
+      ]
+    },
+    "summary": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "type": "string"
+    },
+    "target": {
+      "anyOf": [
+        {
+          "const": "documentation",
+          "type": "string"
+        },
+        {
+          "const": "validator",
+          "type": "string"
+        },
+        {
+          "const": "instruction",
+          "type": "string"
+        },
+        {
+          "const": "skill",
+          "type": "string"
+        },
+        {
+          "const": "architecture",
+          "type": "string"
+        },
+        {
+          "const": "backlog",
+          "type": "string"
+        }
+      ]
+    },
+    "title": {
+      "maxLength": 160,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "proposalId",
+    "patternKey",
+    "generatedAt",
+    "target",
+    "title",
+    "summary",
+    "occurrenceCount",
+    "runIds",
+    "evidenceRefs",
+    "confidence",
+    "status",
+    "inert"
+  ],
+  "type": "object"
+}

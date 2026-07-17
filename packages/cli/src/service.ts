@@ -32,6 +32,12 @@ import {
   type DeploymentPreviewV1,
   type EnvironmentInputsV1,
   type IacBindingV1,
+  type ImprovementCategory,
+  type ImprovementDecisionV1,
+  type ImprovementObservationV1,
+  type ImprovementPolicyV1,
+  type ImprovementProposalV1,
+  type ImprovementSource,
   type LogicalResourceManifestV1,
   type ImplementationIntentV1,
   type Operation,
@@ -63,6 +69,7 @@ import {
   EvidencePolicy,
   EvidenceStore,
   EventJournal,
+  ImprovementStore,
   ObjectStore,
   ProjectStore,
   RunRepository,
@@ -207,6 +214,7 @@ export interface ServiceOptions {
   azureAuthStatus?: (live: boolean) => Promise<{ authenticated: boolean; detail: string }>;
   customizationFailureInjector?: (index: number, destination: string) => void | Promise<void>;
   processRunner?: ProcessRunnerLike;
+  improvementPolicy?: ImprovementPolicyV1;
 }
 
 interface DoctorCheck {
@@ -305,6 +313,8 @@ export class ApexService {
   private readonly azureAuthStatus: (live: boolean) => Promise<{ authenticated: boolean; detail: string }>;
   private readonly customizationFailureInjector?: ServiceOptions["customizationFailureInjector"];
   private readonly processRunner: ProcessRunnerLike;
+  private readonly improvementPolicy: ImprovementPolicyV1 | undefined;
+  private improvementRuntime?: ImprovementStore;
 
   constructor(root: string, options: ServiceOptions = {}) {
     this.root = resolve(root);
@@ -329,6 +339,56 @@ export class ApexService {
       options.azureAuthStatus ?? (async () => ({ authenticated: false, detail: "not-checked; run setup --live" }));
     this.customizationFailureInjector = options.customizationFailureInjector;
     this.processRunner = options.processRunner ?? new ProcessRunner();
+    this.improvementPolicy = options.improvementPolicy;
+  }
+
+  async improvementObserve(input: {
+    taskId?: string;
+    observedAt?: string;
+    source: ImprovementSource;
+    category: ImprovementCategory;
+    severity: ImprovementObservationV1["severity"];
+    statement: string;
+    evidenceRefs: string[];
+  }): Promise<{ observation: ImprovementObservationV1; deduplicated: boolean }> {
+    const run = await this.currentRun();
+    return (await this.improvements()).observe({ projectId: run.projectId, runId: run.runId, ...input });
+  }
+
+  async improvementObservations(): Promise<ImprovementObservationV1[]> {
+    const run = await this.currentRun();
+    const observations = await (await this.improvements()).listObservations();
+    return observations.filter(({ projectId }) => projectId === run.projectId);
+  }
+
+  async improvementScan(): Promise<unknown> {
+    const run = await this.currentRun();
+    return (await this.improvements()).scan(run.projectId);
+  }
+
+  async improvementProposals(): Promise<ImprovementProposalV1[]> {
+    const run = await this.currentRun();
+    return (await this.improvements()).listProposals(run.projectId);
+  }
+
+  async improvementDecide(input: {
+    proposalId: string;
+    actor: string;
+    decision: ImprovementDecisionV1["decision"];
+    rationale: string;
+    externalRef?: string;
+  }): Promise<ImprovementDecisionV1> {
+    const run = await this.currentRun();
+    return (await this.improvements()).decide({ projectId: run.projectId, ...input });
+  }
+
+  async improvementDeleteObservation(observationId: string): Promise<{ deleted: string }> {
+    await (await this.improvements()).deleteObservation(observationId);
+    return { deleted: observationId };
+  }
+
+  async improvementPrune(): Promise<{ observations: number; decisions: number }> {
+    return (await this.improvements()).prune();
   }
 
   async capabilityList(manifestPath?: string): Promise<unknown> {
@@ -3168,6 +3228,17 @@ export class ApexService {
     });
   }
 
+  private async improvements(): Promise<ImprovementStore> {
+    if (this.improvementRuntime !== undefined) return this.improvementRuntime;
+    const policy =
+      this.improvementPolicy ??
+      (JSON.parse(
+        await readFile(join(this.root, ".apex", "runtime", "improvement-policy.v1.json"), "utf8"),
+      ) as ImprovementPolicyV1);
+    this.improvementRuntime = new ImprovementStore(this.root, policy, this.clock);
+    return this.improvementRuntime;
+  }
+
   private async latestRun(projectId: ProjectId): Promise<RunId> {
     const names = await readdir(join(this.projects.projectDirectory(projectId), "runs"));
     const runs = await Promise.all(names.map((name) => this.projects.getRun(projectId, name as RunId)));
@@ -3205,6 +3276,7 @@ export class ApexService {
       defaultsHash: sha256Bytes(await readFile(join(runtimeRoot, "defaults.v1.json"))),
       validatorHash: sha256Bytes(await readFile(validatorPath)),
       qualityScorecardHash: sha256Bytes(await readFile(join(runtimeRoot, "quality-scorecard.v1.json"))),
+      improvementPolicyHash: sha256Bytes(await readFile(join(runtimeRoot, "improvement-policy.v1.json"))),
       requiredCapabilityPacks: [...new Set(requiredCapabilityPacks)].sort(),
     };
     this.assertValid("runtime-lock", lock);
@@ -3236,6 +3308,11 @@ export class ApexService {
           id: "runtime-lock:quality-scorecard",
           expected: lock.qualityScorecardHash,
           path: join(runtimeRoot, "quality-scorecard.v1.json"),
+        },
+        {
+          id: "runtime-lock:improvement-policy",
+          expected: lock.improvementPolicyHash,
+          path: join(runtimeRoot, "improvement-policy.v1.json"),
         },
       ];
       const checks = await Promise.all(

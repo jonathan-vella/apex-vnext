@@ -28,6 +28,7 @@ npm run test:vnext
 npm run test:vnext-validator
 npm run test:vnext-pack
 npm run lint:vnext
+npm run test:bounded-improvement
 ```
 
 `test:vnext-pack` builds tarballs, verifies manifest digests and package contents, installs the runtime package set into
@@ -59,6 +60,11 @@ approved deployment-stack create command.
 Gate 4 supersession tests cover expired preview refresh and an apply-to-destroy sequence on one run. They verify that
 the reduced gate returns to open, old approval cannot authorize the new preview, old preview hashes are stale, and a new
 exact approval is required before destroy.
+
+The bounded-improvement proof creates repeated structured observations across distinct runs, verifies same-run
+deduplication and prompt-injection quarantine, scans one recurring pattern into one inert proposal, and records a human
+rejection. It runs in a temporary local directory, performs no Azure or GitHub operation, and reports zero autonomous
+actions. Run `npm run prove:bounded-improvement` to inspect the deterministic JSON result.
 
 ## Bind Live Evidence
 
