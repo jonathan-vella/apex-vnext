@@ -608,6 +608,8 @@ test("Terraform inventory recursively removes sensitive and secret-denylisted st
               type: "azurerm_example",
               values: {
                 name: "safe",
+                resourceId: "/subscriptions/sub/resourceGroups/rg/providers/example/main",
+                eventHubAuthorizationRuleId: null,
                 nested: { visible: "yes", hidden: "nested-secret" },
                 clientSecret: "denylisted-secret",
               },
@@ -645,7 +647,11 @@ test("Terraform inventory recursively removes sensitive and secret-denylisted st
 
   const inventory = await provider.inventory("project", "run");
   assert.equal(inventory.resources.length, 2);
-  assert.deepEqual(inventory.resources[0]?.properties, { name: "safe", nested: { visible: "yes" } });
+  assert.deepEqual(inventory.resources[0]?.properties, {
+    name: "safe",
+    resourceId: "/subscriptions/sub/resourceGroups/rg/providers/example/main",
+    nested: { visible: "yes" },
+  });
   assert.deepEqual(inventory.resources[1]?.properties, { name: "child" });
   assert.doesNotMatch(JSON.stringify(inventory), /output-secret|nested-secret|denylisted/);
 });
