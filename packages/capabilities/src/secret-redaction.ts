@@ -1,5 +1,6 @@
+import { SECRET_FIELD_PATTERN } from "@apex/contracts";
+
 const REDACTED = "[REDACTED]";
-const SECRET_KEY = /(?:password|passwd|secret|token|key|connectionstring|sas|credential)/i;
 const SECRET_LITERAL =
   /(?:\bBearer\s+[A-Za-z0-9._~+/=-]+|(?:AccountKey|SharedAccessSignature|ClientSecret)\s*=|\b(?:password|passwd|secret|token|api[_-]?key|client[_-]?secret)\s*[:=]\s*\S+)/i;
 
@@ -25,7 +26,7 @@ function sanitize(value: unknown, sensitive: unknown, mode: RedactionMode): unkn
     const sensitivity = object(sensitive) ?? {};
     const sanitized: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(record)) {
-      if (SECRET_KEY.test(key)) {
+      if (SECRET_FIELD_PATTERN.test(key)) {
         if (mode === "replace") sanitized[key] = REDACTED;
         continue;
       }
