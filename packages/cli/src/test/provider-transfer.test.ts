@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { lstat, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { EncryptedEnvelopeTransport, type EncryptedEnvelope } from "@apex/capabilities";
+import { BoundEnvelopeTransport, type BoundEnvelope } from "@apex/capabilities";
 import { canonicalJsonBytes, sha256Bytes } from "@apex/kernel";
 import { execute } from "../cli.js";
 import {
@@ -16,8 +16,6 @@ import {
 import { tempRoot, writeJson } from "./helpers.js";
 
 const instant = new Date("2026-07-15T10:00:00.000Z");
-const key = Buffer.alloc(32, 9);
-const nonce = () => Buffer.alloc(12, 4);
 const hashes = {
   preview: "1".repeat(64),
   input: "2".repeat(64),
@@ -150,19 +148,19 @@ async function source(
 
 async function exported(
   provider: ProviderTransferProvider,
-): Promise<{ root: string; output: string; envelope: EncryptedEnvelope }> {
+): Promise<{ root: string; output: string; envelope: BoundEnvelope }> {
   const fixture = await source(provider);
   await exportProviderTransfer(
     fixture.root,
     fixture.output,
     { previewHash: hashes.preview, provider, recipient: "ci-apply", ttlMs: 30 * 60 * 1_000 },
-    { key, now: () => instant, nonce },
+    { now: () => instant },
   );
-  return { ...fixture, envelope: JSON.parse(await readFile(fixture.output, "utf8")) as EncryptedEnvelope };
+  return { ...fixture, envelope: JSON.parse(await readFile(fixture.output, "utf8")) as BoundEnvelope };
 }
 
-function seal(bundle: ProviderTransferBundle): EncryptedEnvelope {
-  return new EncryptedEnvelopeTransport(() => instant, nonce).encrypt(canonicalJsonBytes(bundle), key, {
+function seal(bundle: ProviderTransferBundle): BoundEnvelope {
+  return new BoundEnvelopeTransport(() => instant).create(canonicalJsonBytes(bundle), {
     kind: PROVIDER_TRANSFER_KIND,
     recipient: "ci-apply",
     ttlMs: 30 * 60 * 1_000,
@@ -188,9 +186,9 @@ test("provider export is deterministic and selects only exact Bicep authority", 
     recipient: "ci-apply",
     authorityExpiresAt: "2026-07-15T11:00:00.000Z",
   });
-  await exportProviderTransfer(fixture.root, fixture.output, options, { key, now: () => instant, nonce });
+  await exportProviderTransfer(fixture.root, fixture.output, options, { now: () => instant });
   const first = await readFile(fixture.output);
-  await exportProviderTransfer(fixture.root, fixture.output, options, { key, now: () => instant, nonce });
+  await exportProviderTransfer(fixture.root, fixture.output, options, { now: () => instant });
   assert.deepEqual(await readFile(fixture.output), first);
   assert(!first.includes(Buffer.alloc(32, 6)));
 });
@@ -212,15 +210,12 @@ test("provider export selects the exact Terraform binding and encrypted artifact
     [
       `artifacts/${sha256Bytes(Buffer.from(terraformBinding().attestation.artifactRef, "utf8"))}.json`,
       `bindings/${hashes.preview}.json`,
+      "plan-transport.key",
     ],
   );
   assert.equal(bundle.bindings.artifactRef, terraformBinding().attestation.artifactRef);
   assert.equal(bundle.bindings.planDigest, hashes.plan);
-  assert(
-    !bundle.files.some(
-      ({ path }) => path.includes("latest") || path.includes("plan-transport.key") || path.includes("f".repeat(64)),
-    ),
-  );
+  assert(!bundle.files.some(({ path }) => path.includes("latest") || path.includes("f".repeat(64))));
 });
 
 test("provider export rejects provider, recipient, binding, artifact, and TTL mismatches", async () => {
@@ -363,7 +358,7 @@ test("provider export rejects provider, recipient, binding, artifact, and TTL mi
       bicep.root,
       bicep.output,
       { previewHash: hashes.preview, provider: "bicep", recipient: "ci-apply", ttlMs: 2 * 60 * 60 * 1_000 },
-      { key, now: () => instant, nonce },
+      { now: () => instant },
     ),
     /cannot outlive/,
   );
@@ -372,25 +367,18 @@ test("provider export rejects provider, recipient, binding, artifact, and TTL mi
 test("provider import rejects wrong recipient, expiry, tampering, and malformed exact contents", async () => {
   const fixture = await exported("terraform");
   await assert.rejects(
-    importProviderTransfer(await tempRoot(), fixture.envelope, "other", key, () => instant),
+    importProviderTransfer(await tempRoot(), fixture.envelope, "other", () => instant),
     /recipient/,
   );
   await assert.rejects(
-    importProviderTransfer(
-      await tempRoot(),
-      fixture.envelope,
-      "ci-apply",
-      key,
-      () => new Date("2026-07-15T10:31:00.000Z"),
-    ),
+    importProviderTransfer(await tempRoot(), fixture.envelope, "ci-apply", () => new Date("2026-07-15T10:31:00.000Z")),
     /expired/,
   );
   await assert.rejects(
     importProviderTransfer(
       await tempRoot(),
-      { ...fixture.envelope, ciphertext: `${fixture.envelope.ciphertext.slice(0, -2)}AA` },
+      { ...fixture.envelope, payload: `${fixture.envelope.payload.slice(0, -2)}AA` },
       "ci-apply",
-      key,
       () => instant,
     ),
   );
@@ -408,22 +396,22 @@ test("provider import rejects wrong recipient, expiry, tampering, and malformed 
   );
   const traversed = { ...bundle, files: bundle.files.map((entry) => ({ ...entry, path: "../escape.json" })) };
   await assert.rejects(
-    importProviderTransfer(await tempRoot(), seal(traversed), "ci-apply", key, () => instant),
+    importProviderTransfer(await tempRoot(), seal(traversed), "ci-apply", () => instant),
     /path/,
   );
   const wrongHash = { ...bundle, files: bundle.files.map((entry) => ({ ...entry, sha256: "0".repeat(64) })) };
   await assert.rejects(
-    importProviderTransfer(await tempRoot(), seal(wrongHash), "ci-apply", key, () => instant),
+    importProviderTransfer(await tempRoot(), seal(wrongHash), "ci-apply", () => instant),
     /integrity/,
   );
   const duplicate = { ...bundle, files: [bundle.files[0]!, bundle.files[0]!] };
   await assert.rejects(
-    importProviderTransfer(await tempRoot(), seal(duplicate), "ci-apply", key, () => instant),
+    importProviderTransfer(await tempRoot(), seal(duplicate), "ci-apply", () => instant),
     /duplicate/,
   );
-  const oversized = { ...fixture.envelope, ciphertext: "A".repeat(Math.ceil((8 * 1024 * 1024) / 3) * 4 + 1) };
+  const oversized = { ...fixture.envelope, payload: "A".repeat(Math.ceil((8 * 1024 * 1024) / 3) * 4 + 1) };
   await assert.rejects(
-    importProviderTransfer(await tempRoot(), oversized, "ci-apply", key, () => instant),
+    importProviderTransfer(await tempRoot(), oversized, "ci-apply", () => instant),
     /8 MiB/,
   );
 });
@@ -431,22 +419,19 @@ test("provider import rejects wrong recipient, expiry, tampering, and malformed 
 test("provider import rejects symlinks and conflicts, and permits byte-identical retries", async () => {
   const fixture = await exported("terraform");
   const destination = await tempRoot();
-  const imported = await importProviderTransfer(destination, fixture.envelope, "ci-apply", key, () => instant);
-  assert.deepEqual(
-    await importProviderTransfer(destination, fixture.envelope, "ci-apply", key, () => instant),
-    imported,
-  );
+  const imported = await importProviderTransfer(destination, fixture.envelope, "ci-apply", () => instant);
+  assert.deepEqual(await importProviderTransfer(destination, fixture.envelope, "ci-apply", () => instant), imported);
   const runtime = join(destination, ".apex", "local", "provider-runtime");
   assert.equal((await lstat(join(runtime, "bindings", `${hashes.preview}.json`))).mode & 0o777, 0o600);
   assert.equal((await lstat(join(runtime, "bindings"))).mode & 0o777, 0o700);
-  await assert.rejects(readFile(join(runtime, "plan-transport.key")), /ENOENT/);
+  assert.equal((await readFile(join(runtime, "plan-transport.key"))).byteLength, 32);
 
   const conflict = await tempRoot();
   await writeJson(join(conflict, ".apex", "local", "provider-runtime", "bindings", `${hashes.preview}.json`), {
     different: true,
   });
   await assert.rejects(
-    importProviderTransfer(conflict, fixture.envelope, "ci-apply", key, () => instant),
+    importProviderTransfer(conflict, fixture.envelope, "ci-apply", () => instant),
     /destination differs/,
   );
   await assert.rejects(
@@ -470,7 +455,7 @@ test("provider import rejects symlinks and conflicts, and permits byte-identical
       await symlink(outside, join(parent, segment), "dir");
     }
     await assert.rejects(
-      importProviderTransfer(linked, fixture.envelope, "ci-apply", key, () => instant),
+      importProviderTransfer(linked, fixture.envelope, "ci-apply", () => instant),
       /unsafe/,
     );
   }
@@ -497,7 +482,7 @@ test("provider export rejects oversized source files", async () => {
   );
 });
 
-test("provider transfer CLI requires confirmation and uses only the external runtime key", async () => {
+test("provider transfer CLI requires confirmation without an external runtime key", async () => {
   const fixture = await source("bicep");
   const runtimeBindingPath = join(
     fixture.root,
@@ -517,36 +502,29 @@ test("provider transfer CLI requires confirmation and uses only the external run
     },
   });
   const destination = await tempRoot();
-  const previousKey = process.env.APEX_PLAN_TRANSPORT_KEY;
-  process.env.APEX_PLAN_TRANSPORT_KEY = key.toString("base64");
-  try {
-    const exportArgs = [
-      "provider",
-      "transfer-export",
-      "--preview",
-      hashes.preview,
-      "--provider",
-      "bicep",
-      "--file",
-      fixture.output,
-      "--recipient",
-      "ci-apply",
-      "--ttl-seconds",
-      "1800",
-    ];
-    await assert.rejects(execute(exportArgs, fixture.root), /requires --yes/);
-    const result = (await execute([...exportArgs, "--yes"], fixture.root)) as { files: number };
-    assert.equal(result.files, 1);
-    const importArgs = ["provider", "transfer-import", "--file", fixture.output, "--recipient", "ci-apply"];
-    await assert.rejects(execute(importArgs, destination), /requires --yes/);
-    const imported = (await execute([...importArgs, "--yes"], destination)) as { previewHash: string };
-    assert.equal(imported.previewHash, hashes.preview);
-    await assert.rejects(
-      readFile(join(destination, ".apex", "local", "provider-runtime", "plan-transport.key")),
-      /ENOENT/,
-    );
-  } finally {
-    if (previousKey === undefined) delete process.env.APEX_PLAN_TRANSPORT_KEY;
-    else process.env.APEX_PLAN_TRANSPORT_KEY = previousKey;
-  }
+  const exportArgs = [
+    "provider",
+    "transfer-export",
+    "--preview",
+    hashes.preview,
+    "--provider",
+    "bicep",
+    "--file",
+    fixture.output,
+    "--recipient",
+    "ci-apply",
+    "--ttl-seconds",
+    "1800",
+  ];
+  await assert.rejects(execute(exportArgs, fixture.root), /requires --yes/);
+  const result = (await execute([...exportArgs, "--yes"], fixture.root)) as { files: number };
+  assert.equal(result.files, 1);
+  const importArgs = ["provider", "transfer-import", "--file", fixture.output, "--recipient", "ci-apply"];
+  await assert.rejects(execute(importArgs, destination), /requires --yes/);
+  const imported = (await execute([...importArgs, "--yes"], destination)) as { previewHash: string };
+  assert.equal(imported.previewHash, hashes.preview);
+  await assert.rejects(
+    readFile(join(destination, ".apex", "local", "provider-runtime", "plan-transport.key")),
+    /ENOENT/,
+  );
 });

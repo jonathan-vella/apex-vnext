@@ -59,18 +59,17 @@ Approval evidence cannot outlive either its preview or the current writer lease.
   recipient even when the current preview writer is different.
 
 Preview bindings and encrypted plan artifacts persist across CLI process restarts under `.apex/local/provider-runtime/`.
-The local AES-256-GCM key is generated with restrictive permissions or injected at runtime through
-`APEX_PLAN_TRANSPORT_KEY`. A symlinked runtime path, permissive key file, wrong recipient, expired artifact, or changed
-binding fails closed. Terraform configuration hashing includes source, automatic variable, and provider lock files while
+The local AES-256-GCM plan key is generated automatically with restrictive permissions. A symlinked runtime path,
+permissive key file, wrong recipient, expired artifact, or changed binding fails closed. Terraform configuration hashing
+includes source, automatic variable, and provider lock files while
 excluding derived `.terraform/` content. Plaintext saved plans are removed immediately after encryption and temporary
 apply files are disposed after use.
 
-Provider-authority transfer uses the generic recipient-bound encrypted envelope to move only the exact preview binding
-and, for Terraform, its exact encrypted saved-plan artifact. Authenticated bindings include provider, operation,
+Provider-authority transfer uses a short-lived recipient-bound bundle to move only the exact preview binding and, for
+Terraform, its exact encrypted saved-plan artifact plus generated local plan key. Bindings include provider, operation,
 project/run, owner epoch, preview hash, recipient, and Terraform artifact reference and digest. Import validates the
-complete envelope and bundle before writing only hash-derived paths beneath `.apex/local/provider-runtime/`. It cannot
-transfer `plan-transport.key`, latest pointers, unrelated previews, or plaintext plans, and it cannot create approval or
-deploy.
+complete envelope and bundle before writing only allowlisted paths beneath `.apex/local/provider-runtime/`. It cannot
+transfer latest pointers, unrelated previews, or plaintext plans, and it cannot create approval or deploy.
 
 :::caution[Terraform CI limitation]
 Production CI encrypted saved-plan transport is not yet qualified. Repository-state and provider-authority transfer are
@@ -87,8 +86,8 @@ telemetry is disabled by default and can be consented to, exported, or deleted i
 Never commit credentials, secret values, Terraform state, saved Terraform plan files, secret-bearing transient output,
 or `.apex/local/`. APEX installs `.apex/.gitignore` to exclude `local/`, `work/`, `cache/`, and reproducible capability
 source packs while preserving repository-backed locks, runtime manifests, objects, projects, journals, refs, and views.
-Provider configuration must contain nonsecret settings only; the CLI rejects secret-like keys. Never echo or persist
-`APEX_PLAN_TRANSPORT_KEY`. Resolve credentials
-only at operation time through Azure CLI, OIDC, Managed Identity, or another approved external credential source.
+Provider configuration must contain nonsecret settings only; the CLI rejects secret-like keys. APEX has no
+operator-managed handoff secret. Resolve credentials only at operation time through Azure CLI, OIDC, Managed Identity,
+or another approved external credential source.
 
 Use the [operations guide](operations.md) to configure providers without secrets.

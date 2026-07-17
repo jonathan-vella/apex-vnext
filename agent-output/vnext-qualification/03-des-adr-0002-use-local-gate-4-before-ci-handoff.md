@@ -70,7 +70,7 @@ evidence is accepted. Production Terraform CI apply remains blocked by its separ
 - APEX retains one clear approval authority without depending on a paid GitHub feature.
 - The maintainer reviews the exact native preview before any apply or destroy handoff.
 - CI cannot self-approve or replace the imported decision.
-- Existing encrypted state, provider-authority, exact-plan, OIDC, cleanup, and evidence controls remain useful.
+- Existing state/provider binding, exact-plan, OIDC, cleanup, and evidence controls remain useful.
 - The Environment can remain unprotected without overstating its security meaning.
 
 ### Negative
@@ -118,7 +118,7 @@ evidence is accepted. Production Terraform CI apply remains blocked by its separ
 - Generate local provider configuration without secrets. Terraform local preview uses Azure CLI authentication and a
   backend override with Microsoft Entra authorization; CI apply continues to use OIDC.
 - Derive the CI recipient from a high-entropy handoff identifier so local preview can precede workflow dispatch.
-- Upload approved encrypted state and provider authority to the `handoff` container; delete them only after successful
+- Upload approved state and provider-authority bundles to the `handoff` container; delete them only after successful
   import and writer acceptance.
 - Remove the in-workflow `github-environment` Gate 4 decision and make structural tests reject its return.
 - Re-run deterministic and live qualification after implementation because workflow and runtime hashes change.

@@ -180,12 +180,12 @@ when a decision has lasting architectural consequences that need alternatives an
   Storage firewall rule therefore could not authorize this execution environment.
 - **Options:** Broaden IP allowlisting to Microsoft egress ranges; move execution to a stable-egress runner; use a
   temporary private GitHub release asset; use a bounded Entra-only public endpoint session.
-- **Choice:** Use a time-boxed public endpoint session for encrypted handoff envelopes. Validate the at-rest
+- **Choice:** Use a time-boxed public endpoint session for recipient-bound handoff bundles. Validate the at-rest
   `Disabled`/`Deny`/zero-IP-rule posture, retain Entra RBAC, shared-key disabled, anonymous Blob disabled, and
-  recipient-bound encryption, then temporarily set public access `Enabled` and firewall default `Allow`. Cleanup restores
+  recipient/candidate binding, then temporarily set public access `Enabled` and firewall default `Allow`. Cleanup restores
   `Deny`, then `Disabled`, removes the session-only policy tag, and verifies every final state.
-- **Rationale:** This authorizes identities rather than unstable network egress, preserves encryption and least-privilege
-  RBAC, and remains bounded and auditable without silently broadening to an unmaintainable IP range.
+- **Rationale:** This authorizes identities rather than unstable network egress, preserves platform encryption and
+  least-privilege RBAC, and remains bounded and auditable without silently broadening to an unmaintainable IP range.
 - **Consequences:** During the short transaction, the endpoint is network-reachable from public networks but accepts only
   authenticated, authorized Entra requests. Any cleanup failure is blocking. The exception expires after 24 hours and
   requires fresh review before another session.

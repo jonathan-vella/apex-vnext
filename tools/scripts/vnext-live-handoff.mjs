@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Dispatch and retrieve encrypted vNext live qualification authority handoffs. */
+/** Dispatch and retrieve bound vNext live qualification authority handoffs. */
 
 import { execFile as execFileCallback } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -40,17 +40,6 @@ export function handoffRecipient(repository, handoffId) {
 export function workflowRef(repository, ref = BRANCH) {
   if (!repository || ref !== BRANCH) throw new Error(`Ref must be ${BRANCH}`);
   return `${repository}/.github/workflows/${WORKFLOW}@refs/heads/${ref}`;
-}
-
-export function validateTransportKey(value) {
-  if (typeof value !== "string" || !/^(?:[A-Za-z0-9+/]{4}){10}[A-Za-z0-9+/]{3}=$/.test(value)) {
-    throw new Error("APEX_PLAN_TRANSPORT_KEY must be canonical base64 for exactly 32 bytes");
-  }
-  const bytes = Buffer.from(value, "base64");
-  if (bytes.length !== 32 || bytes.toString("base64") !== value) {
-    throw new Error("APEX_PLAN_TRANSPORT_KEY must be canonical base64 for exactly 32 bytes");
-  }
-  return true;
 }
 
 export function validateDispatchRunState(status, track) {
@@ -583,7 +572,6 @@ async function localProviderConfig(args, temporary, account) {
 }
 
 async function preview(args) {
-  validateTransportKey(process.env.APEX_PLAN_TRANSPORT_KEY);
   const checkout = await gitState(process.cwd());
   if (checkout.branch !== BRANCH) throw new Error(`Checkout must be ${BRANCH}`);
   validateDispatchRunState(await json("node", [SOURCE_CLI, "status", "--json"]), args.track);
@@ -644,7 +632,6 @@ async function preview(args) {
 }
 
 async function dispatch(args) {
-  validateTransportKey(process.env.APEX_PLAN_TRANSPORT_KEY);
   const checkout = await gitState(process.cwd(), true);
   if (checkout.branch !== BRANCH || args.ref !== BRANCH) throw new Error(`Checkout and --ref must be ${BRANCH}`);
   const status = await json("node", [SOURCE_CLI, "status", "--json"]);
@@ -792,7 +779,7 @@ async function dispatch(args) {
       }
     });
   } catch {
-    throw safeError("Encrypted handoff preparation failed after dispatch", {
+    throw safeError("Bound handoff preparation failed after dispatch", {
       runId: runSummary.databaseId,
       handoffId,
       ...(claimHash === undefined ? {} : { claimHash }),
@@ -867,7 +854,6 @@ async function deleteReturnBlob(args, blob) {
 }
 
 async function retrieve(args) {
-  validateTransportKey(process.env.APEX_PLAN_TRANSPORT_KEY);
   const destination = resolve(args.destination);
   const checkout = await assertDestination(destination);
   const suffix = args.stage === "apply" ? "" : "-preview-failure";

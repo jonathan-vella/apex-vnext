@@ -1,6 +1,6 @@
 import { lstat, readFile, readdir } from "node:fs/promises";
 import { isAbsolute, join, posix, relative, resolve, sep } from "node:path";
-import { EncryptedEnvelopeTransport, type EncryptedEnvelope, type EnvelopeBindings } from "@apex/capabilities";
+import { BoundEnvelopeTransport, type BoundEnvelope, type EnvelopeBindings } from "@apex/capabilities";
 import { SECRET_FIELD_PATTERN, SECRET_VALUE_PATTERN } from "@apex/contracts";
 import {
   EventJournal,
@@ -324,13 +324,12 @@ export async function exportStateTransfer(
   root: string,
   outputPath: string,
   options: StateTransferExportOptions,
-  dependencies: { readonly now?: () => Date; readonly nonce?: () => Uint8Array; readonly key: Uint8Array },
+  dependencies: { readonly now?: () => Date } = {},
 ): Promise<{ path: string; sha256: string; files: number; expiresAt: string }> {
   if (!Number.isFinite(options.ttlMs) || options.ttlMs <= 0) throw new Error("State transfer TTL must be positive");
   const now = dependencies.now?.() ?? new Date();
   const bundle = await createStateTransferBundle(root, options, now);
-  const transport = new EncryptedEnvelopeTransport(() => now, dependencies.nonce);
-  const envelope = transport.encrypt(canonicalJsonBytes(bundle), dependencies.key, {
+  const envelope = new BoundEnvelopeTransport(() => now).create(canonicalJsonBytes(bundle), {
     kind: STATE_TRANSFER_KIND,
     recipient: options.recipient,
     ttlMs: options.ttlMs,
@@ -558,27 +557,26 @@ export async function importStateTransfer(
   root: string,
   envelopeValue: unknown,
   recipient: string,
-  key: Uint8Array,
   now: () => Date = () => new Date(),
 ): Promise<{ projectId: string; runId: string; files: number; claimHash: string }> {
   if (envelopeValue === null || typeof envelopeValue !== "object" || Array.isArray(envelopeValue)) {
     throw new Error("State transfer envelope is invalid");
   }
-  const envelope = envelopeValue as EncryptedEnvelope;
-  if (Object.keys(envelope).sort().join("\0") !== ["authTag", "ciphertext", "iv", "metadata"].join("\0")) {
+  const envelope = envelopeValue as BoundEnvelope;
+  if (Object.keys(envelope).sort().join("\0") !== ["metadata", "payload"].join("\0")) {
     throw new Error("State transfer envelope shape is invalid");
   }
   if (envelope.metadata === null || typeof envelope.metadata !== "object" || Array.isArray(envelope.metadata)) {
     throw new Error("State transfer envelope metadata is invalid");
   }
   const maxEncodedPlaintextBytes = Math.ceil(STATE_TRANSFER_MAX_BUNDLE_BYTES / 3) * 4;
-  if (typeof envelope.ciphertext !== "string" || envelope.ciphertext.length > maxEncodedPlaintextBytes) {
-    throw new Error("State transfer encrypted payload exceeds the 16 MiB limit");
+  if (typeof envelope.payload !== "string" || envelope.payload.length > maxEncodedPlaintextBytes) {
+    throw new Error("State transfer payload exceeds the 16 MiB limit");
   }
   if (envelope.metadata.kind !== STATE_TRANSFER_KIND) throw new Error("State transfer envelope kind is invalid");
   const bindings = requireBindings(envelope.metadata.bindings);
   if (bindings.recipient !== recipient) throw new Error("State transfer binding recipient mismatch");
-  const plaintext = new EncryptedEnvelopeTransport(now).decrypt(envelope, key, recipient);
+  const plaintext = new BoundEnvelopeTransport(now).open(envelope, recipient);
   if (plaintext.byteLength > STATE_TRANSFER_MAX_BUNDLE_BYTES)
     throw new Error("State transfer plaintext exceeds 16 MiB");
   const { bundle, entries } = validateBundle(parseJson(plaintext, "state-transfer-bundle"), bindings);

@@ -460,26 +460,18 @@ export async function execute(argv: string[], root = process.cwd()): Promise<unk
       if (!Number.isInteger(ttlSeconds) || ttlSeconds <= 0) {
         throw new ApexError("APEX_USAGE", "--ttl-seconds must be a positive integer", EXIT_CODES.usage);
       }
-      const runtime = await createFileProviderRuntime(root);
-      return exportStateTransfer(
-        root,
-        required(flags, "file"),
-        {
-          claimHash: required(flags, "claim"),
-          recipient: required(flags, "recipient"),
-          ttlMs: ttlSeconds * 1_000,
-        },
-        { key: await runtime.keyProvider() },
-      );
+      return exportStateTransfer(root, required(flags, "file"), {
+        claimHash: required(flags, "claim"),
+        recipient: required(flags, "recipient"),
+        ttlMs: ttlSeconds * 1_000,
+      });
     }
     case "state transfer-import": {
       confirmed(flags, "state transfer-import");
-      const runtime = await createFileProviderRuntime(root);
       return importStateTransfer(
         root,
         JSON.parse(await readFile(required(flags, "file"), "utf8")) as unknown,
         required(flags, "recipient"),
-        await runtime.keyProvider(),
       );
     }
     case "provider transfer-export": {
@@ -492,27 +484,19 @@ export async function execute(argv: string[], root = process.cwd()): Promise<unk
       if (provider !== "bicep" && provider !== "terraform") {
         throw new ApexError("APEX_USAGE", "--provider must be bicep or terraform", EXIT_CODES.usage);
       }
-      const runtime = await createFileProviderRuntime(root);
-      return exportProviderTransfer(
-        root,
-        required(flags, "file"),
-        {
-          previewHash: required(flags, "preview"),
-          provider,
-          recipient: required(flags, "recipient"),
-          ttlMs: ttlSeconds * 1_000,
-        },
-        { key: await runtime.keyProvider() },
-      );
+      return exportProviderTransfer(root, required(flags, "file"), {
+        previewHash: required(flags, "preview"),
+        provider,
+        recipient: required(flags, "recipient"),
+        ttlMs: ttlSeconds * 1_000,
+      });
     }
     case "provider transfer-import": {
       confirmed(flags, "provider transfer-import");
-      const runtime = await createFileProviderRuntime(root);
       return importProviderTransfer(
         root,
         JSON.parse(await readFile(required(flags, "file"), "utf8")) as unknown,
         required(flags, "recipient"),
-        await runtime.keyProvider(),
       );
     }
     case "status":

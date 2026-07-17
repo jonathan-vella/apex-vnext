@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { EncryptedEnvelopeTransport, type EncryptedEnvelope } from "@apex/capabilities";
+import { BoundEnvelopeTransport, type BoundEnvelope } from "@apex/capabilities";
 import { ObjectStore, canonicalJsonBytes } from "@apex/kernel";
 import { execute } from "../cli.js";
 import { ApexService } from "../service.js";
@@ -16,8 +16,6 @@ import {
 import { prepareValidatedRun, tempRoot, writeJson } from "./helpers.js";
 
 const instant = new Date("2026-07-15T10:00:00.000Z");
-const key = Buffer.alloc(32, 9);
-const nonce = () => Buffer.alloc(12, 4);
 
 interface SourceState {
   root: string;
@@ -59,18 +57,18 @@ async function sourceState(clock = instant): Promise<SourceState> {
   };
 }
 
-async function exportEnvelope(source: SourceState): Promise<EncryptedEnvelope> {
+async function exportEnvelope(source: SourceState): Promise<BoundEnvelope> {
   await exportStateTransfer(
     source.root,
     source.envelopePath,
     { claimHash: source.claimHash, recipient: "ci", ttlMs: 30 * 60 * 1_000 },
-    { key, now: () => instant, nonce },
+    { now: () => instant },
   );
-  return JSON.parse(await readFile(source.envelopePath, "utf8")) as EncryptedEnvelope;
+  return JSON.parse(await readFile(source.envelopePath, "utf8")) as BoundEnvelope;
 }
 
-function seal(bundle: StateTransferBundle): EncryptedEnvelope {
-  return new EncryptedEnvelopeTransport(() => instant, nonce).encrypt(canonicalJsonBytes(bundle), key, {
+function seal(bundle: StateTransferBundle): BoundEnvelope {
+  return new BoundEnvelopeTransport(() => instant).create(canonicalJsonBytes(bundle), {
     kind: STATE_TRANSFER_KIND,
     recipient: "ci",
     ttlMs: 30 * 60 * 1_000,
@@ -246,15 +244,15 @@ test("state import rejects wrong recipient, expiry, and tampered envelopes", asy
   const source = await sourceState();
   const envelope = await exportEnvelope(source);
   await assert.rejects(
-    importStateTransfer(await tempRoot(), envelope, "other", key, () => instant),
+    importStateTransfer(await tempRoot(), envelope, "other", () => instant),
     /recipient/,
   );
   await assert.rejects(
-    importStateTransfer(await tempRoot(), envelope, "ci", key, () => new Date("2026-07-15T10:31:00.000Z")),
+    importStateTransfer(await tempRoot(), envelope, "ci", () => new Date("2026-07-15T10:31:00.000Z")),
     /expired/,
   );
-  const tampered = { ...envelope, ciphertext: `${envelope.ciphertext.slice(0, -2)}AA` };
-  await assert.rejects(importStateTransfer(await tempRoot(), tampered, "ci", key, () => instant));
+  const tampered = { ...envelope, payload: `${envelope.payload.slice(0, -2)}AA` };
+  await assert.rejects(importStateTransfer(await tempRoot(), tampered, "ci", () => instant));
 });
 
 test("state envelope cannot outlive its writer-transfer claim", async () => {
@@ -264,7 +262,7 @@ test("state envelope cannot outlive its writer-transfer claim", async () => {
       source.root,
       source.envelopePath,
       { claimHash: source.claimHash, recipient: "ci", ttlMs: 2 * 60 * 60 * 1_000 },
-      { key, now: () => instant, nonce },
+      { now: () => instant },
     ),
     /cannot outlive/,
   );
@@ -282,7 +280,7 @@ test("state import rejects traversal and symlink ancestors", async () => {
     files: bundle.files.map((entry, index) => (index === 0 ? { ...entry, path: "../escape.json" } : entry)),
   };
   await assert.rejects(
-    importStateTransfer(await tempRoot(), seal(traversed), "ci", key, () => instant),
+    importStateTransfer(await tempRoot(), seal(traversed), "ci", () => instant),
     /allowlist/,
   );
 
@@ -291,14 +289,14 @@ test("state import rejects traversal and symlink ancestors", async () => {
   await mkdir(join(destination, ".apex"));
   await symlink(outside, join(destination, ".apex", "projects"), "dir");
   await assert.rejects(
-    importStateTransfer(destination, seal(bundle), "ci", key, () => instant),
+    importStateTransfer(destination, seal(bundle), "ci", () => instant),
     /ancestor is unsafe/,
   );
 
   const linkedRoot = await tempRoot();
   await symlink(await tempRoot(), join(linkedRoot, ".apex"), "dir");
   await assert.rejects(
-    importStateTransfer(linkedRoot, seal(bundle), "ci", key, () => instant),
+    importStateTransfer(linkedRoot, seal(bundle), "ci", () => instant),
     /APEX root is unsafe/,
   );
 });
@@ -307,9 +305,9 @@ test("state import preflights conflicts, permits idempotence, and preserves writ
   const source = await sourceState();
   const envelope = await exportEnvelope(source);
   const destination = await tempRoot();
-  const imported = await importStateTransfer(destination, envelope, "ci", key, () => instant);
+  const imported = await importStateTransfer(destination, envelope, "ci", () => instant);
   assert.equal(imported.claimHash, source.claimHash);
-  assert.deepEqual(await importStateTransfer(destination, envelope, "ci", key, () => instant), imported);
+  assert.deepEqual(await importStateTransfer(destination, envelope, "ci", () => instant), imported);
 
   const destinationService = new ApexService(destination, {
     clock: () => instant,
@@ -328,7 +326,7 @@ test("state import preflights conflicts, permits idempotence, and preserves writ
   await mkdir(join(conflictDestination, ".apex"), { recursive: true });
   await writeJson(join(conflictDestination, ".apex", "config.json"), { projectId: "different", runId: "run-x" });
   await assert.rejects(
-    importStateTransfer(conflictDestination, envelope, "ci", key, () => instant),
+    importStateTransfer(conflictDestination, envelope, "ci", () => instant),
     /destination differs: config.json/,
   );
   await assert.rejects(readFile(join(conflictDestination, ".apex", "apex.lock.json")), /ENOENT/);
@@ -361,15 +359,14 @@ test("post-preview state transfer resumes in a fresh workspace and deploys the e
     sourceRoot,
     envelopePath,
     { claimHash: transfer.hash, recipient: "ci", ttlMs: 30 * 60 * 1_000 },
-    { key, now: () => instant, nonce },
+    { now: () => instant },
   );
 
   const destination = await tempRoot();
   await importStateTransfer(
     destination,
-    JSON.parse(await readFile(envelopePath, "utf8")) as EncryptedEnvelope,
+    JSON.parse(await readFile(envelopePath, "utf8")) as BoundEnvelope,
     "ci",
-    key,
     () => instant,
   );
   const resumed = new ApexService(destination, { clock: () => instant });
@@ -378,31 +375,11 @@ test("post-preview state transfer resumes in a fresh workspace and deploys the e
   assert.equal((deployed.operation as { previewHash?: unknown }).previewHash, preview.previewHash);
 });
 
-test("state transfer CLI adapters require confirmation and use the provider runtime key", async () => {
+test("state transfer CLI adapters require confirmation without creating provider runtime state", async () => {
   const source = await sourceState(new Date());
   const destination = await tempRoot();
-  const previousKey = process.env.APEX_PLAN_TRANSPORT_KEY;
-  process.env.APEX_PLAN_TRANSPORT_KEY = key.toString("base64");
-  try {
-    await assert.rejects(
-      execute(
-        [
-          "state",
-          "transfer-export",
-          "--claim",
-          source.claimHash,
-          "--file",
-          source.envelopePath,
-          "--recipient",
-          "ci",
-          "--ttl-seconds",
-          "1800",
-        ],
-        source.root,
-      ),
-      /requires --yes/,
-    );
-    const exported = (await execute(
+  await assert.rejects(
+    execute(
       [
         "state",
         "transfer-export",
@@ -414,26 +391,39 @@ test("state transfer CLI adapters require confirmation and use the provider runt
         "ci",
         "--ttl-seconds",
         "1800",
-        "--yes",
       ],
       source.root,
-    )) as { files: number };
-    assert(exported.files > 0);
-    await assert.rejects(
-      execute(["state", "transfer-import", "--file", source.envelopePath, "--recipient", "ci"], destination),
-      /requires --yes/,
-    );
-    const imported = (await execute(
-      ["state", "transfer-import", "--file", source.envelopePath, "--recipient", "ci", "--yes"],
-      destination,
-    )) as { claimHash: string };
-    assert.equal(imported.claimHash, source.claimHash);
-    await assert.rejects(
-      readFile(join(destination, ".apex", "local", "provider-runtime", "plan-transport.key")),
-      /ENOENT/,
-    );
-  } finally {
-    if (previousKey === undefined) delete process.env.APEX_PLAN_TRANSPORT_KEY;
-    else process.env.APEX_PLAN_TRANSPORT_KEY = previousKey;
-  }
+    ),
+    /requires --yes/,
+  );
+  const exported = (await execute(
+    [
+      "state",
+      "transfer-export",
+      "--claim",
+      source.claimHash,
+      "--file",
+      source.envelopePath,
+      "--recipient",
+      "ci",
+      "--ttl-seconds",
+      "1800",
+      "--yes",
+    ],
+    source.root,
+  )) as { files: number };
+  assert(exported.files > 0);
+  await assert.rejects(
+    execute(["state", "transfer-import", "--file", source.envelopePath, "--recipient", "ci"], destination),
+    /requires --yes/,
+  );
+  const imported = (await execute(
+    ["state", "transfer-import", "--file", source.envelopePath, "--recipient", "ci", "--yes"],
+    destination,
+  )) as { claimHash: string };
+  assert.equal(imported.claimHash, source.claimHash);
+  await assert.rejects(
+    readFile(join(destination, ".apex", "local", "provider-runtime", "plan-transport.key")),
+    /ENOENT/,
+  );
 });
