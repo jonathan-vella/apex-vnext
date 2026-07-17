@@ -1,0 +1,475 @@
+{
+  "$schema": "schemas/modernization-ownership.schema.json",
+  "schemaVersion": "1.0.0",
+  "candidate": "c447f744e3bee97f8919b36ea285f0f5aaa3e42e",
+  "surfaces": [
+    {
+      "id": "workspace-operating-frame",
+      "category": "guidance",
+      "classification": "keep",
+      "canonicalOwner": "AGENTS.md",
+      "sourceRefs": ["AGENTS.md", ".github/copilot-instructions.md"],
+      "consumers": ["contributors", "GitHub Copilot agents"],
+      "proofCommands": ["npm run validate:instruction-checks"],
+      "removalGate": "A replacement operating frame covers setup, validation, workflow, and security boundaries.",
+      "rationale": "The root frame owns repository-wide conventions; Copilot instructions own editor-specific routing."
+    },
+    {
+      "id": "scoped-instruction-discovery",
+      "category": "guidance",
+      "classification": "consolidate",
+      "canonicalOwner": ".github/instructions/*.instructions.md frontmatter",
+      "sourceRefs": [".github/instructions/*.instructions.md", "tools/scripts/validate-instruction-checks.mjs"],
+      "consumers": ["Copilot instruction loader", "repository validators"],
+      "proofCommands": ["npm run validate:instruction-checks", "npm run lint:glob-audit"],
+      "removalGate": "A generated scope view reproduces every applyTo binding without becoming a second source.",
+      "rationale": "Instruction files remain authoritative, but their overlapping scopes need one computed audit view.",
+      "followUp": "Generate the instruction scope view during the guidance modernization slice.",
+      "decisionRef": "OWN-001"
+    },
+    {
+      "id": "user-documentation",
+      "category": "guidance",
+      "classification": "keep",
+      "canonicalOwner": "docs/",
+      "sourceRefs": ["docs/**/*.md", ".github/instructions/docs.instructions.md"],
+      "consumers": ["APEX users", "contributors", "release reviewers"],
+      "proofCommands": ["npm run validate:docs"],
+      "removalGate": "Equivalent versioned user guidance exists and all inbound links are migrated.",
+      "rationale": "User documentation is distinct from repository-authoring and runtime prompt guidance."
+    },
+    {
+      "id": "agent-registry",
+      "category": "invocation",
+      "classification": "keep",
+      "canonicalOwner": "tools/registry/agent-registry.json",
+      "sourceRefs": ["tools/registry/agent-registry.json", ".github/agents/*.agent.md"],
+      "consumers": ["Copilot agent discovery", "workflow routing", "model consistency checks"],
+      "proofCommands": ["npm run validate:agent-registry", "npm run validate:agents"],
+      "removalGate": "A replacement registry preserves file, model, step, and invocation semantics.",
+      "rationale": "The registry is the explicit routing index while agent frontmatter remains executable definition."
+    },
+    {
+      "id": "model-catalog",
+      "category": "invocation",
+      "classification": "keep",
+      "canonicalOwner": ".github/model-catalog.json",
+      "sourceRefs": [".github/model-catalog.json", "tools/scripts/generate-model-catalog.mjs"],
+      "consumers": ["agent frontmatter", "model validators", "release checks"],
+      "proofCommands": ["npm run validate:models", "npm run validate:model-catalog"],
+      "removalGate": "A replacement preserves the model allowlist, assignments, deprecations, and consistency proof.",
+      "rationale": "Definitions are maintained centrally and assignments are generated from executable frontmatter."
+    },
+    {
+      "id": "skill-discovery",
+      "category": "invocation",
+      "classification": "consolidate",
+      "canonicalOwner": ".github/skills/*/SKILL.md frontmatter",
+      "sourceRefs": [".github/skills/*/SKILL.md", "tools/scripts/validate-skills.mjs"],
+      "consumers": ["Copilot skill discovery", "agents", "orphan-content validation"],
+      "proofCommands": ["npm run validate:skills", "npm run lint:orphaned-content"],
+      "removalGate": "A generated skill view reproduces discovery metadata without hand-maintained duplication.",
+      "rationale": "Skill frontmatter stays canonical; a computed consumer view should replace repeated inventory prose.",
+      "followUp": "Generate the skill consumer view during invocation-graph modernization.",
+      "decisionRef": "OWN-001"
+    },
+    {
+      "id": "workflow-dag",
+      "category": "invocation",
+      "classification": "keep",
+      "canonicalOwner": ".github/skills/workflow-engine/templates/workflow-graph.json",
+      "sourceRefs": [
+        ".github/skills/workflow-engine/templates/workflow-graph.json",
+        "tools/schemas/workflow-graph.schema.json"
+      ],
+      "consumers": ["orchestrator", "handoff validation", "documentation synchronization"],
+      "proofCommands": ["npm run validate:workflow-graph", "npm run lint:workflow-table-sync"],
+      "removalGate": "A replacement preserves all nodes, edges, gates, artifacts, and track routing.",
+      "rationale": "The DAG is the machine-readable owner of workflow order and handoffs."
+    },
+    {
+      "id": "runtime-manifests",
+      "category": "runtime",
+      "classification": "keep",
+      "canonicalOwner": "config/*.v1.json",
+      "sourceRefs": ["config/*.v1.json", "tools/scripts/validate-vnext.mjs"],
+      "consumers": ["runtime initialization", "package assets", "qualification"],
+      "proofCommands": ["npm run validate:vnext"],
+      "removalGate": "Versioned replacements support deterministic migration and package validation.",
+      "rationale": "Versioned manifests separate runtime configuration from repository authoring details."
+    },
+    {
+      "id": "workspace-package-boundaries",
+      "category": "runtime",
+      "classification": "keep",
+      "canonicalOwner": "packages/*/package.json",
+      "sourceRefs": ["packages/*/package.json", "tsconfig.vnext.json", "package-lock.json"],
+      "consumers": ["TypeScript build", "clean-install tests", "package consumers"],
+      "proofCommands": ["npm run test:vnext", "npm run test:vnext-pack"],
+      "removalGate": "A replacement package graph preserves public exports, build order, and clean installation.",
+      "rationale": "Workspace packages are the executable ownership units for contracts, kernel, CLI, and adapters."
+    },
+    {
+      "id": "schema-libraries",
+      "category": "runtime",
+      "classification": "investigate",
+      "canonicalOwner": "packages/contracts/src/",
+      "sourceRefs": [
+        "packages/contracts/src/*.ts",
+        "packages/contracts/schemas/*.schema.json",
+        "tools/schemas/*.schema.json"
+      ],
+      "consumers": ["runtime contracts", "repository artifact validators", "external tooling"],
+      "proofCommands": ["npm run lint:json-schemas", "npm run test:vnext"],
+      "removalGate": "Every persisted schema has one declared source and generated-byte parity before either library changes.",
+      "rationale": "TypeBox contracts and repository JSON schemas overlap in purpose but serve different consumers.",
+      "followUp": "Map generated versus hand-authored schemas before choosing consolidation boundaries.",
+      "decisionRef": "OWN-005"
+    },
+    {
+      "id": "customization-distribution",
+      "category": "runtime",
+      "classification": "investigate",
+      "canonicalOwner": "customizations/manifest.json",
+      "sourceRefs": ["customizations/manifest.json", "packages/cli/scripts/prepare-assets.mjs"],
+      "consumers": ["CLI initialization", "managed customization update", "consumer repositories"],
+      "proofCommands": ["npm run validate:vnext", "npm run test:vnext"],
+      "removalGate": "Source, bundled asset, and installed consumer boundaries are documented and byte-tested.",
+      "rationale": "The manifest is explicit, but source-versus-shipped ownership is not documented end to end.",
+      "followUp": "Characterize source, bundle, lock, and installed-file lifecycle.",
+      "decisionRef": "OWN-006"
+    },
+    {
+      "id": "workflow-validator-ownership",
+      "category": "validation",
+      "classification": "keep",
+      "canonicalOwner": "packages/kernel/src/workflow-validator-ownership.ts",
+      "sourceRefs": ["packages/kernel/src/workflow-validator-ownership.ts", "packages/cli/src/workflow-validators.ts"],
+      "consumers": ["workflow engine", "task completion", "Gate 4", "terminal evidence"],
+      "proofCommands": ["npm run test:vnext"],
+      "removalGate": "A replacement maps every validator ID to one executable owner and boundary.",
+      "rationale": "This is the runtime authorization map, not merely a repository lint registry."
+    },
+    {
+      "id": "repository-validator-graph",
+      "category": "validation",
+      "classification": "consolidate",
+      "canonicalOwner": "package.json scripts",
+      "sourceRefs": ["package.json", ".github/workflows/ci.yml"],
+      "consumers": ["pull-request CI", "contributors", "pre-push validation"],
+      "proofCommands": ["npm run validate:_node-ci"],
+      "removalGate": "A generated dependency graph preserves command names, prerequisites, parallel safety, and check diagnostics.",
+      "rationale": "The node, node-CI, external, workflow, and hook command lists currently repeat dependency knowledge.",
+      "followUp": "Characterize command inputs and outputs before generating orchestration views.",
+      "decisionRef": "OWN-002"
+    },
+    {
+      "id": "language-validator-boundaries",
+      "category": "validation",
+      "classification": "keep",
+      "canonicalOwner": "language-native tools invoked by package.json",
+      "sourceRefs": ["package.json", "pyproject.toml", "eslint.config.mjs"],
+      "consumers": ["JavaScript", "Python", "Markdown", "Bicep", "Terraform"],
+      "proofCommands": ["npm run validate:all"],
+      "removalGate": "Replacement checks retain language-native parsing and equivalent failure diagnostics.",
+      "rationale": "Language tools should not be reimplemented by generic string validators."
+    },
+    {
+      "id": "artifact-template-validation",
+      "category": "validation",
+      "classification": "consolidate",
+      "canonicalOwner": ".github/skills/azure-artifacts/templates/",
+      "sourceRefs": [
+        ".github/skills/azure-artifacts/templates/*.md",
+        "tools/scripts/validate-artifacts.mjs",
+        "tools/scripts/_lib/artifact-headings.mjs"
+      ],
+      "consumers": ["artifact authors", "pre-commit hook", "challenger review"],
+      "proofCommands": ["npm run validate:artifacts", "npm run check:h2-order"],
+      "removalGate": "One template-derived heading model replaces hand-synchronized heading lists with parity tests.",
+      "rationale": "Templates are canonical, while validator and summary heading lists are duplicated derivatives.",
+      "followUp": "Generate heading metadata from templates during validator modernization.",
+      "decisionRef": "OWN-004"
+    },
+    {
+      "id": "precommit-hooks",
+      "category": "automation",
+      "classification": "rewrite",
+      "canonicalOwner": "lefthook.yml",
+      "sourceRefs": ["lefthook.yml", "tools/scripts/validate-hooks.mjs", "tools/tests/test-hooks.sh"],
+      "consumers": ["git pre-commit", "contributors", "artifact validation"],
+      "proofCommands": ["npm run validate:hooks", "npm run test:hooks"],
+      "removalGate": "Index-lock coordination permits safe parallel execution with unchanged staged-file semantics.",
+      "rationale": "Serial execution is a documented safety workaround for multiple stage_fixed writers.",
+      "followUp": "Add an explicit index coordination design and representative staged-file benchmark.",
+      "decisionRef": "OWN-003"
+    },
+    {
+      "id": "github-required-checks",
+      "category": "automation",
+      "classification": "keep",
+      "canonicalOwner": ".github/workflows/ci.yml",
+      "sourceRefs": [".github/workflows/ci.yml", ".github/workflows/branch-enforcement.yml"],
+      "consumers": ["branch protection", "pull requests", "release qualification"],
+      "proofCommands": ["npm run validate:_node-ci"],
+      "removalGate": "Replacement checks retain stable names, least privilege, exact triggers, and equivalent commands.",
+      "rationale": "GitHub workflows own hosted execution; npm scripts own reusable command implementation."
+    },
+    {
+      "id": "maintenance-workflows",
+      "category": "automation",
+      "classification": "keep",
+      "canonicalOwner": ".github/workflows/weekly-maintenance.yml",
+      "sourceRefs": [".github/workflows/weekly-maintenance.yml", ".github/workflows/sensei-branch-maintenance.yml"],
+      "consumers": ["maintainers", "dependency freshness", "branch hygiene"],
+      "proofCommands": ["npm run validate:tool-versions", "npm run lint:docs-freshness"],
+      "removalGate": "Equivalent scheduled ownership exists for every freshness and maintenance task.",
+      "rationale": "Scheduled automation is distinct from required pull-request checks."
+    },
+    {
+      "id": "model-catalog-generation",
+      "category": "generation",
+      "classification": "keep",
+      "canonicalOwner": "tools/scripts/generate-model-catalog.mjs",
+      "sourceRefs": ["tools/scripts/generate-model-catalog.mjs", ".github/model-catalog.json"],
+      "consumers": ["model catalog assignments", "agent validators"],
+      "proofCommands": ["npm run validate:model-catalog"],
+      "removalGate": "Replacement generation is byte-deterministic and preserves hand-maintained model definitions.",
+      "rationale": "Assignments are derived data and should remain generated."
+    },
+    {
+      "id": "entity-count-generation",
+      "category": "generation",
+      "classification": "keep",
+      "canonicalOwner": "tools/registry/count-manifest.json",
+      "sourceRefs": ["tools/registry/count-manifest.json", "tools/scripts/validate-no-hardcoded-counts.mjs"],
+      "consumers": ["documentation", "freshness checks", "repository audits"],
+      "proofCommands": ["npm run validate:no-hardcoded-counts"],
+      "removalGate": "A replacement computes every tracked entity count from canonical globs.",
+      "rationale": "Exact entity counts are derived facts and must not be copied into prose."
+    },
+    {
+      "id": "avm-index-generation",
+      "category": "generation",
+      "classification": "keep",
+      "canonicalOwner": "tools/scripts/refresh-avm-module-index.mjs",
+      "sourceRefs": ["tools/scripts/refresh-avm-module-index.mjs", ".github/data/avm-module-index.json"],
+      "consumers": ["IaC planners", "module pin validators", "weekly maintenance"],
+      "proofCommands": ["npm run validate:avm-versions:offline"],
+      "removalGate": "Replacement preserves Bicep and Terraform pin freshness with offline validation.",
+      "rationale": "The index is generated cache data; module declarations remain canonical in IaC."
+    },
+    {
+      "id": "freshness-generation",
+      "category": "generation",
+      "classification": "keep",
+      "canonicalOwner": "tools/registry/source-freshness.json",
+      "sourceRefs": ["tools/registry/source-freshness.json", "tools/scripts/check-docs-freshness.mjs"],
+      "consumers": ["documentation CI", "skill references", "quarterly audit"],
+      "proofCommands": ["npm run lint:docs-freshness"],
+      "removalGate": "Replacement tracks source canaries, review dates, and stale references with equivalent diagnostics.",
+      "rationale": "Freshness metadata is a dedicated drift-control surface."
+    },
+    {
+      "id": "v1-compatibility-matrix",
+      "category": "compatibility",
+      "classification": "retire",
+      "canonicalOwner": "docs/vnext/phase-0a/v1-behavior-compatibility.md",
+      "sourceRefs": [
+        "docs/vnext/phase-0a/v1-behavior-compatibility.md",
+        "tools/scripts/validate-v1-compatibility-matrix.mjs"
+      ],
+      "consumers": ["modernization reviewers", "cutover review", "compatibility tests"],
+      "proofCommands": ["npm run validate:v1-compatibility-matrix"],
+      "removalGate": "Issue #13 accepts cutover and every preserved or changed behavior has replacement proof.",
+      "rationale": "The matrix is required through modernization but becomes historical after accepted cutover.",
+      "followUp": "Archive, do not delete, after the final cutover decision.",
+      "decisionRef": "OWN-007"
+    },
+    {
+      "id": "public-command-compatibility",
+      "category": "compatibility",
+      "classification": "investigate",
+      "canonicalOwner": "packages/cli/src/cli.ts",
+      "sourceRefs": ["packages/cli/src/cli.ts", "docs/guides/cli-reference.md"],
+      "consumers": ["CLI users", "automation", "consumer repositories"],
+      "proofCommands": ["npm run test:vnext", "npm run validate:v1-compatibility-matrix"],
+      "removalGate": "Every alias and legacy command has usage evidence, replacement guidance, and a dated removal decision.",
+      "rationale": "Public command compatibility cannot be inferred safely from implementation names alone.",
+      "followUp": "Inventory aliases and command consumers during the compatibility slice.",
+      "decisionRef": "OWN-010"
+    },
+    {
+      "id": "validator-diagnostics",
+      "category": "diagnostics",
+      "classification": "consolidate",
+      "canonicalOwner": "tools/scripts/_lib/reporter.mjs",
+      "sourceRefs": ["tools/scripts/_lib/reporter.mjs", "tools/scripts/validate-*.mjs"],
+      "consumers": ["local validation", "CI logs", "agent remediation"],
+      "proofCommands": ["npm run test:lib-json", "npm run test:lib-ajv"],
+      "removalGate": "All validator families emit stable severity, path, summary, and machine-readable diagnostics.",
+      "rationale": "Shared reporter adoption is partial, producing inconsistent output and remediation context.",
+      "followUp": "Migrate validators by family after snapshotting current output contracts.",
+      "decisionRef": "OWN-008"
+    },
+    {
+      "id": "workflow-telemetry",
+      "category": "diagnostics",
+      "classification": "investigate",
+      "canonicalOwner": "tools/scripts/measure-workflow-baseline.mjs",
+      "sourceRefs": ["tools/scripts/measure-workflow-baseline.mjs", "tools/schemas/session-state.schema.json"],
+      "consumers": ["modernization baselines", "workflow retrospectives", "release review"],
+      "proofCommands": ["npm run measure:baseline"],
+      "removalGate": "Automatic collection yields representative elapsed, token, retry, subagent, and cache samples.",
+      "rationale": "The aggregator exists, but the current repository contains no telemetry records.",
+      "followUp": "Instrument apex-recall checkpoints before claiming workflow savings.",
+      "decisionRef": "OWN-009"
+    },
+    {
+      "id": "debug-log-profiling",
+      "category": "diagnostics",
+      "classification": "investigate",
+      "canonicalOwner": "tools/scripts/profile_debug_log.py",
+      "sourceRefs": ["tools/scripts/profile_debug_log.py", "docs/guides/testing.md"],
+      "consumers": ["context optimization", "local investigations"],
+      "proofCommands": ["npm run profile:debug-log"],
+      "removalGate": "A privacy-safe supported source supplies repeatable context measurements or the profiler is explicitly retired.",
+      "rationale": "The profiler depends on local debug logs and is not a portable CI baseline.",
+      "followUp": "Decide whether local profiling remains advisory or becomes supported telemetry.",
+      "decisionRef": "OWN-009"
+    }
+  ],
+  "baselines": [
+    {
+      "id": "context",
+      "status": "gap",
+      "sourceRefs": ["tools/scripts/validate-context-budget.mjs", "tools/scripts/measure-workflow-baseline.mjs"],
+      "measurement": "npm run validate:context-budget; node tools/scripts/measure-workflow-baseline.mjs --json",
+      "evidence": "Static frozen-artifact rules pass; the candidate has no workflow telemetry records.",
+      "followUp": "Collect representative runtime token and cache samples before claiming context improvement."
+    },
+    {
+      "id": "ci",
+      "status": "captured",
+      "sourceRefs": [".github/workflows/ci.yml", "package.json"],
+      "measurement": "Recent successful main runs queried with gh run list for ci.yml.",
+      "evidence": "Elapsed range 143-209 seconds; median 165 seconds; candidate run 29585231105 completed in 152 seconds."
+    },
+    {
+      "id": "hooks",
+      "status": "gap",
+      "sourceRefs": ["lefthook.yml", "tools/scripts/validate-hooks.mjs", "tools/tests/test-hooks.sh"],
+      "measurement": "npm run validate:hooks; npm run test:hooks",
+      "evidence": "Validation and characterization pass; serial stage_fixed execution has no representative staged-file timing benchmark.",
+      "followUp": "Benchmark representative documentation, code, workflow, and artifact commits before hook rewrites."
+    },
+    {
+      "id": "dependencies",
+      "status": "captured",
+      "sourceRefs": ["package-lock.json", "packages/*/package.json", "tsconfig.vnext.json"],
+      "measurement": "sha256sum package-lock.json; workspace package enumeration",
+      "evidence": "Lock SHA-256 45b3eae971a59165a9374de580140ab92f5e55f1ba6136dce27ebd4c133c597d; workspace package boundaries recorded by package manifests."
+    },
+    {
+      "id": "diagnostics",
+      "status": "gap",
+      "sourceRefs": ["tools/scripts/_lib/reporter.mjs", "tools/scripts/validate-*.mjs"],
+      "measurement": "Reporter import scan; npm run test:lib-json; npm run test:lib-ajv",
+      "evidence": "Shared diagnostic library tests pass; reporter adoption is partial across the registered validator command set.",
+      "followUp": "Capture output snapshots before migrating remaining validator families."
+    },
+    {
+      "id": "drift",
+      "status": "captured",
+      "sourceRefs": [
+        "tools/registry/source-freshness.json",
+        "tools/registry/count-manifest.json",
+        ".github/model-catalog.json"
+      ],
+      "measurement": "Thirty-day git path concentration plus quarterly drift validators.",
+      "evidence": "Recent churn is concentrated in skills, tools, packages, docs, instructions, agents, and workflows; generated freshness, count, and model checks are the existing drift gates."
+    }
+  ],
+  "decisions": [
+    {
+      "id": "OWN-001",
+      "status": "decided",
+      "decision": "Keep skill and instruction frontmatter canonical; generate consumer and scope views.",
+      "rationale": "A hand-maintained second registry would create new drift instead of consolidating ownership.",
+      "owner": "Invocation and guidance modernization",
+      "gate": "Generated views match discovery metadata and existing validators remain green."
+    },
+    {
+      "id": "OWN-002",
+      "status": "decided",
+      "decision": "Generate validator orchestration views from explicit command dependencies.",
+      "rationale": "Package scripts are reusable implementation, but repeated orchestration lists obscure prerequisites and parallel safety.",
+      "owner": "Validation command graph modernization",
+      "gate": "Characterization tests preserve commands, outputs, ordering constraints, and required check names."
+    },
+    {
+      "id": "OWN-003",
+      "status": "deferred",
+      "decision": "Retain serial hooks until an explicit Git index coordination design is proven.",
+      "rationale": "Parallel stage_fixed writers race on the Git index; speed cannot override staged-file correctness.",
+      "owner": "Hook modernization",
+      "gate": "Representative benchmarks and race tests pass with coordinated parallel execution."
+    },
+    {
+      "id": "OWN-004",
+      "status": "decided",
+      "decision": "Derive artifact heading metadata from canonical templates.",
+      "rationale": "Hand-synchronized heading arrays duplicate template ownership and create drift.",
+      "owner": "Artifact validation modernization",
+      "gate": "Generated metadata is byte-stable and all artifact characterization tests pass."
+    },
+    {
+      "id": "OWN-005",
+      "status": "deferred",
+      "decision": "Do not merge TypeBox and repository JSON schema libraries until source and consumer provenance is mapped.",
+      "rationale": "The libraries overlap conceptually but serve runtime packages and repository artifacts differently.",
+      "owner": "Generated metadata modernization",
+      "gate": "Every schema has one source, generation path, consumer set, compatibility rule, and byte-parity test."
+    },
+    {
+      "id": "OWN-006",
+      "status": "deferred",
+      "decision": "Keep customization source, bundled assets, and installed files unchanged pending lifecycle characterization.",
+      "rationale": "Changing an unclear shipping boundary risks consumer drift and managed-file conflicts.",
+      "owner": "Customization modernization",
+      "gate": "Source-to-bundle-to-install provenance and rollback tests are complete."
+    },
+    {
+      "id": "OWN-007",
+      "status": "decided",
+      "decision": "Retire the v1 compatibility matrix from active gates only after accepted cutover, then archive it.",
+      "rationale": "The matrix protects modernization behavior until the maintainer accepts the final candidate.",
+      "owner": "Issue #13 cutover review",
+      "gate": "Issue #13 closes with replacement evidence for every preserved and changed behavior."
+    },
+    {
+      "id": "OWN-008",
+      "status": "decided",
+      "decision": "Consolidate validator diagnostics on the shared reporter by validator family.",
+      "rationale": "Stable structured diagnostics improve local repair and CI interpretation without combining validation semantics.",
+      "owner": "Validation diagnostics modernization",
+      "gate": "Output snapshots and machine-readable findings remain compatible for each migrated family."
+    },
+    {
+      "id": "OWN-009",
+      "status": "deferred",
+      "decision": "Treat workflow telemetry and debug-log profiling as advisory until representative automatic samples exist.",
+      "rationale": "No optimization claim is defensible from an empty telemetry set or machine-local debug logs.",
+      "owner": "Context and diagnostic modernization",
+      "gate": "Privacy-safe automated samples cover representative tiers, tracks, retries, cache use, and context."
+    },
+    {
+      "id": "OWN-010",
+      "status": "deferred",
+      "decision": "Retain public CLI compatibility until aliases and external consumers are enumerated.",
+      "rationale": "Removing an apparently unused alias can break consumer automation outside this repository.",
+      "owner": "Compatibility modernization",
+      "gate": "Usage evidence, replacement guidance, and a dated removal decision exist for every alias."
+    }
+  ]
+}
