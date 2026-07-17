@@ -90,8 +90,9 @@ No `azure.yaml` is required because the qualification runtime intentionally uses
 
 - The backend has public network access `Disabled` at rest and a default-deny firewall.
 - Shared-key authorization, anonymous Blob access, and client secrets remain disabled.
-- The GitHub identity receives Contributor only on the two workload resource groups, Log Analytics Reader on the
-  qualification workspace, and storage roles at the backend account or container scopes defined by the template.
+- The GitHub identity receives Contributor only on the two workload resource groups, Log Analytics Contributor on the
+  qualification workspace, and storage roles at the backend account or container scopes defined by the template. The
+  workspace role permits linked diagnostic settings without broadening access to either workload resource group.
 - The local uploader receives only backend firewall management and `handoff` container data access.
 - Local APEX creates the native Bicep/Terraform preview, renders it for the maintainer, and records Gate 4 through the
   existing `tty` mechanism. The approval binds the preview hash, dependency revision, writer epoch, recipient, and
