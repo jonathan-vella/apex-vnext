@@ -666,28 +666,6 @@ async function dispatch(args) {
   const previewHash = approvedDispatchState(status, approval, args.track, recipient);
   await withFirewall(args, async () => undefined);
   const handoffId = args.handoff_id;
-  await run("gh", [
-    "workflow",
-    "run",
-    WORKFLOW,
-    "--ref",
-    args.ref,
-    "-f",
-    `track=${args.track}`,
-    "-f",
-    `operation=${args.operation}`,
-    "-f",
-    `handoff_id=${handoffId}`,
-    "-f",
-    `candidate_sha=${checkout.head}`,
-    "-f",
-    `preview_hash=${previewHash}`,
-  ]);
-  const runSummary = await discoverRun(handoffId, checkout.head);
-  const details = await json("gh", ["api", `repos/${repository}/actions/runs/${runSummary.databaseId}`]);
-  if (details.run_attempt !== 1 || details.head_branch !== BRANCH || details.head_sha !== checkout.head) {
-    throw safeError("Dispatched run binding verification failed", { runId: runSummary.databaseId, handoffId });
-  }
   const temporary = await mkdtemp(join(tmpdir(), "apex-vnext-handoff-"));
   const stateEnvelope = join(temporary, "state.json");
   const providerEnvelope = join(temporary, "provider.json");
@@ -779,13 +757,34 @@ async function dispatch(args) {
       }
     });
   } catch {
-    throw safeError("Bound handoff preparation failed after dispatch", {
-      runId: runSummary.databaseId,
+    throw safeError("Bound handoff preparation failed before dispatch", {
       handoffId,
       ...(claimHash === undefined ? {} : { claimHash }),
     });
   } finally {
     await rm(temporary, { recursive: true, force: true });
+  }
+  await run("gh", [
+    "workflow",
+    "run",
+    WORKFLOW,
+    "--ref",
+    args.ref,
+    "-f",
+    `track=${args.track}`,
+    "-f",
+    `operation=${args.operation}`,
+    "-f",
+    `handoff_id=${handoffId}`,
+    "-f",
+    `candidate_sha=${checkout.head}`,
+    "-f",
+    `preview_hash=${previewHash}`,
+  ]);
+  const runSummary = await discoverRun(handoffId, checkout.head);
+  const details = await json("gh", ["api", `repos/${repository}/actions/runs/${runSummary.databaseId}`]);
+  if (details.run_attempt !== 1 || details.head_branch !== BRANCH || details.head_sha !== checkout.head) {
+    throw safeError("Dispatched run binding verification failed", { runId: runSummary.databaseId, handoffId });
   }
   return {
     command: "dispatch",

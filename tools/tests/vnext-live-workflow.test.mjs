@@ -430,6 +430,16 @@ test("dispatch permits only repository-backed APEX state drift", () => {
   assert.throws(() => validateGitStatus("R  .apex/old -> .apex/new\n", true), /permitted APEX state boundary/);
 });
 
+test("dispatch uploads bound authority before starting CI", () => {
+  const dispatch = launcher.slice(
+    launcher.indexOf("async function dispatch"),
+    launcher.indexOf("async function assertDestination"),
+  );
+  assert.ok(
+    dispatch.indexOf('"storage",\n          "blob",\n          "upload"') < dispatch.indexOf('"workflow",\n    "run"'),
+  );
+});
+
 test("launcher validates the exception and at-rest posture before opening its endpoint session", () => {
   const helper = launcher.slice(
     launcher.indexOf("async function withFirewall"),
