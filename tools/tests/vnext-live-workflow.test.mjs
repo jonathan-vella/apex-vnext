@@ -218,6 +218,20 @@ rejectsMutation(
   "apply imports",
 );
 rejectsMutation(
+  "missing isolated runtime fails",
+  (text) => text.replace("      APEX_RUNTIME_ROOT: ${{ github.workspace }}/apex-live/runtime\n", ""),
+  "isolated APEX runtime",
+);
+rejectsMutation(
+  "checkout-root state import fails",
+  (text) =>
+    text.replace(
+      '          cd "$APEX_RUNTIME_ROOT"\n          node "$cli" state transfer-import',
+      '          cd "$GITHUB_WORKSPACE"\n          node "$cli" state transfer-import',
+    ),
+  "import state in the isolated runtime",
+);
+rejectsMutation(
   "missing writer acceptance fails",
   (text) => text.replace("writer transfer-accept", "writer inspect"),
   "import, accept, approval, and deletion order",
@@ -246,8 +260,8 @@ rejectsMutation(
   "early incoming deletion fails",
   (text) =>
     text.replace(
-      "          node packages/cli/dist/cli.js approval show --json",
-      "          az storage blob delete --name early\n          node packages/cli/dist/cli.js approval show --json",
+      '          node "$cli" approval show --json',
+      '          az storage blob delete --name early\n          node "$cli" approval show --json',
     ),
   "import, accept, approval, and deletion order",
 );

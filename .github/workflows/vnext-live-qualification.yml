@@ -85,6 +85,7 @@ jobs:
       APEX_LOCATION: ${{ vars.APEX_LOCATION }}
       APEX_PROJECT_NAME: ${{ vars.APEX_PROJECT_NAME }}
       APEX_QUALIFICATION_TAGS_JSON: ${{ vars.APEX_QUALIFICATION_TAGS_JSON }}
+      APEX_RUNTIME_ROOT: ${{ github.workspace }}/apex-live/runtime
     steps:
       - name: Checkout exact candidate
         uses: actions/checkout@v6
@@ -156,7 +157,7 @@ jobs:
       - name: Download encrypted local authority
         run: |
           set -euo pipefail
-          mkdir -p apex-live/evidence apex-live/incoming apex-live/plans
+          mkdir -p apex-live/evidence apex-live/incoming apex-live/plans "$APEX_RUNTIME_ROOT"
           for object in state provider; do
             for attempt in 1 2 3 4 5; do
               if az storage blob download --auth-mode login --account-name "$APEX_BACKEND_STORAGE_ACCOUNT" --container-name handoff --name "incoming/${{ inputs.handoff_id }}/${object}.json" --file "apex-live/incoming/${object}.json" --overwrite true --only-show-errors --output none; then break; fi
@@ -173,17 +174,21 @@ jobs:
           TRACK: ${{ inputs.track }}
         run: |
           set -euo pipefail
-          node packages/cli/dist/cli.js state transfer-import --file apex-live/incoming/state.json --recipient "$APPLY_RECIPIENT" --yes --json > apex-live/evidence/state-import.json
-          claim_hash="$(jq -er '.result.claimHash' apex-live/evidence/state-import.json)"
-          node packages/cli/dist/cli.js provider transfer-import --file apex-live/incoming/provider.json --recipient "$APPLY_RECIPIENT" --yes --json > apex-live/evidence/provider-import.json
-          test "$(jq -er '.result.previewHash' apex-live/evidence/provider-import.json)" = "$PREVIEW_HASH"
-          test "$(jq -er '.result.provider' apex-live/evidence/provider-import.json)" = "$TRACK"
-          node packages/cli/dist/cli.js writer transfer-accept --claim "$claim_hash" --recipient "$APPLY_RECIPIENT" --head "$GITHUB_SHA" --json > apex-live/evidence/writer-accept.json
+          cli="$GITHUB_WORKSPACE/packages/cli/dist/cli.js"
+          evidence="$GITHUB_WORKSPACE/apex-live/evidence"
+          incoming="$GITHUB_WORKSPACE/apex-live/incoming"
+          cd "$APEX_RUNTIME_ROOT"
+          node "$cli" state transfer-import --file "$incoming/state.json" --recipient "$APPLY_RECIPIENT" --yes --json > "$evidence/state-import.json"
+          claim_hash="$(jq -er '.result.claimHash' "$evidence/state-import.json")"
+          node "$cli" provider transfer-import --file "$incoming/provider.json" --recipient "$APPLY_RECIPIENT" --yes --json > "$evidence/provider-import.json"
+          test "$(jq -er '.result.previewHash' "$evidence/provider-import.json")" = "$PREVIEW_HASH"
+          test "$(jq -er '.result.provider' "$evidence/provider-import.json")" = "$TRACK"
+          node "$cli" writer transfer-accept --claim "$claim_hash" --recipient "$APPLY_RECIPIENT" --head "$GITHUB_SHA" --json > "$evidence/writer-accept.json"
           printf 'accepted=true\n' >> "$GITHUB_OUTPUT"
-          node packages/cli/dist/cli.js approval show --json > apex-live/evidence/approval.json
-          node packages/cli/dist/cli.js status --json > apex-live/evidence/status.json
-          APPROVAL=apex-live/evidence/approval.json STATUS=apex-live/evidence/status.json node -e 'const fs=require("node:fs");const approval=JSON.parse(fs.readFileSync(process.env.APPROVAL)).result;const run=JSON.parse(fs.readFileSync(process.env.STATUS)).result.run;const expected={gate:4,decision:"approved",mechanism:"tty",previewHash:process.env.PREVIEW_HASH,recipientIdentity:process.env.APPLY_RECIPIENT};for(const [key,value] of Object.entries(expected))if(approval?.[key]!==value)process.exit(1);if(!Number.isInteger(approval?.writerEpoch)||run?.ownerEpoch!==approval.writerEpoch+1)process.exit(1)'
-          test "$(jq -er '.result.run.iacTool' apex-live/evidence/status.json)" = "$TRACK"
+          node "$cli" approval show --json > "$evidence/approval.json"
+          node "$cli" status --json > "$evidence/status.json"
+          APPROVAL="$evidence/approval.json" STATUS="$evidence/status.json" node -e 'const fs=require("node:fs");const approval=JSON.parse(fs.readFileSync(process.env.APPROVAL)).result;const run=JSON.parse(fs.readFileSync(process.env.STATUS)).result.run;const expected={gate:4,decision:"approved",mechanism:"tty",previewHash:process.env.PREVIEW_HASH,recipientIdentity:process.env.APPLY_RECIPIENT};for(const [key,value] of Object.entries(expected))if(approval?.[key]!==value)process.exit(1);if(!Number.isInteger(approval?.writerEpoch)||run?.ownerEpoch!==approval.writerEpoch+1)process.exit(1)'
+          test "$(jq -er '.result.run.iacTool' "$evidence/status.json")" = "$TRACK"
           test "$GITHUB_SHA" = "$(git rev-parse HEAD)"
           for object in state provider; do
             az storage blob delete --auth-mode login --account-name "$APEX_BACKEND_STORAGE_ACCOUNT" --container-name handoff --name "incoming/${{ inputs.handoff_id }}/${object}.json" --only-show-errors --output none
@@ -209,11 +214,11 @@ jobs:
             printf 'TF_VAR_project_name=%s\nTF_VAR_environment=qualification\nTF_VAR_location=%s\nTF_VAR_resource_group_name=%s\nTF_VAR_log_analytics_workspace_resource_id=%s\nTF_VAR_tags=%s\n' "$APEX_PROJECT_NAME" "$APEX_LOCATION" "$APEX_TERRAFORM_RESOURCE_GROUP" "$APEX_LOG_ANALYTICS_WORKSPACE_RESOURCE_ID" "$APEX_QUALIFICATION_TAGS_JSON" >> "$GITHUB_ENV"
             export TF_VAR_project_name="$APEX_PROJECT_NAME" TF_VAR_environment=qualification TF_VAR_location="$APEX_LOCATION" TF_VAR_resource_group_name="$APEX_TERRAFORM_RESOURCE_GROUP" TF_VAR_log_analytics_workspace_resource_id="$APEX_LOG_ANALYTICS_WORKSPACE_RESOURCE_ID" TF_VAR_tags="$APEX_QUALIFICATION_TAGS_JSON"
             lock_hash="$(sha256sum infra/terraform/vnext-qualification/.terraform.lock.hcl | cut -d ' ' -f 1)"
-            attested_lock_hash="$(jq -er '.attestation.lockfileHash' ".apex/local/provider-runtime/bindings/${PREVIEW_HASH}.json")"
+            attested_lock_hash="$(jq -er '.attestation.lockfileHash' "$APEX_RUNTIME_ROOT/.apex/local/provider-runtime/bindings/${PREVIEW_HASH}.json")"
             test "$lock_hash" = "$attested_lock_hash"
             terraform -chdir=infra/terraform/vnext-qualification init -input=false -backend-config="$GITHUB_WORKSPACE/apex-live/backend.hcl"
             test "$(sha256sum infra/terraform/vnext-qualification/.terraform.lock.hcl | cut -d ' ' -f 1)" = "$attested_lock_hash"
-            jq -n --arg cwd "infra/terraform/vnext-qualification" --arg target "$APEX_TERRAFORM_RESOURCE_GROUP" --arg plans "$GITHUB_WORKSPACE/apex-live/plans" --arg lock "$lock_hash" '{terraform:{cwd:$cwd,target:$target,planDirectory:$plans,lockfileHash:$lock}}' > apex-live/provider-config.json
+            jq -n --arg cwd "$GITHUB_WORKSPACE/infra/terraform/vnext-qualification" --arg target "$APEX_TERRAFORM_RESOURCE_GROUP" --arg plans "$GITHUB_WORKSPACE/apex-live/plans" --arg lock "$lock_hash" '{terraform:{cwd:$cwd,target:$target,planDirectory:$plans,lockfileHash:$lock}}' > apex-live/provider-config.json
           fi
       - name: Refresh ARM OIDC token for deploy
         id: deploy_oidc
@@ -235,10 +240,13 @@ jobs:
           ARM_USE_OIDC: "true"
         run: |
           set -euo pipefail
-          node packages/cli/dist/cli.js deploy --preview "${{ inputs.preview_hash }}" --provider-config apex-live/provider-config.json --json > apex-live/evidence/deploy.json
-          node packages/cli/dist/cli.js render --kind approval --json > apex-live/evidence/approval-render.json || true
-          node packages/cli/dist/cli.js inventory --json > apex-live/evidence/inventory.json || true
-          node packages/cli/dist/cli.js diagnose --json > apex-live/evidence/diagnose.json || true
+          cli="$GITHUB_WORKSPACE/packages/cli/dist/cli.js"
+          evidence="$GITHUB_WORKSPACE/apex-live/evidence"
+          cd "$APEX_RUNTIME_ROOT"
+          node "$cli" deploy --preview "${{ inputs.preview_hash }}" --provider-config "$GITHUB_WORKSPACE/apex-live/provider-config.json" --json > "$evidence/deploy.json"
+          node "$cli" render --kind approval --json > "$evidence/approval-render.json" || true
+          node "$cli" inventory --json > "$evidence/inventory.json" || true
+          node "$cli" diagnose --json > "$evidence/diagnose.json" || true
       - name: Return authority to local maintainer
         id: return
         if: always() && steps.accept.outputs.accepted == 'true'
@@ -248,9 +256,12 @@ jobs:
           LOCAL_RECIPIENT: local:${{ inputs.handoff_id }}
         run: |
           set -euo pipefail
-          node packages/cli/dist/cli.js writer transfer-create --repo "$GITHUB_REPOSITORY" --branch "$GITHUB_REF_NAME" --commit "$GITHUB_SHA" --workflow "$GITHUB_WORKFLOW_REF" --sender "$APPLY_RECIPIENT" --recipient "$LOCAL_RECIPIENT" --head "$GITHUB_SHA" --ttl 3600000 --json > apex-live/evidence/return-claim.json
-          claim_hash="$(jq -er '.result.hash' apex-live/evidence/return-claim.json)"
-          node packages/cli/dist/cli.js state transfer-export --claim "$claim_hash" --recipient "$LOCAL_RECIPIENT" --ttl-seconds 3000 --file apex-live/return-authority.json --yes --json > apex-live/evidence/return-export.json
+          cli="$GITHUB_WORKSPACE/packages/cli/dist/cli.js"
+          evidence="$GITHUB_WORKSPACE/apex-live/evidence"
+          cd "$APEX_RUNTIME_ROOT"
+          node "$cli" writer transfer-create --repo "$GITHUB_REPOSITORY" --branch "$GITHUB_REF_NAME" --commit "$GITHUB_SHA" --workflow "$GITHUB_WORKFLOW_REF" --sender "$APPLY_RECIPIENT" --recipient "$LOCAL_RECIPIENT" --head "$GITHUB_SHA" --ttl 3600000 --json > "$evidence/return-claim.json"
+          claim_hash="$(jq -er '.result.hash' "$evidence/return-claim.json")"
+          node "$cli" state transfer-export --claim "$claim_hash" --recipient "$LOCAL_RECIPIENT" --ttl-seconds 3000 --file "$GITHUB_WORKSPACE/apex-live/return-authority.json" --yes --json > "$evidence/return-export.json"
           blob="return/${{ inputs.handoff_id }}/${{ inputs.track }}-${{ inputs.operation }}.json"
           for attempt in 1 2 3 4 5; do
             if az storage blob upload --auth-mode login --account-name "$APEX_BACKEND_STORAGE_ACCOUNT" --container-name handoff --name "$blob" --file apex-live/return-authority.json --overwrite false --only-show-errors --output none; then break; fi
