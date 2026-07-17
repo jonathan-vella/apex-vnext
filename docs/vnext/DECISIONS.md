@@ -170,3 +170,24 @@ when a decision has lasting architectural consequences that need alternatives an
   isolated non-production qualification sandbox until live evidence is accepted.
 - **ADR:** [ADR-0002](../../agent-output/vnext-qualification/03-des-adr-0002-use-local-gate-4-before-ci-handoff.md).
 - **Issue/PR:** Destination issue `#9`.
+
+## DECISION-011: Use A Bounded Entra-Only Handoff Endpoint Session
+
+- **Date:** 2026-07-17
+- **Owner:** `@jonathan-vella`
+- **Context:** The qualification runner's general internet IP was `78.133.3.226`, but Azure Storage diagnostics recorded
+  OAuth Blob requests from non-deterministic Microsoft egress addresses `20.97.9.18` and `20.97.10.99`. A single-host
+  Storage firewall rule therefore could not authorize this execution environment.
+- **Options:** Broaden IP allowlisting to Microsoft egress ranges; move execution to a stable-egress runner; use a
+  temporary private GitHub release asset; use a bounded Entra-only public endpoint session.
+- **Choice:** Use a time-boxed public endpoint session for encrypted handoff envelopes. Validate the at-rest
+  `Disabled`/`Deny`/zero-IP-rule posture, retain Entra RBAC, shared-key disabled, anonymous Blob disabled, and
+  recipient-bound encryption, then temporarily set public access `Enabled` and firewall default `Allow`. Cleanup restores
+  `Deny`, then `Disabled`, removes the session-only policy tag, and verifies every final state.
+- **Rationale:** This authorizes identities rather than unstable network egress, preserves encryption and least-privilege
+  RBAC, and remains bounded and auditable without silently broadening to an unmaintainable IP range.
+- **Consequences:** During the short transaction, the endpoint is network-reachable from public networks but accepts only
+  authenticated, authorized Entra requests. Any cleanup failure is blocking. The exception expires after 24 hours and
+  requires fresh review before another session.
+- **ADR:** [ADR-0003](../../agent-output/vnext-qualification/03-des-adr-0003-use-bounded-entra-only-handoff-session.md).
+- **Issue/PR:** Destination issue `#9`.

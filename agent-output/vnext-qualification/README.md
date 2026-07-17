@@ -78,8 +78,9 @@ fallback only.
 | --- | --- | :---: | --- |
 | [03-des-adr-0001-use-split-encrypted-ci-transport.md](./03-des-adr-0001-use-split-encrypted-ci-transport.md) | Split encrypted transport decision | Superseded | 2026-07-15 |
 | [03-des-adr-0002-use-local-gate-4-before-ci-handoff.md](./03-des-adr-0002-use-local-gate-4-before-ci-handoff.md) | Local exact-preview approval before CI handoff | Accepted | 2026-07-16 |
-| [04-governance-constraints.json](./04-governance-constraints.json) | Live Azure Policy constraints | Complete | 2026-07-15 |
-| [04-governance-constraints.md](./04-governance-constraints.md) | Human-readable governance and exception record | Complete | 2026-07-15 |
+| [03-des-adr-0003-use-bounded-entra-only-handoff-session.md](./03-des-adr-0003-use-bounded-entra-only-handoff-session.md) | Bounded Entra-only handoff endpoint session | Accepted | 2026-07-17 |
+| [04-governance-constraints.json](./04-governance-constraints.json) | Live Azure Policy constraints | Complete | 2026-07-17 |
+| [04-governance-constraints.md](./04-governance-constraints.md) | Human-readable governance and exception record | Complete | 2026-07-17 |
 | [sku-manifest.json](./sku-manifest.json) | Canonical Standard LRS dual-track SKU decision | Locked | 2026-07-15 |
 | [sku-manifest.md](./sku-manifest.md) | Deterministic human-readable SKU rendering | Locked | 2026-07-15 |
 

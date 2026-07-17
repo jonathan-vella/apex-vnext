@@ -6,11 +6,11 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { securityExceptionIssues } from "./_lib/security-exceptions.mjs";
 
-export const FIREWALL_EXCEPTION_ID = "vnext-qualification-backend-runner-ip";
+export const FIREWALL_EXCEPTION_ID = "vnext-qualification-backend-entra-session";
 export const FIREWALL_SESSION_MINIMUM_REMAINING_MINUTES = 75;
-const FIREWALL_EXCEPTION_CONTROL = "public-network-access";
+const FIREWALL_EXCEPTION_CONTROL = "authenticated-public-network-session";
 const FIREWALL_EXCEPTION_ENVIRONMENT = "vnext-qualification";
-const FIREWALL_EXCEPTION_WORKLOAD = "terraform-backend";
+const FIREWALL_EXCEPTION_WORKLOAD = "encrypted-handoff-backend";
 const FIREWALL_EXCEPTION_MAXIMUM_HOURS = 24;
 
 export const EXPECTED_TAGS = Object.freeze({
@@ -62,18 +62,25 @@ export function qualificationSecurityExceptionIssues(
   const endpointLifecycle = exception.endpoint_lifecycle;
   const expectedOpenSequence = [
     "validate-exception",
+    "validate-at-rest-entra-only-posture",
     "add-transient-policy-exclusion",
     "enable-public-network-access",
-    "add-ephemeral-/32",
+    "set-firewall-default-allow",
   ];
   const expectedCleanupSequence = [
-    "remove-ephemeral-/32",
+    "set-firewall-default-deny",
     "disable-public-network-access",
     "remove-transient-policy-exclusion",
-    "verify-disabled-and-exclusion-absent",
+    "verify-deny-disabled-and-exclusion-absent",
   ];
   if (endpointLifecycle?.at_rest_public_network_access !== "Disabled") {
     issues.push("exception endpoint lifecycle must keep public network access Disabled at rest");
+  }
+  if (endpointLifecycle?.at_rest_default_action !== "Deny") {
+    issues.push("exception endpoint lifecycle must keep firewall default action Deny at rest");
+  }
+  if (endpointLifecycle?.session_authorization !== "entra-rbac-only") {
+    issues.push("exception endpoint lifecycle must require Entra RBAC only");
   }
   if (
     endpointLifecycle?.policy_exclusion?.tag_name !== "SecurityControl" ||
