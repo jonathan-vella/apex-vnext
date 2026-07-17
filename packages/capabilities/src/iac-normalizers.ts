@@ -195,7 +195,7 @@ export function selectAzureDeploymentStack(value: unknown, resourceGroup: string
   }
   if (selected === null) return null;
   const properties = object(selected.properties);
-  if (properties === undefined || !Array.isArray(properties.resources)) {
+  if (!Array.isArray(properties?.resources) && !Array.isArray(selected.resources)) {
     throw new IacOutputParseError("azure-stack", `Azure stack '${stackName}' has malformed managed resources`);
   }
   return selected;
