@@ -18,6 +18,15 @@ import { validateWorkflowText } from "../scripts/validate-vnext-live-workflow.mj
 
 const baseline = readFileSync(new URL("../../.github/workflows/vnext-live-qualification.yml", import.meta.url), "utf8");
 const launcher = readFileSync(new URL("../scripts/vnext-live-handoff.mjs", import.meta.url), "utf8");
+const closedBackendState = JSON.stringify({
+  publicNetworkAccess: "Disabled",
+  defaultAction: "Deny",
+  ipRules: [],
+  securityControl: null,
+  allowSharedKeyAccess: false,
+  allowBlobPublicAccess: false,
+  defaultToOAuthAuthentication: true,
+});
 
 function rejectsMutation(name, mutate, expected) {
   test(name, () => {
@@ -105,14 +114,14 @@ rejectsMutation(
   "exact qualification context",
 );
 rejectsMutation(
-  "qualification validation after firewall opening fails",
+  "qualification validation after endpoint opening fails",
   (text) => {
     const validation = "          node tools/scripts/validate-vnext-qualification-context.mjs\n";
     const firewall =
-      '          az storage account network-rule add --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --account-name "$APEX_BACKEND_STORAGE_ACCOUNT" --ip-address "${{ steps.ip.outputs.address }}/32" --only-show-errors --output none\n';
+      '          az storage account update --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --default-action Allow --only-show-errors --output none\n';
     return text.replace(validation, "").replace(firewall, `${firewall}${validation}`);
   },
-  "apply security exception validation must precede firewall add",
+  "apply security exception validation must precede endpoint opening",
 );
 rejectsMutation(
   "missing firewall boundary exception recheck fails",
@@ -122,6 +131,15 @@ rejectsMutation(
       "",
     ),
   "apply firewall boundary transaction",
+);
+rejectsMutation(
+  "storage IP rule fails",
+  (text) =>
+    text.replace(
+      "          for attempt in 1 2 3 4 5; do",
+      '          az storage account network-rule add --account-name "$APEX_BACKEND_STORAGE_ACCOUNT" --ip-address 203.0.113.10\n          for attempt in 1 2 3 4 5; do',
+    ),
+  "IP rules forbidden",
 );
 rejectsMutation(
   "missing transient policy exclusion fails",
@@ -154,15 +172,16 @@ rejectsMutation(
   "missing unconditional cleanup fails",
   (text) =>
     text.replace(
-      "      - name: Remove temporary firewall rule\n        if: always()",
-      "      - name: Remove temporary firewall rule",
+      "      - name: Close temporary Entra-only endpoint session\n        if: always()",
+      "      - name: Close temporary Entra-only endpoint session",
     ),
   "unconditional cleanup",
 );
 rejectsMutation(
-  "missing stale rule cleanup fails",
-  (text) => text.replace("      - name: Ensure no stale runner firewall rule", "      - name: Skip stale runner check"),
-  "clear a stale runner rule",
+  "missing at-rest endpoint validation fails",
+  (text) =>
+    text.replace("      - name: Validate at-rest endpoint boundary", "      - name: Skip at-rest endpoint check"),
+  "at-rest endpoint validation",
 );
 rejectsMutation(
   "deploy without exact preview fails",
@@ -384,21 +403,21 @@ test("dispatch permits only repository-backed APEX state drift", () => {
   assert.throws(() => validateGitStatus("R  .apex/old -> .apex/new\n", true), /permitted APEX state boundary/);
 });
 
-test("launcher validates the exception before opening its local firewall rule", () => {
+test("launcher validates the exception and at-rest posture before opening its endpoint session", () => {
   const helper = launcher.slice(
     launcher.indexOf("async function withFirewall"),
     launcher.indexOf("async function discoverRun"),
   );
-  assert.ok(helper.lastIndexOf("assertException()") < helper.indexOf('"network-rule", "add"'));
+  assert.ok(helper.lastIndexOf("assertException()") < helper.indexOf('"--default-action"'));
+  assert.ok(helper.indexOf("allowSharedKeyAccess") < helper.indexOf('"tags.SecurityControl=Ignore"'));
   assert.ok(helper.indexOf('"tags.SecurityControl=Ignore"') < helper.indexOf('"--public-network-access"'));
-  assert.ok(helper.indexOf('"public-network-access",\n    "Enabled"') < helper.indexOf('"network-rule", "add"'));
-  assert.ok(helper.lastIndexOf('"--public-network-access"') > helper.indexOf('"network-rule", "remove"'));
-  assert.ok(helper.lastIndexOf('"tags.SecurityControl"') > helper.indexOf('"network-rule", "remove"'));
-  assert.ok(helper.lastIndexOf('"Disabled"') > helper.indexOf('"network-rule", "remove"'));
+  assert.ok(helper.indexOf('"public-network-access",\n      "Enabled"') < helper.indexOf('"--default-action"'));
+  assert.ok(helper.lastIndexOf('"--default-action"') > helper.indexOf('"storage", "blob"'));
+  assert.ok(helper.lastIndexOf('"--public-network-access"') > helper.indexOf('"storage", "blob"'));
+  assert.doesNotMatch(helper, /network-rule/);
 });
 
-test("launcher rejects an exception that expires while resolving its public IP", async () => {
-  let validation = 0;
+test("launcher rejects an invalid exception before endpoint mutation", async () => {
   const commands = [];
   await assert.rejects(
     withFirewall(
@@ -409,8 +428,7 @@ test("launcher rejects an exception that expires while resolving its public IP",
       },
       async () => undefined,
       {
-        validateException: () => (++validation === 1 ? [] : ["exception is expired"]),
-        publicIpv4: async () => "203.0.113.10",
+        validateException: () => ["exception is expired"],
         run: async (file, args) => commands.push([file, ...args]),
       },
     ),
@@ -419,7 +437,7 @@ test("launcher rejects an exception that expires while resolving its public IP",
   assert.deepEqual(commands, []);
 });
 
-test("launcher restores and verifies Disabled after a local firewall session", async () => {
+test("launcher restores and verifies Deny and Disabled after a local endpoint session", async () => {
   const commands = [];
   const result = await withFirewall(
     {
@@ -430,10 +448,9 @@ test("launcher restores and verifies Disabled after a local firewall session", a
     async () => "complete",
     {
       validateException: () => [],
-      publicIpv4: async () => "203.0.113.10",
       run: async (file, args) => {
         commands.push([file, ...args]);
-        return args.includes("show") ? '{"publicNetworkAccess":"Disabled","securityControl":null}' : "";
+        return args.includes("show") ? closedBackendState : "";
       },
     },
   );
@@ -441,8 +458,9 @@ test("launcher restores and verifies Disabled after a local firewall session", a
   const rendered = commands.map((command) => command.join(" "));
   assert.ok(rendered.some((command) => command.includes("--set tags.SecurityControl=Ignore")));
   assert.ok(rendered.some((command) => command.includes("--public-network-access Enabled")));
-  assert.ok(rendered.some((command) => command.includes("network-rule add")));
-  assert.ok(rendered.some((command) => command.includes("network-rule remove")));
+  assert.ok(rendered.some((command) => command.includes("--default-action Allow")));
+  assert.ok(rendered.some((command) => command.includes("--default-action Deny")));
+  assert.ok(rendered.every((command) => !command.includes("network-rule")));
   assert.ok(rendered.some((command) => command.includes("--public-network-access Disabled")));
   assert.ok(rendered.some((command) => command.includes("--remove tags.SecurityControl")));
   assert.ok(rendered.some((command) => command.includes("account show") && command.includes("publicNetworkAccess")));
@@ -462,17 +480,16 @@ test("launcher cleans up before propagating a protected operation failure", asyn
       },
       {
         validateException: () => [],
-        publicIpv4: async () => "203.0.113.10",
         run: async (file, args) => {
           commands.push([file, ...args]);
-          return args.includes("show") ? '{"publicNetworkAccess":"Disabled","securityControl":null}' : "";
+          return args.includes("show") ? closedBackendState : "";
         },
       },
     ),
     /protected operation failed/,
   );
   const rendered = commands.map((command) => command.join(" "));
-  assert.ok(rendered.some((command) => command.includes("network-rule remove")));
+  assert.ok(rendered.some((command) => command.includes("--default-action Deny")));
   assert.ok(rendered.some((command) => command.includes("--public-network-access Disabled")));
   assert.ok(rendered.some((command) => command.includes("--remove tags.SecurityControl")));
   assert.ok(rendered.some((command) => command.includes("account show") && command.includes("publicNetworkAccess")));

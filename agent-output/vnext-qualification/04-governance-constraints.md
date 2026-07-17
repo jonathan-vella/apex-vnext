@@ -83,7 +83,7 @@ present, in scope, active, and no longer than 24 hours.
 
 | Original design | Policy evidence | Adaptation |
 | --- | --- | --- |
-| Default-deny backend with temporary runner `/32` | Storage public-network Modify policy | Apply `SecurityControl=Ignore` only for the bounded session. |
+| Default-deny backend with bounded Entra-only session | Storage public-network Modify policy | Apply `SecurityControl=Ignore` only for the bounded session. |
 | Base tags on every resource | Resource-group Deny and inheritance Modify policies | Keep the exact ten base tags on resource groups and resources. |
 | `swedencentral` qualification | Allowed-locations Audit assignment | Retain region because it is explicitly allowed. |
 | Shared Log Analytics | Sentinel capacity Deny | Use `PerGB2018` without capacity reservation. |
@@ -151,7 +151,7 @@ permitted only during an approved backend session and must be absent at rest and
 flowchart LR
     RG["Resource group: exact ten tags"] -->|Modify inheritance| RES["Normal resources"]
     RG --> IDLE["Backend: public access Disabled"]
-    EX["Validated exception with 75-minute margin"] --> SESSION["Transient exclusion + Enabled + one /32"]
+    EX["Validated exception with 75-minute margin"] --> SESSION["Transient exclusion + Enabled + Allow"]
     IDLE --> SESSION
     SESSION -->|unconditional cleanup| IDLE
 ```
@@ -165,7 +165,7 @@ flowchart LR
 | Shared-key storage auth | Disabled | Source plus live Modify policy |
 | Anonymous blob access | Disabled | Source plus live Modify policy |
 | Workload public network | Disabled | Source plus live Modify policy |
-| Backend public endpoint | Disabled at rest; Default Deny plus one ephemeral `/32` in-session | Runtime transaction |
+| Backend public endpoint | Disabled and Default Deny at rest; Entra-only public session in-transaction | Runtime transaction |
 | Azure authentication | Entra OIDC and data-plane RBAC | Workflow and backend configuration |
 | User write authentication | MFA | Tenant Deny policy |
 
@@ -194,7 +194,7 @@ captured from live deployment evidence before cost is treated as measured.
 | Cross-subscription vNet peering | Deny | No virtual network peering is planned. |
 
 The backend firewall defaults to Deny and carries no persistent IP rule. Preview and apply must each validate the
-exception before adding one runner `/32`; cleanup is unconditional and does not depend on exception validity.
+exception before enabling the Entra-only session; cleanup is unconditional and does not depend on exception validity.
 
 ## 📜 Compliance Frameworks
 
@@ -215,25 +215,33 @@ diagnostic review.
 
 | Field | Approved value |
 | --- | --- |
-| ID | `vnext-qualification-backend-runner-ip` |
-| Control | `public-network-access` |
+| ID | `vnext-qualification-backend-entra-session` |
+| Control | `authenticated-public-network-session` |
+| Requested by | `jonathan-vella` |
 | Environment | `vnext-qualification` |
-| Workload | `terraform-backend` |
-| Requested | `2026-07-16T17:02:23Z` |
-| Expires | `2026-07-17T17:02:23Z` |
+| Workload | `encrypted-handoff-backend` |
+| Requested | `2026-07-17T07:04:48Z` |
+| Expires | `2026-07-18T07:04:48Z` |
 | Maximum lifetime | 24 hours |
+| Minimum remaining time | 75 minutes |
+| Reason | Permit a bounded Entra-authenticated public endpoint session for encrypted qualification handoff envelopes when the execution environment uses non-deterministic Microsoft egress. |
 | Tracking issue | [#9](https://github.com/jonathan-vella/apex-vnext/issues/9) |
+| At-rest posture | `publicNetworkAccess: Disabled`, `defaultAction: Deny`, zero IP rules |
+| Session authorization | `entra-rbac-only` |
+| Policy exclusion | `SecurityControl=Ignore` with `session-only` persistence |
+| Open sequence | `validate-exception` → `validate-at-rest-entra-only-posture` → `add-transient-policy-exclusion` → `enable-public-network-access` → `set-firewall-default-allow` |
+| Cleanup sequence | `set-firewall-default-deny` → `disable-public-network-access` → `remove-transient-policy-exclusion` → `verify-deny-disabled-and-exclusion-absent` |
 
 Compensating controls:
 
-- Storage public network access is Disabled at rest; firewall default action is Deny.
-- The live policy's documented `SecurityControl=Ignore` exclusion exists only during the approved session.
-- Shared-key authorization and anonymous blob access remain disabled.
-- Each boundary validates identity, control, scope, activation, expiry, duration, and at least 75 minutes remaining.
-- Each caller removes its `/32`, restores Disabled, removes the exclusion, and verifies both final states.
-- Backend management and blob data permissions remain narrowly scoped.
+- At rest, storage public network access remains Disabled, firewall default action remains Deny, and IP rules remain empty.
+- The session remains Entra RBAC only, with shared key access disabled and anonymous blob access disabled.
+- Only encrypted recipient-bound envelopes are transferred during the approved session.
+- The `SecurityControl=Ignore` session tag exists only during the transaction.
+- Cleanup restores Deny then Disabled, removes the transient policy-exclusion tag, and verifies Deny/Disabled with exclusion absence.
+- Permissions remain narrowly scoped to the minimum backend management and blob data operations required for qualification.
 
-If the exception expires before live qualification, no firewall rule may be opened. Renewal requires an updated
+If the exception expires before live qualification, no endpoint session may be opened. Renewal requires an updated
 governance record and a fresh review before deployment.
 
 ---

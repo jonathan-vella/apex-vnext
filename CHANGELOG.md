@@ -89,6 +89,8 @@ the original APEX repository. See [docs/MIGRATION.md](docs/MIGRATION.md) for pro
 
 ### Fixed (APEX vNext security)
 
+- fix(vnext): replace the unenforceable single-runner IP handoff exception with a reviewed, time-boxed Entra-only public
+  endpoint session that retains RBAC and encryption and verifies restoration to firewall `Deny` plus network `Disabled`.
 - fix(vnext): parse both canonical two-column Git porcelain and the command wrapper's first-line trimmed form when
   enforcing dispatch-only `.apex/**` drift, without permitting source changes or renames.
 - fix(vnext): request Azure what-if with `--no-pretty-print` so the native Bicep provider receives strict JSON instead

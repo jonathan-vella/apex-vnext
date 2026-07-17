@@ -293,7 +293,7 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
     assumptions: ["One unit is retained only to bind a current public price; live cost is measured from evidence"],
   };
   const exceptionExpiry = governance.security_exceptions?.find(
-    ({ id }) => id === "vnext-qualification-backend-runner-ip",
+    ({ id }) => id === "vnext-qualification-backend-entra-session",
   )?.expires_at;
   const discoveredAt = new Date(governance.discovered_at).toISOString();
   const expiresAt = new Date(
