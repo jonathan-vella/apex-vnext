@@ -156,8 +156,9 @@ superseded preview, expired lease, or changed dependency revision fails before p
 Dispatch permits only the `.apex/**` state changes produced by preview and local approval. It still requires the exact
 `main` commit and rejects changes to source, workflows, configuration, or any other workspace path.
 
-The GitHub Environment scopes OIDC, variables, and secrets only. It is not approval evidence. Production CI remains
-blocked until the complete local-approval and CI-apply transfer path has live proof on the exact release candidate.
+The GitHub Environment scopes OIDC, variables, and secrets only. It is not approval evidence. The complete local
+approval and CI apply transfer path has live Bicep and Terraform proof. Production workflow enablement remains a
+separate release and cutover decision.
 
 Bicep defaults to `detachAll`. Set `ownershipAuthorizesDeleteResources: true` only when the stack exclusively owns every
 resource it may delete. `deleteAll` additionally requires an explicitly dedicated sandbox resource group and separate
@@ -192,8 +193,8 @@ apex deploy --preview "$PREVIEW_HASH" --json
 
 For Terraform, use `--provider terraform` and the Terraform provider config. The preview saves the plan under the local
 plan directory, immediately encrypts it into the local provider runtime, removes the plaintext plan, and deploy applies
-the approved exact plan. Provider transfer is implemented, but production CI encrypted plan transport remains blocked
-pending live proof across separate preview and apply jobs.
+the approved exact plan. Separate-job provider transfer passed live apply and destroy qualification with recipient,
+digest, lineage, serial, owner epoch, and expiry bindings.
 
 The semantic dependency revision covers project/run identity, target, IaC track, runtime lock, and accepted artifact
 hashes. Writer ownership epoch is separate authority: an ownership-only transfer preserves the revision while approval
