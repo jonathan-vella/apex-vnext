@@ -17,6 +17,8 @@ the original APEX repository. See [docs/MIGRATION.md](docs/MIGRATION.md) for pro
 
 ### Added (APEX vNext Phase 0A baseline)
 
+- feat(vnext): add guarded `--replace-existing` live qualification preparation that requires Gate 4 closed and no active
+  writer ownership, backs up the prior `.apex` tree, and restores it after any failed task or validator.
 - feat(vnext): added durable project controls, structured work-item and regression intake, and an offline validator for
   requirement references, local links, issue-form fields, and frozen Phase 0A evidence.
 - docs(vnext): added approved v1 baseline decisions, candidate transcripts and manifest, the
