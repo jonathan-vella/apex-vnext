@@ -9,7 +9,6 @@ import {
   parseArgs,
   validateDispatchRunState,
   validateGitStatus,
-  validateTransportKey,
   validateWorkflowBootstrap,
   withFirewall,
   workflowRef,
@@ -85,13 +84,13 @@ rejectsMutation(
   "apply must need validate_dispatch",
 );
 rejectsMutation(
-  "job-wide transport key fails",
+  "manual transport key fails",
   (text) =>
     text.replace(
-      "      APEX_CONTROL_RESOURCE_GROUP: ${{ vars.APEX_CONTROL_RESOURCE_GROUP }}",
-      "      APEX_PLAN_TRANSPORT_KEY: ${{ secrets.APEX_PLAN_TRANSPORT_KEY }}\n      APEX_CONTROL_RESOURCE_GROUP: ${{ vars.APEX_CONTROL_RESOURCE_GROUP }}",
+      "      APEX_CONTROL_RESOURCE_GROUP:",
+      "      APEX_PLAN_TRANSPORT_KEY: forbidden\n      APEX_CONTROL_RESOURCE_GROUP:",
     ),
-  "transport key must not be job-wide",
+  "manual transport key is forbidden",
 );
 rejectsMutation(
   "exported ARM token fails",
@@ -507,11 +506,6 @@ test("launcher cleans up before propagating a protected operation failure", asyn
   assert.ok(rendered.some((command) => command.includes("--public-network-access Disabled")));
   assert.ok(rendered.some((command) => command.includes("--remove tags.SecurityControl")));
   assert.ok(rendered.some((command) => command.includes("account show") && command.includes("publicNetworkAccess")));
-});
-
-test("launcher validates transport keys without exposing values", () => {
-  assert.equal(validateTransportKey(Buffer.alloc(32, 7).toString("base64")), true);
-  assert.throws(() => validateTransportKey(Buffer.alloc(31).toString("base64")), /exactly 32 bytes/);
 });
 
 test("launcher preflights selected track and gate state before dispatch", () => {

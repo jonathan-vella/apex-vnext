@@ -27,20 +27,22 @@
 The qualification handoff backend is `Disabled` with firewall default `Deny` at rest. The original exception allowed one
 observed runner IPv4. The dev container reported `78.133.3.226`, but Storage diagnostics recorded OAuth Blob requests
 from rotating Microsoft egress addresses `20.97.9.18` and `20.97.10.99`. The installed single-host rule could not match
-the request source, so encrypted state/provider envelopes could not reach the `handoff` container.
+the request source, so state/provider handoff bundles could not reach the `handoff` container.
 
-The handoff still needs a bounded path between local exact-preview approval and GitHub OIDC apply. Shared keys, anonymous
-Blob access, plaintext state, plaintext plans, and unbounded public access remain prohibited.
+The handoff still needs a bounded path between local exact-preview approval and GitHub OIDC apply. Shared Storage keys,
+anonymous Blob access, plaintext Terraform plans, and unbounded public access remain prohibited.
 
 ## ✅ Decision
 
-Use a bounded Entra-only public endpoint session for encrypted qualification handoffs:
+Use a bounded Entra-only public endpoint session for qualification handoffs:
 
 1. Require a current 24-hour governance exception with at least 75 minutes remaining.
 2. Verify public network access is `Disabled`, firewall default is `Deny`, no IP rules exist, the policy tag is absent,
    shared keys and anonymous Blob are disabled, and OAuth is the default authentication mode.
 3. Apply `SecurityControl=Ignore` only for the transaction, enable the endpoint, and set firewall default to `Allow`.
-4. Transfer only recipient-bound AES-256-GCM state/provider envelopes using Entra RBAC.
+4. Transfer only short-lived, recipient-bound, digest-checked state/provider bundles using Entra RBAC. Do not require an
+   operator-managed transport secret; TLS, Azure encryption at rest, and Entra data-plane authorization protect the
+   transport.
 5. In unconditional cleanup, restore firewall default `Deny`, disable public network access, remove the policy tag, and
    verify all final states.
 
@@ -58,7 +60,7 @@ Use a bounded Entra-only public endpoint session for encrypted qualification han
 ### Positive
 
 - Works with non-deterministic Microsoft egress without broad IP-range maintenance.
-- Preserves Entra RBAC, recipient-bound encryption, shared-key denial, and anonymous Blob denial.
+- Preserves Entra RBAC, recipient and candidate binding, shared-key denial, and anonymous Blob denial.
 - Fails closed on stale exceptions, unexpected at-rest posture, or incomplete cleanup.
 
 ### Negative
@@ -75,7 +77,7 @@ Use a bounded Entra-only public endpoint session for encrypted qualification han
 
 | Pillar | Impact | Notes |
 | --- | --- | --- |
-| Security | → | Network restriction is relaxed briefly; strong identity, encryption, and fail-closed cleanup remain |
+| Security | → | Network restriction is relaxed briefly; strong identity, platform encryption, and cleanup remain |
 | Reliability | ↑ | Removes dependence on unstable egress addresses |
 | Performance | ↑ | Avoids repeated firewall mismatch and propagation retries |
 | Cost | ↑ | No dedicated runner or private networking service is added |

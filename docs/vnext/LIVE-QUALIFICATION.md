@@ -1,7 +1,7 @@
 # vNext Live Qualification
 
-This procedure prepares the local APEX Gate 4 and GitHub OIDC ceremony for the live qualification and encrypted
-Terraform plan transport issues in this repository. It does not record live deployment proof. A run is evidence only
+This procedure prepares the local APEX Gate 4 and GitHub OIDC ceremony for live qualification. It does not record live
+deployment proof. A run is evidence only
 after the candidate-bound apply and destroy ceremonies complete and their outputs are accepted into the release evidence
 index.
 
@@ -10,10 +10,9 @@ index.
 Bootstrap the committed control plane from `infra/bicep/vnext-qualification/bootstrap.bicep`. Supply the dedicated
 GitHub deployment principal and the local handoff uploader principal at deployment time. Do not commit a parameter file.
 
-Configure the unprotected `vnext-qualification` GitHub Environment with these secrets:
+Configure the unprotected `vnext-qualification` GitHub Environment with these OIDC settings:
 
-- `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` for OIDC.
-- `APEX_PLAN_TRANSPORT_KEY`, canonical base64 encoding of exactly 32 random bytes.
+- `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID`.
 
 Configure these Environment variables from the bootstrap outputs and canonical governance contract:
 
@@ -54,8 +53,8 @@ active writer ownership, keeps the prior `.apex` tree in a private backup, and r
 fails.
 
 Review and merge the resulting repository-backed `.apex` state. Use a fresh exact `main` checkout for preview so the
-candidate commit includes the journaled artifacts, validation evidence, and Gate 1–3 decisions. Set
-`APEX_PLAN_TRANSPORT_KEY` in the current process, then create the native preview locally. Terraform preview opens a
+candidate commit includes the journaled artifacts, validation evidence, and Gate 1–3 decisions. Create the native
+preview locally. Terraform preview opens a
 bounded backend network session; Bicep preview remains management-plane only. The launcher returns the handoff ID, stable
 CI recipient, preview hash, rendered preview, and exact approval command.
 
@@ -74,7 +73,7 @@ apex gate decide --gate 4 --decision approved \
 ```
 
 Dispatch with the same handoff ID. Dispatch verifies the current local TTY approval, creates one writer-transfer claim,
-encrypts the already-approved run state and exact provider authority, uploads both envelopes, and starts the apply job.
+packages the already-approved run state and exact provider authority, uploads both bundles, and starts the apply job.
 The checkout must remain at exact `main`; only repository-backed `.apex/**` changes created by preview and approval are
 permitted. Any source, workflow, or other workspace drift blocks dispatch.
 
@@ -87,7 +86,7 @@ node tools/scripts/vnext-live-handoff.mjs dispatch --yes \
 Repeat for each track and operation. After retrieving apply authority, create and approve a new destroy preview from the
 same selected run. The new preview supersedes the prior Gate 4 decision; CI cannot create or refresh approval.
 
-Each dispatch is valid only for run attempt one. A retry requires a new dispatch and a new encrypted handoff.
+Each dispatch is valid only for run attempt one. A retry requires a new dispatch and a new handoff.
 
 ## Retrieve
 
@@ -112,9 +111,9 @@ fallback artifact name; it does not download arbitrary workflow artifacts.
   `SecurityControl=Ignore` tag, enables the endpoint, and temporarily sets firewall default action to `Allow`. Data-plane
   access remains Entra RBAC only; shared keys and anonymous Blob stay disabled. Cleanup restores `Deny`, then `Disabled`,
   removes the tag, and verifies all final states. The tag is never persistent.
-- Azure access uses Entra authentication and GitHub OIDC. Shared keys, client secrets, plaintext plans, plaintext state,
-  and the transport key are never artifacts.
-- Local preview and CI apply have distinct writer epochs. Apply imports the already-approved encrypted state and exact
+- Azure access uses Entra authentication and GitHub OIDC. Shared keys, client secrets, and plaintext Terraform plans are
+  never artifacts. APEX requires no operator-managed handoff secret.
+- Local preview and CI apply have distinct writer epochs. Apply imports the already-approved state and exact
   provider authority, accepts the one-hop writer claim, validates the local TTY approval, and deploys only the imported
   preview hash.
 - CI cannot run `apex preview` or `apex gate decide`. Evidence artifacts are nonsecret.
@@ -124,7 +123,7 @@ fallback artifact name; it does not download arbitrary workflow artifacts.
 
 The structural validator parses YAML and checks trigger, permission, OIDC/configuration Environment, imported local
 approval, recipient, transfer, cleanup, exact-preview, encrypted-artifact, return-path, and forbidden-command invariants.
-Its mutation suite also tests the launcher's pure argument, recipient, workflow-reference, and transport-key helpers
+Its mutation suite also tests the launcher's pure argument, recipient, and workflow-reference helpers
 without subprocess or network use.
 
 ```bash

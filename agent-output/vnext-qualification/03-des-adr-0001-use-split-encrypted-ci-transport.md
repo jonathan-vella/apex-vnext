@@ -21,9 +21,9 @@
 > Date: 2026-07-15
 > Deciders: jonathan-vella
 >
-> [ADR-0002](03-des-adr-0002-use-local-gate-4-before-ci-handoff.md) supersedes the approval boundary and incoming
-> transport route below. Its separate encrypted envelopes, exact-plan, network, cleanup, and production constraints
-> remain accepted.
+> [ADR-0002](03-des-adr-0002-use-local-gate-4-before-ci-handoff.md) supersedes the approval boundary.
+> [ADR-0003](03-des-adr-0003-use-bounded-entra-only-handoff-session.md) supersedes the incoming transport and key
+> boundary. Exact-plan, cleanup, and production constraints remain accepted.
 
 ## 🔍 Context
 

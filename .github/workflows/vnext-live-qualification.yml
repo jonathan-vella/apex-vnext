@@ -1,5 +1,5 @@
 # Manual live qualification apply for an exact locally previewed vNext candidate.
-# Local APEX creates Gate 4 approval and encrypted authority before dispatch.
+# Local APEX creates Gate 4 approval and bound authority bundles before dispatch.
 name: vNext Live Qualification
 run-name: vnext-live-${{ inputs.track }}-${{ inputs.operation }}-${{ inputs.handoff_id }}
 
@@ -119,14 +119,12 @@ jobs:
             return token;
       - name: Validate protected inputs
         env:
-          APEX_PLAN_TRANSPORT_KEY: ${{ secrets.APEX_PLAN_TRANSPORT_KEY }}
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
           set -euo pipefail
           for name in APEX_CONTROL_RESOURCE_GROUP APEX_BACKEND_STORAGE_ACCOUNT APEX_BICEP_RESOURCE_GROUP APEX_TERRAFORM_RESOURCE_GROUP APEX_LOG_ANALYTICS_WORKSPACE_RESOURCE_ID APEX_LOCATION APEX_PROJECT_NAME APEX_QUALIFICATION_TAGS_JSON; do test -n "${!name:-}"; done
           node tools/scripts/validate-vnext-qualification-context.mjs
           test "$(az account show --query id --output tsv)" = "$AZURE_SUBSCRIPTION_ID"
-          node -e 'const value=process.env.APEX_PLAN_TRANSPORT_KEY??"";const bytes=Buffer.from(value,"base64");if(bytes.length!==32||bytes.toString("base64")!==value)process.exit(1)'
           test "$GITHUB_SHA" = "$(git rev-parse HEAD)"
       - name: Define stable authority recipient
         id: names
@@ -154,7 +152,7 @@ jobs:
             node -e 'setTimeout(()=>{},Number(process.argv[1]))' "$((attempt * 5000))"
           done
           exit 1
-      - name: Download encrypted local authority
+      - name: Download bound local authority
         run: |
           set -euo pipefail
           mkdir -p apex-live/evidence apex-live/incoming apex-live/plans "$APEX_RUNTIME_ROOT"
@@ -168,7 +166,6 @@ jobs:
       - name: Import authority and validate local approval
         id: accept
         env:
-          APEX_PLAN_TRANSPORT_KEY: ${{ secrets.APEX_PLAN_TRANSPORT_KEY }}
           APPLY_RECIPIENT: ${{ steps.names.outputs.apply_recipient }}
           PREVIEW_HASH: ${{ inputs.preview_hash }}
           TRACK: ${{ inputs.track }}
@@ -231,7 +228,6 @@ jobs:
             return token;
       - name: Deploy exact preview
         env:
-          APEX_PLAN_TRANSPORT_KEY: ${{ secrets.APEX_PLAN_TRANSPORT_KEY }}
           ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           ARM_OIDC_TOKEN: ${{ steps.deploy_oidc.outputs.result }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -251,7 +247,6 @@ jobs:
         id: return
         if: always() && steps.accept.outputs.accepted == 'true'
         env:
-          APEX_PLAN_TRANSPORT_KEY: ${{ secrets.APEX_PLAN_TRANSPORT_KEY }}
           APPLY_RECIPIENT: ${{ steps.names.outputs.apply_recipient }}
           LOCAL_RECIPIENT: local:${{ inputs.handoff_id }}
         run: |
@@ -269,7 +264,7 @@ jobs:
             node -e 'setTimeout(()=>{},Number(process.argv[1]))' "$((attempt * 5000))"
           done
           printf 'claim_hash=%s\nblob=%s\n' "$claim_hash" "$blob" >> "$GITHUB_OUTPUT"
-      - name: Upload encrypted return fallback
+      - name: Upload bound return fallback
         if: always() && steps.accept.outputs.accepted == 'true'
         uses: actions/upload-artifact@v4
         with:

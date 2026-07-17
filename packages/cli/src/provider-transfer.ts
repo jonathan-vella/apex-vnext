@@ -1,6 +1,6 @@
 import { chmod, lstat, mkdir, readFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
-import { EncryptedEnvelopeTransport, type EncryptedEnvelope, type EnvelopeBindings } from "@apex/capabilities";
+import { BoundEnvelopeTransport, type BoundEnvelope, type EnvelopeBindings } from "@apex/capabilities";
 import { atomicWriteBytes, canonicalJsonBytes, sha256Bytes, sha256Json, type JsonValue } from "@apex/kernel";
 
 export const PROVIDER_TRANSFER_KIND = "apex-provider-authority";
@@ -11,6 +11,7 @@ const HASH_PATTERN = /^[0-9a-f]{64}$/;
 const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 const BINDING_PATH_PATTERN = /^bindings\/[0-9a-f]{64}\.json$/;
 const ARTIFACT_PATH_PATTERN = /^artifacts\/[0-9a-f]{64}\.json$/;
+const PLAN_KEY_PATH = "plan-transport.key";
 
 export type ProviderTransferProvider = "bicep" | "terraform";
 export type ProviderTransferOperation = "apply" | "destroy";
@@ -368,6 +369,10 @@ export async function createProviderTransferBundle(
       authorityExpiresAt: earliestExpiry(bindings.authorityExpiresAt, artifact.expiresAt),
     };
     selected.push({ path: artifactPath, bytes: artifactBytes });
+    selected.push({
+      path: PLAN_KEY_PATH,
+      bytes: await readRegular(join(runtimeRoot, PLAN_KEY_PATH), "Terraform plan key"),
+    });
   }
   if (Date.parse(bindings.authorityExpiresAt) <= now.getTime()) {
     throw new Error("Provider transfer authority has expired");
@@ -393,16 +398,17 @@ export async function exportProviderTransfer(
   root: string,
   outputPath: string,
   options: ProviderTransferExportOptions,
-  dependencies: { readonly key: Uint8Array; readonly now?: () => Date; readonly nonce?: () => Uint8Array },
+  dependencies: { readonly now?: () => Date } = {},
 ): Promise<{ path: string; sha256: string; files: number; expiresAt: string }> {
   if (!Number.isFinite(options.ttlMs) || options.ttlMs <= 0) throw new Error("Provider transfer TTL must be positive");
   const now = dependencies.now?.() ?? new Date();
   const bundle = await createProviderTransferBundle(root, options, now);
-  const envelope = new EncryptedEnvelopeTransport(() => now, dependencies.nonce).encrypt(
-    canonicalJsonBytes(bundle),
-    dependencies.key,
-    { kind: PROVIDER_TRANSFER_KIND, recipient: options.recipient, ttlMs: options.ttlMs, bindings: bundle.bindings },
-  );
+  const envelope = new BoundEnvelopeTransport(() => now).create(canonicalJsonBytes(bundle), {
+    kind: PROVIDER_TRANSFER_KIND,
+    recipient: options.recipient,
+    ttlMs: options.ttlMs,
+    bindings: bundle.bindings,
+  });
   const bytes = canonicalJsonBytes(envelope);
   await atomicWriteBytes(resolve(outputPath), bytes);
   return {
@@ -454,7 +460,7 @@ function decodeFile(entry: unknown): { path: string; bytes: Buffer } {
   );
   if (
     typeof file.path !== "string" ||
-    (!BINDING_PATH_PATTERN.test(file.path) && !ARTIFACT_PATH_PATTERN.test(file.path))
+    (!BINDING_PATH_PATTERN.test(file.path) && !ARTIFACT_PATH_PATTERN.test(file.path) && file.path !== PLAN_KEY_PATH)
   ) {
     throw new Error("Provider transfer file path is invalid");
   }
@@ -510,9 +516,12 @@ function validateBundle(
   if (bindings.provider === "terraform") {
     const artifactPath = `artifacts/${sha256Bytes(Buffer.from(bindings.artifactRef!, "utf8"))}.json`;
     expected.push(artifactPath);
+    expected.push(PLAN_KEY_PATH);
     const artifactBytes = entries.find(({ path }) => path === artifactPath)?.bytes;
     if (artifactBytes === undefined) throw new Error("Provider transfer exact Terraform artifact is missing");
     const artifact = parseStoredArtifact(parseJson(artifactBytes, "Terraform artifact"), authority);
+    const planKey = entries.find(({ path }) => path === PLAN_KEY_PATH)?.bytes;
+    if (planKey?.byteLength !== 32) throw new Error("Provider transfer Terraform plan key is invalid");
     actualBindings = {
       ...actualBindings,
       authorityExpiresAt: earliestExpiry(actualBindings.authorityExpiresAt, artifact.expiresAt),
@@ -560,7 +569,6 @@ export async function importProviderTransfer(
   root: string,
   envelopeValue: unknown,
   recipient: string,
-  key: Uint8Array,
   now: () => Date = () => new Date(),
 ): Promise<{
   provider: ProviderTransferProvider;
@@ -570,18 +578,18 @@ export async function importProviderTransfer(
 }> {
   requireNonempty(recipient, "Provider transfer recipient");
   const envelopeRecord = requireRecord(envelopeValue, "Provider transfer envelope");
-  exactKeys(envelopeRecord, ["authTag", "ciphertext", "iv", "metadata"], "Provider transfer envelope");
-  const envelope = envelopeValue as EncryptedEnvelope;
+  exactKeys(envelopeRecord, ["metadata", "payload"], "Provider transfer envelope");
+  const envelope = envelopeValue as BoundEnvelope;
   const metadata = requireRecord(envelope.metadata, "Provider transfer envelope metadata");
   if (metadata.kind !== PROVIDER_TRANSFER_KIND) throw new Error("Provider transfer envelope kind is invalid");
   const maxEncodedBytes = Math.ceil(PROVIDER_TRANSFER_MAX_BUNDLE_BYTES / 3) * 4;
-  if (typeof envelope.ciphertext !== "string" || envelope.ciphertext.length > maxEncodedBytes) {
-    throw new Error("Provider transfer encrypted payload exceeds the 8 MiB limit");
+  if (typeof envelope.payload !== "string" || envelope.payload.length > maxEncodedBytes) {
+    throw new Error("Provider transfer payload exceeds the 8 MiB limit");
   }
   const bindings = requireBindings(metadata.bindings);
   if (bindings.recipient !== recipient || metadata.recipient !== recipient)
     throw new Error("Provider transfer recipient mismatch");
-  const plaintext = new EncryptedEnvelopeTransport(now).decrypt(envelope, key, recipient);
+  const plaintext = new BoundEnvelopeTransport(now).open(envelope, recipient);
   if (plaintext.byteLength > PROVIDER_TRANSFER_MAX_BUNDLE_BYTES)
     throw new Error("Provider transfer plaintext exceeds 8 MiB");
   const { bundle, entries } = validateBundle(parseJson(plaintext, "Provider transfer bundle"), bindings);
@@ -598,8 +606,6 @@ export async function importProviderTransfer(
     if (!destination.startsWith(`${runtimeRoot}${sep}`) || relative(runtimeRoot, destination).startsWith("..")) {
       throw new Error("Provider transfer path escapes provider runtime");
     }
-    if (destination.endsWith(`${sep}plan-transport.key`))
-      throw new Error("Provider transfer cannot write the transport key");
     try {
       const info = await lstat(destination);
       if (info.isSymbolicLink() || !info.isFile())

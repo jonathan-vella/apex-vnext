@@ -48,7 +48,7 @@ Transfer authorization tests also cover stable semantic dependency revisions, se
 claims or events, authenticated ownership lineage, transfer-after-preview ordering, exact one-hop success, wrong or
 missing claim hashes, nonconsecutive and second-hop epochs, tampered lineage, post-preview dependency drift, and
 superseded previews. Native Terraform tests preview as one writer, encrypt for the planned recipient, and apply as that
-recipient only after the exact approved transfer. Encrypted state tests approve locally, resume in a fresh workspace,
+recipient only after the exact approved transfer. State-bundle tests approve locally, resume in a fresh workspace,
 accept the post-approval claim, and deploy the imported exact preview. Lease tests cover same-epoch retry after a
 failed mutation, pending-transfer rejection, expiry, and journal compare-and-swap.
 
