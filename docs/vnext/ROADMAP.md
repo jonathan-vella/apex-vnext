@@ -97,15 +97,15 @@ or live and has a prepared procedure.
 - Terraform backend, protected exact plan, approval, apply, inventory, diagnosis, destroy, and recovery.
 - Promotion to a linked environment with Gate 4 refresh.
 
-The manual workflow, encrypted local handoff launcher, bootstrap resources, and structural mutation tests are prepared.
-See [LIVE-QUALIFICATION.md](LIVE-QUALIFICATION.md). Live proof remains outstanding. The GitHub Environment scopes OIDC
-and configuration but is not an approval authority; the exact preview must be approved locally through APEX Gate 4
-before CI handoff.
+The manual workflow, bound local handoff launcher, bootstrap resources, and structural mutation tests are implemented.
+Live Bicep and recipient-bound encrypted Terraform apply/destroy proof is recorded in destination issues `#9` and `#10`.
+The GitHub Environment scopes OIDC and configuration but is not an approval authority; the exact preview is approved
+locally through APEX Gate 4 before CI handoff.
 The dispatch-only workflow is part of this repository's default branch. Each ceremony still binds checkout, workflow,
 packages, state, preview, and evidence to one exact `main` commit.
 
-**Exit gate:** Evidence is bound to the candidate head and dependency hashes. Production Terraform CI apply remains
-blocked if encrypted recipient-bound transport is not proven.
+**Exit gate:** Satisfied for the live Bicep and Terraform ceremonies. Final exact-head release qualification remains in
+Milestone H because later modernization changes intentionally create a new candidate.
 
 **Historical traceability:** Build plan platform spikes, dual-track proof, deployment, and qualification phases.
 

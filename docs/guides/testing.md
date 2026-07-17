@@ -98,9 +98,9 @@ rejection, managed-file conflict refusal, fake dual-track completion, and succes
 ## Record Known Limitations
 
 - vNext is a preview and does not import v1 sessions or artifacts.
-- Production CI encrypted Terraform saved-plan transport is not qualified. Local preview and Gate 4 approval followed by
-  recipient-bound CI apply are implemented and deterministically tested, but production CI stays blocked until the
-  sequence has live proof on the release candidate. No production workflow YAML is enabled by this implementation.
+- Recipient-bound encrypted Terraform saved-plan transport passed live separate-job apply and destroy qualification.
+  Production workflow enablement remains a separate release and cutover decision. No production workflow YAML is
+  enabled by this implementation.
 - The optional VS Code agent-plugin distribution path is not required or qualified for this preview.
 - Kernel authority does not extend to VS Code conversation history or system context.
 - Real Azure tests may incur cost and require sandbox governance, credentials, quotas, and cleanup ownership.

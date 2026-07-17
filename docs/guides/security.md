@@ -71,10 +71,10 @@ project/run, owner epoch, preview hash, recipient, and Terraform artifact refere
 complete envelope and bundle before writing only allowlisted paths beneath `.apex/local/provider-runtime/`. It cannot
 transfer latest pointers, unrelated previews, or plaintext plans, and it cannot create approval or deploy.
 
-:::caution[Terraform CI limitation]
-Production CI encrypted saved-plan transport is not yet qualified. Repository-state and provider-authority transfer are
-implemented, but the separate preview/apply job sequence still requires live proof. Do not claim or enable production CI
-Terraform apply until both recipient-bound transports pass live qualification.
+:::note[Terraform CI qualification]
+Recipient-bound encrypted saved-plan transport passed live separate-job apply and destroy qualification. The accepted
+plans bound the exact candidate, recipient, digest, state lineage, state serial, owner epoch, and expiry. Enabling a
+production workflow remains a separate release and cutover decision; qualification does not enable one automatically.
 :::
 
 ## Separate Evidence and Telemetry

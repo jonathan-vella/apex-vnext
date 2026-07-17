@@ -107,10 +107,10 @@ Import does not accept writer authority. After reviewing the imported claim, run
 claim hash, recipient, and current Git head.
 
 Provider transfer export packages only `bindings/<preview-hash>.json` and, for Terraform, the encrypted artifact whose
-path is derived from the binding's `artifactRef`. It excludes local keys, latest pointers, plaintext plans, and all
-unrelated runtime files. Import validates the authenticated envelope, exact authority bindings, file hashes, and
-binding/artifact cross-links before atomic mode-`0600` writes under `.apex/local/provider-runtime/`. It does not approve
-Gate 4 or deploy. Production CI remains blocked until the transfer has live proof across separate preview and apply jobs.
+path is derived from the binding's `artifactRef` plus its generated local plan key. It excludes latest pointers,
+plaintext plans, and all unrelated runtime files. Import validates the bound bundle, exact authority bindings, file
+hashes, and binding/artifact cross-links before atomic mode-`0600` writes under `.apex/local/provider-runtime/`. It does
+not approve Gate 4 or deploy. Separate-job Terraform apply and destroy transport passed live qualification.
 
 Gate 4 is approved locally for the exact intended execution recipient before writer transfer:
 

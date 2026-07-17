@@ -22,18 +22,6 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **State:** Open
 - **Closure proof:** Required-check URLs showing success on the candidate SHA.
 
-### RISK-002: Terraform CI Plan Transport Is Not Qualified
-
-- **Type:** `RISK`
-- **Owner:** Terraform runtime
-- **Impact:** Production Terraform CI apply cannot be enabled.
-- **Evidence:** [Security documentation](../guides/security.md) limits support to local exact-plan
-  operation; `REQ-TERRAFORM-001` requires recipient-bound encrypted transport.
-- **Related issue:** Destination issue `#10`.
-- **Mitigation:** Prove encrypted, expiring, recipient-bound plan transport and exact-plan apply in GitHub Actions.
-- **State:** Open
-- **Closure proof:** Live CI evidence bound to the approved preview, head, lineage, serial, and recipient.
-
 ### RISK-003: GitHub Project Access Is Unavailable To The Current Token
 
 - **Type:** `RISK`
@@ -159,6 +147,15 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Closure proof:** Scorecard artifacts satisfying every minimum-sample and unavailable-data rule.
 
 ## Closed Or Historical Entries
+
+### RISK-002: Terraform CI Plan Transport Is Not Qualified
+
+- **Type:** `RISK`
+- **Owner:** Terraform runtime
+- **Disposition:** Closed after live encrypted apply and destroy through separate GitHub Actions jobs.
+- **State:** Closed
+- **Closure proof:** Destination issue `#10`; apply run `29583857856`; destroy run `29584406631`; exact recipient,
+  digest, lineage, serial, owner epoch, expiry, authority return, and cleanup evidence.
 
 ### RISK-004: Required Environment Reviewers Were Unavailable On The Current GitHub Plan
 
