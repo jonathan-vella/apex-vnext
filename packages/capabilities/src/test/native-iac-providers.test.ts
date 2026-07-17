@@ -663,6 +663,18 @@ test("local reference plan transport authenticates metadata, recipient, expiry, 
   });
   assert.equal(encrypted.metadata.implementation, "local-reference");
   assert.equal(transport.decrypt(encrypted, key, authority.recipientIdentity).toString(), "saved-plan");
+  const persisted = {
+    ...encrypted,
+    metadata: {
+      algorithm: encrypted.metadata.algorithm,
+      createdAt: encrypted.metadata.createdAt,
+      digest: encrypted.metadata.digest,
+      expiresAt: encrypted.metadata.expiresAt,
+      implementation: encrypted.metadata.implementation,
+      recipient: encrypted.metadata.recipient,
+    },
+  };
+  assert.equal(transport.decrypt(persisted, key, authority.recipientIdentity).toString(), "saved-plan");
   assert.throws(() => transport.decrypt(encrypted, key, "other@example.com"), /recipient/);
   assert.throws(() =>
     transport.decrypt(

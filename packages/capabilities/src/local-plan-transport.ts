@@ -36,7 +36,17 @@ function digest(bytes: Uint8Array): string {
 }
 
 function authenticatedMetadata(metadata: LocalEncryptedPlanMetadata): Buffer {
-  return Buffer.from(JSON.stringify(metadata), "utf8");
+  return Buffer.from(
+    JSON.stringify({
+      implementation: metadata.implementation,
+      algorithm: metadata.algorithm,
+      digest: metadata.digest,
+      recipient: metadata.recipient,
+      createdAt: metadata.createdAt,
+      expiresAt: metadata.expiresAt,
+    }),
+    "utf8",
+  );
 }
 
 export class LocalEncryptedPlanTransport {
