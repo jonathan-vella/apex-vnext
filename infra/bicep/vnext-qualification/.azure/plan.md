@@ -93,7 +93,8 @@ No `azure.yaml` is required because the qualification runtime intentionally uses
 - The GitHub identity receives Contributor only on the two workload resource groups, Log Analytics Contributor on the
   qualification workspace, and storage roles at the backend account or container scopes defined by the template. The
   workspace role permits linked diagnostic settings without broadening access to either workload resource group.
-- The local uploader receives only backend firewall management and `handoff` container data access.
+- The local uploader receives backend firewall management plus data access on the `handoff` and `tfstate` containers.
+  The `tfstate` assignment is required to create exact local Terraform previews and is not scoped to the account.
 - Local APEX creates the native Bicep/Terraform preview, renders it for the maintainer, and records Gate 4 through the
   existing `tty` mechanism. The approval binds the preview hash, dependency revision, writer epoch, recipient, and
   expiry before any state or provider authority is exported to CI.

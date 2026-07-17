@@ -187,6 +187,11 @@ module backendStorageAccount 'br/public:avm/res/storage/storage-account:0.32.1' 
               roleDefinitionIdOrName: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
               description: 'Read, lock, and write Terraform qualification state.'
             }
+            {
+              principalId: handoffUploaderPrincipalId
+              roleDefinitionIdOrName: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+              description: 'Create exact local Terraform previews against qualification state.'
+            }
           ]
         }
         {
