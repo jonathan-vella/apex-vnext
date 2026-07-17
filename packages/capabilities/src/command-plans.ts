@@ -168,6 +168,10 @@ export class TerraformCommandAdapter {
     return { executable: "terraform", args: ["show", "-json", savedPlanPath], cwd };
   }
 
+  statePull(cwd: string): CommandPlan {
+    return { executable: "terraform", args: ["state", "pull"], cwd };
+  }
+
   #requirePlanPath(savedPlanPath: string): void {
     if (savedPlanPath.trim().length === 0 || savedPlanPath.startsWith("-")) {
       throw new TypeError("A concrete saved Terraform plan path is required");

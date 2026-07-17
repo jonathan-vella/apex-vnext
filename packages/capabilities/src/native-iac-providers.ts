@@ -98,6 +98,22 @@ export interface TerraformPreviewBinding {
   readonly attestation: TerraformPlanAttestation;
 }
 
+function terraformStateIdentity(value: unknown): { stateLineage?: string; stateSerial?: number } {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return {};
+  const state = value as Record<string, unknown>;
+  const stateLineage = typeof state.lineage === "string" && state.lineage.length > 0 ? state.lineage : undefined;
+  const stateSerial =
+    typeof state.serial === "number" && Number.isInteger(state.serial) && state.serial >= 0 ? state.serial : undefined;
+  return {
+    ...(stateLineage === undefined ? {} : { stateLineage }),
+    ...(stateSerial === undefined ? {} : { stateSerial }),
+  };
+}
+
+function terraformStateIdentityOutput(stdout: string): { stateLineage?: string; stateSerial?: number } {
+  return stdout.trim().length === 0 ? {} : terraformStateIdentity(parseJsonProcessOutput("terraform-state", stdout));
+}
+
 abstract class NativeProviderBase {
   protected readonly runner: ProcessRunnerLike;
   protected readonly now: () => Date;
@@ -540,6 +556,7 @@ export class NativeTerraformProvider extends NativeProviderBase implements IacPr
     }
     const planPath = this.#target.planPath(request, operation);
     await this.run(this.#commands.init(this.#target.cwd, true));
+    const stateIdentity = terraformStateIdentityOutput(await this.run(this.#commands.statePull(this.#target.cwd)));
     await this.run(this.#commands.preview(this.#target.cwd, planPath, operation === "destroy"));
     try {
       const planBytes = await readFile(planPath);
@@ -571,8 +588,7 @@ export class NativeTerraformProvider extends NativeProviderBase implements IacPr
       });
       const preview = this.createPreview(this.track, operation, request, normalized, {
         artifactHash,
-        ...(normalized.stateLineage === undefined ? {} : { stateLineage: normalized.stateLineage }),
-        ...(normalized.stateSerial === undefined ? {} : { stateSerial: normalized.stateSerial }),
+        ...stateIdentity,
       });
       const createdAt = this.now();
       const attestation: TerraformPlanAttestation = {
@@ -645,6 +661,13 @@ export class NativeTerraformProvider extends NativeProviderBase implements IacPr
       binding.attestation.stateSerial !== preview.stateSerial
     ) {
       throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Saved plan attestation does not match the preview");
+    }
+    const currentState = terraformStateIdentityOutput(await this.run(this.#commands.statePull(this.#target.cwd)));
+    if (
+      currentState.stateLineage !== binding.attestation.stateLineage ||
+      currentState.stateSerial !== binding.attestation.stateSerial
+    ) {
+      throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Terraform state changed after preview");
     }
     const providerArtifactHash = sha256({
       planDigest: binding.attestation.planDigest,

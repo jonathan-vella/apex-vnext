@@ -399,6 +399,7 @@ test("native Terraform encrypts immediately and restores exact-plan binding afte
   context.after(async () => rm(root, { recursive: true, force: true }));
   const applyPath = join(root, "apply.tfplan");
   const destroyPath = join(root, "destroy.tfplan");
+  let stateSerial = 7;
   const runner = new FakeRunner(async (process) => {
     const outputArg = process.args.find((argument) => argument.startsWith("-out="));
     if (outputArg !== undefined) {
@@ -410,8 +411,10 @@ test("native Terraform encrypts immediately and restores exact-plan binding afte
     if (process.args[0] === "show" && process.args[1] === "-json") {
       return JSON.stringify({
         resource_changes: [{ address: "azurerm_resource_group.main", change: { actions: ["create"] } }],
-        prior_state: { lineage: "lineage-1", serial: 7 },
       });
+    }
+    if (process.args[0] === "state" && process.args[1] === "pull") {
+      return JSON.stringify({ lineage: "lineage-1", serial: stateSerial });
     }
     return "";
   });
@@ -445,6 +448,8 @@ test("native Terraform encrypts immediately and restores exact-plan binding afte
   await assert.rejects(stat(applyPath), /ENOENT/);
   assert.equal(artifacts.values.size, 1);
   assert.equal(provider.attestation(applyPreview.previewHash)?.lockfileHash, hashes.lock);
+  assert.equal(applyPreview.stateLineage, "lineage-1");
+  assert.equal(applyPreview.stateSerial, 7);
   const attestation = provider.attestation(applyPreview.previewHash);
   assert.equal(
     Value.Check(ExecutionPlanAttestationV1Schema, attestation),
@@ -479,6 +484,13 @@ test("native Terraform encrypts immediately and restores exact-plan binding afte
     (error) => error instanceof IacProviderError && error.code === "PREVIEW_HASH_MISMATCH",
   );
   lockfileHash = hashes.lock;
+
+  stateSerial = 8;
+  await assert.rejects(
+    restarted.apply(mutationPreview, approval(mutationPreview), authority),
+    (error) => error instanceof IacProviderError && error.code === "PREVIEW_HASH_MISMATCH",
+  );
+  stateSerial = 7;
 
   const wrongKey = new NativeTerraformProvider({ ...options, keyProvider: async () => Buffer.alloc(32, 8) });
   await assert.rejects(wrongKey.apply(mutationPreview, approval(mutationPreview), authority));

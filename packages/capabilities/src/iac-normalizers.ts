@@ -7,7 +7,7 @@ export type NormalizedPreview = Pick<DeploymentPreviewV1, "changes" | "blockers"
 
 export class IacOutputParseError extends Error {
   constructor(
-    public readonly source: "azure-what-if" | "azure-stack" | "terraform-plan",
+    public readonly source: "azure-what-if" | "azure-stack" | "terraform-plan" | "terraform-state",
     message: string,
   ) {
     super(message);
