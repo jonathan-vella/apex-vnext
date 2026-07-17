@@ -97,8 +97,8 @@ module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0
       {
         principalId: deploymentPrincipalId
         principalType: 'ServicePrincipal'
-        roleDefinitionIdOrName: '73c42c96-874c-492b-b04d-ab87d138a893'
-        description: 'Read qualification diagnostics without workspace mutation.'
+        roleDefinitionIdOrName: '92aaf0da-9dab-42b6-94a3-d43ce8d16293'
+        description: 'Create diagnostic settings linked to the qualification workspace.'
       }
     ]
   }
