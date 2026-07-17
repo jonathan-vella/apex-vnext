@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.apexops.dev/modernization-ownership-v1.json",
+  "title": "APEX modernization ownership inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "candidate", "surfaces", "baselines", "decisions"],
+  "properties": {
+    "$schema": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "const": "1.0.0" },
+    "candidate": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "surfaces": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "category",
+          "classification",
+          "canonicalOwner",
+          "sourceRefs",
+          "consumers",
+          "proofCommands",
+          "removalGate",
+          "rationale"
+        ],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+          "category": {
+            "enum": [
+              "guidance",
+              "invocation",
+              "runtime",
+              "validation",
+              "automation",
+              "generation",
+              "compatibility",
+              "diagnostics"
+            ]
+          },
+          "classification": { "enum": ["keep", "consolidate", "rewrite", "retire", "investigate"] },
+          "canonicalOwner": { "type": "string", "minLength": 1 },
+          "sourceRefs": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "consumers": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "proofCommands": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "removalGate": { "type": "string", "minLength": 1 },
+          "rationale": { "type": "string", "minLength": 1 },
+          "followUp": { "type": "string", "minLength": 1 },
+          "decisionRef": { "type": "string", "pattern": "^OWN-[0-9]{3}$" }
+        }
+      }
+    },
+    "baselines": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "sourceRefs", "measurement", "evidence"],
+        "properties": {
+          "id": { "enum": ["context", "ci", "hooks", "dependencies", "diagnostics", "drift"] },
+          "status": { "enum": ["captured", "gap"] },
+          "sourceRefs": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "measurement": { "type": "string", "minLength": 1 },
+          "evidence": { "type": "string", "minLength": 1 },
+          "followUp": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "decision", "rationale", "owner", "gate"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^OWN-[0-9]{3}$" },
+          "status": { "enum": ["decided", "deferred"] },
+          "decision": { "type": "string", "minLength": 1 },
+          "rationale": { "type": "string", "minLength": 1 },
+          "owner": { "type": "string", "minLength": 1 },
+          "gate": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}
