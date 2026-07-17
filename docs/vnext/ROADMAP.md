@@ -127,6 +127,10 @@ consumer map, classification, proof test, and removal gate before consolidation 
 **Exit gate:** Every item is classified `keep`, `consolidate`, `rewrite`, `retire`, or `investigate`; unresolved ownership
 choices are decisions; characterization and mutation tests protect selected boundaries.
 
+The candidate-bound inventory and baseline gaps are recorded in
+[MODERNIZATION-INVENTORY.md](MODERNIZATION-INVENTORY.md). Its machine-readable manifest is validated in the Node CI
+graph so later slices cannot move ownership without updating consumers, proof, decisions, and removal gates.
+
 **Historical traceability:** Governance completion plan Phase 3.
 
 ## Milestone F: Modernization Slices

@@ -61,7 +61,7 @@ bind to an exact commit in this repository after the last dependency hash change
 
 ## Resume Pointer
 
-1. Merge the local-Gate-4 workflow and runtime changes through the open issue branch.
-2. Configure Environment secrets and variables from verified bootstrap outputs without printing secret values.
-3. Refresh the expired governance firewall exception before any workflow dispatch.
-4. Run exact-head Bicep and Terraform apply, recovery, and separately approved destroy ceremonies.
+1. Complete issue `#11` by reviewing and merging the candidate-bound modernization ownership inventory.
+2. Start Milestone F with the validator command graph; characterize behavior before changing orchestration.
+3. Compare each slice against the recorded CI, hook, dependency, diagnostic, context, and drift baseline.
+4. Keep production cutover and final exact-head qualification deferred to issue `#13`.
