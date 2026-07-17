@@ -295,6 +295,10 @@ export function validateWorkflowText(text) {
   );
   fail(apply.includes('deploy --preview "${{ inputs.preview_hash }}"'), "deploy must use exact dispatch preview hash");
   fail(
+    apply.includes('denySettingsMode:"none"') && !apply.includes('denySettingsMode:"denyDelete"'),
+    "qualification stack must not require deny-assignment permissions",
+  );
+  fail(
     apply.includes("terraform -chdir=infra/terraform/vnext-qualification init"),
     "fresh apply runner Terraform init missing",
   );
@@ -306,7 +310,8 @@ export function validateWorkflowText(text) {
     "apply must bind the current Terraform lock hash to imported attestation",
   );
   fail(
-    applyJob.includes("local:${{ inputs.handoff_id }}") && apply.includes("return-authority.json"),
+    applyJob.includes("local:${{ inputs.handoff_id }}") &&
+      apply.match(/--file "\$GITHUB_WORKSPACE\/apex-live\/return-authority\.json"/g)?.length === 2,
     "return authority transfer missing",
   );
   fail(

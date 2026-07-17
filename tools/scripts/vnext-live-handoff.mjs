@@ -511,7 +511,7 @@ async function localProviderConfig(args, temporary, account) {
             actionOnUnmanage: "deleteResources",
             ownershipAuthorizesDeleteResources: true,
             dedicatedSandboxResourceGroup: true,
-            denySettingsMode: "denyDelete",
+            denySettingsMode: "none",
           },
         },
         null,
