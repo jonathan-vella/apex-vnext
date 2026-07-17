@@ -103,6 +103,20 @@ rejectsMutation(
   "refreshed ARM token",
 );
 rejectsMutation(
+  "deployment stack deny settings fail without deny-assignment authority",
+  (text) => text.replace('denySettingsMode:"none"', 'denySettingsMode:"denyDelete"'),
+  "qualification stack must not require deny-assignment permissions",
+);
+rejectsMutation(
+  "relative return authority upload path fails",
+  (text) =>
+    text.replace(
+      '--file "$GITHUB_WORKSPACE/apex-live/return-authority.json" --overwrite false',
+      "--file apex-live/return-authority.json --overwrite false",
+    ),
+  "return authority transfer missing",
+);
+rejectsMutation(
   "missing data-plane readiness fails",
   (text) => text.replace("az storage blob list --auth-mode login", "az storage container list --auth-mode login"),
   "readiness probe",
