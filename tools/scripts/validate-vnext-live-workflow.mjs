@@ -127,6 +127,10 @@ export function validateWorkflowText(text) {
     fail(job?.["runs-on"] === "ubuntu-latest", `${name} runner must be ubuntu-latest`);
     fail(job?.env?.APEX_PLAN_TRANSPORT_KEY === undefined, `${name} transport key must not be job-wide`);
     fail(job?.env?.ARM_OIDC_TOKEN === undefined, `${name} ARM token must not be job-wide`);
+    fail(
+      job?.env?.APEX_RUNTIME_ROOT === "${{ github.workspace }}/apex-live/runtime",
+      `${name} isolated APEX runtime missing`,
+    );
     fail(job?.["timeout-minutes"] > 0, `${name} timeout missing`);
     fail(actions.includes("actions/checkout@v6"), `${name} exact checkout action missing`);
     fail(actions.includes("./.github/actions/setup-node-repo"), `${name} setup action missing`);
@@ -263,6 +267,16 @@ export function validateWorkflowText(text) {
     "exact incoming state/provider downloads missing",
   );
   fail(apply.includes("state transfer-import") && apply.includes("provider transfer-import"), "apply imports missing");
+  fail(
+    apply.includes('cd "$APEX_RUNTIME_ROOT"\nnode "$cli" state transfer-import') &&
+      apply.includes("$GITHUB_WORKSPACE/apex-live/incoming") &&
+      !apply.includes("node packages/cli/dist/cli.js state transfer-import"),
+    "apply must import state in the isolated runtime",
+  );
+  fail(
+    apply.includes("$GITHUB_WORKSPACE/infra/terraform/vnext-qualification"),
+    "Terraform source must bind to the exact checkout",
+  );
   fail(
     index(apply, "state transfer-import") < index(apply, "provider transfer-import") &&
       index(apply, "provider transfer-import") < index(apply, "writer transfer-accept") &&
