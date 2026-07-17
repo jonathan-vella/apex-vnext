@@ -204,7 +204,7 @@ jobs:
           set -euo pipefail
           if test "$TRACK" = bicep; then
             jq -n --arg project "$APEX_PROJECT_NAME" --arg location "$APEX_LOCATION" --arg workspace "$APEX_LOG_ANALYTICS_WORKSPACE_RESOURCE_ID" --argjson tags "$APEX_QUALIFICATION_TAGS_JSON" '{"$schema":"https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",contentVersion:"1.0.0.0",parameters:{projectName:{value:$project},environment:{value:"qualification"},location:{value:$location},tags:{value:$tags},logAnalyticsWorkspaceResourceId:{value:$workspace}}}' > apex-live/main.parameters.json
-            jq -n --arg rg "$APEX_BICEP_RESOURCE_GROUP" --arg template "$GITHUB_WORKSPACE/infra/bicep/vnext-qualification/main.bicep" --arg params "$GITHUB_WORKSPACE/apex-live/main.parameters.json" '{bicep:{resourceGroup:$rg,deploymentName:"vnext-qualification",stackName:"vnext-qualification",templateFile:$template,parametersFile:$params,actionOnUnmanage:"deleteResources",ownershipAuthorizesDeleteResources:true,dedicatedSandboxResourceGroup:true,denySettingsMode:"denyDelete"}}' > apex-live/provider-config.json
+            jq -n --arg rg "$APEX_BICEP_RESOURCE_GROUP" --arg template "$GITHUB_WORKSPACE/infra/bicep/vnext-qualification/main.bicep" --arg params "$GITHUB_WORKSPACE/apex-live/main.parameters.json" '{bicep:{resourceGroup:$rg,deploymentName:"vnext-qualification",stackName:"vnext-qualification",templateFile:$template,parametersFile:$params,actionOnUnmanage:"deleteResources",ownershipAuthorizesDeleteResources:true,dedicatedSandboxResourceGroup:true,denySettingsMode:"none"}}' > apex-live/provider-config.json
           else
             printf 'resource_group_name = "%s"\nstorage_account_name = "%s"\ncontainer_name = "tfstate"\nkey = "vnext-qualification.tfstate"\nuse_oidc = true\nuse_azuread_auth = true\n' "$APEX_CONTROL_RESOURCE_GROUP" "$APEX_BACKEND_STORAGE_ACCOUNT" > apex-live/backend.hcl
             printf 'TF_CLI_ARGS_init=-backend-config=%s\n' "$GITHUB_WORKSPACE/apex-live/backend.hcl" >> "$GITHUB_ENV"
@@ -259,7 +259,7 @@ jobs:
           node "$cli" state transfer-export --claim "$claim_hash" --recipient "$LOCAL_RECIPIENT" --ttl-seconds 3000 --file "$GITHUB_WORKSPACE/apex-live/return-authority.json" --yes --json > "$evidence/return-export.json"
           blob="return/${{ inputs.handoff_id }}/${{ inputs.track }}-${{ inputs.operation }}.json"
           for attempt in 1 2 3 4 5; do
-            if az storage blob upload --auth-mode login --account-name "$APEX_BACKEND_STORAGE_ACCOUNT" --container-name handoff --name "$blob" --file apex-live/return-authority.json --overwrite false --only-show-errors --output none; then break; fi
+            if az storage blob upload --auth-mode login --account-name "$APEX_BACKEND_STORAGE_ACCOUNT" --container-name handoff --name "$blob" --file "$GITHUB_WORKSPACE/apex-live/return-authority.json" --overwrite false --only-show-errors --output none; then break; fi
             test "$attempt" -lt 5
             node -e 'setTimeout(()=>{},Number(process.argv[1]))' "$((attempt * 5000))"
           done
