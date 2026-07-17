@@ -4,7 +4,6 @@
 import { execFile as execFileCallback } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { isIPv4 } from "node:net";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -237,18 +236,9 @@ async function gitState(directory, allowApexState = false) {
   return { head, branch };
 }
 
-async function publicIpv4(fetchImpl = fetch) {
-  const response = await fetchImpl("https://api.ipify.org", { signal: AbortSignal.timeout(15_000) });
-  if (!response.ok) throw new Error("Public IPv4 lookup failed");
-  const address = (await response.text()).trim();
-  if (!isIPv4(address)) throw new Error("Public endpoint did not return an IPv4 address");
-  return address;
-}
-
 export async function withFirewall(args, action, dependencies = {}) {
   const validateException =
     dependencies.validateException ?? (() => validateQualificationSecurityException(GOVERNANCE_FILE));
-  const resolvePublicIpv4 = dependencies.publicIpv4 ?? publicIpv4;
   const runCommand = dependencies.run ?? run;
   const assertException = () => {
     const exceptionIssues = validateException();
@@ -257,19 +247,33 @@ export async function withFirewall(args, action, dependencies = {}) {
     }
   };
   assertException();
-  const address = await resolvePublicIpv4();
-  assertException();
-  const common = [
-    "--resource-group",
-    args.resource_group,
-    "--account-name",
-    args.storage_account,
-    "--ip-address",
-    `${address}/32`,
-    "--only-show-errors",
-    "--output",
-    "none",
-  ];
+  const atRestState = JSON.parse(
+    await runCommand("az", [
+      "storage",
+      "account",
+      "show",
+      "--resource-group",
+      args.resource_group,
+      "--name",
+      args.storage_account,
+      "--query",
+      "{publicNetworkAccess:publicNetworkAccess,defaultAction:networkRuleSet.defaultAction,ipRules:networkRuleSet.ipRules,securityControl:tags.SecurityControl,allowSharedKeyAccess:allowSharedKeyAccess,allowBlobPublicAccess:allowBlobPublicAccess,defaultToOAuthAuthentication:defaultToOAuthAuthentication}",
+      "--output",
+      "json",
+    ]),
+  );
+  if (
+    atRestState?.publicNetworkAccess !== "Disabled" ||
+    atRestState?.defaultAction !== "Deny" ||
+    !Array.isArray(atRestState?.ipRules) ||
+    atRestState.ipRules.length !== 0 ||
+    atRestState?.securityControl != null ||
+    atRestState?.allowSharedKeyAccess !== false ||
+    atRestState?.allowBlobPublicAccess !== false ||
+    atRestState?.defaultToOAuthAuthentication !== true
+  ) {
+    throw new Error("Qualification backend is not in the required closed Entra-only posture");
+  }
   let operationResult;
   let operationFailure;
   let cleanupFailure;
@@ -302,7 +306,20 @@ export async function withFirewall(args, action, dependencies = {}) {
       "--output",
       "none",
     ]);
-    await runCommand("az", ["storage", "account", "network-rule", "add", ...common]);
+    await runCommand("az", [
+      "storage",
+      "account",
+      "update",
+      "--resource-group",
+      args.resource_group,
+      "--name",
+      args.storage_account,
+      "--default-action",
+      "Allow",
+      "--only-show-errors",
+      "--output",
+      "none",
+    ]);
     for (let attempt = 1; attempt <= 5; attempt += 1) {
       try {
         await runCommand("az", [
@@ -331,11 +348,24 @@ export async function withFirewall(args, action, dependencies = {}) {
   } catch (error) {
     operationFailure = error;
   } finally {
-    let removalFailed = false;
+    let denyFailed = false;
     try {
-      await runCommand("az", ["storage", "account", "network-rule", "remove", ...common]);
+      await runCommand("az", [
+        "storage",
+        "account",
+        "update",
+        "--resource-group",
+        args.resource_group,
+        "--name",
+        args.storage_account,
+        "--default-action",
+        "Deny",
+        "--only-show-errors",
+        "--output",
+        "none",
+      ]);
     } catch {
-      removalFailed = true;
+      denyFailed = true;
     }
     let disableFailed = false;
     try {
@@ -387,18 +417,21 @@ export async function withFirewall(args, action, dependencies = {}) {
           "--name",
           args.storage_account,
           "--query",
-          "{publicNetworkAccess:publicNetworkAccess,securityControl:tags.SecurityControl}",
+          "{publicNetworkAccess:publicNetworkAccess,defaultAction:networkRuleSet.defaultAction,securityControl:tags.SecurityControl}",
           "--output",
           "json",
         ]),
       );
-      verificationFailed = endpointState?.publicNetworkAccess !== "Disabled" || endpointState?.securityControl != null;
+      verificationFailed =
+        endpointState?.publicNetworkAccess !== "Disabled" ||
+        endpointState?.defaultAction !== "Deny" ||
+        endpointState?.securityControl != null;
     } catch {
       verificationFailed = true;
     }
-    if (removalFailed || disableFailed || exclusionRemovalFailed || verificationFailed) {
+    if (denyFailed || disableFailed || exclusionRemovalFailed || verificationFailed) {
       cleanupFailure = safeError("Qualification firewall cleanup failed", {
-        removalFailed,
+        denyFailed,
         disableFailed,
         exclusionRemovalFailed,
         verificationFailed,

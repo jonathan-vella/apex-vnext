@@ -105,10 +105,9 @@ fallback artifact name; it does not download arbitrary workflow artifacts.
 
 - The backend has public network access Disabled at rest and a default-deny firewall. A session is admitted only when
   the exact governance exception is active and has at least 75 minutes remaining. The caller applies the live policy's
-  `SecurityControl=Ignore` tag, enables the endpoint, and adds only its observed public IPv4 `/32`. Cleanup removes the
-  rule, restores Disabled, removes the tag, and verifies both final states. The tag is never persistent.
-- Before CI apply opens its session, it verifies stale rules are absent. This preserves the exception's one-runner
-  maximum even after a failed local preview cleanup.
+  `SecurityControl=Ignore` tag, enables the endpoint, and temporarily sets firewall default action to `Allow`. Data-plane
+  access remains Entra RBAC only; shared keys and anonymous Blob stay disabled. Cleanup restores `Deny`, then `Disabled`,
+  removes the tag, and verifies all final states. The tag is never persistent.
 - Azure access uses Entra authentication and GitHub OIDC. Shared keys, client secrets, plaintext plans, plaintext state,
   and the transport key are never artifacts.
 - Local preview and CI apply have distinct writer epochs. Apply imports the already-approved encrypted state and exact

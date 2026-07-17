@@ -118,6 +118,7 @@ export function validateWorkflowText(text) {
     const job = jobs[name];
     const script = runs(job);
     const actions = uses(job);
+    fail(!script.includes("network-rule add") && !script.includes("network-rule remove"), `${name} IP rules forbidden`);
     fail(
       hasExactPermissions(job?.permissions, { contents: "read", "id-token": "write" }),
       `${name} permissions must be contents read and id-token write only`,
@@ -133,7 +134,17 @@ export function validateWorkflowText(text) {
     fail(actions.includes("hashicorp/setup-terraform@v3"), `${name} Terraform setup version invalid`);
     fail(actions.includes("actions/github-script@v8"), `${name} OIDC script version invalid`);
     fail(script.includes("git rev-parse HEAD"), `${name} does not verify checked out HEAD`);
-    const firewallOpen = steps(job).find((step) => step.name === "Open temporary firewall rule");
+    const atRest = steps(job).find((step) => step.name === "Validate at-rest endpoint boundary");
+    fail(
+      atRest?.run?.includes("publicNetworkAccess") &&
+        atRest.run.includes("networkRuleSet.defaultAction") &&
+        atRest.run.includes("networkRuleSet.ipRules") &&
+        atRest.run.includes("allowSharedKeyAccess") &&
+        atRest.run.includes("allowBlobPublicAccess") &&
+        atRest.run.includes("defaultToOAuthAuthentication"),
+      `${name} at-rest endpoint validation missing`,
+    );
+    const firewallOpen = steps(job).find((step) => step.name === "Open temporary Entra-only endpoint session");
     const firewallOpenScript = firewallOpen?.run ?? "";
     fail(
       firewallOpenScript.includes("--security-exception-only") &&
@@ -141,8 +152,8 @@ export function validateWorkflowText(text) {
           index(firewallOpenScript, "--set tags.SecurityControl=Ignore") &&
         index(firewallOpenScript, "--set tags.SecurityControl=Ignore") <
           index(firewallOpenScript, "--public-network-access Enabled") &&
-        index(firewallOpenScript, "--public-network-access Enabled") < index(firewallOpenScript, "network-rule add") &&
-        firewallOpenScript.includes("/32"),
+        index(firewallOpenScript, "--public-network-access Enabled") <
+          index(firewallOpenScript, "--default-action Allow"),
       `${name} firewall boundary transaction missing`,
     );
     fail(
@@ -154,19 +165,21 @@ export function validateWorkflowText(text) {
         script.includes('= "$attested_lock_hash"'),
       `${name} exact Terraform lockfile binding missing`,
     );
-    const cleanup = steps(job).find((step) => step.name === "Remove temporary firewall rule");
+    const cleanup = steps(job).find((step) => step.name === "Close temporary Entra-only endpoint session");
     fail(
       cleanup?.if === "always()" &&
-        cleanup.run?.includes("network-rule remove") &&
+        cleanup.run?.includes("--default-action Deny") &&
         cleanup.run?.includes("--public-network-access Disabled") &&
         cleanup.run?.includes("--remove tags.SecurityControl") &&
+        cleanup.run?.includes("defaultAction:networkRuleSet.defaultAction") &&
         cleanup.run?.includes("securityControl:tags.SecurityControl") &&
         cleanup.run?.includes('!= "Disabled"') &&
+        cleanup.run?.includes('!= "Deny"') &&
         cleanup.run?.includes('-n "$security_control"'),
       `${name} unconditional cleanup missing`,
     );
     fail(
-      script.includes("removed:$removed") && script.includes("restored:$restored") && script.includes('exit "$status"'),
+      script.includes("session:$session") && script.includes("restored:$restored") && script.includes('exit "$status"'),
       `${name} cleanup evidence/failure missing`,
     );
     for (const variable of REQUIRED_VARS) fail(script.includes(variable), `${name} does not validate ${variable}`);
@@ -184,10 +197,10 @@ export function validateWorkflowText(text) {
         ?.split(/\r?\n/)
         .some((line) => line.trim() === "node tools/scripts/validate-vnext-qualification-context.mjs"),
     );
-    const firewallAddIndex = jobSteps.findIndex((step) => step.run?.includes("network-rule add"));
+    const firewallAddIndex = jobSteps.findIndex((step) => step.name === "Open temporary Entra-only endpoint session");
     fail(
       qualificationValidationIndex >= 0 && firewallAddIndex > qualificationValidationIndex,
-      `${name} security exception validation must precede firewall add`,
+      `${name} security exception validation must precede endpoint opening`,
     );
     const protectedInputs = steps(job).find((step) => step.name === "Validate protected inputs");
     fail(
@@ -235,15 +248,6 @@ export function validateWorkflowText(text) {
   const apply = runs(jobs.apply);
   const applyJob = JSON.stringify(jobs.apply);
   const applySteps = steps(jobs.apply);
-  const staleRuleCleanup = applySteps.find((step) => step.name === "Ensure no stale runner firewall rule");
-  fail(
-    staleRuleCleanup?.env?.RUNNER_IP === "${{ steps.ip.outputs.address }}" &&
-      staleRuleCleanup.run?.includes("network-rule remove") &&
-      staleRuleCleanup.run?.includes("networkRuleSet.ipRules") &&
-      applySteps.indexOf(staleRuleCleanup) <
-        applySteps.findIndex((step) => step.name === "Open temporary firewall rule"),
-    "apply must clear a stale runner rule before opening its own",
-  );
   const stableRecipient = 'apply_recipient="github-actions:${GITHUB_REPOSITORY}:handoff:${HANDOFF_ID}:apply"';
   fail(apply.includes(stableRecipient), "stable handoff apply recipient missing");
   fail(

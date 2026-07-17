@@ -24,18 +24,20 @@ const environment = {
 const now = new Date("2026-07-15T13:00:00Z");
 const securityException = {
   id: FIREWALL_EXCEPTION_ID,
-  control: "public-network-access",
+  control: "authenticated-public-network-session",
   requested_at: "2026-07-15T12:50:34Z",
   expires_at: "2026-07-16T12:50:34Z",
-  reason: "Permit one ephemeral runner IP during qualification.",
+  reason: "Permit one bounded Entra-only endpoint session during qualification.",
   issue_link: "https://github.com/jonathan-vella/apex-vnext/issues/543",
   scope: {
     environment: "vnext-qualification",
-    workload: "terraform-backend",
+    workload: "encrypted-handoff-backend",
     maximum_lifetime_hours: 24,
   },
   endpoint_lifecycle: {
     at_rest_public_network_access: "Disabled",
+    at_rest_default_action: "Deny",
+    session_authorization: "entra-rbac-only",
     policy_exclusion: {
       tag_name: "SecurityControl",
       tag_value: "Ignore",
@@ -44,15 +46,16 @@ const securityException = {
     minimum_remaining_minutes: 75,
     open_sequence: [
       "validate-exception",
+      "validate-at-rest-entra-only-posture",
       "add-transient-policy-exclusion",
       "enable-public-network-access",
-      "add-ephemeral-/32",
+      "set-firewall-default-allow",
     ],
     cleanup_sequence: [
-      "remove-ephemeral-/32",
+      "set-firewall-default-deny",
       "disable-public-network-access",
       "remove-transient-policy-exclusion",
-      "verify-disabled-and-exclusion-absent",
+      "verify-deny-disabled-and-exclusion-absent",
     ],
   },
   compensating_controls: ["Default-deny firewall with unconditional cleanup."],
@@ -147,10 +150,12 @@ test("qualification firewall exception rejects scope and duration mutations", ()
 test("qualification firewall exception rejects endpoint lifecycle drift", () => {
   for (const [name, value] of [
     ["at_rest_public_network_access", "Enabled"],
+    ["at_rest_default_action", "Allow"],
+    ["session_authorization", "shared-key"],
     ["policy_exclusion", { tag_name: "Other", tag_value: "Ignore", persistence: "session-only" }],
     ["minimum_remaining_minutes", 60],
-    ["open_sequence", ["add-ephemeral-/32"]],
-    ["cleanup_sequence", ["remove-ephemeral-/32"]],
+    ["open_sequence", ["set-firewall-default-allow"]],
+    ["cleanup_sequence", ["set-firewall-default-deny"]],
   ]) {
     const mutated = {
       ...securityException,

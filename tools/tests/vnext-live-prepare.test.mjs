@@ -13,7 +13,7 @@ import {
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const CANDIDATE_SHA = "a".repeat(40);
-const NOW = "2026-07-16T18:00:00.000Z";
+const NOW = "2026-07-17T07:10:00.000Z";
 const SUBSCRIPTION = "00858ffc-dded-4f0f-8bbf-e17fff0d47d9";
 
 function digest(value) {

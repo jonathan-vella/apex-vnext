@@ -135,30 +135,18 @@ jobs:
           set -euo pipefail
           apply_recipient="github-actions:${GITHUB_REPOSITORY}:handoff:${HANDOFF_ID}:apply"
           printf 'apply_recipient=%s\n' "$apply_recipient" >> "$GITHUB_OUTPUT"
-      - name: Resolve runner IPv4
-        id: ip
+      - name: Validate at-rest endpoint boundary
         run: |
           set -euo pipefail
-          ip="$(node -e 'fetch("https://api.ipify.org").then((r)=>r.text()).then((v)=>{v=v.trim();if(!require("node:net").isIPv4(v))process.exit(1);process.stdout.write(v)})')"
-          printf 'address=%s\n' "$ip" >> "$GITHUB_OUTPUT"
-      - name: Ensure no stale runner firewall rule
-        env:
-          RUNNER_IP: ${{ steps.ip.outputs.address }}
-        run: |
-          set -euo pipefail
-          rules="$(az storage account show --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --query 'networkRuleSet.ipRules[].ipAddress' --output json)"
-          if RULES="$rules" node -e 'const rules=JSON.parse(process.env.RULES);const ip=process.env.RUNNER_IP;process.exit(rules.includes(ip)||rules.includes(`${ip}/32`)?0:1)'; then
-            az storage account network-rule remove --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --account-name "$APEX_BACKEND_STORAGE_ACCOUNT" --ip-address "$RUNNER_IP/32" --only-show-errors --output none
-          fi
-          rules="$(az storage account show --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --query 'networkRuleSet.ipRules[].ipAddress' --output json)"
-          RULES="$rules" node -e 'const rules=JSON.parse(process.env.RULES);const ip=process.env.RUNNER_IP;if(rules.includes(ip)||rules.includes(`${ip}/32`))process.exit(1)'
-      - name: Open temporary firewall rule
+          state="$(az storage account show --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --query '{publicNetworkAccess:publicNetworkAccess,defaultAction:networkRuleSet.defaultAction,ipRules:networkRuleSet.ipRules,securityControl:tags.SecurityControl,allowSharedKeyAccess:allowSharedKeyAccess,allowBlobPublicAccess:allowBlobPublicAccess,defaultToOAuthAuthentication:defaultToOAuthAuthentication}' --output json)"
+          STATE="$state" node -e 'const value=JSON.parse(process.env.STATE);if(value.publicNetworkAccess!=="Disabled"||value.defaultAction!=="Deny"||(value.ipRules??[]).length!==0||value.securityControl!=null||value.allowSharedKeyAccess!==false||value.allowBlobPublicAccess!==false||value.defaultToOAuthAuthentication!==true)process.exit(1)'
+      - name: Open temporary Entra-only endpoint session
         run: |
           set -euo pipefail
           node tools/scripts/validate-vnext-qualification-context.mjs --security-exception-only
           az storage account update --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --set tags.SecurityControl=Ignore --only-show-errors --output none
           az storage account update --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --public-network-access Enabled --only-show-errors --output none
-          az storage account network-rule add --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --account-name "$APEX_BACKEND_STORAGE_ACCOUNT" --ip-address "${{ steps.ip.outputs.address }}/32" --only-show-errors --output none
+          az storage account update --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --default-action Allow --only-show-errors --output none
           for attempt in 1 2 3 4 5; do
             if az storage blob list --auth-mode login --account-name "$APEX_BACKEND_STORAGE_ACCOUNT" --container-name handoff --num-results 1 --only-show-errors --output none; then exit 0; fi
             test "$attempt" -lt 5
@@ -280,25 +268,26 @@ jobs:
           compression-level: 0
           include-hidden-files: false
           if-no-files-found: error
-      - name: Remove temporary firewall rule
+      - name: Close temporary Entra-only endpoint session
         if: always()
         run: |
           set +e
-          az storage account network-rule remove --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --account-name "$APEX_BACKEND_STORAGE_ACCOUNT" --ip-address "${{ steps.ip.outputs.address }}/32" --only-show-errors --output none
-          remove_status=$?
+          az storage account update --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --default-action Deny --only-show-errors --output none
+          deny_status=$?
           az storage account update --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --public-network-access Disabled --only-show-errors --output none
           disable_status=$?
           az storage account update --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --remove tags.SecurityControl --only-show-errors --output none
           exclusion_status=$?
-          endpoint_state="$(az storage account show --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --query '{publicNetworkAccess:publicNetworkAccess,securityControl:tags.SecurityControl}' --output json 2>/dev/null)"
+          endpoint_state="$(az storage account show --resource-group "$APEX_CONTROL_RESOURCE_GROUP" --name "$APEX_BACKEND_STORAGE_ACCOUNT" --query '{publicNetworkAccess:publicNetworkAccess,defaultAction:networkRuleSet.defaultAction,securityControl:tags.SecurityControl}' --output json 2>/dev/null)"
           verify_status=$?
           public_access="$(jq -r '.publicNetworkAccess // ""' <<<"$endpoint_state" 2>/dev/null)"
+          default_action="$(jq -r '.defaultAction // ""' <<<"$endpoint_state" 2>/dev/null)"
           security_control="$(jq -r '.securityControl // ""' <<<"$endpoint_state" 2>/dev/null)"
-          if [[ "$public_access" != "Disabled" || -n "$security_control" ]]; then verify_status=1; fi
+          if [[ "$public_access" != "Disabled" || "$default_action" != "Deny" || -n "$security_control" ]]; then verify_status=1; fi
           status=0
-          if [[ "$remove_status" -ne 0 || "$disable_status" -ne 0 || "$exclusion_status" -ne 0 || "$verify_status" -ne 0 ]]; then status=1; fi
+          if [[ "$deny_status" -ne 0 || "$disable_status" -ne 0 || "$exclusion_status" -ne 0 || "$verify_status" -ne 0 ]]; then status=1; fi
           mkdir -p apex-live/evidence
-          jq -n --arg job apply --arg ip "${{ steps.ip.outputs.address }}/32" --arg publicAccess "$public_access" --arg securityControl "$security_control" --argjson removed "$( [[ "$remove_status" -eq 0 ]] && printf true || printf false )" --argjson restored "$( [[ "$disable_status" -eq 0 && "$exclusion_status" -eq 0 && "$verify_status" -eq 0 ]] && printf true || printf false )" '{job:$job,rule:$ip,removed:$removed,restored:$restored,publicNetworkAccess:$publicAccess,securityControl:$securityControl}' > apex-live/evidence/cleanup.json
+          jq -n --arg job apply --arg session "entra-only-public-endpoint" --arg publicAccess "$public_access" --arg defaultAction "$default_action" --arg securityControl "$security_control" --argjson restored "$( [[ "$deny_status" -eq 0 && "$disable_status" -eq 0 && "$exclusion_status" -eq 0 && "$verify_status" -eq 0 ]] && printf true || printf false )" '{job:$job,session:$session,restored:$restored,publicNetworkAccess:$publicAccess,defaultAction:$defaultAction,securityControl:$securityControl}' > apex-live/evidence/cleanup.json
           exit "$status"
       - name: Upload apply evidence
         if: always()
