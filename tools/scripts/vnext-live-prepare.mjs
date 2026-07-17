@@ -3,7 +3,7 @@
 
 import { execFile as execFileCallback } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import process from "node:process";
@@ -49,14 +49,14 @@ export function parsePrepareArgs(argv) {
     if (!name?.startsWith("--")) throw new Error(`Unexpected argument: ${name ?? "<missing>"}`);
     const key = name.slice(2).replaceAll("-", "_");
     if (Object.hasOwn(values, key)) throw new Error(`Duplicate argument: ${name}`);
-    if (key === "yes") values.yes = true;
+    if (key === "yes" || key === "replace_existing") values[key] = true;
     else {
       const value = argv[++index];
       if (!value || value.startsWith("--")) throw new Error(`Missing value for ${name}`);
       values[key] = value;
     }
   }
-  const allowed = new Set(["yes", "track", "actor", "subscription"]);
+  const allowed = new Set(["yes", "replace_existing", "track", "actor", "subscription"]);
   for (const key of Object.keys(values)) {
     if (!allowed.has(key)) throw new Error(`Unknown argument: --${key.replaceAll("_", "-")}`);
   }
@@ -561,141 +561,173 @@ export async function prepareQualificationState(args, dependencies = {}) {
   const targetResourceGroup = `rg-vnext-qualification-${args.track}`;
   const targetScope = `/subscriptions/${args.subscription}/resourceGroups/${targetResourceGroup}`;
   const { ApexService } = await import("../../packages/cli/dist/index.js");
-  const service = new ApexService(root, {
-    clock: () => new Date(now),
-    architectureAvailabilityAdapter: async (evidence) => {
-      if (evidence.targetScope !== targetScope || evidence.mode !== "native") {
-        throw new Error("Native availability evidence does not match the qualification target");
-      }
-    },
-  });
-  const emptyCustomizations = await mkdtemp(join(tmpdir(), "apex-vnext-empty-customizations-"));
-  let runId;
-  try {
-    ({ runId } = await service.init({
-      projectId: PROJECT_ID,
-      displayName: "APEX vNext Live Qualification",
-      environment: ENVIRONMENT,
-      targetScope,
-      iacTool: args.track,
-      customizationsSource: emptyCustomizations,
-    }));
-  } finally {
-    await rm(emptyCustomizations, { recursive: true, force: true });
+  let backupRoot;
+  let backupPath;
+  if (args.replace_existing === true) {
+    const existing = new ApexService(root);
+    const existingStatus = await existing.status();
+    if (
+      existingStatus.run.projectId !== PROJECT_ID ||
+      existingStatus.run.gates.find(({ gate }) => gate === 4)?.state !== "closed"
+    ) {
+      throw new Error("Existing qualification state must select vnext-qualification with Gate 4 closed");
+    }
+    if ((await existing.currentWriter()) !== null) {
+      throw new Error("Existing qualification state has writer ownership and cannot be replaced");
+    }
+    backupRoot = await mkdtemp(join(tmpdir(), "apex-vnext-state-backup-"));
+    backupPath = join(backupRoot, "apex");
+    await rename(join(root, ".apex"), backupPath);
   }
-  await service.recordRequirementsInput({
-    workload: "vnext qualification marker",
-    requirements: "exact native lifecycle proof in the isolated sandbox",
-    candidateSha,
-  });
-  const sourceRefs = {
-    pricing: await acceptedEvidenceHash(service, "pricing-evidence", availability.pricing),
-    quota: await acceptedEvidenceHash(service, "quota-evidence", availability.quota),
-    regionalAvailability: await acceptedEvidenceHash(
-      service,
-      "regional-availability-evidence",
-      availability.regionalAvailability,
-    ),
+  const execute = async () => {
+    const service = new ApexService(root, {
+      clock: () => new Date(now),
+      architectureAvailabilityAdapter: async (evidence) => {
+        if (evidence.targetScope !== targetScope || evidence.mode !== "native") {
+          throw new Error("Native availability evidence does not match the qualification target");
+        }
+      },
+    });
+    const emptyCustomizations = await mkdtemp(join(tmpdir(), "apex-vnext-empty-customizations-"));
+    let runId;
+    try {
+      ({ runId } = await service.init({
+        projectId: PROJECT_ID,
+        displayName: "APEX vNext Live Qualification",
+        environment: ENVIRONMENT,
+        targetScope,
+        iacTool: args.track,
+        customizationsSource: emptyCustomizations,
+      }));
+    } finally {
+      await rm(emptyCustomizations, { recursive: true, force: true });
+    }
+    await service.recordRequirementsInput({
+      workload: "vnext qualification marker",
+      requirements: "exact native lifecycle proof in the isolated sandbox",
+      candidateSha,
+    });
+    const sourceRefs = {
+      pricing: await acceptedEvidenceHash(service, "pricing-evidence", availability.pricing),
+      quota: await acceptedEvidenceHash(service, "quota-evidence", availability.quota),
+      regionalAvailability: await acceptedEvidenceHash(
+        service,
+        "regional-availability-evidence",
+        availability.regionalAvailability,
+      ),
+    };
+    await acceptedEvidenceHash(service, "architecture-availability-v1", {
+      schemaVersion: "1.0.0",
+      projectId: PROJECT_ID,
+      runId,
+      targetScope,
+      mode: "native",
+      collectedAt: now,
+      expiresAt: new Date(Date.parse(now) + 24 * 60 * 60 * 1000).toISOString(),
+      checks: {
+        pricing: { status: "current", evidenceRef: sourceRefs.pricing },
+        quota: { status: "current", evidenceRef: sourceRefs.quota },
+        regionalAvailability: { status: "current", evidenceRef: sourceRefs.regionalAvailability },
+      },
+    });
+    const artifacts = await buildQualificationArtifacts({
+      root: sourceRoot,
+      track: args.track,
+      subscription: args.subscription,
+      runId,
+      now,
+      availability,
+    });
+    const requirements = await complete(service, "requirements", [
+      { kind: "requirements", value: artifacts.requirements },
+      { kind: "sku-manifest", value: artifacts.skuManifest },
+    ]);
+    await complete(service, "requirements-review", [
+      {
+        kind: "review-findings",
+        value: review(PROJECT_ID, runId, "requirements", requirements.outputHashes.requirements, now),
+      },
+    ]);
+    await service.decideGateNumber(1, "approved", args.actor);
+    const architecture = await complete(service, "architecture", [
+      { kind: "architecture", value: artifacts.architecture },
+      { kind: "cost-estimate", value: artifacts.costEstimate },
+    ]);
+    await complete(service, "architecture-review", [
+      {
+        kind: "review-findings",
+        value: review(PROJECT_ID, runId, "architecture", architecture.outputHashes.architecture, now),
+      },
+    ]);
+    const governance = await complete(service, "governance-discovery", [
+      { kind: "governance-constraints", value: artifacts.governanceArtifact },
+    ]);
+    artifacts.policyMap.governanceHash = governance.outputHashes["governance-constraints"];
+    const policy = await complete(service, "governance-reconciliation", [
+      { kind: "policy-property-map", value: artifacts.policyMap },
+    ]);
+    await complete(service, "governance-review", [
+      {
+        kind: "review-findings",
+        value: review(PROJECT_ID, runId, "policy-property-map", policy.outputHashes["policy-property-map"], now),
+      },
+    ]);
+    await service.decideGateNumber(2, "approved", args.actor);
+    artifacts.intent.sourceHashes = {
+      requirements: requirements.outputHashes.requirements,
+      architecture: architecture.outputHashes.architecture,
+      "governance-constraints": governance.outputHashes["governance-constraints"],
+      "policy-property-map": policy.outputHashes["policy-property-map"],
+    };
+    artifacts.binding.intentHash = sha256Json(artifacts.intent);
+    artifacts.handoff.intentHash = sha256Json(artifacts.intent);
+    artifacts.handoff.bindingHash = sha256Json(artifacts.binding);
+    const plan = await complete(service, "plan", [
+      { kind: "implementation-intent", value: artifacts.intent },
+      { kind: "iac-binding", value: artifacts.binding },
+      { kind: "environment-inputs", value: artifacts.environmentInputs },
+    ]);
+    await complete(service, "plan-review", [
+      {
+        kind: "review-findings",
+        value: review(PROJECT_ID, runId, "plan", plan.outputHashes["implementation-intent"], now),
+      },
+    ]);
+    await service.decideGateNumber(3, "approved", args.actor);
+    await complete(service, `codegen-${args.track}`, [
+      { kind: "logical-resource-manifest", value: artifacts.logicalManifest },
+      { kind: "iac-handoff", value: artifacts.handoff },
+    ]);
+    const entries = dependencies.validationEntries ?? (await nativeValidation(sourceRoot, args.track, artifacts));
+    await complete(service, `validation-${args.track}`, [
+      {
+        kind: "validation-evidence",
+        value: { schemaVersion: "1.0.0", projectId: PROJECT_ID, runId, createdAt: now, entries },
+      },
+    ]);
+    const status = await service.status();
+    return {
+      projectId: PROJECT_ID,
+      runId,
+      track: args.track,
+      candidateSha,
+      targetScope,
+      gates: status.run.gates,
+      next: "Review and merge the repository-backed .apex state, then create the native preview from exact clean main",
+    };
   };
-  await acceptedEvidenceHash(service, "architecture-availability-v1", {
-    schemaVersion: "1.0.0",
-    projectId: PROJECT_ID,
-    runId,
-    targetScope,
-    mode: "native",
-    collectedAt: now,
-    expiresAt: new Date(Date.parse(now) + 24 * 60 * 60 * 1000).toISOString(),
-    checks: {
-      pricing: { status: "current", evidenceRef: sourceRefs.pricing },
-      quota: { status: "current", evidenceRef: sourceRefs.quota },
-      regionalAvailability: { status: "current", evidenceRef: sourceRefs.regionalAvailability },
-    },
-  });
-  const artifacts = await buildQualificationArtifacts({
-    root: sourceRoot,
-    track: args.track,
-    subscription: args.subscription,
-    runId,
-    now,
-    availability,
-  });
-  const requirements = await complete(service, "requirements", [
-    { kind: "requirements", value: artifacts.requirements },
-    { kind: "sku-manifest", value: artifacts.skuManifest },
-  ]);
-  await complete(service, "requirements-review", [
-    {
-      kind: "review-findings",
-      value: review(PROJECT_ID, runId, "requirements", requirements.outputHashes.requirements, now),
-    },
-  ]);
-  await service.decideGateNumber(1, "approved", args.actor);
-  const architecture = await complete(service, "architecture", [
-    { kind: "architecture", value: artifacts.architecture },
-    { kind: "cost-estimate", value: artifacts.costEstimate },
-  ]);
-  await complete(service, "architecture-review", [
-    {
-      kind: "review-findings",
-      value: review(PROJECT_ID, runId, "architecture", architecture.outputHashes.architecture, now),
-    },
-  ]);
-  const governance = await complete(service, "governance-discovery", [
-    { kind: "governance-constraints", value: artifacts.governanceArtifact },
-  ]);
-  artifacts.policyMap.governanceHash = governance.outputHashes["governance-constraints"];
-  const policy = await complete(service, "governance-reconciliation", [
-    { kind: "policy-property-map", value: artifacts.policyMap },
-  ]);
-  await complete(service, "governance-review", [
-    {
-      kind: "review-findings",
-      value: review(PROJECT_ID, runId, "policy-property-map", policy.outputHashes["policy-property-map"], now),
-    },
-  ]);
-  await service.decideGateNumber(2, "approved", args.actor);
-  artifacts.intent.sourceHashes = {
-    requirements: requirements.outputHashes.requirements,
-    architecture: architecture.outputHashes.architecture,
-    "governance-constraints": governance.outputHashes["governance-constraints"],
-    "policy-property-map": policy.outputHashes["policy-property-map"],
-  };
-  artifacts.binding.intentHash = sha256Json(artifacts.intent);
-  artifacts.handoff.intentHash = sha256Json(artifacts.intent);
-  artifacts.handoff.bindingHash = sha256Json(artifacts.binding);
-  const plan = await complete(service, "plan", [
-    { kind: "implementation-intent", value: artifacts.intent },
-    { kind: "iac-binding", value: artifacts.binding },
-    { kind: "environment-inputs", value: artifacts.environmentInputs },
-  ]);
-  await complete(service, "plan-review", [
-    {
-      kind: "review-findings",
-      value: review(PROJECT_ID, runId, "plan", plan.outputHashes["implementation-intent"], now),
-    },
-  ]);
-  await service.decideGateNumber(3, "approved", args.actor);
-  await complete(service, `codegen-${args.track}`, [
-    { kind: "logical-resource-manifest", value: artifacts.logicalManifest },
-    { kind: "iac-handoff", value: artifacts.handoff },
-  ]);
-  const entries = dependencies.validationEntries ?? (await nativeValidation(sourceRoot, args.track, artifacts));
-  await complete(service, `validation-${args.track}`, [
-    {
-      kind: "validation-evidence",
-      value: { schemaVersion: "1.0.0", projectId: PROJECT_ID, runId, createdAt: now, entries },
-    },
-  ]);
-  const status = await service.status();
-  return {
-    projectId: PROJECT_ID,
-    runId,
-    track: args.track,
-    candidateSha,
-    targetScope,
-    gates: status.run.gates,
-    next: "Review and merge the repository-backed .apex state, then create the native preview from exact clean main",
-  };
+  try {
+    const result = await execute();
+    if (backupRoot !== undefined) await rm(backupRoot, { recursive: true, force: true });
+    return result;
+  } catch (error) {
+    if (backupPath !== undefined) {
+      await rm(join(root, ".apex"), { recursive: true, force: true });
+      await rename(backupPath, join(root, ".apex"));
+      await rm(backupRoot, { recursive: true, force: true });
+    }
+    throw error;
+  }
 }
 
 async function main() {
