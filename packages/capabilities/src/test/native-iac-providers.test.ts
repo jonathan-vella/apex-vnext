@@ -192,8 +192,14 @@ function stack(name: string, resourceGroup = "rg", resources: unknown[] = []) {
 
 test("Azure stack selection distinguishes absent, exact, malformed, duplicate, and wrong-scope results", () => {
   const exact = stack("workload");
+  const failedStack = {
+    ...stack("failed"),
+    properties: { provisioningState: "failed" },
+    resources: [{ id: "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/example" }],
+  };
   assert.equal(selectAzureDeploymentStack([stack("other")], "rg", "workload"), null);
   assert.equal(selectAzureDeploymentStack([stack("other"), exact], "rg", "Workload"), exact);
+  assert.equal(selectAzureDeploymentStack([failedStack], "rg", "failed"), failedStack);
   assert.throws(() => selectAzureDeploymentStack({}, "rg", "workload"), /must be a JSON array/);
   assert.throws(() => selectAzureDeploymentStack([{}], "rg", "workload"), /entry 0 is malformed/);
   assert.throws(() => selectAzureDeploymentStack([exact, stack("WORKLOAD")], "rg", "workload"), /duplicate name/);
