@@ -33,4 +33,6 @@ test("qualification backend is policy-compliant at rest without broad Azure serv
   assert.match(source, /defaultAction: 'Deny'/);
   assert.match(source, /92aaf0da-9dab-42b6-94a3-d43ce8d16293/);
   assert.doesNotMatch(source, /73c42c96-874c-492b-b04d-ab87d138a893/);
+  assert.equal(source.match(/principalId: handoffUploaderPrincipalId/g)?.length, 3);
+  assert.equal(source.match(/roleDefinitionIdOrName: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'/g)?.length, 4);
 });
