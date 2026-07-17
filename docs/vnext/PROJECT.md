@@ -52,8 +52,6 @@ The transferred issues remain authoritative:
 
 | Issue | Work                                           |
 | ----- | ---------------------------------------------- |
-| `#9`  | Qualify supported VS Code and cloud workflows  |
-| `#10` | Prove encrypted Terraform CI plan transport    |
 | `#11` | Inventory modernization ownership surfaces     |
 | `#12` | Design bounded observe-and-propose improvement |
 | `#13` | Run final qualification and cutover review     |
