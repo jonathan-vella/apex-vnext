@@ -61,14 +61,13 @@ missing exact stack is treated as an empty managed set, so the first cloud mutat
 source drift, variable drift, lock drift, or a symlink fails closed. `configHash` may pin an expected tree hash but is not
 required because APEX always computes the current value.
 
-APEX stores preview bindings and encrypted Terraform plan artifacts under `.apex/local/provider-runtime/`. The generated
-local transport key is mode `0600` and never enters provider configuration. A trusted process can instead inject a
-base64-encoded 32-byte key through `APEX_PLAN_TRANSPORT_KEY`; never print, commit, or place that value in a workflow
-definition. Injecting a key does not qualify production CI transport.
+APEX stores preview bindings and encrypted Terraform plan artifacts under `.apex/local/provider-runtime/`. Terraform
+plan encryption uses an automatically generated mode-`0600` local key. Operators do not create, synchronize, or inject
+a transport secret. Provider configuration never contains the local key.
 
 ## Transfer Repository State to CI
 
-Create a writer-transfer claim first, then encrypt only the selected repository-backed state for that claim:
+Create a writer-transfer claim first, then package only the selected repository-backed state for that claim:
 
 ```bash
 apex state transfer-export \
@@ -79,7 +78,7 @@ apex state transfer-export \
   --yes --json
 ```
 
-The recipient imports with the same externally supplied 32-byte transport key:
+The recipient imports the short-lived, recipient-bound bundle without a shared transport key:
 
 ```bash
 apex state transfer-import \
@@ -130,10 +129,10 @@ apex provider transfer-import \
   --yes --json
 ```
 
-The import accepts only the exact hash-derived binding path and optional Terraform artifact path. It rejects changed
-destinations and symlinked runtime ancestors, while allowing byte-identical retries. It never transfers or creates the
-transport key, approval, or provider operation. Keep production CI apply blocked until live proof qualifies the complete
-repository-state and provider-authority sequence.
+The import accepts only the exact hash-derived binding path and, for Terraform, the exact artifact and its generated
+local plan key. It rejects changed destinations and symlinked runtime ancestors, while allowing byte-identical retries.
+It never creates approval or a provider operation. Keep production CI apply blocked until live proof qualifies the
+complete repository-state and provider-authority sequence.
 
 ## Approve Gate 4 Before CI Handoff
 

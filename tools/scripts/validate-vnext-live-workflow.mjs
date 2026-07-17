@@ -113,6 +113,7 @@ export function validateWorkflowText(text) {
   );
   fail(validation.includes("[0-9a-f]{8}-[0-9a-f]{4}-4"), "handoff UUID guard missing");
   fail(uses(jobs.validate_dispatch).includes("actions/checkout@v6"), "validation checkout must use v6");
+  fail(!text.includes("APEX_PLAN_TRANSPORT_KEY"), "manual transport key is forbidden");
 
   for (const name of PROTECTED) {
     const job = jobs[name];
@@ -125,7 +126,6 @@ export function validateWorkflowText(text) {
     );
     fail(job?.environment === "vnext-qualification", `${name} environment missing`);
     fail(job?.["runs-on"] === "ubuntu-latest", `${name} runner must be ubuntu-latest`);
-    fail(job?.env?.APEX_PLAN_TRANSPORT_KEY === undefined, `${name} transport key must not be job-wide`);
     fail(job?.env?.ARM_OIDC_TOKEN === undefined, `${name} ARM token must not be job-wide`);
     fail(
       job?.env?.APEX_RUNTIME_ROOT === "${{ github.workspace }}/apex-live/runtime",
@@ -231,14 +231,6 @@ export function validateWorkflowText(text) {
     );
     for (const step of steps(job)) {
       const command = step.run ?? "";
-      if (
-        /\b(?:state|provider) transfer-(?:import|export)\b|\bpreview --operation\b|\bdeploy --preview\b/.test(command)
-      ) {
-        fail(
-          step.env?.APEX_PLAN_TRANSPORT_KEY === "${{ secrets.APEX_PLAN_TRANSPORT_KEY }}",
-          `${name} APEX command lacks step-scoped transport key`,
-        );
-      }
       if (/terraform -chdir=|\bdeploy --preview\b/.test(command)) {
         const expectedToken =
           step.name === "Deploy exact preview"
@@ -259,7 +251,7 @@ export function validateWorkflowText(text) {
     "run-scoped recipient forbidden",
   );
   const stateBlob = "incoming/${{ inputs.handoff_id }}/${object}.json";
-  const authorityDownload = applySteps.find((step) => step.name === "Download encrypted local authority");
+  const authorityDownload = applySteps.find((step) => step.name === "Download bound local authority");
   fail(
     authorityDownload?.run?.includes(stateBlob) &&
       authorityDownload.run.includes("for object in state provider") &&
@@ -321,7 +313,7 @@ export function validateWorkflowText(text) {
     !uses(jobs.apply).some((action) => action.startsWith("actions/download-artifact@")),
     "artifact authority download forbidden",
   );
-  const returnFallback = applySteps.find((step) => step.name === "Upload encrypted return fallback");
+  const returnFallback = applySteps.find((step) => step.name === "Upload bound return fallback");
   fail(
     returnFallback?.uses === "actions/upload-artifact@v4" &&
       returnFallback.with?.path === "apex-live/return-authority.json" &&

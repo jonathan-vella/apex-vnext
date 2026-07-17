@@ -54,15 +54,15 @@
 ## 🏛️ Architecture
 
 No diagram is generated yet. The current design isolates a control resource group, Bicep workload resource group, and
-Terraform workload resource group. Azure Blob carries the approved encrypted state and exact provider-authority
-envelopes from local preview to CI apply. GitHub Actions artifacts carry nonsecret evidence and provide a bounded return
+Terraform workload resource group. Azure Blob carries approved state and exact provider-authority bundles from local
+preview to CI apply. GitHub Actions artifacts carry nonsecret evidence and provide a bounded return
 fallback only.
 
 ### Key Resources
 
 | Resource | Type | SKU | Purpose |
 | --- | --- | --- | --- |
-| Qualification backend | Azure Storage | Standard LRS GPv2 | Terraform state and encrypted handoff envelopes |
+| Qualification backend | Azure Storage | Standard LRS GPv2 | Terraform state and Entra-bound handoff bundles |
 | Bicep workload marker | Azure Storage | Standard LRS GPv2 | Deployment-stack lifecycle proof |
 | Terraform workload marker | Azure Storage | Standard LRS GPv2 | Saved-plan lifecycle proof |
 | Qualification logs | Log Analytics | PerGB2018 | Diagnostics and read-only evidence |

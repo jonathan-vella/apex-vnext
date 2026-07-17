@@ -10,7 +10,6 @@ import type {
 import { atomicWriteBytes, atomicWriteJson, sha256Bytes, sha256Json } from "@apex/kernel";
 
 const HASH_PATTERN = /^[0-9a-f]{64}$/;
-const KEY_ENVIRONMENT_VARIABLE = "APEX_PLAN_TRANSPORT_KEY";
 
 interface StoredArtifact {
   reference: string;
@@ -222,17 +221,7 @@ async function readLocalKey(path: string): Promise<Buffer> {
   return key;
 }
 
-function environmentKey(environment: NodeJS.ProcessEnv): Buffer | undefined {
-  const encoded = environment[KEY_ENVIRONMENT_VARIABLE];
-  if (encoded === undefined) return undefined;
-  const key = Buffer.from(encoded, "base64");
-  if (key.byteLength !== 32) throw new Error(`${KEY_ENVIRONMENT_VARIABLE} must encode exactly 32 bytes`);
-  return key;
-}
-
-async function localKeyProvider(runtimeRoot: string, environment: NodeJS.ProcessEnv): Promise<Uint8Array> {
-  const supplied = environmentKey(environment);
-  if (supplied !== undefined) return supplied;
+async function localKeyProvider(runtimeRoot: string): Promise<Uint8Array> {
   const path = join(runtimeRoot, "plan-transport.key");
   try {
     return await readLocalKey(path);
@@ -247,10 +236,7 @@ async function localKeyProvider(runtimeRoot: string, environment: NodeJS.Process
   return await readLocalKey(path);
 }
 
-export async function createFileProviderRuntime(
-  workspaceRoot: string,
-  environment: NodeJS.ProcessEnv = process.env,
-): Promise<{
+export async function createFileProviderRuntime(workspaceRoot: string): Promise<{
   bindingStores: {
     bicep: FilePreviewBindingStore;
     terraform: FilePreviewBindingStore;
@@ -268,6 +254,6 @@ export async function createFileProviderRuntime(
       terraform: new FilePreviewBindingStore(bindingsRoot, latestRoot, "terraform"),
     },
     artifactStore: new FileEncryptedPlanArtifactStore(artifactsRoot),
-    keyProvider: async () => await localKeyProvider(runtimeRoot, environment),
+    keyProvider: async () => await localKeyProvider(runtimeRoot),
   };
 }

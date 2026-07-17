@@ -1,4 +1,5 @@
 export * from "./capability.js";
+export * from "./bound-envelope-transport.js";
 export * from "./command-plans.js";
 export * from "./encrypted-envelope-transport.js";
 export * from "./iac.js";
