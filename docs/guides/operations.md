@@ -179,6 +179,9 @@ qualification IaC and governance contract, and an explicit Gate 1–3 actor. It 
 Commit the resulting repository-backed `.apex` state through review, then create the preview from the merged exact `main`
 candidate.
 
+Use `--replace-existing` only to refresh an already reviewed qualification run whose Gate 4 is closed. Replacement is
+transactional, rejects active writer ownership, and restores the previous state if preparation fails.
+
 For other workflows, complete required tasks and gates first, then configure the selected run's provider:
 
 ```bash

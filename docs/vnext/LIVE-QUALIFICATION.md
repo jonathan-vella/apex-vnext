@@ -49,6 +49,10 @@ npm run prepare:vnext-live -- --yes \
   --subscription <subscription-id>
 ```
 
+When reviewed qualification state already exists and its Gate 4 is closed, add `--replace-existing`. The command refuses
+active writer ownership, keeps the prior `.apex` tree in a private backup, and restores it if any new task or validator
+fails.
+
 Review and merge the resulting repository-backed `.apex` state. Use a fresh exact `main` checkout for preview so the
 candidate commit includes the journaled artifacts, validation evidence, and Gate 1–3 decisions. Set
 `APEX_PLAN_TRANSPORT_KEY` in the current process, then create the native preview locally. Terraform preview opens a
