@@ -240,14 +240,15 @@ export class ImprovementStore {
         if (!Value.Check(ImprovementProposalV1Schema, proposal)) throw new Error("Improvement proposal is invalid");
         await atomicWriteJson(path, proposal, { refuseOverwrite: true });
       }
-      proposals.push(proposal);
+      proposals.push(await this.withDecisionStatus(proposal));
     }
     return { recurrences, proposals };
   }
 
   async listProposals(projectId?: string): Promise<ImprovementProposalV1[]> {
     const proposals = await readDirectory<ImprovementProposalV1>(this.proposalsRoot);
-    return projectId === undefined ? proposals : proposals.filter((proposal) => proposal.projectId === projectId);
+    const selected = projectId === undefined ? proposals : proposals.filter((proposal) => proposal.projectId === projectId);
+    return await Promise.all(selected.map(async (proposal) => await this.withDecisionStatus(proposal)));
   }
 
   async decide(input: ImprovementDecisionInput): Promise<ImprovementDecisionV1> {
@@ -271,7 +272,6 @@ export class ImprovementStore {
     };
     if (!Value.Check(ImprovementDecisionV1Schema, decision)) throw new Error("Improvement decision is invalid");
     await atomicWriteJson(decisionPath, decision, { refuseOverwrite: true });
-    await atomicWriteJson(proposalPath, { ...proposal, status: input.decision });
     return decision;
   }
 
@@ -301,5 +301,10 @@ export class ImprovementStore {
       }
     }
     return { observations: observationCount, decisions: decisionCount };
+  }
+
+  private async withDecisionStatus(proposal: ImprovementProposalV1): Promise<ImprovementProposalV1> {
+    const decision = await readJson<ImprovementDecisionV1>(join(this.decisionsRoot, `${proposal.proposalId}.json`));
+    return decision === undefined ? proposal : { ...proposal, status: decision.decision };
   }
 }

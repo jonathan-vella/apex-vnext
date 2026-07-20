@@ -118,6 +118,16 @@ test("human decisions are immutable and retention plus explicit deletion are bou
     rationale: "False positive after human review.",
   });
   assert.equal(decision.decision, "rejected");
+  assert.equal((await store.listProposals("demo"))[0]?.status, "rejected");
+  assert.equal(
+    JSON.parse(
+      await readFile(
+        join(projectRoot, ".apex", "quality", "improvement", "proposals", `${proposal.proposalId}.json`),
+        "utf8",
+      ),
+    ).status,
+    "pending",
+  );
   await assert.rejects(
     store.decide({
       projectId: "demo",
@@ -134,6 +144,7 @@ test("human decisions are immutable and retention plus explicit deletion are bou
   assert.deepEqual(await store.prune(), { observations: 2, decisions: 1 });
   assert.equal((await store.listObservations()).length, 0);
   assert.equal((await store.listDecisions()).length, 0);
+  assert.equal((await store.listProposals("demo"))[0]?.status, "pending");
   await assert.rejects(readFile(join(projectRoot, "outside.json")), /ENOENT/);
 });
 

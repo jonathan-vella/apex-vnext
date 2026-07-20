@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import test from "node:test";
 import type { ImprovementPolicyV1 } from "@apex/contracts";
+import { ImprovementStore } from "@apex/kernel";
 import { execute } from "../cli.js";
 import { ApexService } from "../service.js";
 import { tempRoot, writeJson } from "./helpers.js";
@@ -63,6 +64,42 @@ test("CLI observation uses structured files and destructive improvement operatio
     await execute(["quality", "delete-observation", "--observation", result.observation.observationId, "--yes"], root),
     { deleted: result.observation.observationId },
   );
+});
+
+test("CLI records only confirmed immutable human proposal decisions", async () => {
+  const root = await tempRoot();
+  await execute(["init", "--project", "demo"], root);
+  const store = new ImprovementStore(root, policy, () => new Date("2026-07-17T12:00:00.000Z"));
+  for (const runId of ["run-1", "run-2", "run-3"]) {
+    await store.observe({
+      projectId: "demo",
+      runId,
+      source: "validation-failure",
+      category: "documentation",
+      severity: "low",
+      statement: "The guide omitted a required boundary.",
+      evidenceRefs: [Buffer.from(runId.padEnd(64, "0")).toString("hex").slice(0, 64)],
+    });
+  }
+  const proposal = (await store.scan("demo")).proposals[0]!;
+  const command = [
+    "quality",
+    "decide",
+    "--proposal",
+    proposal.proposalId,
+    "--actor",
+    "maintainer",
+    "--decision",
+    "rejected",
+    "--rationale",
+    "False positive after human review.",
+  ];
+  await assert.rejects(execute(command, root), /requires --yes/);
+  const decision = (await execute([...command, "--yes"], root)) as { decision: string };
+  assert.equal(decision.decision, "rejected");
+  const proposals = (await execute(["quality", "proposals"], root)) as Array<{ status: string }>;
+  assert.equal(proposals[0]?.status, "rejected");
+  await assert.rejects(execute([...command, "--yes"], root), /already has/);
 });
 
 test("CLI exposes no proposal application or autonomous repository operation", async () => {
