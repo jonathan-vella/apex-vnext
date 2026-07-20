@@ -31,13 +31,15 @@ qualification workload, publish packages, or authorize production Terraform CI a
 | **Tenant**        | `30bac921-1547-4b1e-8445-72455da783f1`                             |
 | **Location**      | `swedencentral` - approved                                         |
 | Repository        | `jonathan-vella/apex-vnext`                                        |
-| Candidate base    | `2b4b1b9d62adb96b5a8d9594f3fad7355d8dcb3e`                         |
+| Candidate base    | `751a5fc2c94b49faad8e6e1eaff06c08f7317bae`                         |
 | GitHub boundary   | Unprotected Environment `vnext-qualification` for OIDC/config only |
 | Approval boundary | Local APEX Gate 4 decision bound to the exact preview              |
 
-The provider metadata lists Sweden Central for Storage Accounts and Log Analytics. Both resource providers and
-`Microsoft.Quota` are currently unregistered in `apex-shared`, so validation and quota discovery remain blocked until
-the maintainer separately authorizes registration. Live policy discovery found no allowed-location list.
+The provider metadata lists Sweden Central for Storage Accounts and Log Analytics. `Microsoft.Storage`,
+`Microsoft.OperationalInsights`, and `Microsoft.Quota` were registered with explicit maintainer authorization and
+verified through Azure Resource Manager on 2026-07-20. Storage quota discovery reports a 250-account limit with zero
+accounts in use. Live policy discovery found no allowed-location list. Validation, what-if, bootstrap, identity, and
+GitHub configuration remain outside the provider-registration authorization.
 
 ## 3. Components Detected
 
@@ -116,8 +118,8 @@ The complete issue `#9` lifecycle includes the bootstrap plus one Bicep and one 
 | Resource Type                                 | Number to Deploy | Total After Deployment | Limit / Quota   | Notes                                                        |
 | --------------------------------------------- | ---------------- | ---------------------- | --------------- | ------------------------------------------------------------ |
 | Microsoft.Resources/resourceGroups            | 3                | 5                      | 980             | Current subscription count 2; official ARM limit             |
-| Microsoft.Storage/storageAccounts             | 3                | 3                      | Unavailable     | Current count 0; provider and quota API are unregistered     |
-| Microsoft.OperationalInsights/workspaces      | 1                | 1                      | No count limit  | Current count 0; provider is unregistered                    |
+| Microsoft.Storage/storageAccounts             | 3                | 3                      | 250             | Current count 0; provider, quota, and usage APIs pass         |
+| Microsoft.OperationalInsights/workspaces      | 1                | 1                      | No count limit  | Current count 0; provider registered                         |
 | Microsoft.Authorization/roleAssignments       | 8                | 21                     | 4,000           | Current visible assignments 13; official RBAC limit          |
 | Microsoft.Insights/diagnosticSettings         | 6                | 1 per target resource  | 5 per resource  | One account and one Blob-service setting per storage account |
 | Microsoft Entra application/service principal | 1 pair           | 1 pair                 | Tenant governed | No matching application exists; no API permissions or secret |
@@ -125,16 +127,16 @@ The complete issue `#9` lifecycle includes the bootstrap plus one Bicep and one 
 
 ### Phase 2: Quota and Capacity Sources
 
-| Resource family | Primary result                                                  | Fallback / source                                  | Capacity decision                                  |
-| --------------- | --------------------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------- |
-| Storage         | Blocked: `Microsoft.Storage` and `Microsoft.Quota` unregistered | Azure Resource Graph count                         | Unavailable                                        |
-| Log Analytics   | Blocked: `Microsoft.OperationalInsights` unregistered           | Azure Resource Graph count                         | Unavailable                                        |
-| Resource groups | Quota API not applicable                                        | Azure CLI count plus Azure Resource Manager limits | Pass: 5 of 980                                     |
-| RBAC            | Quota API not applicable                                        | Azure CLI count plus Azure RBAC limits             | Pass: 21 of 4,000                                  |
-| Diagnostics     | Per-resource hard limit                                         | Azure Monitor service limits                       | Pass: 1 setting on each diagnostic target, limit 5 |
+| Resource family | Primary result                                    | Fallback / source                                  | Capacity decision                                  |
+| --------------- | ------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------- |
+| Storage         | Quota limit 250; authoritative usage 0           | Azure Resource Graph count                         | Pass: 3 of 250                                     |
+| Log Analytics   | Provider registered; no count-based quota exposed | Resource count and regional provider metadata      | Pass: 0 current; 1 planned                         |
+| Resource groups | Quota API not applicable                          | Azure CLI count plus Azure Resource Manager limits | Pass: 5 of 980                                     |
+| RBAC            | Quota API not applicable                          | Azure CLI count plus Azure RBAC limits             | Pass: 21 of 4,000                                  |
+| Diagnostics     | Per-resource hard limit                           | Azure Monitor service limits                       | Pass: 1 setting on each diagnostic target, limit 5 |
 
-**Status:** Blocked. Resource-group and RBAC limits have headroom, but provider registration and Storage quota evidence
-must be completed before the plan can return to `Validated`.
+**Status:** Capacity checks pass. Deployment remains blocked pending separately authorized policy-aware validation,
+replacement Entra/OIDC and bootstrap preparation, a current governance exception, and exact-preview Gate 4 approval.
 
 Official limit references:
 
@@ -149,7 +151,7 @@ Official limit references:
 - [x] Gather requirements from issue `#9`, the PRD, ADR, and live qualification procedure
 - [x] Confirm subscription and location with the maintainer
 - [x] Prepare the complete bootstrap and workload resource inventory
-- [ ] Fetch quotas and validate capacity after required providers are registered
+- [x] Fetch quotas and validate capacity after required providers are registered
 - [x] Scan Bicep, Terraform, workflow, launcher, context validator, governance, and SKU inputs
 - [x] Select native Bicep, Azure CLI, and GitHub API recipes
 - [x] Plan identity, Azure, GitHub, evidence, and cleanup boundaries
@@ -158,7 +160,7 @@ Official limit references:
 ### Phase 2: Preparation
 
 - [x] Research the Bicep, Terraform, Entra federation, GitHub Environment, and RBAC components
-- [ ] Confirm provisioning limits after provider registration
+- [x] Confirm provisioning limits after provider registration
 - [x] Verify the committed Bicep and Terraform artifacts need no generation changes
 - [x] Review the committed templates against governance, AVM, identity, network, and secret-handling controls
 - [x] Update this plan to `Ready for Validation`
@@ -217,13 +219,13 @@ Official limit references:
 The `azure-validate` workflow must replace this section with `apex-shared` evidence before the plan can be marked
 `Validated`. The 2026-07-16 evidence for `noalz` is historical and does not authorize this subscription.
 
-| Check                 | Command Run                                         | Result                                                 | Timestamp      |
-| --------------------- | --------------------------------------------------- | ------------------------------------------------------ | -------------- |
-| Azure authentication  | `az account show --subscription b47d2942-...`       | Pass                                                   | 2026-07-20 UTC |
-| Live policy discovery | `discover.py --subscription b47d2942-... --refresh` | Pass: 6 assignments                                    | 2026-07-20 UTC |
-| Resource inventory    | Explicit-subscription Azure CLI queries             | Pass: no qualification resources                       | 2026-07-20 UTC |
-| Provider readiness    | `az provider show`                                  | Blocked: Storage and Operational Insights unregistered | 2026-07-20 UTC |
-| Storage quota         | `az quota list`                                     | Blocked: Microsoft.Quota unregistered                  | 2026-07-20 UTC |
+| Check                 | Command Run                                      | Result                                        | Timestamp            |
+| --------------------- | ------------------------------------------------ | --------------------------------------------- | -------------------- |
+| Azure authentication  | `az account show --subscription b47d2942-...`    | Pass                                          | 2026-07-20 UTC       |
+| Live policy discovery | `discover.py --subscription b47d2942-... --refresh` | Pass: 6 assignments                        | 2026-07-20 UTC       |
+| Resource inventory    | Explicit-subscription Azure CLI queries          | Pass: no qualification resources              | 2026-07-20 10:32 UTC |
+| Provider readiness    | `az provider show`                               | Pass: all three required providers registered | 2026-07-20 10:32 UTC |
+| Storage quota         | `az quota list`; `az storage account show-usage` | Pass: limit 250, current usage 0               | 2026-07-20 10:32 UTC |
 
 **Validated by:** Pending
 
@@ -283,11 +285,11 @@ approval, and CI execution must fail when imported Gate 4 approval is missing or
 
 ## 12. Next Steps
 
-> Current: Subscription migration blocked on provider registration
+> Current: Provider registration and capacity checks complete; bootstrap remains unauthorized
 
-1. Obtain explicit authorization to register `Microsoft.Storage`, `Microsoft.OperationalInsights`, and
-   `Microsoft.Quota` in `apex-shared`.
-2. Re-run quota discovery, template validation, and policy-aware what-if.
+1. Obtain separate explicit authorization before policy-aware validation/what-if, bootstrap, Entra/OIDC, or GitHub
+  Environment mutation.
+2. After authorization, run template validation and policy-aware what-if against `apex-shared`.
 3. Deploy the approved bootstrap and create replacement Entra/OIDC configuration through the deployment workflow.
 4. Replace all stale GitHub Environment outputs from verified bootstrap outputs.
 5. Authorize a new bounded governance exception before any sandbox apply/destroy dispatch.
