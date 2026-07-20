@@ -60,6 +60,22 @@ test("CLI observation uses structured files and destructive improvement operatio
     execute(["quality", "delete-observation", "--observation", result.observation.observationId], root),
     /requires --yes/,
   );
+  const foreign = await new ImprovementStore(root, policy).observe({
+    projectId: "other-project",
+    runId: "run-1",
+    source: "explicit-correction",
+    category: "documentation",
+    severity: "low",
+    statement: "Another project has separate evidence.",
+    evidenceRefs: ["c".repeat(64)],
+  });
+  await assert.rejects(
+    execute(
+      ["quality", "delete-observation", "--observation", foreign.observation.observationId, "--yes"],
+      root,
+    ),
+    /Improvement observation not found/,
+  );
   assert.deepEqual(
     await execute(["quality", "delete-observation", "--observation", result.observation.observationId, "--yes"], root),
     { deleted: result.observation.observationId },
@@ -100,6 +116,16 @@ test("CLI records only confirmed immutable human proposal decisions", async () =
   const proposals = (await execute(["quality", "proposals"], root)) as Array<{ status: string }>;
   assert.equal(proposals[0]?.status, "rejected");
   await assert.rejects(execute([...command, "--yes"], root), /already has/);
+});
+
+test("improvement operations reject runtime policy drift", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo" });
+  assert.deepEqual(await service.improvementObservations(), []);
+  const policyPath = join(root, ".apex", "runtime", "improvement-policy.v1.json");
+  await writeJson(policyPath, { ...policy, recurrence: { threshold: 2, windowDays: 30 } });
+  await assert.rejects(service.improvementObservations(), /Improvement policy lock is not current/);
 });
 
 test("CLI exposes no proposal application or autonomous repository operation", async () => {

@@ -352,23 +352,23 @@ export class ApexService {
     evidenceRefs: string[];
   }): Promise<{ observation: ImprovementObservationV1; deduplicated: boolean }> {
     const run = await this.currentRun();
-    return (await this.improvements()).observe({ projectId: run.projectId, runId: run.runId, ...input });
+    return (await this.improvements(run)).observe({ projectId: run.projectId, runId: run.runId, ...input });
   }
 
   async improvementObservations(): Promise<ImprovementObservationV1[]> {
     const run = await this.currentRun();
-    const observations = await (await this.improvements()).listObservations();
+    const observations = await (await this.improvements(run)).listObservations();
     return observations.filter(({ projectId }) => projectId === run.projectId);
   }
 
   async improvementScan(): Promise<unknown> {
     const run = await this.currentRun();
-    return (await this.improvements()).scan(run.projectId);
+    return (await this.improvements(run)).scan(run.projectId);
   }
 
   async improvementProposals(): Promise<ImprovementProposalV1[]> {
     const run = await this.currentRun();
-    return (await this.improvements()).listProposals(run.projectId);
+    return (await this.improvements(run)).listProposals(run.projectId);
   }
 
   async improvementDecide(input: {
@@ -379,16 +379,23 @@ export class ApexService {
     externalRef?: string;
   }): Promise<ImprovementDecisionV1> {
     const run = await this.currentRun();
-    return (await this.improvements()).decide({ projectId: run.projectId, ...input });
+    return (await this.improvements(run)).decide({ projectId: run.projectId, ...input });
   }
 
   async improvementDeleteObservation(observationId: string): Promise<{ deleted: string }> {
-    await (await this.improvements()).deleteObservation(observationId);
+    const run = await this.currentRun();
+    const store = await this.improvements(run);
+    const observation = (await store.listObservations()).find((item) => item.observationId === observationId);
+    if (observation === undefined || observation.projectId !== run.projectId) {
+      throw new ApexError("APEX_NOT_FOUND", "Improvement observation not found", EXIT_CODES.notFound);
+    }
+    await store.deleteObservation(observationId);
     return { deleted: observationId };
   }
 
   async improvementPrune(): Promise<{ observations: number; decisions: number }> {
-    return (await this.improvements()).prune();
+    const run = await this.currentRun();
+    return (await this.improvements(run)).prune();
   }
 
   async capabilityList(manifestPath?: string): Promise<unknown> {
@@ -3228,14 +3235,25 @@ export class ApexService {
     });
   }
 
-  private async improvements(): Promise<ImprovementStore> {
-    if (this.improvementRuntime !== undefined) return this.improvementRuntime;
-    const policy =
-      this.improvementPolicy ??
-      (JSON.parse(
-        await readFile(join(this.root, ".apex", "runtime", "improvement-policy.v1.json"), "utf8"),
-      ) as ImprovementPolicyV1);
-    this.improvementRuntime = new ImprovementStore(this.root, policy, this.clock);
+  private async improvements(run: RunConfigV1): Promise<ImprovementStore> {
+    if (this.improvementPolicy !== undefined) {
+      this.improvementRuntime ??= new ImprovementStore(this.root, this.improvementPolicy, this.clock);
+      return this.improvementRuntime;
+    }
+    const [policyBytes, lockBytes] = await Promise.all([
+      readFile(join(this.root, ".apex", "runtime", "improvement-policy.v1.json")),
+      readFile(join(this.root, ".apex", "apex.lock.json")),
+    ]);
+    const lock = JSON.parse(lockBytes.toString("utf8")) as RuntimeBundleLockV1;
+    this.assertValid("runtime-lock", lock);
+    if (sha256Json(lock) !== run.runtimeLockHash || sha256Bytes(policyBytes) !== lock.improvementPolicyHash) {
+      throw new ApexError("APEX_STALE", "Improvement policy lock is not current", EXIT_CODES.stale);
+    }
+    this.improvementRuntime ??= new ImprovementStore(
+      this.root,
+      JSON.parse(policyBytes.toString("utf8")) as ImprovementPolicyV1,
+      this.clock,
+    );
     return this.improvementRuntime;
   }
 
