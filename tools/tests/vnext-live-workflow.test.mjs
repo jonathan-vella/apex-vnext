@@ -4,8 +4,10 @@ import test from "node:test";
 import {
   approvedDispatchState,
   canonicalRecipient,
+  failedBeforeAuthorityImport,
   handoffRecipient,
   isAcceptedLocalOwnership,
+  matchesFailedTransferClaim,
   parseArgs,
   validateDispatchRunState,
   validateGitStatus,
@@ -642,7 +644,7 @@ test("launcher requires the workflow file on the default branch before dispatch"
   assert.throws(() => validateWorkflowBootstrap({ nameWithOwner: "owner/repo" }, null, null, null), /metadata/);
 });
 
-test("launcher strictly parses dispatch and retrieve arguments", () => {
+test("launcher strictly parses dispatch, retrieve, and recovery arguments", () => {
   const handoffId = "123e4567-e89b-42d3-a456-426614174000";
   const common = [
     "--yes",
@@ -660,6 +662,19 @@ test("launcher strictly parses dispatch and retrieve arguments", () => {
   assert.equal(parseArgs(["dispatch", ...common, "--ref", "main", "--handoff-id", handoffId]).container, "handoff");
   const retrieved = parseArgs(["retrieve", ...common, "--handoff-id", handoffId, "--destination", "/tmp/candidate"]);
   assert.equal(retrieved.stage, "apply");
+  const recovered = parseArgs([
+    "recover",
+    "--yes",
+    "--track",
+    "bicep",
+    "--operation",
+    "apply",
+    "--handoff-id",
+    handoffId,
+    "--run-id",
+    "123",
+  ]);
+  assert.equal(recovered.run_id, "123");
   assert.throws(() => parseArgs(["preview", ...common, "--handoff-id", "not-a-uuid"]), /UUID/);
   assert.throws(() => parseArgs(["dispatch", ...common, "--ref", "main"]), /requires --handoff-id UUID/);
   assert.throws(
@@ -667,4 +682,90 @@ test("launcher strictly parses dispatch and retrieve arguments", () => {
     /must be main/,
   );
   assert.throws(() => parseArgs(["dispatch", ...common, "--ref", "main", "--handoff-id", handoffId, "--extra", "x"]));
+  assert.throws(
+    () => parseArgs(["recover", "--yes", "--track", "bicep", "--operation", "apply", "--handoff-id", handoffId]),
+    /numeric --run-id/,
+  );
+});
+
+test("launcher recovers only a completed failed run before authority import", () => {
+  const handoffId = "123e4567-e89b-42d3-a456-426614174000";
+  const expectedDisplayTitle = `vnext-live-bicep-apply-${handoffId}`;
+  const workflowRun = {
+    databaseId: 123,
+    workflowName: "vNext Live Qualification",
+    attempt: 1,
+    displayTitle: expectedDisplayTitle,
+    headBranch: "main",
+    headSha: "a".repeat(40),
+    status: "completed",
+    conclusion: "failure",
+    event: "workflow_dispatch",
+    jobs: [
+      {
+        name: "Import local Gate 4 approval and deploy exact preview",
+        steps: [
+          { name: "Azure OIDC login", conclusion: "failure" },
+          { name: "Open temporary Entra-only endpoint session", conclusion: "skipped" },
+          { name: "Download bound local authority", conclusion: "skipped" },
+          { name: "Import authority and validate local approval", conclusion: "skipped" },
+          { name: "Deploy exact preview", conclusion: "skipped" },
+        ],
+      },
+    ],
+  };
+  assert.equal(failedBeforeAuthorityImport(workflowRun, expectedDisplayTitle, 123), true);
+  assert.equal(failedBeforeAuthorityImport({ ...workflowRun, attempt: 2 }, expectedDisplayTitle, 123), false);
+  assert.equal(failedBeforeAuthorityImport(workflowRun, `vnext-live-terraform-apply-${handoffId}`, 123), false);
+  assert.equal(
+    failedBeforeAuthorityImport({ ...workflowRun, conclusion: "success" }, expectedDisplayTitle, 123),
+    false,
+  );
+  assert.equal(
+    failedBeforeAuthorityImport(
+      {
+        ...workflowRun,
+        jobs: [
+          {
+            ...workflowRun.jobs[0],
+            steps: [
+              { name: "Import authority and validate local approval", conclusion: "success" },
+              { name: "Deploy exact preview", conclusion: "skipped" },
+            ],
+          },
+        ],
+      },
+      expectedDisplayTitle,
+      123,
+    ),
+    false,
+  );
+  assert.equal(
+    failedBeforeAuthorityImport(
+      {
+        ...workflowRun,
+        jobs: [
+          {
+            ...workflowRun.jobs[0],
+            steps: workflowRun.jobs[0].steps.map((step) =>
+              step.name === "Open temporary Entra-only endpoint session" ? { ...step, conclusion: "success" } : step,
+            ),
+          },
+        ],
+      },
+      expectedDisplayTitle,
+      123,
+    ),
+    false,
+  );
+});
+
+test("launcher binds a failed candidate claim independently of the newer recovery checkout", () => {
+  const failedCandidateSha = "a".repeat(40);
+  const recoveryCheckoutSha = "b".repeat(40);
+  const recipient = "github-actions:org/repo:handoff:123e4567-e89b-42d3-a456-426614174000:apply";
+  const claim = { recipient, sender: "local", commit: failedCandidateSha, branch: "main" };
+  assert.notEqual(failedCandidateSha, recoveryCheckoutSha);
+  assert.equal(matchesFailedTransferClaim(claim, recipient, failedCandidateSha), true);
+  assert.equal(matchesFailedTransferClaim(claim, recipient, recoveryCheckoutSha), false);
 });
