@@ -6,12 +6,18 @@ import { join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
+import { releaseSbomArguments } from "../../scripts/pack-vnext.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
 const resistantProcessTree = join(import.meta.dirname, "fixtures", "resistant-process-tree.mjs");
+const packScript = join(root, "tools", "scripts", "pack-vnext.mjs");
 const defaultRunTimeoutMs = 120_000;
 const defaultTerminationGraceMs = 1_000;
 const defaultMaxOutputBytes = 1_048_576;
+
+test("release SBOM is derived from the lockfile instead of ambient node_modules", () => {
+  assert.deepEqual(releaseSbomArguments, ["sbom", "--omit=dev", "--package-lock-only", "--sbom-format=cyclonedx"]);
+});
 
 const delay = (milliseconds) => new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
 
@@ -273,16 +279,8 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     run(command, args, cwd, { ...options, signal: context.signal });
   const outputDirectory = join(temporaryRoot, "packages");
   const secondOutputDirectory = join(temporaryRoot, "packages-repeat");
-  await runInTest(process.execPath, [
-    join(root, "tools", "scripts", "pack-vnext.mjs"),
-    "--output-dir",
-    outputDirectory,
-  ]);
-  await runInTest(process.execPath, [
-    join(root, "tools", "scripts", "pack-vnext.mjs"),
-    "--output-dir",
-    secondOutputDirectory,
-  ]);
+  await runInTest(process.execPath, [packScript, "--output-dir", outputDirectory]);
+  await runInTest(process.execPath, [packScript, "--output-dir", secondOutputDirectory]);
 
   const outputFiles = (await readdir(outputDirectory)).sort();
   assert.deepEqual((await readdir(secondOutputDirectory)).sort(), outputFiles);
@@ -339,12 +337,7 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
   assert.deepEqual(provenance.predicate.buildDefinition.internalParameters, release.toolchain);
 
   const testkitOutput = join(temporaryRoot, "packages-with-testkit");
-  await runInTest(process.execPath, [
-    join(root, "tools", "scripts", "pack-vnext.mjs"),
-    "--output-dir",
-    testkitOutput,
-    "--include-testkit",
-  ]);
+  await runInTest(process.execPath, [packScript, "--output-dir", testkitOutput, "--include-testkit"]);
   const testkitRelease = JSON.parse(await readFile(join(testkitOutput, "release-manifest.json"), "utf8"));
   assert.ok(testkitRelease.packages.some(({ package: name }) => name === "@apex/testkit"));
   const testkitSbom = JSON.parse(await readFile(join(testkitOutput, testkitRelease.security.sbom.file), "utf8"));
