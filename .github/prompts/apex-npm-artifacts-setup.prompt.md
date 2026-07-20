@@ -2,7 +2,6 @@
 name: "APEX npm feed setup"
 description: "Configure, authenticate, and validate an Azure Artifacts npm feed without exposing credentials to chat or Git."
 agent: agent
-model: "MAI-Code-1-Flash"
 argument-hint: "Optional credential-free registry URL or npmrc snippet. Never include a token or auth block."
 tools: [vscode/askQuestions, execute/runInTerminal, read, edit]
 ---
@@ -16,7 +15,7 @@ provider, and run the selected validation depth. Keep feed routing local to the 
 
 - Collect only credential-free configuration through `vscode/askQuestions`.
 - Route npm through the selected Azure Artifacts feed without modifying shared repository configuration.
-- Authenticate through `artifacts-npm-credprovider` device flow in the terminal or browser.
+- Authenticate through `artifacts-npm-credprovider` device flow or a user-scoped PAT fallback.
 - Verify exact runtime dependencies and optionally run deterministic installs and package qualification.
 - Leave Git clean and never expose credentials in chat, logs, tracked files, or command arguments.
 
@@ -26,6 +25,8 @@ provider, and run the selected validation depth. Keep feed routing local to the 
 - Linux-native Node.js and npm must be on `PATH`; stop if either path begins with `/mnt/c/`.
 - The feed must use HTTPS under `pkgs.dev.azure.com` and have an approved npmjs.org upstream.
 - The project `.npmrc` contains routing only. User authentication belongs in npm's user configuration file.
+- Prefer device flow for interactive use. Use the PAT fallback only for durable headless access or when device flow is
+  unavailable. The fallback PAT requires Packaging Read for installs and Packaging Read & Write only when publishing.
 - This prompt configures a developer workstation or devcontainer. It does not configure Azure DevOps Pipelines; those use
   `NpmAuthenticate@0`.
 - Do not commit `.npmrc`, credentials, corporate feed configuration, generated tokens, or identity-cache files.
@@ -51,6 +52,7 @@ Otherwise, call `vscode/askQuestions` once with these three questions:
 - Freeform input: disabled.
 - Recommended option: `SelfDescribing token (recommended)` - avoids PAT generation but may require sign-in more often.
 - Alternative option: `Provider default` - use only when organization policy explicitly permits it.
+- Alternative option: `User-scoped PAT fallback` - use only when durable non-interactive access is required.
 
 ### Verification Depth Question
 
@@ -62,6 +64,8 @@ Otherwise, call `vscode/askQuestions` once with these three questions:
 - Alternative option: `Configure and authenticate only` - stop after token and feed validation.
 
 Never ask for a PAT, password, auth token, encoded password, auth block, or device code through `vscode/askQuestions`.
+If a credential appears in chat, logs, command arguments, or a tracked file, stop using it and tell the user to revoke it
+before generating a replacement.
 
 ## Workflow
 
@@ -98,7 +102,7 @@ Accept either a single registry URL or a snippet containing `registry=...` and o
 - Preserve the trailing slash on the registry URL.
 
 When the snippet contains `always-auth=true`, inspect the npm major version. npm 11 warns that this project setting is
-unknown. For npm 11 or newer, call `vscode/askQuestions` with one follow-up:
+unknown and may reject it in a future major version. For npm 11 or newer, call `vscode/askQuestions` with one follow-up:
 
 - `header: always-auth-policy`
 - `question: npm reports always-auth as obsolete. How should setup continue?`
@@ -169,6 +173,23 @@ If authentication is canceled, stop and print the exact retry command without a 
 secure keyring storage is unavailable, verify the fallback cache is owned by the current user with mode `700` and the
 user npm configuration is mode `600`.
 
+### Step 5a - Configure The User-Scoped PAT Fallback
+
+Perform this step only when the selected token mode is `User-scoped PAT fallback` or device flow cannot satisfy a
+durable non-interactive requirement.
+
+- Tell the user to create a replacement Azure DevOps PAT directly in Azure DevOps. Request Packaging Read for installs;
+  request Packaging Read & Write only when publishing is required.
+- Do not receive, display, copy, encode, decode, log, or pass the PAT in a command argument. The user enters it only
+  into a private terminal prompt.
+- Add Azure DevOps' standard username, base64-encoded password, and email entries for both the feed registry path and
+  feed path to npm's user configuration file. Do not add authentication entries to the project `.npmrc`.
+- Preserve unrelated user configuration. Replace only a clearly delimited Azure Artifacts credential block for this
+  feed, rather than appending duplicate credentials.
+- Set the user configuration mode to `600`. Do not read or display its contents after writing.
+- Validate the result only through `npm view` and credential-provider validation. If validation fails with `E401`, stop
+  and tell the user to verify the PAT's status, organization, expiration, and Packaging scope in Azure DevOps.
+
 ### Step 6 - Verify Feed And Policy Eligibility
 
 Run credential validation again, then verify the configured registry and APEX runtime pins:
@@ -199,13 +220,22 @@ For either install option, run from the repository root:
 npm ci --no-audit --no-fund
 ```
 
+When `site/package.json` exists, also run:
+
+```bash
+npm --prefix site ci --no-audit --no-fund
+```
+
 Do not run `npm approve-scripts` automatically. Report script-approval warnings separately from installation failures.
 
-For `Full install and vNext package qualification`, verify the script exists and run:
+For `Full install and vNext package qualification`, first verify the script exists. Run it when present:
 
 ```bash
 npm run test:vnext-pack
 ```
+
+When `test:vnext-pack` is absent, report package qualification as not configured rather than treating it as a feed or
+package failure. Do not create or alter package scripts as part of this setup.
 
 A registry-policy timeout is not automatically an APEX package defect. A test timeout that leaves a child process alive
 is a separate test-harness defect and must be reported separately.
@@ -228,6 +258,7 @@ Report:
 
 - normalized feed host and path, without credentials;
 - credential-provider version and token mode;
+- whether device flow or the user-scoped PAT fallback provided the validated access;
 - token validation result;
 - exact dependency eligibility results;
 - root install, site install, and package qualification results when selected;
@@ -243,6 +274,6 @@ Do not commit, push, open a pull request, publish a package, change dependency p
 - Feed input is credential-free and validated before writing.
 - `.npmrc` is local to the clone and ignored by Git.
 - Credentials remain outside the repository with restrictive permissions.
-- Device authentication occurs only through the official provider.
+- Device authentication occurs only through the official provider; the PAT fallback is user-scoped and terminal-only.
 - Every selected executable check ran, or the output identifies the precise blocking boundary.
 - Final Git status contains no change created by this prompt.

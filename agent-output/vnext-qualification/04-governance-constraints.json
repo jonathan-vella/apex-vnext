@@ -2,12 +2,12 @@
   "schema_version": "governance-constraints-v1",
   "project": "vnext-qualification",
   "subscription_id": "00858ffc-dded-4f0f-8bbf-e17fff0d47d9",
-  "discovered_at": "2026-07-15T19:48:47Z",
+  "discovered_at": "2026-07-17T07:02:58Z",
   "source": "azure-policy-rest-api",
   "discovery_status": "COMPLETE",
   "discovery_metadata": {
     "discovery_status": "COMPLETE",
-    "discovered_at": "2026-07-15T19:48:47Z",
+    "discovered_at": "2026-07-17T07:02:58Z",
     "scope": {
       "subscription_id": "00858ffc-dded-4f0f-8bbf-e17fff0d47d9",
       "management_groups": [
@@ -10248,20 +10248,22 @@
   ],
   "security_exceptions": [
     {
-      "id": "vnext-qualification-backend-runner-ip",
-      "control": "public-network-access",
-      "requested_at": "2026-07-15T12:50:34Z",
+      "id": "vnext-qualification-backend-entra-session",
+      "control": "authenticated-public-network-session",
+      "requested_at": "2026-07-17T07:03:22Z",
       "requested_by": "jonathan-vella",
-      "expires_at": "2026-07-16T12:50:34Z",
-      "reason": "Permit one ephemeral GitHub-hosted runner /32 to access non-production Terraform state during bounded live qualification.",
-      "issue_link": "https://github.com/jonathan-vella/apex/issues/543",
+      "expires_at": "2026-07-18T07:03:22Z",
+      "reason": "Permit a bounded Entra-authenticated public endpoint session for encrypted qualification handoff envelopes when the execution environment uses non-deterministic Microsoft egress.",
+      "issue_link": "https://github.com/jonathan-vella/apex-vnext/issues/9",
       "scope": {
         "environment": "vnext-qualification",
-        "workload": "terraform-backend",
+        "workload": "encrypted-handoff-backend",
         "maximum_lifetime_hours": 24
       },
       "endpoint_lifecycle": {
         "at_rest_public_network_access": "Disabled",
+        "at_rest_default_action": "Deny",
+        "session_authorization": "entra-rbac-only",
         "policy_exclusion": {
           "tag_name": "SecurityControl",
           "tag_value": "Ignore",
@@ -10270,22 +10272,25 @@
         "minimum_remaining_minutes": 75,
         "open_sequence": [
           "validate-exception",
+          "validate-at-rest-entra-only-posture",
           "add-transient-policy-exclusion",
           "enable-public-network-access",
-          "add-ephemeral-/32"
+          "set-firewall-default-allow"
         ],
         "cleanup_sequence": [
-          "remove-ephemeral-/32",
+          "set-firewall-default-deny",
           "disable-public-network-access",
           "remove-transient-policy-exclusion",
-          "verify-disabled-and-exclusion-absent"
+          "verify-deny-disabled-and-exclusion-absent"
         ]
       },
       "compensating_controls": [
-        "Storage public network access is Disabled at rest; the firewall defaults to Deny and has no persistent IP rules.",
-        "Each session requires at least 75 minutes before expiry, applies the policy's exclusion tag only for the session, enables the endpoint, adds one runner /32, and unconditionally removes the rule, restores Disabled, and removes the tag.",
-        "Shared-key authorization and public blob access remain disabled; Terraform uses Entra ID data-plane access.",
-        "Storage Account Contributor and Storage Blob Data Contributor are scoped to the backend account and container."
+        "At rest, public network access is Disabled, firewall default action is Deny, and there are zero IP rules.",
+        "The session remains Entra RBAC only with shared key access and anonymous blob access disabled.",
+        "Only encrypted recipient-bound handoff envelopes are transferred during the session.",
+        "The SecurityControl=Ignore session tag exists only during the transaction window.",
+        "Cleanup restores firewall default action to Deny before disabling public network access, removes the transient exclusion tag, and verifies Deny and Disabled state with exclusion absence.",
+        "Permissions remain narrowly scoped to the minimum backend management and blob data actions required for the qualification flow."
       ]
     }
   ],

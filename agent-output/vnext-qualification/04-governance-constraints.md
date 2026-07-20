@@ -215,23 +215,31 @@ diagnostic review.
 
 | Field | Approved value |
 | --- | --- |
-| ID | `vnext-qualification-backend-runner-ip` |
-| Control | `public-network-access` |
+| ID | `vnext-qualification-backend-entra-session` |
+| Control | `authenticated-public-network-session` |
+| Requested by | `jonathan-vella` |
 | Environment | `vnext-qualification` |
-| Workload | `terraform-backend` |
-| Requested | `2026-07-15T12:50:34Z` |
-| Expires | `2026-07-16T12:50:34Z` |
+| Workload | `encrypted-handoff-backend` |
+| Requested | `2026-07-17T07:03:22Z` |
+| Expires | `2026-07-18T07:03:22Z` |
 | Maximum lifetime | 24 hours |
-| Tracking issue | [#543](https://github.com/jonathan-vella/apex/issues/543) |
+| Minimum remaining time | 75 minutes |
+| Reason | Permit a bounded Entra-authenticated public endpoint session for encrypted qualification handoff envelopes when the execution environment uses non-deterministic Microsoft egress. |
+| Tracking issue | [#9](https://github.com/jonathan-vella/apex-vnext/issues/9) |
+| At-rest posture | `publicNetworkAccess: Disabled`, `defaultAction: Deny`, zero IP rules |
+| Session authorization | `entra-rbac-only` |
+| Policy exclusion | `SecurityControl=Ignore` with `session-only` persistence |
+| Open sequence | `validate-exception` → `validate-at-rest-entra-only-posture` → `add-transient-policy-exclusion` → `enable-public-network-access` → `set-firewall-default-allow` |
+| Cleanup sequence | `set-firewall-default-deny` → `disable-public-network-access` → `remove-transient-policy-exclusion` → `verify-deny-disabled-and-exclusion-absent` |
 
 Compensating controls:
 
-- Storage public network access is Disabled at rest; firewall default action is Deny.
-- The live policy's documented `SecurityControl=Ignore` exclusion exists only during the approved session.
-- Shared-key authorization and anonymous blob access remain disabled.
-- Each boundary validates identity, control, scope, activation, expiry, duration, and at least 75 minutes remaining.
-- Each caller removes its `/32`, restores Disabled, removes the exclusion, and verifies both final states.
-- Backend management and blob data permissions remain narrowly scoped.
+- At rest, storage public network access remains Disabled, firewall default action remains Deny, and IP rules remain empty.
+- The session remains Entra RBAC only, with shared key access disabled and anonymous blob access disabled.
+- Only encrypted recipient-bound envelopes are transferred during the approved session.
+- The `SecurityControl=Ignore` session tag exists only during the transaction.
+- Cleanup restores Deny then Disabled, removes the transient policy-exclusion tag, and verifies Deny/Disabled with exclusion absence.
+- Permissions remain narrowly scoped to the minimum backend management and blob data operations required for qualification.
 
 If the exception expires before live qualification, no firewall rule may be opened. Renewal requires an updated
 governance record and a fresh review before deployment.
