@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -222,6 +222,10 @@ test("preparation creates a validated run with Gates 1-3 approved and Gate 4 clo
     assert.notEqual(replacement.runId, result.runId);
     const replacementSelection = JSON.parse(await readFile(join(stateRoot, ".apex/config.json"), "utf8"));
     assert.equal(replacementSelection.runId, replacement.runId);
+    assert.deepEqual(
+      (await readdir(stateRoot)).filter((entry) => entry.startsWith(".apex-state-backup-")),
+      [],
+    );
 
     const beforeFailedReplacement = await readFile(join(stateRoot, ".apex/config.json"), "utf8");
     await assert.rejects(
@@ -245,6 +249,10 @@ test("preparation creates a validated run with Gates 1-3 approved and Gate 4 clo
       /business:logical-resource-parity/,
     );
     assert.equal(await readFile(join(stateRoot, ".apex/config.json"), "utf8"), beforeFailedReplacement);
+    assert.deepEqual(
+      (await readdir(stateRoot)).filter((entry) => entry.startsWith(".apex-state-backup-")),
+      [],
+    );
   } finally {
     await rm(stateRoot, { recursive: true, force: true });
   }
