@@ -162,6 +162,9 @@ async function runTrack(
     },
     injectFailure,
   );
+  if (context.checks.at(-1)?.status === "fail") {
+    return failedTrackReport(track, context.checks);
+  }
   await checked(
     context.checks,
     clock,
@@ -327,6 +330,16 @@ async function runTrack(
       logicalInventory,
       renderedInventory,
     },
+  };
+}
+
+function failedTrackReport(track: QualificationTrack, checks: QualificationCheck[]): QualificationTrackReport {
+  return {
+    track,
+    status: "fail",
+    checks,
+    eventCount: 0,
+    hashes: { eventHead: "", logicalInventory: "", renderedInventory: "" },
   };
 }
 
