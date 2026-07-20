@@ -2,6 +2,7 @@ export * from "./artifacts.js";
 export * from "./common.js";
 export * from "./deployment.js";
 export * from "./evidence.js";
+export * from "./improvement.js";
 export * from "./runtime.js";
 export * from "./targets.js";
 
@@ -19,6 +20,13 @@ import {
   QualityMeasurementsV1Schema,
   QualityScorecardV1Schema,
 } from "./evidence.js";
+import {
+  ImprovementDecisionV1Schema,
+  ImprovementObservationV1Schema,
+  ImprovementPolicyV1Schema,
+  ImprovementProposalV1Schema,
+  ImprovementRecurrenceV1Schema,
+} from "./improvement.js";
 import {
   EventV1Schema,
   ProjectConfigV1Schema,
@@ -63,6 +71,11 @@ export const contractSchemas = [
   QualityScorecardV1Schema,
   QualityMeasurementsV1Schema,
   ArchitectureAvailabilityV1Schema,
+  ImprovementObservationV1Schema,
+  ImprovementRecurrenceV1Schema,
+  ImprovementProposalV1Schema,
+  ImprovementDecisionV1Schema,
+  ImprovementPolicyV1Schema,
   SkuManifestV1Schema,
   ArchitectureV1Schema,
   CostEstimateV1Schema,
@@ -114,6 +127,11 @@ export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
   "https://schemas.apexops.dev/quality-scorecard-v1.json": metadata(262_144, "public"),
   "https://schemas.apexops.dev/quality-measurements-v1.json": metadata(1_048_576, "confidential"),
   "https://schemas.apexops.dev/architecture-availability-v1.json": metadata(131_072, "confidential"),
+  "https://schemas.apexops.dev/improvement-observation-v1.json": metadata(16_384, "confidential"),
+  "https://schemas.apexops.dev/improvement-recurrence-v1.json": metadata(65_536, "confidential"),
+  "https://schemas.apexops.dev/improvement-proposal-v1.json": metadata(65_536, "confidential"),
+  "https://schemas.apexops.dev/improvement-decision-v1.json": metadata(16_384, "confidential"),
+  "https://schemas.apexops.dev/improvement-policy-v1.json": metadata(16_384, "public"),
   "https://schemas.apexops.dev/sku-manifest-v1.json": metadata(524_288),
   "https://schemas.apexops.dev/architecture-v1.json": metadata(1_048_576),
   "https://schemas.apexops.dev/cost-estimate-v1.json": metadata(1_048_576, "confidential"),

@@ -1,0 +1,130 @@
+{
+  "$id": "https://schemas.apexops.dev/improvement-recurrence-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "category": {
+      "anyOf": [
+        {
+          "const": "correctness",
+          "type": "string"
+        },
+        {
+          "const": "security",
+          "type": "string"
+        },
+        {
+          "const": "reliability",
+          "type": "string"
+        },
+        {
+          "const": "performance",
+          "type": "string"
+        },
+        {
+          "const": "usability",
+          "type": "string"
+        },
+        {
+          "const": "documentation",
+          "type": "string"
+        },
+        {
+          "const": "capability-gap",
+          "type": "string"
+        }
+      ]
+    },
+    "confidence": {
+      "anyOf": [
+        {
+          "const": "low",
+          "type": "string"
+        },
+        {
+          "const": "medium",
+          "type": "string"
+        },
+        {
+          "const": "high",
+          "type": "string"
+        }
+      ]
+    },
+    "detectedAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "distinctRunCount": {
+      "minimum": 2,
+      "type": "integer"
+    },
+    "evidenceRefs": {
+      "items": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "firstSeenAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "lastSeenAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "observationIds": {
+      "items": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minItems": 2,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "occurrenceCount": {
+      "minimum": 2,
+      "type": "integer"
+    },
+    "patternKey": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "projectId": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "runIds": {
+      "items": {
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+        "type": "string"
+      },
+      "minItems": 2,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "patternKey",
+    "category",
+    "detectedAt",
+    "firstSeenAt",
+    "lastSeenAt",
+    "occurrenceCount",
+    "distinctRunCount",
+    "runIds",
+    "observationIds",
+    "evidenceRefs",
+    "confidence"
+  ],
+  "type": "object"
+}

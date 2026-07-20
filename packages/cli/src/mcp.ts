@@ -150,6 +150,53 @@ export function createMcpServer(service: ApexService): McpServer {
   server.registerTool("inventory", {}, async () => result(await service.inventory()));
   server.registerTool("diagnose", {}, async () => result(await service.diagnose()));
   server.registerTool(
+    "improvementObserve",
+    {
+      description: "Submit one bounded redacted observation for the selected run",
+      inputSchema: {
+        taskId: z.string().optional(),
+        observedAt: z.string().datetime().optional(),
+        source: z.enum([
+          "task-completion",
+          "deterministic-test",
+          "validation-failure",
+          "capability-execution",
+          "cache-check",
+          "explicit-correction",
+        ]),
+        category: z.enum([
+          "correctness",
+          "security",
+          "reliability",
+          "performance",
+          "usability",
+          "documentation",
+          "capability-gap",
+        ]),
+        severity: z.enum(["critical", "high", "medium", "low", "info"]),
+        statement: z.string().min(1).max(1024),
+        evidenceRefs: z
+          .array(z.string().regex(/^[0-9a-f]{64}$/))
+          .min(1)
+          .max(32),
+      },
+    },
+    async ({ taskId, observedAt, ...input }) =>
+      result(
+        await service.improvementObserve({
+          ...input,
+          ...(taskId === undefined ? {} : { taskId }),
+          ...(observedAt === undefined ? {} : { observedAt }),
+        }),
+      ),
+  );
+  server.registerTool("improvementObservations", { description: "Read bounded observations" }, async () =>
+    result(await service.improvementObservations()),
+  );
+  server.registerTool("improvementProposals", { description: "Read inert improvement proposals" }, async () =>
+    result(await service.improvementProposals()),
+  );
+  server.registerTool(
     "render",
     { inputSchema: { kind: z.enum(["status", "requirements", "preview", "approval", "inventory"]) } },
     async ({ kind }) => result(await service.render(kind)),

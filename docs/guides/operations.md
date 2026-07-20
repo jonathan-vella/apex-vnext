@@ -5,6 +5,25 @@ description: "Configure, preview, apply, destroy, reconcile, diagnose, and recov
 
 Run operations from the initialized consumer repository. Add `--json` whenever another process consumes the result.
 
+## Triage Improvement Proposals
+
+Use `apex quality observations --json` to inspect redacted evidence and `apex quality scan --json` to detect recurrence
+under the runtime-locked policy. Review inert records with `apex quality proposals --json`. Record a decision only after
+checking the cited evidence and pattern scope:
+
+```bash
+apex quality decide \
+  --proposal "$PROPOSAL_ID" \
+  --actor local-maintainer \
+  --decision deferred \
+  --rationale "Collect another independent run before changing the validator." \
+  --yes --json
+```
+
+Acceptance is triage, not application. Create any resulting repository issue or change manually through the normal
+review workflow. Periodically run `apex quality prune --yes --json`; use explicit observation deletion for data subject
+or evidence-lifecycle requests. See the [security guide](security.md#bound-improvement-authority) for the trust boundary.
+
 ## Check Setup and Health
 
 ```bash

@@ -52,6 +52,18 @@ const CONFIG_SHAPES = {
     "compatibility",
   ],
   "quality-scorecard.v1.json": ["schemaVersion", "frozenAt", "rules"],
+  "improvement-policy.v1.json": [
+    "schemaVersion",
+    "allowedSources",
+    "allowedCategories",
+    "recurrence",
+    "retention",
+    "limits",
+    "proposalTargets",
+    "humanDecisionRequired",
+    "automatedIssueCreation",
+    "contextInjection",
+  ],
   "capability-packs.v1.json": ["schemaVersion", "protocolVersion", "installationPolicy", "packs"],
   "toolchain.v1.json": [
     "schemaVersion",

@@ -629,6 +629,29 @@ export async function execute(argv: string[], root = process.cwd()): Promise<unk
       return evaluateQuality(root, flags);
     case "quality status":
       return qualityStatus(root);
+    case "quality observe":
+      return service.improvementObserve((await inputJson(flags)) as never);
+    case "quality scan":
+      return service.improvementScan();
+    case "quality observations":
+      return service.improvementObservations();
+    case "quality proposals":
+      return service.improvementProposals();
+    case "quality decide":
+      confirmed(flags, "quality decide");
+      return service.improvementDecide({
+        proposalId: required(flags, "proposal"),
+        actor: required(flags, "actor"),
+        decision: required(flags, "decision") as "accepted" | "rejected" | "deferred",
+        rationale: required(flags, "rationale"),
+        ...(typeof flags["external-ref"] === "string" ? { externalRef: flags["external-ref"] } : {}),
+      });
+    case "quality delete-observation":
+      confirmed(flags, "quality delete-observation");
+      return service.improvementDeleteObservation(required(flags, "observation"));
+    case "quality prune":
+      confirmed(flags, "quality prune");
+      return service.improvementPrune();
     case "mcp serve":
       await serveMcp(service);
       return undefined;
