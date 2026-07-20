@@ -1,1 +1,0 @@
-{"environment":"qualification","inputs":{"location":{"kind":"value","value":"swedencentral"},"resourceGroup":{"kind":"value","value":"rg-vnext-qualification-terraform"},"subscriptionId":{"kind":"value","value":"00858ffc-dded-4f0f-8bbf-e17fff0d47d9"}},"projectId":"vnext-qualification","runId":"c332a96d-925c-4af2-aac6-91ffd26f4d5a","schemaVersion":"1.0.0"}

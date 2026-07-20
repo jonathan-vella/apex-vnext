@@ -1,0 +1,1 @@
+{"environment":"qualification","inputs":{"location":{"kind":"value","value":"swedencentral"},"resourceGroup":{"kind":"value","value":"rg-vnext-qualification-bicep"},"subscriptionId":{"kind":"value","value":"b47d2942-f5ad-4d3c-b28e-c23e4f83d97e"}},"projectId":"vnext-qualification","runId":"e16098e7-87fb-44f0-83e6-91af0de41e21","schemaVersion":"1.0.0"}

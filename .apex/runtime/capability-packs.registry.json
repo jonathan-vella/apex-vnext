@@ -43,7 +43,7 @@
       "artifact": {
         "type": "local-directory",
         "spec": "capability-packs/azure-pricing/source",
-        "digest": "536a5d49d75f212592491584b9297647f04326fb12abd227064b4ec985b52b82"
+        "digest": "597e85751b302d9a4b528df09e8741624470fbbaea82ed4d4f1f29e67b95fdb8"
       },
       "lock": {
         "installer": "uv",

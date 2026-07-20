@@ -200,5 +200,9 @@
     // Reproducible package assets are validated against canonical source by
     // validate:vnext and pack tests; lint customizations/ instead.
     "packages/cli/assets/**",
+
+    // Repository-backed runtime state is hash-bound and validated by the
+    // session-state and runtime-lock contracts.
+    ".apex/**",
   ],
 }
