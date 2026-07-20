@@ -328,6 +328,11 @@ rejectsMutation(
   "apply artifacts invalid",
 );
 rejectsMutation(
+  "wrong OIDC script action version fails",
+  (text) => text.replaceAll("actions/github-script@v9", "actions/github-script@v8"),
+  "OIDC script version invalid",
+);
+rejectsMutation(
   "unsafe return fallback settings fail",
   (text) => text.replace("          compression-level: 0", "          compression-level: 6"),
   "encrypted return fallback artifact",
