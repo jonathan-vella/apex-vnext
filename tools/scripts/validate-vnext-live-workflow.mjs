@@ -136,7 +136,7 @@ export function validateWorkflowText(text) {
     fail(actions.includes("./.github/actions/setup-node-repo"), `${name} setup action missing`);
     fail(actions.includes("azure/login@v3"), `${name} Azure login version invalid`);
     fail(actions.includes("hashicorp/setup-terraform@v3"), `${name} Terraform setup version invalid`);
-    fail(actions.includes("actions/github-script@v8"), `${name} OIDC script version invalid`);
+    fail(actions.includes("actions/github-script@v9"), `${name} OIDC script version invalid`);
     fail(script.includes("git rev-parse HEAD"), `${name} does not verify checked out HEAD`);
     const atRest = steps(job).find((step) => step.name === "Validate at-rest endpoint boundary");
     fail(
@@ -214,7 +214,7 @@ export function validateWorkflowText(text) {
     const oidc = steps(job).find((step) => step.name === "Acquire ARM OIDC token");
     fail(
       oidc?.id === "arm_oidc" &&
-        oidc.uses === "actions/github-script@v8" &&
+        oidc.uses === "actions/github-script@v9" &&
         oidc.with?.["result-encoding"] === "string" &&
         oidc.with?.script?.includes("return token") &&
         !oidc.with?.script?.includes("exportVariable"),
@@ -224,7 +224,7 @@ export function validateWorkflowText(text) {
     const refreshedId = "deploy_oidc";
     fail(
       refreshedOidc?.id === refreshedId &&
-        refreshedOidc.uses === "actions/github-script@v8" &&
+        refreshedOidc.uses === "actions/github-script@v9" &&
         refreshedOidc.with?.["result-encoding"] === "string" &&
         refreshedOidc.with?.script?.includes("return token"),
       `${name} refreshed ARM token step missing`,
