@@ -1,6 +1,6 @@
 # Azure Deployment Plan
 
-> **Status:** Planning
+> **Status:** Ready for Validation
 >
 > **Architecture change:** GitHub Environment reviewer protection is no longer part of the APEX approval model. APEX
 > Gate 4 remains the sole human approval and must be recorded locally against the exact rendered preview before CI
@@ -31,7 +31,7 @@ qualification workload, publish packages, or authorize production Terraform CI a
 | **Tenant**        | `30bac921-1547-4b1e-8445-72455da783f1`                             |
 | **Location**      | `swedencentral` - approved                                         |
 | Repository        | `jonathan-vella/apex-vnext`                                        |
-| Candidate base    | `751a5fc2c94b49faad8e6e1eaff06c08f7317bae`                         |
+| Candidate base    | `af1221e66dcab40a990185d408631dfcef4c7ff0`                         |
 | GitHub boundary   | Unprotected Environment `vnext-qualification` for OIDC/config only |
 | Approval boundary | Local APEX Gate 4 decision bound to the exact preview              |
 
@@ -182,13 +182,14 @@ Official limit references:
 
 ### Phase 3: Validation
 
-- [ ] Invoke `azure-validate` against `apex-shared`
-- [ ] Re-run Bicep build and lint
-- [ ] Validate Terraform with backend disabled
-- [ ] Run exact subscription template validation and policy-aware what-if
-- [ ] Run the IaC security baseline and AVM pin validators
-- [ ] Run `npm run validate:vnext-live-workflow`
-- [ ] Run `npm run test:vnext-live-workflow`
+- [x] Invoke `azure-validate` against `apex-shared`
+- [x] Re-run Bicep build and lint
+- [x] Validate Terraform with backend disabled
+- [x] Run provider-level subscription validation and a policy-aware what-if probe with explicit surrogate principals
+- [ ] Re-run subscription validation and what-if with the exact replacement deployment principal
+- [x] Run the IaC security baseline and AVM pin validators
+- [x] Run `npm run validate:vnext-live-workflow`
+- [x] Run `npm run test:vnext-live-workflow`
 - [ ] Create and confirm the replacement federated credential in the current tenant
 - [ ] Update this plan to `Validated` and populate validation proof
 
@@ -216,20 +217,33 @@ Official limit references:
 
 ## 8. Validation Proof
 
-The `azure-validate` workflow must replace this section with `apex-shared` evidence before the plan can be marked
-`Validated`. The 2026-07-16 evidence for `noalz` is historical and does not authorize this subscription.
+The 2026-07-20 validation attempt used `apex-shared` and made no resource changes. Provider-level validation and what-if
+used a fixed non-existent service-principal UUID plus the signed-in maintainer as explicit surrogate identity inputs.
+That probe validates resource shape and policy applicability but is not deployable evidence. The plan remains `Ready
+for Validation` until a separately authorized replacement principal exists and the exact identity-bound checks pass.
+The 2026-07-16 evidence for `noalz` remains historical and does not authorize this subscription.
 
-| Check                 | Command Run                                      | Result                                        | Timestamp            |
-| --------------------- | ------------------------------------------------ | --------------------------------------------- | -------------------- |
-| Azure authentication  | `az account show --subscription b47d2942-...`    | Pass                                          | 2026-07-20 UTC       |
-| Live policy discovery | `discover.py --subscription b47d2942-... --refresh` | Pass: 6 assignments                        | 2026-07-20 UTC       |
-| Resource inventory    | Explicit-subscription Azure CLI queries          | Pass: no qualification resources              | 2026-07-20 10:32 UTC |
-| Provider readiness    | `az provider show`                               | Pass: all three required providers registered | 2026-07-20 10:32 UTC |
-| Storage quota         | `az quota list`; `az storage account show-usage` | Pass: limit 250, current usage 0               | 2026-07-20 10:32 UTC |
+| Check                     | Command Run                                               | Result                                                | Timestamp            |
+| ------------------------- | --------------------------------------------------------- | ----------------------------------------------------- | -------------------- |
+| Azure authentication      | Account plus ARM access-token checks                      | Pass                                                  | 2026-07-20 10:45 UTC |
+| Live policy discovery     | `discover.py --subscription b47d2942-... --refresh`       | Pass: 6 assignments                                   | 2026-07-20 UTC       |
+| Provider readiness        | `az provider show`                                        | Pass: all three required providers registered         | 2026-07-20 10:32 UTC |
+| Storage quota             | Quota list plus Storage usage                             | Pass: limit 250, current usage 0                       | 2026-07-20 10:32 UTC |
+| Bicep build and lint      | `az bicep build`; `az bicep lint`                         | Pass: bootstrap and workload                          | 2026-07-20 10:47 UTC |
+| Terraform validation      | Format, backend-free init, and validate                   | Pass                                                  | 2026-07-20 10:47 UTC |
+| Security and AVM          | Security baseline and offline AVM validators              | Pass: 0 errors, 0 warnings                            | 2026-07-20 10:47 UTC |
+| Workflow validation       | Live workflow validator and tests                         | Pass: 78 of 78                                        | 2026-07-20 10:47 UTC |
+| ARM template validation   | Provider-level subscription validation                    | Probe pass with surrogate principals                  | 2026-07-20 10:49 UTC |
+| ARM what-if               | Provider-level subscription what-if                       | Probe pass: 19 creates, no diagnostics                 | 2026-07-20 10:50 UTC |
+| Policy reconciliation     | Direct deny/modify rule review against rendered resources | Pass for planned resource types and Sweden Central     | 2026-07-20 10:52 UTC |
+| Exact deployment identity | Entra application and service-principal lookup            | Blocked: no replacement identity exists                | 2026-07-20 10:47 UTC |
+| Post-probe inventory      | Resource groups, resources, and deployment-record queries | Pass: no qualification resources or deployment record | 2026-07-20 10:52 UTC |
 
 **Validated by:** Pending
 
 **Validation timestamp:** Pending
+
+**Latest partial validation attempt:** 2026-07-20T10:52:07Z
 
 ### Deployment Evidence
 
@@ -285,11 +299,12 @@ approval, and CI execution must fail when imported Gate 4 approval is missing or
 
 ## 12. Next Steps
 
-> Current: Provider registration and capacity checks complete; bootstrap remains unauthorized
+> Current: Partial validation complete; exact identity-bound validation remains blocked
 
-1. Obtain separate explicit authorization before policy-aware validation/what-if, bootstrap, Entra/OIDC, or GitHub
-  Environment mutation.
-2. After authorization, run template validation and policy-aware what-if against `apex-shared`.
-3. Deploy the approved bootstrap and create replacement Entra/OIDC configuration through the deployment workflow.
-4. Replace all stale GitHub Environment outputs from verified bootstrap outputs.
-5. Authorize a new bounded governance exception before any sandbox apply/destroy dispatch.
+1. Obtain separate explicit authorization before preparing or creating the replacement Entra application, service
+   principal, and federated credential.
+2. Re-run provider-level template validation and policy-aware what-if with that exact deployment principal.
+3. Mark this plan `Validated` only after the identity-bound checks pass.
+4. Obtain separate deployment authorization before invoking the bootstrap workflow.
+5. Replace all stale GitHub Environment outputs only from verified bootstrap outputs.
+6. Authorize a new bounded governance exception before any sandbox apply/destroy dispatch.
