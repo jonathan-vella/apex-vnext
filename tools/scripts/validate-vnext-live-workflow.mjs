@@ -135,7 +135,7 @@ export function validateWorkflowText(text) {
     fail(actions.includes("actions/checkout@v6"), `${name} exact checkout action missing`);
     fail(actions.includes("./.github/actions/setup-node-repo"), `${name} setup action missing`);
     fail(actions.includes("azure/login@v3"), `${name} Azure login version invalid`);
-    fail(actions.includes("hashicorp/setup-terraform@v3"), `${name} Terraform setup version invalid`);
+    fail(actions.includes("hashicorp/setup-terraform@v4"), `${name} Terraform setup version invalid`);
     fail(actions.includes("actions/github-script@v9"), `${name} OIDC script version invalid`);
     fail(script.includes("git rev-parse HEAD"), `${name} does not verify checked out HEAD`);
     const atRest = steps(job).find((step) => step.name === "Validate at-rest endpoint boundary");

@@ -333,6 +333,11 @@ rejectsMutation(
   "OIDC script version invalid",
 );
 rejectsMutation(
+  "wrong Terraform setup action version fails",
+  (text) => text.replace("hashicorp/setup-terraform@v4", "hashicorp/setup-terraform@v3"),
+  "Terraform setup version invalid",
+);
+rejectsMutation(
   "unsafe return fallback settings fail",
   (text) => text.replace("          compression-level: 0", "          compression-level: 6"),
   "encrypted return fallback artifact",
