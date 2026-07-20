@@ -431,7 +431,12 @@ test("launcher binds local approval to the stable handoff recipient", () => {
   );
 });
 
-test("dispatch permits only repository-backed APEX state drift", () => {
+test("preview and dispatch permit only repository-backed APEX state drift", () => {
+  const preview = launcher.slice(
+    launcher.indexOf("async function preview"),
+    launcher.indexOf("async function dispatch"),
+  );
+  assert.match(preview, /gitState\(process\.cwd\(\), true\)/);
   assert.doesNotThrow(() => validateGitStatus(" M .apex/config.json\n?? .apex/objects/sha256/ab/object\n", true));
   assert.doesNotThrow(() => validateGitStatus("M .apex/config.json\n?? .apex/objects/sha256/ab/object", true));
   assert.throws(() => validateGitStatus(" M .apex/config.json\n"), /permitted APEX state boundary/);

@@ -91,6 +91,8 @@ the original APEX repository. See [docs/MIGRATION.md](docs/MIGRATION.md) for pro
 
 ### Fixed (APEX vNext security)
 
+- fix(vnext): allow a fresh preview after terminal writer-transfer recovery to carry only repository-backed
+  `.apex/**` authority drift while continuing to reject source changes and renames.
 - fix(vnext): replace the unenforceable single-runner IP handoff exception with a reviewed, time-boxed Entra-only public
   endpoint session that retains RBAC and encryption and verifies restoration to firewall `Deny` plus network `Disabled`.
 - fix(vnext): parse both canonical two-column Git porcelain and the command wrapper's first-line trimmed form when
