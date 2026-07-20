@@ -37,6 +37,30 @@ test("qualification runs complete bicep and terraform reports", async (context) 
   assert.equal(qualificationJson(report), qualificationJson(report));
 });
 
+test("qualification reports initialization failures without reading missing run state", async (context) => {
+  const root = await tempWorkspace(context, "apex-qualification-init-failure-");
+  const report = await runQualification({
+    workspaceRoot: join(root, "repositories"),
+    customizationsSource: await customizationSource(root),
+    injectFailure: "initialize-customizations",
+  });
+  assert.equal(report.status, "fail");
+  assert.deepEqual(
+    report.tracks.map(({ checks, eventCount }) => ({ checks, eventCount })),
+    ["bicep", "terraform"].map(() => ({
+      checks: [
+        {
+          id: "initialize-customizations",
+          status: "fail",
+          durationMs: 1,
+          detail: "Injected qualification failure: initialize-customizations",
+        },
+      ],
+      eventCount: 0,
+    })),
+  );
+});
+
 test("qualification status detects failed checks", () => {
   assert.equal(qualificationStatus([{ id: "ok", status: "pass", durationMs: 1 }]), "pass");
   assert.equal(qualificationStatus([{ id: "fault", status: "fail", durationMs: 1, detail: "detected" }]), "fail");
