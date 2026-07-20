@@ -247,7 +247,8 @@ export class ImprovementStore {
 
   async listProposals(projectId?: string): Promise<ImprovementProposalV1[]> {
     const proposals = await readDirectory<ImprovementProposalV1>(this.proposalsRoot);
-    const selected = projectId === undefined ? proposals : proposals.filter((proposal) => proposal.projectId === projectId);
+    const selected =
+      projectId === undefined ? proposals : proposals.filter((proposal) => proposal.projectId === projectId);
     return await Promise.all(selected.map(async (proposal) => await this.withDecisionStatus(proposal)));
   }
 

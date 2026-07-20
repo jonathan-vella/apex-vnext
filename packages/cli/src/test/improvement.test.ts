@@ -70,10 +70,7 @@ test("CLI observation uses structured files and destructive improvement operatio
     evidenceRefs: ["c".repeat(64)],
   });
   await assert.rejects(
-    execute(
-      ["quality", "delete-observation", "--observation", foreign.observation.observationId, "--yes"],
-      root,
-    ),
+    execute(["quality", "delete-observation", "--observation", foreign.observation.observationId, "--yes"], root),
     /Improvement observation not found/,
   );
   assert.deepEqual(
