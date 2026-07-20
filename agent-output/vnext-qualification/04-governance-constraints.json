@@ -2,12 +2,12 @@
   "schema_version": "governance-constraints-v1",
   "project": "vnext-qualification",
   "subscription_id": "b47d2942-f5ad-4d3c-b28e-c23e4f83d97e",
-  "discovered_at": "2026-07-20T10:02:40Z",
+  "discovered_at": "2026-07-20T13:44:30Z",
   "source": "azure-policy-rest-api",
   "discovery_status": "COMPLETE",
   "discovery_metadata": {
     "discovery_status": "COMPLETE",
-    "discovered_at": "2026-07-20T10:02:40Z",
+    "discovered_at": "2026-07-20T13:44:30Z",
     "scope": {
       "subscription_id": "b47d2942-f5ad-4d3c-b28e-c23e4f83d97e",
       "management_groups": [
@@ -5857,5 +5857,54 @@
   "tags_required": [],
   "location_constraints": [],
   "allowed_locations": [],
-  "_out_path": "agent-output/vnext-qualification/04-governance-constraints.json"
+  "_out_path": "agent-output/vnext-qualification/04-governance-constraints.json",
+  "security_exceptions": [
+    {
+      "id": "vnext-qualification-backend-entra-session",
+      "control": "authenticated-public-network-session",
+      "requested_at": "2026-07-20T13:43:47Z",
+      "requested_by": "jonathan-vella",
+      "expires_at": "2026-07-21T13:43:47Z",
+      "reason": "Permit a bounded Entra-authenticated public endpoint session for encrypted qualification handoff envelopes when the execution environment uses non-deterministic Microsoft egress.",
+      "issue_link": "https://github.com/jonathan-vella/apex-vnext/issues/13",
+      "scope": {
+        "environment": "vnext-qualification",
+        "workload": "encrypted-handoff-backend",
+        "maximum_lifetime_hours": 24
+      },
+      "endpoint_lifecycle": {
+        "at_rest_public_network_access": "Disabled",
+        "at_rest_default_action": "Deny",
+        "session_authorization": "entra-rbac-only",
+        "policy_exclusion": {
+          "tag_name": "SecurityControl",
+          "tag_value": "Ignore",
+          "persistence": "session-only"
+        },
+        "minimum_remaining_minutes": 75,
+        "open_sequence": [
+          "validate-exception",
+          "validate-at-rest-entra-only-posture",
+          "add-transient-policy-exclusion",
+          "enable-public-network-access",
+          "set-firewall-default-allow"
+        ],
+        "cleanup_sequence": [
+          "set-firewall-default-deny",
+          "disable-public-network-access",
+          "remove-transient-policy-exclusion",
+          "verify-deny-disabled-and-exclusion-absent"
+        ]
+      },
+      "compensating_controls": [
+        "At rest, public network access is Disabled, firewall default action is Deny, and there are zero IP rules.",
+        "The session remains Entra RBAC only with shared key access and anonymous blob access disabled.",
+        "Only encrypted recipient-bound handoff envelopes are transferred during the session.",
+        "This repository authorization record is not an Azure Policy exemption and does not alter policy assignment or exemption state.",
+        "The SecurityControl=Ignore session tag exists only during the transaction window.",
+        "Cleanup restores firewall default action to Deny before disabling public network access, removes the transient exclusion tag, and verifies Deny and Disabled state with exclusion absence.",
+        "Permissions remain narrowly scoped to the minimum backend management and blob data actions required for the qualification flow."
+      ]
+    }
+  ]
 }

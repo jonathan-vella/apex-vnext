@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -13,8 +14,16 @@ import {
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const CANDIDATE_SHA = "a".repeat(40);
-const NOW = "2026-07-20T10:10:00.000Z";
 const SUBSCRIPTION = "b47d2942-f5ad-4d3c-b28e-c23e4f83d97e";
+const GOVERNANCE_DISCOVERED_AT = JSON.parse(
+  readFileSync(join(ROOT, "agent-output/vnext-qualification/04-governance-constraints.json"), "utf8"),
+).discovered_at;
+
+function minutesAfterGovernance(minutes) {
+  return new Date(Date.parse(GOVERNANCE_DISCOVERED_AT) + minutes * 60 * 1000).toISOString();
+}
+
+const NOW = minutesAfterGovernance(10);
 
 function digest(value) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -177,7 +186,7 @@ test("preparation creates a validated run with Gates 1-3 approved and Gate 4 clo
         root: stateRoot,
         sourceRoot: ROOT,
         candidateSha: CANDIDATE_SHA,
-        now: "2026-07-20T10:20:00.000Z",
+        now: minutesAfterGovernance(20),
         availability: availability(),
         validationEntries: validationEntries("bicep"),
       },
@@ -200,7 +209,7 @@ test("preparation creates a validated run with Gates 1-3 approved and Gate 4 clo
           root: stateRoot,
           sourceRoot: ROOT,
           candidateSha: CANDIDATE_SHA,
-          now: "2026-07-20T10:30:00.000Z",
+          now: minutesAfterGovernance(30),
           availability: availability(),
           validationEntries: validationEntries("bicep").slice(0, -1),
         },
