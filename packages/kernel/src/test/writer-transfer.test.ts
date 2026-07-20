@@ -57,6 +57,95 @@ test("writer transfer binds head and recipient, releases sender, and atomically 
   assert.equal((await transfers.currentOwnership())?.ownerId, "bob");
 });
 
+test("failed pre-import transfer reclaims the local lease only with exact workflow evidence", async () => {
+  const { transfers } = await fixture();
+  const created = await transfers.create(request);
+  const recovery = {
+    claimHash: created.hash,
+    sender: "alice",
+    expectedRecipient: "bob",
+    failedCandidateCommit: "abc123",
+    workflowRunId: 123,
+    workflowStatus: "completed" as const,
+    workflowConclusion: "failure" as const,
+    importAuthorityConclusion: "skipped" as const,
+    deployConclusion: "skipped" as const,
+    ttlMs: 10_000,
+    eventId: "cancelled-1",
+  };
+  await assert.rejects(
+    transfers.reclaimFailedTransfer({ ...recovery, deployConclusion: "success" as never }),
+    /failed pre-import dispatch/,
+  );
+  await assert.rejects(
+    transfers.reclaimFailedTransfer({ ...recovery, failedCandidateCommit: "def456" }),
+    /current run authority/,
+  );
+  await assert.rejects(
+    transfers.reclaimFailedTransfer({ ...recovery, expectedRecipient: "mallory" }),
+    /current run authority/,
+  );
+  await transfers.reclaimFailedTransfer(recovery);
+  assert.equal(await transfers.hasPendingTransfer(), false);
+  assert.equal((await transfers.leaseStore().current())?.ownerId, "alice");
+  await assert.rejects(
+    transfers.accept({
+      claimHash: created.hash,
+      recipient: "bob",
+      currentGitHead: "abc123",
+      eventId: "late-accept",
+    }),
+    /no longer pending/,
+  );
+  const fresh = await transfers.create({
+    ...request,
+    commit: "def456",
+    currentGitHead: "def456",
+    recipient: "carol",
+    eventId: "requested-2",
+  });
+  const ownership = await transfers.accept({
+    claimHash: fresh.hash,
+    recipient: "carol",
+    currentGitHead: "def456",
+    eventId: "accepted-2",
+  });
+  assert.equal(ownership.ownerId, "carol");
+  assert.equal(ownership.commit, "def456");
+  await assert.rejects(transfers.reclaimFailedTransfer(recovery), /already exists|no longer pending/);
+});
+
+test("cancelled transfer remains terminal after the recovery lease expires", async () => {
+  const { transfers, setNow } = await fixture();
+  const created = await transfers.create(request);
+  const recovery = {
+    claimHash: created.hash,
+    sender: "alice",
+    expectedRecipient: "bob",
+    failedCandidateCommit: "abc123",
+    workflowRunId: 123,
+    workflowStatus: "completed" as const,
+    workflowConclusion: "failure" as const,
+    importAuthorityConclusion: "skipped" as const,
+    deployConclusion: "skipped" as const,
+    ttlMs: 10_000,
+    eventId: "cancelled-1",
+  };
+  await transfers.reclaimFailedTransfer(recovery);
+  setNow("2026-01-01T00:00:11.000Z");
+  assert.equal(await transfers.leaseStore().current(), null);
+  await assert.rejects(
+    transfers.accept({
+      claimHash: created.hash,
+      recipient: "bob",
+      currentGitHead: "abc123",
+      eventId: "late-accept",
+    }),
+    /no longer pending/,
+  );
+  await assert.rejects(transfers.reclaimFailedTransfer(recovery), /no longer pending/);
+});
+
 test("writer transfer lease mismatch creates no claim or journal event", async () => {
   const { transfers, runDirectory } = await fixture();
   const journalBefore = await readdir(join(runDirectory, "journal"));
