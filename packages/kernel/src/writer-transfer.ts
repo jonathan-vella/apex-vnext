@@ -35,6 +35,20 @@ export interface AcceptTransferInput {
   eventId: string;
 }
 
+export interface ReclaimFailedTransferInput {
+  claimHash: string;
+  sender: string;
+  expectedRecipient: string;
+  failedCandidateCommit: string;
+  workflowRunId: number;
+  workflowStatus: "completed";
+  workflowConclusion: "failure";
+  importAuthorityConclusion: "skipped";
+  deployConclusion: "skipped";
+  ttlMs: number;
+  eventId: string;
+}
+
 export interface WriterOwnership {
   ownerId: string;
   ownerEpoch: number;
@@ -122,6 +136,20 @@ export class WriterTransferStore {
     ) as WriterTransferClaim;
     if (sha256Json(claim as unknown as JsonValue) !== input.claimHash)
       throw new Error("Transfer claim integrity check failed");
+    const events = await this.journal.replay();
+    const requestedIndex = events.findLastIndex((event) => event.type === "transfer-requested");
+    if (
+      (events[requestedIndex]?.payload as { claimHash?: unknown } | undefined)?.claimHash !== input.claimHash ||
+      events
+        .slice(requestedIndex + 1)
+        .some(
+          (event) =>
+            ["transfer-accepted", "transfer-cancelled"].includes(event.type) &&
+            (event.payload as { claimHash?: unknown }).claimHash === input.claimHash,
+        )
+    ) {
+      throw new Error("Transfer claim is no longer pending");
+    }
     if (claim.recipient !== input.recipient) throw new Error("Transfer recipient does not match claim");
     if (claim.commit !== input.currentGitHead) throw new Error("Transfer claim Git head is stale");
     if (Date.parse(claim.expiresAt) <= this.clock().getTime()) throw new Error("Transfer claim has expired");
@@ -171,6 +199,75 @@ export class WriterTransferStore {
     return ownership;
   }
 
+  async reclaimFailedTransfer(input: ReclaimFailedTransferInput): Promise<void> {
+    if (!/^[0-9a-f]{64}$/.test(input.claimHash)) throw new Error("Invalid transfer claim hash");
+    if (!Number.isInteger(input.workflowRunId) || input.workflowRunId < 1) throw new Error("Invalid workflow run ID");
+    if (
+      input.workflowStatus !== "completed" ||
+      input.workflowConclusion !== "failure" ||
+      input.importAuthorityConclusion !== "skipped" ||
+      input.deployConclusion !== "skipped"
+    ) {
+      throw new Error("Workflow evidence does not prove a failed pre-import dispatch");
+    }
+    if (!Number.isFinite(input.ttlMs) || input.ttlMs <= 0) throw new Error("Recovery lease TTL must be positive");
+    if ((await this.currentOwnership()) !== null || (await this.leases.current()) !== null) {
+      throw new Error("Writer authority already exists and cannot be reclaimed");
+    }
+    const events = await this.journal.replay();
+    const requested = events.findLast((event) => event.type === "transfer-requested");
+    if ((requested?.payload as { claimHash?: unknown } | undefined)?.claimHash !== input.claimHash) {
+      throw new Error("Recovery claim is not the latest pending transfer");
+    }
+    if (
+      events.some(
+        (event) =>
+          ["transfer-accepted", "transfer-cancelled"].includes(event.type) &&
+          (event.payload as { claimHash?: unknown }).claimHash === input.claimHash,
+      )
+    ) {
+      throw new Error("Transfer is no longer pending");
+    }
+    const claim = JSON.parse(
+      await readFile(join(this.claimDirectory, `${input.claimHash}.json`), "utf8"),
+    ) as WriterTransferClaim;
+    if (sha256Json(claim as unknown as JsonValue) !== input.claimHash) {
+      throw new Error("Transfer claim integrity check failed");
+    }
+    const run = await this.runs.read();
+    if (
+      claim.projectId !== run.projectId ||
+      claim.runId !== run.runId ||
+      claim.sender !== input.sender ||
+      claim.recipient !== input.expectedRecipient ||
+      claim.commit !== input.failedCandidateCommit ||
+      claim.nextEpoch !== run.ownerEpoch + 1
+    ) {
+      throw new Error("Failed transfer does not match the current run authority");
+    }
+    const lease = await this.leases.acquireAtEpoch(input.sender, run.ownerEpoch, input.ttlMs);
+    try {
+      await this.journal.append({
+        eventId: input.eventId,
+        projectId: run.projectId,
+        runId: run.runId,
+        type: "transfer-cancelled",
+        timestamp: this.clock().toISOString(),
+        ownerEpoch: run.ownerEpoch,
+        expectedHead: await this.journal.head(),
+        payload: {
+          claimHash: input.claimHash,
+          workflowRunId: input.workflowRunId,
+          failedCandidateCommit: input.failedCandidateCommit,
+          reason: "failed-before-import",
+        },
+      });
+    } catch (error) {
+      await this.leases.release(input.sender, lease.ownerEpoch);
+      throw error;
+    }
+  }
+
   async currentOwnership(): Promise<WriterOwnership | null> {
     try {
       return JSON.parse(await readFile(this.ownershipPath, "utf8")) as WriterOwnership;
@@ -196,7 +293,8 @@ export class WriterTransferStore {
       .slice(requestedIndex + 1)
       .some(
         (event) =>
-          event.type === "transfer-accepted" && (event.payload as { claimHash?: unknown }).claimHash === claimHash,
+          ["transfer-accepted", "transfer-cancelled"].includes(event.type) &&
+          (event.payload as { claimHash?: unknown }).claimHash === claimHash,
       );
   }
 

@@ -3,17 +3,19 @@
 
 import { execFile as execFileCallback } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { WriterTransferStore } from "../../packages/kernel/dist/index.js";
 import { VNEXT_QUALIFICATION_REPOSITORY } from "./_lib/vnext-qualification.mjs";
 import { EXPECTED_TAGS, validateQualificationSecurityException } from "./validate-vnext-qualification-context.mjs";
 
 const execFile = promisify(execFileCallback);
 const BRANCH = "main";
 const WORKFLOW = "vnext-live-qualification.yml";
+const WORKFLOW_NAME = "vNext Live Qualification";
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TRACKS = new Set(["bicep", "terraform"]);
@@ -115,8 +117,8 @@ export function validateWorkflowBootstrap(repository, defaultWorkflow, candidate
 
 export function parseArgs(argv) {
   const command = argv[0];
-  if (!new Set(["preview", "dispatch", "retrieve"]).has(command)) {
-    throw new Error("Expected preview, dispatch, or retrieve subcommand");
+  if (!new Set(["preview", "dispatch", "retrieve", "recover"]).has(command)) {
+    throw new Error("Expected preview, dispatch, retrieve, or recover subcommand");
   }
   const values = { command };
   for (let index = 1; index < argv.length; index += 1) {
@@ -131,23 +133,30 @@ export function parseArgs(argv) {
       values[key] = value;
     }
   }
-  const common = new Set(["yes", "track", "operation", "resource_group", "storage_account", "container"]);
+  const common = new Set(["yes", "track", "operation"]);
   const allowed =
     command === "preview"
-      ? new Set([...common, "handoff_id"])
+      ? new Set([...common, "resource_group", "storage_account", "container", "handoff_id"])
       : command === "dispatch"
-        ? new Set([...common, "ref", "handoff_id"])
-        : new Set([...common, "handoff_id", "destination", "stage"]);
+        ? new Set([...common, "resource_group", "storage_account", "container", "ref", "handoff_id"])
+        : command === "retrieve"
+          ? new Set([...common, "resource_group", "storage_account", "container", "handoff_id", "destination", "stage"])
+          : new Set([...common, "handoff_id", "run_id"]);
   for (const key of Object.keys(values)) {
     if (key !== "command" && !allowed.has(key)) throw new Error(`Unknown argument: --${key.replaceAll("_", "-")}`);
   }
   if (values.yes !== true) throw new Error(`${command} requires --yes`);
-  for (const key of ["track", "operation", "resource_group", "storage_account"]) {
+  for (const key of ["track", "operation"]) {
     if (typeof values[key] !== "string") throw new Error(`Missing --${key.replaceAll("_", "-")}`);
   }
   if (!TRACKS.has(values.track)) throw new Error("--track must be bicep or terraform");
   if (!OPERATIONS.has(values.operation)) throw new Error("--operation must be apply or destroy");
-  values.container ??= "handoff";
+  if (command !== "recover") {
+    for (const key of ["resource_group", "storage_account"]) {
+      if (typeof values[key] !== "string") throw new Error(`Missing --${key.replaceAll("_", "-")}`);
+    }
+    values.container ??= "handoff";
+  }
   if (command === "preview") {
     if (values.handoff_id !== undefined && !UUID_PATTERN.test(values.handoff_id)) {
       throw new Error("--handoff-id must be a UUID");
@@ -157,7 +166,7 @@ export function parseArgs(argv) {
     if (typeof values.handoff_id !== "string" || !UUID_PATTERN.test(values.handoff_id)) {
       throw new Error("dispatch requires --handoff-id UUID from the approved local preview");
     }
-  } else {
+  } else if (command === "retrieve") {
     for (const key of ["handoff_id", "destination"]) {
       if (typeof values[key] !== "string") throw new Error(`Missing --${key.replaceAll("_", "-")}`);
     }
@@ -165,8 +174,45 @@ export function parseArgs(argv) {
     values.stage ??= "apply";
     if (!STAGES.has(values.stage)) throw new Error("--stage must be apply or preview-failure");
     if (!isAbsolute(values.destination)) throw new Error("--destination must be an absolute path");
+  } else {
+    if (typeof values.handoff_id !== "string" || !UUID_PATTERN.test(values.handoff_id)) {
+      throw new Error("recover requires --handoff-id UUID from the failed dispatch");
+    }
+    if (!/^\d+$/.test(values.run_id ?? "")) throw new Error("recover requires a numeric --run-id");
   }
   return values;
+}
+
+export function failedBeforeAuthorityImport(workflowRun, expectedDisplayTitle, expectedRunId) {
+  const deployJob = workflowRun.jobs?.find(
+    (job) => job.name === "Import local Gate 4 approval and deploy exact preview",
+  );
+  const conclusion = (name) => deployJob?.steps?.find((step) => step.name === name)?.conclusion;
+  return (
+    workflowRun.databaseId === expectedRunId &&
+    workflowRun.workflowName === WORKFLOW_NAME &&
+    workflowRun.attempt === 1 &&
+    workflowRun.displayTitle === expectedDisplayTitle &&
+    workflowRun.headBranch === BRANCH &&
+    SHA_PATTERN.test(workflowRun.headSha ?? "") &&
+    workflowRun.status === "completed" &&
+    workflowRun.conclusion === "failure" &&
+    workflowRun.event === "workflow_dispatch" &&
+    conclusion("Azure OIDC login") === "failure" &&
+    conclusion("Open temporary Entra-only endpoint session") === "skipped" &&
+    conclusion("Download bound local authority") === "skipped" &&
+    conclusion("Import authority and validate local approval") === "skipped" &&
+    conclusion("Deploy exact preview") === "skipped"
+  );
+}
+
+export function matchesFailedTransferClaim(claim, expectedRecipient, failedCandidateSha) {
+  return (
+    claim?.recipient === expectedRecipient &&
+    claim.sender === "local" &&
+    claim.commit === failedCandidateSha &&
+    claim.branch === BRANCH
+  );
 }
 
 function safeError(message, context = {}) {
@@ -935,6 +981,66 @@ async function retrieve(args) {
   }
 }
 
+async function recover(args) {
+  const checkout = await gitState(process.cwd(), true);
+  if (checkout.branch !== BRANCH) throw new Error(`Checkout must be ${BRANCH}`);
+  const expectedDisplayTitle = `vnext-live-${args.track}-${args.operation}-${args.handoff_id}`;
+  const workflowRun = await json("gh", [
+    "run",
+    "view",
+    args.run_id,
+    "--json",
+    "attempt,status,conclusion,databaseId,displayTitle,headBranch,headSha,event,jobs,url,workflowName",
+  ]);
+  if (!failedBeforeAuthorityImport(workflowRun, expectedDisplayTitle, Number(args.run_id))) {
+    throw new Error("Workflow run does not prove an exact first-attempt failure before authority import");
+  }
+  try {
+    await run("git", ["merge-base", "--is-ancestor", workflowRun.headSha, checkout.head], {
+      cwd: process.cwd(),
+    });
+  } catch {
+    throw new Error("Failed workflow candidate is not an ancestor of the recovery checkout");
+  }
+  const selection = JSON.parse(await readFile(join(process.cwd(), ".apex", "config.json"), "utf8"));
+  const runDirectory = join(process.cwd(), ".apex", "projects", selection.projectId, "runs", selection.runId);
+  const expectedRecipient = handoffRecipient(VNEXT_QUALIFICATION_REPOSITORY, args.handoff_id);
+  const claimDirectory = join(runDirectory, "transfers");
+  const matches = [];
+  for (const entry of await readdir(claimDirectory)) {
+    if (!/^[0-9a-f]{64}\.json$/.test(entry)) continue;
+    const claim = JSON.parse(await readFile(join(claimDirectory, entry), "utf8"));
+    if (matchesFailedTransferClaim(claim, expectedRecipient, workflowRun.headSha)) {
+      matches.push(entry.slice(0, -5));
+    }
+  }
+  if (matches.length !== 1) throw new Error(`Expected exactly one matching pending transfer, found ${matches.length}`);
+  const transfers = new WriterTransferStore(runDirectory);
+  await transfers.reclaimFailedTransfer({
+    claimHash: matches[0],
+    sender: "local",
+    expectedRecipient,
+    failedCandidateCommit: workflowRun.headSha,
+    workflowRunId: Number(args.run_id),
+    workflowStatus: workflowRun.status,
+    workflowConclusion: workflowRun.conclusion,
+    importAuthorityConclusion: "skipped",
+    deployConclusion: "skipped",
+    ttlMs: 7_200_000,
+    eventId: randomUUID(),
+  });
+  return {
+    command: "recover",
+    handoffId: args.handoff_id,
+    workflowRunId: Number(args.run_id),
+    workflowUrl: workflowRun.url,
+    recoveryCheckoutSha: checkout.head,
+    failedCandidateSha: workflowRun.headSha,
+    claimHash: matches[0],
+    owner: "local",
+  };
+}
+
 async function main() {
   try {
     const args = parseArgs(process.argv.slice(2));
@@ -943,7 +1049,9 @@ async function main() {
         ? await preview(args)
         : args.command === "dispatch"
           ? await dispatch(args)
-          : await retrieve(args);
+          : args.command === "retrieve"
+            ? await retrieve(args)
+            : await recover(args);
     process.stdout.write(`${JSON.stringify(result)}\n`);
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : "vNext handoff failed"}\n`);
