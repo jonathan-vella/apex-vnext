@@ -611,7 +611,7 @@ export async function prepareQualificationState(args, dependencies = {}) {
       if (!String(error.message).includes("runtime-lock validation failed")) throw error;
       await inspectLegacyReplaceableState(root);
     }
-    backupRoot = await mkdtemp(join(tmpdir(), "apex-vnext-state-backup-"));
+    backupRoot = await mkdtemp(join(root, ".apex-state-backup-"));
     backupPath = join(backupRoot, "apex");
     await rename(join(root, ".apex"), backupPath);
   }
