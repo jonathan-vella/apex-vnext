@@ -15,6 +15,12 @@ import { spawn } from "node:child_process";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const runtimePackages = ["contracts", "kernel", "capabilities", "renderers", "cli"];
+export const releaseSbomArguments = Object.freeze([
+  "sbom",
+  "--omit=dev",
+  "--package-lock-only",
+  "--sbom-format=cyclonedx",
+]);
 const compareText = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
 
 function run(command, args, cwd = repositoryRoot) {
@@ -160,7 +166,7 @@ function normalizeSbom(sbom, releaseManifest) {
 }
 
 async function writeReleaseSecurityArtifacts(outputDirectory, releaseManifest) {
-  const sbomResult = await run("npm", ["sbom", "--omit=dev", "--sbom-format=cyclonedx"]);
+  const sbomResult = await run("npm", releaseSbomArguments);
   const sbom = normalizeSbom(JSON.parse(sbomResult.stdout), releaseManifest);
   sbom.serialNumber = `urn:uuid:${releaseManifest.sourceCommit.slice(0, 8)}-${releaseManifest.sourceCommit.slice(8, 12)}-4${releaseManifest.sourceCommit.slice(13, 16)}-8${releaseManifest.sourceCommit.slice(17, 20)}-${releaseManifest.sourceCommit.slice(20, 32)}`;
   if (sbom.metadata) sbom.metadata.timestamp = "1970-01-01T00:00:00.000Z";
