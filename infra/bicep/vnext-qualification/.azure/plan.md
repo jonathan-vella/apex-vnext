@@ -31,7 +31,7 @@ qualification workload, publish packages, or authorize production Terraform CI a
 | **Tenant**        | `30bac921-1547-4b1e-8445-72455da783f1`                             |
 | **Location**      | `swedencentral` - approved                                         |
 | Repository        | `jonathan-vella/apex-vnext`                                        |
-| Candidate base    | `6d260d53a6cb29f36d8cb6f2e09420a2d3aff749`                         |
+| Candidate base    | `e4cef2cacdfbe09772610e994f4397b764828b44`                         |
 | GitHub boundary   | Unprotected Environment `vnext-qualification` for OIDC/config only |
 | Approval boundary | Local APEX Gate 4 decision bound to the exact preview              |
 
@@ -118,26 +118,26 @@ The complete issue `#9` lifecycle includes the bootstrap plus one Bicep and one 
 
 | Resource Type                                 | Number to Deploy | Total After Deployment | Limit / Quota   | Notes                                                        |
 | --------------------------------------------- | ---------------- | ---------------------- | --------------- | ------------------------------------------------------------ |
-| Microsoft.Resources/resourceGroups            | 3                | 5                      | 980             | Current subscription count 2; official ARM limit             |
-| Microsoft.Storage/storageAccounts             | 3                | 3                      | 250             | Current count 0; provider, quota, and usage APIs pass         |
-| Microsoft.OperationalInsights/workspaces      | 1                | 1                      | No count limit  | Current count 0; provider registered                         |
-| Microsoft.Authorization/roleAssignments       | 8                | 21                     | 4,000           | Current visible assignments 13; official RBAC limit          |
-| Microsoft.Insights/diagnosticSettings         | 6                | 1 per target resource  | 5 per resource  | One account and one Blob-service setting per storage account |
-| Microsoft Entra application/service principal | 1 pair           | 1 pair                 | Tenant governed | No matching application exists; no API permissions or secret |
-| Microsoft Entra federated credentials         | 1                | 1                      | App governed    | One Environment-subject credential for protected jobs        |
+| Microsoft.Resources/resourceGroups            | 3                | 5                      | 980             | Bootstrap complete; current subscription count 5             |
+| Microsoft.Storage/storageAccounts             | 3                | 3                      | 250             | Bootstrap account deployed; two workload accounts remain     |
+| Microsoft.OperationalInsights/workspaces      | 1                | 1                      | No count limit  | Bootstrap complete; current count 1                          |
+| Microsoft.Authorization/roleAssignments       | 9                | 22                     | 4,000           | Bootstrap complete; current visible assignments 22           |
+| Microsoft.Insights/diagnosticSettings         | 6                | 2 per storage account  | 5 per resource  | Bootstrap settings deployed; four workload settings remain   |
+| Microsoft Entra application/service principal | 1 pair           | 1 pair                 | Tenant governed | Created without API permissions, certificate, or secret      |
+| Microsoft Entra federated credentials         | 1                | 1                      | App governed    | Exact Environment-subject credential created and verified    |
 
 ### Phase 2: Quota and Capacity Sources
 
 | Resource family | Primary result                                    | Fallback / source                                  | Capacity decision                                  |
 | --------------- | ------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------- |
-| Storage         | Quota limit 250; authoritative usage 0           | Azure Resource Graph count                         | Pass: 3 of 250                                     |
-| Log Analytics   | Provider registered; no count-based quota exposed | Resource count and regional provider metadata      | Pass: 0 current; 1 planned                         |
+| Storage         | Quota limit 250; authoritative usage 1           | Azure Resource Graph count                         | Pass: 3 of 250                                     |
+| Log Analytics   | Provider registered; no count-based quota exposed | Resource count and regional provider metadata      | Pass: 1 current; no additional workspace planned   |
 | Resource groups | Quota API not applicable                          | Azure CLI count plus Azure Resource Manager limits | Pass: 5 of 980                                     |
-| RBAC            | Quota API not applicable                          | Azure CLI count plus Azure RBAC limits             | Pass: 21 of 4,000                                  |
+| RBAC            | Quota API not applicable                          | Azure CLI count plus Azure RBAC limits             | Pass: 22 of 4,000                                  |
 | Diagnostics     | Per-resource hard limit                           | Azure Monitor service limits                       | Pass: 1 setting on each diagnostic target, limit 5 |
 
-**Status:** Capacity checks pass. Deployment remains blocked pending separately authorized policy-aware validation,
-replacement Entra/OIDC and bootstrap preparation, a current governance exception, and exact-preview Gate 4 approval.
+**Status:** Bootstrap deployment and capacity checks pass. Workload dispatch remains blocked pending separately
+authorized GitHub Environment configuration, a current governance exception, and exact-preview Gate 4 approval.
 
 Official limit references:
 
@@ -196,18 +196,18 @@ Official limit references:
 
 ### Phase 4: Deployment and Live Ceremony
 
-- [ ] Invoke `azure-deploy` for an approved `apex-shared` bootstrap deployment
+- [x] Invoke `azure-deploy` for an approved `apex-shared` bootstrap deployment
 - [x] Create the replacement single-tenant Entra application and service principal without client credentials
 - [x] Add the current maintainer as application owner
 - [x] Add one GitHub Environment federated identity credential
 - [x] Run subscription-scope Bicep what-if with the exact principals and ten-tag contract
-- [ ] Deploy the reviewed qualification bootstrap only after a clean what-if
-- [ ] Verify resource outputs, default-deny storage state, containers, diagnostics, and scoped RBAC
+- [x] Deploy the reviewed qualification bootstrap only after a clean what-if
+- [x] Verify resource outputs, default-deny storage state, containers, diagnostics, and scoped RBAC
 - [ ] Configure the existing unprotected `vnext-qualification` Environment for OIDC, variables, and secrets only
 - [ ] Configure the remaining Environment secrets and nonsecret variables from verified deployment outputs
 - [ ] Verify Environment names only; never read back or print secret values
-- [ ] Record setup evidence and exact resource identifiers in issue `#9`
-- [ ] Confirm backend public access is disabled, default action is deny, shared key is disabled, and no IP rules remain
+- [x] Record bootstrap setup evidence and exact resource identifiers in issue `#13`
+- [x] Confirm backend public access is disabled, default action is deny, shared key is disabled, and no IP rules remain
 - [ ] Confirm a newly authorized governance exception is active before any workflow dispatch
 - [ ] Prepare an exact-head clean `main` consumer state for each IaC track
 - [ ] Dispatch Bicep apply, retrieve authority, collect inventory/diagnosis, then separately approve destroy
@@ -221,8 +221,9 @@ Official limit references:
 The initial 2026-07-20 `apex-shared` probe used explicit surrogate identities and made no resource changes. After
 separately authorized identity preparation, provider-level validation and what-if were repeated with the exact
 replacement service-principal and maintainer object IDs. Both exact checks passed with the reviewed 19-create shape and
-no diagnostics. Post-checks found no qualification resources, deployment records, or Azure RBAC assignments. The
-2026-07-16 evidence for `noalz` remains historical and does not authorize this subscription.
+no diagnostics. Pre-deployment post-checks found no qualification resources, deployment records, or Azure RBAC
+assignments; the separately authorized bootstrap deployment is recorded below. The 2026-07-16 evidence for `noalz`
+remains historical and does not authorize this subscription.
 
 | Check                     | Command Run                                               | Result                                                | Timestamp            |
 | ------------------------- | --------------------------------------------------------- | ----------------------------------------------------- | -------------------- |
@@ -255,14 +256,16 @@ Verified identity identifiers:
 
 ### Deployment Evidence
 
-| Check                | Result                                                                       | Timestamp      |
-| -------------------- | ---------------------------------------------------------------------------- | -------------- |
-| Entra application    | Secretless single-tenant app and service principal verified                   | 2026-07-20 UTC |
-| Federated credential | Exact GitHub Environment issuer, subject, and audience verified               | 2026-07-20 UTC |
-| Azure bootstrap      | No `apex-shared` bootstrap deployment exists                                 | Pending        |
-| Azure resources      | No qualification resource groups or resources exist                          | 2026-07-20 UTC |
-| Backend posture      | No replacement backend exists                                                | Pending        |
-| GitHub configuration | Environment still contains retired-subscription outputs and must not be used | 2026-07-20 UTC |
+| Check                | Result                                                                                   | Timestamp            |
+| -------------------- | ---------------------------------------------------------------------------------------- | -------------------- |
+| Entra application    | Secretless single-tenant app and service principal verified                               | 2026-07-20 UTC       |
+| Federated credential | Exact GitHub Environment issuer, subject, and audience verified                           | 2026-07-20 UTC       |
+| Azure bootstrap      | `vnext-qualification-bootstrap` succeeded; correlation `4143cab9-0ce9-4313-a35f-18b6da15d418` | 2026-07-20 11:34 UTC |
+| Azure resources      | Three groups, one workspace, one Storage account, two containers, two diagnostics        | 2026-07-20 11:42 UTC |
+| Backend posture      | TLS 1.2, HTTPS/OAuth only, shared key/public blob off, network disabled/default deny      | 2026-07-20 11:42 UTC |
+| Blob protection      | Versioning enabled; blob and container deletion retention set to 7 days                   | 2026-07-20 11:42 UTC |
+| Scoped RBAC          | Nine assignments: six deployment-principal and three maintainer; no broader SP assignment | 2026-07-20 11:42 UTC |
+| GitHub configuration | Environment still contains retired-subscription outputs and must not be used             | 2026-07-20 UTC       |
 
 ## 9. Files to Generate or Update
 
@@ -275,7 +278,7 @@ Verified identity identifiers:
 | Local mode-0600 transport key outside Git         | Shared encrypted-envelope key material                     | Create only after approval   |
 | GitHub Environment configuration                  | OIDC subject, secrets, and variables; no reviewer rule     | Pending implementation       |
 | Entra application and federated credential        | Destination repository OIDC trust                          | Created and verified         |
-| Azure bootstrap resources                         | Backend, workspace, resource groups, diagnostics, and RBAC | Not deployed                 |
+| Azure bootstrap resources                         | Backend, workspace, resource groups, diagnostics, and RBAC | Deployed and verified        |
 
 ## 10. Rollback and Cleanup
 
@@ -307,10 +310,9 @@ approval, and CI execution must fail when imported Gate 4 approval is missing or
 
 ## 12. Next Steps
 
-> Current: Exact validation complete; bootstrap deployment remains unauthorized
+> Current: Bootstrap deployed and verified; GitHub Environment changes remain unauthorized
 
-1. Obtain separate deployment authorization before invoking the bootstrap workflow.
-2. Deploy only the exact validated bootstrap shape through `azure-deploy`.
-3. Verify outputs, default-deny backend posture, diagnostics, containers, and scoped RBAC.
-4. Obtain separate authorization before replacing stale GitHub Environment values from verified bootstrap outputs.
-5. Authorize a new bounded governance exception before any sandbox apply/destroy dispatch.
+1. Obtain separate authorization before replacing stale GitHub Environment values from verified bootstrap outputs.
+2. Verify the replacement OIDC/configuration names without reading secret values.
+3. Authorize a new bounded governance exception before any sandbox apply/destroy dispatch.
+4. Prepare exact-head Bicep and Terraform previews and obtain separate Gate 4 decisions for every apply/destroy.
