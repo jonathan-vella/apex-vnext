@@ -174,6 +174,34 @@ test("preparation creates a validated run with Gates 1-3 approved and Gate 4 clo
     assert.deepEqual(customizationLock.files, []);
     assert.ok(customizationLock.runtime.length > 0);
 
+    const legacyLockPath = join(stateRoot, ".apex/apex.lock.json");
+    const legacyLock = JSON.parse(await readFile(legacyLockPath, "utf8"));
+    delete legacyLock.improvementPolicyHash;
+    await writeFile(legacyLockPath, `${JSON.stringify(legacyLock, null, 2)}\n`, "utf8");
+    const ownershipPath = join(stateRoot, ".apex/projects/vnext-qualification/runs", result.runId, "ownership.json");
+    await writeFile(ownershipPath, "{}\n", "utf8");
+    await assert.rejects(
+      prepareQualificationState(
+        {
+          yes: true,
+          replace_existing: true,
+          track: "bicep",
+          actor: "maintainer",
+          subscription: SUBSCRIPTION,
+        },
+        {
+          root: stateRoot,
+          sourceRoot: ROOT,
+          candidateSha: CANDIDATE_SHA,
+          now: minutesAfterGovernance(20),
+          availability: availability(),
+          validationEntries: validationEntries("bicep"),
+        },
+      ),
+      /writer ownership/,
+    );
+    await rm(ownershipPath);
+
     const replacement = await prepareQualificationState(
       {
         yes: true,
