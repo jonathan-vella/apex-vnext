@@ -28,7 +28,7 @@ const securityException = {
   requested_at: "2026-07-15T12:50:34Z",
   expires_at: "2026-07-16T12:50:34Z",
   reason: "Permit one bounded Entra-only endpoint session during qualification.",
-  issue_link: "https://github.com/jonathan-vella/apex-vnext/issues/543",
+  issue_link: "https://github.com/jonathan-vella/apex-vnext/issues/13",
   scope: {
     environment: "vnext-qualification",
     workload: "encrypted-handoff-backend",
@@ -144,6 +144,15 @@ test("qualification firewall exception rejects scope and duration mutations", ()
     qualificationSecurityExceptionIssues({ ...governance, security_exceptions: [longLived] }, now).some((issue) =>
       issue.includes("lifetime"),
     ),
+  );
+  assert.ok(
+    qualificationSecurityExceptionIssues(
+      {
+        ...governance,
+        security_exceptions: [{ ...securityException, issue_link: "https://github.com/example/other" }],
+      },
+      now,
+    ).some((issue) => issue.includes("issue_link")),
   );
 });
 

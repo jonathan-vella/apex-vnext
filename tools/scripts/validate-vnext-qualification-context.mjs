@@ -12,6 +12,7 @@ const FIREWALL_EXCEPTION_CONTROL = "authenticated-public-network-session";
 const FIREWALL_EXCEPTION_ENVIRONMENT = "vnext-qualification";
 const FIREWALL_EXCEPTION_WORKLOAD = "encrypted-handoff-backend";
 const FIREWALL_EXCEPTION_MAXIMUM_HOURS = 24;
+const FIREWALL_EXCEPTION_ISSUE_LINK = "https://github.com/jonathan-vella/apex-vnext/issues/13";
 
 export const EXPECTED_TAGS = Object.freeze({
   environment: "qualification",
@@ -54,6 +55,9 @@ export function qualificationSecurityExceptionIssues(
   }
   if (exception.scope?.workload !== FIREWALL_EXCEPTION_WORKLOAD) {
     issues.push(`exception scope.workload must be ${FIREWALL_EXCEPTION_WORKLOAD}`);
+  }
+  if (exception.issue_link !== FIREWALL_EXCEPTION_ISSUE_LINK) {
+    issues.push(`exception issue_link must be ${FIREWALL_EXCEPTION_ISSUE_LINK}`);
   }
   const maximumHours = exception.scope?.maximum_lifetime_hours;
   if (!Number.isFinite(maximumHours) || maximumHours <= 0 || maximumHours > FIREWALL_EXCEPTION_MAXIMUM_HOURS) {

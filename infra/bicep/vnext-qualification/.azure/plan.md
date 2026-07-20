@@ -208,7 +208,7 @@ Official limit references:
 - [x] Verify Environment names and secret timestamps only; never read back or print secret values
 - [x] Record bootstrap setup evidence and exact resource identifiers in issue `#13`
 - [x] Confirm backend public access is disabled, default action is deny, shared key is disabled, and no IP rules remain
-- [ ] Confirm a newly authorized governance exception is active before any workflow dispatch
+- [x] Confirm a newly authorized governance exception is active before any workflow dispatch
 - [ ] Prepare an exact-head clean `main` consumer state for each IaC track
 - [ ] Dispatch Bicep apply, retrieve authority, collect inventory/diagnosis, then separately approve destroy
 - [ ] Dispatch Terraform apply using the exact encrypted saved plan, retrieve authority, then separately approve destroy
@@ -266,6 +266,7 @@ Verified identity identifiers:
 | Blob protection      | Versioning enabled; blob and container deletion retention set to 7 days                   | 2026-07-20 11:42 UTC |
 | Scoped RBAC          | Nine assignments: six deployment-principal and three maintainer; no broader SP assignment | 2026-07-20 11:42 UTC |
 | GitHub configuration | Eight nonsecret values plus three OIDC secret names/timestamps verified; secrets not read | 2026-07-20 13:26 UTC |
+| Governance exception | 24-hour Entra-only session record active through `2026-07-21T13:43:47Z`; endpoint unchanged | 2026-07-20 13:47 UTC |
 
 ## 9. Files to Generate or Update
 
@@ -310,9 +311,9 @@ approval, and CI execution must fail when imported Gate 4 approval is missing or
 
 ## 12. Next Steps
 
-> Current: Bootstrap and GitHub OIDC/config verified; governance exception remains unauthorized
+> Current: Bounded governance exception active; no endpoint session or workload operation started
 
-1. Obtain separate authorization for a new bounded governance exception before any sandbox apply/destroy dispatch.
-2. Prepare an exact-head Bicep preview under the bounded endpoint session.
-3. Obtain a local Gate 4 decision bound to that exact preview before dispatching Bicep apply.
-4. Repeat the preview, Gate 4, apply, authority-return, and destroy sequence independently for Terraform.
+1. Prepare an exact-head Bicep consumer checkout and preview under the bounded endpoint session.
+2. Verify cleanup restored `Deny`, `Disabled`, and no transient exclusion after preview.
+3. Obtain a separate local Gate 4 decision bound to that exact preview before dispatching Bicep apply.
+4. Repeat preview, Gate 4, apply, authority-return, and destroy independently for Terraform.

@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0",
+  "challenged_artifact": "agent-output/vnext-qualification/04-governance-constraints.md",
+  "artifact_type": "governance-constraints",
+  "review_focus": "governance-reconciliation",
+  "pass_number": 10,
+  "challenge_summary": "Pass-10 governance reconciliation approved the refreshed apex-shared policy snapshot and the separately authorized 24-hour repository security-exception record. The review confirmed the record is narrowly scoped, time-bounded, fail-closed, distinct from Azure Policy exemptions, and does not authorize endpoint mutation, Gate 4, workflow dispatch, or workload operations.",
+  "compact_for_parent": "Pass 10 (governance-reconciliation) | LOW | no must-fix or should-fix findings | Approved",
+  "risk_level": "low",
+  "must_fix_count": 0,
+  "should_fix_count": 0,
+  "suggestion_count": 2,
+  "findings": [],
+  "suggestions": [
+    {
+      "status": "applied",
+      "summary": "Bind the qualification exception to issue #13 in the qualification-specific validator."
+    },
+    {
+      "status": "applied",
+      "summary": "State explicitly that the repository authorization record is not an Azure Policy exemption."
+    }
+  ],
+  "reviewed_at": "2026-07-20T13:49:27Z",
+  "reviewed_inputs": {
+    "prior_findings": [
+      "agent-output/vnext-qualification/challenge-findings-governance-constraints-pass9.json"
+    ],
+    "supporting_files": [
+      "agent-output/vnext-qualification/04-governance-constraints.json",
+      "agent-output/vnext-qualification/04-governance-constraints.md",
+      "infra/bicep/vnext-qualification/.azure/plan.md",
+      "tools/scripts/validate-vnext-qualification-context.mjs",
+      "tools/scripts/_lib/security-exceptions.mjs",
+      "tools/tests/vnext-live-prepare.test.mjs",
+      "tools/tests/vnext-qualification-context.test.mjs"
+    ]
+  },
+  "verified_anchors": [
+    "Live discovery remained complete with 6 assignments, 13 blockers, 32 auto-remediations, and zero Azure Policy exemptions.",
+    "The exception identity, control, scope, 24-hour maximum, 75-minute margin, endpoint lifecycle, and cleanup sequence match the runtime validator.",
+    "At-rest verification retained public network access Disabled, default action Deny, no IP or virtual-network rules, no SecurityControl tag, and shared keys disabled.",
+    "The plan leaves endpoint session, preview, Gate 4, workflow dispatch, workload operations, publication, and deletion unstarted or unauthorized."
+  ],
+  "residual_risk": [
+    "The exception record authorizes only a later bounded session; preview, apply, cleanup, and authority-return behavior still require live execution evidence and separate Gate 4 decisions."
+  ],
+  "cache_inputs": {
+    "artifact_sha": "0b555e5dcc1a15ac6e7ca3cb16c5a5decdee030607d96a6429287db63bdb24b0",
+    "checklists_sha": "1c0e62be1eb42ae25a1c49c54f0b8fbc923e140eac37490101ff97887ea95ad0",
+    "protocol_sha": "55197255ea03bb97e0e33592de94ba1bafbb183cf7f83503d22a2b35f0a2071c",
+    "subagent_sha": "183360559ed4ed7457a4e259395077639aaeb5bba7302be8a861271da676101c",
+    "model": "GPT-5.5",
+    "artifact_hash": "ee664727d5afff4c77fd4c76ecb595c8e022beb8151ac07ca8a59047e5094a2e"
+  }
+}
