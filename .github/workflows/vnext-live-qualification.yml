@@ -110,7 +110,7 @@ jobs:
           terraform_wrapper: false
       - name: Acquire ARM OIDC token
         id: arm_oidc
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           result-encoding: string
           script: |
@@ -219,7 +219,7 @@ jobs:
           fi
       - name: Refresh ARM OIDC token for deploy
         id: deploy_oidc
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           result-encoding: string
           script: |
