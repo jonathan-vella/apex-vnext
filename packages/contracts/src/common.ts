@@ -1,4 +1,4 @@
-import { Type, type Static } from "@sinclair/typebox";
+import { FormatRegistry, Type, type Static } from "@sinclair/typebox";
 
 export const CONTRACT_VERSION = "1.0.0" as const;
 
@@ -16,6 +16,18 @@ export const SECRET_FIELD_PATTERN =
   /(?:secret|password|passphrase|token|authorization|api[-_]?key|private[-_]?key|connectionString|sasToken)/i;
 export const SECRET_VALUE_PATTERN =
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|\bBearer\s+[A-Za-z0-9._~+\/-]{16,}|(?:AccountKey|SharedAccessSignature)=|[?&](?:sig|signature)=[^&\s]{8,}|https?:\/\/[^/\s:@]+:[^@\s/]+@/i;
+
+export function registerContractFormats(): void {
+  if (!FormatRegistry.Has("date-time")) {
+    FormatRegistry.Set("date-time", (value) => Number.isFinite(Date.parse(value)));
+  }
+  if (!FormatRegistry.Has("date")) {
+    FormatRegistry.Set(
+      "date",
+      (value) => /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T00:00:00Z`)),
+    );
+  }
+}
 
 export type ContractVersion = Static<typeof ContractVersionSchema>;
 export type ProjectId = Static<typeof ProjectIdSchema>;

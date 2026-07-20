@@ -15,6 +15,10 @@
       "pattern": "^[0-9a-f]{64}$",
       "type": "string"
     },
+    "improvementPolicyHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
     "qualityScorecardHash": {
       "pattern": "^[0-9a-f]{64}$",
       "type": "string"
@@ -48,6 +52,7 @@
     "defaultsHash",
     "validatorHash",
     "qualityScorecardHash",
+    "improvementPolicyHash",
     "requiredCapabilityPacks"
   ],
   "type": "object"

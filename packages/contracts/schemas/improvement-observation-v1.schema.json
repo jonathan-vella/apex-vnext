@@ -1,0 +1,166 @@
+{
+  "$id": "https://schemas.apexops.dev/improvement-observation-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "category": {
+      "anyOf": [
+        {
+          "const": "correctness",
+          "type": "string"
+        },
+        {
+          "const": "security",
+          "type": "string"
+        },
+        {
+          "const": "reliability",
+          "type": "string"
+        },
+        {
+          "const": "performance",
+          "type": "string"
+        },
+        {
+          "const": "usability",
+          "type": "string"
+        },
+        {
+          "const": "documentation",
+          "type": "string"
+        },
+        {
+          "const": "capability-gap",
+          "type": "string"
+        }
+      ]
+    },
+    "disposition": {
+      "anyOf": [
+        {
+          "const": "active",
+          "type": "string"
+        },
+        {
+          "const": "quarantined",
+          "type": "string"
+        }
+      ]
+    },
+    "evidenceRefs": {
+      "items": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "maxItems": 32,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "observationId": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "observedAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "patternKey": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "projectId": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "redactionCount": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "runId": {
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "severity": {
+      "anyOf": [
+        {
+          "const": "critical",
+          "type": "string"
+        },
+        {
+          "const": "high",
+          "type": "string"
+        },
+        {
+          "const": "medium",
+          "type": "string"
+        },
+        {
+          "const": "low",
+          "type": "string"
+        },
+        {
+          "const": "info",
+          "type": "string"
+        }
+      ]
+    },
+    "source": {
+      "anyOf": [
+        {
+          "const": "task-completion",
+          "type": "string"
+        },
+        {
+          "const": "deterministic-test",
+          "type": "string"
+        },
+        {
+          "const": "validation-failure",
+          "type": "string"
+        },
+        {
+          "const": "capability-execution",
+          "type": "string"
+        },
+        {
+          "const": "cache-check",
+          "type": "string"
+        },
+        {
+          "const": "explicit-correction",
+          "type": "string"
+        }
+      ]
+    },
+    "statement": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "type": "string"
+    },
+    "taskId": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "runId",
+    "observationId",
+    "patternKey",
+    "observedAt",
+    "source",
+    "category",
+    "severity",
+    "statement",
+    "evidenceRefs",
+    "disposition",
+    "redactionCount"
+  ],
+  "type": "object"
+}

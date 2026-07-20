@@ -91,3 +91,22 @@ operator-managed handoff secret. Resolve credentials only at operation time thro
 or another approved external credential source.
 
 Use the [operations guide](operations.md) to configure providers without secrets.
+
+## Bound Improvement Authority
+
+Improvement observations are untrusted evidence, not instructions. The store redacts secret-like values, quarantines
+instruction-like statements, rejects invalid timestamps and policy values, and excludes quarantined records from
+recurrence. Stable IDs are computed after redaction so retries within one run deduplicate without inflating confidence.
+Recurrence requires distinct run IDs within the policy window.
+
+Every generated proposal is contractually `inert: true`. The runtime policy requires human decisions and fixes
+automated issue creation and context injection to `false`; its digest is part of the runtime lock. No proposal or
+decision changes task, gate, writer, preview, approval, deployment, Git, or GitHub state.
+
+Agents receive only MCP tools to submit observations and read observations or proposals. MCP exposes no scan, decision,
+delete, prune, apply, edit, issue, pull-request, approval, publication, context-injection, or deployment operation for
+improvement. Human decisions and destructive lifecycle commands remain explicit, confirmed CLI operations.
+
+The default policy retains observations for 90 days and decisions for 365 days. Operators can delete an observation by
+ID or prune expired records. Improvement files are written atomically with mode `0600` under local APEX state and must
+not be committed or used as a credential or authorization source.
