@@ -19,9 +19,10 @@ Configure these Environment variables from the bootstrap outputs and canonical g
 - `APEX_CONTROL_RESOURCE_GROUP`, `APEX_BACKEND_STORAGE_ACCOUNT`, `APEX_BICEP_RESOURCE_GROUP`, and
   `APEX_TERRAFORM_RESOURCE_GROUP`.
 - `APEX_LOG_ANALYTICS_WORKSPACE_RESOURCE_ID`, `APEX_LOCATION`, and `APEX_PROJECT_NAME`.
-- `APEX_QUALIFICATION_TAGS_JSON`, containing exactly the ten discovered tag keys enforced by the workflow validator.
+- `APEX_QUALIFICATION_TAGS_JSON`, containing exactly the ten project qualification tags enforced by the workflow
+  validator. The project contract remains stricter than subscriptions where Azure Policy requires no tags.
 
-The context validator requires subscription `00858ffc-dded-4f0f-8bbf-e17fff0d47d9`, project `vnext`, location
+The context validator requires subscription `b47d2942-f5ad-4d3c-b28e-c23e4f83d97e`, project `vnext`, location
 `swedencentral`, the `rg-vnext-qualification-*` resource groups, the bootstrap workspace/account naming contract, and
 the exact approved tag values. A key-only or free-form tag object is rejected.
 

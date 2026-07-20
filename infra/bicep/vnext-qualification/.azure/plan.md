@@ -6,7 +6,7 @@
 > Gate 4 remains the sole human approval and must be recorded locally against the exact rendered preview before CI
 > handoff. The unprotected Environment scopes OIDC, variables, and secrets only.
 
-Generated: 2026-07-16 UTC
+Generated: 2026-07-20 UTC
 
 ---
 
@@ -22,32 +22,33 @@ qualification workload, publish packages, or authorize production Terraform CI a
 
 ## 2. Requirements
 
-| Attribute        | Value                                                                 |
-| ---------------- | --------------------------------------------------------------------- |
-| Classification   | Development sandbox                                                   |
-| Scale            | Small                                                                 |
-| Budget           | Cost-Optimized                                                        |
-| **Subscription** | `noalz` (`00858ffc-dded-4f0f-8bbf-e17fff0d47d9`) - approved          |
-| **Tenant**       | `Lord of the Cloud` (`2d04cb4c-999b-4e60-a3a7-e8993edc768b`)         |
-| **Location**     | `swedencentral` - approved                                            |
-| Repository       | `jonathan-vella/apex-vnext`                                           |
-| Candidate base   | `436f3359f324400d3288b6b844ecb6b5a0e7e445`                            |
-| GitHub boundary  | Unprotected Environment `vnext-qualification` for OIDC/config only    |
-| Approval boundary | Local APEX Gate 4 decision bound to the exact preview                 |
+| Attribute         | Value                                                              |
+| ----------------- | ------------------------------------------------------------------ |
+| Classification    | Development sandbox                                                |
+| Scale             | Small                                                              |
+| Budget            | Cost-Optimized                                                     |
+| **Subscription**  | `apex-shared` (`b47d2942-f5ad-4d3c-b28e-c23e4f83d97e`) - approved  |
+| **Tenant**        | `30bac921-1547-4b1e-8445-72455da783f1`                             |
+| **Location**      | `swedencentral` - approved                                         |
+| Repository        | `jonathan-vella/apex-vnext`                                        |
+| Candidate base    | `2b4b1b9d62adb96b5a8d9594f3fad7355d8dcb3e`                         |
+| GitHub boundary   | Unprotected Environment `vnext-qualification` for OIDC/config only |
+| Approval boundary | Local APEX Gate 4 decision bound to the exact preview              |
 
-The location supports Storage Accounts and Log Analytics, both providers are registered, and the inherited allowed
-locations policy includes `swedencentral`.
+The provider metadata lists Sweden Central for Storage Accounts and Log Analytics. Both resource providers and
+`Microsoft.Quota` are currently unregistered in `apex-shared`, so validation and quota discovery remain blocked until
+the maintainer separately authorizes registration. Live policy discovery found no allowed-location list.
 
 ## 3. Components Detected
 
-| Component                 | Type                 | Technology                     | Path                                                   |
-| ------------------------- | -------------------- | ------------------------------ | ------------------------------------------------------ |
-| Qualification bootstrap   | Control plane        | Subscription-scope Bicep + AVM | `infra/bicep/vnext-qualification/bootstrap.bicep`      |
-| Bicep lifecycle workload  | Qualification target | Resource-group Bicep + AVM     | `infra/bicep/vnext-qualification/main.bicep`           |
-| Terraform lifecycle       | Qualification target | Terraform + AVM                | `infra/terraform/vnext-qualification/`                 |
-| GitHub protected workflow | Approval/CI boundary | GitHub Actions + Environment   | `.github/workflows/vnext-live-qualification.yml`       |
-| Handoff launcher          | Writer transfer      | Node.js + Azure CLI + GitHub CLI | `tools/scripts/vnext-live-handoff.mjs`               |
-| Evidence lifecycle        | Release evidence     | Versioned JSON contracts       | `tools/scripts/live-qualification.mjs`                 |
+| Component                 | Type                 | Technology                       | Path                                              |
+| ------------------------- | -------------------- | -------------------------------- | ------------------------------------------------- |
+| Qualification bootstrap   | Control plane        | Subscription-scope Bicep + AVM   | `infra/bicep/vnext-qualification/bootstrap.bicep` |
+| Bicep lifecycle workload  | Qualification target | Resource-group Bicep + AVM       | `infra/bicep/vnext-qualification/main.bicep`      |
+| Terraform lifecycle       | Qualification target | Terraform + AVM                  | `infra/terraform/vnext-qualification/`            |
+| GitHub protected workflow | Approval/CI boundary | GitHub Actions + Environment     | `.github/workflows/vnext-live-qualification.yml`  |
+| Handoff launcher          | Writer transfer      | Node.js + Azure CLI + GitHub CLI | `tools/scripts/vnext-live-handoff.mjs`            |
+| Evidence lifecycle        | Release evidence     | Versioned JSON contracts         | `tools/scripts/live-qualification.mjs`            |
 
 ## 4. Recipe Selection
 
@@ -64,27 +65,27 @@ No `azure.yaml` is required because the qualification runtime intentionally uses
 
 ### Service Mapping
 
-| Component                  | Azure Service                         | SKU / Configuration                      |
-| -------------------------- | ------------------------------------- | ---------------------------------------- |
-| Control resource group     | Microsoft.Resources/resourceGroups    | `rg-vnext-qualification-control`         |
-| Bicep resource group       | Microsoft.Resources/resourceGroups    | `rg-vnext-qualification-bicep`           |
-| Terraform resource group   | Microsoft.Resources/resourceGroups    | `rg-vnext-qualification-terraform`       |
-| Qualification diagnostics  | Log Analytics workspace               | `PerGB2018`, 0.1-GB daily cap, 30 days   |
-| Backend and handoff store  | StorageV2                             | Standard LRS, TLS 1.2, HTTPS only        |
-| Bicep workload marker      | StorageV2                             | Standard LRS, deployment-stack ownership |
-| Terraform workload marker  | StorageV2                             | Standard LRS, exact saved-plan ownership |
-| Deployment identity        | Microsoft Entra service principal     | GitHub OIDC only; no client secret        |
-| Approval boundary          | APEX Gate 4                            | Local exact-preview approval              |
+| Component                 | Azure Service                      | SKU / Configuration                      |
+| ------------------------- | ---------------------------------- | ---------------------------------------- |
+| Control resource group    | Microsoft.Resources/resourceGroups | `rg-vnext-qualification-control`         |
+| Bicep resource group      | Microsoft.Resources/resourceGroups | `rg-vnext-qualification-bicep`           |
+| Terraform resource group  | Microsoft.Resources/resourceGroups | `rg-vnext-qualification-terraform`       |
+| Qualification diagnostics | Log Analytics workspace            | `PerGB2018`, 0.1-GB daily cap, 30 days   |
+| Backend and handoff store | StorageV2                          | Standard LRS, TLS 1.2, HTTPS only        |
+| Bicep workload marker     | StorageV2                          | Standard LRS, deployment-stack ownership |
+| Terraform workload marker | StorageV2                          | Standard LRS, exact saved-plan ownership |
+| Deployment identity       | Microsoft Entra service principal  | GitHub OIDC only; no client secret       |
+| Approval boundary         | APEX Gate 4                        | Local exact-preview approval             |
 
 ### Supporting Services
 
-| Service                         | Purpose                                                                      |
-| ------------------------------- | ---------------------------------------------------------------------------- |
-| Blob container `tfstate`        | Entra-authenticated Terraform state and lease locking                        |
-| Blob container `handoff`        | Encrypted local-to-CI and CI-to-local authority envelopes                    |
-| Azure Monitor diagnostics       | Account and Blob logs/metrics without local authentication                   |
-| GitHub Actions artifact service | Encrypted imported provider authority and exact Terraform plan               |
-| Federated identity credential   | Trust `repo:jonathan-vella/apex-vnext:environment:vnext-qualification`        |
+| Service                         | Purpose                                                                |
+| ------------------------------- | ---------------------------------------------------------------------- |
+| Blob container `tfstate`        | Entra-authenticated Terraform state and lease locking                  |
+| Blob container `handoff`        | Encrypted local-to-CI and CI-to-local authority envelopes              |
+| Azure Monitor diagnostics       | Account and Blob logs/metrics without local authentication             |
+| GitHub Actions artifact service | Encrypted imported provider authority and exact Terraform plan         |
+| Federated identity credential   | Trust `repo:jonathan-vella/apex-vnext:environment:vnext-qualification` |
 
 ### Security Contract
 
@@ -101,10 +102,10 @@ No `azure.yaml` is required because the qualification runtime intentionally uses
 - CI is not permitted to create or replace Gate 4 approval. It imports the already-approved state and exact provider
   authority, accepts the one-hop writer transfer, and deploys only the imported approved preview.
 - The GitHub Environment does not attest human review. It is only an OIDC subject and a scope for variables and secrets.
-- The exact ten-tag qualification contract is used for every resource group and resource.
-- The current transient public-endpoint exception expired at `2026-07-16T12:50:34Z`. Bootstrap preparation may proceed,
-  but workflow dispatch remains blocked until Governance Discovery records a newly authorized, active exception with at
-  least 75 minutes remaining.
+- The exact ten-tag project qualification contract is used for every resource group and resource even though current
+  `apex-shared` policy requires no tags.
+- No transient public-endpoint exception is authorized for `apex-shared`. Workflow dispatch remains blocked until
+  Governance Discovery records a newly authorized, active exception with at least 75 minutes remaining.
 
 ## 6. Provisioning Limit Checklist
 
@@ -112,27 +113,28 @@ No `azure.yaml` is required because the qualification runtime intentionally uses
 
 The complete issue `#9` lifecycle includes the bootstrap plus one Bicep and one Terraform workload storage account.
 
-| Resource Type                                 | Number to Deploy | Total After Deployment | Limit / Quota | Notes |
-| --------------------------------------------- | ---------------- | ---------------------- | ------------- | ----- |
-| Microsoft.Resources/resourceGroups            | 3                | 17                     | 980           | Current Sweden Central count 14; official ARM limit |
-| Microsoft.Storage/storageAccounts             | 3                | 6                      | 250           | Quota CLI `StorageAccounts`: usage 3, limit 250 |
-| Microsoft.OperationalInsights/workspaces      | 1                | 7                      | No count limit | Current Sweden Central count 6; `PerGB2018` is not legacy Free |
-| Microsoft.Authorization/roleAssignments       | 8                | 143                    | 4,000         | Current visible assignments 135; official RBAC limit |
-| Microsoft.Insights/diagnosticSettings         | 6                | 1 per target resource  | 5 per resource | One account and one Blob-service setting per storage account |
+| Resource Type                                 | Number to Deploy | Total After Deployment | Limit / Quota   | Notes                                                        |
+| --------------------------------------------- | ---------------- | ---------------------- | --------------- | ------------------------------------------------------------ |
+| Microsoft.Resources/resourceGroups            | 3                | 5                      | 980             | Current subscription count 2; official ARM limit             |
+| Microsoft.Storage/storageAccounts             | 3                | 3                      | Unavailable     | Current count 0; provider and quota API are unregistered     |
+| Microsoft.OperationalInsights/workspaces      | 1                | 1                      | No count limit  | Current count 0; provider is unregistered                    |
+| Microsoft.Authorization/roleAssignments       | 8                | 21                     | 4,000           | Current visible assignments 13; official RBAC limit          |
+| Microsoft.Insights/diagnosticSettings         | 6                | 1 per target resource  | 5 per resource  | One account and one Blob-service setting per storage account |
 | Microsoft Entra application/service principal | 1 pair           | 1 pair                 | Tenant governed | No matching application exists; no API permissions or secret |
-| Microsoft Entra federated credentials         | 1                | 1                      | App governed  | One Environment-subject credential for protected jobs |
+| Microsoft Entra federated credentials         | 1                | 1                      | App governed    | One Environment-subject credential for protected jobs        |
 
 ### Phase 2: Quota and Capacity Sources
 
-| Resource family | Primary result | Fallback / source | Capacity decision |
-| --------------- | -------------- | ----------------- | ----------------- |
-| Storage         | Azure Quota CLI returned usage 3 and limit 250 | Microsoft Storage quota `StorageAccounts` | Pass: 6 of 250 |
-| Log Analytics   | Azure Quota CLI returned `BadRequest` | Azure Resource Graph count plus Azure Monitor service limits | Pass: all nonlegacy tiers have no workspace count limit |
-| Resource groups | Quota API not applicable | Azure CLI count plus Azure Resource Manager limits | Pass: 17 of 980 |
-| RBAC            | Quota API not applicable | Azure CLI count plus Azure RBAC limits | Pass: 143 of 4,000 |
-| Diagnostics     | Per-resource hard limit | Azure Monitor service limits | Pass: 1 setting on each diagnostic target, limit 5 |
+| Resource family | Primary result                                                  | Fallback / source                                  | Capacity decision                                  |
+| --------------- | --------------------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------- |
+| Storage         | Blocked: `Microsoft.Storage` and `Microsoft.Quota` unregistered | Azure Resource Graph count                         | Unavailable                                        |
+| Log Analytics   | Blocked: `Microsoft.OperationalInsights` unregistered           | Azure Resource Graph count                         | Unavailable                                        |
+| Resource groups | Quota API not applicable                                        | Azure CLI count plus Azure Resource Manager limits | Pass: 5 of 980                                     |
+| RBAC            | Quota API not applicable                                        | Azure CLI count plus Azure RBAC limits             | Pass: 21 of 4,000                                  |
+| Diagnostics     | Per-resource hard limit                                         | Azure Monitor service limits                       | Pass: 1 setting on each diagnostic target, limit 5 |
 
-**Status:** All planned resources are within published limits with substantial headroom.
+**Status:** Blocked. Resource-group and RBAC limits have headroom, but provider registration and Storage quota evidence
+must be completed before the plan can return to `Validated`.
 
 Official limit references:
 
@@ -147,16 +149,16 @@ Official limit references:
 - [x] Gather requirements from issue `#9`, the PRD, ADR, and live qualification procedure
 - [x] Confirm subscription and location with the maintainer
 - [x] Prepare the complete bootstrap and workload resource inventory
-- [x] Fetch quotas and validate capacity using Azure Quota CLI and documented fallbacks
+- [ ] Fetch quotas and validate capacity after required providers are registered
 - [x] Scan Bicep, Terraform, workflow, launcher, context validator, governance, and SKU inputs
 - [x] Select native Bicep, Azure CLI, and GitHub API recipes
 - [x] Plan identity, Azure, GitHub, evidence, and cleanup boundaries
-- [x] Maintainer approved this plan
+- [x] Maintainer selected `apex-shared` as the replacement subscription
 
 ### Phase 2: Preparation
 
 - [x] Research the Bicep, Terraform, Entra federation, GitHub Environment, and RBAC components
-- [x] Confirm the approved Azure context and provisioning limits
+- [ ] Confirm provisioning limits after provider registration
 - [x] Verify the committed Bicep and Terraform artifacts need no generation changes
 - [x] Review the committed templates against governance, AVM, identity, network, and secret-handling controls
 - [x] Update this plan to `Ready for Validation`
@@ -178,31 +180,30 @@ Official limit references:
 
 ### Phase 3: Validation
 
-- [x] Invoke `azure-validate`
-- [x] Re-run Bicep build and lint
-- [x] Validate Terraform with backend disabled
-- [x] Run exact subscription template validation and policy-aware what-if
-- [x] Run the IaC security baseline and AVM pin validators
-- [x] Run `npm run validate:vnext-live-workflow`
-- [x] Run `npm run test:vnext-live-workflow`
-- [x] Confirm the federated credential has the exact destination Environment subject
-- [x] Update this plan to `Validated` and populate validation proof
+- [ ] Invoke `azure-validate` against `apex-shared`
+- [ ] Re-run Bicep build and lint
+- [ ] Validate Terraform with backend disabled
+- [ ] Run exact subscription template validation and policy-aware what-if
+- [ ] Run the IaC security baseline and AVM pin validators
+- [ ] Run `npm run validate:vnext-live-workflow`
+- [ ] Run `npm run test:vnext-live-workflow`
+- [ ] Create and confirm the replacement federated credential in the current tenant
+- [ ] Update this plan to `Validated` and populate validation proof
 
 ### Phase 4: Deployment and Live Ceremony
 
-- [x] Invoke `azure-deploy` for the approved bootstrap deployment
-- [x] Create the single-tenant Entra application and service principal without client credentials
-- [x] Add the current maintainer as application owner
-- [x] Add one GitHub Environment federated identity credential
-- [x] Run subscription-scope Bicep what-if with the exact principals and ten-tag contract
-- [x] Deploy the reviewed qualification bootstrap only after a clean what-if
-- [x] Verify resource outputs, default-deny storage state, containers, diagnostics, and scoped RBAC
+- [ ] Invoke `azure-deploy` for an approved `apex-shared` bootstrap deployment
+- [ ] Create the replacement single-tenant Entra application and service principal without client credentials
+- [ ] Add the current maintainer as application owner
+- [ ] Add one GitHub Environment federated identity credential
+- [ ] Run subscription-scope Bicep what-if with the exact principals and ten-tag contract
+- [ ] Deploy the reviewed qualification bootstrap only after a clean what-if
+- [ ] Verify resource outputs, default-deny storage state, containers, diagnostics, and scoped RBAC
 - [ ] Configure the existing unprotected `vnext-qualification` Environment for OIDC, variables, and secrets only
-- [ ] Generate one mode-0600 transport key outside Git and install the same value as an Environment secret
 - [ ] Configure the remaining Environment secrets and nonsecret variables from verified deployment outputs
 - [ ] Verify Environment names only; never read back or print secret values
 - [ ] Record setup evidence and exact resource identifiers in issue `#9`
-- [x] Confirm backend public access is disabled, default action is deny, shared key is disabled, and no IP rules remain
+- [ ] Confirm backend public access is disabled, default action is deny, shared key is disabled, and no IP rules remain
 - [ ] Confirm a newly authorized governance exception is active before any workflow dispatch
 - [ ] Prepare an exact-head clean `main` consumer state for each IaC track
 - [ ] Dispatch Bicep apply, retrieve authority, collect inventory/diagnosis, then separately approve destroy
@@ -213,49 +214,44 @@ Official limit references:
 
 ## 8. Validation Proof
 
-The `azure-validate` workflow must populate this section before the plan can be marked `Validated`.
+The `azure-validate` workflow must replace this section with `apex-shared` evidence before the plan can be marked
+`Validated`. The 2026-07-16 evidence for `noalz` is historical and does not authorize this subscription.
 
-| Check | Command Run | Result | Timestamp |
-| ----- | ----------- | ------ | --------- |
-| Azure authentication | `az account get-access-token --resource https://management.azure.com/` | Pass | 2026-07-16T15:14:53Z |
-| Bicep compilation and lint | `bicep build` and `bicep lint` for bootstrap and workload | Pass | 2026-07-16T15:14:53Z |
-| ARM template validation | `az deployment sub validate` with exact principals and tags | Pass | 2026-07-16T15:14:53Z |
-| ARM what-if | `az deployment sub what-if --result-format ResourceIdOnly` | Pass: 18 creates, no modifies or deletes | 2026-07-16T15:14:53Z |
-| Terraform | `terraform fmt -check`, backend-disabled `init`, and `validate` | Pass | 2026-07-16T15:14:53Z |
-| Security baseline | `npm run validate:iac-security-baseline` | Pass | 2026-07-16T15:14:53Z |
-| AVM pins | `npm run validate:avm-versions:offline` | Pass | 2026-07-16T15:14:53Z |
-| Live workflow structure | `npm run validate:vnext-live-workflow` | Pass | 2026-07-16T15:14:53Z |
-| Live workflow mutations | `npm run test:vnext-live-workflow` | Pass: 51 tests | 2026-07-16T15:14:53Z |
+| Check                 | Command Run                                         | Result                                                 | Timestamp      |
+| --------------------- | --------------------------------------------------- | ------------------------------------------------------ | -------------- |
+| Azure authentication  | `az account show --subscription b47d2942-...`       | Pass                                                   | 2026-07-20 UTC |
+| Live policy discovery | `discover.py --subscription b47d2942-... --refresh` | Pass: 6 assignments                                    | 2026-07-20 UTC |
+| Resource inventory    | Explicit-subscription Azure CLI queries             | Pass: no qualification resources                       | 2026-07-20 UTC |
+| Provider readiness    | `az provider show`                                  | Blocked: Storage and Operational Insights unregistered | 2026-07-20 UTC |
+| Storage quota         | `az quota list`                                     | Blocked: Microsoft.Quota unregistered                  | 2026-07-20 UTC |
 
-**Validated by:** `azure-validate`
+**Validated by:** Pending
 
-**Validation timestamp:** `2026-07-16T15:14:53Z`
+**Validation timestamp:** Pending
 
 ### Deployment Evidence
 
-| Check | Result | Timestamp |
-| ----- | ------ | --------- |
-| Entra application | Created `apex-vnext-qualification` without passwords or API permissions | 2026-07-16 UTC |
-| Federated credential | Created for `repo:jonathan-vella/apex-vnext:environment:vnext-qualification` | 2026-07-16 UTC |
-| Azure bootstrap | Deployment `vnext-qualification-bootstrap` succeeded | 2026-07-16T15:19:05Z |
-| Azure resources | Three resource groups, workspace, backend account, containers, diagnostics, and RBAC verified | 2026-07-16 UTC |
-| Backend posture | Public access Disabled, firewall Deny, no IP rules, shared key off, TLS 1.2, HTTPS only | 2026-07-16 UTC |
-| GitHub protection | HTTP 422: current billing plan does not support required reviewers for this private repository | 2026-07-16 UTC |
-| Approval decision | Required-reviewer protection deliberately removed from the APEX model; local Gate 4 retained | 2026-07-16 UTC |
-| Partial GitHub state | Unprotected Environment exists with zero variables and zero secrets | 2026-07-16 UTC |
+| Check                | Result                                                                       | Timestamp      |
+| -------------------- | ---------------------------------------------------------------------------- | -------------- |
+| Entra application    | No replacement application verified in the current tenant                    | Pending        |
+| Federated credential | No replacement credential verified                                           | Pending        |
+| Azure bootstrap      | No `apex-shared` bootstrap deployment exists                                 | Pending        |
+| Azure resources      | No qualification resource groups or resources exist                          | 2026-07-20 UTC |
+| Backend posture      | No replacement backend exists                                                | Pending        |
+| GitHub configuration | Environment still contains retired-subscription outputs and must not be used | 2026-07-20 UTC |
 
 ## 9. Files to Generate or Update
 
-| File | Purpose | Status |
-| ---- | ------- | ------ |
-| `infra/bicep/vnext-qualification/.azure/plan.md` | Setup, validation, deployment, and evidence plan | Created |
-| `infra/bicep/vnext-qualification/bootstrap.bicep` | Reviewed subscription bootstrap | Existing; no change expected |
-| `infra/bicep/vnext-qualification/main.bicep` | Bicep lifecycle workload | Existing; no change expected |
-| `infra/terraform/vnext-qualification/` | Terraform lifecycle workload | Existing; no change expected |
-| Local mode-0600 transport key outside Git | Shared encrypted-envelope key material | Create only after approval |
-| GitHub Environment configuration | OIDC subject, secrets, and variables; no reviewer rule | Pending implementation |
-| Entra application and federated credential | Destination repository OIDC trust | Created and verified |
-| Azure bootstrap resources | Backend, workspace, resource groups, diagnostics, and RBAC | Deployed and verified |
+| File                                              | Purpose                                                    | Status                       |
+| ------------------------------------------------- | ---------------------------------------------------------- | ---------------------------- |
+| `infra/bicep/vnext-qualification/.azure/plan.md`  | Setup, validation, deployment, and evidence plan           | Created                      |
+| `infra/bicep/vnext-qualification/bootstrap.bicep` | Reviewed subscription bootstrap                            | Existing; no change expected |
+| `infra/bicep/vnext-qualification/main.bicep`      | Bicep lifecycle workload                                   | Existing; no change expected |
+| `infra/terraform/vnext-qualification/`            | Terraform lifecycle workload                               | Existing; no change expected |
+| Local mode-0600 transport key outside Git         | Shared encrypted-envelope key material                     | Create only after approval   |
+| GitHub Environment configuration                  | OIDC subject, secrets, and variables; no reviewer rule     | Pending implementation       |
+| Entra application and federated credential        | Destination repository OIDC trust                          | Pending replacement          |
+| Azure bootstrap resources                         | Backend, workspace, resource groups, diagnostics, and RBAC | Not deployed                 |
 
 ## 10. Rollback and Cleanup
 
@@ -287,9 +283,11 @@ approval, and CI execution must fail when imported Gate 4 approval is missing or
 
 ## 12. Next Steps
 
-> Current: Approval-model replacement
+> Current: Subscription migration blocked on provider registration
 
-1. Record the local-Gate-4 decision and superseding ADR.
-2. Refactor launcher/workflow so local preview and approval precede direct CI apply handoff.
-3. Validate the replacement and configure the unprotected Environment variables and secrets.
-4. Refresh the expired governance exception before dispatching sandbox apply/destroy ceremonies.
+1. Obtain explicit authorization to register `Microsoft.Storage`, `Microsoft.OperationalInsights`, and
+   `Microsoft.Quota` in `apex-shared`.
+2. Re-run quota discovery, template validation, and policy-aware what-if.
+3. Deploy the approved bootstrap and create replacement Entra/OIDC configuration through the deployment workflow.
+4. Replace all stale GitHub Environment outputs from verified bootstrap outputs.
+5. Authorize a new bounded governance exception before any sandbox apply/destroy dispatch.

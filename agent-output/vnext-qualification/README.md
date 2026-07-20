@@ -23,7 +23,7 @@
 | Property | Value |
 | --- | --- |
 | **Created** | 2026-07-15 |
-| **Last Updated** | 2026-07-16 |
+| **Last Updated** | 2026-07-20 |
 | **Region** | `swedencentral` |
 | **Environment** | `vnext-qualification` sandbox |
 | **Estimated Cost** | Ephemeral pay-as-you-go usage; final live cost not yet measured |
@@ -80,8 +80,8 @@ fallback only.
 | [03-des-adr-0002-use-local-gate-4-before-ci-handoff.md](./03-des-adr-0002-use-local-gate-4-before-ci-handoff.md) | Local exact-preview approval before CI handoff | Accepted | 2026-07-16 |
 | [03-des-adr-0003-use-bounded-entra-only-handoff-session.md](./03-des-adr-0003-use-bounded-entra-only-handoff-session.md) | Bounded Entra-only handoff endpoint session | Accepted | 2026-07-17 |
 | [03-des-adr-0004-use-bounded-observe-and-propose-improvement.md](./03-des-adr-0004-use-bounded-observe-and-propose-improvement.md) | Bounded improvement authority and clean-room decision | Accepted | 2026-07-17 |
-| [04-governance-constraints.json](./04-governance-constraints.json) | Live Azure Policy constraints | Complete | 2026-07-17 |
-| [04-governance-constraints.md](./04-governance-constraints.md) | Human-readable governance and exception record | Complete | 2026-07-17 |
+| [04-governance-constraints.json](./04-governance-constraints.json) | Live `apex-shared` Azure Policy constraints | Complete | 2026-07-20 |
+| [04-governance-constraints.md](./04-governance-constraints.md) | Human-readable `apex-shared` governance record | Complete | 2026-07-20 |
 | [sku-manifest.json](./sku-manifest.json) | Canonical Standard LRS dual-track SKU decision | Locked | 2026-07-15 |
 | [sku-manifest.md](./sku-manifest.md) | Deterministic human-readable SKU rendering | Locked | 2026-07-15 |
 

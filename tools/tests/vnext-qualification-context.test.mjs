@@ -7,7 +7,7 @@ import {
   qualificationSecurityExceptionIssues,
 } from "../scripts/validate-vnext-qualification-context.mjs";
 
-const subscriptionId = "00858ffc-dded-4f0f-8bbf-e17fff0d47d9";
+const subscriptionId = "b47d2942-f5ad-4d3c-b28e-c23e4f83d97e";
 const environment = {
   AZURE_SUBSCRIPTION_ID: subscriptionId,
   APEX_PROJECT_NAME: "vnext",
