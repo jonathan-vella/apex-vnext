@@ -618,7 +618,7 @@ async function localProviderConfig(args, temporary, account) {
 }
 
 async function preview(args) {
-  const checkout = await gitState(process.cwd());
+  const checkout = await gitState(process.cwd(), true);
   if (checkout.branch !== BRANCH) throw new Error(`Checkout must be ${BRANCH}`);
   validateDispatchRunState(await json("node", [SOURCE_CLI, "status", "--json"]), args.track);
   await run("az", ["account", "get-access-token", "--resource", "https://management.azure.com/", "--output", "none"]);
