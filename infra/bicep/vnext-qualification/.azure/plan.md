@@ -203,9 +203,9 @@ Official limit references:
 - [x] Run subscription-scope Bicep what-if with the exact principals and ten-tag contract
 - [x] Deploy the reviewed qualification bootstrap only after a clean what-if
 - [x] Verify resource outputs, default-deny storage state, containers, diagnostics, and scoped RBAC
-- [ ] Configure the existing unprotected `vnext-qualification` Environment for OIDC, variables, and secrets only
-- [ ] Configure the remaining Environment secrets and nonsecret variables from verified deployment outputs
-- [ ] Verify Environment names only; never read back or print secret values
+- [x] Configure the existing unprotected `vnext-qualification` Environment for OIDC, variables, and secrets only
+- [x] Configure the remaining Environment secrets and nonsecret variables from verified deployment outputs
+- [x] Verify Environment names and secret timestamps only; never read back or print secret values
 - [x] Record bootstrap setup evidence and exact resource identifiers in issue `#13`
 - [x] Confirm backend public access is disabled, default action is deny, shared key is disabled, and no IP rules remain
 - [ ] Confirm a newly authorized governance exception is active before any workflow dispatch
@@ -265,7 +265,7 @@ Verified identity identifiers:
 | Backend posture      | TLS 1.2, HTTPS/OAuth only, shared key/public blob off, network disabled/default deny      | 2026-07-20 11:42 UTC |
 | Blob protection      | Versioning enabled; blob and container deletion retention set to 7 days                   | 2026-07-20 11:42 UTC |
 | Scoped RBAC          | Nine assignments: six deployment-principal and three maintainer; no broader SP assignment | 2026-07-20 11:42 UTC |
-| GitHub configuration | Environment still contains retired-subscription outputs and must not be used             | 2026-07-20 UTC       |
+| GitHub configuration | Eight nonsecret values plus three OIDC secret names/timestamps verified; secrets not read | 2026-07-20 13:26 UTC |
 
 ## 9. Files to Generate or Update
 
@@ -276,7 +276,7 @@ Verified identity identifiers:
 | `infra/bicep/vnext-qualification/main.bicep`      | Bicep lifecycle workload                                   | Existing; no change expected |
 | `infra/terraform/vnext-qualification/`            | Terraform lifecycle workload                               | Existing; no change expected |
 | Local mode-0600 transport key outside Git         | Shared encrypted-envelope key material                     | Create only after approval   |
-| GitHub Environment configuration                  | OIDC subject, secrets, and variables; no reviewer rule     | Pending implementation       |
+| GitHub Environment configuration                  | OIDC subject, secrets, and variables; no reviewer rule     | Configured and verified      |
 | Entra application and federated credential        | Destination repository OIDC trust                          | Created and verified         |
 | Azure bootstrap resources                         | Backend, workspace, resource groups, diagnostics, and RBAC | Deployed and verified        |
 
@@ -310,9 +310,9 @@ approval, and CI execution must fail when imported Gate 4 approval is missing or
 
 ## 12. Next Steps
 
-> Current: Bootstrap deployed and verified; GitHub Environment changes remain unauthorized
+> Current: Bootstrap and GitHub OIDC/config verified; governance exception remains unauthorized
 
-1. Obtain separate authorization before replacing stale GitHub Environment values from verified bootstrap outputs.
-2. Verify the replacement OIDC/configuration names without reading secret values.
-3. Authorize a new bounded governance exception before any sandbox apply/destroy dispatch.
-4. Prepare exact-head Bicep and Terraform previews and obtain separate Gate 4 decisions for every apply/destroy.
+1. Obtain separate authorization for a new bounded governance exception before any sandbox apply/destroy dispatch.
+2. Prepare an exact-head Bicep preview under the bounded endpoint session.
+3. Obtain a local Gate 4 decision bound to that exact preview before dispatching Bicep apply.
+4. Repeat the preview, Gate 4, apply, authority-return, and destroy sequence independently for Terraform.
