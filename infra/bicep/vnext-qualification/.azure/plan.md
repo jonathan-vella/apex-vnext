@@ -1,6 +1,6 @@
 # Azure Deployment Plan
 
-> **Status:** Ready for Validation
+> **Status:** Validated
 >
 > **Architecture change:** GitHub Environment reviewer protection is no longer part of the APEX approval model. APEX
 > Gate 4 remains the sole human approval and must be recorded locally against the exact rendered preview before CI
@@ -31,7 +31,7 @@ qualification workload, publish packages, or authorize production Terraform CI a
 | **Tenant**        | `30bac921-1547-4b1e-8445-72455da783f1`                             |
 | **Location**      | `swedencentral` - approved                                         |
 | Repository        | `jonathan-vella/apex-vnext`                                        |
-| Candidate base    | `af1221e66dcab40a990185d408631dfcef4c7ff0`                         |
+| Candidate base    | `6d260d53a6cb29f36d8cb6f2e09420a2d3aff749`                         |
 | GitHub boundary   | Unprotected Environment `vnext-qualification` for OIDC/config only |
 | Approval boundary | Local APEX Gate 4 decision bound to the exact preview              |
 
@@ -39,7 +39,8 @@ The provider metadata lists Sweden Central for Storage Accounts and Log Analytic
 `Microsoft.OperationalInsights`, and `Microsoft.Quota` were registered with explicit maintainer authorization and
 verified through Azure Resource Manager on 2026-07-20. Storage quota discovery reports a 250-account limit with zero
 accounts in use. Live policy discovery found no allowed-location list. Validation, what-if, bootstrap, identity, and
-GitHub configuration remain outside the provider-registration authorization.
+GitHub configuration remain outside the provider-registration authorization. Validation, what-if, and replacement
+identity creation were subsequently authorized as separate bounded steps; bootstrap and GitHub configuration were not.
 
 ## 3. Components Detected
 
@@ -178,7 +179,7 @@ Official limit references:
 - [x] Make structural validation reject any CI-created Gate 4 approval
 - [x] Add mutation tests for missing imported approval, changed preview, recipient mismatch, stale epoch, and expiry
 - [x] Update workflow, security, testing, CLI, and live-qualification documentation
-- [ ] Re-run `azure-validate` and return this plan to `Validated`
+- [x] Re-run `azure-validate` and return this plan to `Validated`
 
 ### Phase 3: Validation
 
@@ -186,20 +187,20 @@ Official limit references:
 - [x] Re-run Bicep build and lint
 - [x] Validate Terraform with backend disabled
 - [x] Run provider-level subscription validation and a policy-aware what-if probe with explicit surrogate principals
-- [ ] Re-run subscription validation and what-if with the exact replacement deployment principal
+- [x] Re-run subscription validation and what-if with the exact replacement deployment principal
 - [x] Run the IaC security baseline and AVM pin validators
 - [x] Run `npm run validate:vnext-live-workflow`
 - [x] Run `npm run test:vnext-live-workflow`
-- [ ] Create and confirm the replacement federated credential in the current tenant
-- [ ] Update this plan to `Validated` and populate validation proof
+- [x] Create and confirm the replacement federated credential in the current tenant
+- [x] Update this plan to `Validated` and populate validation proof
 
 ### Phase 4: Deployment and Live Ceremony
 
 - [ ] Invoke `azure-deploy` for an approved `apex-shared` bootstrap deployment
-- [ ] Create the replacement single-tenant Entra application and service principal without client credentials
-- [ ] Add the current maintainer as application owner
-- [ ] Add one GitHub Environment federated identity credential
-- [ ] Run subscription-scope Bicep what-if with the exact principals and ten-tag contract
+- [x] Create the replacement single-tenant Entra application and service principal without client credentials
+- [x] Add the current maintainer as application owner
+- [x] Add one GitHub Environment federated identity credential
+- [x] Run subscription-scope Bicep what-if with the exact principals and ten-tag contract
 - [ ] Deploy the reviewed qualification bootstrap only after a clean what-if
 - [ ] Verify resource outputs, default-deny storage state, containers, diagnostics, and scoped RBAC
 - [ ] Configure the existing unprotected `vnext-qualification` Environment for OIDC, variables, and secrets only
@@ -217,11 +218,11 @@ Official limit references:
 
 ## 8. Validation Proof
 
-The 2026-07-20 validation attempt used `apex-shared` and made no resource changes. Provider-level validation and what-if
-used a fixed non-existent service-principal UUID plus the signed-in maintainer as explicit surrogate identity inputs.
-That probe validates resource shape and policy applicability but is not deployable evidence. The plan remains `Ready
-for Validation` until a separately authorized replacement principal exists and the exact identity-bound checks pass.
-The 2026-07-16 evidence for `noalz` remains historical and does not authorize this subscription.
+The initial 2026-07-20 `apex-shared` probe used explicit surrogate identities and made no resource changes. After
+separately authorized identity preparation, provider-level validation and what-if were repeated with the exact
+replacement service-principal and maintainer object IDs. Both exact checks passed with the reviewed 19-create shape and
+no diagnostics. Post-checks found no qualification resources, deployment records, or Azure RBAC assignments. The
+2026-07-16 evidence for `noalz` remains historical and does not authorize this subscription.
 
 | Check                     | Command Run                                               | Result                                                | Timestamp            |
 | ------------------------- | --------------------------------------------------------- | ----------------------------------------------------- | -------------------- |
@@ -233,24 +234,31 @@ The 2026-07-16 evidence for `noalz` remains historical and does not authorize th
 | Terraform validation      | Format, backend-free init, and validate                   | Pass                                                  | 2026-07-20 10:47 UTC |
 | Security and AVM          | Security baseline and offline AVM validators              | Pass: 0 errors, 0 warnings                            | 2026-07-20 10:47 UTC |
 | Workflow validation       | Live workflow validator and tests                         | Pass: 78 of 78                                        | 2026-07-20 10:47 UTC |
-| ARM template validation   | Provider-level subscription validation                    | Probe pass with surrogate principals                  | 2026-07-20 10:49 UTC |
-| ARM what-if               | Provider-level subscription what-if                       | Probe pass: 19 creates, no diagnostics                 | 2026-07-20 10:50 UTC |
+| Entra identity            | Application, SP, owner, credential, and RBAC checks        | Pass: secretless exact Environment trust, no RBAC      | 2026-07-20 11:11 UTC |
+| ARM template validation   | Provider-level subscription validation                    | Pass with exact replacement principals                 | 2026-07-20 11:11 UTC |
+| ARM what-if               | Provider-level subscription what-if                       | Pass: 19 creates, no diagnostics, exact principals     | 2026-07-20 11:11 UTC |
 | Policy reconciliation     | Direct deny/modify rule review against rendered resources | Pass for planned resource types and Sweden Central     | 2026-07-20 10:52 UTC |
-| Exact deployment identity | Entra application and service-principal lookup            | Blocked: no replacement identity exists                | 2026-07-20 10:47 UTC |
-| Post-probe inventory      | Resource groups, resources, and deployment-record queries | Pass: no qualification resources or deployment record | 2026-07-20 10:52 UTC |
+| Post-probe inventory      | Resource groups, resources, and deployment-record queries | Pass: no qualification resources or deployment record | 2026-07-20 11:11 UTC |
 
-**Validated by:** Pending
+Verified identity identifiers:
 
-**Validation timestamp:** Pending
+- Application (client) ID: `4b213b46-4fd5-42f8-9edb-8993d323d4ee`
+- Application object ID: `70bc9a0c-ad00-4dad-b1b2-25631f72609b`
+- Service-principal object ID: `1b73cef2-45ba-4c53-b9a1-04964fc27e63`
+- Federated credential: `github-vnext-qualification`
+- Subject: `repo:jonathan-vella/apex-vnext:environment:vnext-qualification`
+- Audience: `api://AzureADTokenExchange`
 
-**Latest partial validation attempt:** 2026-07-20T10:52:07Z
+**Validated by:** `jovella@apexops.pro` through Azure CLI
+
+**Validation timestamp:** 2026-07-20T11:11:51Z
 
 ### Deployment Evidence
 
 | Check                | Result                                                                       | Timestamp      |
 | -------------------- | ---------------------------------------------------------------------------- | -------------- |
-| Entra application    | No replacement application verified in the current tenant                    | Pending        |
-| Federated credential | No replacement credential verified                                           | Pending        |
+| Entra application    | Secretless single-tenant app and service principal verified                   | 2026-07-20 UTC |
+| Federated credential | Exact GitHub Environment issuer, subject, and audience verified               | 2026-07-20 UTC |
 | Azure bootstrap      | No `apex-shared` bootstrap deployment exists                                 | Pending        |
 | Azure resources      | No qualification resource groups or resources exist                          | 2026-07-20 UTC |
 | Backend posture      | No replacement backend exists                                                | Pending        |
@@ -266,7 +274,7 @@ The 2026-07-16 evidence for `noalz` remains historical and does not authorize th
 | `infra/terraform/vnext-qualification/`            | Terraform lifecycle workload                               | Existing; no change expected |
 | Local mode-0600 transport key outside Git         | Shared encrypted-envelope key material                     | Create only after approval   |
 | GitHub Environment configuration                  | OIDC subject, secrets, and variables; no reviewer rule     | Pending implementation       |
-| Entra application and federated credential        | Destination repository OIDC trust                          | Pending replacement          |
+| Entra application and federated credential        | Destination repository OIDC trust                          | Created and verified         |
 | Azure bootstrap resources                         | Backend, workspace, resource groups, diagnostics, and RBAC | Not deployed                 |
 
 ## 10. Rollback and Cleanup
@@ -299,12 +307,10 @@ approval, and CI execution must fail when imported Gate 4 approval is missing or
 
 ## 12. Next Steps
 
-> Current: Partial validation complete; exact identity-bound validation remains blocked
+> Current: Exact validation complete; bootstrap deployment remains unauthorized
 
-1. Obtain separate explicit authorization before preparing or creating the replacement Entra application, service
-   principal, and federated credential.
-2. Re-run provider-level template validation and policy-aware what-if with that exact deployment principal.
-3. Mark this plan `Validated` only after the identity-bound checks pass.
-4. Obtain separate deployment authorization before invoking the bootstrap workflow.
-5. Replace all stale GitHub Environment outputs only from verified bootstrap outputs.
-6. Authorize a new bounded governance exception before any sandbox apply/destroy dispatch.
+1. Obtain separate deployment authorization before invoking the bootstrap workflow.
+2. Deploy only the exact validated bootstrap shape through `azure-deploy`.
+3. Verify outputs, default-deny backend posture, diagnostics, containers, and scoped RBAC.
+4. Obtain separate authorization before replacing stale GitHub Environment values from verified bootstrap outputs.
+5. Authorize a new bounded governance exception before any sandbox apply/destroy dispatch.
