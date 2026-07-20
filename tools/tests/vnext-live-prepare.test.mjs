@@ -13,8 +13,8 @@ import {
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const CANDIDATE_SHA = "a".repeat(40);
-const NOW = "2026-07-17T07:10:00.000Z";
-const SUBSCRIPTION = "00858ffc-dded-4f0f-8bbf-e17fff0d47d9";
+const NOW = "2026-07-20T10:10:00.000Z";
+const SUBSCRIPTION = "b47d2942-f5ad-4d3c-b28e-c23e4f83d97e";
 
 function digest(value) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -177,7 +177,7 @@ test("preparation creates a validated run with Gates 1-3 approved and Gate 4 clo
         root: stateRoot,
         sourceRoot: ROOT,
         candidateSha: CANDIDATE_SHA,
-        now: "2026-07-17T07:20:00.000Z",
+        now: "2026-07-20T10:20:00.000Z",
         availability: availability(),
         validationEntries: validationEntries("bicep"),
       },
@@ -200,7 +200,7 @@ test("preparation creates a validated run with Gates 1-3 approved and Gate 4 clo
           root: stateRoot,
           sourceRoot: ROOT,
           candidateSha: CANDIDATE_SHA,
-          now: "2026-07-17T07:30:00.000Z",
+          now: "2026-07-20T10:30:00.000Z",
           availability: availability(),
           validationEntries: validationEntries("bicep").slice(0, -1),
         },

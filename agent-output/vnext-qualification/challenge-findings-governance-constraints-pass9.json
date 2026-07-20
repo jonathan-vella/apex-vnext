@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0",
+  "challenged_artifact": "agent-output/vnext-qualification/04-governance-constraints.md",
+  "artifact_type": "governance-constraints",
+  "review_focus": "governance-reconciliation",
+  "pass_number": 9,
+  "challenge_summary": "Pass-9 governance reconciliation found no new concrete stale authority, invalid policy interpretation, missing fail-closed gate, docs/code mismatch, or implied readiness beyond the residual live-execution risks already called out in prior passes. The paired governance JSON records COMPLETE discovery for apex-shared with 6 assignments, 13 blockers, 32 auto-remediations, no required tags, no allowed locations, and no active security exception. The deployment plan and live qualification docs consistently mark provider registration, quota evidence, replacement Entra/OIDC/bootstrap state, GitHub Environment outputs, and workflow dispatch as blocked or pending. The workflow and relevant tests enforce fail-closed checks for exact subscription/config variables, ten-tag project contract, missing or stale security exception, local Gate 4 approval import, stale approval epoch, endpoint cleanup, and CI preview/approval bypass attempts. No Azure calls were made during this review.",
+  "compact_for_parent": "Pass 9 (governance-reconciliation) | LOW | 0 must_fix, 0 should_fix | No new concrete drift",
+  "risk_level": "low",
+  "must_fix_count": 0,
+  "should_fix_count": 0,
+  "suggestion_count": 0,
+  "findings": [],
+  "reviewed_inputs": {
+    "prior_findings": [
+      "agent-output/vnext-qualification/challenge-findings-governance-constraints-pass8.json"
+    ],
+    "supporting_files": [
+      "agent-output/vnext-qualification/04-governance-constraints.json",
+      "infra/bicep/vnext-qualification/.azure/plan.md",
+      "docs/vnext/LIVE-QUALIFICATION.md",
+      "tools/scripts/validate-vnext-qualification-context.mjs",
+      "tools/tests/vnext-qualification-context.test.mjs",
+      ".github/workflows/vnext-live-qualification.yml",
+      "tools/tests/vnext-live-workflow.test.mjs",
+      "tools/schemas/governance-constraints.schema.json",
+      "tools/scripts/validate-governance-refs.mjs",
+      "tools/scripts/validate-governance-trace.mjs"
+    ]
+  },
+  "verified_anchors": [
+    "04-governance-constraints.json discovery_summary: assignment_total=6, blocker_count=13, auto_remediate_count=32, audit_count=254, exempted_count=0",
+    "04-governance-constraints.json tags_required=[] and allowed_locations=[]",
+    "04-governance-constraints.md Discovery Source: 0 tag policies required and 13 deployment blockers",
+    "infra/bicep/vnext-qualification/.azure/plan.md: provider readiness blocked for Microsoft.Storage, Microsoft.OperationalInsights, and Microsoft.Quota",
+    "infra/bicep/vnext-qualification/.azure/plan.md: no transient public endpoint exception authorized; workflow dispatch remains blocked",
+    "infra/bicep/vnext-qualification/.azure/plan.md: no replacement Entra application/federated credential/backend/bootstrap exists and GitHub Environment outputs are stale",
+    "docs/vnext/LIVE-QUALIFICATION.md: local validation does not prove OIDC, RBAC propagation, deployment, destroy, or authority return",
+    ".github/workflows/vnext-live-qualification.yml: context validation and security-exception-only check precede endpoint opening",
+    "tools/scripts/validate-vnext-qualification-context.mjs: rejects wrong subscription, stale config, tag drift, missing/expired exception, and endpoint lifecycle drift",
+    "tools/tests/vnext-qualification-context.test.mjs and tools/tests/vnext-live-workflow.test.mjs: mutation coverage for stale epoch, missing imported approval, changed preview, exception expiry, endpoint cleanup, and CI Gate 4 bypass"
+  ],
+  "residual_risk": [
+    "Live Azure Policy evaluation, provider registration, GitHub OIDC/RBAC propagation, bootstrap deployment, apply/destroy, cleanup, and authority-return behavior remain unproven because this pass was review-only and did not call Azure."
+  ],
+  "cache_inputs": {
+    "artifact_sha": "61d1f4feef4129d26010e738e7b81c6c8a4d4320086445936c396e2c5c3b410f",
+    "checklists_sha": "6a7c048e28c7e0f09566eb7a1a4329579cf60fb19d435caf0a22423f6cb06c7b",
+    "protocol_sha": "55197255ea03bb97e0e33592de94ba1bafbb183cf7f83503d22a2b35f0a2071c",
+    "subagent_sha": "bafc28d2f2b6d9b6b817094a57935ab0bf2a5308f219ca696c39eb7cc7955264",
+    "model": "GPT-5.5",
+    "artifact_hash": "a4db5aace267712091e96d0ea5dfa3712e48e3f110e14426e60784c347be6d55"
+  },
+  "supporting_hashes": {
+    "agent-output/vnext-qualification/04-governance-constraints.json": "71fd57a9e36eb26c019e549d43a58c9aa61b1bc8cc0d04769c81fcb93688191a",
+    "infra/bicep/vnext-qualification/.azure/plan.md": "ed35655baeea7519b8ed206a3e3a45005e9bc987959730267de07a18c9e5d6c9",
+    "docs/vnext/LIVE-QUALIFICATION.md": "58dbd13000e5d4eb657f72355be0893fd5d807021f2103795e19df69c5119f57",
+    "tools/scripts/validate-vnext-qualification-context.mjs": "a43f0b8aeaa39ada75e940267da1de8e02ba56b882ef4d82c3f42de04828627a",
+    "tools/tests/vnext-qualification-context.test.mjs": "1050df126be409dff2ff43aad62f7cb2b62c9445416e90b768aa7447845826f1",
+    ".github/workflows/vnext-live-qualification.yml": "6ae6abd6f8d7e106c51a884f1ccc00f9e467fd48673f3377d70e003ed9d16207",
+    "tools/tests/vnext-live-workflow.test.mjs": "17c6b2a14d0827fbb667c978ddf66826ca8849d1d9633418fb05717e99475e41"
+  }
+}
