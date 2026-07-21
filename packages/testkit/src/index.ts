@@ -5,5 +5,6 @@ export * from "./malicious.js";
 export * from "./parity.js";
 export * from "./qualification.js";
 export * from "./quality.js";
+export * from "./scorecard-samples.js";
 export * from "./scenario.js";
 export * from "./workspace.js";

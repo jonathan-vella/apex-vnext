@@ -18,6 +18,8 @@ const WORKFLOW = "vnext-live-qualification.yml";
 const WORKFLOW_NAME = "vNext Live Qualification";
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const RESOURCE_GROUP_PATTERN = /^[A-Za-z0-9_().-]{1,90}$/;
+const STORAGE_ACCOUNT_PATTERN = /^[a-z0-9]{3,24}$/;
 const TRACKS = new Set(["bicep", "terraform"]);
 const OPERATIONS = new Set(["apply", "destroy"]);
 const STAGES = new Set(["apply", "preview-failure"]);
@@ -154,6 +156,12 @@ export function parseArgs(argv) {
   if (command !== "recover") {
     for (const key of ["resource_group", "storage_account"]) {
       if (typeof values[key] !== "string") throw new Error(`Missing --${key.replaceAll("_", "-")}`);
+    }
+    if (!RESOURCE_GROUP_PATTERN.test(values.resource_group) || values.resource_group.endsWith(".")) {
+      throw new Error("--resource-group must be a valid Azure resource group name");
+    }
+    if (!STORAGE_ACCOUNT_PATTERN.test(values.storage_account)) {
+      throw new Error("--storage-account must be a valid Azure storage account name");
     }
     values.container ??= "handoff";
   }
