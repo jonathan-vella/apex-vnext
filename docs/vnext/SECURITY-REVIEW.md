@@ -6,6 +6,10 @@ This document records read-only independent review evidence. The maintainer acce
 `#13` as the CodeQL equivalent while the repository was private. Native CodeQL now passes on the public repository. This
 evidence does not authorize deployment, publication, tagging, or cutover.
 
+All reviews below predate the `0.10.0` re-baseline and are historical characterization. A new independent review must
+cover both supported Copilot clients, ARM MCP adapters, retired dependency boundaries, improvement ingestion, generated
+client bundles, and the final exact candidate before promotion.
+
 ## Reviews
 
 ### Exact-main baseline
@@ -73,7 +77,7 @@ gate revisions and actual serialized task-context projection sizes for each Bice
   authorization-bypass, or release-blocking issue and confirmed that the prior cloud evidence remains behaviorally
   equivalent because no workflow, IaC, or authority path changed. Later PR commits are limited to this finding's
   documentation remediation and deterministic formatting; GitHub checks identify the final exact head.
-- Manual supported VS Code, cross-device, and final promotion scenarios remain outstanding. Both dual-track cloud
-  lifecycles and OIDC writer transfers completed against the same non-`.apex/` source boundary as final `main`.
+- The prior VS Code, cross-device, dual-track cloud lifecycle, and OIDC writer-transfer results remain historical.
+  Supported VS Code and Copilot CLI parity plus the changed dependency boundaries require new exact-candidate evidence.
 
 The evidence and blocker split are also recorded on destination issue `#13`.

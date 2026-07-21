@@ -8,21 +8,19 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 
 ## Open Entries
 
-### RISK-001: Final Promotion Evidence And Authorization Are Incomplete
+### RISK-001: Re-Baselined Promotion Evidence Is Incomplete
 
 - **Type:** `RISK`
 - **Owner:** Release engineering
-- **Impact:** Package publication, release tags, and cutover remain blocked.
-- **Evidence:** Exact-main CI run `29827622151` and release-qualification run `29827622205` passed on
-  `25530c339410e9758ae34538427f24bddfd83e1d`. The downloaded artifact verified through `SHA256SUMS`, the repeated
-  approved-equivalent review found no release blocker, and both live cloud tracks remain behaviorally equivalent.
-  Native CodeQL subsequently passed Actions, JavaScript/TypeScript, and Python with zero open alerts. Supported VS Code
-  evidence, npm publication authority, final tags, and cutover authorization remain outstanding.
-- **Related issue:** Destination issue `#13`.
-- **Mitigation:** Run the supported VS Code and cross-device checklist, configure trusted publishers, then obtain a
-  separate explicit promotion decision.
+- **Impact:** No prior receipt can authorize package publication, release tags, or cutover for the expanded contract.
+- **Evidence:** Candidate `25530c339410e9758ae34538427f24bddfd83e1d` and its exact-main automation qualified the
+  earlier contract. Current characterization base `1a1de02a3a17f496c713dd3c4e425c8df8d30d0e` follows the legacy-agent
+  archive and the approved client, MCP, diagram, improvement, and bundle re-baseline.
+- **Related issue:** Pending Milestone H issue.
+- **Mitigation:** Select a new candidate only after Milestones H through O, then bind all deterministic, client,
+  package, security, and live evidence to that exact commit and dependency set.
 - **State:** Open
-- **Closure proof:** Versioned supported-host evidence plus the final maintainer promotion decision.
+- **Closure proof:** A new exact-candidate dossier, passing receipt, and separate maintainer promotion decision.
 
 ### RISK-003: GitHub Project Access Is Unavailable To The Current Token
 
@@ -81,19 +79,101 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Closure proof:** Public visibility, verified repository security settings, zero transient live artifacts, and native
   CodeQL run `29830116910` passing all configured languages with zero open alerts.
 
-### ASSUMPTION-001: VS Code Handoff Topology Is Supported
+### RISK-008: Supported Copilot Clients Could Diverge
+
+- **Type:** `RISK`
+- **Owner:** Client experience
+- **Impact:** VS Code and Copilot CLI could produce different workflow outcomes or expose different authority.
+- **Evidence:** The previous contract qualified VS Code only. Copilot CLI is not installed in the current development
+  container, and no shared client-parity corpus has run.
+- **Related issue:** Pending Milestone J issue.
+- **Mitigation:** Generate thin projections from one bundle contract and compare normalized typed outcomes,
+  authorization denials, restart/resume behavior, and evidence hashes rather than UI mechanics.
+- **State:** Open
+- **Closure proof:** A passing two-client matrix on supported, version-recorded clients and the exact release candidate.
+
+### RISK-009: ARM MCP Trust And Tool Shapes Could Drift
+
+- **Type:** `RISK`
+- **Owner:** Azure capabilities
+- **Impact:** Authentication, tool-name, or response-shape drift could contaminate managed evidence or bypass policy.
+- **Evidence:** Azure Resource Manager MCP is selected for bounded read evidence but has no qualified APEX adapter or
+  pinned toolchain entry.
+- **Related issue:** Pending Milestones I and K issues.
+- **Mitigation:** Use typed read-allowlisted adapters, normalize versioned fixtures, reject unknown tools and shapes,
+  and keep native Azure and IaC paths authoritative for mutation.
+- **State:** Open
+- **Closure proof:** Clean-environment startup, authentication, schema, fault, allowlist, and denial tests on the exact
+  selected ARM MCP version.
+
+### RISK-010: Replacement Surfaces Could Be Removed Too Early
+
+- **Type:** `RISK`
+- **Owner:** Runtime integration
+- **Impact:** Removing Astro, Azure Pricing, Terraform, or Draw.io MCP surfaces before replacement proof could break
+  supported workflows, packaging, documentation, or tests.
+- **Evidence:** Retirement is approved in the roadmap, but replacement behavior is not yet implemented.
+- **Related issue:** Pending Milestones I, K, and L issues.
+- **Mitigation:** Inventory references and retire one surface at a time only after its named replacement gate passes;
+  verify package contents and a clean consumer after each removal.
+- **State:** Open
+- **Closure proof:** Zero active references, passing replacement tests, and clean package/install evidence for every
+  retired surface.
+
+### RISK-011: Improvement Measurements Could Be Misleading
+
+- **Type:** `RISK`
+- **Owner:** Quality engineering
+- **Impact:** Unbounded, sensitive, duplicated, or weakly attributed outcomes could create noisy proposals or false
+  claims of improvement.
+- **Evidence:** Existing observe-and-propose behavior is inert and characterized; structured outcome ingestion and
+  comparative measurement are not implemented.
+- **Related issue:** Pending Milestone M issue.
+- **Mitigation:** Accept bounded structured outcomes only, retain provenance and redaction, define denominators and
+  confidence explicitly, and keep all proposals human-decided.
+- **State:** Open
+- **Closure proof:** Passing redaction, deduplication, provenance, precision, recurrence, and no-mutation tests with a
+  reviewed measurement report.
+
+### RISK-012: Client Bundle Projections Could Drift
+
+- **Type:** `RISK`
+- **Owner:** Release engineering
+- **Impact:** npm artifacts could diverge from `customizations/manifest.json` or generate unequal client capabilities.
+- **Evidence:** npm remains the selected distribution channel, but the expanded two-client bundle has not been
+  generated or qualified.
+- **Related issue:** Pending Milestone N issue.
+- **Mitigation:** Keep one canonical manifest, generate both projections deterministically, and test reproducibility,
+  clean install, update, rollback, uninstall, package inventory, SBOM, and provenance.
+- **State:** Open
+- **Closure proof:** Byte-reproducible exact-candidate packages whose client projections pass parity and lifecycle tests.
+
+### ASSUMPTION-001: Both Copilot Clients Can Project One Workflow Contract
 
 - **Type:** `ASSUMPTION`
-- **Owner:** VS Code experience
-- **Impact:** Failure would require more agents to remain picker-visible and would change the intended user experience.
-- **Evidence:** The managed customization manifest validates invocation edges. The legacy fleet is archived and local
-  discovery configuration exposes only managed APEX, but no fresh supported VS Code evidence is bound to the resulting
-  candidate.
-- **Related issue:** Destination issue `#9`.
-- **Mitigation:** Merge the archive change, reload VS Code, confirm no legacy agents remain visible, then run direct
-  handoff, hidden worker, model-tier, and `askQuestions` scenarios in a clean supported VS Code.
+- **Owner:** Client experience
+- **Impact:** Failure would require a product-contract or projection redesign before release.
+- **Evidence:** VS Code supports direct handoffs and `askQuestions`; Copilot CLI uses different delegation and input
+  mechanics. Typed kernel outcomes and authority boundaries are intended to remain shared.
+- **Related issue:** Pending Milestone J issue.
+- **Mitigation:** Characterize real supported clients, preserve client-specific interaction mechanics, and compare their
+  normalized outcomes using one scenario corpus.
 - **State:** Open
-- **Closure proof:** Versioned manual qualification evidence on the exact candidate head.
+- **Closure proof:** Versioned two-client qualification evidence on the exact candidate head.
+
+### ASSUMPTION-002: ARM MCP Can Supply Selected Read-Only Azure Evidence
+
+- **Type:** `ASSUMPTION`
+- **Owner:** Azure capabilities
+- **Impact:** Unsupported evidence would remain on existing trusted CLI or provider paths rather than block all ARM MCP
+  adoption.
+- **Evidence:** The upstream integration is selected conceptually; its exact qualified version and usable tool set are
+  not yet recorded.
+- **Related issue:** Pending Milestone K issue.
+- **Mitigation:** Discover and qualify only the evidence calls required by typed APEX contracts; do not expose direct
+  upstream tools to managed creative agents.
+- **State:** Open
+- **Closure proof:** An approved adapter inventory with passing availability, authentication, schema, and fault tests.
 
 ### DEPENDENCY-001: Phase 0A Evidence Remains Frozen
 
@@ -133,21 +213,18 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **State:** Accepted
 - **Closure proof:** Parser mutation tests, exact-main CI, native CodeQL run `29830116910`, and zero open alerts.
 
-### ISSUE-001: Supported VS Code Qualification Evidence Is Pending
+### ISSUE-001: Supported Client Qualification Evidence Is Pending
 
 - **Type:** `ISSUE`
 - **Owner:** Release qualification
-- **Impact:** Final promotion remains blocked even though the automated and cloud qualification gates have passed.
-- **Evidence:** Bicep apply/destroy runs `29816381757` and `29817534614` and Terraform apply/destroy runs `29820944300`
-  and `29821615776` all succeeded on attempt one with local exact-preview Gate 4, GitHub OIDC, one-hop authority transfer,
-  returned authority, empty final inventories, and a restored `Disabled`/`Deny` backend. Fresh supported VS Code and
-  cross-device evidence has not yet been recorded.
-- **Related issue:** Destination issue `#9`.
-- **Mitigation:** Run the supported-host handoff, question, hidden-worker, MCP startup, restart, and cross-device writer
-  transfer checklist and bind the result to the final release-equivalent source boundary.
+- **Impact:** Final promotion remains blocked until VS Code and Copilot CLI pass the expanded contract.
+- **Evidence:** Earlier live Azure and package results remain historical. No Copilot CLI version or parity result is
+  recorded, and the current container does not have the CLI installed.
+- **Related issue:** Pending Milestone J issue.
+- **Mitigation:** Select real supported client versions, run the shared workflow and denial corpus, and bind outcomes to
+  the new exact candidate and generated bundle hashes.
 - **State:** Open
-- **Closure proof:** Versioned manual qualification evidence with VS Code and extension versions, scenario outcomes, and
-  evidence hashes.
+- **Closure proof:** Versioned VS Code and Copilot CLI evidence with scenario outcomes and evidence hashes.
 
 ## Closed Or Historical Entries
 

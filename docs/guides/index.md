@@ -7,6 +7,9 @@ APEX vNext Preview is an isolated, pre-cutover implementation of a deterministic
 and managed workspace customizations for VS Code. Use it to evaluate the new workflow contract in a disposable or
 non-production repository.
 
+The current implementation guide remains VS Code-focused. The re-baselined `0.10.0` release target also requires GitHub
+Copilot CLI parity, but that client path is not yet implemented or qualified and no release candidate is selected.
+
 > [!WARNING]
 > **Preview, not cutover**
 >

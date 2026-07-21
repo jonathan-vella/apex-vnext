@@ -1,12 +1,13 @@
 # APEX vNext
 
 APEX vNext is the standalone development repository for the deterministic APEX
-runtime, CLI, managed VS Code customizations, qualification infrastructure, and
+runtime, CLI, managed Copilot customizations, qualification infrastructure, and
 release controls.
 
 > [!WARNING]
-> This repository is a pre-cutover release line. Production claims remain
-> blocked until the live qualification and final release gates are complete.
+> This repository is a pre-cutover release line with no current release
+> candidate. The `0.10.0` contract is being re-baselined for GitHub Copilot in
+> VS Code and GitHub Copilot CLI. Prior qualification is historical only.
 
 ## Start Here
 
@@ -47,7 +48,7 @@ does not include or publish an Astro site.
 | Path | Purpose |
 | ---- | ------- |
 | `packages/` | TypeScript contracts, kernel, capabilities, renderers, testkit, and CLI |
-| `customizations/` | Managed VS Code agent and skill bundle |
+| `customizations/` | Canonical managed source for supported Copilot client projections |
 | `config/` | Runtime, workflow, capability-pack, toolchain, and scorecard contracts |
 | `infra/` | Bicep and Terraform qualification infrastructure |
 | `tools/` | Validators, packaging, live qualification, MCP servers, and project utilities |

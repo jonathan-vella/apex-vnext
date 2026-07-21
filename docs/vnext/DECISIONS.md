@@ -191,3 +191,138 @@ when a decision has lasting architectural consequences that need alternatives an
   requires fresh review before another session.
 - **ADR:** [ADR-0003](../../agent-output/vnext-qualification/03-des-adr-0003-use-bounded-entra-only-handoff-session.md).
 - **Issue/PR:** Destination issue `#9`.
+
+## DECISION-012: Support VS Code And GitHub Copilot CLI
+
+- **Date:** 2026-07-21
+- **Owner:** `@jonathan-vella`
+- **Context:** DECISION-005 limited the first release to VS Code, but the release must now support the same governed APEX
+  workflow from a terminal client.
+- **Options:** Keep VS Code only; add prompt-only CLI content; support the full governed workflow in both clients; include
+  GitHub Copilot cloud coding-agent sessions.
+- **Choice:** Support GitHub Copilot in VS Code and GitHub Copilot CLI with equivalent typed workflow outcomes. Explicitly
+  exclude GitHub Copilot cloud coding-agent sessions, Copilot code review as an APEX client, and other runtimes.
+- **Rationale:** The kernel already owns state, questions, tasks, gates, and evidence independently of client UI. A
+  client-adapter boundary can preserve those controls while allowing VS Code and terminal-native interaction.
+- **Consequences:** This decision supersedes the first-release scope in DECISION-005. VS Code may use direct handoffs and
+  `vscode/askQuestions`; Copilot CLI may use custom-agent delegation and `ask_user`. Both must record typed answers through
+  APEX and pass client-specific discovery, MCP, resume, hidden-worker, model, and cross-device qualification. ARM MCP
+  support in cloud coding-agent sessions is not a requirement and needs no fallback.
+- **ADR:** Required before implementation if one canonical agent definition cannot generate both client projections
+  without weakening tool or invocation boundaries.
+- **Issue/PR:** Pending work-item creation.
+
+## DECISION-013: Re-Baseline The 0.10.0 Release Candidate
+
+- **Date:** 2026-07-21
+- **Owner:** `@jonathan-vella`
+- **Context:** The accepted client, MCP, diagram, improvement, packaging, automation, and guidance changes alter the
+  release-relevant dependency and behavior boundary after prior exact-main qualification.
+- **Options:** Ship the prior candidate and defer the changes; include only low-risk cleanup; require all approved changes
+  before the first release.
+- **Choice:** Treat every approved roadmap change as blocking for `0.10.0` and repeat complete qualification on one final
+  exact candidate.
+- **Rationale:** Shipping before the changes would immediately create two supported product baselines and make the old
+  evidence appear to qualify behavior it never exercised.
+- **Consequences:** Prior CI, package, security, and live cloud evidence remains historical characterization evidence but
+  cannot authorize the revised candidate. Publication, tags, support dates, and cutover require a new explicit decision
+  after deterministic, security, package, replacement-gate, and both-client qualification passes.
+- **ADR:** Not required; this is a release-governance decision.
+- **Issue/PR:** Pending work-item creation.
+
+## DECISION-014: Use A Typed ARM MCP Adapter For Managed Pricing
+
+- **Date:** 2026-07-21
+- **Owner:** Capabilities and architecture
+- **Context:** The custom Azure Pricing MCP duplicates pricing and cost-management capabilities now available from the
+  Azure Resource Manager MCP server, but APEX requires deterministic evidence and strict authority boundaries.
+- **Options:** Keep the custom server; let agents call ARM MCP directly; normalize ARM MCP output through an APEX-owned
+  typed adapter; remove pricing without replacement.
+- **Choice:** Replace managed pricing with an APEX-owned adapter that calls exact read-allowlisted ARM MCP Pricing and
+  Cost Management tools and emits typed, attested evidence. Permit optional direct read-only ARM MCP use for exploration,
+  but do not treat direct output as gate evidence.
+- **Rationale:** The adapter preserves source provenance, scope, freshness, deterministic arithmetic, redaction, and
+  fail-closed tool compatibility while reducing ownership of upstream Azure price and cost retrieval.
+- **Consequences:** Deployment, cancellation, budget creation, unknown, renamed, and write tools are rejected before
+  transport. The current pricing pack remains active until its declared reliability, latency, security, semantic parity,
+  and maintenance gates pass. Broader Resource Graph, deployment-observation, forecast, and price-sheet uses require
+  separate typed read adapters and qualification. ARM MCP never inherits Gate 4 or native IaC authority.
+- **ADR:** Required before implementation because this changes a release capability and external trust boundary.
+- **Issue/PR:** Pending work-item creation.
+
+## DECISION-015: Retire Legacy MCP And Draw.io Surfaces Through Explicit Gates
+
+- **Date:** 2026-07-21
+- **Owner:** Capabilities and developer experience
+- **Context:** Astro MCP has no active product consumer, Terraform MCP wraps registry lookup rather than Terraform
+  lifecycle behavior, and Draw.io carries a large optional generation and validation surface.
+- **Options:** Keep all servers; remove them immediately; retire each against an owned replacement and preservation gate.
+- **Choice:** Remove Astro MCP directly; replace Terraform MCP registry lookup with deterministic Terraform Registry and
+  native CLI owners; replace new Draw.io outputs with Mermaid and Python after measured diagram qualification.
+- **Rationale:** The chosen owners are simpler and align with the actual behavior boundaries without conflating Azure MCP
+  guidance with Terraform lifecycle semantics.
+- **Consequences:** Microsoft Azure MCP may provide verified Azure and Terraform guidance but is not assumed to replace
+  Terraform Registry or native CLI behavior. Terraform state, plans, imports, apply, destroy, and Gate 4 remain native.
+  Mermaid owns inline diagrams; editable Python plus rendered outputs owns standalone architecture and charts. Historical
+  Draw.io artifacts remain readable. Pricing and Draw.io source moves to a non-discoverable archive only after each
+  replacement gate passes; failed gates leave the current pack active.
+- **ADR:** Required for the diagram artifact-contract migration; not required for the isolated Astro removal.
+- **Issue/PR:** Pending work-item creation.
+
+## DECISION-016: Keep Npm As The Sole Distribution Authority
+
+- **Date:** 2026-07-21
+- **Owner:** Release engineering
+- **Context:** The hve-squad/APM model demonstrates useful source/generated separation, composition manifests, locks, and
+  versioned installation, while APEX already has a typed npm runtime and transactional customization lifecycle.
+- **Options:** Replace npm with APM; add APM as a second path; keep the current bundle unchanged; borrow applicable
+  packaging concepts within the npm lifecycle.
+- **Choice:** Keep npm and `customizations/manifest.json` authoritative. Add explicit source-to-generated mappings,
+  content locks, client projections, composition metadata, and deterministic manifests within the existing bundle.
+- **Rationale:** This gains the useful packaging properties without splitting runtime, capability, update, rollback, and
+  release ownership across package managers.
+- **Consequences:** Do not add `apm.yml`, an APM lock, an APM runtime dependency, or a second install command. Generated
+  CLI assets remain derived and must never be edited directly. The release SBOM covers APEX deliverables; generated IaC
+  projects need an SBOM only when their own requirements request one.
+- **ADR:** Not required unless future evidence proposes a second distribution authority.
+- **Issue/PR:** Pending work-item creation.
+
+## DECISION-017: Operationalize Bounded Improvement Without Promotion Authority
+
+- **Date:** 2026-07-21
+- **Owner:** Quality engineering
+- **Context:** The contracts, store, CLI, MCP, policy, and safety proof from DECISION-004 are implemented, but normal APEX
+  outcomes do not yet feed representative observation and proposal measurements.
+- **Options:** Keep manual submission only; ingest structured APEX outcomes; promote accepted observations into guidance;
+  allow autonomous mutation.
+- **Choice:** Deterministically ingest allowlisted journal and evidence outcomes, then measure observation and recurrence
+  precision, duplication, quarantine, proposal disposition, storage growth, and triage cost. Keep proposals inert and
+  human decisions mandatory.
+- **Rationale:** This adapts the useful recurrence model without introducing transcript injection, self-modification, or
+  a second repository-change path.
+- **Consequences:** Raw chat transcripts, model prose, Copilot Chronicle content, and OpenTelemetry content capture are
+  not sources. The ClawHub `pskoett/self-improving-agent` page is downstream OpenClaw packaging of the upstream work
+  cited by
+  ADR-0004; its flat-file logs, direct `AGENTS.md` or skill promotion, extraction, and autonomous mutation are
+  excluded.
+  A noisy automatic adapter remains disabled without weakening manual observation.
+- **ADR:** ADR-0004 remains authoritative; add a provenance amendment before implementation.
+- **Issue/PR:** Pending work-item creation.
+
+## DECISION-018: Consolidate Automation Conservatively
+
+- **Date:** 2026-07-21
+- **Owner:** Validation and release engineering
+- **Context:** Package scripts, validators, hooks, and workflows contain duplicate orchestration, but required checks and
+  exact-head release evidence depend on stable behavior and diagnostics.
+- **Options:** Leave duplication; build a generic workflow framework; replace all commands at once; migrate measured,
+  independently revertible ownership slices.
+- **Choice:** Complete the existing validator dependency graph, make hooks thin consumers of canonical validators, and
+  consolidate workflows only where characterization proves duplicate ownership.
+- **Rationale:** A small machine-readable ownership graph reduces drift without introducing a general task engine or
+  generated workflow system.
+- **Consequences:** Required check names, triggers, permissions, action pins, diagnostics, artifact boundaries, and release
+  authority remain stable. Serial hooks remain until representative Git-index race and timing evidence permits change.
+  Every slice must reduce canonical owners without worsening CI, hook, context, coverage, or diagnostic baselines.
+- **ADR:** Not required unless a slice changes a public command or hosted trust boundary.
+- **Issue/PR:** Pending work-item creation.
