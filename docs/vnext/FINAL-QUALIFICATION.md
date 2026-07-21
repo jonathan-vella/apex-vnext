@@ -5,7 +5,8 @@
 Automated, package, security-equivalent, and dual-track cloud qualification completed for the prior `0.1.0` package
 candidate. The maintainer subsequently selected one unified `0.10.0` repository, package, customization, and release
 identity. That release-relevant amendment is locally qualified but uncommitted, so the prior exact-head evidence is now
-historical and promotion is not authorized.
+historical and promotion is not authorized. PR `#85` establishes reviewed candidate
+`465c89b4cee7bdb4f99e9122253f67d48ca2c766`; its exact-head workflow evidence remains pending.
 
 No evidence in this dossier authorizes package publication, tag creation, branch changes, or production cutover.
 
@@ -35,8 +36,9 @@ Local checks pass:
 - five package and clean-install tests.
 - reproducible package build and all five `npm publish --dry-run --json` rehearsals.
 
-The local release manifest and artifacts are not immutable candidate evidence because the version amendment is not yet
-committed. Its manifest currently reports the prior Git `HEAD`; these hashes must be regenerated after review and merge.
+The local release manifest and artifacts below were generated before the amendment was committed and are not immutable
+candidate evidence. They report the prior Git `HEAD` and must be replaced by downloaded, verified exact-head workflow
+artifacts before promotion.
 
 ## Exact-Main Automation
 
@@ -88,7 +90,7 @@ dependency order:
 | `@apex/renderers`    | `0.1.0` |    29,007 |      34 | `e90bb46fb104805e34a8975ff003a2859d4a3473e58174527203accb12b9e721` |
 | `@apex/cli`          | `0.1.0` | 1,037,841 |     115 | `f9804d7bf30c3259b42667d6c2e5fa497a286c23bcdcfebcaefe49aeb2cb020e` |
 
-The uncommitted `0.10.0` rehearsal produced the following provisional values:
+The pre-commit `0.10.0` rehearsal produced the following provisional values:
 
 | Package              | Version  |     Bytes | Entries | Provisional SHA-256                                                |
 | -------------------- | -------- | --------: | ------: | ------------------------------------------------------------------ |
@@ -184,8 +186,8 @@ exception tag. Ephemeral leases, ownership, keys, and transfer claims are intent
 
 ## Remaining Manual Gates
 
-1. Review and commit the unified `0.10.0` amendment through a pull request, then repeat exact-head release qualification,
-   package hashes, audits, and the approved security-equivalent review.
+1. Complete PR `#85` exact-head release qualification and replace provisional package hashes with the downloaded,
+   verified workflow artifact values.
 2. Confirm whether the prior cloud evidence remains release-equivalent after the final diff; repeat live qualification if
    any cloud execution or authority path changed.
 3. Run the supported VS Code and cross-device checklist against the resulting exact package candidate.
