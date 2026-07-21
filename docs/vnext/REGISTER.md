@@ -84,9 +84,9 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Type:** `RISK`
 - **Owner:** Client experience
 - **Impact:** VS Code and Copilot CLI could produce different workflow outcomes or expose different authority.
-- **Evidence:** The previous contract qualified VS Code only. Copilot CLI is not installed in the current development
-  container, and no shared client-parity corpus has run.
-- **Related issue:** Pending Milestone J issue.
+- **Evidence:** The previous contract qualified VS Code only. Copilot CLI `1.0.73` is selected and the shared matrix is
+  defined, but neither client has run the re-baselined corpus.
+- **Related issue:** [#91](https://github.com/jonathan-vella/apex-vnext/issues/91)
 - **Mitigation:** Generate thin projections from one bundle contract and compare normalized typed outcomes,
   authorization denials, restart/resume behavior, and evidence hashes rather than UI mechanics.
 - **State:** Open
@@ -155,7 +155,7 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Impact:** Failure would require a product-contract or projection redesign before release.
 - **Evidence:** VS Code supports direct handoffs and `askQuestions`; Copilot CLI uses different delegation and input
   mechanics. Typed kernel outcomes and authority boundaries are intended to remain shared.
-- **Related issue:** Pending Milestone J issue.
+- **Related issue:** [#91](https://github.com/jonathan-vella/apex-vnext/issues/91)
 - **Mitigation:** Characterize real supported clients, preserve client-specific interaction mechanics, and compare their
   normalized outcomes using one scenario corpus.
 - **State:** Open
@@ -218,9 +218,9 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Type:** `ISSUE`
 - **Owner:** Release qualification
 - **Impact:** Final promotion remains blocked until VS Code and Copilot CLI pass the expanded contract.
-- **Evidence:** Earlier live Azure and package results remain historical. No Copilot CLI version or parity result is
-  recorded, and the current container does not have the CLI installed.
-- **Related issue:** Pending Milestone J issue.
+- **Evidence:** Earlier live Azure and package results remain historical. Copilot CLI `1.0.73` and the normalized matrix
+  are recorded, but no parity result exists and the CLI is not globally installed in the current container.
+- **Related issue:** [#91](https://github.com/jonathan-vella/apex-vnext/issues/91)
 - **Mitigation:** Select real supported client versions, run the shared workflow and denial corpus, and bind outcomes to
   the new exact candidate and generated bundle hashes.
 - **State:** Open
