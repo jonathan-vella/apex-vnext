@@ -57,6 +57,9 @@ the original APEX repository. See [docs/MIGRATION.md](docs/MIGRATION.md) for pro
   approvals or cloud operations.
 - feat(vnext): collect release scorecard evidence from 100 real contract mutations, capability fault cases, and cache-key
   mutations, plus replayed gate revisions and serialized `taskContext()` projections from each dual-track run.
+- feat(vnext): automate clean exact-head validation, package qualification, release scorecard sampling, workspace
+  compaction, artifact hashing, and fail-closed receipt generation locally and in GitHub Actions. The automation has no
+  merge, cloud dispatch, publication, tagging, or cutover authority.
 - feat(vnext): added a generic authenticated AES-256-GCM envelope and deterministic repository-state transfer commands
   with a selected-run allowlist, recursive content-addressed object closure, secret and size checks, atomic mode-`0600`
   import, idempotent retry, claim-bounded expiry, and separate writer-transfer acceptance. Production CI remains blocked

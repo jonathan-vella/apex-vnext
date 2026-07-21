@@ -13,13 +13,14 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Type:** `RISK`
 - **Owner:** Release engineering
 - **Impact:** Cutover and any baseline tag remain blocked.
-- **Evidence:** CI run `29760571466` and docs run `29760571448` passed on `e5509097aa7a1b9c389673a79ee7fbf7110de678`.
-  Subsequent scorecard and security changes require a new immutable candidate and exact-head rerun. Code scanning is
-  disabled, so required CodeQL evidence is unavailable; the bounded independent review in
-  [SECURITY-REVIEW.md](SECURITY-REVIEW.md) is not an approved substitute.
+- **Evidence:** Branch Enforcement run `29808356400`, docs run `29808356315`, CI run `29808356346`, and all frozen
+  scorecard rules passed on `860bb459f9ac2d5db1423f400382e0d9ebc8fd12`. Later release-automation changes require a
+  new exact-head run. Code scanning is disabled, so required CodeQL evidence is unavailable; the bounded independent
+  review in [SECURITY-REVIEW.md](SECURITY-REVIEW.md) is not an approved substitute.
 - **Related issue:** Destination issue `#13`.
-- **Mitigation:** Rerun required checks and security review after the final source commit. Enable CodeQL or record an
-  explicitly approved equivalent review before cutover.
+- **Mitigation:** The release-candidate workflow now reruns deterministic, package, and scorecard qualification after
+  every release-relevant candidate change. Complete a final security review and enable CodeQL or record an explicitly
+  approved equivalent review before cutover.
 - **State:** Open
 - **Closure proof:** Required-check URLs showing success on the candidate SHA.
 
@@ -100,21 +101,20 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **State:** Open
 - **Closure proof:** Evidence index with candidate and dependency hashes for every required scenario.
 
-### ISSUE-002: Scorecard Sample Requirements Are Not Satisfied
+## Closed Or Historical Entries
+
+### ISSUE-002: Scorecard Sample Requirements Were Satisfied
 
 - **Type:** `ISSUE`
 - **Owner:** Quality engineering
-- **Impact:** Required release metrics remain blocking or unclaimable.
-- **Evidence:** The current candidate collects 100 observed validation-mutation, capability, and cache outcomes and derives
-  gate-loop and `taskContext()` samples from repeated dual-track reports. A one-run integration probe passes the three
-  100-sample rules; the final 30-run artifact remains to be produced on an immutable candidate.
+- **Disposition:** Closed after release sampling collected 30 dual-track reports, 100 validation-mutation cases, 100
+  capability cases, and 100 cache cases. Every frozen scorecard rule passed. The release-candidate workflow now reruns
+  and compacts this evidence automatically whenever candidate inputs change.
 - **Related issue:** [#542](https://github.com/jonathan-vella/apex/issues/542)
-- **Mitigation:** Complete the 30-run release evaluation after the final source change, hash the compact artifacts, and
-  rerun on the final candidate commit.
-- **State:** Open
-- **Closure proof:** Scorecard artifacts satisfying every minimum-sample and unavailable-data rule.
-
-## Closed Or Historical Entries
+- **State:** Closed
+- **Closure proof:** Candidate `860bb459f9ac2d5db1423f400382e0d9ebc8fd12`; qualification artifact SHA-256
+  `00e6cc140eb9a221a7a47ea068f246498f7345de1614c83f41c217545619f769`; evaluation artifact SHA-256
+  `c2bc086ab0014716ddfc02b8ca5ed86c8cb1169b3c5f1e38d17b535b534d5a3d`.
 
 ### DEFECT-001: CI Lint Resolved Unbuilt Generated Packages
 

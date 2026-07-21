@@ -19,7 +19,7 @@ cutover and does not substitute for the CodeQL-or-explicitly-approved-equivalent
 
 ### Remediation follow-up
 
-- **Candidate:** Current uncommitted remediation change set based on the exact-main baseline above.
+- **Candidate:** `860bb459f9ac2d5db1423f400382e0d9ebc8fd12`, based on the exact-main baseline above.
 - **Date:** 2026-07-20
 - **Method:** Separate adversarial read-only review of the complete diff plus focused local tests.
 - **Result:** The review confirmed that Azure names are validated before HCL generation, CLI calls use argument arrays,
@@ -48,8 +48,8 @@ gate revisions and actual serialized task-context projection sizes for each Bice
 ## Limitations
 
 - GitHub code scanning is disabled, so a supported current CodeQL result and alert #34 closure receipt are unavailable.
-- The follow-up reviewed an uncommitted change set. A final review and required checks must bind to the eventual immutable
-  candidate commit.
+- The follow-up is bound to `860bb459f9ac2d5db1423f400382e0d9ebc8fd12`. Later release-automation changes require a
+  final review and required checks on the eventual immutable candidate commit.
 - No new Azure or GitHub Actions deployment was dispatched. Existing cloud evidence predates these source changes and is
   historical only.
 - Manual VS Code, cross-device, OIDC writer-transfer, dual-track cloud lifecycle, and promotion scenarios remain
