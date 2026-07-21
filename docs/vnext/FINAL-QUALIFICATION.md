@@ -98,9 +98,10 @@ v1 state cannot be resumed in vNext. The supported procedures are in the [instal
 
 ## Security Disposition
 
-The maintainer accepted an independent review as the CodeQL equivalent on issue `#13` while CodeQL was unavailable for
-the private repository. That review covered the unified version amendment and found no critical, high,
-authorization-bypass, or release-blocking issue. Native CodeQL must pass after the authorized public transition.
+The maintainer accepted an independent review as the CodeQL equivalent while the repository was private. That review
+covered the unified version amendment and found no critical, high, authorization-bypass, or release-blocking issue.
+After public conversion, native CodeQL run `29830116910` passed Actions, JavaScript/TypeScript, and Python with zero open
+alerts. All native CodeQL checks are required on protected `main`.
 
 - `npm audit --package-lock-only --omit=dev`: zero vulnerabilities.
 - full lockfile audit: two accepted moderate findings in the development-only Markdown lint path.
@@ -109,7 +110,7 @@ authorization-bypass, or release-blocking issue. Native CodeQL must pass after t
 - heuristic scanning found no obvious credential in committed `.apex/` evidence.
 
 The accepted moderate parser exposure and development lock-metadata hardening item are owned in the
-[release register](REGISTER.md). Native CodeQL and a supported alert-closure receipt remain pending public conversion.
+[release register](REGISTER.md). Public secret scanning also reports zero open alert.
 
 ## Live Cloud Evidence
 
@@ -167,12 +168,11 @@ exception tag. Ephemeral leases, ownership, keys, and transfer claims are intent
 
 ## Remaining Manual Gates
 
-1. Complete the authorized public hardening, visibility transition, and native CodeQL run.
-2. Run the supported VS Code and cross-device checklist against the exact package candidate.
-3. Configure GitHub Actions trusted publishers for the maintainer-owned npm package names and record registry
+1. Run the supported VS Code and cross-device checklist against the exact package candidate.
+2. Configure GitHub Actions trusted publishers for the maintainer-owned npm package names and record registry
    evidence without exposing tokens.
-4. Decide immutable tags, v1 final tag and maintenance reference, cutover date, and the v1 support end date 12 calendar
+3. Decide immutable tags, v1 final tag and maintenance reference, cutover date, and the v1 support end date 12 calendar
    months later.
-5. Review this dossier and explicitly authorize or reject npm publication, tags, support dates, and cutover.
+4. Review this dossier and explicitly authorize or reject npm publication, tags, support dates, and cutover.
 
-Until all five actions are recorded, the release remains unqualified for promotion.
+Until all four actions are recorded, the release remains unqualified for promotion.
