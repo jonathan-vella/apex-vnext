@@ -2,7 +2,8 @@
 
 > [!IMPORTANT]
 > Historical design input, superseded on 2026-07-21. Binding product commitments and delivery order now live in
-> `docs/vnext/PRD.md`, `DECISIONS.md`, and `ROADMAP.md`. Do not execute this prompt as the current plan; its original
+> `docs/vnext/PRD.md`, `docs/vnext/DECISIONS.md`, and `docs/vnext/ROADMAP.md`. Do not execute this prompt as the current
+> plan; its original
 > client, MCP, diagram, and release assumptions are preserved only for traceability.
 
 Rebuild APEX with a greenfield implementation while treating the existing APEX product as a brownfield replacement. The
