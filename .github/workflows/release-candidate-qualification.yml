@@ -55,6 +55,29 @@ jobs:
       - name: Setup Node repository
         uses: ./.github/actions/setup-node-repo
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install Python validation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e tools/apex-recall
+          python -m pip install -e 'tools/mcp-servers/azure-pricing[dev]'
+          python -m pip install pytest
+          python -m venv tools/mcp-servers/azure-pricing/.venv
+          tools/mcp-servers/azure-pricing/.venv/bin/python -m pip install --upgrade pip
+          tools/mcp-servers/azure-pricing/.venv/bin/python -m pip install \
+            -e 'tools/mcp-servers/azure-pricing[admin,dev]'
+
       - name: Bind stable collection time
         id: candidate
         run: printf 'collected_at=%s\n' "$(git show --no-patch --format=%cI "$GITHUB_SHA")" >> "$GITHUB_OUTPUT"
