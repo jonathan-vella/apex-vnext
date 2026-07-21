@@ -3,8 +3,8 @@
 ## Status
 
 This document records read-only independent review evidence. The maintainer accepted this method on destination issue
-`#13` as the CodeQL equivalent for this private GitHub Free repository. It does not authorize deployment, publication,
-tagging, or cutover.
+`#13` as the CodeQL equivalent while the repository was private. Public conversion will enable native CodeQL, which must
+pass before publication or cutover. This evidence does not authorize deployment, publication, tagging, or cutover.
 
 ## Reviews
 
@@ -63,7 +63,7 @@ gate revisions and actual serialized task-context projection sizes for each Bice
 
 ## Limitations
 
-- GitHub code scanning is disabled, so a supported current CodeQL result and alert #34 closure receipt are unavailable.
+- Native CodeQL remains pending until the authorized public visibility transition completes.
 - The committed-state secret review is pattern-based and cannot prove the absence of every possible encoded secret.
 - The approved equivalent review must repeat after any release-relevant source, workflow, generated-asset, or dependency
   change.

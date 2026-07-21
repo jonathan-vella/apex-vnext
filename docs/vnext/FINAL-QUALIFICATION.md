@@ -2,28 +2,24 @@
 
 ## Decision Status
 
-Automated, package, security-equivalent, and dual-track cloud qualification completed for the prior `0.1.0` package
-candidate. The maintainer subsequently selected one unified `0.10.0` repository, package, customization, and release
-identity. That release-relevant amendment is locally qualified but uncommitted, so the prior exact-head evidence is now
-historical and promotion is not authorized. PR `#85` establishes reviewed candidate
-content; GitHub checks and downloaded artifacts identify its exact current head. Exact-head workflow evidence remains
-pending.
+Automated, package, security-equivalent, and dual-track cloud qualification are complete for exact `main` candidate
+`25530c339410e9758ae34538427f24bddfd83e1d`. The unified release identity is verified, but promotion is not authorized.
 
 No evidence in this dossier authorizes package publication, tag creation, branch changes, or production cutover.
 
 ## Candidate Boundary
 
-| Role                       | Commit                                     | Meaning                                                 |
-| -------------------------- | ------------------------------------------ | ------------------------------------------------------- |
-| Prior exact `main`         | `1f8db536fe0398f6575775d7794ba718234d3ef1` | Superseded deterministic and package evidence candidate |
-| Terraform execution        | `58f9420d533a53ab11a626cb07ba6253b9eef94f` | Exact Terraform apply and destroy candidate             |
-| Bicep execution            | `0edf37cc943d0090fbf4f2d5cf09ba0119c14ff1` | Exact Bicep apply and destroy candidate                 |
-| Last release-source change | `8c672d76cb2c2028131fcb93bb023ba9327d256b` | Final dependency remediation                            |
+| Role                       | Commit                                     | Meaning                                      |
+| -------------------------- | ------------------------------------------ | -------------------------------------------- |
+| Final exact `main`         | `25530c339410e9758ae34538427f24bddfd83e1d` | Deterministic and package evidence candidate |
+| Terraform execution        | `58f9420d533a53ab11a626cb07ba6253b9eef94f` | Exact Terraform apply and destroy candidate  |
+| Bicep execution            | `0edf37cc943d0090fbf4f2d5cf09ba0119c14ff1` | Exact Bicep apply and destroy candidate      |
+| Last runtime-source change | `87e4c70b19c00639a19b6fe4d763e3514b96da74` | Unified release identity                     |
 
-Git comparison proves that the Bicep candidate, Terraform candidate, and final `main` differ only under committed
-`.apex/` state and content-addressed evidence. No package, lockfile, workflow, generated asset, runtime, IaC, or release
-script changed across those execution and evidence commits. The commits are recorded separately so cloud execution is
-not falsely attributed to the evidence-only descendant.
+The unified version amendment changed package and runtime identity metadata after the cloud executions. Independent diff
+review confirmed that it did not change workflows, IaC, provider behavior, Gate 4, OIDC, writer transfer, or any cloud
+authority path. The prior Bicep and Terraform evidence therefore remains behaviorally equivalent, but the execution
+commits remain recorded separately and are not falsely presented as the final package candidate.
 
 ## Unified Version Amendment
 
@@ -37,20 +33,19 @@ Local checks pass:
 - five package and clean-install tests.
 - reproducible package build and all five `npm publish --dry-run --json` rehearsals.
 
-The local release manifest and artifacts below were generated before the amendment was committed and are not immutable
-candidate evidence. They report the prior Git `HEAD` and must be replaced by downloaded, verified exact-head workflow
-artifacts before promotion.
+Exact-main CI, package, and release qualification pass. The generated manifest, SBOM, and provenance bind the final
+commit and match the package content qualified by CI.
 
 ## Exact-Main Automation
 
-- CI run `29822326665`: success on attempt one at final exact `main`.
-- release-qualification run `29822400861`: success on attempt one at final exact `main`.
-- artifact: `release-qualification-1f8db536fe0398f6575775d7794ba718234d3ef1`.
-- GitHub artifact digest: `sha256:5cc4aeb2750ba4dadfb8286d71c4df95c14637a4a5744488e95585a03a55647e`.
+- CI run `29827622151`: success on attempt one at final exact `main`.
+- release-qualification run `29827622205`: success on attempt one at final exact `main`.
+- artifact: `release-qualification-25530c339410e9758ae34538427f24bddfd83e1d`.
+- GitHub artifact digest: `sha256:2983f4c0f7d58e160680f2086f1dc8c55de58c2cda8b122915e3cc38a3ef4faa`.
 - `receipt.json`: 4,209 bytes,
-  `sha256:258f1f359e63bba57e0de9a79f95cbe5d03da9288c9232c1e0244d9f7fa782d4`.
+  `sha256:89df22c99443d91b4c338df4fef2dfe74a2ddc22fad1b2cbd7d85431c77ae322`.
 - `SHA256SUMS`: 796 bytes,
-  `sha256:d0886b8d15ad1065d7bf536d73cb175d769b3a9fe7e77e41770421efd668f445`.
+  `sha256:a5daa48a7e0aae6d84ae54d9a250acac8b4b08faf4c1af04ee51e78364eee5b8`.
 - All nine retained artifact checksums verified successfully.
 - The receipt status is `pass`; merge, cloud dispatch, package publication, tag creation, and cutover are all `false`.
 
@@ -66,45 +61,30 @@ artifacts before promotion.
 | Task-context bytes p95               |  8,941 |      60 | Pass     |
 | Workflow elapsed time p95            | 271 ms |      30 | Pass     |
 
-## Prior Exact Package And Lifecycle Evidence
+## Exact Package And Lifecycle Evidence
 
 The exact-main packer generated byte-bound release artifacts with Node `24.18.0`, npm `11.16.0`, and TypeScript
 `7.0.2`. The package test passed reproducible double-pack, tarball inventory comparison, checksum verification, offline
 clean install, CLI and MCP startup, capability install/update/rollback/uninstall, customization rollback/uninstall, SBOM,
 and in-toto provenance assertions.
 
-- release manifest: 2,297 bytes,
-  `sha256:881b604f8ce4ab6eaea68a03342d327528f677418fbf71461dbc3303d308c204`.
-- CycloneDX SBOM: 70,841 bytes,
-  `sha256:0de82f2575eb07f16028cd182e2e44195a8ebe497e39a1312c9c21b8c12ddd5e`.
-- in-toto provenance: 1,429 bytes,
-  `sha256:a594d95498c80c63b8bb90562917623856bb93c109a116faac7805b60065d884`.
+- release manifest: 2,314 bytes,
+  `sha256:e64d6a99c4f2e2c2859d75dad684af24eef7f8aa0e5a280be08a3e35652a7be6`.
+- CycloneDX SBOM: 70,873 bytes,
+  `sha256:3218c9823bcd86589d7747a92ec18127441deb14f3a6b12c4cb203646efe02e3`.
+- in-toto provenance: 1,434 bytes,
+  `sha256:b48691c0ec9239366d110a6f555b8b7e30d48d8cbc94df6ce44b2f79f9932444`.
 
 Each tarball checksum and byte count matched the release manifest before `npm publish --dry-run --json` passed in
 dependency order:
 
-| Package              | Version |     Bytes | Entries | SHA-256                                                            |
-| -------------------- | ------- | --------: | ------: | ------------------------------------------------------------------ |
-| `@apex/contracts`    | `0.1.0` |    63,756 |      85 | `2d2d61876de935e7dc98fdc8e1bba057c97c9dc87fa6cb1c69d627da22ee1a69` |
-| `@apex/kernel`       | `0.1.0` |    77,067 |     110 | `e1cfde660045cba26fbb065f4bb47ffb36ab5e08be574a4162c68a71cada488a` |
-| `@apex/capabilities` | `0.1.0` |   104,876 |      94 | `21cab6a9db62d874a1bed68d6ef092b951730f99df634832f13564b4d32c7e4f` |
-| `@apex/renderers`    | `0.1.0` |    29,007 |      34 | `e90bb46fb104805e34a8975ff003a2859d4a3473e58174527203accb12b9e721` |
-| `@apex/cli`          | `0.1.0` | 1,037,841 |     115 | `f9804d7bf30c3259b42667d6c2e5fa497a286c23bcdcfebcaefe49aeb2cb020e` |
-
-The pre-commit `0.10.0` rehearsal produced the following provisional values:
-
-| Package              | Version  |     Bytes | Entries | Provisional SHA-256                                                |
+| Package              | Version  |     Bytes | Entries | SHA-256                                                            |
 | -------------------- | -------- | --------: | ------: | ------------------------------------------------------------------ |
 | `@apex/contracts`    | `0.10.0` |    63,759 |      85 | `08fa44e89607a8a68446fe4fa3bf2d3ef7f5e78bf7a40ead7d768633bf21d616` |
 | `@apex/kernel`       | `0.10.0` |    77,067 |     110 | `bac8a18a521130271f48a5dd70894bd5b1e226b96c716c81316dea7aea40ce2b` |
 | `@apex/capabilities` | `0.10.0` |   104,877 |      94 | `0b885deddc753d5182c65d07cb4c8f92d94feac460e3ff9ff75eac885b259c71` |
 | `@apex/renderers`    | `0.10.0` |    29,003 |      34 | `88c13ca9a4696ef65a220072ee74f7e9f86b3132da300856614e9c90a37eccf8` |
 | `@apex/cli`          | `0.10.0` | 1,037,841 |     115 | `6fdb42fd9eaf68204668712cc0a19a7308a0b45da40db5fc4803fd0de488d9f2` |
-
-Provisional supporting artifacts are release manifest
-`sha256:71aca63ab276c23069c053368e64f60a798e4a0b8aaef09d16bef1d998ac55e9`, CycloneDX SBOM
-`sha256:d8f76428d18b7b76c23b2616ae03c6e8acc6dfb245ff5107973aa9d3d435f89a`, and in-toto provenance
-`sha256:d55a35ff67aa850cab78957f0c46ee60916ca8a73e7ebe015c746369003ab087`.
 
 The local dry run validates package contents and npm metadata but does not create registry provenance. Real npm
 provenance requires GitHub Actions OIDC and configured npm trusted publishers. This environment has no npm identity;
@@ -118,18 +98,18 @@ v1 state cannot be resumed in vNext. The supported procedures are in the [instal
 
 ## Security Disposition
 
-The maintainer accepted an independent review as the CodeQL equivalent on issue `#13` because CodeQL is unavailable for
-this private GitHub Free repository. That review was repeated read-only on final exact `main` after the dependency delta.
-It found no critical, high, authorization-bypass, or release-blocking issue.
+The maintainer accepted an independent review as the CodeQL equivalent on issue `#13` while CodeQL was unavailable for
+the private repository. That review covered the unified version amendment and found no critical, high,
+authorization-bypass, or release-blocking issue. Native CodeQL must pass after the authorized public transition.
 
 - `npm audit --package-lock-only --omit=dev`: zero vulnerabilities.
 - full lockfile audit: two accepted moderate findings in the development-only Markdown lint path.
 - the former parser finding remains covered by bounded name validation and adversarial dual-track mutation tests.
-- no non-`.apex/` source changed after final dependency remediation.
+- no workflow, IaC, provider, or authority path changed after live qualification.
 - heuristic scanning found no obvious credential in committed `.apex/` evidence.
 
 The accepted moderate parser exposure and development lock-metadata hardening item are owned in the
-[release register](REGISTER.md). Native CodeQL and a supported alert-closure receipt remain unavailable.
+[release register](REGISTER.md). Native CodeQL and a supported alert-closure receipt remain pending public conversion.
 
 ## Live Cloud Evidence
 
@@ -187,15 +167,12 @@ exception tag. Ephemeral leases, ownership, keys, and transfer claims are intent
 
 ## Remaining Manual Gates
 
-1. Complete PR `#85` exact-head release qualification and replace provisional package hashes with the downloaded,
-   verified workflow artifact values.
-2. Confirm whether the prior cloud evidence remains release-equivalent after the final diff; repeat live qualification if
-   any cloud execution or authority path changed.
-3. Run the supported VS Code and cross-device checklist against the resulting exact package candidate.
-4. Configure GitHub Actions trusted publishers for the five maintainer-owned npm package names and record registry
+1. Complete the authorized public hardening, visibility transition, and native CodeQL run.
+2. Run the supported VS Code and cross-device checklist against the exact package candidate.
+3. Configure GitHub Actions trusted publishers for the maintainer-owned npm package names and record registry
    evidence without exposing tokens.
-5. Decide immutable tags, v1 final tag and maintenance reference, cutover date, and the v1 support end date 12 calendar
+4. Decide immutable tags, v1 final tag and maintenance reference, cutover date, and the v1 support end date 12 calendar
    months later.
-6. Review this dossier and explicitly authorize or reject npm publication, tags, support dates, and cutover.
+5. Review this dossier and explicitly authorize or reject npm publication, tags, support dates, and cutover.
 
-Until all six actions are recorded, the release remains unqualified for promotion.
+Until all five actions are recorded, the release remains unqualified for promotion.
