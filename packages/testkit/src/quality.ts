@@ -4,6 +4,7 @@ import type { QualificationBenchmarkReport, QualificationReport, QualificationTr
 
 export interface QualificationMutationResult {
   readonly escaped: boolean;
+  readonly caseId?: string;
 }
 
 export interface QualificationEvent {
@@ -13,6 +14,7 @@ export interface QualificationEvent {
 
 export interface QualificationOutcome {
   readonly success: boolean;
+  readonly caseId?: string;
 }
 
 export interface MeasurementProvenance {
@@ -75,6 +77,16 @@ export function collectQualificationMeasurements(
 ): ScorecardMeasurementSet {
   const reports = options.reports ?? [];
   const reportHashes = reports.map((report) => sha256Json(report));
+  const gateRevisionLoops =
+    options.eventsByRun?.map(countGateLoops) ??
+    reports.flatMap(({ tracks }) =>
+      tracks.flatMap(({ gateRevisionLoops: loops }) => (loops === undefined ? [] : [loops])),
+    );
+  const taskContextBytes =
+    options.taskContextBytes ??
+    reports.flatMap(({ tracks }) =>
+      tracks.flatMap(({ taskContextBytes: bytes }) => (bytes === undefined ? [] : [bytes])),
+    );
   const measurements: QualificationMeasurement[] = [];
   addRate(
     measurements,
@@ -127,10 +139,10 @@ export function collectQualificationMeasurements(
     measurements,
     "gate-revision-loops-per-run-p95",
     SCENARIOS.gateLoops,
-    options.eventsByRun?.map(countGateLoops) ?? [],
+    gateRevisionLoops,
     "event-journal",
     options,
-    evidenceHashes(options.eventsByRun),
+    options.eventsByRun === undefined ? reportHashes : evidenceHashes(options.eventsByRun),
     percentile95,
   );
   addRate(
@@ -147,10 +159,10 @@ export function collectQualificationMeasurements(
     measurements,
     "task-context-bytes-p95",
     SCENARIOS.context,
-    options.taskContextBytes ?? [],
+    taskContextBytes,
     "task-context",
     options,
-    evidenceHashes(options.taskContextBytes),
+    options.taskContextBytes === undefined ? reportHashes : evidenceHashes(options.taskContextBytes),
     percentile95,
   );
   addRate(

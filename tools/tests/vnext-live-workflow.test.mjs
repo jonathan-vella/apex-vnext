@@ -662,6 +662,11 @@ test("launcher strictly parses dispatch, retrieve, and recovery arguments", () =
     "--storage-account",
     "storage",
   ];
+  const withCommonValue = (name, value) => {
+    const mutated = [...common];
+    mutated[mutated.indexOf(name) + 1] = value;
+    return mutated;
+  };
   assert.equal(parseArgs(["preview", ...common]).container, "handoff");
   assert.equal(parseArgs(["preview", ...common, "--handoff-id", handoffId]).handoff_id, handoffId);
   assert.equal(parseArgs(["dispatch", ...common, "--ref", "main", "--handoff-id", handoffId]).container, "handoff");
@@ -680,6 +685,22 @@ test("launcher strictly parses dispatch, retrieve, and recovery arguments", () =
     "123",
   ]);
   assert.equal(recovered.run_id, "123");
+  assert.throws(
+    () => parseArgs(["preview", ...withCommonValue("--resource-group", 'control-rg"\nkey = "attacker')]),
+    /valid Azure resource group name/,
+  );
+  assert.throws(
+    () => parseArgs(["preview", ...withCommonValue("--resource-group", "control-rg.")]),
+    /valid Azure resource group name/,
+  );
+  assert.throws(
+    () => parseArgs(["preview", ...withCommonValue("--storage-account", 'storage"\nkey = "attacker')]),
+    /valid Azure storage account name/,
+  );
+  assert.throws(
+    () => parseArgs(["preview", ...withCommonValue("--storage-account", "Storage_Account")]),
+    /valid Azure storage account name/,
+  );
   assert.throws(() => parseArgs(["preview", ...common, "--handoff-id", "not-a-uuid"]), /UUID/);
   assert.throws(() => parseArgs(["dispatch", ...common, "--ref", "main"]), /requires --handoff-id UUID/);
   assert.throws(

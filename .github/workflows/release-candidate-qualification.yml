@@ -1,0 +1,129 @@
+# Runs complete non-cloud release qualification for every release-relevant candidate revision.
+# The workflow emits evidence only; it cannot merge, deploy, publish, tag, or authorize cutover.
+name: Release Candidate Qualification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/release-candidate-qualification.yml"
+      - "config/**"
+      - "customizations/**"
+      - "package.json"
+      - "package-lock.json"
+      - "packages/**"
+      - "tools/scripts/pack-vnext.mjs"
+      - "tools/scripts/qualify-vnext.mjs"
+      - "tools/scripts/qualify-vnext-release.mjs"
+      - "tools/tests/vnext/**"
+      - "tsconfig*.json"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/release-candidate-qualification.yml"
+      - "config/**"
+      - "customizations/**"
+      - "package.json"
+      - "package-lock.json"
+      - "packages/**"
+      - "tools/scripts/pack-vnext.mjs"
+      - "tools/scripts/qualify-vnext.mjs"
+      - "tools/scripts/qualify-vnext-release.mjs"
+      - "tools/tests/vnext/**"
+      - "tsconfig*.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact-head release qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node repository
+        uses: ./.github/actions/setup-node-repo
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install Python validation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e tools/apex-recall
+          python -m pip install -e 'tools/mcp-servers/azure-pricing[dev]'
+          python -m pip install pytest
+          python -m venv tools/mcp-servers/azure-pricing/.venv
+          tools/mcp-servers/azure-pricing/.venv/bin/python -m pip install --upgrade pip
+          tools/mcp-servers/azure-pricing/.venv/bin/python -m pip install \
+            -e 'tools/mcp-servers/azure-pricing[admin,dev]'
+
+      - name: Bind stable collection time
+        id: candidate
+        env:
+          EXPECTED_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          candidate_sha="$(git rev-parse HEAD)"
+          test "$candidate_sha" = "$EXPECTED_CANDIDATE_SHA"
+          printf 'candidate_sha=%s\n' "$candidate_sha" >> "$GITHUB_OUTPUT"
+          printf 'collected_at=%s\n' "$(git show --no-patch --format=%cI "$candidate_sha")" >> "$GITHUB_OUTPUT"
+
+      - name: Run and compact release qualification
+        env:
+          COLLECTED_AT: ${{ steps.candidate.outputs.collected_at }}
+        run: |
+          npm run qualify:vnext-release -- \
+            --collected-at "$COLLECTED_AT" \
+            --output dist/release-candidate
+
+      - name: Render release gate summary
+        if: success()
+        run: |
+          receipt=dist/release-candidate/receipt.json
+          {
+            printf '## Release candidate qualification\n\n'
+            printf -- '- Candidate: `%s`\n' "$(jq -r '.candidate' "$receipt")"
+            printf -- '- Automated status: **%s**\n\n' "$(jq -r '.status' "$receipt")"
+            printf '| Metric | Samples | Decision |\n'
+            printf '| --- | ---: | --- |\n'
+            jq -r '.evaluations[] | "| `\(.metric)` | \(.samples) | \(.decision) |"' "$receipt"
+            printf '\n### Final manual gates\n\n'
+            jq -r '.remainingManualGates[] | "- " + .' "$receipt"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload compact qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-qualification-${{ steps.candidate.outputs.candidate_sha }}
+          path: |
+            dist/release-candidate/SHA256SUMS
+            dist/release-candidate/receipt.json
+            dist/release-candidate/logs/*.log
+            dist/release-candidate/scorecard/evaluation.json
+            dist/release-candidate/scorecard/evaluation.md
+            dist/release-candidate/scorecard/measurements.json
+            dist/release-candidate/scorecard/qualification.json
+          if-no-files-found: error
+          retention-days: 30

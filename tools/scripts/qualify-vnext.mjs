@@ -14,6 +14,7 @@ import process from "node:process";
 const ROOT = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const DEFAULT_REPETITIONS = 10;
 const RELEASE_REPETITIONS = 30;
+const FAULT_SAMPLES = 100;
 
 export function parseQualificationArguments(argv) {
   const options = {
@@ -66,22 +67,40 @@ export async function runVnextQualification(options, dependencies) {
   );
   const benchmark = dependencies.runQualificationBenchmark(100, dependencies.budgets);
   const indicators = options.indicators === undefined ? {} : JSON.parse(await readFile(options.indicators, "utf8"));
+  const [mutationResults, capabilityResults, cacheResults] = await Promise.all([
+    indicators.mutationResults ?? dependencies.collectValidationMutationResults?.(FAULT_SAMPLES),
+    indicators.capabilityResults ??
+      dependencies.collectCapabilityResults?.(dependencies.capabilityPackageJson, FAULT_SAMPLES),
+    indicators.cacheResults ?? dependencies.collectCacheResults?.(join(workspace, "scorecard-cache"), FAULT_SAMPLES),
+  ]);
+  const collectedIndicators = {
+    ...(mutationResults === undefined ? {} : { mutationResults }),
+    ...(indicators.eventsByRun === undefined ? {} : { eventsByRun: indicators.eventsByRun }),
+    ...(capabilityResults === undefined ? {} : { capabilityResults }),
+    ...(indicators.taskContextBytes === undefined ? {} : { taskContextBytes: indicators.taskContextBytes }),
+    ...(cacheResults === undefined ? {} : { cacheResults }),
+  };
   const collectedAt = options.collectedAt ?? new Date().toISOString();
   const measurementSet = dependencies.collectQualificationMeasurements({
     reports,
     benchmarks: [benchmark],
-    mutationResults: indicators.mutationResults,
+    mutationResults,
     eventsByRun: indicators.eventsByRun,
-    capabilityResults: indicators.capabilityResults,
+    capabilityResults,
     taskContextBytes: indicators.taskContextBytes,
-    cacheResults: indicators.cacheResults,
+    cacheResults,
     clock: () => new Date(collectedAt),
     commandVersions: dependencies.commandVersions,
     toolVersions: dependencies.toolVersions,
   });
   const evaluations = dependencies.evaluateQualityScorecard(dependencies.scorecard, measurementSet.measurements);
   const evaluation = qualityArtifact(dependencies.scorecard, measurementSet.measurements, evaluations);
-  await writeJson(join(output, "qualification.json"), { schemaVersion: "1.0.0", reports, benchmark });
+  await writeJson(join(output, "qualification.json"), {
+    schemaVersion: "1.0.0",
+    reports,
+    benchmark,
+    indicators: collectedIndicators,
+  });
   await writeJson(join(output, "measurements.json"), measurementSet);
   await writeJson(join(output, "evaluation.json"), evaluation);
   await writeFile(
@@ -114,6 +133,7 @@ async function main() {
     ...renderers,
     scorecard,
     customizationsSource: join(ROOT, "packages", "cli", "assets", "customizations"),
+    capabilityPackageJson: join(ROOT, "packages", "capabilities", "package.json"),
     budgets: {
       appendP95Ms: defaults.journalBenchmarks.budgetsMilliseconds.appendP95,
       replayP95Ms: defaults.journalBenchmarks.budgetsMilliseconds.replayP95,

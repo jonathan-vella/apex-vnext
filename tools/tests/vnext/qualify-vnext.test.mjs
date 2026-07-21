@@ -28,6 +28,7 @@ test("qualifier writes deterministic artifacts and blocks unavailable measuremen
     budgets: { appendP95Ms: 1, replayP95Ms: 1, statusP95Ms: 1 },
     commandVersions: { cli: "test" },
     toolVersions: { node: "test" },
+    capabilityPackageJson: join(root, "package.json"),
     scorecard: {
       schemaVersion: "1.0.0",
       frozenAt: "2026-07-13T00:00:00.000Z",
@@ -49,25 +50,49 @@ test("qualifier writes deterministic artifacts and blocks unavailable measuremen
       Promise.all(Array.from({ length: count }, (_, index) => harness(index))),
     runQualification: async () => report,
     runQualificationBenchmark: () => ({ schemaVersion: "1.0.0", status: "pass", eventCount: 1 }),
-    collectQualificationMeasurements: ({ clock, commandVersions, toolVersions }) => ({
-      schemaVersion: "1.0.0",
-      measurements: [
-        {
-          metric: "manual-required",
-          scenario: "vscode",
-          samples: 0,
-          provenance: {
-            source: "manual",
+    collectValidationMutationResults: (samples) => {
+      assert.equal(samples, 100);
+      return [{ caseId: "mutation", escaped: false }];
+    },
+    collectCapabilityResults: async (_packageJson, samples) => {
+      assert.equal(samples, 100);
+      return [{ caseId: "capability", success: true }];
+    },
+    collectCacheResults: async (_workspace, samples) => {
+      assert.equal(samples, 100);
+      return [{ caseId: "cache", success: true }];
+    },
+    collectQualificationMeasurements: ({
+      clock,
+      commandVersions,
+      toolVersions,
+      mutationResults,
+      capabilityResults,
+      cacheResults,
+    }) => {
+      assert.deepEqual(mutationResults, [{ caseId: "mutation", escaped: false }]);
+      assert.deepEqual(capabilityResults, [{ caseId: "capability", success: true }]);
+      assert.deepEqual(cacheResults, [{ caseId: "cache", success: true }]);
+      return {
+        schemaVersion: "1.0.0",
+        measurements: [
+          {
+            metric: "manual-required",
             scenario: "vscode",
-            inputReportHashes: [],
-            sampleCount: 0,
-            collectedAt: clock().toISOString(),
-            commandVersions,
-            toolVersions,
+            samples: 0,
+            provenance: {
+              source: "manual",
+              scenario: "vscode",
+              inputReportHashes: [],
+              sampleCount: 0,
+              collectedAt: clock().toISOString(),
+              commandVersions,
+              toolVersions,
+            },
           },
-        },
-      ],
-    }),
+        ],
+      };
+    },
     evaluateQualityScorecard: (_scorecard, measurements) => [
       {
         metric: measurements[0].metric,

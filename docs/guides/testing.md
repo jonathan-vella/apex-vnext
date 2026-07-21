@@ -18,6 +18,31 @@ npm run qualify:vnext
 This runs runtime/config validation, workspace build and package tests, validator tests, and the package pack plus clean
 consumer-install test.
 
+## Automate Release Candidate Qualification
+
+Run all non-cloud release gates with one command from a clean tracked worktree. Supply a fixed collection time so the
+scorecard provenance remains stable across retries:
+
+```bash
+npm run qualify:vnext-release -- \
+  --collected-at 2026-07-21T06:50:00.000Z \
+  --output dist/release-candidate
+```
+
+The command prepares managed assets, runs `validate:all` and `qualify:vnext`, collects the release scorecard, removes
+the generated per-run workspaces, hashes the compact artifacts and logs, and writes `receipt.json` plus `SHA256SUMS`.
+It fails if the tracked source is dirty before or after qualification, a command fails, or any scorecard rule does not
+pass.
+
+The `Release Candidate Qualification` workflow runs the same command for release-relevant pull-request revisions and
+pushes to `main`. It binds collection metadata to the candidate commit time and retains the compact evidence bundle.
+The workflow uses read-only repository permission and cannot dispatch Azure work, approve Gate 4, merge, publish, tag,
+or authorize cutover.
+
+CodeQL or an approved equivalent, supported VS Code scenarios, exact-preview Gate 4 decisions, live dual-track Azure
+qualification, and final promotion authorization remain separate gates. They are reported in the receipt rather than
+silently treated as passing.
+
 ## Run an Individual Lane
 
 Use the narrowest lane while diagnosing a failure:

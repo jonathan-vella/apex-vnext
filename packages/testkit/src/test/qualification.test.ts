@@ -32,6 +32,8 @@ test("qualification runs complete bicep and terraform reports", async (context) 
     ["bicep", "terraform"],
   );
   assert.ok(report.tracks.every(({ eventCount, hashes }) => eventCount > 0 && hashes.eventHead?.length === 64));
+  assert.ok(report.tracks.every(({ gateRevisionLoops }) => gateRevisionLoops === 0));
+  assert.ok(report.tracks.every(({ taskContextBytes }) => taskContextBytes !== undefined && taskContextBytes > 0));
   assert.equal(report.tracks[0]?.hashes.logicalInventory, report.tracks[1]?.hashes.logicalInventory);
   assert.ok(report.checks.some(({ id }) => id === "logical-parity"));
   assert.equal(qualificationJson(report), qualificationJson(report));
@@ -84,7 +86,7 @@ test("qualification measurements preserve unavailable evidence and deterministic
     schemaVersion: "1.0.0" as const,
     status: "pass" as const,
     durationMs: 100,
-    tracks: ["bicep", "terraform"].map((track) => ({
+    tracks: ["bicep", "terraform"].map((track, index) => ({
       track: track as "bicep" | "terraform",
       status: "pass" as const,
       checks: [
@@ -94,6 +96,8 @@ test("qualification measurements preserve unavailable evidence and deterministic
         "event-replay-object-hashes",
       ].map((id) => ({ id, status: "pass" as const, durationMs: 1 })),
       eventCount: 1,
+      gateRevisionLoops: index,
+      taskContextBytes: (index + 1) * 10,
       hashes: {},
     })),
     checks: [],
@@ -130,6 +134,22 @@ test("qualification measurements preserve unavailable evidence and deterministic
       .inputReportHashes.length,
     1,
   );
+  const derivedContext = collectQualificationMeasurements({
+    reports,
+    clock: () => new Date("2026-07-13T12:00:00.000Z"),
+    commandVersions: { apex: "0.1.0" },
+    toolVersions: { node: "24.0.0" },
+  }).measurements.find(({ metric }) => metric === "task-context-bytes-p95");
+  assert.equal(derivedContext?.samples, 4);
+  assert.equal(derivedContext?.value, 20);
+  const derivedGateLoops = collectQualificationMeasurements({
+    reports,
+    clock: () => new Date("2026-07-13T12:00:00.000Z"),
+    commandVersions: { apex: "0.1.0" },
+    toolVersions: { node: "24.0.0" },
+  }).measurements.find(({ metric }) => metric === "gate-revision-loops-per-run-p95");
+  assert.equal(derivedGateLoops?.samples, 4);
+  assert.equal(derivedGateLoops?.value, 1);
 });
 
 test("repeat qualification rejects invalid sample counts", async () => {
