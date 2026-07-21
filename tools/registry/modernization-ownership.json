@@ -1,7 +1,7 @@
 {
   "$schema": "schemas/modernization-ownership.schema.json",
   "schemaVersion": "1.0.0",
-  "candidate": "c447f744e3bee97f8919b36ea285f0f5aaa3e42e",
+  "candidate": "1a1de02a3a17f496c713dd3c4e425c8df8d30d0e",
   "surfaces": [
     {
       "id": "workspace-operating-frame",
@@ -88,6 +88,23 @@
       "rationale": "The DAG is the machine-readable owner of workflow order and handoffs."
     },
     {
+      "id": "copilot-client-projections",
+      "category": "invocation",
+      "classification": "rewrite",
+      "canonicalOwner": "customizations/manifest.json",
+      "sourceRefs": [
+        "customizations/manifest.json",
+        "customizations/.github/agents/*.agent.md",
+        "customizations/.vscode/mcp.json"
+      ],
+      "consumers": ["GitHub Copilot in VS Code", "GitHub Copilot CLI", "client parity qualification"],
+      "proofCommands": ["npm run validate:vnext", "npm run validate:agents", "npm run validate:vscode"],
+      "removalGate": "Generated VS Code and Copilot CLI projections preserve roles, interaction boundaries, MCP allowlists, and equivalent typed outcomes.",
+      "rationale": "One managed role graph must produce client-specific mechanics without creating separate workflow authorities.",
+      "followUp": "Add a client-neutral interaction contract and generate both client projections from the managed manifest.",
+      "decisionRef": "OWN-011"
+    },
+    {
       "id": "runtime-manifests",
       "category": "runtime",
       "classification": "keep",
@@ -129,15 +146,67 @@
     {
       "id": "customization-distribution",
       "category": "runtime",
-      "classification": "investigate",
+      "classification": "rewrite",
       "canonicalOwner": "customizations/manifest.json",
       "sourceRefs": ["customizations/manifest.json", "packages/cli/scripts/prepare-assets.mjs"],
-      "consumers": ["CLI initialization", "managed customization update", "consumer repositories"],
-      "proofCommands": ["npm run validate:vnext", "npm run test:vnext"],
-      "removalGate": "Source, bundled asset, and installed consumer boundaries are documented and byte-tested.",
-      "rationale": "The manifest is explicit, but source-versus-shipped ownership is not documented end to end.",
-      "followUp": "Characterize source, bundle, lock, and installed-file lifecycle.",
+      "consumers": ["CLI initialization", "managed customization update", "both supported Copilot clients"],
+      "proofCommands": ["npm run validate:vnext", "npm run test:vnext", "npm run test:vnext-pack"],
+      "removalGate": "Both client projections install, update, roll back, and uninstall atomically from one npm-owned manifest and content lock.",
+      "rationale": "The approved lifecycle extends the existing npm and manifest authority rather than adding APM or another installer.",
+      "followUp": "Add deterministic client projections, content locks, composition provenance, and two-client lifecycle tests.",
       "decisionRef": "OWN-006"
+    },
+    {
+      "id": "mcp-portfolio",
+      "category": "runtime",
+      "classification": "investigate",
+      "canonicalOwner": "planned APEX MCP descriptor",
+      "sourceRefs": [
+        ".vscode/mcp.json",
+        "customizations/.vscode/mcp.json",
+        "config/capability-packs.v1.json",
+        "tools/scripts/validate-mcp-config.mjs"
+      ],
+      "consumers": ["developer workspace", "managed clients", "capability packs", "release packaging"],
+      "proofCommands": ["npm run lint:mcp-config", "npm run validate:vnext"],
+      "removalGate": "Each retired server has a passing replacement gate, zero active discovery or package references, and an explicit negative assertion.",
+      "rationale": "MCP ownership is currently distributed across client config, packs, setup, tests, and documentation.",
+      "followUp": "Create one typed descriptor and retire Astro, Terraform, Azure Pricing, and Draw.io integrations independently.",
+      "decisionRef": "OWN-012"
+    },
+    {
+      "id": "pricing-evidence",
+      "category": "runtime",
+      "classification": "rewrite",
+      "canonicalOwner": "packages/contracts/src/evidence.ts",
+      "sourceRefs": [
+        "packages/contracts/src/evidence.ts",
+        "config/capability-packs.v1.json",
+        "tools/mcp-servers/azure-pricing/src/**/*.py"
+      ],
+      "consumers": ["architecture workflow", "cost evidence", "Gate 2 review", "release qualification"],
+      "proofCommands": ["npm run test:azure-pricing-mcp", "npm run test:vnext"],
+      "removalGate": "Typed normalized ARM MCP evidence meets pricing parity, reliability, latency, determinism, security, and maintenance gates before the custom pack is archived.",
+      "rationale": "Managed pricing trust should belong to versioned APEX evidence contracts, not raw upstream MCP output.",
+      "followUp": "Add pricing request and evidence contracts, a read-allowlisted ARM MCP adapter, and restricted raw-evidence attestation.",
+      "decisionRef": "OWN-013"
+    },
+    {
+      "id": "improvement-outcome-ingestion",
+      "category": "runtime",
+      "classification": "rewrite",
+      "canonicalOwner": "config/improvement-policy.v1.json",
+      "sourceRefs": [
+        "config/improvement-policy.v1.json",
+        "packages/contracts/src/improvement.ts",
+        "packages/kernel/src/improvement-store.ts"
+      ],
+      "consumers": ["quality workflow", "human proposal triage", "release scorecard"],
+      "proofCommands": ["npm run test:bounded-improvement", "npm run prove:bounded-improvement"],
+      "removalGate": "Allowlisted outcome ingestion is opt-in, deterministic, redacted, idempotent, measured, and unable to mutate repository or runtime policy.",
+      "rationale": "Existing inert improvement contracts need a bounded outcome adapter and defensible measurements, not a second learning store.",
+      "followUp": "Map journal and evidence outcomes to stable observations and measure precision, duplication, recurrence, quarantine, storage, and triage cost.",
+      "decisionRef": "OWN-015"
     },
     {
       "id": "workflow-validator-ownership",
@@ -271,6 +340,41 @@
       "rationale": "Freshness metadata is a dedicated drift-control surface."
     },
     {
+      "id": "diagram-routing",
+      "category": "generation",
+      "classification": "rewrite",
+      "canonicalOwner": ".github/skills/mermaid/ and .github/skills/python-diagrams/",
+      "sourceRefs": [
+        ".github/skills/mermaid/SKILL.md",
+        ".github/skills/python-diagrams/SKILL.md",
+        ".github/skills/drawio/SKILL.md",
+        "tools/tests/drawio-golden/**/expected.json"
+      ],
+      "consumers": ["design workflow", "IaC planning", "as-built output", "documentation"],
+      "proofCommands": ["npm run validate:skills", "npm run lint:drawio"],
+      "removalGate": "Format-neutral scenarios prove editable Mermaid or Python source, semantic and visual quality, deterministic rendering, and historical Draw.io readability.",
+      "rationale": "New inline and standalone diagrams need explicit format owners before the Draw.io toolchain can retire.",
+      "followUp": "Generalize golden scenarios, route inline output to Mermaid, route standalone output to Python, then archive Draw.io after measured parity.",
+      "decisionRef": "OWN-014"
+    },
+    {
+      "id": "client-bundle-generation",
+      "category": "generation",
+      "classification": "rewrite",
+      "canonicalOwner": "packages/cli/scripts/prepare-assets.mjs",
+      "sourceRefs": [
+        "packages/cli/scripts/prepare-assets.mjs",
+        "customizations/manifest.json",
+        "config/runtime-bundle.v1.json"
+      ],
+      "consumers": ["npm packages", "CLI lifecycle", "release manifest", "SBOM and provenance"],
+      "proofCommands": ["npm run prepare:vnext-assets", "npm run validate:vnext", "npm run test:vnext-pack"],
+      "removalGate": "One deterministic generation path records source mappings, client projections, hashes, versions, composition provenance, and package inventory.",
+      "rationale": "Generated install payloads must stay derived from canonical customizations inside the npm lifecycle.",
+      "followUp": "Extend asset preparation and pack tests; do not add APM metadata or a second package authority.",
+      "decisionRef": "OWN-016"
+    },
+    {
       "id": "v1-compatibility-matrix",
       "category": "compatibility",
       "classification": "retire",
@@ -337,6 +441,23 @@
       "rationale": "The profiler depends on local debug logs and is not a portable CI baseline.",
       "followUp": "Decide whether local profiling remains advisory or becomes supported telemetry.",
       "decisionRef": "OWN-009"
+    },
+    {
+      "id": "managed-consumer-guidance",
+      "category": "guidance",
+      "classification": "consolidate",
+      "canonicalOwner": "customizations/.github/copilot-instructions.md",
+      "sourceRefs": [
+        "customizations/.github/copilot-instructions.md",
+        "customizations/.github/agents/*.agent.md",
+        "customizations/.github/skills/*/SKILL.md"
+      ],
+      "consumers": ["GitHub Copilot in VS Code", "GitHub Copilot CLI", "generated customization bundle"],
+      "proofCommands": ["npm run validate:instruction-checks", "npm run validate:vnext"],
+      "removalGate": "Both client projections receive equivalent kernel, authority, MCP trust, and workflow guidance without duplicating repository-authoring rules.",
+      "rationale": "Shipped consumer behavior needs one managed guidance owner distinct from repository contributor instructions.",
+      "followUp": "Rewrite managed guidance after client and MCP behavior is implemented, then regenerate packaged assets.",
+      "decisionRef": "OWN-017"
     }
   ],
   "baselines": [
@@ -352,8 +473,8 @@
       "id": "ci",
       "status": "captured",
       "sourceRefs": [".github/workflows/ci.yml", "package.json"],
-      "measurement": "Recent successful main runs queried with gh run list for ci.yml.",
-      "evidence": "Elapsed range 143-209 seconds; median 165 seconds; candidate run 29585231105 completed in 152 seconds."
+      "measurement": "Current-base main run queried with gh run list for ci.yml.",
+      "evidence": "Run 29838483672 passed at 1a1de02a3a17f496c713dd3c4e425c8df8d30d0e in 128 seconds; earlier runs remain historical timing samples."
     },
     {
       "id": "hooks",
@@ -368,7 +489,7 @@
       "status": "captured",
       "sourceRefs": ["package-lock.json", "packages/*/package.json", "tsconfig.vnext.json"],
       "measurement": "sha256sum package-lock.json; workspace package enumeration",
-      "evidence": "Lock SHA-256 45b3eae971a59165a9374de580140ab92f5e55f1ba6136dce27ebd4c133c597d; workspace package boundaries recorded by package manifests."
+      "evidence": "Lock SHA-256 5727e5fd6353b31b347cffaf6c537a5c0a6be20ce2460d66125d09b118f8b525; workspace package boundaries recorded by package manifests."
     },
     {
       "id": "diagnostics",
@@ -433,11 +554,11 @@
     },
     {
       "id": "OWN-006",
-      "status": "deferred",
-      "decision": "Keep customization source, bundled assets, and installed files unchanged pending lifecycle characterization.",
-      "rationale": "Changing an unclear shipping boundary risks consumer drift and managed-file conflicts.",
-      "owner": "Customization modernization",
-      "gate": "Source-to-bundle-to-install provenance and rollback tests are complete."
+      "status": "decided",
+      "decision": "Keep npm and customizations/manifest.json authoritative while extending transactional distribution to both supported clients.",
+      "rationale": "Source, generated, lock, composition, and rollback concepts fit the existing lifecycle without adding APM or a second installer.",
+      "owner": "Bundle and client distribution modernization",
+      "gate": "Source-to-generated-to-install provenance, two-client lifecycle, conflict, rollback, package, SBOM, and reproducibility tests pass."
     },
     {
       "id": "OWN-007",
@@ -470,6 +591,62 @@
       "rationale": "Removing an apparently unused alias can break consumer automation outside this repository.",
       "owner": "Compatibility modernization",
       "gate": "Usage evidence, replacement guidance, and a dated removal decision exist for every alias."
+    },
+    {
+      "id": "OWN-011",
+      "status": "decided",
+      "decision": "Generate VS Code and Copilot CLI projections from one managed customization manifest.",
+      "rationale": "Client-specific interaction mechanics must not fork typed workflow, state, gate, evidence, or authority ownership.",
+      "owner": "Supported client parity",
+      "gate": "Both supported clients pass the same normalized workflow and authorization corpus on pinned versions."
+    },
+    {
+      "id": "OWN-012",
+      "status": "decided",
+      "decision": "Manage the MCP portfolio through typed APEX descriptors and per-server replacement gates.",
+      "rationale": "Configuration, setup, packs, tests, and guidance must retire together without granting raw upstream tools managed trust.",
+      "owner": "MCP portfolio modernization",
+      "gate": "Each retired MCP is absent from active discovery, setup, packaging, tests, and guidance after replacement proof passes."
+    },
+    {
+      "id": "OWN-013",
+      "status": "decided",
+      "decision": "Make versioned normalized evidence contracts authoritative for managed Azure pricing.",
+      "rationale": "Typed attestation can preserve pricing semantics and provenance while restricting raw ARM MCP output and denying writes.",
+      "owner": "ARM pricing replacement",
+      "gate": "The ARM adapter passes parity, reliability, latency, security, determinism, arithmetic, and maintenance criteria."
+    },
+    {
+      "id": "OWN-014",
+      "status": "decided",
+      "decision": "Route new inline diagrams to Mermaid and standalone diagrams to editable Python sources.",
+      "rationale": "The two formats cover documentation and inspectable architecture outputs without retaining Draw.io generation.",
+      "owner": "Diagram modernization",
+      "gate": "Format-neutral semantic and visual qualification passes before Draw.io generation is archived."
+    },
+    {
+      "id": "OWN-015",
+      "status": "decided",
+      "decision": "Ingest only allowlisted structured APEX outcomes into the existing inert improvement lifecycle.",
+      "rationale": "Measured recurrence can improve triage without transcript scraping, context injection, or mutation authority.",
+      "owner": "Bounded improvement operationalization",
+      "gate": "Privacy, precision, deduplication, recurrence, retention, provenance, and no-mutation thresholds pass."
+    },
+    {
+      "id": "OWN-016",
+      "status": "decided",
+      "decision": "Keep CLI asset preparation as the only generated bundle path inside npm distribution.",
+      "rationale": "One deterministic generator can add source mappings, client locks, and composition provenance without another package manager.",
+      "owner": "Bundle generation modernization",
+      "gate": "Generated client assets, package inventory, manifest, SBOM, provenance, and tarballs are deterministic and lifecycle-tested."
+    },
+    {
+      "id": "OWN-017",
+      "status": "decided",
+      "decision": "Keep shipped consumer guidance in managed customizations and project it consistently to both clients.",
+      "rationale": "Consumer workflow rules are distinct from repository-authoring instructions and should not be duplicated across clients.",
+      "owner": "Active guidance modernization",
+      "gate": "Both clients discover equivalent managed guidance with no obsolete MCP, Draw.io, VS Code-only, or authority claim."
     }
   ]
 }

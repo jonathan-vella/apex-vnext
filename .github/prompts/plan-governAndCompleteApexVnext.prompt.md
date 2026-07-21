@@ -1,5 +1,10 @@
 ## Plan: Govern and Complete APEX vNext
 
+> [!IMPORTANT]
+> Historical planning input, superseded on 2026-07-21. Binding scope, decisions, sequence, status, and risks now live in
+> `docs/vnext/PRD.md`, `DECISIONS.md`, `ROADMAP.md`, `PROJECT.md`, and `REGISTER.md`. Do not execute this prompt as the
+> current plan; its VS Code-only and pre-rebaseline statements are retained for traceability.
+
 Manage vNext as a durable product project while preserving the current draft-integration model. Stable product intent,
 decisions, risks, regression policy, and release gates live in version-controlled documents. GitHub Issues own granular
 work status, a GitHub Project supplies planning views, and a concise repository checkpoint supports offline and

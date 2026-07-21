@@ -6,6 +6,10 @@ description: "Run deterministic qualification lanes and a manual VS Code and Azu
 Qualify the exact source commit and package set you intend to evaluate. Deterministic lanes require no Azure
 credentials or model calls; manual qualification covers VS Code interaction and optional Azure sandboxes.
 
+> [!IMPORTANT]
+> The manual checklist below characterizes the current VS Code implementation. Final `0.10.0` acceptance also requires
+> an equivalent Copilot CLI matrix and repeat qualification after all re-baseline changes.
+
 ## Run the Full Qualification
 
 From the APEX repository root:
