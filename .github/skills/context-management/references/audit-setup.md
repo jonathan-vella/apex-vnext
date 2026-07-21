@@ -10,7 +10,7 @@
 
 - Python 3.14 (for log parser script)
 - Access to VS Code Copilot Chat debug logs
-- Agent definitions in `.github/agents/*.agent.md` (or equivalent)
+- Managed agent definitions in `customizations/.github/agents/*.agent.md` (or equivalent)
 
 ## Enabling Debug Logs
 
@@ -41,9 +41,7 @@ to capture verbose tool-call data.
 The audit mode contains **no project-specific logic**. To use in another project:
 
 1. Copy `.github/skills/context-management/` to the target repo
-2. Copy `.github/agents/11-context-optimizer.agent.md`
-3. Copy `.github/instructions/context-optimization.instructions.md`
-4. Copy `tools/scripts/snapshot-agent-context.sh` and
+2. Copy `.github/instructions/context-optimization.instructions.md`
+3. Copy `tools/scripts/snapshot-agent-context.sh` and
    `tools/scripts/diff-context-baseline.sh`
-5. Adjust agent numbering if needed (11 is the slot used in this repo)
-6. The log parser auto-discovers VS Code log directories
+4. The log parser auto-discovers VS Code log directories

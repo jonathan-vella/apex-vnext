@@ -61,7 +61,7 @@ const { corpus, perSkill } = gatherReferenceContent();
 // Skill reference regex.
 //
 // Skill wiring is discovered via this regex sweep over agent bodies and
-// other reference content rather than via tools/registry/agent-registry.json.
+// other reference content rather than via the managed customization manifest.
 // The repository has a single skill tier (`SKILL.md`); legacy `SKILL.digest.md`
 // and `SKILL.minimal.md` references are not recognized.
 //

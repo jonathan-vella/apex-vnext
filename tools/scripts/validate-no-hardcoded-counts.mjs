@@ -16,8 +16,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { globSync } from "node:fs";
 import { Reporter } from "./_lib/reporter.mjs";
-import { AGENTS_DIR, SUBAGENTS_DIR, SKILLS_DIR, INSTRUCTIONS_DIR } from "./_lib/paths.mjs";
+import { SKILLS_DIR, INSTRUCTIONS_DIR } from "./_lib/paths.mjs";
 import { parseJsonc } from "./_lib/parse-jsonc.mjs";
+import { getAgents } from "./_lib/workspace-index.mjs";
 
 const ROOT = process.cwd();
 const r = new Reporter("No Hard-Coded Counts Validator");
@@ -71,9 +72,10 @@ function computeActualCounts() {
     }
   }
 
+  const agents = [...getAgents().values()];
   return {
-    primary_agents: countFiles(path.join(AGENTS_DIR, "*.agent.md")),
-    subagents: countFiles(path.join(SUBAGENTS_DIR, "*.agent.md")),
+    primary_agents: agents.filter((agent) => !agent.isSubagent).length,
+    subagents: agents.filter((agent) => agent.isSubagent).length,
     skills: countFiles(path.join(SKILLS_DIR, "*/SKILL.md")),
     instructions: countFiles(path.join(INSTRUCTIONS_DIR, "*.instructions.md")),
     validators: validatorCount,

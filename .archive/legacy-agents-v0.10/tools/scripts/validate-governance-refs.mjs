@@ -47,7 +47,7 @@ function check(description, condition) {
 
 // 1. Bicep Code Generator references governance constraints
 console.log("📄 06b-bicep-codegen.agent.md");
-const codeGenPath = ".github/agents/06b-bicep-codegen.agent.md";
+const codeGenPath = ".archive/legacy-agents-v0.10/.github/agents/06b-bicep-codegen.agent.md";
 // Shared DO/DON'T bullets were extracted to iac-common/references/codegen-do-dont.md
 // in Plan 01 Phase 4 (A1) — accept presence in either the agent body or the
 // canonical shared reference.
@@ -68,7 +68,7 @@ check("DON'T list warns against skipping governance mapping", fileOrSharedRef("S
 
 // 2. bicep-validate-subagent has Governance Compliance section
 console.log("\n📄 bicep-validate-subagent.agent.md");
-const reviewPath = ".github/agents/_subagents/bicep-validate-subagent.agent.md";
+const reviewPath = ".archive/legacy-agents-v0.10/.github/agents/_subagents/bicep-validate-subagent.agent.md";
 check("Has Governance Compliance section", fileContains(reviewPath, "### 7. Governance Compliance"));
 check("Checks tag count against governance constraints", fileContains(reviewPath, "Tag count matches governance"));
 check("Checks Deny policies are satisfied", fileContains(reviewPath, "Deny polic"));
@@ -77,7 +77,7 @@ check("Checks SKU restrictions", fileContains(reviewPath, "SKU restriction"));
 
 // 3. IaC Planner consumes governance JSON as prerequisite
 console.log("\n📄 05-iac-planner.agent.md");
-const plannerPath = ".github/agents/05-iac-planner.agent.md";
+const plannerPath = ".archive/legacy-agents-v0.10/.github/agents/05-iac-planner.agent.md";
 check("References governance constraints as prerequisite", fileContains(plannerPath, "04-governance-constraints"));
 check(
   "Has policy effect decision tree (inline or reference)",
@@ -109,7 +109,7 @@ check("Has Downstream Enforcement section", fileContains(govDiscPath, "## Downst
 
 // 6. IaC Planner uses azurePropertyPath (not bicepPropertyPath) for Terraform
 console.log("\n📄 05-iac-planner.agent.md (Terraform property mapping)");
-const iacPlannerPath = ".github/agents/05-iac-planner.agent.md";
+const iacPlannerPath = ".archive/legacy-agents-v0.10/.github/agents/05-iac-planner.agent.md";
 check(
   "Uses azurePropertyPath (not bicepPropertyPath) for property mapping",
   fileContains(iacPlannerPath, "azurePropertyPath") && fileContains(iacPlannerPath, "always use `azurePropertyPath`"),
@@ -122,7 +122,7 @@ check("References 04-governance-constraints.json", fileContains(iacPlannerPath, 
 
 // 7. Terraform Code Generator governance compliance
 console.log("\n📄 06t-terraform-codegen.agent.md");
-const tfCodeGenPath = ".github/agents/06t-terraform-codegen.agent.md";
+const tfCodeGenPath = ".archive/legacy-agents-v0.10/.github/agents/06t-terraform-codegen.agent.md";
 check("Has Phase 1.5: Governance Compliance Mapping", fileContains(tfCodeGenPath, "Phase 1.5"));
 check("Phase 1.5 is a HARD GATE", fileContains(tfCodeGenPath, "HARD GATE"));
 check("References 04-governance-constraints.json", fileContains(tfCodeGenPath, "04-governance-constraints.json"));
@@ -130,7 +130,7 @@ check("Uses azurePropertyPath for policy translation", fileContains(tfCodeGenPat
 
 // 8. Terraform review subagent has governance compliance section
 console.log("\n📄 terraform-validate-subagent.agent.md");
-const tfReviewPath = ".github/agents/_subagents/terraform-validate-subagent.agent.md";
+const tfReviewPath = ".archive/legacy-agents-v0.10/.github/agents/_subagents/terraform-validate-subagent.agent.md";
 check("Has Governance Compliance section", fileContains(tfReviewPath, "### 7. Governance Compliance"));
 check(
   "References azurePropertyPath for Terraform attribute translation",

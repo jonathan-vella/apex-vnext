@@ -6,6 +6,7 @@ node_modules/
 site/
 agent-output/
 .apex/
+.archive/
 tmp/
 infra/
 logs/
@@ -53,6 +54,7 @@ VERSION.md
 # (model-catalog.json ← generate-model-catalog.mjs; azure-deprecations.json is
 # a fetched data snapshot; mcp.json is hand-maintained with a fixed shape.)
 .github/model-catalog.json
+.github/CODEOWNERS
 .github/data/azure-deprecations.json
 .vscode/mcp.json
 

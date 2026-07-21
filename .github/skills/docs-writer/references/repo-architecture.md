@@ -158,7 +158,7 @@ See `tools/registry/count-manifest.json` for canonical counts.
 | `iac-terraform-best-practices.instructions.md` | `**/*.tf`                                                       |
 | `iac-plan-best-practices.instructions.md`      | `**/04-implementation-plan.md`                                  |
 | `code-quality.instructions.md`                 | `**/*.{js,mjs,cjs,ts,tsx,jsx,py,ps1,sh,bicep,tf}`               |
-| `context-optimization.instructions.md`         | `.github/agents/**/*.agent.md, .github/skills/**/SKILL.md`      |
+| `context-optimization.instructions.md`         | `customizations/.github/agents/**/*.agent.md, .github/skills/**/SKILL.md` |
 | `docs.instructions.md`                         | `docs/guides/**/*.md`                                         |
 | `docs-trigger.instructions.md`                 | `**/*.agent.md, **/SKILL.md, **/scripts/*.mjs`                  |
 | `github-actions.instructions.md`               | `.github/workflows/*.yml`                                       |

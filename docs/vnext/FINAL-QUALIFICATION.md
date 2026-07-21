@@ -168,11 +168,13 @@ exception tag. Ephemeral leases, ownership, keys, and transfer claims are intent
 
 ## Remaining Manual Gates
 
-1. Run the supported VS Code and cross-device checklist against the exact package candidate.
-2. Configure GitHub Actions trusted publishers for the maintainer-owned npm package names and record registry
+1. Merge and requalify the managed-agent discovery and legacy archive change, then reload VS Code and confirm only the
+   managed APEX family is visible.
+2. Run the supported VS Code and cross-device checklist against the resulting exact package candidate.
+3. Configure GitHub Actions trusted publishers for the maintainer-owned npm package names and record registry
    evidence without exposing tokens.
-3. Decide immutable tags, v1 final tag and maintenance reference, cutover date, and the v1 support end date 12 calendar
+4. Decide immutable tags, v1 final tag and maintenance reference, cutover date, and the v1 support end date 12 calendar
    months later.
-4. Review this dossier and explicitly authorize or reject npm publication, tags, support dates, and cutover.
+5. Review this dossier and explicitly authorize or reject npm publication, tags, support dates, and cutover.
 
-Until all four actions are recorded, the release remains unqualified for promotion.
+Until all five actions are recorded, the release remains unqualified for promotion.

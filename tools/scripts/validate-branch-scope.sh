@@ -30,8 +30,8 @@ case "$PREFIX" in
     LABEL="docs/, README.md, CONTRIBUTING.md, CHANGELOG.md"
     ;;
   agents)
-    ALLOWED_PATTERN='^(\.github/agents/|tools/registry/agent-registry\.json)'
-    LABEL=".github/agents/, tools/registry/agent-registry.json"
+    ALLOWED_PATTERN='^(customizations/\.github/agents/|customizations/manifest\.json)'
+    LABEL="customizations/.github/agents/, customizations/manifest.json"
     ;;
   skills)
     ALLOWED_PATTERN='^(\.github/skills/)'

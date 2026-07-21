@@ -14,7 +14,7 @@ Fixes #
 
 - [ ] 🆕 New prompt guide section
 - [ ] 🏗️ New infrastructure module (Bicep/Terraform)
-- [ ] 🤖 Agent definition update (.github/agents/)
+- [ ] 🤖 Managed agent definition update (customizations/.github/agents/)
 - [ ] 📝 Documentation update
 - [ ] 🐛 Bug fix
 - [ ] 🔧 Refactoring (no functional changes)
@@ -78,8 +78,7 @@ If YES, expected impact:
 
 ### Draw.io changes (if applicable)
 
-If this PR touches `.github/agents/04-design.agent.md`,
-`.github/skills/drawio/**`, `tools/mcp-servers/drawio/**`,
+If this PR touches `.github/skills/drawio/**`, `tools/mcp-servers/drawio/**`,
 `tools/scripts/validate-drawio-files.mjs`,
 `assets/drawio-libraries/azure-icons/**`, or `tools/tests/drawio-{golden,baseline}/**`:
 

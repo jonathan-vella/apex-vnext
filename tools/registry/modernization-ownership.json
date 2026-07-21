@@ -39,15 +39,15 @@
       "rationale": "User documentation is distinct from repository-authoring and runtime prompt guidance."
     },
     {
-      "id": "agent-registry",
+      "id": "managed-agent-manifest",
       "category": "invocation",
       "classification": "keep",
-      "canonicalOwner": "tools/registry/agent-registry.json",
-      "sourceRefs": ["tools/registry/agent-registry.json", ".github/agents/*.agent.md"],
-      "consumers": ["Copilot agent discovery", "workflow routing", "model consistency checks"],
-      "proofCommands": ["npm run validate:agent-registry", "npm run validate:agents"],
-      "removalGate": "A replacement registry preserves file, model, step, and invocation semantics.",
-      "rationale": "The registry is the explicit routing index while agent frontmatter remains executable definition."
+      "canonicalOwner": "customizations/manifest.json",
+      "sourceRefs": ["customizations/manifest.json", "customizations/.github/agents/*.agent.md"],
+      "consumers": ["Copilot agent discovery", "kernel task routing", "model consistency checks"],
+      "proofCommands": ["npm run validate:model-consistency", "npm run validate:agents"],
+      "removalGate": "A replacement preserves managed roles, models, interaction types, and invocation edges.",
+      "rationale": "The managed manifest owns roles and invocation edges while agent frontmatter remains executable definition."
     },
     {
       "id": "model-catalog",
