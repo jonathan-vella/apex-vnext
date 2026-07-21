@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.10.0",
   "managedFiles": [
     ".github/agents/apex.agent.md",
     ".github/agents/apex-requirements.agent.md",
