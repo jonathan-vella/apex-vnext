@@ -13,9 +13,10 @@
 ## Current State
 
 The maintainer selected a unified `0.10.0` repository, package, customization, and release identity after qualification
-of the prior `0.1.0` package candidate. The amendment is locally qualified but uncommitted. The
-[final qualification dossier](FINAL-QUALIFICATION.md) preserves the prior immutable evidence and labels the new package
-hashes provisional until an exact-head rerun.
+of the prior `0.1.0` package candidate. PR `#85` establishes reviewed candidate
+`465c89b4cee7bdb4f99e9122253f67d48ca2c766`. The [final qualification dossier](FINAL-QUALIFICATION.md) preserves the
+prior immutable evidence and labels pre-commit package hashes provisional until the exact-head workflow artifact is
+downloaded and verified.
 
 Both Bicep and Terraform apply/destroy workflows succeeded on attempt one after separate local exact-preview Gate 4
 decisions. Final target inventories are empty, writer authority returned locally before ephemeral files were excluded,
@@ -43,7 +44,7 @@ cutover artifact has been created. Those actions remain separately authorized re
 | Final Azure cleanup              | Pass               | Both sandboxes empty; backend restored to `Disabled`/`Deny`                          |
 | Supported VS Code scenarios      | Pending            | User-run clean supported-host and cross-device checklist                             |
 | Promotion authorization          | Pending            | Separate publication, tag, support-date, and cutover decision                        |
-| Unified `0.10.0` package set     | Local pass         | vNext validator, 109 package-owner tests, package rehearsal, and five npm dry runs   |
+| Unified `0.10.0` package set     | PR candidate       | Local qualification passes; PR `#85` exact-head workflows pending                    |
 
 ## Release Boundaries
 
@@ -59,8 +60,8 @@ cutover artifact has been created. Those actions remain separately authorized re
 
 ## Resume Pointer
 
-1. Review the unified `0.10.0` amendment, commit it through a pull request, and merge only after required checks pass.
-2. Repeat exact-head release qualification, package hashing, audits, and the approved security-equivalent review.
+1. Complete PR `#85` exact-head checks and replace provisional package evidence with the verified workflow artifact.
+2. Record the repeated approved security-equivalent review and its cloud-equivalence conclusion.
 3. Confirm cloud evidence equivalence, then run the supported VS Code and cross-device scenarios against that exact
   package candidate.
 4. Configure trusted publishers and a protected release environment for the maintainer-owned `@apex` packages.
