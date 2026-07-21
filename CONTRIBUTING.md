@@ -14,6 +14,7 @@ dependency-complete change.
 | Project controls   | [vNext project hub](docs/vnext/README.md)                                |
 | Open issues        | Use the repository's **Issues** tab                                     |
 | Source provenance  | [Migration record](docs/MIGRATION.md)                                    |
+| Security reports   | [Private vulnerability reporting](SECURITY.md)                           |
 
 ## Validate Changes
 
@@ -25,6 +26,9 @@ npm ci
 npm run qualify:vnext
 npm run validate:all
 ```
+
+Report vulnerabilities through the confidential process in [SECURITY.md](SECURITY.md), never through a public issue or
+pull request.
 
 ## License
 

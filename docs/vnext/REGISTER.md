@@ -13,16 +13,14 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Type:** `RISK`
 - **Owner:** Release engineering
 - **Impact:** Package publication, release tags, and cutover remain blocked.
-- **Evidence:** Exact-main CI run `29822326665` and release-qualification run `29822400861` passed on
-  `1f8db536fe0398f6575775d7794ba718234d3ef1`. All nine scorecard rules passed, the downloaded artifact verified through
-  `SHA256SUMS`, the explicitly approved CodeQL-equivalent review was repeated on that exact commit, and both live cloud
-  tracks completed. The later maintainer-selected unified `0.10.0` version amendment is committed on PR `#85`; its
-  exact-head workflows remain pending, so the prior exact-head evidence is historical. Supported VS Code evidence, npm
-  publication authority, final tags, and cutover authorization remain outstanding.
+- **Evidence:** Exact-main CI run `29827622151` and release-qualification run `29827622205` passed on
+  `25530c339410e9758ae34538427f24bddfd83e1d`. The downloaded artifact verified through `SHA256SUMS`, the repeated
+  approved-equivalent review found no release blocker, and both live cloud tracks remain behaviorally equivalent.
+  Supported VS Code evidence, public native CodeQL, npm publication authority, final tags, and cutover authorization
+  remain outstanding.
 - **Related issue:** Destination issue `#13`.
-- **Mitigation:** Complete and verify PR `#85` exact-head qualification, record the repeated security-equivalent review
-  and cloud-evidence equivalence, complete the supported VS Code and cross-device checklist, configure trusted publishers,
-  then obtain a separate explicit promotion decision.
+- **Mitigation:** Complete public hardening and native CodeQL, run the supported VS Code and cross-device checklist,
+  configure trusted publishers, then obtain a separate explicit promotion decision.
 - **State:** Open
 - **Closure proof:** Versioned supported-host evidence plus the final maintainer promotion decision.
 
@@ -66,6 +64,21 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **State:** Accepted
 - **Closure proof:** A regenerated lock entry uses canonical registry metadata and SHA-512 integrity, with exact-head CI
   and release qualification passing.
+
+### RISK-007: Public Visibility Exposes Operational Qualification Metadata
+
+- **Type:** `RISK`
+- **Owner:** Repository maintainer
+- **Impact:** Git history, issues, pull requests, Actions logs, Azure subscription identifiers, resource names, policy
+  evidence, and author email metadata become publicly readable and forkable.
+- **Evidence:** A history-wide Gitleaks scan found no secret, but the repository intentionally retains canonical
+  qualification journals and governance evidence. The maintainer reviewed and accepted this noncredential disclosure.
+- **Related issue:** Destination issue `#13`.
+- **Mitigation:** Delete transient live return/evidence artifacts before conversion, publish a confidential reporting
+  policy, restrict Actions and fork execution, protect `main`, enable secret scanning and push protection, and run native
+  CodeQL immediately after conversion.
+- **State:** Accepted
+- **Closure proof:** Public visibility plus verified repository security settings and a passing native CodeQL result.
 
 ### ASSUMPTION-001: VS Code Handoff Topology Is Supported
 
