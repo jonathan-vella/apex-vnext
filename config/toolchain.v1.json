@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "observationCutoff": "2026-07-21",
+  "observationCutoff": "2026-07-13",
   "supportPolicy": {
     "selection": "newest-production-supported-mutually-compatible-set-at-cutoff",
     "node": "newest-supported-lts-patch",
