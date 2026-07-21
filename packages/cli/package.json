@@ -1,6 +1,6 @@
 {
   "name": "@apex/cli",
-  "version": "0.1.0",
+  "version": "0.10.0",
   "description": "Portable no-shell CLI and MCP facade for APEX",
   "license": "MIT",
   "repository": {
@@ -31,10 +31,10 @@
     "assets"
   ],
   "dependencies": {
-    "@apex/capabilities": "0.1.0",
-    "@apex/contracts": "0.1.0",
-    "@apex/kernel": "0.1.0",
-    "@apex/renderers": "0.1.0",
+    "@apex/capabilities": "0.10.0",
+    "@apex/contracts": "0.10.0",
+    "@apex/kernel": "0.10.0",
+    "@apex/renderers": "0.10.0",
     "@modelcontextprotocol/sdk": "1.29.0",
     "zod": "4.4.3"
   },

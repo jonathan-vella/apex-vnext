@@ -46,8 +46,8 @@ const releaseManifest = {
   packages: [
     {
       package: "@apex/cli",
-      version: "0.1.0",
-      file: "apex-cli-0.1.0.tgz",
+      version: "0.10.0",
+      file: "apex-cli-0.10.0.tgz",
       sha256: hash,
       bytes: 1,
       dependencies: {},

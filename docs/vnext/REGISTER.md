@@ -8,21 +8,23 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 
 ## Open Entries
 
-### RISK-001: Exact-Head Integration And Security Evidence Is Incomplete
+### RISK-001: Final Promotion Evidence And Authorization Are Incomplete
 
 - **Type:** `RISK`
 - **Owner:** Release engineering
-- **Impact:** Cutover and any baseline tag remain blocked.
-- **Evidence:** Branch Enforcement run `29808356400`, docs run `29808356315`, CI run `29808356346`, and all frozen
-  scorecard rules passed on `860bb459f9ac2d5db1423f400382e0d9ebc8fd12`. Later release-automation changes require a
-  new exact-head run. Code scanning is disabled, so required CodeQL evidence is unavailable; the bounded independent
-  review in [SECURITY-REVIEW.md](SECURITY-REVIEW.md) is not an approved substitute.
+- **Impact:** Package publication, release tags, and cutover remain blocked.
+- **Evidence:** Exact-main CI run `29822326665` and release-qualification run `29822400861` passed on
+  `1f8db536fe0398f6575775d7794ba718234d3ef1`. All nine scorecard rules passed, the downloaded artifact verified through
+  `SHA256SUMS`, the explicitly approved CodeQL-equivalent review was repeated on that exact commit, and both live cloud
+  tracks completed. The later maintainer-selected unified `0.10.0` version amendment is committed on PR `#85`; its
+  exact-head workflows remain pending, so the prior exact-head evidence is historical. Supported VS Code evidence, npm
+  publication authority, final tags, and cutover authorization remain outstanding.
 - **Related issue:** Destination issue `#13`.
-- **Mitigation:** The release-candidate workflow now reruns deterministic, package, and scorecard qualification after
-  every release-relevant candidate change. Complete a final security review and enable CodeQL or record an explicitly
-  approved equivalent review before cutover.
+- **Mitigation:** Complete and verify PR `#85` exact-head qualification, record the repeated security-equivalent review
+  and cloud-evidence equivalence, complete the supported VS Code and cross-device checklist, configure trusted publishers,
+  then obtain a separate explicit promotion decision.
 - **State:** Open
-- **Closure proof:** Required-check URLs showing success on the candidate SHA.
+- **Closure proof:** Versioned supported-host evidence plus the final maintainer promotion decision.
 
 ### RISK-003: GitHub Project Access Is Unavailable To The Current Token
 
@@ -49,6 +51,21 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
   `markdownlint-cli2` when an upstream release consumes `js-yaml@5.2.1` or newer.
 - **State:** Accepted
 - **Closure proof:** Full audit contains no critical or high finding; production-only audit contains no finding.
+
+### RISK-006: A Development Lock Entry Uses Mirror-Resolved SHA-1 Metadata
+
+- **Type:** `RISK`
+- **Owner:** Release engineering
+- **Impact:** Reproducing the development-only `xmlbuilder2` validation path depends on the approved npm proxy retaining
+  the exact `js-yaml@4.3.0` tarball identified by legacy SHA-1 lock metadata. Published runtime packages are unaffected.
+- **Evidence:** The nested lock entry is marked `dev: true`; `npm audit --package-lock-only --omit=dev` reports zero
+  vulnerabilities, and the exact-main independent review found no release-blocking supply-chain issue.
+- **Related issue:** Destination issue `#13`.
+- **Mitigation:** Retain lockfile and package-artifact SHA-256 qualification, then normalize this entry to canonical
+  registry metadata with SHA-512 integrity when the approved proxy emits it without changing the resolved dependency.
+- **State:** Accepted
+- **Closure proof:** A regenerated lock entry uses canonical registry metadata and SHA-512 integrity, with exact-head CI
+  and release qualification passing.
 
 ### ASSUMPTION-001: VS Code Handoff Topology Is Supported
 
@@ -87,33 +104,38 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **State:** Accepted
 - **Closure proof:** Destination root commit, transferred issues, and source pull-request closure receipts.
 
-### REGRESSION-001: CodeQL Detects Polynomial ReDoS In IaC Generation
+### REGRESSION-001: Former CodeQL Parser Finding Uses An Approved Equivalent Review
 
 - **Type:** `REGRESSION`
 - **Owner:** Capabilities and security
-- **Impact:** High-severity security finding blocks cutover.
+- **Impact:** Native CodeQL evidence remains unavailable on the private GitHub Free repository; any new critical or high
+  finding still blocks release.
 - **Evidence:** The vulnerable expression was replaced by a bounded line-oriented parser with adversarial dual-track
-  coverage. Exact-main CI passes and the independent review found no unresolved high or critical issue, but code scanning
-  is now disabled and alert #34 cannot be re-verified through a supported CodeQL run.
+  coverage. The maintainer explicitly accepted an independent exact-head review as the CodeQL equivalent on issue `#13`.
+  That review was repeated after the final dependency change on
+  `1f8db536fe0398f6575775d7794ba718234d3ef1` and found no critical, high, or release-blocking issue.
 - **Related issue:** [#537](https://github.com/jonathan-vella/apex/issues/537)
-- **Mitigation:** Enable CodeQL and verify alert closure, or obtain explicit maintainer approval for an equivalent review.
-- **State:** Blocked
-- **Closure proof:** Regression test, closed alert #34, and successful CodeQL check on the fixing SHA.
+- **Mitigation:** Preserve the bounded parser regression tests and repeat the approved equivalent review after any
+  release-relevant source, workflow, generated-asset, or dependency change.
+- **State:** Accepted
+- **Closure proof:** Exact-main independent review, parser mutation tests, CI run `29822326665`, and the issue `#13`
+  approval record.
 
-### ISSUE-001: Live Qualification Evidence Is Unavailable
+### ISSUE-001: Supported VS Code Qualification Evidence Is Pending
 
 - **Type:** `ISSUE`
 - **Owner:** Release qualification
-- **Impact:** VS Code, GitHub OIDC/transfer, Azure Bicep, and Azure Terraform release claims remain unavailable.
-- **Evidence:** Azure bootstrap resources and secretless destination OIDC federation are deployed. The unprotected
-  `vnext-qualification` Environment intentionally scopes OIDC/configuration only. Local exact-preview Gate 4 approval
-  and imported CI apply are implemented but have no accepted exact-head live evidence.
+- **Impact:** Final promotion remains blocked even though the automated and cloud qualification gates have passed.
+- **Evidence:** Bicep apply/destroy runs `29816381757` and `29817534614` and Terraform apply/destroy runs `29820944300`
+  and `29821615776` all succeeded on attempt one with local exact-preview Gate 4, GitHub OIDC, one-hop authority transfer,
+  returned authority, empty final inventories, and a restored `Disabled`/`Deny` backend. Fresh supported VS Code and
+  cross-device evidence has not yet been recorded.
 - **Related issue:** Destination issue `#9`.
-- **Mitigation:** Configure the remaining destination controls and follow
-  [LIVE-QUALIFICATION.md](LIVE-QUALIFICATION.md). Record local approval, OIDC, one-hop authority transfer, exact apply,
-  cleanup, and return evidence without claiming Environment review.
+- **Mitigation:** Run the supported-host handoff, question, hidden-worker, MCP startup, restart, and cross-device writer
+  transfer checklist and bind the result to the final release-equivalent source boundary.
 - **State:** Open
-- **Closure proof:** Evidence index with candidate and dependency hashes for every required scenario.
+- **Closure proof:** Versioned manual qualification evidence with VS Code and extension versions, scenario outcomes, and
+  evidence hashes.
 
 ## Closed Or Historical Entries
 

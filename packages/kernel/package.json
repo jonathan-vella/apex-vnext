@@ -1,6 +1,6 @@
 {
   "name": "@apex/kernel",
-  "version": "0.1.0",
+  "version": "0.10.0",
   "description": "Deterministic local runtime kernel for APEX vNext",
   "license": "MIT",
   "repository": {
@@ -25,7 +25,7 @@
     "dist"
   ],
   "dependencies": {
-    "@apex/contracts": "0.1.0",
+    "@apex/contracts": "0.10.0",
     "@sinclair/typebox": "0.34.52"
   },
   "scripts": {
