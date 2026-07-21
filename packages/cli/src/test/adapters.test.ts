@@ -24,7 +24,7 @@ test("CLI emits a stable JSON envelope", async () => {
   assert.equal(code, 0);
   assert.deepEqual(JSON.parse(stdout), {
     ok: true,
-    result: { version: "0.1.0", bundleVersion: "0.1.0", configVersion: "1.0.0" },
+    result: { version: "0.10.0", bundleVersion: "0.10.0", configVersion: "1.0.0" },
   });
 });
 
@@ -169,8 +169,8 @@ test("CLI requires explicit Bicep stack cleanup ownership", async () => {
 
   await writeJson(path, { bicep: { ...bicep, ownershipAuthorizesDeleteResources: true } });
   assert.deepEqual(await execute(["version", "--provider-config", path], root), {
-    version: "0.1.0",
-    bundleVersion: "0.1.0",
+    version: "0.10.0",
+    bundleVersion: "0.10.0",
     configVersion: "1.0.0",
   });
 });
@@ -187,8 +187,8 @@ test("CLI defaults Bicep stack cleanup to detachAll", async () => {
     },
   });
   assert.deepEqual(await execute(["version", "--provider-config", path], root), {
-    version: "0.1.0",
-    bundleVersion: "0.1.0",
+    version: "0.10.0",
+    bundleVersion: "0.10.0",
     configVersion: "1.0.0",
   });
 });
@@ -225,7 +225,7 @@ test("CLI rejects a stale Terraform lock hash", async () => {
 
   await writeJson(path, { terraform });
   const configured = await execute(["version", "--provider-config", path], root);
-  assert.deepEqual(configured, { version: "0.1.0", bundleVersion: "0.1.0", configVersion: "1.0.0" });
+  assert.deepEqual(configured, { version: "0.10.0", bundleVersion: "0.10.0", configVersion: "1.0.0" });
 });
 
 test("CLI capability commands report retained packs and require confirmation for mutation", async () => {

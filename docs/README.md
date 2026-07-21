@@ -25,6 +25,7 @@ build is required to read, review, or validate it.
 - [Roadmap](vnext/ROADMAP.md)
 - [Risk and issue register](vnext/REGISTER.md)
 - [Decision log](vnext/DECISIONS.md)
+- [Final qualification dossier](vnext/FINAL-QUALIFICATION.md)
 - [Live qualification procedure](vnext/LIVE-QUALIFICATION.md)
 
 ## Historical Evidence

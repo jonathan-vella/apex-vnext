@@ -341,7 +341,7 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
   const testkitRelease = JSON.parse(await readFile(join(testkitOutput, "release-manifest.json"), "utf8"));
   assert.ok(testkitRelease.packages.some(({ package: name }) => name === "@apex/testkit"));
   const testkitSbom = JSON.parse(await readFile(join(testkitOutput, testkitRelease.security.sbom.file), "utf8"));
-  assert.ok(testkitSbom.components.some((component) => component["bom-ref"] === "@apex/testkit@0.1.0"));
+  assert.ok(testkitSbom.components.some((component) => component["bom-ref"] === "@apex/testkit@0.10.0"));
   const testkitProvenance = JSON.parse(
     await readFile(join(testkitOutput, testkitRelease.security.provenance.file), "utf8"),
   );
@@ -390,7 +390,10 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
 
   const apexBin = join(project, "node_modules", ".bin", process.platform === "win32" ? "apex.cmd" : "apex");
   const version = JSON.parse((await runInTest(apexBin, ["version", "--json"], project)).stdout);
-  assert.deepEqual(version, { ok: true, result: { version: "0.1.0", bundleVersion: "0.1.0", configVersion: "1.0.0" } });
+  assert.deepEqual(version, {
+    ok: true,
+    result: { version: "0.10.0", bundleVersion: "0.10.0", configVersion: "1.0.0" },
+  });
   await runInTest("git", ["init", "--initial-branch", "qualification"], project);
   await runInTest(apexBin, ["init", "--project", "demo", "--json"], project);
   await readFile(join(project, ".github", "agents", "apex.agent.md"));

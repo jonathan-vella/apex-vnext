@@ -379,7 +379,7 @@ export async function execute(argv: string[], root = process.cwd()): Promise<unk
     case "version": {
       const assets = await resolveBundledAssets();
       return {
-        version: "0.1.0",
+        version: "0.10.0",
         bundleVersion: assets.manifest.sources.customizations,
         configVersion: assets.manifest.sources.config,
       };
