@@ -6,18 +6,19 @@ Automated, package, security-equivalent, and dual-track cloud qualification comp
 candidate. The maintainer subsequently selected one unified `0.10.0` repository, package, customization, and release
 identity. That release-relevant amendment is locally qualified but uncommitted, so the prior exact-head evidence is now
 historical and promotion is not authorized. PR `#85` establishes reviewed candidate
-`465c89b4cee7bdb4f99e9122253f67d48ca2c766`; its exact-head workflow evidence remains pending.
+content; GitHub checks and downloaded artifacts identify its exact current head. Exact-head workflow evidence remains
+pending.
 
 No evidence in this dossier authorizes package publication, tag creation, branch changes, or production cutover.
 
 ## Candidate Boundary
 
-| Role                       | Commit                                     | Meaning                                                      |
-| -------------------------- | ------------------------------------------ | ------------------------------------------------------------ |
-| Prior exact `main`         | `1f8db536fe0398f6575775d7794ba718234d3ef1` | Superseded deterministic and package evidence candidate      |
-| Terraform execution        | `58f9420d533a53ab11a626cb07ba6253b9eef94f` | Exact Terraform apply and destroy candidate                  |
-| Bicep execution            | `0edf37cc943d0090fbf4f2d5cf09ba0119c14ff1` | Exact Bicep apply and destroy candidate                      |
-| Last release-source change | `8c672d76cb2c2028131fcb93bb023ba9327d256b` | Final dependency remediation                                 |
+| Role                       | Commit                                     | Meaning                                                 |
+| -------------------------- | ------------------------------------------ | ------------------------------------------------------- |
+| Prior exact `main`         | `1f8db536fe0398f6575775d7794ba718234d3ef1` | Superseded deterministic and package evidence candidate |
+| Terraform execution        | `58f9420d533a53ab11a626cb07ba6253b9eef94f` | Exact Terraform apply and destroy candidate             |
+| Bicep execution            | `0edf37cc943d0090fbf4f2d5cf09ba0119c14ff1` | Exact Bicep apply and destroy candidate                 |
+| Last release-source change | `8c672d76cb2c2028131fcb93bb023ba9327d256b` | Final dependency remediation                            |
 
 Git comparison proves that the Bicep candidate, Terraform candidate, and final `main` differ only under committed
 `.apex/` state and content-addressed evidence. No package, lockfile, workflow, generated asset, runtime, IaC, or release

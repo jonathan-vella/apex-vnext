@@ -16,10 +16,9 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Evidence:** Exact-main CI run `29822326665` and release-qualification run `29822400861` passed on
   `1f8db536fe0398f6575775d7794ba718234d3ef1`. All nine scorecard rules passed, the downloaded artifact verified through
   `SHA256SUMS`, the explicitly approved CodeQL-equivalent review was repeated on that exact commit, and both live cloud
-  tracks completed. The later maintainer-selected unified `0.10.0` version amendment is committed on PR `#85` candidate
-  `465c89b4cee7bdb4f99e9122253f67d48ca2c766`; its exact-head workflows remain pending, so the prior exact-head evidence
-  is historical. Supported VS Code evidence, npm publication authority, final tags, and cutover authorization remain
-  outstanding.
+  tracks completed. The later maintainer-selected unified `0.10.0` version amendment is committed on PR `#85`; its
+  exact-head workflows remain pending, so the prior exact-head evidence is historical. Supported VS Code evidence, npm
+  publication authority, final tags, and cutover authorization remain outstanding.
 - **Related issue:** Destination issue `#13`.
 - **Mitigation:** Complete and verify PR `#85` exact-head qualification, record the repeated security-equivalent review
   and cloud-evidence equivalence, complete the supported VS Code and cross-device checklist, configure trusted publishers,
