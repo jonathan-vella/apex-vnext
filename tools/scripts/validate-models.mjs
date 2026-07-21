@@ -28,11 +28,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { Reporter } from "./_lib/reporter.mjs";
 import { getAgents } from "./_lib/workspace-index.mjs";
-import { REGISTRY_PATH } from "./_lib/paths.mjs";
-import { normalizeModel, walkRegistry, buildAssignments } from "./_lib/model-helpers.mjs";
+import { normalizeModel, buildAssignments } from "./_lib/model-helpers.mjs";
 
 const ROOT = process.cwd();
 const CATALOG_PATH = path.join(ROOT, ".github", "model-catalog.json");
+const CUSTOMIZATION_MANIFEST_PATH = path.join(ROOT, "customizations", "manifest.json");
 
 /**
  * Print a Reporter's pass/fail message (mirroring `Reporter.exitOnError`
@@ -54,13 +54,13 @@ function finishMode(r, passMsg, failMsg) {
 
 // ── Mode: catalog ────────────────────────────────────────────────────────────
 
-function collectRegistryModels(registry) {
+function collectRoleModels(manifest) {
   const out = new Map(); // model -> [origin labels]
-  for (const [label, entry] of walkRegistry(registry)) {
-    const m = normalizeModel(entry.model);
+  for (const role of manifest.roles ?? []) {
+    const m = normalizeModel(role.model);
     if (!m) continue;
     if (!out.has(m)) out.set(m, []);
-    out.get(m).push(label);
+    out.get(m).push(role.agent);
   }
   return out;
 }
@@ -95,18 +95,18 @@ function runCatalog() {
 
   console.log("  Check 1: referenced labels exist in catalog.models");
   const fmModels = collectFrontmatterModels();
-  const registry = JSON.parse(fs.readFileSync(REGISTRY_PATH, "utf8"));
-  const regModels = collectRegistryModels(registry);
+  const manifest = JSON.parse(fs.readFileSync(CUSTOMIZATION_MANIFEST_PATH, "utf8"));
+  const roleModels = collectRoleModels(manifest);
   for (const [model, origins] of fmModels) {
     r.tick();
     if (!declared.has(model)) {
       r.error(`frontmatter model "${model}"`, `not declared in catalog.models — used by ${origins.join(", ")}`);
     }
   }
-  for (const [model, origins] of regModels) {
+  for (const [model, origins] of roleModels) {
     r.tick();
     if (!declared.has(model)) {
-      r.error(`registry model "${model}"`, `not declared in catalog.models — used by ${origins.join(", ")}`);
+      r.error(`managed role model "${model}"`, `not declared in catalog.models — used by ${origins.join(", ")}`);
     }
   }
 
@@ -124,11 +124,11 @@ function runCatalog() {
   for (const dep of deprecated) {
     r.tick();
     const fmHits = fmModels.get(dep) || [];
-    const regHits = regModels.get(dep) || [];
-    if (fmHits.length || regHits.length) {
+    const roleHits = roleModels.get(dep) || [];
+    if (fmHits.length || roleHits.length) {
       r.error(
         `deprecated model "${dep}"`,
-        `still in active use — frontmatter: ${fmHits.join(", ") || "none"}; registry: ${regHits.join(", ") || "none"}`,
+        `still in active use — frontmatter: ${fmHits.join(", ") || "none"}; managed roles: ${roleHits.join(", ") || "none"}`,
       );
     }
   }
@@ -139,79 +139,55 @@ function runCatalog() {
 
 // ── Mode: consistency ────────────────────────────────────────────────────────
 
-function buildAgentLookup(agents) {
-  const byBase = new Map();
-  const byRelPath = new Map();
-  for (const [file, agent] of agents) {
-    byBase.set(file, agent.frontmatter || null);
-    if (agent.path) {
-      const rel = agent.path.replace(/^\.?\/?/, "");
-      byRelPath.set(rel, agent.frontmatter || null);
-    }
-  }
-  return { byBase, byRelPath };
-}
-
-function findAgentFrontmatter(lookup, registryAgentPath) {
-  if (!registryAgentPath) return null;
-  const direct = lookup.byRelPath.get(registryAgentPath);
-  if (direct !== undefined) return direct;
-  const base = registryAgentPath.split("/").pop();
-  if (base && lookup.byBase.has(base)) return lookup.byBase.get(base);
-  return null;
-}
-
-function checkConsistencyEntry(r, key, entry, lookup) {
-  const registryAgentPath = entry.agent;
-  if (!registryAgentPath) {
-    r.error(`Agent "${key}"`, "registry entry missing agent file path");
-    return;
-  }
-  const fm = findAgentFrontmatter(lookup, registryAgentPath);
+function checkConsistencyEntry(r, role, agentsByName) {
+  const fm = agentsByName.get(role.agent);
   if (!fm) {
-    r.error(`Agent "${key}"`, `agent file not found in workspace index: ${registryAgentPath}`);
+    r.error(`Managed role "${role.agent}"`, "agent file not found in active workspace index");
     return;
   }
   const yamlModel = normalizeModel(fm.model);
-  const regModel = normalizeModel(entry.model);
+  const roleModel = normalizeModel(role.model);
 
   if (!yamlModel) {
-    r.error(`Agent "${key}"`, `frontmatter is missing \`model\` field`);
+    r.error(`Managed role "${role.agent}"`, "frontmatter is missing `model` field");
     return;
   }
-  if (!regModel) {
-    r.error(`Agent "${key}"`, `registry entry is missing \`model\` field`);
+  if (!roleModel) {
+    r.error(`Managed role "${role.agent}"`, "manifest role is missing `model` field");
     return;
   }
-  if (yamlModel !== regModel) {
-    r.error(`Agent "${key}"`, `frontmatter model "${yamlModel}" does not equal registry model "${regModel}"`);
+  if (yamlModel !== roleModel) {
+    r.error(
+      `Managed role "${role.agent}"`,
+      `frontmatter model "${yamlModel}" does not equal role model "${roleModel}"`,
+    );
   }
 }
 
 function runConsistency() {
   const r = new Reporter("Model Consistency Validator");
-  console.log("\n📋 Validating model consistency (frontmatter ≡ registry)...\n");
+  console.log("\n📋 Validating model consistency (frontmatter ≡ customization manifest)...\n");
 
-  if (!fs.existsSync(REGISTRY_PATH)) {
-    r.error(`Agent registry not found at ${REGISTRY_PATH}`);
+  if (!fs.existsSync(CUSTOMIZATION_MANIFEST_PATH)) {
+    r.error(`Customization manifest not found at ${CUSTOMIZATION_MANIFEST_PATH}`);
     return false;
   }
 
-  let registry;
+  let manifest;
   try {
-    registry = JSON.parse(fs.readFileSync(REGISTRY_PATH, "utf-8"));
+    manifest = JSON.parse(fs.readFileSync(CUSTOMIZATION_MANIFEST_PATH, "utf-8"));
   } catch (e) {
-    r.error(`Cannot parse ${REGISTRY_PATH}: ${e.message}`);
+    r.error(`Cannot parse ${CUSTOMIZATION_MANIFEST_PATH}: ${e.message}`);
     return false;
   }
 
-  const lookup = buildAgentLookup(getAgents());
+  const agentsByName = new Map([...getAgents().values()].map((agent) => [agent.frontmatter?.name, agent.frontmatter]));
   let count = 0;
-  for (const [label, entry] of walkRegistry(registry)) {
-    checkConsistencyEntry(r, label, entry, lookup);
+  for (const role of manifest.roles ?? []) {
+    checkConsistencyEntry(r, role, agentsByName);
     count++;
   }
-  r.ok(`Checked ${count} registry entries`);
+  r.ok(`Checked ${count} managed roles`);
   console.log(`\n📊 Results: ${r.errors} error(s), ${r.warnings} warning(s)\n`);
 
   if (r.errors > 0) {
@@ -224,7 +200,7 @@ function runConsistency() {
 
 // ── Mode: deprecated ─────────────────────────────────────────────────────────
 
-const SCAN_GLOBS = [".github/agents", "tools/apex-prompts", "tools/tests/prompts"];
+const SCAN_GLOBS = ["customizations/.github/agents", "tools/apex-prompts", "tools/tests/prompts"];
 const ALLOWED_FILES = new Set([
   ".github/model-catalog.json",
   "CHANGELOG.md",
@@ -258,7 +234,7 @@ function collectDeprecatedScanFiles() {
   for (const g of SCAN_GLOBS) {
     files.push(...walkDir(path.join(ROOT, g)));
   }
-  files.push(path.join(ROOT, REGISTRY_PATH));
+  files.push(CUSTOMIZATION_MANIFEST_PATH);
   return files.filter((f) => {
     const rel = path.relative(ROOT, f);
     if (ALLOWED_FILES.has(rel)) return false;

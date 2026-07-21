@@ -39,7 +39,7 @@ import * as yaml from "js-yaml";
 
 import { getAgents } from "./_lib/workspace-index.mjs";
 import { getBody } from "./_lib/parse-frontmatter.mjs";
-import { MAX_BODY_LINES, REGISTRY_PATH, AGENT_OUTPUT_DIR } from "./_lib/paths.mjs";
+import { MAX_BODY_LINES, AGENT_OUTPUT_DIR } from "./_lib/paths.mjs";
 import { classifyModel, isClaude, isGptFamily } from "./validate-agents.mjs";
 
 // ── Limits ──────────────────────────────────────────────────────────────────
@@ -480,26 +480,22 @@ function classifyValidatorStatus(findings) {
 
 const VENDOR_CHECK_TITLES = ["Vendor Prompting Rules", "Model-Prompt Alignment"];
 
-// ── Registry enrichment ───────────────────────────────────────────────────────
+// ── Managed-role enrichment ───────────────────────────────────────────────────
 function loadRegistry() {
   try {
-    const reg = JSON.parse(fs.readFileSync(REGISTRY_PATH, "utf8"));
+    const manifest = JSON.parse(fs.readFileSync("customizations/manifest.json", "utf8"));
+    const roles = new Map((manifest.roles ?? []).map((role) => [role.agent, role]));
     const byPath = new Map();
-    const walk = (group) => {
-      for (const entry of Object.values(group || {})) {
-        for (const sub of [entry, entry.bicep, entry.terraform]) {
-          if (sub && typeof sub.agent === "string") {
-            byPath.set(path.normalize(sub.agent), {
-              step: entry.step ?? null,
-              invokable: entry.invokable ?? null,
-              registry_model: sub.model ?? null,
-            });
-          }
-        }
+    for (const agent of getAgents().values()) {
+      const role = roles.get(agent.frontmatter?.name);
+      if (role) {
+        byPath.set(path.normalize(agent.path), {
+          step: null,
+          invokable: role.interactionType === "interactive-handoff",
+          registry_model: role.model ?? null,
+        });
       }
-    };
-    walk(reg.agents);
-    walk(reg.subagents);
+    }
     return byPath;
   } catch {
     return new Map();

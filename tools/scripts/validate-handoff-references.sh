@@ -9,11 +9,11 @@
 # Usage:
 #   tools/scripts/validate-handoff-references.sh [agents-dir]
 #
-# Defaults to `.github/agents` when no path is given.
+# Defaults to the managed APEX source directory when no path is given.
 
 set -euo pipefail
 
-agents_dir="${1:-.github/agents}"
+agents_dir="${1:-customizations/.github/agents}"
 
 if [[ ! -d "$agents_dir" ]]; then
   echo "::error::Agents directory not found: $agents_dir"

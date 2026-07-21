@@ -3,48 +3,48 @@
   "description": "Machine-readable registry mapping agent roles to their definitions, models, and workflow steps. Skills are wired by the agent body's `Read .github/skills/{name}/SKILL.md` line (discovered at runtime by tools/scripts/validate-orphaned-content.mjs), not by an entry in this registry.",
   "agents": {
     "orchestrator": {
-      "agent": ".github/agents/01-orchestrator.agent.md",
+      "agent": ".archive/legacy-agents-v0.10/.github/agents/01-orchestrator.agent.md",
       "model": "MAI-Code-1-Flash",
       "invokable": true,
       "step": null
     },
     "requirements": {
-      "agent": ".github/agents/02-requirements.agent.md",
+      "agent": ".archive/legacy-agents-v0.10/.github/agents/02-requirements.agent.md",
       "model": "Claude Sonnet 5",
       "invokable": true,
       "step": 1
     },
     "architect": {
-      "agent": ".github/agents/03-architect.agent.md",
+      "agent": ".archive/legacy-agents-v0.10/.github/agents/03-architect.agent.md",
       "model": "Claude Opus 4.8",
       "invokable": true,
       "step": 2
     },
     "design": {
-      "agent": ".github/agents/04-design.agent.md",
+      "agent": ".archive/legacy-agents-v0.10/.github/agents/04-design.agent.md",
       "model": "Claude Sonnet 5",
       "invokable": true,
       "step": 3
     },
     "governance": {
-      "agent": ".github/agents/04g-governance.agent.md",
+      "agent": ".archive/legacy-agents-v0.10/.github/agents/04g-governance.agent.md",
       "model": "GPT-5.3-Codex",
       "invokable": true,
       "step": 3.5
     },
     "iac-plan": {
-      "agent": ".github/agents/05-iac-planner.agent.md",
+      "agent": ".archive/legacy-agents-v0.10/.github/agents/05-iac-planner.agent.md",
       "model": "Claude Opus 4.8",
       "invokable": true,
       "step": 4
     },
     "iac-code": {
       "bicep": {
-        "agent": ".github/agents/06b-bicep-codegen.agent.md",
+        "agent": ".archive/legacy-agents-v0.10/.github/agents/06b-bicep-codegen.agent.md",
         "model": "Claude Sonnet 5"
       },
       "terraform": {
-        "agent": ".github/agents/06t-terraform-codegen.agent.md",
+        "agent": ".archive/legacy-agents-v0.10/.github/agents/06t-terraform-codegen.agent.md",
         "model": "Claude Sonnet 5"
       },
       "invokable": true,
@@ -52,42 +52,42 @@
     },
     "deploy": {
       "bicep": {
-        "agent": ".github/agents/07b-bicep-deploy.agent.md",
+        "agent": ".archive/legacy-agents-v0.10/.github/agents/07b-bicep-deploy.agent.md",
         "model": "GPT-5.3-Codex"
       },
       "terraform": {
-        "agent": ".github/agents/07t-terraform-deploy.agent.md",
+        "agent": ".archive/legacy-agents-v0.10/.github/agents/07t-terraform-deploy.agent.md",
         "model": "GPT-5.3-Codex"
       },
       "invokable": true,
       "step": 6
     },
     "as-built": {
-      "agent": ".github/agents/08-as-built.agent.md",
+      "agent": ".archive/legacy-agents-v0.10/.github/agents/08-as-built.agent.md",
       "model": "Claude Sonnet 5",
       "invokable": true,
       "step": 7
     },
     "diagnose": {
-      "agent": ".github/agents/09-diagnose.agent.md",
+      "agent": ".archive/legacy-agents-v0.10/.github/agents/09-diagnose.agent.md",
       "model": "GPT-5.5",
       "invokable": true,
       "step": null
     },
     "challenger": {
-      "agent": ".github/agents/10-challenger.agent.md",
+      "agent": ".archive/legacy-agents-v0.10/.github/agents/10-challenger.agent.md",
       "model": "GPT-5.3-Codex",
       "invokable": true,
       "step": null
     },
     "context-optimizer": {
-      "agent": ".github/agents/11-context-optimizer.agent.md",
+      "agent": ".archive/legacy-agents-v0.10/.github/agents/11-context-optimizer.agent.md",
       "model": "Claude Sonnet 5",
       "invokable": true,
       "step": null
     },
     "e2e-orchestrator": {
-      "agent": ".github/agents/e2e-orchestrator.agent.md",
+      "agent": ".archive/legacy-agents-v0.10/.github/agents/e2e-orchestrator.agent.md",
       "model": "GPT-5.5",
       "invokable": false,
       "step": null
@@ -95,37 +95,37 @@
   },
   "subagents": {
     "challenger-review-subagent": {
-      "agent": ".github/agents/_subagents/challenger-review-subagent.agent.md",
+      "agent": ".archive/legacy-agents-v0.10/.github/agents/_subagents/challenger-review-subagent.agent.md",
       "model": "GPT-5.5",
       "invokable": false
     },
     "cost-estimate-subagent": {
-      "agent": ".github/agents/_subagents/cost-estimate-subagent.agent.md",
+      "agent": ".archive/legacy-agents-v0.10/.github/agents/_subagents/cost-estimate-subagent.agent.md",
       "model": "GPT-5.3-Codex",
       "invokable": false
     },
     "bicep-validate-subagent": {
-      "agent": ".github/agents/_subagents/bicep-validate-subagent.agent.md",
+      "agent": ".archive/legacy-agents-v0.10/.github/agents/_subagents/bicep-validate-subagent.agent.md",
       "model": "Claude Sonnet 5",
       "invokable": false
     },
     "bicep-whatif-subagent": {
-      "agent": ".github/agents/_subagents/bicep-whatif-subagent.agent.md",
+      "agent": ".archive/legacy-agents-v0.10/.github/agents/_subagents/bicep-whatif-subagent.agent.md",
       "model": "Claude Sonnet 5",
       "invokable": false
     },
     "terraform-validate-subagent": {
-      "agent": ".github/agents/_subagents/terraform-validate-subagent.agent.md",
+      "agent": ".archive/legacy-agents-v0.10/.github/agents/_subagents/terraform-validate-subagent.agent.md",
       "model": "Claude Sonnet 5",
       "invokable": false
     },
     "terraform-plan-subagent": {
-      "agent": ".github/agents/_subagents/terraform-plan-subagent.agent.md",
+      "agent": ".archive/legacy-agents-v0.10/.github/agents/_subagents/terraform-plan-subagent.agent.md",
       "model": "Claude Sonnet 5",
       "invokable": false
     },
     "policy-precheck-subagent": {
-      "agent": ".github/agents/_subagents/policy-precheck-subagent.agent.md",
+      "agent": ".archive/legacy-agents-v0.10/.github/agents/_subagents/policy-precheck-subagent.agent.md",
       "model": "Claude Sonnet 5",
       "invokable": false
     }

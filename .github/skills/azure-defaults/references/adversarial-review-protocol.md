@@ -14,7 +14,8 @@ Single source of truth for adversarial review lenses. Agents and the
 new lenses are added here first and registered in
 `tools/scripts/validate-workflow-graph.mjs` (`VALID_LENSES`) and the
 `review_focus` enum of
-`.github/agents/_subagents/challenger-review-subagent.agent.md`.
+`.archive/legacy-agents-v0.10/.github/agents/_subagents/challenger-review-subagent.agent.md` for historical workflow
+compatibility. Managed APEX review behavior is owned by `customizations/.github/agents/apex-reviewer.agent.md`.
 
 | Lens                        | Applies to (`artifact_type`)                                                         | Description                                                                            | Checklist anchor                                                                                        |
 | --------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |

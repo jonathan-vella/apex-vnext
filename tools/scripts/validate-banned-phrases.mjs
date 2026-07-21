@@ -27,7 +27,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 
 const RULES = [
   {
-    file: ".github/agents/03-architect.agent.md",
+    file: ".archive/legacy-agents-v0.10/.github/agents/03-architect.agent.md",
     regex: /hand(?:\s|-)?off to (?:the )?IaC Planner/i,
     reason:
       "Architect must route to Design (Step 3) or Governance Discovery (Step 3.5), not directly to IaC Planner. See Phase A5 of the nordic-foods lessons plan.",
@@ -39,7 +39,7 @@ const RULES = [
       "Tag baseline must derive from live Azure Policy; PascalCase is demoted to a deprecated convention. See azure-defaults/references/tag-strategy.md.",
   },
   {
-    file: ".github/agents/04g-governance.agent.md",
+    file: ".archive/legacy-agents-v0.10/.github/agents/04g-governance.agent.md",
     regex: /RG\/resource same-region enforcement/,
     reason:
       "Same-region is now a silent default with auditable marker; remove from Phase 2.7 askQuestions panel. See Phase E1 of the nordic-foods lessons plan.",

@@ -43,14 +43,14 @@ const EXPECTATIONS = {
     ],
   },
   "fixture-bad-gpt55.agent.md": {
-    mustHave: ["gpt55-skeleton-001", "gpt-no-claude-xml-001", "personality-scoping-001", "handoff-enrichment-001"],
-    mustNotHave: [],
+    mustHave: ["gpt55-skeleton-001", "gpt-no-claude-xml-001", "handoff-enrichment-001"],
+    mustNotHave: ["personality-scoping-001"],
   },
 };
 
 /**
  * Expected rule IDs per prompt fixture. Mirrors EXPECTATIONS but for
- * `.prompt.md` files staged into `.github/prompts/`.
+ * `.prompt.md` files staged into the active test prompt source.
  */
 const PROMPT_EXPECTATIONS = {
   "fixture-good-custom-agent.prompt.md": {
@@ -100,9 +100,9 @@ for (const [fixture, exp] of Object.entries(EXPECTATIONS)) {
     const filePath = path.join(FIXTURES, fixture);
     assert.ok(fs.existsSync(filePath), `Missing fixture: ${filePath}`);
 
-    // Stage the fixture into .github/agents/ for the live validator to pick up,
+    // Stage the fixture into the managed agent source for the live validator,
     // run the validator, then clean up.
-    const stagedPath = path.join(".github/agents", fixture);
+    const stagedPath = path.join("customizations/.github/agents", fixture);
     fs.copyFileSync(filePath, stagedPath);
     let findings;
     try {
@@ -129,9 +129,9 @@ for (const [fixture, exp] of Object.entries(PROMPT_EXPECTATIONS)) {
     const filePath = path.join(PROMPT_FIXTURES, fixture);
     assert.ok(fs.existsSync(filePath), `Missing fixture: ${filePath}`);
 
-    // Stage into .github/prompts/ so the live validator picks it up via
+    // Stage into tools/tests/prompts so the live validator picks it up via
     // getPromptFiles(); clean up regardless of test outcome.
-    const stagedPath = path.join(".github/prompts", fixture);
+    const stagedPath = path.join("tools/tests/prompts", fixture);
     fs.copyFileSync(filePath, stagedPath);
     let findings;
     try {

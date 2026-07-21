@@ -86,10 +86,12 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Type:** `ASSUMPTION`
 - **Owner:** VS Code experience
 - **Impact:** Failure would require more agents to remain picker-visible and would change the intended user experience.
-- **Evidence:** The managed customization manifest validates invocation edges, but no fresh supported VS Code evidence is
-  bound to the current candidate.
+- **Evidence:** The managed customization manifest validates invocation edges. The legacy fleet is archived and local
+  discovery configuration exposes only managed APEX, but no fresh supported VS Code evidence is bound to the resulting
+  candidate.
 - **Related issue:** Destination issue `#9`.
-- **Mitigation:** Run direct handoff, hidden worker, model-tier, and `askQuestions` scenarios in a clean supported VS Code.
+- **Mitigation:** Merge the archive change, reload VS Code, confirm no legacy agents remain visible, then run direct
+  handoff, hidden worker, model-tier, and `askQuestions` scenarios in a clean supported VS Code.
 - **State:** Open
 - **Closure proof:** Versioned manual qualification evidence on the exact candidate head.
 

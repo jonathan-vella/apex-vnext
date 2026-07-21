@@ -23,6 +23,11 @@ Transient live artifacts were deleted before conversion. Selected Actions, exter
 tokens, shorter retention, protected `main`, secret scanning, push protection, private vulnerability reporting,
 immutable releases, Dependabot security updates, and native CodeQL are enabled and verified.
 
+The legacy prompt-led agent fleet and its registry, schema, validators, and step-agent instructions are archived under
+`.archive/legacy-agents-v0.10/`. VS Code discovery now points only to the runtime-managed APEX agents and skills under
+`customizations/`. Active model, count, ownership, assessment, and validation tooling derives from
+`customizations/manifest.json` and managed frontmatter.
+
 Both Bicep and Terraform apply/destroy workflows succeeded on attempt one after separate local exact-preview Gate 4
 decisions. Final target inventories are empty, writer authority returned locally before ephemeral files were excluded,
 and the Azure backend is restored to public network `Disabled` with firewall default `Deny` and no temporary rule or
@@ -52,6 +57,7 @@ cutover artifact has been created. Those actions remain separately authorized re
 | Unified package set              | Pass               | Exact-main package, clean-install, SBOM, provenance, and npm dry-run evidence        |
 | Public repository readiness      | Pass               | Public controls verified; zero open secret or code-scanning alerts                   |
 | Native CodeQL                    | Pass               | Run `29830116910`; Actions, JavaScript/TypeScript, and Python passed                 |
+| Managed agent discovery          | Local pass         | Legacy fleet archived; managed agents and hidden workers validate without warnings   |
 
 ## Release Boundaries
 
@@ -66,7 +72,9 @@ cutover artifact has been created. Those actions remain separately authorized re
 
 ## Resume Pointer
 
-1. Run the supported VS Code and cross-device scenarios against the exact package candidate.
-2. Configure trusted publishers and a protected release environment for the maintainer-owned `@apex` packages.
-3. Decide immutable tag names, v1 maintenance reference, cutover date, and v1 support end date.
-4. Request one explicit maintainer decision before dispatching publication, tag, or cutover automation.
+1. Merge and requalify the managed-agent discovery and legacy archive change.
+2. Reload VS Code and confirm only the managed APEX family is visible.
+3. Run the supported VS Code and cross-device scenarios against the exact package candidate.
+4. Configure trusted publishers and a protected release environment for the maintainer-owned `@apex` packages.
+5. Decide immutable tag names, v1 maintenance reference, cutover date, and v1 support end date.
+6. Request one explicit maintainer decision before dispatching publication, tag, or cutover automation.

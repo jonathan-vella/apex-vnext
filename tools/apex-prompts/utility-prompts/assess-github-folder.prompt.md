@@ -28,7 +28,7 @@ pass. This prompt produces a PLAN; execution is a separate, gated pass.
 This repo is APEX (Azure Agentic Platform Engineering eXperience). Scope is
 limited to the authoring assets under `.github/`:
 
-- `.github/agents/**/*.agent.md` (+ `_subagents/`)
+- `customizations/.github/agents/**/*.agent.md`
 - `.github/skills/**/SKILL.md` (+ `references/`)
 - `.github/instructions/*.instructions.md`
 - `.github/copilot-instructions.md`
@@ -41,7 +41,7 @@ Authoritative rule sources to check against (read on demand, do not restate):
 - `.github/instructions/agent-skills.instructions.md`
 - `.github/instructions/vendor-prompting.instructions.md`
 - `.github/instructions/no-hardcoded-counts.instructions.md`
-- `tools/registry/agent-registry.json`, `tools/registry/count-manifest.json`
+- `customizations/manifest.json`, `tools/registry/count-manifest.json`
 
 Do NOT hard-code entity counts — read them from `count-manifest.json`.
 
@@ -75,7 +75,7 @@ instructions matched by no file glob).
 
 ## Phase 1 — Errors & rule violations
 
-- Run: `npm run validate:agents`, `npm run validate:agent-registry`,
+- Run: `npm run validate:agents`, `npm run validate:model-consistency`,
   `npm run lint:vendor-prompting`, `npm run lint:md`, `npm run lint:safe-shell`.
   Record every failure as a finding.
 - Flag every breach of the context-optimization limits (agent body >350 lines,

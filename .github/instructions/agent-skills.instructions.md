@@ -108,8 +108,8 @@ If the file is used as-is in output → `assets/`.
 
 ## Wiring a Skill to an Agent
 
-Skills are wired by referencing them in the agent body, **not** by an entry
-in `tools/registry/agent-registry.json`. The orphan-content validator
+Skills are wired by referencing them in the agent body and managed customization manifest, **not** by a separate agent
+registry. The orphan-content validator
 (`tools/scripts/validate-orphaned-content.mjs`) discovers references at
 runtime by scanning agent bodies, other skills, and instruction files for
 the canonical pattern:
@@ -138,10 +138,9 @@ wiring form. Use the canonical `SKILL.md` pattern for explicit wiring.
 - [ ] Scripts include help docs and error handling
 - [ ] No hardcoded credentials
 
-## Per-Step File Re-Read Budget (HARD LIMIT)
+## Managed Task File Re-Read Budget (HARD LIMIT)
 
-Agents driving a workflow step (`.github/agents/0*-*.agent.md`) MUST treat
-predecessor artifacts as session-cached. The rule:
+Managed interactive agents MUST treat accepted predecessor artifacts as session-cached. The rule:
 
 - Read `agent-output/{project}/04-implementation-plan.md`,
   `agent-output/{project}/04-governance-constraints.{md,json}`, and

@@ -197,8 +197,8 @@ apex-recall decide <project> --key vnet_plan_decision --value <confirmed|edited|
 
 `subnet_plan` MUST conform to
 [`tools/schemas/subnet-plan.schema.json`](../../../../tools/schemas/subnet-plan.schema.json)
-(v1). `validate:decision-keys` parses it and emits a soft warning
-when the value is absent but the trigger contract holds.
+(v1). The schema remains the compatibility contract; the retired prose-key validator is preserved under
+`.archive/legacy-agents-v0.10/`.
 
 ## Defaults that always hold
 

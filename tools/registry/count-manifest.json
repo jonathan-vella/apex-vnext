@@ -3,12 +3,12 @@
   "description": "Single source of truth for project entity counts. Validators auto-compute actual values from computed_from globs and compare. Never hard-code these counts elsewhere — use descriptive language and reference this file when exact numbers are needed.",
   "counts": {
     "primary_agents": {
-      "computed_from": ".github/agents/*.agent.md (excluding _subagents/)",
-      "description": "Top-level user-invocable agent definitions"
+      "computed_from": "customizations/.github/agents/*.agent.md (user-invocable: true)",
+      "description": "Managed user-invocable APEX agent definitions"
     },
     "subagents": {
-      "computed_from": ".github/agents/_subagents/*.agent.md",
-      "description": "Non-user-invocable subagent definitions delegated to by parent agents"
+      "computed_from": "customizations/.github/agents/*.agent.md (user-invocable: false)",
+      "description": "Managed hidden APEX worker definitions"
     },
     "skills": {
       "computed_from": ".github/skills/*/SKILL.md",

@@ -14,7 +14,9 @@
  */
 
 import fs from "node:fs";
-import { getAgents } from "./_lib/workspace-index.mjs";
+import path from "node:path";
+import { LEGACY_AGENTS_DIR, LEGACY_SUBAGENTS_DIR } from "./_lib/paths.mjs";
+import { parseFrontmatter } from "./_lib/parse-frontmatter.mjs";
 import { Reporter } from "./_lib/reporter.mjs";
 
 const GRAPH_PATH = ".github/skills/workflow-engine/templates/workflow-graph.json";
@@ -23,10 +25,15 @@ const r = new Reporter("Workflow Graph Validator");
 
 function getAgentFiles() {
   const agents = new Set();
-  for (const [file, agent] of getAgents()) {
-    const name = agent.frontmatter?.name?.trim();
-    if (name) agents.add(name);
-    agents.add(file.replace(".agent.md", ""));
+  for (const directory of [LEGACY_AGENTS_DIR, LEGACY_SUBAGENTS_DIR]) {
+    if (!fs.existsSync(directory)) continue;
+    for (const file of fs.readdirSync(directory)) {
+      if (!file.endsWith(".agent.md")) continue;
+      const frontmatter = parseFrontmatter(fs.readFileSync(path.join(directory, file), "utf8"));
+      const name = frontmatter?.name?.trim();
+      if (name) agents.add(name);
+      agents.add(file.replace(".agent.md", ""));
+    }
   }
   return agents;
 }

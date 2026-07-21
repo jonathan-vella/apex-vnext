@@ -40,12 +40,13 @@ All fields are optional. The file must use `.agent.md` extension.
 
 | Scope                     | Path                                                            |
 | ------------------------- | --------------------------------------------------------------- |
-| Workspace                 | `.github/agents/`                                               |
+| Workspace source          | `customizations/.github/agents/`                                |
 | Workspace (Claude format) | `.claude/agents/`                                               |
 | User profile              | `~/.copilot/agents` or agents folder of current VS Code profile |
 | Custom                    | Configured via `chat.agentFilesLocations` setting               |
 
-VS Code detects any `.md` files in `.github/agents/` as custom agents.
+VS Code detects the managed source through `chat.agentFilesLocations`. Installed consumers receive the same definitions
+under `.github/agents/` from the CLI customization bundle.
 
 ## Body
 

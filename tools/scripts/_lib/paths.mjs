@@ -5,8 +5,10 @@
  * Eliminates ~32 lines of duplicated path definitions across 8+ scripts.
  */
 
-export const AGENTS_DIR = ".github/agents";
-export const SUBAGENTS_DIR = ".github/agents/_subagents";
+export const AGENTS_DIR = "customizations/.github/agents";
+export const SUBAGENTS_DIR = "customizations/.github/agents/_subagents";
+export const LEGACY_AGENTS_DIR = ".archive/legacy-agents-v0.10/.github/agents";
+export const LEGACY_SUBAGENTS_DIR = ".archive/legacy-agents-v0.10/.github/agents/_subagents";
 export const SKILLS_DIR = ".github/skills";
 export const INSTRUCTIONS_DIR = ".github/instructions";
 export const AGENT_OUTPUT_DIR = "agent-output";
@@ -23,7 +25,6 @@ export const PROMPTS_DIR = "tools/apex-prompts";
  */
 export const PROMPT_SOURCE_DIRS = ["tools/apex-prompts", "tools/tests/prompts"];
 
-export const REGISTRY_PATH = "tools/registry/agent-registry.json";
 export const COUNT_MANIFEST_PATH = "tools/registry/count-manifest.json";
 export const COPILOT_INSTRUCTIONS = ".github/copilot-instructions.md";
 
