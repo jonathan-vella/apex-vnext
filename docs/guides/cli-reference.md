@@ -64,6 +64,8 @@ Run `apex <command> --json` for automation. Success is written to stdout as
 | `apex diagnose`                   | None                                                          | Return selected-run status and doctor results.                           |
 | `apex render`                     | `--kind`; see values below                                    | Render a deterministic Markdown view.                                    |
 | `apex promote`                    | `--environment --target`                                      | Create and select a linked environment run.                              |
+| `apex customizations rollback`    | None                                                          | Restore the previously recorded managed customization bundle.            |
+| `apex customizations uninstall`   | None                                                          | Remove unchanged managed files while preserving conflicts and history.   |
 | `apex writer transfer-create`     | See writer flags below                                        | Create a bound writer-transfer claim.                                    |
 | `apex writer transfer-accept`     | `--claim --recipient --head`                                  | Accept a current writer-transfer claim.                                  |
 | `apex writer show`                | None                                                          | Show current writer ownership.                                           |

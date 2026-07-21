@@ -13,6 +13,7 @@ This directory is the durable project hub for completing and releasing APEX vNex
 | Prioritization and views | GitHub Project `APEX vNext` | The project is a view, never a second backlog. |
 | Risks and delivery concerns | [REGISTER.md](REGISTER.md) | Link actionable entries to an issue. |
 | Decisions | [DECISIONS.md](DECISIONS.md) | Append entries; use an ADR for consequential design choices. |
+| Final release evidence | [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md) | Update after a release-relevant evidence boundary changes. |
 | Modernization ownership | [MODERNIZATION-INVENTORY.md](MODERNIZATION-INVENTORY.md) | Update before ownership moves. |
 | Resume state | [PROJECT.md](PROJECT.md) | Update at checkpoints and milestone transitions. |
 | Historical product baseline | [phase-0a/](phase-0a/) | Frozen evidence; do not edit or repurpose. |

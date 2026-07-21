@@ -2,9 +2,9 @@
 
 ## Status
 
-This document records read-only independent review evidence. It does not authorize deployment, publication, tagging, or
-cutover and does not substitute for the CodeQL-or-explicitly-approved-equivalent requirement in the
-[product requirements](PRD.md#cutover-acceptance).
+This document records read-only independent review evidence. The maintainer accepted this method on destination issue
+`#13` as the CodeQL equivalent for this private GitHub Free repository. It does not authorize deployment, publication,
+tagging, or cutover.
 
 ## Reviews
 
@@ -33,6 +33,22 @@ is sequential.
 Suggestions to reject resource-group hyphens were not accepted because Azure naming rules permit them. No valid critical
 or high finding remains from the follow-up review.
 
+### Final exact-main repeat
+
+- **Candidate:** `1f8db536fe0398f6575775d7794ba718234d3ef1`
+- **Date:** 2026-07-21
+- **Method:** Separate read-only review of the final dependency delta, parser and subprocess boundaries, local Gate 4 and
+  OIDC handoff authority, release workflow permissions and exact-head binding, package contents and provenance settings,
+  and committed `.apex/` evidence.
+- **Result:** No critical, high, actionable release-blocking, or authorization-bypass finding. Production lockfile audit
+  reported zero vulnerabilities. Full lockfile audit reported two accepted moderate findings in the development-only
+  Markdown lint path.
+
+The review confirmed that no non-`.apex/` file changed after the final dependency remediation commit
+`8c672d76cb2c2028131fcb93bb023ba9327d256b`. It identified one non-blocking hardening item: the development-only nested
+`js-yaml@4.3.0` lock entry is resolved through the approved npm mirror with legacy SHA-1 integrity metadata. This is
+tracked as `RISK-006` in the [release register](REGISTER.md).
+
 ## Remediation
 
 The [live handoff launcher](../../tools/scripts/vnext-live-handoff.mjs) now validates resource-group names against the
@@ -48,11 +64,12 @@ gate revisions and actual serialized task-context projection sizes for each Bice
 ## Limitations
 
 - GitHub code scanning is disabled, so a supported current CodeQL result and alert #34 closure receipt are unavailable.
-- The follow-up is bound to `860bb459f9ac2d5db1423f400382e0d9ebc8fd12`. Later release-automation changes require a
-  final review and required checks on the eventual immutable candidate commit.
-- No new Azure or GitHub Actions deployment was dispatched. Existing cloud evidence predates these source changes and is
-  historical only.
-- Manual VS Code, cross-device, OIDC writer-transfer, dual-track cloud lifecycle, and promotion scenarios remain
-  unavailable for the final candidate.
+- The committed-state secret review is pattern-based and cannot prove the absence of every possible encoded secret.
+- The approved equivalent review must repeat after any release-relevant source, workflow, generated-asset, or dependency
+  change.
+- The maintainer-selected unified `0.10.0` version amendment is release-relevant and therefore supersedes the final
+  exact-main review above until a committed candidate receives a repeated review.
+- Manual supported VS Code, cross-device, and final promotion scenarios remain outstanding. Both dual-track cloud
+  lifecycles and OIDC writer transfers completed against the same non-`.apex/` source boundary as final `main`.
 
 The evidence and blocker split are also recorded on destination issue `#13`.
