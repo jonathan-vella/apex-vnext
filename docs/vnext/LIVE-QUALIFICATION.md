@@ -5,6 +5,10 @@ deployment proof. A run is evidence only
 after the candidate-bound apply and destroy ceremonies complete and their outputs are accepted into the release evidence
 index.
 
+> [!IMPORTANT]
+> This is the implemented Bicep and Terraform ceremony from the prior contract. It remains regression input, but it must
+> be rerun on the new exact candidate after both-client, ARM MCP, retirement, improvement, and bundle gates pass.
+
 ## Prerequisites
 
 Bootstrap the committed control plane from `infra/bicep/vnext-qualification/bootstrap.bicep`. Supply the dedicated

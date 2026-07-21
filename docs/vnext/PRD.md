@@ -1,15 +1,16 @@
 ## APEX vNext Product Requirements
 
 APEX vNext replaces the current prompt-led workflow with a deterministic TypeScript runtime and npm CLI while retaining
-selected v1 behavior. Managed VS Code customizations remain the user experience; the kernel owns workflow, state,
-authorization, validation, evidence, and controlled capabilities.
+selected v1 behavior. Managed GitHub Copilot experiences in VS Code and GitHub Copilot CLI provide client-specific
+interfaces; the kernel owns workflow, state, authorization, validation, evidence, and controlled capabilities.
 
 ## Goals
 
 - Make platform-engineering runs deterministic, resumable, auditable, and safe under one active writer.
 - Preserve the approved v1 behavior dispositions in [phase-0a/v1-behavior-compatibility.md](phase-0a/v1-behavior-compatibility.md).
 - Support Bicep and Terraform through one track-neutral workflow and equivalent logical outcomes.
-- Ship a clean-installable npm runtime plus managed VS Code customizations with safe update and rollback.
+- Ship a clean-installable npm runtime plus managed Copilot customizations with safe update and rollback.
+- Provide equivalent governed workflow outcomes in GitHub Copilot for VS Code and GitHub Copilot CLI.
 - Bind every approval and external operation to exact inputs, state, target, commit, evidence, and expiry.
 - Measure release quality from deterministic events and retain unavailable evidence without inventing claims.
 
@@ -24,9 +25,10 @@ authorization, validation, evidence, and controlled capabilities.
 
 ### REQ-DIST-001: Distribution And Installation
 
-The release must provide an npm `apex` CLI and kernel that install a versioned managed customization bundle into a clean
-supported workspace. Init, update, rollback, and uninstall must be transactional, detect local edits, and avoid silently
-overwriting unrelated files.
+The release must provide an npm `apex` CLI and kernel that install versioned client projections from one canonical
+customization manifest into a clean supported workspace. Init, update, rollback, and uninstall must be transactional,
+detect local edits, and avoid silently overwriting unrelated files. The bundle must use source/generated separation,
+content locks, composition metadata, and deterministic manifests; npm remains the only distribution authority.
 
 ### REQ-STATE-001: Runtime State And Writer Authority
 
@@ -54,7 +56,8 @@ requirements and SKU intent, and prevent later stages from silently changing app
 ### REQ-ARCH-001: Architecture, Cost, Quota, And Availability
 
 Architecture must trace resources to requirements and current pricing, quota, regional availability, reliability,
-security, operations, performance, and cost evidence. Stale or unavailable blocking evidence must prevent approval.
+security, operations, performance, and cost evidence. Managed pricing must use typed, attested evidence collected through
+an allowlisted Azure Resource Manager MCP adapter. Stale or unavailable blocking evidence must prevent approval.
 
 ### REQ-GOV-001: Governance And Policy
 
@@ -82,7 +85,8 @@ semantics.
 Terraform must use a secured Azure Storage backend with identity-based access, locking, retention, and compliant
 networking. Preview must create a protected saved plan; approval and apply must bind that exact plan, lineage, serial,
 inputs, commit, recipient, and expiry. Production CI apply remains blocked until recipient-bound encrypted transport is
-qualified.
+qualified. Native Terraform CLI and provider interfaces remain lifecycle authorities; Terraform or Azure MCP tools may
+assist discovery and guidance but cannot own initialization, schemas, state, plans, imports, apply, or destroy.
 
 ### REQ-APPROVAL-001: Preview And Approval Binding
 
@@ -106,39 +110,51 @@ must not satisfy deterministic gates.
 ### REQ-CAPABILITY-001: Capabilities And Optional Packs
 
 External operations must pass through a versioned capability protocol with grants, roles, expiry, bounded output,
-timeouts, redaction, and safe argv execution. Python, Deno, governance, pricing, and diagram packs remain optional,
-independently locked, verified, transactional, and non-blocking when absent unless the selected workflow needs them.
+timeouts, redaction, and safe argv execution. Astro and Terraform MCP servers must not be active dependencies. Managed
+Azure Resource Manager MCP use must pass through typed, read-allowlisted APEX adapters that reject deployment, budget,
+unknown, and write tools before transport. Direct ARM MCP reads are exploratory and cannot satisfy a gate without APEX
+attestation. Governance and replacement capability packs remain independently locked, verified, and transactional.
 
 ### REQ-SECURITY-001: Security And Supply Chain
 
 Agents must not self-approve, deploy models, or bypass kernel authorization. The release must provide least-privilege
 roles, secret and PII redaction, symlink and traversal defenses, immutable dependency pins, release manifest, CycloneDX
-SBOM, provenance, and no high or critical unresolved security finding.
+SBOM, provenance, and no high or critical unresolved security finding. The SBOM covers released APEX runtime,
+customization, and capability deliverables; generated IaC projects do not require an SBOM unless their requirements say
+otherwise.
 
-### REQ-CUSTOMIZATION-001: Managed VS Code Experience
+### REQ-CUSTOMIZATION-001: Managed Copilot Experiences
 
-APEX remains VS Code-only for this release. Interactive specialists use direct handoffs and may ask users; hidden workers
-cannot ask users and return typed `needs_input` results. Model tiers, grants, handoffs, managed files, and MCP inventory
-must be validated against the shipped bundle.
+APEX must support GitHub Copilot in VS Code and GitHub Copilot CLI for this release. Both clients must produce equivalent
+typed workflow outcomes, state and resume behavior, authorization decisions, gates, evidence, and hidden-worker
+boundaries. VS Code may use direct handoffs and `vscode/askQuestions`; Copilot CLI may use custom-agent delegation and
+`ask_user`. Both paths must resolve the kernel-owned `needs_input` contract and record typed answers without relying on
+chat history. Model availability, grants, agents, skills, managed files, and MCP inventory must be qualified per client.
 
 ### REQ-DETERMINISM-001: Deterministic Packaging And Validation
 
 Equivalent inputs must produce byte-stable contracts, rendered artifacts, generated IaC, package tarballs, release
 manifest, SBOM, and provenance. Validators must have executable registry ownership, stable diagnostics, and equivalent
-local, hook, and CI behavior.
+local, hook, and CI behavior. Validator, hook, and workflow consolidation must reduce duplicate ownership without
+changing required check names, permissions, triggers, diagnostics, release authority, or exact-head semantics.
 
 ### REQ-DOCS-001: Documentation And Lifecycle
 
 Installation, workflow, CLI, security, operations, testing, capability packs, upgrade, downgrade, rollback, uninstall,
-release, and v1 maintenance behavior must match the candidate implementation. The v1 support end date is set relative to
-cutover, and v1 sessions are not resumable in vNext.
+release, supported Copilot clients, diagram formats, and v1 maintenance behavior must match the candidate implementation.
+New inline diagrams use Mermaid; new standalone architecture and chart artifacts use editable Python sources and rendered
+outputs. Active `.github/copilot-instructions.md` and applicable `AGENTS.md` files must identify canonical owners without
+duplicating volatile values. The v1 support end date is set relative to cutover, and v1 sessions are not resumable in
+vNext.
 
 ### REQ-IMPROVE-001: Bounded Improvement
 
 The quality and evidence lifecycle may store redacted structured observations, detect deterministic recurrence, and
-produce inert proposals. Human decisions and the normal issue and pull-request flow remain mandatory. Observations and
+produce inert proposals. A deterministic adapter may ingest allowlisted journal and evidence outcomes, but not raw chat
+transcripts or model prose. Human decisions and the normal issue and pull-request flow remain mandatory. Observations and
 proposals cannot inject context or autonomously edit policy, prompts, agents, skills, code, issues, pull requests,
-releases, or deployments.
+releases, or deployments. Release acceptance requires measured precision, duplication, quarantine, recurrence, storage,
+and triage outcomes; a noisy automatic adapter remains disabled without weakening manual observation.
 
 ## Non-Functional Requirements
 
@@ -159,9 +175,13 @@ releases, or deployments.
 
 - Distributed collaborative writers.
 - Cross-version resume of v1 sessions or artifacts.
-- GitHub Copilot CLI or non-VS Code agent runtimes.
+- GitHub Copilot cloud coding-agent sessions, Copilot code review as an APEX client, and non-VS Code/non-Copilot-CLI
+  runtimes.
 - Preview VS Code plugin behavior as a first-release dependency.
+- APM as a package manager or a second runtime distribution authority.
 - Autonomous issue creation, repository edits, pull requests, approvals, releases, or deployments from improvement data.
+- Transcript scraping or direct promotion of observations into instructions, agents, skills, or code.
+- Azure Resource Manager MCP deployment, cancellation, or budget-write tools in managed APEX workflows.
 - Generic unscoped Bicep destroy or post-approval Terraform plan regeneration.
 - Production Terraform CI apply before encrypted recipient-bound plan transport is proven.
 - External repository or organization webhook changes without separate authorization.
@@ -181,7 +201,13 @@ Cutover requires all of the following on the exact candidate head:
 - The Phase 0A compatibility matrix has no unowned drift.
 - Required CI and CodeQL checks pass, with no unresolved critical or high security finding.
 - Clean install, update, rollback, uninstall, package reproducibility, SBOM, provenance, and publication dry run pass.
-- Supported VS Code handoffs, questions, hidden workers, MCP startup, restart, and cross-device resume are qualified.
+- Supported VS Code and Copilot CLI agents, questions, hidden workers, MCP startup, restart, and cross-device resume are
+  qualified against equivalent typed outcomes.
+- Astro, Terraform, custom pricing, and Draw.io MCP dependencies are absent from active discovery only after their
+  applicable replacement gates pass.
+- ARM pricing and Python diagram replacements satisfy their measured compatibility, reliability, security, and
+  maintainability gates.
+- Automatic improvement ingestion meets its precision and privacy thresholds while proposals remain inert.
 - Bicep and Terraform preview, approval, apply, inventory, diagnosis, destroy, and recovery scenarios are qualified.
 - Local APEX Gate 4 approval, GitHub OIDC, and local-to-CI writer transfer are proven.
 - Scorecard sample requirements and unavailable-data dispositions are satisfied.

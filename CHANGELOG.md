@@ -12,8 +12,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.10.0] — Unreleased
 
-This release line was extracted from the qualified vNext integration head in
-the original APEX repository. See [docs/MIGRATION.md](docs/MIGRATION.md) for provenance.
+This release line was extracted from a qualified vNext integration head in the
+original APEX repository. The release contract was subsequently re-baselined;
+prior qualification is retained as historical characterization. See
+[docs/MIGRATION.md](docs/MIGRATION.md) for provenance.
+
+### Re-baselined
+
+- Reopened every `0.10.0` release gate for the expanded product contract. No
+  exact release candidate is currently selected.
+- Added GitHub Copilot CLI as a first-class target beside GitHub Copilot in VS
+  Code, with release acceptance based on equivalent typed workflow outcomes.
+- Selected typed, read-allowlisted Azure Resource Manager MCP adapters to
+  replace custom managed pricing after measured parity, while native Terraform
+  CLI remains the lifecycle authority.
+- Selected retirement of active Astro, Terraform, custom pricing, and Draw.io
+  MCP dependencies only after their individual replacement gates pass.
+- Selected Mermaid for new inline diagrams, Python for new standalone diagram
+  artifacts, structured bounded-improvement outcome measurement, and npm-only
+  generation of both client projections.
+- Demoted prior exact-main, package, security, VS Code, and live Azure evidence
+  to historical characterization pending complete requalification.
 
 ### Added (APEX vNext Phase 0A baseline)
 
@@ -36,8 +55,9 @@ the original APEX repository. See [docs/MIGRATION.md](docs/MIGRATION.md) for pro
   preserving local-feature resolution within the required workspace trust boundary.
   The v1 compatibility validator now invokes the repository-owned `apex-recall`
   module instead of requiring a globally installed console script.
-- docs(vnext): narrowed the first-release Copilot client scope to VS Code and
-  deferred GitHub Copilot CLI support.
+- docs(vnext): initially narrowed the first-release Copilot client scope to VS
+  Code and deferred GitHub Copilot CLI support. This historical decision is
+  superseded by the two-client re-baseline above.
 - docs(vnext): revised the rewrite plan around workspace-native customizations,
   direct interactive handoffs, model-tier-safe subagents, a durable walking
   skeleton, contract waves, an early dual-track proof, lazy capability packs,

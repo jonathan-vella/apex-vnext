@@ -13,7 +13,15 @@ Project controls
   -> modernization inventory and baselines
   -> dependency-complete modernization slices
   -> bounded improvement proof of concept
-  -> final exact-head qualification
+  -> candidate re-baseline and replacement characterization
+  -> independent legacy MCP retirement
+  -> VS Code and Copilot CLI governed workflow parity
+  -> ARM MCP pricing replacement
+  -> Mermaid and Python diagram migration
+  -> bounded improvement operationalization
+  -> bundle, validator, hook, and workflow simplification
+  -> active guidance rewrite
+  -> complete exact-head and both-client qualification
   -> maintainer cutover decision
 ```
 
@@ -98,14 +106,14 @@ or live and has a prepared procedure.
 - Promotion to a linked environment with Gate 4 refresh.
 
 The manual workflow, bound local handoff launcher, bootstrap resources, and structural mutation tests are implemented.
-Live Bicep and recipient-bound encrypted Terraform apply/destroy proof is recorded in destination issues `#9` and `#10`.
-The GitHub Environment scopes OIDC and configuration but is not an approval authority; the exact preview is approved
-locally through APEX Gate 4 before CI handoff.
-The dispatch-only workflow is part of this repository's default branch. Each ceremony still binds checkout, workflow,
-packages, state, preview, and evidence to one exact `main` commit.
+Historical Bicep and recipient-bound encrypted Terraform apply/destroy proof is recorded in destination issues `#9` and
+`#10`. The GitHub Environment scopes OIDC and configuration but is not an approval authority; the exact preview is
+approved locally through APEX Gate 4 before CI handoff. Each ceremony still binds checkout, workflow, packages, state,
+preview, and evidence to one exact `main` commit.
 
-**Exit gate:** Satisfied for the live Bicep and Terraform ceremonies. Final exact-head release qualification remains in
-Milestone H because later modernization changes intentionally create a new candidate.
+**Exit gate:** Historical Bicep and Terraform ceremonies passed. DECISION-013 requires final live qualification to repeat
+after the last release-relevant dependency change; the prior runs characterize behavior but do not qualify the revised
+candidate.
 
 **Historical traceability:** Build plan platform spikes, dual-track proof, deployment, and qualification phases.
 
@@ -174,20 +182,183 @@ context. Automated issue creation requires a later explicit decision.
 
 **Historical traceability:** Governance completion plan Phase 5.
 
-## Milestone H: Final Qualification And Cutover Decision
+## Milestone H: Candidate Re-Baseline And Characterization
 
-**Outcome:** The exact candidate head has complete deterministic and live evidence, rollback ownership, and an explicit
-release decision.
+**Outcome:** The approved `0.10.0` scope has current decisions, requirements, owners, baselines, and removal gates before
+release-relevant implementation resumes.
+
+**Requirements:** All requirements in [PRD.md](PRD.md), with emphasis on `REQ-CUSTOMIZATION-001`,
+`REQ-CAPABILITY-001`, `REQ-DETERMINISM-001`, `REQ-DOCS-001`, and `REQ-IMPROVE-001`.
+
+**Dependency-complete slices:**
+
+1. Record DECISION-012 through DECISION-018 and revise all project-control documents.
+2. Mark prior exact-main and live evidence as historical characterization rather than current release proof.
+3. Pin a supported Copilot CLI version and define per-client qualification scenarios.
+4. Capture active MCP tools, pricing semantics, diagram scenarios, bundle contents, validators, hooks, workflows,
+   diagnostics, timings, and context baselines.
+5. Bind every removal or ownership move to a machine-readable replacement and rollback gate.
+
+**Exit gate:** Project controls validate; every new requirement has an implementation owner, dependency, risk, proof
+method, and removal gate; frozen Phase 0A evidence and existing archives remain byte-stable.
+
+## Milestone I: Independent Legacy MCP Retirement
+
+**Outcome:** Unneeded MCP dependencies are removed without changing Azure or Terraform lifecycle authority.
+
+**Requirements:** `REQ-CAPABILITY-001`, `REQ-TERRAFORM-001`, `REQ-DETERMINISM-001`, `REQ-DOCS-001`.
+
+**Dependency-complete slices:**
+
+1. Remove Astro MCP from active workspace configuration and reject its reintroduction.
+2. Characterize the Terraform MCP registry-only tools and their active consumers.
+3. Implement bounded Terraform Registry API lookup with deterministic fixtures, caching, and unavailable results.
+4. Route installed provider schemas through native Terraform CLI and import guidance through official provider docs.
+5. Update active Terraform instructions and skills, then remove Terraform MCP setup and configuration.
+6. Remove Go from the devcontainer only if no independent active consumer remains.
+
+**Exit gate:** Active nonhistorical sources contain no Astro or Terraform MCP dependency; Registry and native CLI tests
+pass; Terraform state, saved-plan, apply, destroy, and Gate 4 behavior is unchanged.
+
+## Milestone J: Supported Copilot Client Parity
+
+**Outcome:** GitHub Copilot in VS Code and GitHub Copilot CLI drive the same kernel-governed APEX workflow.
+
+**Requirements:** `REQ-DIST-001`, `REQ-STATE-001`, `REQ-CONTRACT-001`, `REQ-WORKFLOW-001`,
+`REQ-CUSTOMIZATION-001`, `REQ-APPROVAL-001`, `REQ-SECURITY-001`, `REQ-DOCS-001`.
+
+**Dependency-complete slices:**
+
+1. Keep questions and `needs_input` kernel-owned; map VS Code to `vscode/askQuestions` and Copilot CLI to `ask_user`.
+2. Record typed answers through APEX MCP instead of relying on client chat history.
+3. Generate VS Code and Copilot CLI agent projections from `customizations/manifest.json`.
+4. Add workspace-owned Copilot CLI MCP configuration with an explicit APEX tool allowlist.
+5. Extend transactional customization install, update, rollback, uninstall, locks, and conflict handling to both clients.
+6. Qualify agent, skill, instruction, model, question, hidden-worker, MCP, gate, restart, and cross-device behavior in both
+   clients against equivalent typed outcomes.
+
+**Exit gate:** Both pinned clients produce equivalent journal, task, artifact, gate, denial, resume, and transfer results.
+GitHub Copilot cloud coding-agent sessions, Copilot code review, and `/delegate` are not implementation or release gates.
+
+## Milestone K: ARM MCP Pricing Replacement
+
+**Outcome:** Managed architecture pricing uses typed, attested Azure Resource Manager MCP evidence without exposing write
+authority to agents.
+
+**Requirements:** `REQ-ARCH-001`, `REQ-CAPABILITY-001`, `REQ-QUALITY-001`, `REQ-SECURITY-001`,
+`REQ-DETERMINISM-001`, `REQ-DOCS-001`.
+
+**Dependency-complete slices:**
+
+1. Freeze a parity matrix for retail, meter-aware projection, bulk estimates, regional comparison, commitments,
+   negotiated prices, ambiguity, uncertainty, throttling, and provenance.
+2. Add versioned pricing-request and pricing-evidence contracts.
+3. Implement a pinned-host ARM MCP client with exact Pricing and Cost Management read allowlists.
+4. Reject deployment, cancellation, budget creation, unknown, renamed, and write tools before transport.
+5. Add an operator collection and attestation path that keeps restricted raw evidence out of task context.
+6. Run paired reliability, latency, security, semantic, determinism, and maintenance measurements at the declared pack
+   threshold.
+7. Archive and remove the custom pricing pack only after every replacement criterion passes.
+8. Evaluate Resource Graph inventory, deployment observation, actual and forecast cost, and price-sheet retrieval as
+   separately authorized read adapters.
+
+**Exit gate:** The candidate is no worse than the current pack on declared metrics, typed arithmetic and meter semantics
+pass, write-tool denial is proven, and no direct exploratory MCP output can satisfy an APEX gate.
+
+## Milestone L: Mermaid And Python Diagram Migration
+
+**Outcome:** New diagrams use source-controlled Mermaid or Python without losing semantic or visual quality.
+
+**Requirements:** `REQ-QUALITY-001`, `REQ-CAPABILITY-001`, `REQ-DETERMINISM-001`, `REQ-DOCS-001`.
+
+**Dependency-complete slices:**
+
+1. Route inline flow, sequence, state, ER, and compact documentation diagrams to Mermaid.
+2. Route standalone architecture, network, dependency, runtime, as-built, WAF, cost, and compliance outputs to Python.
+3. Generalize existing golden scenarios into format-neutral node, edge, zone, label, legend, and accessibility manifests.
+4. Update artifact contracts, templates, prompts, workflow manifests, validators, benchmarks, and Markdown consumers.
+5. Qualify editable source, deterministic rendering, semantic coverage, nonblank output, dimensions, clipping, overlap,
+   labels, latency, security, and maintenance at the declared pack threshold.
+6. Archive and remove Draw.io MCP, skill, assets, tests, and setup only after every replacement criterion passes.
+
+**Exit gate:** No new workflow emits `.drawio`; Python replacements pass the measured gate; historical Draw.io artifacts
+remain readable and need no conversion.
+
+## Milestone M: Bounded Improvement Operationalization
+
+**Outcome:** Approved structured APEX outcomes feed useful inert proposals without transcript or mutation authority.
+
+**Requirements:** `REQ-IMPROVE-001`, `REQ-QUALITY-001`, `REQ-SECURITY-001`, `REQ-DETERMINISM-001`.
+
+**Dependency-complete slices:**
+
+1. Amend ADR-0004 provenance for the downstream ClawHub packaging while retaining exact-source clean-room ownership.
+2. Map allowlisted journal and evidence outcomes to stable category, severity, statement, and evidence-reference fields.
+3. Make ingestion opt-in, deterministic, idempotent, restart-safe, redacted, quarantined, retained, and deletable.
+4. Exclude transcripts, model prose, Chronicle content, and OpenTelemetry content capture.
+5. Measure observation precision, duplication, quarantine, recurrence precision, proposal dispositions, storage, and triage
+   time across representative modernization and qualification runs.
+
+**Exit gate:** Accepted precision and privacy thresholds are met while proposals remain inert and human-decided. A noisy
+automatic adapter remains disabled without weakening manual observation or the existing safety proof.
+
+## Milestone N: Bundle And Automation Simplification
+
+**Outcome:** One npm-owned bundle and one characterized validation graph replace duplicate orchestration without a new
+framework.
+
+**Requirements:** `REQ-DIST-001`, `REQ-QUALITY-001`, `REQ-SECURITY-001`, `REQ-DETERMINISM-001`, `REQ-DOCS-001`.
+
+**Dependency-complete slices:**
+
+1. Add source-to-generated mappings, client projections, composition metadata, content locks, and deterministic manifests
+   to the npm bundle; do not add APM or a second installer.
+2. Complete the machine-readable validator dependency graph and retain externally consumed aliases until proven unused.
+3. Make lefthook a thin consumer of canonical validators; retain serial execution until Git-index evidence permits change.
+4. Consolidate workflow setup and responsibility only where characterization proves duplicate ownership.
+5. Archive obsolete scripts and workflows with provenance instead of retaining successful no-op compatibility paths.
+
+**Exit gate:** Canonical owners and duplicate definitions decrease; required checks, permissions, triggers, pins,
+diagnostics, artifacts, coverage, and exact-head behavior remain stable; CI, hook, and context baselines do not regress.
+
+## Milestone O: Active Guidance Rewrite
+
+**Outcome:** Repository and managed guidance describe the implemented two-client system and point to canonical owners.
+
+**Requirements:** `REQ-CUSTOMIZATION-001`, `REQ-CAPABILITY-001`, `REQ-DETERMINISM-001`, `REQ-DOCS-001`.
+
+**Dependency-complete slices:**
+
+1. Rewrite `.github/copilot-instructions.md` around supported clients, cloud-agent exclusion, kernel and Gate 4 authority,
+   MCP distinctions, source/generated boundaries, validation ownership, and release controls.
+2. Rewrite root `AGENTS.md` for common setup, build, validation, and client qualification.
+3. Keep scoped `AGENTS.md` files limited to directory-specific IaC rules and update them only where ownership changed.
+4. Update managed instructions, agents, skills, prompts, templates, guides, workflow documentation, changelog, and
+   provenance.
+5. Regenerate packaged assets only from canonical sources and validate instruction discovery in both clients.
+
+**Exit gate:** Active guidance contains no obsolete MCP, Draw.io, VS Code-only, APM-adoption, or per-IaC SBOM claim;
+generated assets match canonical sources; both clients discover the intended instructions without conflict.
+
+## Milestone P: Final Qualification And Cutover Decision
+
+**Outcome:** One exact revised candidate has complete deterministic, replacement, security, package, live, and
+both-client evidence, rollback ownership, and an explicit release decision.
 
 **Requirements:** All requirements in [PRD.md](PRD.md).
 
 **Final gate:**
 
-- Repeat deterministic and live qualification after the final dependency hash change.
-- Complete independent security review and resolve every critical or high finding.
-- Rehearse package publication, capability packs, upgrade, downgrade, uninstall, release, and rollback.
-- Complete v1 critical-fix sync, documentation audit, scorecard samples, and `npm run validate:all`.
-- Account for every requirement, metric, risk, limitation, evidence hash, and rollback owner.
-- Obtain explicit maintainer authorization before tags, publication, cutover artifacts, or merge to `main`.
+- Run full repository validation, native CodeQL, dependency review, and independent security review.
+- Qualify deterministic packages, release manifest, APEX-level SBOM, provenance, clean install, capability packs,
+  customization update, rollback, and uninstall.
+- Prove each retired surface is absent from active discovery, packaging, setup, validation, and guidance only after its
+  replacement gate passes.
+- Repeat VS Code and Copilot CLI manual qualification, cross-device transfer, and final Bicep and Terraform ceremonies
+  after the last release-relevant hash change.
+- Recalculate scorecard measurements and account for every requirement, metric, risk, limitation, evidence hash, and
+  rollback owner.
+- Complete v1 critical-fix sync, documentation audit, trusted-publisher setup, tag and support-date proposals.
+- Obtain new explicit maintainer authorization before tags, publication, support dates, or cutover.
 
-**Historical traceability:** Build plan release and cutover phases; governance completion plan Phase 6.
+**Historical traceability:** Build plan release and cutover phases; governance completion plan Phase 6; DECISION-013.

@@ -13,7 +13,7 @@ This directory is the durable project hub for completing and releasing APEX vNex
 | Prioritization and views | GitHub Project `APEX vNext` | The project is a view, never a second backlog. |
 | Risks and delivery concerns | [REGISTER.md](REGISTER.md) | Link actionable entries to an issue. |
 | Decisions | [DECISIONS.md](DECISIONS.md) | Append entries; use an ADR for consequential design choices. |
-| Final release evidence | [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md) | Update after a release-relevant evidence boundary changes. |
+| Qualification evidence | [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md) | Preserve historical evidence; replace only with a new exact-candidate dossier. |
 | Modernization ownership | [MODERNIZATION-INVENTORY.md](MODERNIZATION-INVENTORY.md) | Update before ownership moves. |
 | Resume state | [PROJECT.md](PROJECT.md) | Update at checkpoints and milestone transitions. |
 | Historical product baseline | [phase-0a/](phase-0a/) | Frozen evidence; do not edit or repurpose. |
@@ -48,13 +48,13 @@ local links, and the frozen Phase 0A evidence digest. It deliberately does not q
 ## Historical Plans
 
 The approved Phase 0A evidence under [phase-0a/](phase-0a/) is immutable. The historical
-[`plan-buildApexVnext.prompt.md`](../../.github/prompts/plan-buildApexVnext.prompt.md) records design input; its binding
-product commitments are represented in [PRD.md](PRD.md), and its remaining delivery order is represented in
-[ROADMAP.md](ROADMAP.md). The governing execution prompt is
-[`plan-governAndCompleteApexVnext.prompt.md`](../../.github/prompts/plan-governAndCompleteApexVnext.prompt.md).
+[`plan-buildApexVnext.prompt.md`](../../.github/prompts/plan-buildApexVnext.prompt.md) and
+[`plan-governAndCompleteApexVnext.prompt.md`](../../.github/prompts/plan-governAndCompleteApexVnext.prompt.md) record
+superseded design and governance input. They are nonbinding. Current product commitments, decisions, and delivery order
+live in [PRD.md](PRD.md), [DECISIONS.md](DECISIONS.md), and [ROADMAP.md](ROADMAP.md).
 
 ## Resume Protocol
 
-Use `/apex-vnext-continue` in a fresh VS Code Copilot chat. The prompt re-verifies repository and GitHub state before it
-selects work. If that prompt is unavailable, read [PROJECT.md](PROJECT.md), the active issue checkpoint, and the current
-`main` check state directly.
+Use `/apex-vnext-continue` when the active Copilot client exposes the repository prompt. It re-verifies repository and
+GitHub state before selecting work. If the prompt is unavailable, read [PROJECT.md](PROJECT.md), the active issue
+checkpoint, and the current `main` check state directly.

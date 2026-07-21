@@ -23,7 +23,7 @@ Do not claim completion when required automated or manual evidence is unavailabl
 </output_contract>
 
 <scope_fencing>
-Follow the approved plan in `.github/prompts/plan-governAndCompleteApexVnext.prompt.md`.
+Follow `docs/vnext/PRD.md`, `DECISIONS.md`, and `ROADMAP.md` as the binding product, decision, and delivery authorities.
 Do not expand a slice into unrelated cleanup, a mass rewrite, or autonomous self-modification.
 Use this repository's `main` as the vNext integration line. Keep the original APEX `main` untouched as the v1 line.
 Stop before any merge, auto-merge, release, tag, publication, deployment, or cutover action.
@@ -40,9 +40,10 @@ By invoking this prompt, the user approves these operating decisions:
 - Use short-lived issue branches in isolated worktrees and target their pull requests to `main`.
 - Use GitHub Issues for executable work state, repository documents for durable intent and governance, and the
   `APEX vNext` GitHub Project only as a planning view.
-- Use the small document set defined by the governing plan.
+- Use the small project-control document set under `docs/vnext/`.
 - Modernize through dependency-complete vertical slices.
-- Keep self-improvement limited to observe-and-propose.
+- Keep improvement limited to structured observe-and-propose measurement with human decisions.
+- Support GitHub Copilot in VS Code and GitHub Copilot CLI; do not treat cloud coding-agent sessions as an APEX client.
 - Commit and push validated work on the issue branch and open or update a pull request targeting
   `main`.
 
@@ -54,9 +55,10 @@ operations, or production cutover.
 Read these first, without re-reading a file already loaded in the current session:
 
 1. `AGENTS.md` and `.github/copilot-instructions.md`.
-2. `.github/prompts/plan-governAndCompleteApexVnext.prompt.md` as the governing execution plan.
-3. `docs/vnext/PROJECT.md`, `PRD.md`, `ROADMAP.md`, `REGISTER.md`, and `DECISIONS.md` when they exist.
-4. `.github/prompts/plan-buildApexVnext.prompt.md` only when reconciling historical commitments.
+2. `docs/vnext/PRD.md`, `DECISIONS.md`, and `ROADMAP.md` as binding authorities.
+3. `docs/vnext/PROJECT.md`, `REGISTER.md`, and `MODERNIZATION-INVENTORY.md` for the current checkpoint, risks, and
+   ownership gates.
+4. The two `plan-*.prompt.md` files only when tracing historical intent; they are superseded and nonbinding.
 5. Applicable path-scoped instruction files for files that the selected slice will change.
 6. The active GitHub issue and its latest resumable checkpoint comment, when one exists.
 
@@ -89,46 +91,20 @@ Apply these rules:
 4. If only one exists, diagnose the mismatch and recover without deleting work or rewriting history.
 5. Never check out `main` in a second worktree when another worktree owns it.
 6. Preserve unrelated dirty files and generated evidence that this execution did not create.
-7. If VS Code file-editing tools cannot access the new worktree, stop after creating it and ask the user to open that
-   worktree in a new VS Code window before invoking this prompt again.
+7. If the active client cannot access the new worktree, stop after creating it and ask the user to open or select that
+   worktree before invoking this prompt again.
 
 ## Work Selection
 
-If the project-control documents do not exist, execute Phase 1 of the governing plan. Begin with baseline reconciliation
-and continue through the project-control validation gate unless a concrete blocker requires a checkpoint.
-
-If the project controls exist:
-
 1. Read `docs/vnext/PROJECT.md` for the resume pointer, not granular status.
-2. Query GitHub Issues and the `APEX vNext` Project for the authoritative active item.
+2. Query GitHub Issues and the `APEX vNext` Project for the authoritative active item when access is available.
 3. If an issue number was supplied, verify that it is open, approved, dependency-ready, and consistent with the roadmap.
 4. Otherwise, select the first dependency-ready issue in the current milestone and workstream.
 5. Execute only that issue's dependency-complete slice during this invocation.
-6. Do not begin a later phase while an earlier release gate is unresolved.
+6. Do not begin a later milestone while an earlier release gate is unresolved.
 
 Ask one concise question only when multiple equally valid items require a product decision. Do not ask the user to
 repeat information already available in repository or GitHub state.
-
-## Phase 1 Bootstrap
-
-When project controls are absent, complete the governing plan's Phase 1 in dependency order:
-
-1. Reconcile the current baseline, including branch and PR heads, local changes, current checks, known security
-   findings, and every older pending item's disposition.
-2. Create the internal vNext hub, checkpoint, PRD, roadmap, register, and decision index under `docs/vnext/`.
-3. Reconcile every still-valid commitment from `plan-buildApexVnext.prompt.md` into the PRD or roadmap. Mark the old
-   plan superseded only when that mapping is complete and reviewable.
-4. Add the vNext work-item issue form. Reuse existing defect intake unless evidence proves a separate regression form is
-   necessary.
-5. Inventory existing labels, milestones, projects, and issue conventions before creating anything on GitHub.
-6. Create the approved `APEX vNext` Project and only the minimal missing taxonomy, fields, and views required by the
-   governing plan.
-7. Seed dependency-ready issues from the approved roadmap and reconciled pending work. Do not duplicate mutable status
-   in `PROJECT.md`.
-8. Validate all controls and prove that each concern has one mutable source of truth.
-
-Do not add a network-dependent CI validator for mutable GitHub state. Add a repository validator only when an invariant
-cannot be enforced by existing Markdown, link, JSON, YAML, issue-form, or docs checks.
 
 ## Slice Execution Protocol
 
