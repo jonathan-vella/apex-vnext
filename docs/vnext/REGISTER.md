@@ -36,6 +36,20 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **State:** Blocked
 - **Closure proof:** Project URL and verified field and view inventory.
 
+### RISK-005: Markdown Linter Carries A Moderate Parser Denial-Of-Service Advisory
+
+- **Type:** `RISK`
+- **Owner:** Release engineering
+- **Impact:** Adversarial Markdown could consume excess CI CPU during linting; shipped runtime packages are unaffected.
+- **Evidence:** `markdownlint-cli2@0.23.0` pins `js-yaml@5.2.0`, which is affected by the moderate `!!omap`
+  quadratic-complexity advisory. `npm audit --omit=dev` reports zero vulnerabilities, and the high-severity 4.x
+  merge-key advisory is removed by pinning the compatible `xmlbuilder2` branch to `js-yaml@4.3.0`.
+- **Related issue:** Dependabot alert `#1`.
+- **Mitigation:** Accept for the private trusted-contributor release line, retain bounded CI job timeouts, and update
+  `markdownlint-cli2` when an upstream release consumes `js-yaml@5.2.1` or newer.
+- **State:** Accepted
+- **Closure proof:** Full audit contains no critical or high finding; production-only audit contains no finding.
+
 ### ASSUMPTION-001: VS Code Handoff Topology Is Supported
 
 - **Type:** `ASSUMPTION`

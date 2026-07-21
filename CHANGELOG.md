@@ -96,6 +96,8 @@ the original APEX repository. See [docs/MIGRATION.md](docs/MIGRATION.md) for pro
 
 ### Fixed (APEX vNext security)
 
+- fix(deps): pin the development-only `xmlbuilder2` parser to `js-yaml` 4.3.0, removing the high-severity merge-key
+  quadratic-complexity denial-of-service advisory from release tooling.
 - fix(vnext): validate Azure resource-group and storage-account names at the live handoff argument boundary before
   generating Terraform backend HCL, rejecting quote, newline, and Azure-invalid injection payloads.
 - fix(vnext): derive release SBOMs from `package-lock.json` instead of the ambient `node_modules` tree so package
