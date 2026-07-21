@@ -4,6 +4,7 @@
 - **Milestone:** Final qualification and promotion decision
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
+- **Current public main:** `54a211077d5f05954679e0fd8d3bc24fe29bc3f0`
 - **Verified exact-main candidate:** `25530c339410e9758ae34538427f24bddfd83e1d`
 - **Live release-source boundary:** `8c672d76cb2c2028131fcb93bb023ba9327d256b`
 - **Source repository:** `jonathan-vella/apex`
@@ -17,10 +18,10 @@ reproducibility, audits, and the approved independent security review pass. The 
 through its checksum manifest, and the prior cloud evidence remains behaviorally equivalent because no workflow, IaC,
 or authority path changed.
 
-The maintainer accepted publication of the repository's operational Azure metadata, authorized deletion of transient
-live artifacts, and authorized a hardening-first public visibility transition. Gitleaks found no secrets across the
-complete Git history. Public visibility will be followed immediately by branch protection, restrictive Actions and fork
-policies, secret scanning, push protection, private vulnerability reporting, and native CodeQL.
+The repository is public after an explicit operational-metadata disclosure decision and a history-wide Gitleaks scan.
+Transient live artifacts were deleted before conversion. Selected Actions, external-fork approval, read-only workflow
+tokens, shorter retention, protected `main`, secret scanning, push protection, private vulnerability reporting,
+immutable releases, Dependabot security updates, and native CodeQL are enabled and verified.
 
 Both Bicep and Terraform apply/destroy workflows succeeded on attempt one after separate local exact-preview Gate 4
 decisions. Final target inventories are empty, writer authority returned locally before ephemeral files were excluded,
@@ -49,7 +50,8 @@ cutover artifact has been created. Those actions remain separately authorized re
 | Supported VS Code scenarios      | Pending            | User-run clean supported-host and cross-device checklist                             |
 | Promotion authorization          | Pending            | Separate publication, tag, support-date, and cutover decision                        |
 | Unified package set              | Pass               | Exact-main package, clean-install, SBOM, provenance, and npm dry-run evidence        |
-| Public repository readiness      | In progress        | Transient live artifacts removed; hardening and native CodeQL pending                |
+| Public repository readiness      | Pass               | Public controls verified; zero open secret or code-scanning alerts                   |
+| Native CodeQL                    | Pass               | Run `29830116910`; Actions, JavaScript/TypeScript, and Python passed                 |
 
 ## Release Boundaries
 
@@ -64,9 +66,7 @@ cutover artifact has been created. Those actions remain separately authorized re
 
 ## Resume Pointer
 
-1. Merge the public-readiness hardening change, switch visibility, and configure GitHub-native protections.
-2. Run native CodeQL and resolve every critical or high finding.
-3. Run the supported VS Code and cross-device scenarios against the exact package candidate.
-4. Configure trusted publishers and a protected release environment for the maintainer-owned `@apex` packages.
-5. Decide immutable tag names, v1 maintenance reference, cutover date, and v1 support end date.
-6. Request one explicit maintainer decision before dispatching publication, tag, or cutover automation.
+1. Run the supported VS Code and cross-device scenarios against the exact package candidate.
+2. Configure trusted publishers and a protected release environment for the maintainer-owned `@apex` packages.
+3. Decide immutable tag names, v1 maintenance reference, cutover date, and v1 support end date.
+4. Request one explicit maintainer decision before dispatching publication, tag, or cutover automation.
