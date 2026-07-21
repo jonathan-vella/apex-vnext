@@ -54,6 +54,56 @@ Use `--customizations-source /absolute/path` only when testing a deliberate loca
 `apex update` performs a three-way managed-file update. A modified managed file is never silently replaced; resolve the
 reported conflict or restore the recorded base before retrying.
 
+## Upgrade And Roll Back
+
+Commit the workspace and authoritative `.apex/` project state before changing versions. Upgrade the CLI to one exact
+approved version, verify the installed bundle, and then apply its transactional managed-file update:
+
+```bash
+npm install --save-exact @apex/cli@<approved-version>
+npx apex version --json
+npx apex update --json
+npx apex doctor --json
+```
+
+The CLI declares exact versions of the matching contracts, kernel, capabilities, and renderers packages. Do not mix
+runtime package versions or install from a floating release channel.
+
+To reject an update, first restore the previously recorded customization bundle while the current CLI is available,
+then reinstall the complete prior approved package version and verify it:
+
+```bash
+npx apex customizations rollback --json
+npm install --save-exact @apex/cli@<previous-approved-version>
+npx apex version --json
+npx apex doctor --json
+```
+
+Rollback restores only the prior managed bundle. It does not rewrite project journals or deployment evidence. If an
+older runtime rejects a newer persisted contract, restore the repository and `.apex/` state from the checkpoint created
+by that older release. Never force a contract downgrade. The first vNext release has no vNext package predecessor, and
+v1 sessions or artifacts cannot be resumed in vNext.
+
+Capability packs have an independent transactional lifecycle:
+
+```bash
+npx apex capability update --pack <pack-id> --yes --json
+npx apex capability rollback --pack <pack-id> --yes --json
+npx apex capability uninstall --pack <pack-id> --yes --json
+```
+
+## Uninstall
+
+Remove managed workspace files before removing the CLI. Modified managed files are reported as conflicts and preserved;
+project journals and runtime evidence remain available for audit.
+
+```bash
+npx apex customizations uninstall --json
+npm uninstall @apex/cli
+```
+
+Review retained `.apex/` state explicitly. Delete or archive it only under the repository's evidence-retention policy.
+
 ## Verify Discovery
 
 1. Run `npx apex doctor --json` and address actionable checks.

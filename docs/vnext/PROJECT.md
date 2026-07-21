@@ -1,67 +1,68 @@
 ## APEX vNext Checkpoint
 
-- **Updated:** 2026-07-16 UTC
-- **Milestone:** Live qualification setup
+- **Updated:** 2026-07-21 UTC
+- **Milestone:** Final qualification and promotion decision
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
-- **Verified destination head:** `436f3359f324400d3288b6b844ecb6b5a0e7e445`
+- **Prior exact-main candidate:** `1f8db536fe0398f6575775d7794ba718234d3ef1`
+- **Live release-source boundary:** `8c672d76cb2c2028131fcb93bb023ba9327d256b`
 - **Source repository:** `jonathan-vella/apex`
-- **Source commit:** `60d96d5a46ff534069c58275cfd32cb8d4490971`
-- **History strategy:** Clean snapshot
+- **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
+- **History strategy:** Clean snapshot with source provenance
 
 ## Current State
 
-The runtime packages, workspace customizations, configuration, validators, tests, qualification infrastructure,
-project controls, and frozen Phase 0A evidence have moved into the dedicated repository. The Astro site is excluded;
-user documentation now lives under `docs/guides/` and validates as repository-native Markdown.
+The maintainer selected a unified `0.10.0` repository, package, customization, and release identity after qualification
+of the prior `0.1.0` package candidate. The amendment is locally qualified but uncommitted. The
+[final qualification dossier](FINAL-QUALIFICATION.md) preserves the prior immutable evidence and labels the new package
+hashes provisional until an exact-head rerun.
 
-The original APEX `main` branch was not modified. The old rolling integration and workflow-bootstrap pull requests are
-source-provenance records only and close unmerged after migration receipts are posted.
+Both Bicep and Terraform apply/destroy workflows succeeded on attempt one after separate local exact-preview Gate 4
+decisions. Final target inventories are empty, writer authority returned locally before ephemeral files were excluded,
+and the Azure backend is restored to public network `Disabled` with firewall default `Deny` and no temporary rule or
+exception tag.
 
-Issue `#9` is the active dependency-ready workstream. Its destination-readiness slice binds the live launcher,
-dispatch workflow, and release evidence to this repository. The secretless Entra application, destination Environment
-federation, and Azure qualification bootstrap are deployed and verified.
-
-The Environment is intentionally unprotected and scopes OIDC, variables, and secrets only. Local APEX Gate 4 is the sole
-human approval and binds the exact preview before CI handoff. The workflow imports that approval and cannot create one.
+Issue `#13` is the active release workstream. No npm package, release tag, v1 maintenance reference, support date, or
+cutover artifact has been created. Those actions remain separately authorized release operations.
 
 ## Validation State
 
-| Check                        | Result   | Evidence                                                                      |
-| ---------------------------- | -------- | ----------------------------------------------------------------------------- |
-| Source snapshot              | Pass     | `SOURCE_PROVENANCE.json` binds repository, branch, commit, and excluded path. |
-| Markdown docs (local)        | Pass     | `npm run validate:docs`.                                                      |
-| vNext contracts              | Pass     | `npm run validate:vnext`.                                                     |
-| Live workflow structure      | Pass     | `npm run validate:vnext-live-workflow`.                                       |
-| Live workflow mutation tests | Pass     | `npm run test:vnext-live-workflow`.                                           |
-| Repository mutation tests    | Pass     | `npm run test:vnext-validator`.                                               |
-| Full vNext qualification     | Pass     | PR workflow run `29505179368` on `9086c00`.                                   |
-| Full repository validation   | Pass     | `npm run validate:all` before PR `#14`.                                       |
-| Destination CI               | Pass     | Branch, docs, and CI checks passed for PR `#14`.                              |
-| Markdown docs (CI)           | Pass     | Workflow run `29495046638` on `099616a6`.                                     |
-| IaC checks                   | Pass     | Workflow run `29495064776` on `099616a6`.                                     |
-| Entra OIDC federation        | Pass     | Destination Environment subject exists; no client secret or API permission.   |
-| Azure bootstrap              | Pass     | Deployment `vnext-qualification-bootstrap` and security checks succeeded.     |
-| Local Gate 4 transfer design | Pass     | Package and workflow mutation tests cover exact post-approval transfer.       |
-| Devcontainer CI              | Disabled | Workflow is disabled and is not a migration or release gate.                  |
-| Dependency audit             | External | Public npm audit endpoint returned a TLS handshake failure during extraction. |
+| Check                            | Result             | Evidence                                                                             |
+| -------------------------------- | ------------------ | ------------------------------------------------------------------------------------ |
+| Prior exact-main CI              | Historical pass    | Run `29822326665`, attempt one                                                       |
+| Prior release qualification      | Historical pass    | Run `29822400861`, attempt one; all nine scorecard rules pass                        |
+| Release artifact integrity       | Pass               | GitHub digest and all internal `SHA256SUMS` entries verified                         |
+| Package qualification            | Pass               | Five reproducible tarballs, clean/offline install, SBOM, and provenance              |
+| npm publication dry run          | Pass with boundary | All five tarballs passed; registry identity and trusted publishing remain unverified |
+| Production dependency audit      | Pass               | Zero known vulnerabilities                                                           |
+| Full dependency audit            | Accepted           | Two moderate development-only Markdown lint findings                                 |
+| CodeQL equivalent                | Accepted pass      | Repeated independent exact-main review; no critical, high, or blocking finding       |
+| v1 compatibility and sync        | Pass               | Matrix has zero errors or warnings; no post-baseline v1 fix exists                   |
+| Bicep live lifecycle             | Pass               | Apply `29816381757`; destroy `29817534614`                                           |
+| Terraform live lifecycle         | Pass               | Apply `29820944300`; destroy `29821615776`                                           |
+| Final Azure cleanup              | Pass               | Both sandboxes empty; backend restored to `Disabled`/`Deny`                          |
+| Supported VS Code scenarios      | Pending            | User-run clean supported-host and cross-device checklist                             |
+| Promotion authorization          | Pending            | Separate publication, tag, support-date, and cutover decision                        |
+| Unified `0.10.0` package set     | Local pass         | vNext validator, 109 package-owner tests, package rehearsal, and five npm dry runs   |
 
-## Remaining Release Work
+## Release Boundaries
 
-The transferred issues remain authoritative:
-
-| Issue | Work                                           |
-| ----- | ---------------------------------------------- |
-| `#11` | Inventory modernization ownership surfaces     |
-| `#12` | Design bounded observe-and-propose improvement |
-| `#13` | Run final qualification and cutover review     |
-
-Live evidence produced against the old repository or an earlier source head is historical. Final release evidence must
-bind to an exact commit in this repository after the last dependency hash change.
+- The unprotected `vnext-qualification` Environment scopes OIDC and configuration only. Local APEX Gate 4 is the sole
+  cloud approval authority.
+- No release workflow exists. The maintainer controls the `@apex` scope, but trusted publishers and a protected release
+  environment must be configured against the final reviewed workflow.
+- The maintainer selected `0.10.0` as the unified repository, package, customization, and release identity. Exact-head
+  evidence must be regenerated after the amendment is committed.
+- The exact v1 support end date remains 12 calendar months after the yet-unauthorized cutover date.
+- Existing stashes and return worktrees preserve superseded or unrelated local state and must not be deleted as release
+  cleanup.
 
 ## Resume Pointer
 
-1. Complete issue `#11` by reviewing and merging the candidate-bound modernization ownership inventory.
-2. Start Milestone F with the validator command graph; characterize behavior before changing orchestration.
-3. Compare each slice against the recorded CI, hook, dependency, diagnostic, context, and drift baseline.
-4. Keep production cutover and final exact-head qualification deferred to issue `#13`.
+1. Review the unified `0.10.0` amendment, commit it through a pull request, and merge only after required checks pass.
+2. Repeat exact-head release qualification, package hashing, audits, and the approved security-equivalent review.
+3. Confirm cloud evidence equivalence, then run the supported VS Code and cross-device scenarios against that exact
+  package candidate.
+4. Configure trusted publishers and a protected release environment for the maintainer-owned `@apex` packages.
+5. Decide immutable tag names, v1 maintenance reference, cutover date, and v1 support end date.
+6. Request one explicit maintainer decision before dispatching publication, tag, or cutover automation.
