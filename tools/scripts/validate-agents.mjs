@@ -142,7 +142,8 @@ function runFrontmatterValidation() {
 
     if (!isSubagent) {
       for (const field of RECOMMENDED_FIELDS) {
-        if (!(field in frontmatter)) {
+        const explicitEmptyAgents = field === "agents" && /^agents:\s*\[\s*\]\s*$/m.test(content);
+        if (!(field in frontmatter) && !explicitEmptyAgents) {
           r.warn(relativePath, `Missing recommended 1.109 field '${field}'`);
         }
       }
@@ -1485,12 +1486,19 @@ function runWorkflowHandoffs() {
     const sourceStep = agentToStep.get(sourceAgent);
     const sourceIsArtifactProducer = artifactProducers.has(sourceAgent);
     const handoffs = parseStructuredHandoffs(agent.content);
+    const isManagedAgent = agent.path.startsWith("customizations/.github/agents/");
 
     // ── B1a + B1b ────────────────────────────────────────────────────
     if (!isExcluded && handoffs.length > 0) {
       for (const [i, h] of handoffs.entries()) {
         // B1a: target legality
-        const verdict = evaluateHandoffTarget(graph, sourceAgent, sourceStep, h, agentToStep, sourceIsArtifactProducer);
+        const verdict = isManagedAgent
+          ? {
+              legal: knownAgentNames.has(h?.agent),
+              escalate: true,
+              reason: "target is not a managed agent",
+            }
+          : evaluateHandoffTarget(graph, sourceAgent, sourceStep, h, agentToStep, sourceIsArtifactProducer);
         if (!verdict.legal) {
           const msg = `handoffs[${i}] (${h?.label || "?"}) target "${h?.agent || "?"}" — ${verdict.reason}`;
           emitWorkflowHandoff(r, "workflow-handoff-target-001", relPath, msg, {
@@ -1503,7 +1511,7 @@ function runWorkflowHandoffs() {
     }
 
     // ── B2: artifact-sync ────────────────────────────────────────────
-    if (!isExcluded) {
+    if (!isExcluded && !isManagedAgent) {
       for (const [i, h] of handoffs.entries()) {
         const issues = evaluateArtifactSync(graph, sourceStep, h, agentToStep, allProduced);
         for (const issue of issues) {

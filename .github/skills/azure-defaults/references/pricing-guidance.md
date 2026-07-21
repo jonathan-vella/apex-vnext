@@ -441,8 +441,7 @@ and you should mark the line `Estimate unavailable`.
 
 ### Recovery protocol (subagent + parent)
 
-1. Subagent first applies all four `## Mandatory pre-bulk normalization`
-   rules from `.github/agents/_subagents/cost-estimate-subagent.agent.md`.
+1. The caller first applies all four `## Mandatory pre-bulk normalization` rules in this file.
 2. If a line still returns 0 results after bulk + per-line `azure_price_search`
    fallback, the subagent records `Estimate unavailable` and finishes with
    `status: FAILED` listing the line in `unresolved_items[]`.

@@ -118,7 +118,7 @@ For ad-hoc spot checks, the underlying tools still work standalone:
 
 ```sh
 npm run profile:debug-log -- logs/smoke-<date>.json
-npm run validate:review-ceiling -- --budget logs/smoke-<date>.json
+npm run assess:agents -- --profile=logs/smoke-<date>.json
 ```
 
 ## Acceptance criteria

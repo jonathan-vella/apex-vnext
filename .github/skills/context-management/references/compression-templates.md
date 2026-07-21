@@ -122,12 +122,10 @@ and sends `resume <project>`:
 4. Skips re-reading completed-step artifacts unless the user explicitly
    asks to revisit them.
 
-### Validator
+### Historical Validator
 
-`tools/scripts/validate_orchestrator_handoff.py` parses
-`.github/agents/01-orchestrator.agent.md` and asserts the verbatim
-resume line is documented in at least one Gate-acceptance context.
-Wired into `npm run validate:agents` (hard fail).
+The retired orchestrator handoff validator and source agent are preserved under `.archive/legacy-agents-v0.10/` for
+compatibility evidence. Managed APEX resumes from kernel state through `apex/status` and does not use this prose contract.
 
 ### Tradeoff
 

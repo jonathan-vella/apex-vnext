@@ -50,13 +50,13 @@ All markdown documentation **except** `agent-output/**/*.md`:
 | Path                                        | Governed By                                    |
 | ------------------------------------------- | ---------------------------------------------- |
 | `agent-output/**/*.md`                      | `azure-artifacts.instructions.md` + validators |
-| `.github/agents/*.agent.md`                 | `agent-authoring.instructions.md`              |
+| `customizations/.github/agents/*.agent.md`  | `agent-authoring.instructions.md`              |
 | `.github/skills/azure-artifacts/templates/` | Read-only reference (do not modify)            |
 | `**/*.bicep`                                | `iac-bicep-best-practices.instructions.md`     |
 
 ## Rules
 
-- **Out of scope, always** — `agent-output/**/*.md` (governed by `azure-artifacts.instructions.md`), `.github/agents/*.agent.md` (governed by `agent-authoring.instructions.md`), `**/*.bicep` (governed by `iac-bicep-best-practices.instructions.md`), `azure-artifacts/templates/` (read-only)
+- **Out of scope, always** — `agent-output/**/*.md` (governed by `azure-artifacts.instructions.md`), `customizations/.github/agents/*.agent.md` (governed by `agent-authoring.instructions.md`), `**/*.bicep` (governed by `iac-bicep-best-practices.instructions.md`), `azure-artifacts/templates/` (read-only)
 - **Single H1 rule** — the title is the only H1; everything else is H2 or deeper
 - **120-char line limit** — CI enforces this on docs and instruction files
 - **Version source of truth** is `VERSION.md`; never hard-code version numbers in prose
@@ -83,7 +83,7 @@ one-line summary so the agent knows which one to load.
 
 ## Guardrails
 
-- **Never modify** files in `agent-output/`, `.github/agents/`,
+- **Never modify** files in `agent-output/`, `customizations/.github/agents/`,
   or `.github/skills/azure-artifacts/templates/`
 - **Always read** the latest file version before editing
 - **Always verify** line length ≤ 120 characters after edits
@@ -97,7 +97,7 @@ one-line summary so the agent knows which one to load.
 | Lint fails on line length | Break lines at 120 chars after punctuation                      |
 | Link validation fails     | Check relative paths resolve; use standard markdown link format |
 | Version mismatch          | Read `VERSION.md` and propagate to all docs                     |
-| Count mismatch            | List `.github/agents/` and `.github/skills/` directories        |
+| Count mismatch            | List managed agents and `.github/skills/` directories           |
 
 ## References
 

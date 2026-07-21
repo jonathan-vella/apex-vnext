@@ -30,7 +30,7 @@
 
 ### 2. Agent Count and Table
 
-**Source of truth**: List `.github/agents/*.agent.md` files
+**Source of truth**: List `customizations/.github/agents/*.agent.md` files
 (exclude `_subagents/` directory).
 
 **Expected count**: computed dynamically from `tools/registry/count-manifest.json`
@@ -65,7 +65,7 @@ appropriate category table. Remove entries for deleted skills.
 
 ### 4. Documentation Index Currency
 
-**Source of truth**: `docs/README.md`, `.github/agents/`, and `.github/skills/`.
+**Source of truth**: `docs/README.md`, `customizations/.github/agents/`, and `.github/skills/`.
 
 **Files to check**:
 

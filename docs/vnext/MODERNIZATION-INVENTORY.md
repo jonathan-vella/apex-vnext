@@ -23,7 +23,7 @@ revertible slice with characterization tests and baseline comparison.
 | `workspace-operating-frame`    | keep        | `AGENTS.md`             | Existing split remains authoritative   |
 | `scoped-instruction-discovery` | consolidate | instruction frontmatter | `OWN-001`                              |
 | `user-documentation`           | keep        | `docs/`                 | User guidance remains separate         |
-| `agent-registry`               | keep        | agent registry          | Explicit invocation index              |
+| `managed-agent-manifest`       | keep        | customization manifest  | Roles, models, and invocation edges    |
 | `model-catalog`                | keep        | model catalog           | Definitions plus generated assignments |
 | `skill-discovery`              | consolidate | skill frontmatter       | `OWN-001`                              |
 | `workflow-dag`                 | keep        | workflow graph          | Machine-readable workflow owner        |

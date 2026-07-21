@@ -37,12 +37,13 @@ export function getAgents() {
       const filePath = path.join(dir, file);
       const content = fs.readFileSync(filePath, "utf-8");
       const frontmatter = parseFrontmatter(content);
+      const hiddenWorker = [false, "false", "never"].includes(frontmatter?.["user-invocable"]);
       _agents.set(file, {
         path: filePath,
         dir,
         content,
         frontmatter,
-        isSubagent,
+        isSubagent: isSubagent || hiddenWorker,
       });
     }
   }

@@ -18,16 +18,15 @@ extending the challenger schema.
 - **Deliverable:** reusable tooling (assess-agents prompt + script + rubric refs) + a first run.
 - **Layer 4:** generic adversarial pass via `Explore` subagent + a NEW agent-definition
   checklist (the `challenger-review-subagent` cannot target `.agent.md`).
-- **Scope:** ALL agents — main `.github/agents/*.agent.md` + subagents under
-  `.github/agents/_subagents/`. Derive the agent list from the filesystem walk
+- **Scope:** all managed agents under `customizations/.github/agents/`. Derive the agent list from the filesystem walk
   (`tools/scripts/_lib/workspace-index.mjs#getAgents`), then enrich with
-  `tools/registry/agent-registry.json` (no hard-coded counts).
+  `customizations/manifest.json` (no hard-coded counts).
 
 ## The 4 layers (grounded)
 
 - **L1 Mechanical** (deterministic, existing validators): `validate:agents`
   (frontmatter / structural / model-alignment / vendor-prompting / workflow-handoffs),
-  `validate:agent-registry`, `validate:model-consistency`, `validate:deprecated-models`,
+  `validate:model-consistency`, `validate:deprecated-models`,
   `validate:model-catalog`, `validate:workflow-graph`, `lint:workflow-table-sync`,
   `lint:glob-audit`, `lint:orphaned-content`, `check:context-redundancy`,
   `lint:safe-shell`, `snapshot:baseline` / `diff:baseline`.

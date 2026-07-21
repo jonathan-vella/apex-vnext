@@ -36,7 +36,7 @@ chat must be able to resume from `review-plan.md` + `review-index.json` +
 <context>
 This repo is APEX (Azure Agentic Platform Engineering eXperience). It contains:
 
-- Custom agents and subagents under `.github/agents/`
+- Managed agents and hidden workers under `customizations/.github/agents/`
 - Skills under `.github/skills/`
 - Instructions under `.github/instructions/`
 - Prompts under `.github/prompts/` and `tools/tests/prompts/`
@@ -45,7 +45,7 @@ This repo is APEX (Azure Agentic Platform Engineering eXperience). It contains:
 - Validators under `tools/scripts/`
 - Tests under `tools/tests/`
 - Markdown documentation under `docs/`
-- Registries: `tools/registry/agent-registry.json`,
+- Managed invocation owner: `customizations/manifest.json`,
   `tools/registry/count-manifest.json`,
   `.github/model-catalog.json`,
   `.github/skills/vendor-prompting/rules.json`,
@@ -59,7 +59,7 @@ Read these orientation files BEFORE Phase 0:
 
 - `AGENTS.md` (root project conventions)
 - `.github/copilot-instructions.md` (Copilot orchestration)
-- `tools/registry/agent-registry.json` (agent inventory)
+- `customizations/manifest.json` (managed role and invocation inventory)
 - `tools/registry/count-manifest.json` (entity counts; do NOT hard-code)
 - `.github/skills/workflow-engine/templates/workflow-graph.json` (DAG)
 - `lefthook.yml` (pre-commit / pre-push wiring)
@@ -120,7 +120,7 @@ re-reading every body. This is the "knowledge graph" for this session.
    ```
 
 3. Aggregate into `review-index.json`:
-   - `agents[]` — from `tools/registry/agent-registry.json` plus parsed
+  - `agents[]` — from `customizations/manifest.json` plus parsed
      frontmatter (name, model, family, body_lines, declared skills,
      handoffs).
    - `subagents[]` — same shape, scoped to `_subagents/`.
@@ -204,7 +204,7 @@ Domain report: `agent-output/_baselines/{review_id}/01-validators.md`.
 
 Sources of truth:
 
-- `tools/registry/agent-registry.json` (+ schema)
+- `customizations/manifest.json`
 - `tools/registry/count-manifest.json` (+ generator script)
 - `tools/registry/source-freshness.json`
 - `.github/model-catalog.json` (+ generator)

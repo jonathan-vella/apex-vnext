@@ -328,7 +328,7 @@ function runCrossSkillReferenceValidation() {
   const skills = getSkills();
   const validSkillNames = new Set(skills.keys());
 
-  // Agents and subagents (under `.github/agents/` and `.github/agents/_subagents/`)
+  // Managed interactive agents and hidden workers from the workspace index.
   // are valid redirect targets even though they aren't skills. Discover them
   // so the allowlist stays in sync with the filesystem.
   const validAgentNames = new Set();

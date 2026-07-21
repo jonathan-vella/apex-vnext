@@ -6,6 +6,7 @@ node_modules/
 site/
 agent-output/
 .apex/
+.archive/
 tmp/
 infra/
 logs/

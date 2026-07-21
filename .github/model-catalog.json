@@ -151,30 +151,16 @@
     "generated_by": "tools/scripts/generate-model-catalog.mjs",
     "description": "Auto-generated inventory of agent → model assignments derived from frontmatter (canonical source). Do not edit by hand; run `node tools/scripts/generate-model-catalog.mjs` or let the lefthook pre-commit hook refresh it when frontmatter changes.",
     "agents": {
-      "01-orchestrator.agent.md": "MAI-Code-1-Flash",
-      "02-requirements.agent.md": "Claude Sonnet 5",
-      "03-architect.agent.md": "Claude Opus 4.8",
-      "04-design.agent.md": "Claude Sonnet 5",
-      "04g-governance.agent.md": "GPT-5.3-Codex",
-      "05-iac-planner.agent.md": "Claude Opus 4.8",
-      "06b-bicep-codegen.agent.md": "Claude Sonnet 5",
-      "06t-terraform-codegen.agent.md": "Claude Sonnet 5",
-      "07b-bicep-deploy.agent.md": "GPT-5.3-Codex",
-      "07t-terraform-deploy.agent.md": "GPT-5.3-Codex",
-      "08-as-built.agent.md": "Claude Sonnet 5",
-      "09-diagnose.agent.md": "GPT-5.5",
-      "10-challenger.agent.md": "GPT-5.3-Codex",
-      "11-context-optimizer.agent.md": "Claude Sonnet 5",
-      "e2e-orchestrator.agent.md": "GPT-5.5"
+      "apex-architect.agent.md": "Claude Opus 4.8",
+      "apex-operator.agent.md": "GPT-5.5",
+      "apex-planner.agent.md": "Claude Opus 4.8",
+      "apex-requirements.agent.md": "Claude Sonnet 5",
+      "apex.agent.md": "MAI-Code-1-Flash"
     },
     "subagents": {
-      "bicep-validate-subagent.agent.md": "Claude Sonnet 5",
-      "bicep-whatif-subagent.agent.md": "Claude Sonnet 5",
-      "challenger-review-subagent.agent.md": "GPT-5.5",
-      "cost-estimate-subagent.agent.md": "GPT-5.3-Codex",
-      "policy-precheck-subagent.agent.md": "Claude Sonnet 5",
-      "terraform-plan-subagent.agent.md": "Claude Sonnet 5",
-      "terraform-validate-subagent.agent.md": "Claude Sonnet 5"
+      "apex-codegen.agent.md": "Claude Sonnet 5",
+      "apex-reviewer.agent.md": "Claude Sonnet 5",
+      "apex-validator.agent.md": "Claude Sonnet 5"
     }
   }
 }

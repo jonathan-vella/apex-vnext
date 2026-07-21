@@ -10,7 +10,7 @@ tools: [vscode/askQuestions, execute/runInTerminal, read]
 
 Collect Copilot debug logs from this workspace's active session (and
 optionally older sessions / workspace logs), filter the main JSONL stream
-down to lines that reference **custom agents** in `.github/agents/`,
+down to lines that reference **custom agents** in `customizations/.github/agents/`,
 compress everything into a single `.tar.gz` archive under `.apex-logs/`,
 and print a manual upload instruction. **The prompt never uploads —
 you upload to OneDrive yourself via a browser**.
@@ -29,8 +29,8 @@ you upload to OneDrive yourself via a browser**.
   same workspace, the active session transcript JSONL, and workspace
   `logs/copilot/`.
 - Filter source for "custom agent" lines: every agent file path under
-  `.github/agents/*.agent.md` plus the short keys in
-  `tools/registry/agent-registry.json` (`agents` map keys).
+  `customizations/.github/agents/*.agent.md` plus managed role names in
+  `customizations/manifest.json`.
 - Redaction (default on): strip common secret patterns from the
   filtered JSONL before bundling.
 - Never includes `agent-output/`, `infra/`, or `node_modules/`.
@@ -178,19 +178,19 @@ Derive both the file-path tokens and the short-key tokens that mark
 custom-agent activity in `main.jsonl`:
 
 ```bash
-# File-path tokens (e.g. ".github/agents/01-orchestrator.agent.md")
-mapfile -t AGENT_FILES < <(ls -1 .github/agents/*.agent.md 2>/dev/null)
+# File-path tokens (e.g. "customizations/.github/agents/apex.agent.md")
+mapfile -t AGENT_FILES < <(ls -1 customizations/.github/agents/*.agent.md 2>/dev/null)
 
-# Short keys from the registry (e.g. "orchestrator", "requirements", ...)
-mapfile -t AGENT_KEYS < <(node -e "const r=require('./tools/registry/agent-registry.json'); console.log(Object.keys(r.agents).join('\n'))" 2>/dev/null)
+# Managed role names (e.g. "APEX", "APEX Requirements", ...)
+mapfile -t AGENT_KEYS < <(node -e "const m=require('./customizations/manifest.json'); console.log(m.roles.map((role)=>role.agent).join('\n'))" 2>/dev/null)
 
 # Combined alternation regex for grep.
 FILTER_RE="$(printf '%s\n' "${AGENT_FILES[@]}" "${AGENT_KEYS[@]}" .github/skills/ .github/instructions/ apex-recall '@01-Orchestrator' '@02-Requirements' '@03-Architect' '@04-Design' '@04g-Governance' '@05-IaC-Planner' '@06b-Bicep-CodeGen' '@06t-Terraform-CodeGen' '@07b-Bicep-Deploy' '@07t-Terraform-Deploy' '@08-As-Built' '@e2e-Orchestrator' | awk 'NF' | paste -sd'|' -)"
 echo "filter pattern length: ${#FILTER_RE}"
 ```
 
-This produces a regex covering: every `.agent.md` file path, every
-short registry key, the skills/instructions roots, the `apex-recall`
+This produces a regex covering: every managed `.agent.md` file path, every
+managed role name, the skills/instructions roots, the `apex-recall`
 CLI, and every chat participant mention. That is the definition of
 "work done by my custom agents" used everywhere downstream.
 
@@ -343,7 +343,7 @@ const manifest = {
     redacted: process.env.REDACT !== 'no'
   },
   agent_filter: {
-    source: 'tools/registry/agent-registry.json + .github/agents/*.agent.md',
+    source: 'customizations/manifest.json + customizations/.github/agents/*.agent.md',
     note: 'custom-agents-only.jsonl files contain only lines matching this filter'
   },
   files,
@@ -405,15 +405,15 @@ review before uploading if the chat may have contained secrets.
 
 Print this summary table at the end:
 
-| Step          | Result                                                             |
-| ------------- | ------------------------------------------------------------------ |
-| Session dir   | `<absolute path>`                                                  |
-| Captured      | active + (older / transcript / workspace logs as selected)         |
-| Filter source | `tools/registry/agent-registry.json` + `.github/agents/*.agent.md` |
-| Redaction     | on / off                                                           |
-| Archive       | `.apex-logs/<bundle-id>.tar.gz` (`<size>`)                         |
-| Upload target | `<onedrive-link>` or `(provide link to upload)`                    |
-| Gitignore     | `.apex-logs/` already-ignored / added                              |
+| Step          | Result                                                                      |
+| ------------- | --------------------------------------------------------------------------- |
+| Session dir   | `<absolute path>`                                                           |
+| Captured      | active + (older / transcript / workspace logs as selected)                  |
+| Filter source | `customizations/manifest.json` + `customizations/.github/agents/*.agent.md` |
+| Redaction     | on / off                                                                    |
+| Archive       | `.apex-logs/<bundle-id>.tar.gz` (`<size>`)                                  |
+| Upload target | `<onedrive-link>` or `(provide link to upload)`                             |
+| Gitignore     | `.apex-logs/` already-ignored / added                                       |
 
 ## Rules
 

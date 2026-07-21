@@ -20,7 +20,7 @@ body:
       options:
         - Bicep templates (infra/bicep/)
         - PowerShell scripts
-        - Agent definitions (.github/agents/)
+        - Managed agent definitions (customizations/.github/agents/)
         - Documentation (docs/, README files)
         - GitHub Actions workflows
         - MCP Server (tools/mcp-servers/azure-pricing/)
