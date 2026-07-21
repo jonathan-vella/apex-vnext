@@ -70,7 +70,8 @@ gate revisions and actual serialized task-context projection sizes for each Bice
 - The maintainer-selected unified `0.10.0` version amendment supersedes the final exact-main review above. A repeated
   read-only review of PR `#85` candidate `465c89b4cee7bdb4f99e9122253f67d48ca2c766` found no critical, high,
   authorization-bypass, or release-blocking issue and confirmed that the prior cloud evidence remains behaviorally
-  equivalent because no workflow, IaC, or authority path changed.
+  equivalent because no workflow, IaC, or authority path changed. Later PR commits are limited to this finding's
+  documentation remediation and deterministic formatting; GitHub checks identify the final exact head.
 - Manual supported VS Code, cross-device, and final promotion scenarios remain outstanding. Both dual-track cloud
   lifecycles and OIDC writer transfers completed against the same non-`.apex/` source boundary as final `main`.
 
