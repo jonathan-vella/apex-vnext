@@ -1,1 +1,0 @@
-{"meterId":"39d8c6c1-22c0-5719-9330-593a56b3a2e0","productName":"General Block Blob v2","retrievedAt":"2026-07-21T08:50:03.093Z","skuName":"Hot LRS","sourceUri":"https://prices.azure.com/api/retail/prices?api-version=2023-01-01-preview&$filter=armRegionName%20eq%20'swedencentral'%20and%20serviceName%20eq%20'Storage'%20and%20priceType%20eq%20'Consumption'","unitPrice":0.0184}
