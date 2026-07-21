@@ -2,8 +2,8 @@
 
 This inventory freezes repository ownership surfaces before consolidation. The machine-readable source is
 [`modernization-ownership.json`](../../tools/registry/modernization-ownership.json), bound to candidate
-`c447f744e3bee97f8919b36ea285f0f5aaa3e42e`. Existing registries remain canonical; this inventory references them and
-does not copy their entries.
+`1a1de02a3a17f496c713dd3c4e425c8df8d30d0e`. Existing registries remain canonical; this inventory references them and
+does not copy their entries. New owners below are planned migration targets and do not claim implemented behavior.
 
 ## Classification Rules
 
@@ -13,7 +13,7 @@ does not copy their entries.
 - `retire`: retain until the stated removal gate succeeds, then archive or remove.
 - `investigate`: preserve the surface until consumers and replacement proof are complete.
 
-No classification authorizes implementation in this issue. Milestone F applies each change as an independently
+No classification authorizes implementation by itself. Milestones I through O apply each change as an independently
 revertible slice with characterization tests and baseline comparison.
 
 ## Guidance And Invocation
@@ -27,6 +27,7 @@ revertible slice with characterization tests and baseline comparison.
 | `model-catalog`                | keep        | model catalog           | Definitions plus generated assignments |
 | `skill-discovery`              | consolidate | skill frontmatter       | `OWN-001`                              |
 | `workflow-dag`                 | keep        | workflow graph          | Machine-readable workflow owner        |
+| `managed-consumer-guidance`    | consolidate | managed instructions    | `OWN-017`                              |
 
 ## Runtime And Validation
 
@@ -35,11 +36,25 @@ revertible slice with characterization tests and baseline comparison.
 | `runtime-manifests`             | keep        | versioned config manifests        | Existing runtime boundary  |
 | `workspace-package-boundaries`  | keep        | workspace package manifests       | Executable ownership units |
 | `schema-libraries`              | investigate | contracts plus repository schemas | `OWN-005`                  |
-| `customization-distribution`    | investigate | customization manifest            | `OWN-006`                  |
+| `customization-distribution`    | rewrite     | customization manifest            | `OWN-006`                  |
 | `workflow-validator-ownership`  | keep        | kernel ownership table            | Runtime authorization map  |
 | `repository-validator-graph`    | consolidate | package scripts                   | `OWN-002`                  |
 | `language-validator-boundaries` | keep        | language-native tools             | Preserve native parsing    |
 | `artifact-template-validation`  | consolidate | artifact templates                | `OWN-004`                  |
+
+## Re-Baselined Product Surfaces
+
+| Surface                         | Class       | Planned canonical owner          | Decision  |
+| ------------------------------- | ----------- | -------------------------------- | --------- |
+| `copilot-client-projections`    | rewrite     | customization manifest           | `OWN-011` |
+| `mcp-portfolio`                 | investigate | APEX MCP descriptor              | `OWN-012` |
+| `pricing-evidence`              | rewrite     | versioned evidence contracts     | `OWN-013` |
+| `diagram-routing`               | rewrite     | Mermaid and Python skills        | `OWN-014` |
+| `improvement-outcome-ingestion` | rewrite     | improvement policy and contracts | `OWN-015` |
+| `client-bundle-generation`      | rewrite     | CLI asset preparation            | `OWN-016` |
+
+These rows identify migration targets only. Current VS Code projections, MCP servers, pricing pack, Draw.io paths,
+manual improvement submission, and single-client bundle remain active until their individual replacement gates pass.
 
 ## Automation And Generation
 
@@ -73,8 +88,10 @@ representative samples exist.
 
 ### CI
 
-Recent successful `main` CI runs span 143 to 209 seconds, with a 165-second median. Candidate run `29585231105`
-completed in 152 seconds. Required check names and command ownership remain in workflow files and package scripts.
+Current-base `main` CI run `29838483672` passed on
+`1a1de02a3a17f496c713dd3c4e425c8df8d30d0e` in 128 seconds. Earlier successful runs remain historical timing samples,
+not a directly comparable post-modernization baseline. Required check names and command ownership remain in workflow
+files and package scripts.
 
 ### Hooks
 
@@ -84,7 +101,7 @@ multiple `stage_fixed` commands can race on the Git index.
 
 ### Dependencies
 
-The candidate lockfile SHA-256 is `45b3eae971a59165a9374de580140ab92f5e55f1ba6136dce27ebd4c133c597d`. Workspace
+The candidate lockfile SHA-256 is `5727e5fd6353b31b347cffaf6c537a5c0a6be20ce2460d66125d09b118f8b525`. Workspace
 package manifests and TypeScript project references own package boundaries; exact package counts remain derived rather
 than copied into this document.
 
@@ -95,9 +112,9 @@ commands, so output compatibility snapshots are required before each family migr
 
 ### Drift
 
-Recent changes concentrate in skills, tooling, packages, documentation, instructions, agents, and workflows. Existing
-model, entity-count, source-freshness, orphan-content, and glob-audit checks remain the drift gates. This inventory adds
-ownership drift validation without replacing those specialized checks.
+Recent changes include the legacy-agent archive and managed-discovery boundary. Existing model, entity-count,
+source-freshness, orphan-content, and glob-audit checks remain the drift gates. This inventory adds ownership drift
+validation without replacing those specialized checks.
 
 ## Ownership Decisions
 
@@ -106,20 +123,27 @@ ownership drift validation without replacing those specialized checks.
 - `OWN-003`: retain serial hooks until Git index coordination and representative benchmarks pass.
 - `OWN-004`: derive artifact heading metadata from canonical templates.
 - `OWN-005`: defer schema-library consolidation until source and consumer provenance is mapped.
-- `OWN-006`: preserve customization boundaries until source-to-install lifecycle proof exists.
+- `OWN-006`: keep npm and the customization manifest authoritative while extending the transactional client lifecycle.
 - `OWN-007`: retire the active v1 matrix only after issue #13 accepts cutover; archive it afterward.
 - `OWN-008`: migrate validator diagnostics to the shared reporter by characterized family.
 - `OWN-009`: keep telemetry advisory until automatic, representative, privacy-safe samples exist.
 - `OWN-010`: retain public compatibility aliases until consumers and replacement guidance are known.
+- `OWN-011`: generate VS Code and Copilot CLI projections from one customization manifest and compare typed outcomes.
+- `OWN-012`: inventory and retire MCP integrations only through per-server replacement gates and a typed descriptor.
+- `OWN-013`: make versioned normalized evidence contracts authoritative for managed pricing; keep raw data restricted.
+- `OWN-014`: route new inline diagrams to Mermaid and standalone diagrams to editable Python sources.
+- `OWN-015`: feed only allowlisted structured outcomes into the existing inert improvement lifecycle.
+- `OWN-016`: keep npm and CLI asset preparation as the only bundle-generation path, with client locks and provenance.
+- `OWN-017`: consolidate shipped consumer guidance in managed instructions generated consistently for both clients.
 
 ## Removal And Change Gates
 
 Every surface has a specific gate in the machine-readable manifest. The common rule is stricter than "no references":
 replacement behavior, consumers, diagnostics, required checks, and baseline impact must be proven before ownership moves
-or a surface is removed. Open and deferred decisions are inputs to Milestone F, not permission to bundle refactors.
+or a surface is removed. Open and deferred decisions are roadmap inputs, not permission to bundle refactors.
 
 ## Next Slice Order
 
-Milestone F proceeds in roadmap order: validator command graph, generated metadata, guidance, invocation/context,
-hooks, then scripts and workflows. Each slice compares its affected baseline, updates this inventory, and remains
-independently revertible.
+Complete Milestone H characterization first. Then proceed in roadmap order through MCP retirement, client parity, ARM
+pricing, diagram migration, improvement measurement, bundle and automation simplification, and active guidance rewrite.
+Each slice compares its affected baseline, updates this inventory, and remains independently revertible.

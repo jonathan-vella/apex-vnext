@@ -51,13 +51,33 @@
         "model-tier-routing"
       ],
       "previewFeaturesRequired": false
+    },
+    "copilotCli": {
+      "authoritativeSource": "https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli",
+      "releaseChannel": "stable",
+      "newestObservedVersion": null,
+      "selectedExactVersion": null,
+      "installedVersion": null,
+      "observedAt": "2026-07-21",
+      "selectionStatus": "qualification-required",
+      "requiredQualification": [
+        "workspace-instruction-agent-skill-discovery",
+        "typed-question-input-loop",
+        "apex-mcp-startup-and-tool-allowlist",
+        "specialist-and-hidden-worker-routing",
+        "gate-and-authorization-parity",
+        "restart-resume-and-cross-device-transfer",
+        "managed-customization-lifecycle"
+      ],
+      "cloudCodingAgentRequired": false
     }
   },
   "compatibilitySet": {
     "node": "24.18.0",
     "npm": "11.16.0",
     "typescript": "7.0.2",
-    "vscode": "qualified-stable-release-to-be-pinned"
+    "vscode": "qualified-stable-release-to-be-pinned",
+    "copilotCli": "qualified-stable-release-to-be-pinned"
   },
   "optionalCapabilityPackRuntimes": {
     "python": {

@@ -4,9 +4,9 @@
 
 **Current Version:** 0.10.0 (pre-release)
 
-**Status:** Unreleased — development in progress on `main`
+**Status:** Unreleased - re-baseline and characterization in progress on `main`; no release candidate selected
 
-**Last Content Update:** 2026-07-16
+**Last Content Update:** 2026-07-21
 
 **Build:** standalone-vnext
 

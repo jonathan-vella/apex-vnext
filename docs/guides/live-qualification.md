@@ -7,6 +7,10 @@ Use the live qualification record only after deterministic qualification passes.
 cloud-backed results to one repository commit, package lock, release manifest, runtime bundle, and evidence manifest.
 The command creates and validates evidence files; it does not invoke VS Code, approve a gate, or call a cloud provider.
 
+> [!IMPORTANT]
+> The current record schema reflects the implemented VS Code-era ceremony. It remains useful for characterization, but a
+> final `0.10.0` record must also cover Copilot CLI parity and every re-baselined dependency boundary.
+
 ## Prepare the Candidate
 
 Install dependencies and produce the release package set from the exact commit under test:
