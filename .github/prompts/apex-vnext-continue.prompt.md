@@ -23,7 +23,8 @@ Do not claim completion when required automated or manual evidence is unavailabl
 </output_contract>
 
 <scope_fencing>
-Follow `docs/vnext/PRD.md`, `DECISIONS.md`, and `ROADMAP.md` as the binding product, decision, and delivery authorities.
+Follow `docs/vnext/PRD.md`, `docs/vnext/DECISIONS.md`, and `docs/vnext/ROADMAP.md` as the binding product, decision, and
+delivery authorities.
 Do not expand a slice into unrelated cleanup, a mass rewrite, or autonomous self-modification.
 Use this repository's `main` as the vNext integration line. Keep the original APEX `main` untouched as the v1 line.
 Stop before any merge, auto-merge, release, tag, publication, deployment, or cutover action.
@@ -55,9 +56,9 @@ operations, or production cutover.
 Read these first, without re-reading a file already loaded in the current session:
 
 1. `AGENTS.md` and `.github/copilot-instructions.md`.
-2. `docs/vnext/PRD.md`, `DECISIONS.md`, and `ROADMAP.md` as binding authorities.
-3. `docs/vnext/PROJECT.md`, `REGISTER.md`, and `MODERNIZATION-INVENTORY.md` for the current checkpoint, risks, and
-   ownership gates.
+2. `docs/vnext/PRD.md`, `docs/vnext/DECISIONS.md`, and `docs/vnext/ROADMAP.md` as binding authorities.
+3. `docs/vnext/PROJECT.md`, `docs/vnext/REGISTER.md`, and `docs/vnext/MODERNIZATION-INVENTORY.md` for the current
+   checkpoint, risks, and ownership gates.
 4. The two `plan-*.prompt.md` files only when tracing historical intent; they are superseded and nonbinding.
 5. Applicable path-scoped instruction files for files that the selected slice will change.
 6. The active GitHub issue and its latest resumable checkpoint comment, when one exists.
@@ -76,7 +77,8 @@ Before selecting work:
 4. Confirm `origin/main` is the exact base for the next issue branch.
 5. Inventory dirty and untracked files in every relevant worktree. Preserve all changes that were not created by this
    execution.
-6. Record material differences from the latest `PROJECT.md` checkpoint instead of silently correcting history.
+6. Record material differences from the latest `docs/vnext/PROJECT.md` checkpoint instead of silently correcting
+   history.
 
 The source SHA in `SOURCE_PROVENANCE.json` is evidence, not a permanent base. Always use the currently verified
 `origin/main` head when creating a new slice branch.
@@ -132,8 +134,8 @@ Before pausing for any reason:
    and next issue links.
 2. Add or update the active issue checkpoint comment with worktree, branch, head, completed work, next action, blockers,
    tests run, and uncommitted changes.
-3. Update `REGISTER.md` for unresolved risks, defects, regressions, dependencies, or external failures.
-4. Update `DECISIONS.md` when a consequential choice was made or a viable alternative was rejected.
+3. Update `docs/vnext/REGISTER.md` for unresolved risks, defects, regressions, dependencies, or external failures.
+4. Update `docs/vnext/DECISIONS.md` when a consequential choice was made or a viable alternative was rejected.
 5. Ensure issue state and assignee remain the authority for daily status.
 
 ## Validation
