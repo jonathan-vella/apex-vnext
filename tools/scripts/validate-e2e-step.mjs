@@ -79,7 +79,7 @@ const STEP_VALIDATORS = {
   1: ["npm run lint:artifact-templates --silent 2>&1", "npm run lint:h2-sync --silent 2>&1"],
   2: ["npm run lint:artifact-templates --silent 2>&1"],
   3: [],
-  3.5: ["npm run lint:governance-refs --silent 2>&1"],
+  3.5: ["npm run test:governance-discovery --silent 2>&1"],
   4: ["npm run lint:artifact-templates --silent 2>&1", "npm run lint:h2-sync --silent 2>&1"],
   5: [],
   6: [],

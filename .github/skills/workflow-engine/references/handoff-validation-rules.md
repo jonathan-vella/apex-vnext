@@ -110,7 +110,7 @@ Validates `agents[]` (the `#runSubagent` dispatch list, distinct
 from `handoffs[]`):
 
 - Build subagent inventory at startup from
-  `.github/agents/_subagents/*.agent.md`.
+  managed files with `user-invocable: false` under `customizations/.github/agents/`.
 - **Wildcard handling**: `agents: ["*"]` is legal iff the agent has
   frontmatter `cross_cutting: true` OR appears in
   `CROSS_CUTTING_ALLOWLIST` (initial: `11-Context Optimizer`).

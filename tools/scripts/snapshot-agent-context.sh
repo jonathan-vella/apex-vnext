@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Snapshot agent context files for before/after comparison.
-# Backs up: .github/agents, .github/instructions, tools/apex-prompts, .github/skills, AGENTS.md
+# Backs up managed agents, instructions, prompts, skills, and AGENTS.md.
 
 set -euo pipefail
 
@@ -9,7 +9,7 @@ readonly REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 readonly BASELINES_DIR="${REPO_ROOT}/agent-output/_baselines"
 
 readonly BACKUP_TARGETS=(
-  ".github/agents"
+  "customizations/.github/agents"
   ".github/instructions"
   "tools/apex-prompts"
   ".github/skills"
@@ -29,7 +29,7 @@ Options:
   -h, --help  Show this help message
 
 Backed-up targets:
-  .github/agents/        Agent definitions (including _subagents/)
+  customizations/.github/agents/  Managed agent definitions and hidden workers
   .github/instructions/  Instruction files
   tools/apex-prompts/    Prompt files (workspace-only, not auto-loaded)
   .github/skills/        Skills (full recursive)

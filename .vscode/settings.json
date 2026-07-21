@@ -4,13 +4,13 @@
   "chat.useClaudeMdFile": false,
   "chat.customAgentInSubagent.enabled": true,
   "chat.agentFilesLocations": {
-    ".github/agents": true,
-    ".github/agents/_subagents": true,
+    "customizations/.github/agents": true,
     "~/.copilot/agents": false,
     "~/.claude/agents": false
   },
   "chat.agentSkillsLocations": {
     ".github/skills": true,
+    "customizations/.github/skills": true,
     "~/.copilot/skills": false,
     "~/.claude/skills": false
   },
@@ -26,10 +26,6 @@
   "chat.useCustomAgentHooks": true,
   "chat.useAgentSkills": true,
   "json.schemas": [
-    {
-      "fileMatch": ["tools/registry/agent-registry.json"],
-      "url": "./tools/schemas/agent-registry.schema.json"
-    },
     {
       "fileMatch": [".github/data/governance-policy-baseline.fixture.json"],
       "url": "./tools/schemas/governance-baseline.schema.json"

@@ -137,9 +137,7 @@ Consumed by 05-IaC Planner, 06b/06t CodeGen, and 04g-Governance.
 | `subnet_plan`         | JSON array conforming to `tools/schemas/subnet-plan.schema.json` | n/a (gate emits placeholder `[]` in `deferred`)     | 03-Architect   | 05-IaC Planner, 06b/06t CodeGen, 04g-Governance    |
 | `vnet_plan_decision`  | `confirmed` \| `edited` \| `deferred`                   | n/a (only set after gate fires)                     | 03-Architect   | 05-IaC Planner, 04g-Governance, 10-Challenger      |
 
-`validate:decision-keys` loads `subnet-plan.schema.json` and validates
-any project's `decisions.subnet_plan` against it; a soft warning fires
-when the trigger contract holds but `subnet_plan` is absent.
+`subnet-plan.schema.json` remains the shape contract for historical `decisions.subnet_plan` values.
 
 ### Free-form decision-log entries
 
@@ -149,8 +147,6 @@ records a free-form decision-log entry (no `--key` flag). These are
 
 ## Validator
 
-`tools/scripts/validate-decision-keys.mjs` greps every `.agent.md` file
-for `apex-recall decide --key <k>` patterns and asserts that `<k>`
-appears in this registry. New keys MUST be added here before being
-used in an agent file. Run via `npm run validate:decision-keys` (wired
-into `npm run validate:all` and `lefthook`).
+The legacy prose-key validator is preserved at
+`.archive/legacy-agents-v0.10/tools/scripts/validate-decision-keys.mjs`. Managed APEX state changes use typed kernel
+contracts rather than agent-authored `apex-recall decide --key` commands.

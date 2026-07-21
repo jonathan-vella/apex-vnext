@@ -28,8 +28,7 @@ PLAN; execution is a separate, gated pass.
 <context>
 This repo is APEX (Azure Agentic Platform Engineering eXperience). Scope is the agent fleet:
 
-- `.github/agents/*.agent.md` (main, user-invocable)
-- `.github/agents/_subagents/*.agent.md` (subagents, non-invocable)
+- `customizations/.github/agents/*.agent.md` (interactive agents and hidden workers)
 
 The four layers (see `references/agent-scorecard-rubric.md` for bands + weights):
 
@@ -54,7 +53,7 @@ Authoritative rule sources (read on demand, do not restate):
 - `.github/instructions/context-optimization.instructions.md`,
   `.github/instructions/agent-authoring.instructions.md`,
   `.github/instructions/vendor-prompting.instructions.md`
-- `tools/registry/agent-registry.json`, `tools/registry/count-manifest.json`
+- `customizations/manifest.json`, `tools/registry/count-manifest.json`
 
 Do NOT hard-code fleet counts — derive them from the harness output (which walks the filesystem).
 `{ts}` in output paths is a UTC timestamp: `$(date -u +%Y%m%dT%H%M%SZ)`.

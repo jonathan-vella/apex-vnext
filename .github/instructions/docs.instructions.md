@@ -36,8 +36,7 @@ Each file has exactly ONE H1 heading (the title). Use H2+ for all other sections
 ## Current Architecture
 
 See `tools/registry/count-manifest.json` for current agent, subagent, and skill counts.
-See `tools/registry/agent-registry.json` for the agent role → file mapping.
-See `tools/registry/agent-registry.json` for the agent role → file/model/skills mapping.
+See `customizations/manifest.json` for managed agent roles, models, interaction types, and invocation edges.
 
 ## Prohibited References
 

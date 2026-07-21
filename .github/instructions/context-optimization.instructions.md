@@ -1,6 +1,6 @@
 ---
 description: "Context window optimization rules for agent definitions, skills, and instruction files"
-applyTo: ".github/agents/**/*.agent.md, .github/skills/**/SKILL.md, .github/instructions/*.instructions.md"
+applyTo: "customizations/.github/agents/**/*.agent.md, .github/skills/**/SKILL.md, .github/instructions/*.instructions.md"
 ---
 
 # Context Window Optimization Rules

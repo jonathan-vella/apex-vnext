@@ -13,7 +13,7 @@ import { Reporter } from "./_lib/reporter.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../..");
 const MATRIX_PATH = path.join(REPO_ROOT, "docs/vnext/phase-0a/v1-behavior-compatibility.md");
-const AGENTS_DIR = path.join(REPO_ROOT, ".github/agents");
+const AGENTS_DIR = path.join(REPO_ROOT, ".archive/legacy-agents-v0.10/.github/agents");
 const SCHEMAS_DIR = path.join(REPO_ROOT, "tools/schemas");
 const MCP_DIR = path.join(REPO_ROOT, "tools/mcp-servers");
 const WORKFLOW_PATH = path.join(REPO_ROOT, ".github/skills/workflow-engine/templates/workflow-graph.json");
@@ -55,7 +55,9 @@ if (!fs.existsSync(MATRIX_PATH)) {
 }
 
 const matrix = fs.readFileSync(MATRIX_PATH, "utf8");
-const agentPaths = findFiles(AGENTS_DIR, ".agent.md").map(toRepoPath);
+const agentPaths = findFiles(AGENTS_DIR, ".agent.md").map((filePath) =>
+  toRepoPath(filePath).replace(/^\.archive\/legacy-agents-v0\.10\//, ""),
+);
 const schemaNames = findFiles(SCHEMAS_DIR, ".schema.json").map((filePath) => path.basename(filePath));
 const mcpPaths = fs
   .readdirSync(MCP_DIR, { withFileTypes: true })

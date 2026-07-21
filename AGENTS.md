@@ -26,7 +26,7 @@ npm run validate:all
 npm run lint:md                          # Markdown linting
 npm run lint:json                        # JSON/JSONC validation
 npm run validate:agents                  # Agent + prompt frontmatter, model alignment
-npm run validate:agent-registry          # Registry shape (file path, model, step)
+npm run validate:model-consistency       # Managed agent frontmatter and manifest model alignment
 npm run validate:iac-security-baseline   # TLS/HTTPS/Entra-only/no-public-blob baseline
 npm run lint:safe-shell                  # No interactive shell prompts in committed snippets
 

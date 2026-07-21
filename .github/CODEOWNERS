@@ -5,7 +5,7 @@
 *                           @jonathan-vella
 
 # Agent definitions require additional review
-.github/agents/             @jonathan-vella
+customizations/.github/agents/ @jonathan-vella
 .github/instructions/       @jonathan-vella
 tools/apex-prompts/         @jonathan-vella
 

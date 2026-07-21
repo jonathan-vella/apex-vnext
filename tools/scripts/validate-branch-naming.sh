@@ -18,7 +18,7 @@ if ! echo "$BRANCH" | grep -qE "^($ALLOWED_PREFIXES)"; then
   echo ""
   echo "   Allowed prefixes:"
   echo "     docs/         Documentation changes (docs/, README.md)"
-  echo "     agents/       Agent definitions (.github/agents/)"
+  echo "     agents/       Managed agent definitions (customizations/.github/agents/)"
   echo "     skills/       Skill files (.github/skills/)"
   echo "     infra/        Infrastructure code (infra/bicep/, infra/terraform/)"
   echo "     tools/scripts/      Validation scripts, linters"

@@ -27,7 +27,7 @@
     },
     "is_subagent": {
       "type": "boolean",
-      "description": "True for definitions under .github/agents/_subagents/."
+      "description": "True for managed definitions with user-invocable set to false."
     },
     "model": {
       "type": ["string", "array", "null"],

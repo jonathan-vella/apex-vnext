@@ -41,7 +41,7 @@ OpenAI defines three classes; this repo maps them to actions:
 
 ## Upgrade workflow (mapped to repo)
 
-1. **Inventory** — `grep -rn "model:" .github/agents/ .github/prompts/`
+1. **Inventory** — `grep -rn "model:" customizations/.github/agents/ .github/prompts/`
    plus `.github/model-catalog.json`.
 2. **Pair model usage with prompt surface** — for each `.agent.md`
    the prompt surface is the file body itself.
@@ -65,7 +65,7 @@ OpenAI defines three classes; this repo maps them to actions:
 1. Can the current host accept the `gpt-5.5` model string? ✅ VS Code
    Copilot.
 2. Are the related prompts identifiable and editable? ✅
-   `.github/agents/*.agent.md`.
+   `customizations/.github/agents/*.agent.md`.
 3. Does the host depend on behavior that needs API-surface changes?
    ❌ Agent definitions are markdown only.
 4. Would the likely fix be prompt-only? ✅

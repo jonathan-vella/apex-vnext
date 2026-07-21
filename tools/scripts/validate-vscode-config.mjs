@@ -109,17 +109,20 @@ function validateDevcontainer() {
 
     // Check agent paths
     const agentPaths = settings["chat.agentFilesLocations"] || {};
-    if (!agentPaths[".github/agents"]) {
-      warnings.push("⚠️  .github/agents not in chat.agentFilesLocations");
+    if (!agentPaths["customizations/.github/agents"]) {
+      errors.push("❌ customizations/.github/agents not in chat.agentFilesLocations");
     }
-    if (!agentPaths[".github/agents/_subagents"]) {
-      warnings.push("⚠️  .github/agents/_subagents not in chat.agentFilesLocations");
+    if (agentPaths[".github/agents"] || agentPaths[".github/agents/_subagents"]) {
+      errors.push("❌ legacy .github/agents paths must not be discoverable");
     }
 
     // Check skills path
     const skillPaths = settings["chat.agentSkillsLocations"] || {};
     if (!skillPaths[".github/skills"]) {
       warnings.push("⚠️  .github/skills not in chat.agentSkillsLocations");
+    }
+    if (!skillPaths["customizations/.github/skills"]) {
+      errors.push("❌ customizations/.github/skills not in chat.agentSkillsLocations");
     }
 
     checkRequiredExtensionsInList("devcontainer.json", extensions);
