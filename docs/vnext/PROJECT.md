@@ -4,7 +4,7 @@
 - **Milestone:** Final qualification and promotion decision
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
-- **Prior exact-main candidate:** `1f8db536fe0398f6575775d7794ba718234d3ef1`
+- **Verified exact-main candidate:** `25530c339410e9758ae34538427f24bddfd83e1d`
 - **Live release-source boundary:** `8c672d76cb2c2028131fcb93bb023ba9327d256b`
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -12,11 +12,15 @@
 
 ## Current State
 
-The maintainer selected a unified `0.10.0` repository, package, customization, and release identity after qualification
-of the prior `0.1.0` package candidate. PR `#85` establishes reviewed candidate
-content; GitHub checks and downloaded artifacts identify its exact current head. The
-[final qualification dossier](FINAL-QUALIFICATION.md) preserves the prior immutable evidence and labels pre-commit
-package hashes provisional until the exact-head workflow artifact is downloaded and verified.
+The unified release identity is merged and qualified on exact `main`. CI, docs, release qualification, package
+reproducibility, audits, and the approved independent security review pass. The downloaded release artifact verifies
+through its checksum manifest, and the prior cloud evidence remains behaviorally equivalent because no workflow, IaC,
+or authority path changed.
+
+The maintainer accepted publication of the repository's operational Azure metadata, authorized deletion of transient
+live artifacts, and authorized a hardening-first public visibility transition. Gitleaks found no secrets across the
+complete Git history. Public visibility will be followed immediately by branch protection, restrictive Actions and fork
+policies, secret scanning, push protection, private vulnerability reporting, and native CodeQL.
 
 Both Bicep and Terraform apply/destroy workflows succeeded on attempt one after separate local exact-preview Gate 4
 decisions. Final target inventories are empty, writer authority returned locally before ephemeral files were excluded,
@@ -28,42 +32,41 @@ cutover artifact has been created. Those actions remain separately authorized re
 
 ## Validation State
 
-| Check                        | Result             | Evidence                                                                             |
-| ---------------------------- | ------------------ | ------------------------------------------------------------------------------------ |
-| Prior exact-main CI          | Historical pass    | Run `29822326665`, attempt one                                                       |
-| Prior release qualification  | Historical pass    | Run `29822400861`, attempt one; all nine scorecard rules pass                        |
-| Release artifact integrity   | Pass               | GitHub digest and all internal `SHA256SUMS` entries verified                         |
-| Package qualification        | Pass               | Five reproducible tarballs, clean/offline install, SBOM, and provenance              |
-| npm publication dry run      | Pass with boundary | All five tarballs passed; registry identity and trusted publishing remain unverified |
-| Production dependency audit  | Pass               | Zero known vulnerabilities                                                           |
-| Full dependency audit        | Accepted           | Two moderate development-only Markdown lint findings                                 |
-| CodeQL equivalent            | Accepted pass      | Repeated independent exact-main review; no critical, high, or blocking finding       |
-| v1 compatibility and sync    | Pass               | Matrix has zero errors or warnings; no post-baseline v1 fix exists                   |
-| Bicep live lifecycle         | Pass               | Apply `29816381757`; destroy `29817534614`                                           |
-| Terraform live lifecycle     | Pass               | Apply `29820944300`; destroy `29821615776`                                           |
-| Final Azure cleanup          | Pass               | Both sandboxes empty; backend restored to `Disabled`/`Deny`                          |
-| Supported VS Code scenarios  | Pending            | User-run clean supported-host and cross-device checklist                             |
-| Promotion authorization      | Pending            | Separate publication, tag, support-date, and cutover decision                        |
-| Unified `0.10.0` package set | PR candidate       | Local qualification passes; PR `#85` exact-head workflows pending                    |
+| Check                            | Result             | Evidence                                                                             |
+| -------------------------------- | ------------------ | ------------------------------------------------------------------------------------ |
+| Exact-main CI                    | Pass               | Run `29827622151`, attempt one                                                       |
+| Exact-main release qualification | Pass               | Run `29827622205`, attempt one; all scorecard rules pass                             |
+| Release artifact integrity       | Pass               | GitHub digest and all internal `SHA256SUMS` entries verified                         |
+| Package qualification            | Pass               | Five reproducible tarballs, clean/offline install, SBOM, and provenance              |
+| npm publication dry run          | Pass with boundary | All five tarballs passed; registry identity and trusted publishing remain unverified |
+| Production dependency audit      | Pass               | Zero known vulnerabilities                                                           |
+| Full dependency audit            | Accepted           | Two moderate development-only Markdown lint findings                                 |
+| CodeQL equivalent                | Accepted pass      | Repeated independent exact-main review; no critical, high, or blocking finding       |
+| v1 compatibility and sync        | Pass               | Matrix has zero errors or warnings; no post-baseline v1 fix exists                   |
+| Bicep live lifecycle             | Pass               | Apply `29816381757`; destroy `29817534614`                                           |
+| Terraform live lifecycle         | Pass               | Apply `29820944300`; destroy `29821615776`                                           |
+| Final Azure cleanup              | Pass               | Both sandboxes empty; backend restored to `Disabled`/`Deny`                          |
+| Supported VS Code scenarios      | Pending            | User-run clean supported-host and cross-device checklist                             |
+| Promotion authorization          | Pending            | Separate publication, tag, support-date, and cutover decision                        |
+| Unified package set              | Pass               | Exact-main package, clean-install, SBOM, provenance, and npm dry-run evidence        |
+| Public repository readiness      | In progress        | Transient live artifacts removed; hardening and native CodeQL pending                |
 
 ## Release Boundaries
 
 - The unprotected `vnext-qualification` Environment scopes OIDC and configuration only. Local APEX Gate 4 is the sole
   cloud approval authority.
 - No release workflow exists. The maintainer controls the `@apex` scope, but trusted publishers and a protected release
-  environment must be configured against the final reviewed workflow.
-- The maintainer selected `0.10.0` as the unified repository, package, customization, and release identity. Exact-head
-  evidence must be regenerated after the amendment is committed.
+  environment must be configured against a separately reviewed workflow.
+- Public visibility does not authorize npm publication, tags, support dates, or cutover.
 - The exact v1 support end date remains 12 calendar months after the yet-unauthorized cutover date.
 - Existing stashes and return worktrees preserve superseded or unrelated local state and must not be deleted as release
   cleanup.
 
 ## Resume Pointer
 
-1. Complete PR `#85` exact-head checks and replace provisional package evidence with the verified workflow artifact.
-2. Record the repeated approved security-equivalent review and its cloud-equivalence conclusion.
-3. Confirm cloud evidence equivalence, then run the supported VS Code and cross-device scenarios against that exact
-   package candidate.
+1. Merge the public-readiness hardening change, switch visibility, and configure GitHub-native protections.
+2. Run native CodeQL and resolve every critical or high finding.
+3. Run the supported VS Code and cross-device scenarios against the exact package candidate.
 4. Configure trusted publishers and a protected release environment for the maintainer-owned `@apex` packages.
 5. Decide immutable tag names, v1 maintenance reference, cutover date, and v1 support end date.
 6. Request one explicit maintainer decision before dispatching publication, tag, or cutover automation.

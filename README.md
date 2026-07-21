@@ -35,6 +35,7 @@ npm run test:vnext-pack
 - [CLI and MCP reference](docs/guides/cli-reference.md)
 - [Operations](docs/guides/operations.md)
 - [Security](docs/guides/security.md)
+- [Security policy and vulnerability reporting](SECURITY.md)
 - [Qualification](docs/guides/testing.md)
 - [Project and release controls](docs/vnext/README.md)
 
