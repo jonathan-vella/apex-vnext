@@ -16,11 +16,11 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Evidence:** Exact-main CI run `29827622151` and release-qualification run `29827622205` passed on
   `25530c339410e9758ae34538427f24bddfd83e1d`. The downloaded artifact verified through `SHA256SUMS`, the repeated
   approved-equivalent review found no release blocker, and both live cloud tracks remain behaviorally equivalent.
-  Supported VS Code evidence, public native CodeQL, npm publication authority, final tags, and cutover authorization
-  remain outstanding.
+  Native CodeQL subsequently passed Actions, JavaScript/TypeScript, and Python with zero open alerts. Supported VS Code
+  evidence, npm publication authority, final tags, and cutover authorization remain outstanding.
 - **Related issue:** Destination issue `#13`.
-- **Mitigation:** Complete public hardening and native CodeQL, run the supported VS Code and cross-device checklist,
-  configure trusted publishers, then obtain a separate explicit promotion decision.
+- **Mitigation:** Run the supported VS Code and cross-device checklist, configure trusted publishers, then obtain a
+  separate explicit promotion decision.
 - **State:** Open
 - **Closure proof:** Versioned supported-host evidence plus the final maintainer promotion decision.
 
@@ -78,7 +78,8 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
   policy, restrict Actions and fork execution, protect `main`, enable secret scanning and push protection, and run native
   CodeQL immediately after conversion.
 - **State:** Accepted
-- **Closure proof:** Public visibility plus verified repository security settings and a passing native CodeQL result.
+- **Closure proof:** Public visibility, verified repository security settings, zero transient live artifacts, and native
+  CodeQL run `29830116910` passing all configured languages with zero open alerts.
 
 ### ASSUMPTION-001: VS Code Handoff Topology Is Supported
 
@@ -117,22 +118,18 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **State:** Accepted
 - **Closure proof:** Destination root commit, transferred issues, and source pull-request closure receipts.
 
-### REGRESSION-001: Former CodeQL Parser Finding Uses An Approved Equivalent Review
+### REGRESSION-001: Former CodeQL Parser Finding Is Clear In Native Analysis
 
 - **Type:** `REGRESSION`
 - **Owner:** Capabilities and security
-- **Impact:** Native CodeQL evidence remains unavailable on the private GitHub Free repository; any new critical or high
-  finding still blocks release.
+- **Impact:** Any new critical or high native CodeQL finding blocks release.
 - **Evidence:** The vulnerable expression was replaced by a bounded line-oriented parser with adversarial dual-track
-  coverage. The maintainer explicitly accepted an independent exact-head review as the CodeQL equivalent on issue `#13`.
-  That review was repeated after the final dependency change on
-  `1f8db536fe0398f6575775d7794ba718234d3ef1` and found no critical, high, or release-blocking issue.
+  coverage. The approved equivalent review found no critical, high, or release-blocking issue. After public conversion,
+  native CodeQL run `29830116910` passed all configured languages with no open alert.
 - **Related issue:** [#537](https://github.com/jonathan-vella/apex/issues/537)
-- **Mitigation:** Preserve the bounded parser regression tests and repeat the approved equivalent review after any
-  release-relevant source, workflow, generated-asset, or dependency change.
+- **Mitigation:** Preserve the bounded parser regression tests and required native CodeQL checks on `main`.
 - **State:** Accepted
-- **Closure proof:** Exact-main independent review, parser mutation tests, CI run `29822326665`, and the issue `#13`
-  approval record.
+- **Closure proof:** Parser mutation tests, exact-main CI, native CodeQL run `29830116910`, and zero open alerts.
 
 ### ISSUE-001: Supported VS Code Qualification Evidence Is Pending
 
