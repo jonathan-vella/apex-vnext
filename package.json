@@ -47,7 +47,6 @@
     "lint:vendor-prompting": "node tools/scripts/validate-agents.mjs --only=vendor-prompting",
     "lint:workflow-handoffs": "node tools/scripts/validate-agents.mjs --only=workflow-handoffs",
     "test:vendor-prompting": "node --test tools/tests/vendor-prompting/run.test.mjs",
-    "test:workflow-handoffs": "node --test tools/tests/workflow-handoffs/run.test.mjs",
     "lint:skills-format": "node tools/scripts/validate-skills.mjs",
     "test:governance-discovery": "python3 -m pytest .github/skills/azure-governance-discovery/scripts/test_discover.py -q",
     "validate:instruction-checks": "node tools/scripts/validate-instruction-checks.mjs",

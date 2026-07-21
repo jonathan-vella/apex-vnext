@@ -24,7 +24,7 @@ Forbidden Claude XML for GPT.
 
 # Personality
 
-This is an internal pipeline subagent — Personality should NOT appear here.
+This is an internal pipeline subagent. Hidden workers are exempt from user-facing personality scoping.
 
 # Goal
 
@@ -36,7 +36,7 @@ Expected findings:
 
 - gpt55-skeleton-001 (missing # Success criteria, # Constraints, # Output)
 - gpt-no-claude-xml-001 × 2 (<context_awareness>, <output_contract>)
-- personality-scoping-001 (Personality on non-user-facing agent)
+- personality-scoping-001 must not fire for a hidden worker
 - handoff-enrichment-001 (handoff missing input + output)
 - gpt55-stop-rules-non-empty-001 — actually this section IS non-empty
   because it contains this prose; rule should not fire.

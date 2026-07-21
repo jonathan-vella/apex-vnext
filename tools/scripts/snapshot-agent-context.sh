@@ -10,6 +10,7 @@ readonly BASELINES_DIR="${REPO_ROOT}/agent-output/_baselines"
 
 readonly BACKUP_TARGETS=(
   "customizations/.github/agents"
+  "customizations/.github/skills"
   ".github/instructions"
   "tools/apex-prompts"
   ".github/skills"
@@ -30,6 +31,7 @@ Options:
 
 Backed-up targets:
   customizations/.github/agents/  Managed agent definitions and hidden workers
+  customizations/.github/skills/  Managed workflow skills
   .github/instructions/  Instruction files
   tools/apex-prompts/    Prompt files (workspace-only, not auto-loaded)
   .github/skills/        Skills (full recursive)
