@@ -103,7 +103,7 @@ pre-commit:
         🔧 Challenger:  re-run challenger-review-subagent or 10-Challenger
 
     agents:
-      glob: "customizations/.github/agents/**/*.agent.md,.github/prompts/**/*.prompt.md"
+      glob: "customizations/.github/agents/**/*.agent.md,.github/prompts/**/*.prompt.md,tools/apex-prompts/**/*.prompt.md,tools/tests/prompts/**/*.prompt.md"
       run: |
         STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(agent|prompt)\.md$' || true)
         if [ -n "$STAGED" ]; then

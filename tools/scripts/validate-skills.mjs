@@ -328,22 +328,20 @@ function runCrossSkillReferenceValidation() {
   const skills = getSkills();
   const validSkillNames = new Set(skills.keys());
 
-  // Managed interactive agents and hidden workers from the workspace index.
-  // are valid redirect targets even though they aren't skills. Discover them
-  // so the allowlist stays in sync with the filesystem.
+  // Managed interactive agents and hidden workers are valid redirect targets
+  // even though they aren't skills. Derive file IDs and normalized role names
+  // from the workspace index so the allowlist follows active discovery.
   const validAgentNames = new Set();
-  const agentsDir = path.join(".github", "agents");
-  if (fs.existsSync(agentsDir)) {
-    for (const entry of fs.readdirSync(agentsDir, { withFileTypes: true })) {
-      if (entry.isFile() && entry.name.endsWith(".agent.md")) {
-        validAgentNames.add(entry.name.replace(/\.agent\.md$/, ""));
-      } else if (entry.isDirectory() && entry.name === "_subagents") {
-        for (const sub of fs.readdirSync(path.join(agentsDir, "_subagents"))) {
-          if (sub.endsWith(".agent.md")) {
-            validAgentNames.add(sub.replace(/\.agent\.md$/, ""));
-          }
-        }
-      }
+  for (const [file, agent] of getAgents()) {
+    validAgentNames.add(file.replace(/\.agent\.md$/, ""));
+    const roleName = agent.frontmatter?.name;
+    if (typeof roleName === "string") {
+      validAgentNames.add(
+        roleName
+          .toLowerCase()
+          .replaceAll(/[^a-z0-9]+/g, "-")
+          .replaceAll(/^-|-$/g, ""),
+      );
     }
   }
 
