@@ -55,6 +55,8 @@ the original APEX repository. See [docs/MIGRATION.md](docs/MIGRATION.md) for pro
   `live:vnext` template, validation, and rendering commands that bind manual VS Code,
   GitHub, and Azure results to exact candidate and evidence hashes without executing
   approvals or cloud operations.
+- feat(vnext): collect release scorecard evidence from 100 real contract mutations, capability fault cases, and cache-key
+  mutations, plus replayed gate revisions and serialized `taskContext()` projections from each dual-track run.
 - feat(vnext): added a generic authenticated AES-256-GCM envelope and deterministic repository-state transfer commands
   with a selected-run allowlist, recursive content-addressed object closure, secret and size checks, atomic mode-`0600`
   import, idempotent retry, claim-bounded expiry, and separate writer-transfer acceptance. Production CI remains blocked
@@ -91,6 +93,8 @@ the original APEX repository. See [docs/MIGRATION.md](docs/MIGRATION.md) for pro
 
 ### Fixed (APEX vNext security)
 
+- fix(vnext): validate Azure resource-group and storage-account names at the live handoff argument boundary before
+  generating Terraform backend HCL, rejecting quote, newline, and Azure-invalid injection payloads.
 - fix(vnext): derive release SBOMs from `package-lock.json` instead of the ambient `node_modules` tree so package
   qualification remains deterministic when the developer installation contains unrelated or invalid dependencies.
 - fix(vnext): allow a fresh preview after terminal writer-transfer recovery to carry only repository-backed

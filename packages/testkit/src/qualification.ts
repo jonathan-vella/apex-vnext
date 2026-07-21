@@ -22,6 +22,8 @@ export interface QualificationTrackReport {
   status: QualificationCheckStatus;
   checks: QualificationCheck[];
   eventCount: number;
+  gateRevisionLoops?: number;
+  taskContextBytes?: number;
   hashes: Record<string, string>;
 }
 
@@ -68,6 +70,7 @@ interface TrackContext {
   runId: string;
   service: ApexService;
   checks: QualificationCheck[];
+  taskContextBytes: number[];
 }
 
 const HASH = "a".repeat(64);
@@ -146,6 +149,7 @@ async function runTrack(
     runId: "",
     service: new ApexService(root, serviceOptions),
     checks: [],
+    taskContextBytes: [],
   };
   await checked(
     context.checks,
@@ -184,8 +188,8 @@ async function runTrack(
       const preview = await context.service.preview({ operation: "apply", provider: "fake" });
       await context.service.decideGateNumber(4, "approved", "qualification");
       inventory = (await context.service.deploy(preview.previewHash)).inventory;
-      await complete(context.service, "diagnosis", [{ kind: "diagnosis", value: diagnosis(context) }]);
-      await complete(context.service, "quality", [{ kind: "quality-report", value: await quality(context) }]);
+      await complete(context, "diagnosis", [{ kind: "diagnosis", value: diagnosis(context) }]);
+      await complete(context, "quality", [{ kind: "quality-report", value: await quality(context) }]);
       await context.service.render("preview");
       await context.service.render("approval");
       await context.service.render("inventory");
@@ -325,6 +329,12 @@ async function runTrack(
     status: qualificationStatus(context.checks),
     checks: context.checks,
     eventCount: replay.length,
+    gateRevisionLoops: replay.filter(({ type, payload }) => {
+      if (type === "gate.revision-requested") return true;
+      if (type !== "gate.decided" || payload === null || typeof payload !== "object") return false;
+      return (payload as { decision?: unknown }).decision === "rejected";
+    }).length,
+    ...(context.taskContextBytes.length === 0 ? {} : { taskContextBytes: Math.max(...context.taskContextBytes) }),
     hashes: {
       eventHead: replay.at(-1)?.hash ?? "",
       logicalInventory,
@@ -352,11 +362,11 @@ async function completeCreativeWorkflow(context: TrackContext): Promise<void> {
   const { service, runId, track } = context;
   await service.nextTask();
   const requirementValue = requirements(track);
-  const requirementHashes = await complete(service, "requirements", [
+  const requirementHashes = await complete(context, "requirements", [
     { kind: "requirements", value: requirementValue },
     { kind: "sku-manifest", value: skuManifest(track, sha256Json(requirementValue)) },
   ]);
-  await complete(service, "requirements-review", [
+  await complete(context, "requirements-review", [
     { kind: "review-findings", value: review(context, "requirements", requirementHashes.requirements!) },
   ]);
   await service.decideGateNumber(1, "approved", "qualification");
@@ -378,20 +388,20 @@ async function completeCreativeWorkflow(context: TrackContext): Promise<void> {
     required: true,
   });
   restart(context);
-  const architectureHashes = await complete(context.service, "architecture", [
+  const architectureHashes = await complete(context, "architecture", [
     { kind: "architecture", value: architecture(context) },
     { kind: "cost-estimate", value: costEstimate(context) },
   ]);
-  await complete(context.service, "architecture-review", [
+  await complete(context, "architecture-review", [
     { kind: "review-findings", value: review(context, "architecture", architectureHashes.architecture!) },
   ]);
-  const governanceHashes = await complete(context.service, "governance-discovery", [
+  const governanceHashes = await complete(context, "governance-discovery", [
     { kind: "governance-constraints", value: governance(context) },
   ]);
-  const policyHashes = await complete(context.service, "governance-reconciliation", [
+  const policyHashes = await complete(context, "governance-reconciliation", [
     { kind: "policy-property-map", value: policyMap(context, governanceHashes["governance-constraints"]!) },
   ]);
-  await complete(context.service, "governance-review", [
+  await complete(context, "governance-review", [
     { kind: "review-findings", value: review(context, "policy-property-map", policyHashes["policy-property-map"]!) },
   ]);
   await context.service.decideGateNumber(2, "approved", "qualification");
@@ -402,28 +412,30 @@ async function completeCreativeWorkflow(context: TrackContext): Promise<void> {
     "governance-constraints": governanceHashes["governance-constraints"]!,
     "policy-property-map": policyHashes["policy-property-map"]!,
   });
-  const planHashes = await complete(context.service, "plan", plan);
-  await complete(context.service, "plan-review", [
+  const planHashes = await complete(context, "plan", plan);
+  await complete(context, "plan-review", [
     { kind: "review-findings", value: review(context, "plan", planHashes["implementation-intent"]!) },
   ]);
   await context.service.decideGateNumber(3, "approved", "qualification");
   restart(context);
-  await complete(context.service, `codegen-${track}`, codegenBundle(context, plan));
-  await complete(context.service, `validation-${track}`, [{ kind: "validation-evidence", value: validation(context) }]);
+  await complete(context, `codegen-${track}`, codegenBundle(context, plan));
+  await complete(context, `validation-${track}`, [{ kind: "validation-evidence", value: validation(context) }]);
   if (runId.length === 0) throw new Error("Run was not initialized");
 }
 
 async function complete(
-  service: ApexService,
+  context: TrackContext,
   expected: string,
   outputs: TaskOutput[],
 ): Promise<Partial<Record<TaskOutput["kind"], string>>> {
-  const issued = await service.nextTask();
+  const issued = await context.service.nextTask();
   if (issued.status !== "task" || issued.task.taskType !== expected)
     throw new Error(
       `Expected ${expected}, received ${issued.status === "task" ? issued.task.taskType : issued.status}`,
     );
-  return (await service.completeTaskOutputs(issued.task.taskId, outputs)).outputHashes;
+  const projection = await context.service.taskContext(issued.task.taskId);
+  context.taskContextBytes.push(Buffer.byteLength(JSON.stringify(projection), "utf8"));
+  return (await context.service.completeTaskOutputs(issued.task.taskId, outputs)).outputHashes;
 }
 
 function projectId(track: QualificationTrack): string {
@@ -803,6 +815,7 @@ async function minimalService(
     runId: "",
     service,
     checks: [],
+    taskContextBytes: [],
   };
   context.runId = (await service.init({ projectId: projectId(track), iacTool: track })).runId;
   await completeCreativeWorkflow(context);

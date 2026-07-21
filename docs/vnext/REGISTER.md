@@ -8,17 +8,18 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 
 ## Open Entries
 
-### RISK-001: Exact-Head Integration Checks Are Red
+### RISK-001: Exact-Head Integration And Security Evidence Is Incomplete
 
 - **Type:** `RISK`
 - **Owner:** Release engineering
 - **Impact:** Cutover and any baseline tag remain blocked.
-- **Evidence:** PR #533 at `7fc27966`; CI, docs, devcontainer summary, and CodeQL checks are failing.
-- **Related issue:** [#537](https://github.com/jonathan-vella/apex/issues/537),
-  [#538](https://github.com/jonathan-vella/apex/issues/538),
-  [#539](https://github.com/jonathan-vella/apex/issues/539), and
-  [#540](https://github.com/jonathan-vella/apex/issues/540)
-- **Mitigation:** Resolve each product failure separately, then rerun required checks on the exact integration head.
+- **Evidence:** CI run `29760571466` and docs run `29760571448` passed on `e5509097aa7a1b9c389673a79ee7fbf7110de678`.
+  Subsequent scorecard and security changes require a new immutable candidate and exact-head rerun. Code scanning is
+  disabled, so required CodeQL evidence is unavailable; the bounded independent review in
+  [SECURITY-REVIEW.md](SECURITY-REVIEW.md) is not an approved substitute.
+- **Related issue:** Destination issue `#13`.
+- **Mitigation:** Rerun required checks and security review after the final source commit. Enable CodeQL or record an
+  explicitly approved equivalent review before cutover.
 - **State:** Open
 - **Closure proof:** Required-check URLs showing success on the candidate SHA.
 
@@ -71,53 +72,18 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **State:** Accepted
 - **Closure proof:** Destination root commit, transferred issues, and source pull-request closure receipts.
 
-### DEFECT-001: CI Lint Resolves Unbuilt Generated Packages
-
-- **Type:** `DEFECT`
-- **Owner:** Validation and CI
-- **Impact:** The required `ci` check fails before vNext qualification can run.
-- **Evidence:** CI run `29274684761` reports unresolved imports for `packages/testkit/dist/index.js` and
-  `packages/renderers/dist/index.js` from `tools/scripts/qualify-vnext.mjs`.
-- **Related issue:** [#538](https://github.com/jonathan-vella/apex/issues/538)
-- **Mitigation:** Align lint with the build graph or avoid generated-only imports while preserving focused diagnostics.
-- **State:** Open
-- **Closure proof:** Regression test and successful required CI check on the fixing SHA.
-
-### DEFECT-002: vNext Documentation Contains Broken Relative Links
-
-- **Type:** `DEFECT`
-- **Owner:** Documentation
-- **Impact:** Docs checks and every devcontainer matrix leg fail.
-- **Evidence:** Docs run `29274684657` reports broken links among CLI, installation, operations, security, testing, and
-  workflow pages; devcontainer run `29274685239` fails only its internal `validate-all` link check on every leg.
-- **Related issue:** [#539](https://github.com/jonathan-vella/apex/issues/539)
-- **Mitigation:** Correct cross-page links and retain strict link validation.
-- **State:** Open
-- **Closure proof:** Link regression coverage and successful docs and devcontainer checks on the fixing SHA.
-
 ### REGRESSION-001: CodeQL Detects Polynomial ReDoS In IaC Generation
 
 - **Type:** `REGRESSION`
 - **Owner:** Capabilities and security
 - **Impact:** High-severity security finding blocks cutover.
-- **Evidence:** CodeQL alert #34, `js/polynomial-redos`, in `packages/capabilities/src/iac-generation.ts` at the PR head.
+- **Evidence:** The vulnerable expression was replaced by a bounded line-oriented parser with adversarial dual-track
+  coverage. Exact-main CI passes and the independent review found no unresolved high or critical issue, but code scanning
+  is now disabled and alert #34 cannot be re-verified through a supported CodeQL run.
 - **Related issue:** [#537](https://github.com/jonathan-vella/apex/issues/537)
-- **Mitigation:** Replace vulnerable matching with bounded parsing and add adversarial long-input tests.
-- **State:** Open
+- **Mitigation:** Enable CodeQL and verify alert closure, or obtain explicit maintainer approval for an equivalent review.
+- **State:** Blocked
 - **Closure proof:** Regression test, closed alert #34, and successful CodeQL check on the fixing SHA.
-
-### DEFECT-003: Package Clean-Install Test Times Out And Leaks Its Child
-
-- **Type:** `DEFECT`
-- **Owner:** Release engineering
-- **Impact:** `npm run qualify:vnext` cannot complete and package clean-install evidence is unavailable.
-- **Evidence:** On 2026-07-14, `test:vnext-pack` produced tarballs, SBOM, provenance, and manifest, then timed out at
-  180 seconds during consumer `npm install`; the child remained alive until the execution terminated it after 544 seconds.
-- **Related issue:** [#540](https://github.com/jonathan-vella/apex/issues/540)
-- **Mitigation:** Add abort-aware subprocess cleanup, preserve bounded diagnostics, and determine why local tarball install
-  stalls.
-- **State:** Open
-- **Closure proof:** Deterministic timeout regression test and successful clean-install pack test.
 
 ### ISSUE-001: Live Qualification Evidence Is Unavailable
 
@@ -139,14 +105,44 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Type:** `ISSUE`
 - **Owner:** Quality engineering
 - **Impact:** Required release metrics remain blocking or unclaimable.
-- **Evidence:** [quality-scorecard.v1.json](../../config/quality-scorecard.v1.json) requires repeated samples; current tests
-  prove deterministic evaluation but do not provide the release sample set.
+- **Evidence:** The current candidate collects 100 observed validation-mutation, capability, and cache outcomes and derives
+  gate-loop and `taskContext()` samples from repeated dual-track reports. A one-run integration probe passes the three
+  100-sample rules; the final 30-run artifact remains to be produced on an immutable candidate.
 - **Related issue:** [#542](https://github.com/jonathan-vella/apex/issues/542)
-- **Mitigation:** Produce repeated mutation, fault, restart, context, cache, and capability measurements.
+- **Mitigation:** Complete the 30-run release evaluation after the final source change, hash the compact artifacts, and
+  rerun on the final candidate commit.
 - **State:** Open
 - **Closure proof:** Scorecard artifacts satisfying every minimum-sample and unavailable-data rule.
 
 ## Closed Or Historical Entries
+
+### DEFECT-001: CI Lint Resolved Unbuilt Generated Packages
+
+- **Type:** `DEFECT`
+- **Owner:** Validation and CI
+- **Disposition:** Closed after CI build ordering and generated-import validation were aligned.
+- **State:** Closed
+- **Closure proof:** Exact-main CI run `29760571466` passed build, lint, validators, and deterministic tests on
+  `e5509097aa7a1b9c389673a79ee7fbf7110de678`.
+
+### DEFECT-002: vNext Documentation Broken Links Were Corrected
+
+- **Type:** `DEFECT`
+- **Owner:** Documentation
+- **Disposition:** Closed after strict relative-link validation passed on the exact main candidate.
+- **State:** Closed
+- **Closure proof:** Exact-main docs run `29760571448` completed successfully on
+  `e5509097aa7a1b9c389673a79ee7fbf7110de678`.
+
+### DEFECT-003: Package Timeout Cleanup And Clean Install Were Repaired
+
+- **Type:** `DEFECT`
+- **Owner:** Release engineering
+- **Disposition:** Closed after abort-aware process-tree termination, bounded diagnostics, and deterministic package
+  installation coverage landed.
+- **State:** Closed
+- **Closure proof:** `npm run qualify:vnext` and all five package qualification tests passed on
+  `e5509097aa7a1b9c389673a79ee7fbf7110de678`, including timeout cleanup and offline clean install.
 
 ### RISK-002: Terraform CI Plan Transport Is Not Qualified
 
