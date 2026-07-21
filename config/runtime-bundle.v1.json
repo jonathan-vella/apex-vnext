@@ -1,31 +1,31 @@
 {
   "schemaVersion": "1.0.0",
-  "bundleVersion": "0.1.0",
+  "bundleVersion": "0.10.0",
   "capabilityProtocolVersion": "1.0.0",
   "components": {
     "cli": {
       "source": "local",
-      "version": "0.1.0"
+      "version": "0.10.0"
     },
     "contracts": {
       "source": "local",
-      "version": "0.1.0"
+      "version": "0.10.0"
     },
     "kernel": {
       "source": "local",
-      "version": "0.1.0"
+      "version": "0.10.0"
     },
     "capabilities": {
       "source": "local",
-      "version": "0.1.0"
+      "version": "0.10.0"
     },
     "renderers": {
       "source": "local",
-      "version": "0.1.0"
+      "version": "0.10.0"
     },
     "customizationBundle": {
       "source": "local",
-      "version": "0.1.0"
+      "version": "0.10.0"
     }
   },
   "config": {

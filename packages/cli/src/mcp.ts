@@ -18,7 +18,7 @@ const normalizeOutputs = (outputs: z.infer<typeof taskOutput>[]) =>
   }));
 
 export function createMcpServer(service: ApexService): McpServer {
-  const server = new McpServer({ name: "apex", version: "0.1.0" });
+  const server = new McpServer({ name: "apex", version: "0.10.0" });
   const result = (value: unknown) => ({
     content: [{ type: "text" as const, text: JSON.stringify(value) }],
     structuredContent: value as Record<string, unknown>,

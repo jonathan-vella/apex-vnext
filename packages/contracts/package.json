@@ -1,6 +1,6 @@
 {
   "name": "@apex/contracts",
-  "version": "0.1.0",
+  "version": "0.10.0",
   "description": "Versioned persisted and published contracts for APEX vNext",
   "license": "MIT",
   "repository": {
