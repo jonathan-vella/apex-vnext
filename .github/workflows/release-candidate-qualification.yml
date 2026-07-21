@@ -49,6 +49,7 @@ jobs:
       - name: Checkout exact candidate
         uses: actions/checkout@v6
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -80,7 +81,13 @@ jobs:
 
       - name: Bind stable collection time
         id: candidate
-        run: printf 'collected_at=%s\n' "$(git show --no-patch --format=%cI "$GITHUB_SHA")" >> "$GITHUB_OUTPUT"
+        env:
+          EXPECTED_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          candidate_sha="$(git rev-parse HEAD)"
+          test "$candidate_sha" = "$EXPECTED_CANDIDATE_SHA"
+          printf 'candidate_sha=%s\n' "$candidate_sha" >> "$GITHUB_OUTPUT"
+          printf 'collected_at=%s\n' "$(git show --no-patch --format=%cI "$candidate_sha")" >> "$GITHUB_OUTPUT"
 
       - name: Run and compact release qualification
         env:
@@ -109,7 +116,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: release-qualification-${{ github.sha }}
+          name: release-qualification-${{ steps.candidate.outputs.candidate_sha }}
           path: |
             dist/release-candidate/SHA256SUMS
             dist/release-candidate/receipt.json
