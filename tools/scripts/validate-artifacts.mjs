@@ -16,6 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createAjv } from "./_lib/ajv-validator.mjs";
 import { ARTIFACT_HEADINGS } from "./_lib/artifact-headings.mjs";
+import { ARTIFACT_TEMPLATE_PATHS, OPTIONAL_ARTIFACT_HEADINGS } from "./_lib/artifact-heading-sources.mjs";
 
 // ============================================================================
 // Shared utilities
@@ -44,7 +45,6 @@ function extractH2Headings(text) {
 const SKILL_PATH = ".github/skills/azure-artifacts/SKILL.md";
 const SKILL_REFS_DIR = ".github/skills/azure-artifacts/references";
 const H2_REF_PATH = ".github/instructions/azure-artifacts.instructions.md";
-const VALIDATOR_PATH = "tools/scripts/_lib/artifact-headings.mjs";
 
 const ARTIFACT_NAMES = [
   "01-requirements.md",
@@ -89,36 +89,6 @@ function parseMarkdownH2Blocks(text) {
   return result;
 }
 
-function parseValidatorHeadings(text) {
-  const result = new Map();
-
-  const blockMatch = text.match(/(?:const|export const) ARTIFACT_HEADINGS\s*=\s*\{([\s\S]*?)\n\};/);
-  if (!blockMatch) return result;
-
-  const block = blockMatch[1];
-  const entryRegex = /"([^"]+\.md)":\s*\[([\s\S]*?)\]/g;
-  let match;
-
-  while ((match = entryRegex.exec(block)) !== null) {
-    const artifactName = match[1];
-    const arrayContent = match[2];
-
-    const headingRegex = /"(## [^"]+)"/g;
-    const headings = [];
-    let hMatch;
-
-    while ((hMatch = headingRegex.exec(arrayContent)) !== null) {
-      headings.push(hMatch[1]);
-    }
-
-    if (headings.length > 0) {
-      result.set(artifactName, headings);
-    }
-  }
-
-  return result;
-}
-
 function stripReferences(headings) {
   return headings.filter((h) => h !== "## References");
 }
@@ -128,13 +98,8 @@ function runH2Sync() {
 
   let syncErrors = 0;
 
-  const missing = [];
-  if (!exists(SKILL_PATH)) missing.push(SKILL_PATH);
-  if (!exists(VALIDATOR_PATH)) missing.push(VALIDATOR_PATH);
-  if (missing.length > 0) {
-    for (const f of missing) {
-      console.log(`::error::Missing source file: ${f}`);
-    }
+  if (!exists(SKILL_PATH)) {
+    console.log(`::error::Missing source file: ${SKILL_PATH}`);
     return 1;
   }
 
@@ -159,7 +124,7 @@ function runH2Sync() {
   }
 
   const h2RefHeadings = h2RefExists ? parseMarkdownH2Blocks(readText(H2_REF_PATH)) : new Map();
-  const validatorHeadings = parseValidatorHeadings(readText(VALIDATOR_PATH));
+  const validatorHeadings = new Map(Object.entries(ARTIFACT_HEADINGS));
 
   console.log(
     `Sources: SKILL.md + references/ (${skillHeadings.size}), H2-reference (${h2RefHeadings.size}${h2RefExists ? "" : " — skipped"}), Validator (${validatorHeadings.size})\n`,
@@ -205,7 +170,7 @@ function runH2Sync() {
       continue;
     }
     if (!validator) {
-      console.log(`::error file=${VALIDATOR_PATH}::${artifactName}: missing from ARTIFACT_HEADINGS`);
+      console.log(`::error::${artifactName}: missing from generated ARTIFACT_HEADINGS`);
       syncErrors++;
       continue;
     }
@@ -250,37 +215,7 @@ const ARTIFACT_STRICTNESS = {
   "00-handoff.md": "relaxed",
 };
 
-const OPTIONAL_ALLOWED = {
-  "01-requirements.md": ["## References"],
-  "02-architecture-assessment.md": ["## References"],
-  "04-implementation-plan.md": ["## References"],
-  "04-governance-constraints.md": ["## 📜 Compliance Frameworks", "## References"],
-  "04-preflight-check.md": ["## References"],
-  "05-implementation-reference.md": ["## Next Steps", "## References"],
-  "06-deployment-summary.md": ["## References"],
-  "07-design-document.md": ["## References"],
-  "07-operations-runbook.md": ["## References"],
-  "07-resource-inventory.md": [
-    "## Resource Configuration Details",
-    "## Tags Applied",
-    "## Resource Dependencies",
-    "## Cost Summary by Resource",
-    "## Cost by Resource",
-    "## Private DNS Zones",
-    "## IP Address Allocation",
-    "## Module Summary",
-    "## Validation Commands",
-    "## References",
-  ],
-  "07-backup-dr-plan.md": ["## 3. Disaster Recovery Architecture", "## References"],
-  "07-compliance-matrix.md": ["## Security Controls Summary", "## References"],
-  "07-documentation-index.md": ["## Architecture Overview", "## References"],
-  "03-des-cost-estimate.md": ["## References"],
-  "07-ab-cost-estimate.md": ["## References"],
-  "README.md": [],
-  "09-lessons-learned.md": ["## References"],
-  "00-handoff.md": [],
-};
+const OPTIONAL_ALLOWED = OPTIONAL_ARTIFACT_HEADINGS;
 
 const TITLE_DRIFT = "Artifact Template Drift";
 const TITLE_MISSING = "Missing Template or Agent";
@@ -311,27 +246,7 @@ const AGENTS = {
   "00-handoff.md": null,
 };
 
-const TEMPLATE_DIR = ".github/skills/azure-artifacts/templates";
-
-const TEMPLATES = {
-  "01-requirements.md": `${TEMPLATE_DIR}/01-requirements.template.md`,
-  "02-architecture-assessment.md": `${TEMPLATE_DIR}/02-architecture-assessment.template.md`,
-  "04-implementation-plan.md": `${TEMPLATE_DIR}/04-implementation-plan.template.md`,
-  "04-governance-constraints.md": `${TEMPLATE_DIR}/04-governance-constraints.template.md`,
-  "04-preflight-check.md": `${TEMPLATE_DIR}/04-preflight-check.template.md`,
-  "06-deployment-summary.md": `${TEMPLATE_DIR}/06-deployment-summary.template.md`,
-  "05-implementation-reference.md": `${TEMPLATE_DIR}/05-implementation-reference.template.md`,
-  "07-design-document.md": `${TEMPLATE_DIR}/07-design-document.template.md`,
-  "07-operations-runbook.md": `${TEMPLATE_DIR}/07-operations-runbook.template.md`,
-  "07-resource-inventory.md": `${TEMPLATE_DIR}/07-resource-inventory.template.md`,
-  "07-backup-dr-plan.md": `${TEMPLATE_DIR}/07-backup-dr-plan.template.md`,
-  "07-compliance-matrix.md": `${TEMPLATE_DIR}/07-compliance-matrix.template.md`,
-  "07-documentation-index.md": `${TEMPLATE_DIR}/07-documentation-index.template.md`,
-  "03-des-cost-estimate.md": `${TEMPLATE_DIR}/03-des-cost-estimate.template.md`,
-  "07-ab-cost-estimate.md": `${TEMPLATE_DIR}/07-ab-cost-estimate.template.md`,
-  "README.md": `${TEMPLATE_DIR}/PROJECT-README.template.md`,
-  "09-lessons-learned.md": `${TEMPLATE_DIR}/09-lessons-learned.template.md`,
-};
+const TEMPLATES = ARTIFACT_TEMPLATE_PATHS;
 
 const STANDARD_DOC = ".github/instructions/markdown.instructions.md";
 
