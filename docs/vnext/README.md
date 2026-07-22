@@ -15,6 +15,7 @@ This directory is the durable project hub for completing and releasing APEX vNex
 | Decisions | [DECISIONS.md](DECISIONS.md) | Append entries; use an ADR for consequential design choices. |
 | Supported client qualification | [CLIENT-QUALIFICATION.md](CLIENT-QUALIFICATION.md) | Pin clients and compare normalized outcomes. |
 | Guidance and automation review | [GUIDANCE-AUTOMATION-REVIEW.md](GUIDANCE-AUTOMATION-REVIEW.md) | Characterize owners before consolidation. |
+| Guidance and automation evidence | [GUIDANCE-AUTOMATION-CHARACTERIZATION.md](GUIDANCE-AUTOMATION-CHARACTERIZATION.md) | Preserve consumer maps, baselines, and later change gates. |
 | Qualification evidence | [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md) | Preserve historical evidence; replace only with a new exact-candidate dossier. |
 | Modernization ownership | [MODERNIZATION-INVENTORY.md](MODERNIZATION-INVENTORY.md) | Update before ownership moves. |
 | Resume state | [PROJECT.md](PROJECT.md) | Update at checkpoints and milestone transitions. |

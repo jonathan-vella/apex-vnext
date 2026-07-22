@@ -1,7 +1,7 @@
 {
   "$schema": "schemas/modernization-ownership.schema.json",
   "schemaVersion": "1.0.0",
-  "candidate": "1a1de02a3a17f496c713dd3c4e425c8df8d30d0e",
+  "candidate": "b27d17350870a0ed3d5411346701cbb2eb6a4d4b",
   "surfaces": [
     {
       "id": "workspace-operating-frame",
@@ -244,6 +244,26 @@
       "rationale": "Language tools should not be reimplemented by generic string validators."
     },
     {
+      "id": "markdown-policy-enforcement",
+      "category": "validation",
+      "classification": "consolidate",
+      "canonicalOwner": ".markdownlint-cli2.jsonc and package.json scripts",
+      "sourceRefs": [
+        ".markdownlint-cli2.jsonc",
+        ".github/instructions/markdown.instructions.md",
+        ".github/instructions/markdown-docs.instructions.md",
+        "package.json",
+        "lefthook.yml",
+        ".github/workflows/docs.yml"
+      ],
+      "consumers": ["Markdown authors", "pre-commit hooks", "pull-request documentation checks", "editor integration"],
+      "proofCommands": ["npm run lint:md", "npm run validate:docs", "npm run validate:hooks", "npm run test:hooks"],
+      "removalGate": "Hooks and hosted checks call repository-owned commands and preserve lint scope, diagnostics, exclusions, and nonzero failures when tooling is unavailable.",
+      "rationale": "Audience-specific authoring guidance is distinct from executable lint policy, but hooks and workflows should consume the same npm-owned command contract.",
+      "followUp": "Repair the fail-open Markdown hook lookup in Milestone N and add a missing-executable regression test before changing lint scope.",
+      "decisionRef": "OWN-018"
+    },
+    {
       "id": "artifact-template-validation",
       "category": "validation",
       "classification": "consolidate",
@@ -268,21 +288,45 @@
       "sourceRefs": ["lefthook.yml", "tools/scripts/validate-hooks.mjs", "tools/tests/test-hooks.sh"],
       "consumers": ["git pre-commit", "contributors", "artifact validation"],
       "proofCommands": ["npm run validate:hooks", "npm run test:hooks"],
-      "removalGate": "Index-lock coordination permits safe parallel execution with unchanged staged-file semantics.",
-      "rationale": "Serial execution is a documented safety workaround for multiple stage_fixed writers.",
-      "followUp": "Add an explicit index coordination design and representative staged-file benchmark.",
+      "removalGate": "Missing executables fail nonzero, staged-file scope and diagnostics match direct npm commands, and index-lock coordination permits safe parallel execution with unchanged staged-file semantics.",
+      "rationale": "Serial execution protects multiple stage_fixed writers, while the Markdown wrapper currently converts executable lookup failure into a successful hook.",
+      "followUp": "First add a missing-executable regression test and fail-closed Markdown invocation; only then design index coordination and benchmark representative staged changes.",
       "decisionRef": "OWN-003"
     },
     {
       "id": "github-required-checks",
       "category": "automation",
       "classification": "keep",
-      "canonicalOwner": ".github/workflows/ci.yml",
-      "sourceRefs": [".github/workflows/ci.yml", ".github/workflows/branch-enforcement.yml"],
+      "canonicalOwner": "GitHub branch protection and .github/workflows/ci.yml",
+      "sourceRefs": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/docs.yml",
+        ".github/workflows/branch-enforcement.yml"
+      ],
       "consumers": ["branch protection", "pull requests", "release qualification"],
-      "proofCommands": ["npm run validate:_node-ci"],
+      "proofCommands": [
+        "npm run validate:_node-ci",
+        "npm run validate:docs",
+        "npm run test:apex-recall",
+        "npm run test:azure-pricing-mcp"
+      ],
       "removalGate": "Replacement checks retain stable names, least privilege, exact triggers, and equivalent commands.",
-      "rationale": "GitHub workflows own hosted execution; npm scripts own reusable command implementation."
+      "rationale": "GitHub branch protection owns required contexts, workflows own hosted execution, and npm scripts own reusable command implementation."
+    },
+    {
+      "id": "exact-head-release-qualification",
+      "category": "automation",
+      "classification": "keep",
+      "canonicalOwner": ".github/workflows/release-candidate-qualification.yml",
+      "sourceRefs": [
+        ".github/workflows/release-candidate-qualification.yml",
+        "tools/scripts/qualify-vnext-release.mjs",
+        "tools/scripts/pack-vnext.mjs"
+      ],
+      "consumers": ["release reviewers", "pull requests", "exact-candidate evidence consumers"],
+      "proofCommands": ["npm run qualify:vnext-release", "npm run test:vnext-pack"],
+      "removalGate": "A replacement checks out the exact candidate without persisted credentials and preserves compact evidence, checksums, retention, denial of release authority, and separate hosted visibility.",
+      "rationale": "Release qualification has a longer evidence-producing trust boundary than required deterministic CI and must remain independently visible."
     },
     {
       "id": "maintenance-workflows",
@@ -466,23 +510,27 @@
       "status": "gap",
       "sourceRefs": ["tools/scripts/validate-context-budget.mjs", "tools/scripts/measure-workflow-baseline.mjs"],
       "measurement": "npm run validate:context-budget; node tools/scripts/measure-workflow-baseline.mjs --json",
-      "evidence": "Static frozen-artifact rules pass; the candidate has no workflow telemetry records.",
-      "followUp": "Collect representative runtime token and cache samples before claiming context improvement."
+      "evidence": "At b27d173, active repository and managed guidance Markdown/JSON totals 3793215 bytes; static budget rules pass, but the repository has no representative runtime token or cache records.",
+      "followUp": "Milestone O must collect both-client token and cache samples before claiming context improvement."
     },
     {
       "id": "ci",
       "status": "captured",
-      "sourceRefs": [".github/workflows/ci.yml", "package.json"],
-      "measurement": "Current-base main run queried with gh run list for ci.yml.",
-      "evidence": "Run 29838483672 passed at 1a1de02a3a17f496c713dd3c4e425c8df8d30d0e in 128 seconds; earlier runs remain historical timing samples."
+      "sourceRefs": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/release-candidate-qualification.yml",
+        "package.json"
+      ],
+      "measurement": "Current-main runs queried with gh run list; PR checks and branch protection queried with gh pr checks and gh api.",
+      "evidence": "Run 29898484667 passed at b27d173 in 122 seconds. Main protection is strict and requires ci, both external Python test and three CodeQL contexts; PR #92 also preserved separate docs, branch-enforcement, CodeQL summary, and exact-head qualification checks."
     },
     {
       "id": "hooks",
       "status": "gap",
       "sourceRefs": ["lefthook.yml", "tools/scripts/validate-hooks.mjs", "tools/tests/test-hooks.sh"],
       "measurement": "npm run validate:hooks; npm run test:hooks",
-      "evidence": "Validation and characterization pass; serial stage_fixed execution has no representative staged-file timing benchmark.",
-      "followUp": "Benchmark representative documentation, code, workflow, and artifact commits before hook rewrites."
+      "evidence": "At b27d173, direct missing Markdown tooling exits 127 while the current hook wrapper pattern prints the same lookup error and exits 0; serial stage_fixed execution also lacks a representative timing benchmark.",
+      "followUp": "Milestone N owns a fail-closed regression test and repair, then representative documentation, code, workflow, and artifact timing benchmarks."
     },
     {
       "id": "dependencies",
@@ -496,8 +544,8 @@
       "status": "gap",
       "sourceRefs": ["tools/scripts/_lib/reporter.mjs", "tools/scripts/validate-*.mjs"],
       "measurement": "Reporter import scan; npm run test:lib-json; npm run test:lib-ajv",
-      "evidence": "Shared diagnostic library tests pass; reporter adoption is partial across the registered validator command set.",
-      "followUp": "Capture output snapshots before migrating remaining validator families."
+      "evidence": "Shared diagnostic library tests pass; reporter adoption is partial and hook wrappers can alter exit propagation even when command diagnostics are retained.",
+      "followUp": "Milestone N must capture family-level output and exit snapshots before migrating validators or wrappers."
     },
     {
       "id": "drift",
@@ -647,6 +695,14 @@
       "rationale": "Consumer workflow rules are distinct from repository-authoring instructions and should not be duplicated across clients.",
       "owner": "Active guidance modernization",
       "gate": "Both clients discover equivalent managed guidance with no obsolete MCP, Draw.io, VS Code-only, or authority claim."
+    },
+    {
+      "id": "OWN-018",
+      "status": "decided",
+      "decision": "Keep Markdown authoring guidance audience-specific while making npm scripts the shared executable lint contract.",
+      "rationale": "Human docs, agents, skills, templates, and frozen artifacts need different authoring rules, but hook and CI failure behavior must not fork.",
+      "owner": "Markdown policy and validation modernization",
+      "gate": "Direct, hook, editor, and hosted checks preserve scope and diagnostics and fail nonzero when the executable is missing."
     }
   ]
 }
