@@ -266,7 +266,7 @@ jobs:
           printf 'claim_hash=%s\nblob=%s\n' "$claim_hash" "$blob" >> "$GITHUB_OUTPUT"
       - name: Upload bound return fallback
         if: always() && steps.accept.outputs.accepted == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vnext-return-${{ inputs.handoff_id }}-${{ inputs.track }}-${{ inputs.operation }}-apply
           path: apex-live/return-authority.json
@@ -297,7 +297,7 @@ jobs:
           exit "$status"
       - name: Upload apply evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vnext-apply-evidence-${{ inputs.handoff_id }}-${{ inputs.track }}-${{ inputs.operation }}
           path: apex-live/evidence/
