@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Archived the obsolete upstream workflow synchronization command with provenance and rollback guidance; standalone
+  workflow files and hosted contracts remain authoritative.
 - Reopened every `0.10.0` release gate for the expanded product contract. No
   exact release candidate is currently selected.
 - Added GitHub Copilot CLI as a first-class target beside GitHub Copilot in VS

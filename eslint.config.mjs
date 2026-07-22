@@ -20,6 +20,7 @@ export default [
       "**/venv/**",
       ".github/skills/sensei/**", // Self-contained sub-project with its own toolchain
       "agent-output/**",
+      ".archive/retired-automation/**", // Provenance-only retired source; not active tooling
       "tmp/**",
       "infra/**",
       "logs/**",
