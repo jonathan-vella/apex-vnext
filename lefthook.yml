@@ -3,11 +3,9 @@
 # https://github.com/evilmartians/lefthook
 
 pre-commit:
-  # SAFETY: serial because two commands now use stage_fixed (markdown-lint
-  # touches *.md; model-catalog-sync touches .github/model-catalog.json).
-  # Although their file sets are disjoint today, parallel + stage_fixed
-  # races on git index lock when both try to re-stage. Keep serial unless
-  # an explicit file-lock coordination layer is introduced.
+  # SAFETY: serial because model-catalog-sync and sku-manifest-render both
+  # generate files and re-stage them through one Git index. Keep serial unless
+  # an explicit index-lock coordination layer is introduced.
   parallel: false
   commands:
     markdown-lint:
@@ -27,8 +25,6 @@ pre-commit:
         else
           echo "ℹ️  No markdown files to validate"
         fi
-      stage_fixed: true
-
     link-check:
       glob: "docs/guides/**/*.md"
       run: |
@@ -253,7 +249,7 @@ pre-commit:
         STAGED_TF=$(git diff --cached --name-only --diff-filter=ACM | grep '\.tf$' || true)
         if [ -n "$STAGED_TF" ]; then
           echo "🔧 Checking Terraform formatting..."
-          terraform fmt -check -recursive infra/terraform/ || {
+          npm run lint:terraform-fmt || {
             echo "❌ terraform fmt failed. Run: terraform fmt -recursive infra/terraform/"
             exit 1
           }

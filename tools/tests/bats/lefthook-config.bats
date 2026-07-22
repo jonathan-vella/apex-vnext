@@ -7,8 +7,18 @@ extract_markdown_lint_hook() {
   awk '
     /^    markdown-lint:/ { in_hook=1 }
     in_hook && /^      run: \|/ { capture=1; next }
-    capture && /^      stage_fixed:/ { exit }
+    capture && /^    [a-z][a-z0-9-]*:/ { exit }
     capture { sub(/^        /, ""); print }
+  ' "$REPO_ROOT/lefthook.yml"
+}
+
+extract_hook_block() {
+  local hook_name="$1"
+  awk -v hook_name="$hook_name" '
+    $0 == "    " hook_name ":" { capture=1 }
+    capture && $0 != "    " hook_name ":" && /^    [a-z][a-z0-9-]*:/ { exit }
+    capture && /^      fail_text:/ { exit }
+    capture { print }
   ' "$REPO_ROOT/lefthook.yml"
 }
 
@@ -46,10 +56,37 @@ create_markdown_fixture() {
   fi
 }
 
-@test "pre-commit parallel remains false" {
+@test "only generating pre-commit hooks own the serial Git index" {
   local parallel
+  local writers
   parallel=$(awk '/^pre-commit:/{in_precommit=1; next} in_precommit && /^  parallel:/{print $2; exit}' "$REPO_ROOT/lefthook.yml")
+  writers=$(awk '
+    /^    [a-z][a-z0-9-]*:/ { command=$1; sub(/:$/, "", command) }
+    /^      stage_fixed: true$/ { print command }
+  ' "$REPO_ROOT/lefthook.yml" | sort)
   [ "$parallel" = "false" ]
+  [ "$writers" = $'model-catalog-sync\nsku-manifest-render' ]
+}
+
+@test "Terraform formatting delegates validator behavior to its canonical npm script" {
+  local terraform_hook
+  terraform_hook=$(extract_hook_block terraform-fmt)
+
+  [[ "$terraform_hook" == *"npm run lint:terraform-fmt"* ]]
+  [[ "$terraform_hook" != *"terraform fmt -check"* ]]
+}
+
+@test "a held Git index lock rejects a concurrent writer" {
+  local fixture="$TEST_LOG_DIR/repository"
+  mkdir -p "$fixture"
+  git -C "$fixture" init --quiet
+  printf 'fixture\n' >"$fixture/generated.txt"
+  : >"$fixture/.git/index.lock"
+
+  run git -C "$fixture" add generated.txt
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"index.lock"* ]]
 }
 
 @test "markdown lint hook propagates repository command failure" {
