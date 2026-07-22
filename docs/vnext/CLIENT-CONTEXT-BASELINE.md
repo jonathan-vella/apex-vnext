@@ -22,10 +22,10 @@ that counter.
 
 ## Adapter Status
 
-| Client                 | Raw source status                                                            | Normalized contract |
-| ---------------------- | ---------------------------------------------------------------------------- | ------------------- |
-| GitHub Copilot VS Code | Existing OTel profiler recognizes exact input-token and output-token fields. | Fixture-qualified   |
-| GitHub Copilot CLI     | No raw telemetry shape is characterized in this repository.                  | Fixture-qualified   |
+| Client                 | Raw source status                          | Contract          |
+| ---------------------- | ------------------------------------------ | ----------------- |
+| GitHub Copilot VS Code | Exact OTel token fields are characterized. | Fixture-qualified |
+| GitHub Copilot CLI     | No raw telemetry shape is characterized.   | Fixture-qualified |
 
 Fixture qualification proves schema, privacy rejection, unavailable handling, and deterministic aggregation. It is not
 evidence that either client emitted those measurements. A Copilot CLI adapter must remain unavailable until a supported
@@ -75,5 +75,5 @@ Run `npm run test:client-context-samples`. The suite covers both supported clien
 sample IDs and aggregates, unavailable cache metrics, duplicate samples, invalid counters, unknown clients, and
 content-bearing input rejection.
 
-Issue [#121](https://github.com/jonathan-vella/apex-vnext/issues/121) owns this slice. The context baseline remains a gap
-until representative live samples exist for both supported clients.
+Issue [#121](https://github.com/jonathan-vella/apex-vnext/issues/121) owns this slice.
+The context baseline remains a gap until representative live samples exist for both supported clients.

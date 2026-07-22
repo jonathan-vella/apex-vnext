@@ -166,6 +166,32 @@ test("rejects duplicate sample identifiers", () => {
   assert.throws(() => aggregateClientContextSamples([sample, sample]), /duplicate sampleId/u);
 });
 
+test("rejects malformed normalized samples before aggregation", () => {
+  const sample = normalizeClientContextSample(source(), metadata());
+  assert.throws(
+    () => aggregateClientContextSamples([{ ...sample, sampleId: "not-a-digest" }]),
+    /every input must be a normalized client context sample/u,
+  );
+  assert.throws(
+    () => aggregateClientContextSamples([{ ...sample, client: { ...sample.client, id: "unknown" } }]),
+    /missing grouping or metric fields/u,
+  );
+  assert.throws(
+    () =>
+      aggregateClientContextSamples([
+        { ...sample, metrics: { ...sample.metrics, inputTokens: { status: "unavailable" } } },
+      ]),
+    /requires a measured inputTokens/u,
+  );
+  assert.throws(
+    () =>
+      aggregateClientContextSamples([
+        { ...sample, metrics: { ...sample.metrics, cacheHits: { status: "measured", value: -1 } } },
+      ]),
+    /invalid cacheHits value/u,
+  );
+});
+
 test("keeps distinct scenarios in separate aggregate groups", () => {
   const requirements = normalizeClientContextSample(source(), metadata());
   const architecture = normalizeClientContextSample(source(), {
