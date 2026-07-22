@@ -50,12 +50,18 @@ function countFiles(globPattern) {
 }
 
 function computeActualCounts() {
-  let validatorCount = 0;
+  let validatorCount = -1;
   if (fs.existsSync(VALIDATOR_GRAPH_PATH)) {
-    const graph = JSON.parse(fs.readFileSync(VALIDATOR_GRAPH_PATH, "utf-8"));
-    validatorCount = graph.commands.filter(
-      ({ script, retirement }) => retirement.status === "active" && /^(lint|validate):/.test(script),
-    ).length;
+    try {
+      const graph = JSON.parse(fs.readFileSync(VALIDATOR_GRAPH_PATH, "utf-8"));
+      validatorCount = graph.commands.filter(
+        ({ script, retirement }) => retirement.status === "active" && /^(lint|validate):/.test(script),
+      ).length;
+    } catch (error) {
+      r.error("tools/registry/repository-validator-graph.json", `Cannot derive validator count: ${error.message}`);
+    }
+  } else {
+    r.error("tools/registry/repository-validator-graph.json", "File not found");
   }
 
   let extensionCount = 0;

@@ -95,8 +95,9 @@ export function validateRepositoryValidatorGraph({ graph, schema, scripts, consu
     }
     if (visited.has(script)) return;
     visiting.add(script);
-    for (const member of aggregates.get(script)?.members ?? []) {
-      if (aggregates.has(member)) visitAggregate(member);
+    const aggregate = aggregates.get(script);
+    for (const dependency of [...(aggregate?.prerequisites ?? []), ...(aggregate?.members ?? [])]) {
+      if (aggregates.has(dependency)) visitAggregate(dependency);
     }
     visiting.delete(script);
     visited.add(script);
@@ -159,7 +160,7 @@ export function validateRepositoryValidatorGraph({ graph, schema, scripts, consu
 
   for (const consumer of graph.consumers) {
     const value = consumers[consumer.id];
-    if (value === undefined) errors.push(`${consumer.id}: consumer evidence is missing`);
+    if (value === undefined || value === null) errors.push(`${consumer.id}: consumer evidence is missing`);
     else if (value !== consumer.script) errors.push(`${consumer.id}: expected ${consumer.script}, found ${value}`);
   }
 
@@ -169,10 +170,14 @@ export function validateRepositoryValidatorGraph({ graph, schema, scripts, consu
 export function collectConsumerEvidence(graph, read = readFileSync) {
   return Object.fromEntries(
     graph.consumers.map((consumer) => {
-      const content = read(consumer.path, "utf8");
-      const hasName = content.includes(`name: ${consumer.name}`) || content.includes(`${consumer.name}:`);
-      const hasScript = content.includes(`npm run ${consumer.script}`);
-      return [consumer.id, hasName && hasScript ? consumer.script : null];
+      try {
+        const content = read(consumer.path, "utf8");
+        const hasName = content.includes(`name: ${consumer.name}`) || content.includes(`${consumer.name}:`);
+        const hasScript = content.includes(`npm run ${consumer.script}`);
+        return [consumer.id, hasName && hasScript ? consumer.script : null];
+      } catch {
+        return [consumer.id, null];
+      }
     }),
   );
 }

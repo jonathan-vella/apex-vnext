@@ -93,6 +93,14 @@ test("collects read-only workflow and hook consumer evidence", () => {
   assert.deepEqual(evidence, { "ci-main": "validate:_node-ci" });
 });
 
+test("reports unreadable consumer files as missing evidence", () => {
+  const consumers = collectConsumerEvidence(graph, () => {
+    throw new Error("missing fixture");
+  });
+  const errors = validateRepositoryValidatorGraph({ ...options, consumers });
+  assert.ok(errors.includes("ci-main: consumer evidence is missing"));
+});
+
 test("rejects aggregate, alias, safety, retirement, and consumer drift", () => {
   const invalid = structuredClone(graph);
   invalid.profiles[0].ciSafety = "conditional";
@@ -135,4 +143,27 @@ test("rejects aggregate dependency cycles and missing consumer evidence", () => 
   });
   assert.ok(errors.some((error) => error.includes("aggregate dependency cycle")));
   assert.ok(errors.some((error) => error.includes("consumer evidence is missing")));
+});
+
+test("rejects cycles through aggregate prerequisites", () => {
+  const invalid = structuredClone(graph);
+  invalid.aggregates.push({
+    id: "validate-loop",
+    script: "validate:loop",
+    prerequisites: ["validate:_node-ci"],
+    members: ["validate:example"],
+    continueOnError: false,
+    epilogue: null,
+  });
+  invalid.aggregates[0].prerequisites = ["validate:loop"];
+  const errors = validateRepositoryValidatorGraph({
+    ...options,
+    graph: invalid,
+    scripts: {
+      ...scripts,
+      "validate:_node-ci": "npm run validate:loop && run-p validate:example",
+      "validate:loop": "npm run validate:_node-ci && run-p validate:example",
+    },
+  });
+  assert.ok(errors.some((error) => error.includes("aggregate dependency cycle")));
 });
