@@ -142,6 +142,11 @@ than copied into this document.
 Shared JSON and AJV diagnostic-library tests pass. Reporter adoption remains partial across registered validator
 commands, so output compatibility snapshots are required before each family migrates.
 
+Issue #115 completes `OWN-004`: canonical artifact templates now generate both the runtime heading module and compact
+JSON summary. Explicit metadata remains only for optional headings, template-only headings, and the non-template
+handoff artifact. Byte-parity and mutation tests replace JavaScript source regex parsing while preserving every
+existing artifact heading and validator behavior.
+
 ### Drift
 
 Recent changes include the legacy-agent archive and managed-discovery boundary. Existing model, entity-count,

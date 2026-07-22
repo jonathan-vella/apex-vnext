@@ -1,7 +1,7 @@
 {
   "$schema": "schemas/modernization-ownership.schema.json",
   "schemaVersion": "1.0.0",
-  "candidate": "93bf2fee93ed06eb73f0774b4f1904d5b7d90e10",
+  "candidate": "00feb98e6fcfeabc23ad1fe1e5e72a26207fe53d",
   "surfaces": [
     {
       "id": "workspace-operating-frame",
@@ -283,14 +283,16 @@
       "canonicalOwner": ".github/skills/azure-artifacts/templates/",
       "sourceRefs": [
         ".github/skills/azure-artifacts/templates/*.md",
+        "tools/scripts/_lib/artifact-heading-sources.mjs",
+        "tools/scripts/_lib/artifact-heading-generator.mjs",
         "tools/scripts/validate-artifacts.mjs",
         "tools/scripts/_lib/artifact-headings.mjs"
       ],
       "consumers": ["artifact authors", "pre-commit hook", "challenger review"],
       "proofCommands": ["npm run validate:artifacts", "npm run check:h2-order"],
       "removalGate": "One template-derived heading model replaces hand-synchronized heading lists with parity tests.",
-      "rationale": "Templates are canonical, while validator and summary heading lists are duplicated derivatives.",
-      "followUp": "Generate heading metadata from templates during validator modernization.",
+      "rationale": "Templates are canonical; runtime and compact heading registries are deterministic generated derivatives with explicit non-template exceptions.",
+      "followUp": "Issue #115 derives both heading registries from templates, replaces JavaScript source regex parsing with structured metadata, and adds byte-parity and mutation tests.",
       "decisionRef": "OWN-004"
     },
     {
