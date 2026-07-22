@@ -526,10 +526,10 @@
       "canonicalOwner": "tools/scripts/profile_debug_log.py",
       "sourceRefs": ["tools/scripts/profile_debug_log.py", "docs/guides/testing.md"],
       "consumers": ["context optimization", "local investigations"],
-      "proofCommands": ["npm run profile:debug-log"],
+      "proofCommands": ["npm run profile:debug-log", "npm run test:client-context-samples"],
       "removalGate": "A privacy-safe supported source supplies repeatable context measurements or the profiler is explicitly retired.",
-      "rationale": "The profiler depends on local debug logs and is not a portable CI baseline.",
-      "followUp": "Decide whether local profiling remains advisory or becomes supported telemetry.",
+      "rationale": "The profiler depends on local debug logs; normalized fixture proof is portable, but live client evidence is not yet a CI baseline.",
+      "followUp": "Issue #121 qualifies normalized samples and deterministic aggregation; collect representative live samples before changing the baseline status.",
       "decisionRef": "OWN-009"
     },
     {
@@ -554,10 +554,16 @@
     {
       "id": "context",
       "status": "gap",
-      "sourceRefs": ["tools/scripts/validate-context-budget.mjs", "tools/scripts/measure-workflow-baseline.mjs"],
-      "measurement": "npm run validate:context-budget; node tools/scripts/measure-workflow-baseline.mjs --json",
-      "evidence": "At b27d173, active repository and managed guidance Markdown/JSON totals 3793215 bytes; static budget rules pass, but the repository has no representative runtime token or cache records.",
-      "followUp": "Milestone O must collect both-client token and cache samples before claiming context improvement."
+      "sourceRefs": [
+        "tools/scripts/validate-context-budget.mjs",
+        "tools/scripts/measure-workflow-baseline.mjs",
+        "tools/scripts/normalize-client-context-sample.mjs",
+        "tools/scripts/aggregate-client-context-samples.mjs",
+        "tools/registry/schemas/client-context-sample.schema.json"
+      ],
+      "measurement": "npm run validate:context-budget; npm run test:client-context-samples; node tools/scripts/measure-workflow-baseline.mjs --json",
+      "evidence": "At b27d173, active repository and managed guidance Markdown/JSON totals 3793215 bytes. Static budgets pass and issue #121 fixture-qualifies privacy-safe normalized samples, but the repository has no representative live token or cache records from both clients.",
+      "followUp": "Milestone O must collect both-client live token and cache samples before claiming context improvement."
     },
     {
       "id": "ci",

@@ -86,9 +86,10 @@ manual improvement submission, and single-client bundle remain active until thei
 
 ### Context
 
-Static context-budget validation passes for frozen-artifact consumers. Dynamic workflow telemetry is a gap: the current
-candidate contains no measured telemetry records. No context-size or token-savings claim is permitted until automatic,
-representative samples exist.
+Static context-budget validation passes for frozen-artifact consumers. Issue #121 adds a fixture-qualified, privacy-safe
+normalized sample contract and deterministic aggregation with explicit unavailable cache metrics. Dynamic workflow
+telemetry remains a gap: the current candidate contains no representative live records from both supported clients. No
+context-size, token-savings, or cache-improvement claim is permitted until those samples exist.
 
 ### CI
 

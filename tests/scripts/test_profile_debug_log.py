@@ -44,6 +44,8 @@ def test_load_spans_rejects_malformed(profiler, tmp_path):
 def test_profile_totals(profiler):
     spans = profiler.load_spans(FIXTURE)
     m = profiler.profile(spans)
+    assert m["schemaVersion"] == "1.0.0"
+    assert m["format"] == "apex-debug-profile"
     t = m["totals"]
     assert t["input_tokens"] == 45000
     assert t["output_tokens"] == 1200

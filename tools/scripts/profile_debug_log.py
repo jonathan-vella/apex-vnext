@@ -111,7 +111,7 @@ def _duration_s(span: dict[str, Any]) -> float:
     try:
         start = int(span["startTimeUnixNano"])
         end = int(span["endTimeUnixNano"])
-    except (KeyError, ValueError, TypeError):
+    except KeyError, ValueError, TypeError:
         return 0.0
     return max(0.0, (end - start) / 1e9)
 
@@ -190,7 +190,7 @@ def profile(
             e = int(span["endTimeUnixNano"])
             session_start = s if session_start is None else min(session_start, s)
             session_end = e if session_end is None else max(session_end, e)
-        except (KeyError, ValueError, TypeError):
+        except KeyError, ValueError, TypeError:
             pass
 
         # Error spans (status.code == 2). Counted up front because the
@@ -214,7 +214,7 @@ def profile(
             try:
                 in_tok = int(attrs.get("gen_ai.usage.input_tokens", 0))
                 out_tok = int(attrs.get("gen_ai.usage.output_tokens", 0))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 in_tok = out_tok = 0
             row = tokens_by_model[model]
             row["input"] += in_tok
@@ -250,7 +250,7 @@ def profile(
                 try:
                     args_obj = json.loads(args_blob) if args_blob else {}
                     fpath = args_obj.get("filePath") or "(unknown)"
-                except (json.JSONDecodeError, TypeError):
+                except json.JSONDecodeError, TypeError:
                     fpath = "(unparseable)"
                 read_file_paths[fpath] += 1
             elif tname == "vscode_askQuestions":
@@ -292,11 +292,11 @@ def profile(
         key=lambda r: r["bytes"],
         reverse=True,
     )[:10]
-    duplicate_reads = [
-        {"path": p, "count": c} for p, c in read_file_paths.most_common(20) if c > 1
-    ]
+    duplicate_reads = [{"path": p, "count": c} for p, c in read_file_paths.most_common(20) if c > 1]
 
     return {
+        "schemaVersion": "1.0.0",
+        "format": "apex-debug-profile",
         "totals": {
             "input_tokens": total_input,
             "output_tokens": total_output,
@@ -306,9 +306,7 @@ def profile(
             "max_input_per_call": max_input_per_call,
             "askquestions_count": len(ask_durations),
             "subagent_invocations": len(subagent_calls),
-            "challenger_invocations": sum(
-                1 for c in subagent_calls if c["name"] == "challenger-review-subagent"
-            ),
+            "challenger_invocations": sum(1 for c in subagent_calls if c["name"] == "challenger-review-subagent"),
             "error_spans_total": error_spans_raw_count,
             "error_spans_non_benign": len(error_spans),
         },
