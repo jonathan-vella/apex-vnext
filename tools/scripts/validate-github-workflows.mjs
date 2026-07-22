@@ -83,6 +83,63 @@ function workflowScripts(value) {
     .join("\n");
 }
 
+function validatePythonSetupAction(text) {
+  let value;
+  try {
+    value = yaml.load(text);
+  } catch (error) {
+    return [`Python setup action YAML parse failed: ${error.message}`];
+  }
+  const steps = value?.runs?.steps;
+  const exactKeys = (object, expected) =>
+    object !== null &&
+    typeof object === "object" &&
+    !Array.isArray(object) &&
+    JSON.stringify(Object.keys(object).sort()) === JSON.stringify([...expected].sort());
+  const errors = [];
+  if (
+    !exactKeys(value, ["name", "description", "runs"]) ||
+    !exactKeys(value?.runs, ["using", "steps"]) ||
+    value?.runs?.using !== "composite"
+  ) {
+    errors.push("Python setup action structure or runtime drift");
+  }
+  if (!Array.isArray(steps) || steps.length !== 2) return ["Python setup action must contain exactly two steps"];
+  const [setup, install] = steps;
+  const expectedInstall = [
+    "set -euo pipefail",
+    "python -m pip install --upgrade pip",
+    "python -m pip install -e tools/apex-recall",
+    "python -m pip install -e 'tools/mcp-servers/azure-pricing[dev]'",
+    "python -m pip install pytest",
+    "python -m venv tools/mcp-servers/azure-pricing/.venv",
+    "tools/mcp-servers/azure-pricing/.venv/bin/python -m pip install --upgrade pip",
+    "tools/mcp-servers/azure-pricing/.venv/bin/python -m pip install \\",
+    "-e 'tools/mcp-servers/azure-pricing[admin,dev]'",
+  ];
+  const actualInstall = String(install?.run ?? "")
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (
+    !exactKeys(setup, ["name", "uses", "with"]) ||
+    !exactKeys(setup?.with, ["python-version", "cache"]) ||
+    setup?.uses !== "actions/setup-python@v6" ||
+    setup.with?.["python-version"] !== "3.14" ||
+    setup.with?.cache !== "pip"
+  ) {
+    errors.push("Python setup action version or cache contract drift");
+  }
+  if (
+    !exactKeys(install, ["name", "shell", "run"]) ||
+    install?.shell !== "bash" ||
+    JSON.stringify(actualInstall) !== JSON.stringify(expectedInstall)
+  ) {
+    errors.push("Python setup action dependency bootstrap drift");
+  }
+  return errors;
+}
+
 function containsForbiddenReleaseAuthority(script) {
   for (const line of script.split(/\r?\n/u)) {
     const tokens = line
@@ -184,6 +241,8 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
       errors.push(`${path}: local action content drift`);
     }
   }
+  const pythonAction = localActionTexts[".github/actions/setup-python-validation/action.yml"];
+  if (pythonAction !== undefined) errors.push(...validatePythonSetupAction(pythonAction));
 
   const values = new Map();
   const referencedLocalActions = new Set();
@@ -286,18 +345,14 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
     errors.push("release qualification permissions must remain exactly contents read with no job override");
   }
   const releaseActions = workflowActions({ jobs: { qualify: releaseJob } });
-  const allowedReleaseActions = [
-    "actions/checkout@v6",
-    "hashicorp/setup-terraform@v4",
-    "actions/setup-python@v6",
-    "actions/upload-artifact@v4",
-  ];
+  const allowedReleaseActions = ["actions/checkout@v6", "hashicorp/setup-terraform@v4", "actions/upload-artifact@v4"];
   const localReleaseActions = releaseSteps
     .filter((step) => step !== null && typeof step === "object" && String(step.uses ?? "").startsWith("./"))
     .map((step) => step.uses);
   if (
     JSON.stringify(releaseActions) !== JSON.stringify(allowedReleaseActions) ||
-    JSON.stringify(localReleaseActions) !== JSON.stringify(["./.github/actions/setup-node-repo"])
+    JSON.stringify(localReleaseActions) !==
+      JSON.stringify(["./.github/actions/setup-node-repo", "./.github/actions/setup-python-validation"])
   ) {
     errors.push("release qualification contains an unapproved action");
   }

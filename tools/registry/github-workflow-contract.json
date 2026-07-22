@@ -22,7 +22,8 @@
     "peter-evans/create-pull-request": ["v8"]
   },
   "localActions": {
-    ".github/actions/setup-node-repo/action.yml": "56966f1af2a2da0e0c3c51f8f160db41e55ae0bc756f0bb22b17480473d25139"
+    ".github/actions/setup-node-repo/action.yml": "56966f1af2a2da0e0c3c51f8f160db41e55ae0bc756f0bb22b17480473d25139",
+    ".github/actions/setup-python-validation/action.yml": "f62e5e4664839ff423f5a1a611cbd6756b0b103b7035dca00e8c3ffde018c0d6"
   },
   "workflows": [
     {
@@ -42,7 +43,7 @@
       "triggerDigest": "5c375602c9ef5d8ec711bfa7db1aaaf0484d84e8339627fa7f3bcb8de81edbb6",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "8e8875885b8649129eb6dfd01240ab2f8cfb108a9f70f038baa8c7ed9873bdf6",
+      "jobsDigest": "b3bd2f2041bc4b165e508aad8e34a7c2aea5d9a6684fef065c2b768310e97aae",
       "jobs": { "ci": "ci", "external-tests": "External Python tests (apex-recall + azure-pricing MCP)" }
     },
     {
@@ -92,7 +93,7 @@
       "triggerDigest": "267a76bf9976b37b8267e70d277289467c5e081a07130713e09f99650755fac5",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "9d0e0bfd50c6e04ec39baac21f54a938d3a60e7ffa356f568ccde9073171699c",
+      "jobsDigest": "e5f5d114b3d6e41912cd5244362bab3775012a28144e57ae47de6178e4cef3f2",
       "jobs": { "qualify": "Exact-head release qualification" }
     },
     {

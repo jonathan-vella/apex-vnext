@@ -1,0 +1,27 @@
+# Composite action: shared Python validation environment.
+# Callers must check out the repository and install Node dependencies first.
+
+name: Setup Python Validation
+description: Install Python 3.14 validation dependencies and the component-owned pricing test environment
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.14"
+        cache: pip
+
+    - name: Install Python validation dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+        python -m pip install --upgrade pip
+        python -m pip install -e tools/apex-recall
+        python -m pip install -e 'tools/mcp-servers/azure-pricing[dev]'
+        python -m pip install pytest
+        python -m venv tools/mcp-servers/azure-pricing/.venv
+        tools/mcp-servers/azure-pricing/.venv/bin/python -m pip install --upgrade pip
+        tools/mcp-servers/azure-pricing/.venv/bin/python -m pip install \
+          -e 'tools/mcp-servers/azure-pricing[admin,dev]'

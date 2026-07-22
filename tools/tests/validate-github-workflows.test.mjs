@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import * as yaml from "js-yaml";
@@ -107,6 +108,44 @@ test("rejects local composite action drift", () => {
   const changed = { ...localActionTexts, ".github/actions/setup-node-repo/action.yml": "name: changed\n" };
   const errors = validateGithubWorkflowContract({ contract, schema, workflowTexts, localActionTexts: changed });
   assert.ok(errors.includes(".github/actions/setup-node-repo/action.yml: local action content drift"));
+});
+
+test("rejects Python validation setup weakening and caller removal", () => {
+  const actionPath = ".github/actions/setup-python-validation/action.yml";
+  for (const [search, replacement, expected] of [
+    ['python-version: "3.14"', 'python-version: "3.13"', "version or cache contract drift"],
+    ["cache: pip", "cache: none", "version or cache contract drift"],
+    ["set -euo pipefail", "set -e", "dependency bootstrap drift"],
+    ["[admin,dev]", "[dev]", "dependency bootstrap drift"],
+    ["using: composite", "using: node20", "structure or runtime drift"],
+    ["      shell: bash", "      continue-on-error: true\n      shell: bash", "dependency bootstrap drift"],
+    [
+      "      shell: bash",
+      "      env:\n        BASH_ENV: ./bootstrap.sh\n      shell: bash",
+      "dependency bootstrap drift",
+    ],
+    ["      shell: bash", "      working-directory: tools\n      shell: bash", "dependency bootstrap drift"],
+  ]) {
+    const changed = { ...localActionTexts, [actionPath]: localActionTexts[actionPath].replace(search, replacement) };
+    const changedContract = structuredClone(contract);
+    changedContract.localActions[actionPath] = createHash("sha256").update(changed[actionPath]).digest("hex");
+    const errors = validateGithubWorkflowContract({
+      contract: changedContract,
+      schema,
+      workflowTexts,
+      localActionTexts: changed,
+    });
+    assert.ok(errors.some((error) => error.includes(expected)));
+  }
+
+  for (const path of [".github/workflows/ci.yml", ".github/workflows/release-candidate-qualification.yml"]) {
+    const texts = mutate(
+      path,
+      "      - name: Setup Python validation\n        uses: ./.github/actions/setup-python-validation\n",
+      "",
+    );
+    assert.ok(validate(texts).some((error) => error.includes("complete job contract drift")));
+  }
 });
 
 test("reports a missing local composite action without throwing", () => {
