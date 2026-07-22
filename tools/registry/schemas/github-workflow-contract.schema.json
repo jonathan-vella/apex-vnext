@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.apexops.dev/github-workflow-contract-v1.json",
+  "title": "APEX GitHub workflow contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "expectedRequiredContexts",
+    "managedContexts",
+    "actionVersions",
+    "localActions",
+    "workflows"
+  ],
+  "properties": {
+    "$schema": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "const": "1.0.0" },
+    "expectedRequiredContexts": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "managedContexts": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "actionVersions": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": true,
+        "items": { "type": "string", "pattern": "^v[0-9]+(?:\\.[0-9]+)?$" }
+      }
+    },
+    "localActions": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/sha256" }
+    },
+    "workflows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "path",
+          "name",
+          "triggerDigest",
+          "permissionsDigest",
+          "concurrencyDigest",
+          "jobsDigest",
+          "jobs"
+        ],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+          "path": { "type": "string", "pattern": "^\\.github/workflows/[a-z0-9-]+\\.ya?ml$" },
+          "name": { "type": "string", "minLength": 1 },
+          "triggerDigest": { "$ref": "#/$defs/sha256" },
+          "permissionsDigest": { "$ref": "#/$defs/sha256" },
+          "concurrencyDigest": { "$ref": "#/$defs/sha256" },
+          "jobsDigest": { "$ref": "#/$defs/sha256" },
+          "jobs": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

@@ -5,8 +5,8 @@
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
-- **Active issue:** [#99](https://github.com/jonathan-vella/apex-vnext/issues/99)
-- **Working branch:** `feat/99-bundle-composition-lock`
+- **Active issue:** [#103](https://github.com/jonathan-vella/apex-vnext/issues/103)
+- **Working branch:** `feat/103-workflow-contract-validator`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -17,7 +17,8 @@ PR #90 merged the `0.10.0` re-baseline. PR #92 pinned the supported Copilot CLI 
 contract. PR #94 completed the guidance and automation characterization without changing active behavior.
 PR #96 repaired the Markdown pre-commit failure path with executable regression coverage. Runtime-managed APEX agents
 and skills remain under `customizations/`, with `customizations/manifest.json` as their canonical manifest. PR #98 added
-the schema-backed repository validator graph while retaining package scripts as executable projections.
+the schema-backed repository validator graph while retaining package scripts as executable projections. PR #102 added
+the deterministic npm bundle composition lock and source/generated provenance without changing installation behavior.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
@@ -38,7 +39,8 @@ qualification has run, and no ARM MCP version has been selected or qualified.
 | Copilot CLI `1.0.73` and cross-client matrix                             | Contract defined; execution pending                           |
 | Guidance, Markdown, lint, hook, and workflow ownership                   | Characterized; first hook repair merged                       |
 | ARM MCP adapters and MCP retirements                                     | Pending                                                       |
-| Diagram, improvement-measurement, and bundle changes                     | Pending                                                       |
+| Bundle composition mappings and lock                                     | Implemented; client projections remain pending                |
+| Diagram and improvement-measurement changes                              | Pending                                                       |
 | Final deterministic, client, package, security, and live qualification   | Reopened                                                      |
 
 ## Release Boundaries
@@ -51,7 +53,7 @@ qualification has run, and no ARM MCP version has been selected or qualified.
 
 ## Immediate Sequence
 
-1. Complete issue #99's metadata-only npm bundle composition lock without changing installation behavior.
+1. Complete issue #103's read-only hosted workflow contract without changing workflow YAML.
 2. Continue Milestone N through independently revertible bundle, validator, hook, and workflow slices.
 3. Retire the selected MCP and Draw.io surfaces only after each replacement gate passes.
 4. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.
@@ -63,6 +65,6 @@ qualification has run, and no ARM MCP version has been selected or qualified.
 
 1. Read [PRD.md](PRD.md), [ROADMAP.md](ROADMAP.md), and [REGISTER.md](REGISTER.md).
 2. Verify the current `main` head, open pull requests, worktrees, and dirty files before selecting a slice.
-3. Resume issue #99 from the `customization-distribution` and `client-bundle-generation` ownership records; keep later
-   implementation in independently revertible Milestone N and O slices.
+3. Resume issue #103 from the `github-required-checks` and `exact-head-release-qualification` ownership records; keep
+   later implementation in independently revertible Milestone N and O slices.
 4. Treat [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md) as historical evidence until a new candidate is declared.

@@ -244,6 +244,13 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "test-github-workflows",
+      "script": "test:github-workflows",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "validate-agents",
       "script": "validate:agents",
       "profile": "node-validation",
@@ -384,6 +391,13 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "validate-github-workflows",
+      "script": "validate:github-workflows",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "validate-session-state",
       "script": "validate:session-state",
       "profile": "node-validation",
@@ -513,6 +527,8 @@
         "test:modernization-ownership",
         "validate:repository-validator-graph",
         "test:repository-validator-graph",
+        "validate:github-workflows",
+        "test:github-workflows",
         "validate:iac-security-baseline",
         "validate:policy-precheck",
         "validate:sku-manifest",
@@ -580,6 +596,8 @@
         "test:modernization-ownership",
         "validate:repository-validator-graph",
         "test:repository-validator-graph",
+        "validate:github-workflows",
+        "test:github-workflows",
         "validate:policy-precheck",
         "lint:js:ci",
         "lint:safe-shell"

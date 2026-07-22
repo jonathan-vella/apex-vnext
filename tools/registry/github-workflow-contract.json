@@ -1,0 +1,157 @@
+{
+  "$schema": "schemas/github-workflow-contract.schema.json",
+  "schemaVersion": "1.0.0",
+  "expectedRequiredContexts": [
+    "ci",
+    "External Python tests (apex-recall + azure-pricing MCP)",
+    "Analyze (actions)",
+    "Analyze (javascript-typescript)",
+    "Analyze (python)"
+  ],
+  "managedContexts": ["Analyze (actions)", "Analyze (javascript-typescript)", "Analyze (python)"],
+  "actionVersions": {
+    "actions/checkout": ["v6", "v7"],
+    "actions/download-artifact": ["v8"],
+    "actions/github-script": ["v9"],
+    "actions/setup-python": ["v6"],
+    "actions/upload-artifact": ["v4", "v7"],
+    "azure/login": ["v3"],
+    "denoland/setup-deno": ["v2"],
+    "devcontainers/ci": ["v0.3"],
+    "hashicorp/setup-terraform": ["v4"],
+    "peter-evans/create-pull-request": ["v8"]
+  },
+  "localActions": {
+    ".github/actions/setup-node-repo/action.yml": "56966f1af2a2da0e0c3c51f8f160db41e55ae0bc756f0bb22b17480473d25139"
+  },
+  "workflows": [
+    {
+      "id": "branch-enforcement",
+      "path": ".github/workflows/branch-enforcement.yml",
+      "name": "Branch Enforcement",
+      "triggerDigest": "d200653bd7eeaf47f016907cfad28dff6696409693f772b5ed42f02e1e1d0723",
+      "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
+      "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
+      "jobsDigest": "c1e93493cdfe701e2fe1b37ab0a64f45be9e6e2b52da18a8560f520efd511325",
+      "jobs": { "branch-naming": "Branch Naming Convention", "branch-scope": "Branch Scope Check" }
+    },
+    {
+      "id": "ci",
+      "path": ".github/workflows/ci.yml",
+      "name": "ci",
+      "triggerDigest": "5c375602c9ef5d8ec711bfa7db1aaaf0484d84e8339627fa7f3bcb8de81edbb6",
+      "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
+      "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
+      "jobsDigest": "8e8875885b8649129eb6dfd01240ab2f8cfb108a9f70f038baa8c7ed9873bdf6",
+      "jobs": { "ci": "ci", "external-tests": "External Python tests (apex-recall + azure-pricing MCP)" }
+    },
+    {
+      "id": "docs",
+      "path": ".github/workflows/docs.yml",
+      "name": "docs",
+      "triggerDigest": "9528c5fafe290dd59af3621087da54e10c4f283fe6ba52a94bbe9c90baa2aded",
+      "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
+      "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
+      "jobsDigest": "aca1e80ddb2246870cacb21926529fa2fa4180bb3ade3c34edb09ca94abc3614",
+      "jobs": { "validate": "Markdown docs" }
+    },
+    {
+      "id": "e2e-validation",
+      "path": ".github/workflows/e2e-validation.yml",
+      "name": "e2e-validation",
+      "triggerDigest": "1c20ce1b37f4e47081e6db26abc2dd6c028c16be7a0ddb464e7eb9ca589a0d5e",
+      "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
+      "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
+      "jobsDigest": "feb3b244ed2fc9dadb237866cdee38ef96b1eeaa82839ca1f3af3377ab83d2ed",
+      "jobs": { "validate": "Validate E2E artifacts", "benchmark": "Benchmark E2E projects" }
+    },
+    {
+      "id": "governance-policy-baseline",
+      "path": ".github/workflows/governance-policy-baseline.yml",
+      "name": "Governance Policy Baseline",
+      "triggerDigest": "5276e95ef02255815cf3f19de909ba100d57992ad286bdae15cf8f64e2eefdeb",
+      "permissionsDigest": "e780d99acb8992dbb7dd375a4e4167b135d1ace462209423726fdfe650ac01c7",
+      "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
+      "jobsDigest": "ac4605702b950156c5457f3177219488b03e164391d9aa6693bf69dae37a129d",
+      "jobs": { "collect-baseline": "collect-baseline" }
+    },
+    {
+      "id": "iac-checks",
+      "path": ".github/workflows/iac-checks.yml",
+      "name": "iac-checks",
+      "triggerDigest": "c487b034aea7bf4b37f8630c60a34ca80cd25c7cb411cab154b9009a3d8d5440",
+      "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
+      "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
+      "jobsDigest": "4b809338437e2a900681f437b6ded24069bc03fa404cdf675ec03b47236edd50",
+      "jobs": { "terraform": "Terraform fmt + validate", "bicep": "Bicep fmt" }
+    },
+    {
+      "id": "release-candidate-qualification",
+      "path": ".github/workflows/release-candidate-qualification.yml",
+      "name": "Release Candidate Qualification",
+      "triggerDigest": "267a76bf9976b37b8267e70d277289467c5e081a07130713e09f99650755fac5",
+      "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
+      "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
+      "jobsDigest": "9d0e0bfd50c6e04ec39baac21f54a938d3a60e7ffa356f568ccde9073171699c",
+      "jobs": { "qualify": "Exact-head release qualification" }
+    },
+    {
+      "id": "sensei-branch-maintenance",
+      "path": ".github/workflows/sensei-branch-maintenance.yml",
+      "name": "Sensei Branch Maintenance",
+      "triggerDigest": "790fda8901d7b6df162030cafd9d442fcab98722edcbb9520aede9b90755d456",
+      "permissionsDigest": "89bca53c88856951c2b5fadca05cdef10954ff73e93f0a1f6df49919b7acc8fd",
+      "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
+      "jobsDigest": "8bc7bedaea6def989fa15d37f25a9f0baeb5337f74b8893e76ca9fe648c35c13",
+      "jobs": {
+        "verify-branch-exists": "Verify feat/skills-sensei still exists",
+        "merge-main-into-sensei": "Merge main into feat/skills-sensei",
+        "validate-sensei-branch": "Validate skills + agents on feat/skills-sensei"
+      }
+    },
+    {
+      "id": "validate-devcontainer-base",
+      "path": ".github/workflows/validate-devcontainer-base.yml",
+      "name": "Dev Container Base Validation",
+      "triggerDigest": "4788f5e6b2b3479da96ef6011b4e733c70939f6fcecfd4a77c41612d49753841",
+      "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
+      "concurrencyDigest": "178eb943266420af611c930c78ccc7c035add7d4b4fa78adfd302cff1d6f6f30",
+      "jobsDigest": "39a3a25b5b9fcde07a7b9fb11b8bd80834c74204d9feb1edda70f5ecd8158294",
+      "jobs": {
+        "preflight": "Resolve images and manifest",
+        "validate": "${{ matrix.variant }} / ${{ matrix.arch }}",
+        "compare": "Compare base-image verdicts"
+      }
+    },
+    {
+      "id": "vnext-live-qualification",
+      "path": ".github/workflows/vnext-live-qualification.yml",
+      "name": "vNext Live Qualification",
+      "triggerDigest": "e3ded6e02ec4d49557432b3b0d6fba9b1e37aa8136ebb240386c6d72546b4ec9",
+      "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
+      "concurrencyDigest": "ac5c13ccbc116722f751295746c3c0d50eb7a8c994519ad66f4c2ed00f8ecc81",
+      "jobsDigest": "b16ee385f64d867ebb17a551a570e0c13e85f34e476dfec3a3af7f044a6f9d2e",
+      "jobs": {
+        "validate_dispatch": "Validate exact dispatch",
+        "apply": "Import local Gate 4 approval and deploy exact preview"
+      }
+    },
+    {
+      "id": "weekly-maintenance",
+      "path": ".github/workflows/weekly-maintenance.yml",
+      "name": "Weekly Maintenance",
+      "triggerDigest": "e1a2eeace4ec779df21a7a24202de6cb681e873d0678ae11869c10ff1db45f92",
+      "permissionsDigest": "0686420875052835389cb6e71bf20b413979858f142d3c2eb5c3efd881b5b4c9",
+      "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
+      "jobsDigest": "c5a1664dba10d0211acc2c6488f37595e1e12ca36b7d9adee7fc2f7565621988",
+      "jobs": {
+        "refresh-avm-module-index": "Refresh AVM Module Index",
+        "track-deprecations": "Track Azure Deprecations",
+        "docs-freshness": "Quarterly Audit (glob, orphans, freshness)",
+        "drawio-mcp-tests": "Drawio MCP Tests (Deno)",
+        "drawio-icon-converter-tests": "Drawio Icon Converter Tests (Python)",
+        "link-check": "Check docs links"
+      }
+    }
+  ]
+}

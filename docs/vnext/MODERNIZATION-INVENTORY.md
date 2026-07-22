@@ -62,15 +62,15 @@ manual improvement submission, and single-client bundle remain active until thei
 
 ## Automation And Generation
 
-| Surface                    | Class   | Canonical owner           | Decision                    |
-| -------------------------- | ------- | ------------------------- | --------------------------- |
-| `precommit-hooks`          | rewrite | `lefthook.yml`            | `OWN-003`                   |
-| `github-required-checks`   | keep    | CI workflow               | Hosted execution boundary   |
-| `maintenance-workflows`    | keep    | scheduled workflows       | Freshness and hygiene owner |
-| `model-catalog-generation` | keep    | model catalog generator   | Derived assignments         |
-| `entity-count-generation`  | keep    | count manifest            | Derived entity counts       |
-| `avm-index-generation`     | keep    | AVM index refresher       | Generated module cache      |
-| `freshness-generation`     | keep    | source freshness registry | Drift metadata              |
+| Surface                    | Class   | Canonical owner             | Decision                    |
+| -------------------------- | ------- | --------------------------- | --------------------------- |
+| `precommit-hooks`          | rewrite | `lefthook.yml`              | `OWN-003`                   |
+| `github-required-checks`   | keep    | branch protection/workflows | Hosted execution boundary   |
+| `maintenance-workflows`    | keep    | scheduled workflows         | Freshness and hygiene owner |
+| `model-catalog-generation` | keep    | model catalog generator     | Derived assignments         |
+| `entity-count-generation`  | keep    | count manifest              | Derived entity counts       |
+| `avm-index-generation`     | keep    | AVM index refresher         | Generated module cache      |
+| `freshness-generation`     | keep    | source freshness registry   | Drift metadata              |
 
 ## Compatibility And Diagnostics
 
@@ -114,6 +114,10 @@ and hosted checks to consume repository-owned commands with equivalent diagnosti
 The `exact-head-release-qualification` surface remains separate from `github-required-checks`: deterministic pull-request
 checks protect integration, while exact-head qualification emits candidate-bound release evidence without merge,
 publication, deployment, tag, or cutover authority.
+
+Issue #103 adds a read-only hosted workflow contract over the existing owners. It freezes names, triggers, paths,
+permissions, concurrency, action versions, external-runtime visibility, artifacts, and exact-head denial boundaries;
+workflow YAML and branch protection remain authoritative and unchanged.
 
 ### Dependencies
 
