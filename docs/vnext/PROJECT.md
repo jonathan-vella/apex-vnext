@@ -5,8 +5,8 @@
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
-- **Active issue:** [#111](https://github.com/jonathan-vella/apex-vnext/issues/111)
-- **Working branch:** `feat/111-client-projections`
+- **Active issue:** [#113](https://github.com/jonathan-vella/apex-vnext/issues/113)
+- **Working branch:** `chore/113-hook-coordination`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -23,6 +23,7 @@ PR #104 added the read-only hosted workflow contract without changing workflow Y
 PR #106 delegated public validation aliases to canonical npm scripts without removing compatibility names.
 PR #108 extracted the shared Python validation bootstrap while preserving required and exact-head hosted boundaries.
 PR #110 archived obsolete workflow synchronization with provenance and a durable retirement regression.
+PR #112 generated deterministic VS Code and Copilot CLI projections from the npm-owned customization bundle.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
@@ -41,7 +42,7 @@ qualification has run, and no ARM MCP version has been selected or qualified.
 | Prior exact candidate `25530c339410e9758ae34538427f24bddfd83e1d`         | Historical characterization for the earlier contract          |
 | Prior VS Code, package, security, and live Azure results                 | Preserved in [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md) |
 | Copilot CLI `1.0.73` and cross-client matrix                             | Contract defined; execution pending                           |
-| Guidance, Markdown, lint, hook, and workflow ownership                   | Characterized; first hook repair merged                       |
+| Guidance, Markdown, lint, hook, and workflow ownership                   | Characterized; hook coordination simplification in issue #113 |
 | ARM MCP adapters and MCP retirements                                     | Pending                                                       |
 | Bundle composition mappings, aggregate lock, and client projections      | Implemented; live client qualification remains pending        |
 | Diagram and improvement-measurement changes                              | Pending                                                       |
@@ -57,8 +58,8 @@ qualification has run, and no ARM MCP version has been selected or qualified.
 
 ## Immediate Sequence
 
-1. Complete issue #111's deterministic VS Code and Copilot CLI bundle projections.
-2. Continue Milestone N through independently revertible bundle, validator, hook, and workflow slices.
+1. Complete issue #113's conservative pre-commit index coordination and exact-scope validator delegation.
+2. Close Milestone N only after its bundle, validator, hook, and workflow exit evidence is accounted for.
 3. Retire the selected MCP and Draw.io surfaces only after each replacement gate passes.
 4. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.
 5. Complete ARM pricing evidence, diagram routing, bounded improvement measurement, bundle generation, and guidance
@@ -69,6 +70,6 @@ qualification has run, and no ARM MCP version has been selected or qualified.
 
 1. Read [PRD.md](PRD.md), [ROADMAP.md](ROADMAP.md), and [REGISTER.md](REGISTER.md).
 2. Verify the current `main` head, open pull requests, worktrees, and dirty files before selecting a slice.
-3. Resume issue #111 from the `copilot-client-projections` and `client-bundle-generation` ownership records; keep later
-   implementation in independently revertible Milestone N and O slices.
+3. Resume issue #113 from the `precommit-hooks` ownership record; keep later implementation in independently revertible
+   Milestone N and O slices.
 4. Treat [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md) as historical evidence until a new candidate is declared.

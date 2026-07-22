@@ -1,7 +1,7 @@
 {
   "$schema": "schemas/modernization-ownership.schema.json",
   "schemaVersion": "1.0.0",
-  "candidate": "4e989e87348914dc9901846ee9eb3b40d57b6d77",
+  "candidate": "93bf2fee93ed06eb73f0774b4f1904d5b7d90e10",
   "surfaces": [
     {
       "id": "workspace-operating-frame",
@@ -302,8 +302,8 @@
       "consumers": ["git pre-commit", "contributors", "artifact validation"],
       "proofCommands": ["npm run validate:hooks", "npm run test:hooks"],
       "removalGate": "Missing executables fail nonzero, staged-file scope and diagnostics match direct npm commands, and index-lock coordination permits safe parallel execution with unchanged staged-file semantics.",
-      "rationale": "Serial execution protects multiple stage_fixed writers, while the Markdown wrapper currently converts executable lookup failure into a successful hook.",
-      "followUp": "Issue #95 adds the missing-executable regression and fail-closed Markdown invocation; index coordination and representative staged-change benchmarks remain later slices.",
+      "rationale": "Serial execution protects the model-catalog and SKU-manifest generators, which both re-stage output through one Git index; read-only hooks must not claim stage_fixed ownership.",
+      "followUp": "Issues #95 and #113 make Markdown fail closed, remove its unnecessary stage_fixed ownership, delegate Terraform formatting to its canonical npm command, and prove a held index lock rejects a concurrent writer. Serial execution remains required unless explicit coordination is added.",
       "decisionRef": "OWN-003"
     },
     {

@@ -99,13 +99,16 @@ files and package scripts.
 
 ### Hooks
 
-Hook validation and characterization tests pass. Hook timing remains a gap because no benchmark currently exercises
-representative staged documentation, code, workflow, and artifact changes. Serial execution remains required while
-multiple `stage_fixed` commands can race on the Git index.
+Hook validation and characterization tests pass. Issue #113 removes unnecessary `stage_fixed` ownership from the
+read-only Markdown hook and delegates Terraform formatting to its canonical npm command. The Python hook retains its
+narrower Azure Pricing scope because the repository command also validates `apex-recall`. Deterministic lock contention
+coverage proves a concurrent writer fails while the Git index lock is held. Serial execution remains required because
+the model-catalog and SKU-manifest generators both re-stage output through that shared index.
 
 PR #96 repaired the characterized pre-commit Markdown failure path: the hook now invokes the repository-owned lint
-command, preserves diagnostics, and propagates a nonzero result with executable regression coverage. Serial execution
-remains unchanged; representative hook timing and Git-index coordination remain later gates.
+command, preserves diagnostics, and propagates a nonzero result with executable regression coverage. Issue #113 keeps
+that scope and failure contract while reducing index writers to the two genuine generators. Representative timing
+remains a later optimization gate; no global parallelism claim is made.
 
 The `markdown-policy-enforcement` cluster records the split between audience-specific authoring guidance and the shared
 executable lint contract. `OWN-018` keeps those guidance audiences separate while requiring hooks, editor integration,
@@ -149,7 +152,8 @@ validation without replacing those specialized checks.
 
 - `OWN-001`: keep skill and instruction frontmatter canonical; generate audit views.
 - `OWN-002`: keep validator metadata in the schema-backed repository graph and package scripts as executable projections.
-- `OWN-003`: retain serial hooks until Git index coordination and representative benchmarks pass.
+- `OWN-003`: keep only genuine generators as index writers and retain serial hooks until explicit Git index coordination
+  and representative timing benchmarks pass.
 - `OWN-004`: derive artifact heading metadata from canonical templates.
 - `OWN-005`: defer schema-library consolidation until source and consumer provenance is mapped.
 - `OWN-006`: keep npm and the customization manifest authoritative while extending the transactional client lifecycle.
