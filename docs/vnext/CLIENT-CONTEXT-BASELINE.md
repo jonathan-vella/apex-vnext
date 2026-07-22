@@ -15,9 +15,10 @@ The normalized contract is
 - whether the source is a fixture or live operator capture; and
 - a deterministic SHA-256 sample ID.
 
-Prompts, responses, messages, transcripts, tool arguments, tool results, credentials, and secrets are prohibited. Content
-capture remains disabled. Missing cache counters are `unavailable`; they are never inferred from latency, token totals,
-or repeated calls. Aggregates publish totals and averages only when every sample in a group measured that counter.
+Prompts, responses, messages, transcripts, tool arguments, tool results, credentials, and secrets are prohibited.
+Content capture remains disabled. Missing cache counters are `unavailable`; they are never inferred from latency,
+token totals, or repeated calls. Aggregates publish totals and averages only when every sample in a group measured
+that counter.
 
 ## Adapter Status
 
@@ -56,8 +57,9 @@ local client produces a documented, redacted source shape.
      --output tmp/vscode-sample.json
    ```
 
-6. Repeat across the approved scenario matrix, retries, tiers, tracks, and both clients. If a client has no characterized
-   raw adapter or a metric is absent, record the evidence as unavailable rather than translating or estimating it.
+6. Repeat across the approved scenario matrix, retries, tiers, tracks, and both clients. If a client has no
+   characterized raw adapter or a metric is absent, record the evidence as unavailable rather than translating or
+   estimating it.
 7. Aggregate normalized samples deterministically:
 
    ```bash
