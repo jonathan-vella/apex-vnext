@@ -19,7 +19,7 @@
       "description": "Instruction files with glob-based auto-application"
     },
     "validators": {
-      "computed_from": "package.json validate:_node + validate:_external unique script names",
+      "computed_from": "tools/registry/repository-validator-graph.json active lint and validation commands",
       "description": "Validation and lint scripts registered in the npm suite"
     },
     "vscode_extensions": {
@@ -35,5 +35,5 @@
       "description": "VS Code auto-loaded prompt files (discoverable via chat input /). Tracked separately from tools/apex-prompts/ which are non-auto-loaded APEX planning prompts."
     }
   },
-  "updated": "2026-05-18"
+  "updated": "2026-07-22"
 }
