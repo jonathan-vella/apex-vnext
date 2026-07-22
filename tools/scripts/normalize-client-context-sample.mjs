@@ -10,6 +10,7 @@ const TIERS = new Set(["simple", "standard", "complex"]);
 const IAC_TRACKS = new Set(["neutral", "bicep", "terraform"]);
 const EVIDENCE_KINDS = new Set(["fixture", "live"]);
 const PROHIBITED_KEYS = /(?:prompt|response|message|content|transcript|tool.*(?:argument|result)|credential|secret)/iu;
+const SCENARIO_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
 function requireString(value, name) {
   if (typeof value !== "string" || value.trim() === "") throw new Error(`${name} must be a non-empty string`);
@@ -19,6 +20,12 @@ function requireString(value, name) {
 function requireChoice(value, name, choices) {
   requireString(value, name);
   if (!choices.has(value)) throw new Error(`${name} has unsupported value: ${value}`);
+  return value;
+}
+
+function requireScenarioId(value) {
+  requireString(value, "scenarioId");
+  if (!SCENARIO_ID.test(value)) throw new Error("scenarioId must be a lowercase kebab-case identifier");
   return value;
 }
 
@@ -78,7 +85,7 @@ export function normalizeClientContextSample(source, metadata) {
       version: requireString(metadata.clientVersion, "clientVersion"),
     },
     scenario: {
-      id: requireString(metadata.scenarioId, "scenarioId"),
+      id: requireScenarioId(metadata.scenarioId),
       tier: requireChoice(metadata.tier, "tier", TIERS),
       iacTrack: requireChoice(metadata.iacTrack, "iacTrack", IAC_TRACKS),
       retry: metadata.retry === true,

@@ -37,10 +37,11 @@ local client produces a documented, redacted source shape.
 3. For a characterized VS Code OTel export, create an aggregate-only profile:
 
    ```bash
-   npm run --silent profile:debug-log -- path/to/redacted-otel.json --json > tmp/vscode-profile.json
+   npm run --silent profile:debug-log -- path/to/redacted-otel.json --json --metrics-only > tmp/vscode-profile.json
    ```
 
-4. Inspect the profile for the `apex-debug-profile` format and confirm it contains no prohibited content-bearing fields.
+4. Inspect the profile for the `apex-debug-profile` format and confirm it contains only `schemaVersion`, `format`, and
+   allowlisted aggregate counters under `totals`.
 5. Normalize one sample with explicit scenario metadata:
 
    ```bash

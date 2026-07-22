@@ -85,6 +85,15 @@ def test_cli_text_and_json(profiler, capsys):
     parsed = json.loads(json_out)
     assert parsed["totals"]["input_tokens"] == 45000
 
+    rc = profiler.main([str(FIXTURE), "--json", "--metrics-only"])
+    assert rc == 0
+    metrics_out = json.loads(capsys.readouterr().out)
+    assert metrics_out == {
+        "schemaVersion": "1.0.0",
+        "format": "apex-debug-profile",
+        "totals": {"chat_calls": 1, "input_tokens": 45000, "output_tokens": 1200},
+    }
+
 
 def test_cli_handles_missing_file(profiler, capsys):
     rc = profiler.main(["does/not/exist.json"])

@@ -75,6 +75,22 @@ test("rejects unsupported clients and malformed counters", () => {
     () => normalizeClientContextSample(source({ cache_hits: 0.5 }), metadata()),
     /cache_hits must be a non-negative safe integer/u,
   );
+  assert.throws(
+    () => normalizeClientContextSample(source({ cache_hits: -1 }), metadata()),
+    /cache_hits must be a non-negative safe integer/u,
+  );
+  assert.throws(
+    () => normalizeClientContextSample(source(), { ...metadata(), scenarioId: "Step 1 Requirements" }),
+    /scenarioId must be a lowercase kebab-case identifier/u,
+  );
+  assert.throws(
+    () => normalizeClientContextSample({ ...source(), schemaVersion: "2.0.0" }, metadata()),
+    /source must use apex-debug-profile schemaVersion 1.0.0/u,
+  );
+  assert.throws(
+    () => normalizeClientContextSample({ ...source(), format: "unknown-profile" }, metadata()),
+    /source must use apex-debug-profile schemaVersion 1.0.0/u,
+  );
 });
 
 test("rejects content-bearing and secret-bearing source fields", () => {
@@ -88,6 +104,10 @@ test("rejects content-bearing and secret-bearing source fields", () => {
   );
   assert.throws(
     () => normalizeClientContextSample({ ...source(), apiSecret: "not-a-real-secret" }, metadata()),
+    /prohibited content-bearing field/u,
+  );
+  assert.throws(
+    () => normalizeClientContextSample({ ...source(), errors: [{ message: "raw error" }] }, metadata()),
     /prohibited content-bearing field/u,
   );
 });
@@ -144,4 +164,18 @@ test("aggregates samples deterministically without claiming partial cache metric
 test("rejects duplicate sample identifiers", () => {
   const sample = normalizeClientContextSample(source(), metadata());
   assert.throws(() => aggregateClientContextSamples([sample, sample]), /duplicate sampleId/u);
+});
+
+test("keeps distinct scenarios in separate aggregate groups", () => {
+  const requirements = normalizeClientContextSample(source(), metadata());
+  const architecture = normalizeClientContextSample(source(), {
+    ...metadata(),
+    scenarioId: "architecture-standard-bicep",
+  });
+  const aggregate = aggregateClientContextSamples([requirements, architecture]);
+
+  assert.deepEqual(
+    aggregate.summaries.map(({ scenarioId }) => scenarioId),
+    ["architecture-standard-bicep", "requirements-standard-bicep"],
+  );
 });

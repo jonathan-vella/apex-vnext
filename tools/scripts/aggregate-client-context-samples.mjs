@@ -46,9 +46,13 @@ export function aggregateClientContextSamples(samples) {
     assertSample(sample);
     if (ids.has(sample.sampleId)) throw new Error(`duplicate sampleId: ${sample.sampleId}`);
     ids.add(sample.sampleId);
-    const key = [sample.client.id, sample.scenario.tier, sample.scenario.iacTrack, String(sample.scenario.retry)].join(
-      "|",
-    );
+    const key = [
+      sample.client.id,
+      sample.scenario.id,
+      sample.scenario.tier,
+      sample.scenario.iacTrack,
+      String(sample.scenario.retry),
+    ].join("|");
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(sample);
   }
@@ -56,9 +60,10 @@ export function aggregateClientContextSamples(samples) {
   const summaries = [...groups.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([key, groupedSamples]) => {
-      const [client, tier, iacTrack, retry] = key.split("|");
+      const [client, scenarioId, tier, iacTrack, retry] = key.split("|");
       return {
         client,
+        scenarioId,
         tier,
         iacTrack,
         retry: retry === "true",

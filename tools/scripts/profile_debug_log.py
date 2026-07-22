@@ -391,10 +391,37 @@ def render_text(metrics: dict[str, Any], path: Path) -> str:
     return "\n".join(lines)
 
 
+def metrics_only(metrics: dict[str, Any]) -> dict[str, Any]:
+    """Return only aggregate fields accepted by context sample normalization."""
+    totals = metrics["totals"]
+    allowed_totals = {
+        key: totals[key]
+        for key in (
+            "input_tokens",
+            "output_tokens",
+            "chat_calls",
+            "cache_read_tokens",
+            "cache_write_tokens",
+            "cache_hits",
+        )
+        if key in totals
+    }
+    return {
+        "schemaVersion": metrics["schemaVersion"],
+        "format": metrics["format"],
+        "totals": allowed_totals,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("log", type=Path, help="Path to OTel debug log JSON")
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of text")
+    parser.add_argument(
+        "--metrics-only",
+        action="store_true",
+        help="Emit only allowlisted aggregate fields for context sample normalization",
+    )
     parser.add_argument(
         "--max-spans-between-clears",
         type=int,
@@ -421,8 +448,11 @@ def main(argv: list[str] | None = None) -> int:
         max_askquestions_per_phase=args.max_askquestions_per_phase,
     )
 
+    if args.metrics_only and not args.json:
+        parser.error("--metrics-only requires --json")
+
     if args.json:
-        json.dump(metrics, sys.stdout, indent=2, sort_keys=True)
+        json.dump(metrics_only(metrics) if args.metrics_only else metrics, sys.stdout, indent=2, sort_keys=True)
         sys.stdout.write("\n")
     else:
         print(render_text(metrics, args.log))
