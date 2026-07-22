@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Added a strict Copilot CLI `1.0.73` JSONL telemetry adapter that emits only allowlisted aggregate token counters;
+  local content-disabled characterization succeeds while representative two-client evidence remains pending.
 - Added a privacy-safe, fixture-qualified two-client context/cache sample contract and deterministic aggregation for
   Milestone O; representative live evidence remains pending.
 - Closed Milestone N with isolated documentation, JavaScript, workflow, and artifact pre-commit parity measurements,
