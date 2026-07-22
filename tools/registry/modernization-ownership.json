@@ -1,7 +1,7 @@
 {
   "$schema": "schemas/modernization-ownership.schema.json",
   "schemaVersion": "1.0.0",
-  "candidate": "00feb98e6fcfeabc23ad1fe1e5e72a26207fe53d",
+  "candidate": "ada8ae1b21b1eca227fa97dba1a1944158f99f24",
   "surfaces": [
     {
       "id": "workspace-operating-frame",
@@ -494,12 +494,16 @@
       "category": "diagnostics",
       "classification": "consolidate",
       "canonicalOwner": "tools/scripts/_lib/reporter.mjs",
-      "sourceRefs": ["tools/scripts/_lib/reporter.mjs", "tools/scripts/validate-*.mjs"],
+      "sourceRefs": [
+        "tools/scripts/_lib/reporter.mjs",
+        "tools/scripts/_lib/registry-validator-reporter.mjs",
+        "tools/scripts/validate-*.mjs"
+      ],
       "consumers": ["local validation", "CI logs", "agent remediation"],
-      "proofCommands": ["npm run test:lib-json", "npm run test:lib-ajv"],
+      "proofCommands": ["npm run test:lib-json", "npm run test:lib-ajv", "npm run test:registry-validator-reporter"],
       "removalGate": "All validator families emit stable severity, path, summary, and machine-readable diagnostics.",
       "rationale": "Shared reporter adoption is partial, producing inconsistent output and remediation context.",
-      "followUp": "Migrate validators by family after snapshotting current output contracts.",
+      "followUp": "Issue #117 migrates the registry and hosted-workflow contract family with text and JSON output snapshots; remaining families migrate independently.",
       "decisionRef": "OWN-008"
     },
     {
@@ -585,9 +589,9 @@
       "id": "diagnostics",
       "status": "gap",
       "sourceRefs": ["tools/scripts/_lib/reporter.mjs", "tools/scripts/validate-*.mjs"],
-      "measurement": "Reporter import scan; npm run test:lib-json; npm run test:lib-ajv",
-      "evidence": "Shared diagnostic library tests pass; reporter adoption is partial and hook wrappers can alter exit propagation even when command diagnostics are retained.",
-      "followUp": "Milestone N must capture family-level output and exit snapshots before migrating validators or wrappers."
+      "measurement": "Reporter import scan; npm run test:lib-json; npm run test:lib-ajv; npm run test:registry-validator-reporter",
+      "evidence": "Shared diagnostic library tests pass. Issue #117 snapshots stable text and JSON diagnostics for the modernization ownership, repository validator graph, and hosted workflow contract family; repository-wide reporter adoption remains partial.",
+      "followUp": "Migrate each remaining validator family only after capturing its output and exit contract."
     },
     {
       "id": "drift",

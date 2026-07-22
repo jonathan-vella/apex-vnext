@@ -139,8 +139,10 @@ than copied into this document.
 
 ### Diagnostics
 
-Shared JSON and AJV diagnostic-library tests pass. Reporter adoption remains partial across registered validator
-commands, so output compatibility snapshots are required before each family migrates.
+Shared JSON and AJV diagnostic-library tests pass. Issue #117 migrates the modernization ownership, repository validator
+graph, and hosted workflow contract family to one reporter adapter with stable text and JSON diagnostics, source paths,
+summaries, and failure exits. Reporter adoption remains partial across other validator families, so output compatibility
+snapshots are still required before each family migrates.
 
 Issue #115 completes `OWN-004`: canonical artifact templates now generate both the runtime heading module and compact
 JSON summary. Explicit metadata remains only for optional headings, template-only headings, and the non-template
