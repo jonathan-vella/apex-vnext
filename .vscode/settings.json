@@ -25,6 +25,10 @@
   },
   "chat.useCustomAgentHooks": true,
   "chat.useAgentSkills": true,
+  "github.copilot.chat.otel.enabled": true,
+  "github.copilot.chat.otel.exporterType": "file",
+  "github.copilot.chat.otel.captureContent": false,
+  "github.copilot.chat.otel.outfile": "/workspaces/apex-vnext/tmp/vscode-copilot-otel.jsonl",
   "json.schemas": [
     {
       "fileMatch": [".github/data/governance-policy-baseline.fixture.json"],
