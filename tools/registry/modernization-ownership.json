@@ -260,7 +260,7 @@
       "proofCommands": ["npm run lint:md", "npm run validate:docs", "npm run validate:hooks", "npm run test:hooks"],
       "removalGate": "Hooks and hosted checks call repository-owned commands and preserve lint scope, diagnostics, exclusions, and nonzero failures when tooling is unavailable.",
       "rationale": "Audience-specific authoring guidance is distinct from executable lint policy, but hooks and workflows should consume the same npm-owned command contract.",
-      "followUp": "Repair the fail-open Markdown hook lookup in Milestone N and add a missing-executable regression test before changing lint scope.",
+      "followUp": "Issue #95 repairs the fail-open Markdown hook lookup and adds missing-executable regression coverage before any lint-scope change.",
       "decisionRef": "OWN-018"
     },
     {
@@ -290,7 +290,7 @@
       "proofCommands": ["npm run validate:hooks", "npm run test:hooks"],
       "removalGate": "Missing executables fail nonzero, staged-file scope and diagnostics match direct npm commands, and index-lock coordination permits safe parallel execution with unchanged staged-file semantics.",
       "rationale": "Serial execution protects multiple stage_fixed writers, while the Markdown wrapper currently converts executable lookup failure into a successful hook.",
-      "followUp": "First add a missing-executable regression test and fail-closed Markdown invocation; only then design index coordination and benchmark representative staged changes.",
+      "followUp": "Issue #95 adds the missing-executable regression and fail-closed Markdown invocation; index coordination and representative staged-change benchmarks remain later slices.",
       "decisionRef": "OWN-003"
     },
     {
@@ -530,7 +530,7 @@
       "sourceRefs": ["lefthook.yml", "tools/scripts/validate-hooks.mjs", "tools/tests/test-hooks.sh"],
       "measurement": "npm run validate:hooks; npm run test:hooks",
       "evidence": "At b27d173, direct missing Markdown tooling exits 127 while the current hook wrapper pattern prints the same lookup error and exits 0; serial stage_fixed execution also lacks a representative timing benchmark.",
-      "followUp": "Milestone N owns a fail-closed regression test and repair, then representative documentation, code, workflow, and artifact timing benchmarks."
+      "followUp": "Issue #95 owns the fail-closed regression and repair; representative documentation, code, workflow, and artifact timing benchmarks remain a later Milestone N slice."
     },
     {
       "id": "dependencies",

@@ -17,8 +17,8 @@ No classification authorizes implementation by itself. Milestones I through O ap
 revertible slice with characterization tests and baseline comparison.
 
 The [guidance and automation review contract](GUIDANCE-AUTOMATION-REVIEW.md) defines the required Milestone H
-characterization for agent guidance, Markdown, linting, and workflows. Issue #93 must complete those consumer maps and
-behavior baselines before the related ownership entries move.
+characterization for agent guidance, Markdown, linting, and workflows. PR #94 completed those consumer maps and behavior
+baselines before the related ownership entries move.
 
 ## Guidance And Invocation
 
@@ -103,9 +103,9 @@ Hook validation and characterization tests pass. Hook timing remains a gap becau
 representative staged documentation, code, workflow, and artifact changes. Serial execution remains required while
 multiple `stage_fixed` commands can race on the Git index.
 
-The pre-commit Markdown command currently reports `markdownlint-cli2: No such file or directory` while the hook summary
-still reports success. Issue #93 must capture a reproducer and assign the fail-closed repair to Milestone N; the review
-does not change hook behavior.
+The characterized pre-commit Markdown wrapper reports missing tooling while returning success. Issue #95 owns the first
+Milestone N repair: invoke the repository-owned lint command, preserve diagnostics, and propagate a nonzero result with
+executable regression coverage. Serial execution remains unchanged.
 
 The `markdown-policy-enforcement` cluster records the split between audience-specific authoring guidance and the shared
 executable lint contract. `OWN-018` keeps those guidance audiences separate while requiring hooks, editor integration,
