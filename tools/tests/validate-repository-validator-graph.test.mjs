@@ -71,17 +71,25 @@ const scripts = {
 const options = { graph, schema, scripts, consumers: { "ci-main": "validate:_node-ci" } };
 
 function runScript(script, args = []) {
-  const result = spawnSync("npm", ["run", script, "--", ...args], {
+  const result = spawnSync("npm", ["run", "--silent", script, "--", ...args], {
     cwd: process.cwd(),
     encoding: "utf8",
     env: { ...process.env, NO_COLOR: "1" },
   });
+  if (result.error !== undefined) throw result.error;
+  assert.notEqual(result.status, null, `${script} terminated without an exit status`);
   const output = `${result.stdout}${result.stderr}`;
   const lines = output.split(/\r?\n/u);
   const start = lines.findIndex((line) =>
     /(?:Policy Precheck Output Validator|Agent Validators \(consolidated\))/u.test(line),
   );
-  return { status: result.status, output: lines.slice(start).join("\n").trim() };
+  assert.notEqual(start, -1, `${script} emitted no recognizable validator diagnostics`);
+  const diagnostics = lines
+    .slice(start)
+    .filter((line) => !/^npm (?:error|ERR!)/iu.test(line))
+    .join("\n")
+    .trim();
+  return { status: result.status, output: diagnostics };
 }
 
 test("parses prerequisites, parallel members, continue-on-error, and epilogue", () => {
@@ -146,7 +154,7 @@ test("rejects multi-hop alias delegation", () => {
 test("rejects a canonical script delegated back to its alias", () => {
   const errors = validateRepositoryValidatorGraph({
     ...options,
-    scripts: { ...scripts, "validate:example": "npm run lint:example --" },
+    scripts: { ...scripts, "validate:example": "npm run lint:example -- --foo" },
   });
   assert.ok(errors.some((error) => error.includes("canonical script delegates to alias")));
 });

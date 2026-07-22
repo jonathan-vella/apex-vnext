@@ -108,7 +108,7 @@ export function validateRepositoryValidatorGraph({ graph, schema, scripts, consu
   for (const command of graph.commands) {
     if (!profiles.has(command.profile)) errors.push(`${command.script}: unknown profile ${command.profile}`);
     if (scripts[command.script] === undefined) errors.push(`${command.script}: package script is missing`);
-    const canonicalDelegate = scripts[command.script]?.match(/^npm run ([a-z0-9:_-]+) --$/u)?.[1];
+    const canonicalDelegate = scripts[command.script]?.match(/^npm run ([a-z0-9:_-]+)(?:\s|$)/u)?.[1];
     if (canonicalDelegate !== undefined && aliases.has(canonicalDelegate)) {
       errors.push(`${command.script}: canonical script delegates to alias ${canonicalDelegate}`);
     }
