@@ -3739,7 +3739,7 @@ export class ApexService {
   private async walkFiles(directory: string): Promise<string[]> {
     const entries = await readdir(directory, { withFileTypes: true });
     const files: string[] = [];
-    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+    for (const entry of entries.sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0))) {
       const path = join(directory, entry.name);
       if (entry.isSymbolicLink())
         throw new ApexError(

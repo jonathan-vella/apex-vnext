@@ -11,7 +11,7 @@ async function treeDigest(root: string): Promise<string> {
   const hash = createHash("sha256");
   const visit = async (directory: string): Promise<void> => {
     const entries = (await readdir(directory, { withFileTypes: true })).sort((left, right) =>
-      left.name.localeCompare(right.name),
+      left.name < right.name ? -1 : left.name > right.name ? 1 : 0,
     );
     for (const entry of entries) {
       const path = join(directory, entry.name);

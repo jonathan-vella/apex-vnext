@@ -17,7 +17,7 @@
     "validate:vnext-live-workflow": "node tools/scripts/validate-vnext-live-workflow.mjs",
     "test:vnext-live-workflow": "node --test tools/tests/vnext-live-prepare.test.mjs tools/tests/vnext-live-workflow.test.mjs tools/tests/vnext-qualification-context.test.mjs",
     "test:vnext-validator": "npm run build --workspace @apex/contracts && node --test tools/tests/vnext/validate-vnext.test.mjs tools/tests/vnext/live-qualification.test.mjs tools/tests/vnext-live-workflow.test.mjs tools/tests/vnext-qualification-context.test.mjs",
-    "test:vnext-pack": "node --test tools/tests/vnext/pack-vnext.test.mjs",
+    "test:vnext-pack": "node --test tools/tests/vnext/pack-vnext.test.mjs tools/tests/vnext/prepare-assets.test.mjs",
     "pack:vnext": "node tools/scripts/pack-vnext.mjs",
     "qualify:vnext": "npm run validate:vnext && npm run test:vnext && npm run test:vnext-validator && npm run test:vnext-pack",
     "qualify:vnext-release": "node tools/scripts/qualify-vnext-release.mjs",
