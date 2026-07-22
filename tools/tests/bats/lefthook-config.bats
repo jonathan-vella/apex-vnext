@@ -74,6 +74,7 @@ create_markdown_fixture() {
 
   [[ "$terraform_hook" == *"npm run lint:terraform-fmt"* ]]
   [[ "$terraform_hook" != *"terraform fmt -check"* ]]
+  [[ "$terraform_hook" == *"npm run lint:terraform-fmt failed"* ]]
 }
 
 @test "a held Git index lock rejects a concurrent writer" {

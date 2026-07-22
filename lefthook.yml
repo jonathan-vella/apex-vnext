@@ -250,7 +250,7 @@ pre-commit:
         if [ -n "$STAGED_TF" ]; then
           echo "🔧 Checking Terraform formatting..."
           npm run lint:terraform-fmt || {
-            echo "❌ terraform fmt failed. Run: terraform fmt -recursive infra/terraform/"
+            echo "❌ npm run lint:terraform-fmt failed. Fix with: terraform fmt -recursive infra/terraform/"
             exit 1
           }
         else
