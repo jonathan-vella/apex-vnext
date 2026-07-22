@@ -22,23 +22,29 @@ that counter.
 
 ## Adapter Status
 
-| Client                 | Raw source status                          | Contract          |
-| ---------------------- | ------------------------------------------ | ----------------- |
-| GitHub Copilot VS Code | Exact OTel token fields are characterized. | Fixture-qualified |
-| GitHub Copilot CLI     | No raw telemetry shape is characterized.   | Fixture-qualified |
+| Client                 | Raw source status                           | Contract           |
+| ---------------------- | ------------------------------------------- | ------------------ |
+| GitHub Copilot VS Code | Exact OTel token fields are characterized.  | Fixture-qualified  |
+| GitHub Copilot CLI     | Version `1.0.73` local JSONL characterized. | Live-characterized |
 
-Fixture qualification proves schema, privacy rejection, unavailable handling, and deterministic aggregation. It is not
-evidence that either client emitted those measurements. A Copilot CLI adapter must remain unavailable until a supported
-local client produces a documented, redacted source shape.
+Fixture qualification proves schema, privacy rejection, unavailable handling, and deterministic aggregation. A bounded
+live Copilot CLI sample additionally proves that version `1.0.73` emits exact input, output, and cache-creation token
+counters with content capture disabled. It does not provide representative matrix coverage or satisfy the VS Code gate.
 
 ## Operator Procedure
 
 1. Record the installed client ID and version. Do not install or update a client as part of measurement.
 2. Run an approved representative scenario with OpenTelemetry content capture disabled.
-3. For a characterized VS Code OTel export, create an aggregate-only profile:
+3. Create an aggregate-only profile with the client-specific adapter:
 
    ```bash
+   # VS Code resourceSpans export
    npm run --silent profile:debug-log -- path/to/redacted-otel.json --json --metrics-only > tmp/vscode-profile.json
+
+   # Copilot CLI 1.0.73 local JSONL export
+   npm run --silent profile:copilot-cli-otel -- \
+     --source tmp/copilot-cli-otel.jsonl \
+     --output tmp/copilot-cli-profile.json
    ```
 
 4. Inspect the profile for the `apex-debug-profile` format and confirm it contains only `schemaVersion`, `format`, and
@@ -75,5 +81,5 @@ Run `npm run test:client-context-samples`. The suite covers both supported clien
 sample IDs and aggregates, unavailable cache metrics, duplicate samples, invalid counters, unknown clients, and
 content-bearing input rejection.
 
-Issue [#121](https://github.com/jonathan-vella/apex-vnext/issues/121) owns this slice.
+Issue [#126](https://github.com/jonathan-vella/apex-vnext/issues/126) owns live collection.
 The context baseline remains a gap until representative live samples exist for both supported clients.

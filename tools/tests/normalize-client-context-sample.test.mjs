@@ -4,6 +4,7 @@ import test from "node:test";
 import Ajv2020 from "ajv/dist/2020.js";
 import { aggregateClientContextSamples } from "../scripts/aggregate-client-context-samples.mjs";
 import { normalizeClientContextSample, parseArgs } from "../scripts/normalize-client-context-sample.mjs";
+import { profileCopilotCliOtel } from "../scripts/profile-copilot-cli-otel.mjs";
 
 const schema = JSON.parse(
   readFileSync(new URL("../registry/schemas/client-context-sample.schema.json", import.meta.url), "utf8"),
@@ -34,6 +35,64 @@ function metadata(client = "github-copilot-vscode") {
     retry: false,
   };
 }
+
+function cliRecord(name, attributes = {}) {
+  return JSON.stringify({
+    type: "span",
+    name,
+    attributes,
+    events: [{ message: "must never be copied" }],
+  });
+}
+
+test("profiles only allowlisted Copilot CLI counters", () => {
+  const profile = profileCopilotCliOtel(
+    [
+      cliRecord("invoke_agent", { "gen_ai.tool.definitions": "must never be copied" }),
+      cliRecord("chat model-a", {
+        "gen_ai.usage.input_tokens": 12_000,
+        "gen_ai.usage.output_tokens": 300,
+        "gen_ai.usage.cache_creation.input_tokens": 11_500,
+        "gen_ai.response.id": "must never be copied",
+      }),
+      cliRecord("chat model-b", {
+        "gen_ai.usage.input_tokens": 2_000,
+        "gen_ai.usage.output_tokens": 100,
+        "gen_ai.usage.cache_creation.input_tokens": 1_800,
+      }),
+    ].join("\n"),
+  );
+
+  assert.deepEqual(
+    profile,
+    source({
+      input_tokens: 14_000,
+      output_tokens: 400,
+      chat_calls: 2,
+      cache_write_tokens: 13_300,
+    }),
+  );
+  assert.doesNotMatch(JSON.stringify(profile), /model|message|response|tool/iu);
+});
+
+test("rejects malformed Copilot CLI counters without inferring missing values", () => {
+  assert.throws(() => profileCopilotCliOtel("not-json"), /line 1: invalid JSON/u);
+  assert.throws(() => profileCopilotCliOtel(cliRecord("invoke_agent")), /no chat records/u);
+  assert.throws(
+    () => profileCopilotCliOtel(cliRecord("chat model", { "gen_ai.usage.input_tokens": 1 })),
+    /missing exact token counters/u,
+  );
+  assert.throws(
+    () =>
+      profileCopilotCliOtel(
+        cliRecord("chat model", {
+          "gen_ai.usage.input_tokens": -1,
+          "gen_ai.usage.output_tokens": 1,
+        }),
+      ),
+    /input_tokens must be a non-negative safe integer/u,
+  );
+});
 
 test("normalizes deterministic samples for both supported clients", () => {
   const vscode = normalizeClientContextSample(source(), metadata());
