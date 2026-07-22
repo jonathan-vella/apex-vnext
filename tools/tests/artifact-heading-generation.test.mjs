@@ -8,6 +8,7 @@ import {
   buildArtifactHeadings,
   renderArtifactHeadingsModule,
   renderArtifactHeadingsSummary,
+  validateArtifactHeadingSources,
 } from "../scripts/_lib/artifact-heading-generator.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -31,9 +32,10 @@ test("canonical templates reproduce the existing artifact heading contract", () 
 test("artifact heading rendering is deterministic", async () => {
   const generated = buildArtifactHeadings(repoRoot);
   const firstModule = await renderArtifactHeadingsModule(generated);
-  const secondModule = await renderArtifactHeadingsModule(buildArtifactHeadings(repoRoot));
+  const regenerated = buildArtifactHeadings(repoRoot);
+  const secondModule = await renderArtifactHeadingsModule(regenerated);
   assert.equal(firstModule, secondModule);
-  assert.equal(renderArtifactHeadingsSummary(generated), renderArtifactHeadingsSummary(generated));
+  assert.equal(renderArtifactHeadingsSummary(generated), renderArtifactHeadingsSummary(regenerated));
   assert.equal(
     renderArtifactHeadingsSummary(generated),
     readFileSync(resolve(repoRoot, "tools/scripts/_lib/artifact-headings-summary.json"), "utf8"),
@@ -62,5 +64,17 @@ test("duplicate required template headings fail generation", () => {
           : text;
       }),
     /duplicate required H2 headings/,
+  );
+});
+
+test("an artifact cannot have both template and non-template heading sources", () => {
+  assert.throws(
+    () =>
+      validateArtifactHeadingSources(
+        { "fixture.md": "templates/fixture.md" },
+        { "fixture.md": ["## Fixture"] },
+        { "fixture.md": [] },
+      ),
+    /heading sources overlap: fixture\.md/,
   );
 });

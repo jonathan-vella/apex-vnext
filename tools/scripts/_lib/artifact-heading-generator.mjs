@@ -16,20 +16,32 @@ export function extractRequiredTemplateHeadings(text, artifactName) {
     .filter((line) => line.startsWith("## ") && !excluded.has(line));
 }
 
-export function buildArtifactHeadings(repoRoot, readFile = readFileSync) {
-  const templatePaths = Object.values(ARTIFACT_TEMPLATE_PATHS);
-  if (templatePaths.length !== new Set(templatePaths).size) {
+export function validateArtifactHeadingSources(
+  templatePaths = ARTIFACT_TEMPLATE_PATHS,
+  nonTemplateHeadings = NON_TEMPLATE_ARTIFACT_HEADINGS,
+  optionalHeadings = OPTIONAL_ARTIFACT_HEADINGS,
+) {
+  const templateArtifacts = new Set(Object.keys(templatePaths));
+  const overlappingArtifacts = Object.keys(nonTemplateHeadings).filter((artifactName) =>
+    templateArtifacts.has(artifactName),
+  );
+  if (overlappingArtifacts.length > 0) {
+    throw new Error(`Artifact heading sources overlap: ${overlappingArtifacts.join(", ")}`);
+  }
+  const templatePathValues = Object.values(templatePaths);
+  if (templatePathValues.length !== new Set(templatePathValues).size) {
     throw new Error("Artifact template paths must be unique");
   }
-  const knownArtifacts = new Set([
-    ...Object.keys(ARTIFACT_TEMPLATE_PATHS),
-    ...Object.keys(NON_TEMPLATE_ARTIFACT_HEADINGS),
-  ]);
-  for (const artifactName of Object.keys(OPTIONAL_ARTIFACT_HEADINGS)) {
+  const knownArtifacts = new Set([...templateArtifacts, ...Object.keys(nonTemplateHeadings)]);
+  for (const artifactName of Object.keys(optionalHeadings)) {
     if (!knownArtifacts.has(artifactName)) {
       throw new Error(`Optional headings reference unknown artifact: ${artifactName}`);
     }
   }
+}
+
+export function buildArtifactHeadings(repoRoot, readFile = readFileSync) {
+  validateArtifactHeadingSources();
   const generated = {};
   for (const [artifactName, templatePath] of Object.entries(ARTIFACT_TEMPLATE_PATHS)) {
     const text = readFile(resolve(repoRoot, templatePath), "utf8");
