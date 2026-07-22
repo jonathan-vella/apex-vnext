@@ -1444,7 +1444,8 @@ export class ApexService {
       );
     }
     const providerName = [...events].reverse().find((event) => event.type === "preview.created")?.payload as
-      { provider?: unknown } | undefined;
+      | { provider?: unknown }
+      | undefined;
     const provider =
       providerName?.provider === "bicep" || providerName?.provider === "terraform" ? providerName.provider : "fake";
     const commonValidatorIds = await this.validateDeployValidators(
@@ -1790,12 +1791,14 @@ export class ApexService {
       if (route.task !== undefined) {
         const packStatuses = await this.capabilityPacks().requiredForWorkflows([route.task.id]);
         checks.push(
-          ...packStatuses.map((status): DoctorCheck => ({
-            id: `capability-pack:${status.id}`,
-            ok: status.state === "installed",
-            value: status.reason ?? status.state,
-            remedy: status.action,
-          })),
+          ...packStatuses.map(
+            (status): DoctorCheck => ({
+              id: `capability-pack:${status.id}`,
+              ok: status.state === "installed",
+              value: status.reason ?? status.state,
+              remedy: status.action,
+            }),
+          ),
         );
       }
       const providerConfigured = await this.exists(join(this.root, ".apex", "provider-config.json"));
