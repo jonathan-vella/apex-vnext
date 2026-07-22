@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
@@ -63,11 +64,25 @@ const graph = {
 const scripts = {
   "build:vnext": "tsc -b",
   "validate:example": "node example.mjs",
-  "lint:example": "node example.mjs",
+  "lint:example": "npm run validate:example --",
   "validate:_node-ci": "npm run build:vnext && run-p validate:example",
 };
 
 const options = { graph, schema, scripts, consumers: { "ci-main": "validate:_node-ci" } };
+
+function runScript(script, args = []) {
+  const result = spawnSync("npm", ["run", script, "--", ...args], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    env: { ...process.env, NO_COLOR: "1" },
+  });
+  const output = `${result.stdout}${result.stderr}`;
+  const lines = output.split(/\r?\n/u);
+  const start = lines.findIndex((line) =>
+    /(?:Policy Precheck Output Validator|Agent Validators \(consolidated\))/u.test(line),
+  );
+  return { status: result.status, output: lines.slice(start).join("\n").trim() };
+}
 
 test("parses prerequisites, parallel members, continue-on-error, and epilogue", () => {
   assert.deepEqual(parseAggregate("npm run build:vnext && run-p validate:a validate:b"), {
@@ -109,15 +124,40 @@ test("rejects aggregate, alias, safety, retirement, and consumer drift", () => {
   const errors = validateRepositoryValidatorGraph({
     ...options,
     graph: invalid,
-    scripts: { ...scripts, "lint:example": "node other.mjs", "validate:_node-ci": "run-p validate:example" },
+    scripts: { ...scripts, "lint:example": "npm run validate:other --", "validate:_node-ci": "run-p validate:example" },
     consumers: { "ci-main": "validate:other" },
   });
-  assert.ok(errors.some((error) => error.includes("alias implementation drift")));
+  assert.ok(errors.some((error) => error.includes("alias delegation drift")));
   assert.ok(errors.some((error) => error.includes("retired command requires a replacement")));
   assert.ok(errors.some((error) => error.includes("prerequisites drift")));
   assert.ok(errors.some((error) => error.includes("CI-unsafe dependency")));
   assert.ok(errors.some((error) => error.includes("parallel member is serial-only")));
   assert.ok(errors.some((error) => error.includes("expected validate:_node-ci")));
+});
+
+test("rejects multi-hop alias delegation", () => {
+  const errors = validateRepositoryValidatorGraph({
+    ...options,
+    scripts: { ...scripts, "lint:example": "npm run lint:other --", "lint:other": "npm run validate:example --" },
+  });
+  assert.ok(errors.some((error) => error.includes("alias delegation drift")));
+});
+
+test("rejects a canonical script delegated back to its alias", () => {
+  const errors = validateRepositoryValidatorGraph({
+    ...options,
+    scripts: { ...scripts, "validate:example": "npm run lint:example --" },
+  });
+  assert.ok(errors.some((error) => error.includes("canonical script delegates to alias")));
+});
+
+test("delegated aliases preserve canonical exits and diagnostics", () => {
+  for (const scenario of [
+    { canonical: "validate:policy-precheck", alias: "lint:policy-precheck", args: [] },
+    { canonical: "validate:agents", alias: "lint:agent-checks", args: ["--only=unknown"] },
+  ]) {
+    assert.deepEqual(runScript(scenario.alias, scenario.args), runScript(scenario.canonical, scenario.args));
+  }
 });
 
 test("rejects aggregate dependency cycles and missing consumer evidence", () => {

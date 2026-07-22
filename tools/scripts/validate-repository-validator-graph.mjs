@@ -84,6 +84,7 @@ export function validateRepositoryValidatorGraph({ graph, schema, scripts, consu
   const profiles = new Map(graph.profiles.map((profile) => [profile.id, profile]));
   const commands = new Map(graph.commands.map((command) => [command.script, command]));
   const commandIds = new Set(graph.commands.map(({ id }) => id));
+  const aliases = new Set(graph.commands.flatMap(({ aliases: values }) => values));
   const aggregates = new Map(graph.aggregates.map((aggregate) => [aggregate.script, aggregate]));
 
   const visiting = new Set();
@@ -107,11 +108,15 @@ export function validateRepositoryValidatorGraph({ graph, schema, scripts, consu
   for (const command of graph.commands) {
     if (!profiles.has(command.profile)) errors.push(`${command.script}: unknown profile ${command.profile}`);
     if (scripts[command.script] === undefined) errors.push(`${command.script}: package script is missing`);
+    const canonicalDelegate = scripts[command.script]?.match(/^npm run ([a-z0-9:_-]+) --$/u)?.[1];
+    if (canonicalDelegate !== undefined && aliases.has(canonicalDelegate)) {
+      errors.push(`${command.script}: canonical script delegates to alias ${canonicalDelegate}`);
+    }
     for (const alias of command.aliases) {
       if (scripts[alias] === undefined)
         errors.push(`${command.script}: alias is missing from package scripts: ${alias}`);
-      else if (scripts[alias] !== scripts[command.script])
-        errors.push(`${command.script}: alias implementation drift: ${alias}`);
+      else if (scripts[alias] !== `npm run ${command.script} --`)
+        errors.push(`${command.script}: alias delegation drift: ${alias}`);
     }
     for (const replacementId of command.retirement.replacementIds) {
       if (!commandIds.has(replacementId))
