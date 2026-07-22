@@ -5,8 +5,8 @@
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
-- **Active issue:** [#121](https://github.com/jonathan-vella/apex-vnext/issues/121) - two-client context/cache baseline
-- **Working branch:** `feat/121-client-context-baseline`
+- **Active issue:** [#126](https://github.com/jonathan-vella/apex-vnext/issues/126) - live two-client context/cache samples
+- **Working branch:** `main`; collection awaits operator-provided client access
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -28,8 +28,9 @@ PR #114 reduced pre-commit index writers and retained serial execution for the t
 PR #116 derived runtime and compact artifact heading metadata from canonical templates.
 PR #118 standardized text and JSON diagnostics for the registry and hosted-workflow contract validator family.
 Issue #119 closes Milestone N with representative pre-commit hook selection, exit, and timing parity evidence.
-Issue #121 starts Milestone O with a privacy-safe normalized context/cache sample contract and deterministic aggregate;
-representative live samples remain pending and no improvement claim is authorized.
+PR #125 completes issue #121 with a privacy-safe normalized context/cache sample contract and deterministic aggregate.
+Issue #126 owns representative live sampling; no improvement claim is authorized until both supported clients provide
+the required evidence.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
@@ -64,7 +65,7 @@ qualification has run, and no ARM MCP version has been selected or qualified.
 
 ## Immediate Sequence
 
-1. Complete issue #121's fixture-qualified context/cache collection boundary.
+1. Obtain explicit operator authorization and access for supported VS Code and Copilot CLI sampling under issue #126.
 2. Collect representative two-client context and cache samples before making context-reduction claims.
 3. Retire the selected MCP and Draw.io surfaces only after each replacement gate passes.
 4. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.
