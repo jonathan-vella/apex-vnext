@@ -6,7 +6,7 @@ Automated, package, security-equivalent, and dual-track cloud qualification comp
 candidate `25530c339410e9758ae34538427f24bddfd83e1d`. The evidence remains valid characterization of that earlier product
 contract, but the commit is no longer a release candidate.
 
-The current characterization base is `1a1de02a3a17f496c713dd3c4e425c8df8d30d0e`. The `0.10.0` contract now adds
+The current characterization base is `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`. The `0.10.0` contract now adds
 GitHub Copilot CLI parity, typed Azure Resource Manager MCP evidence, MCP and Draw.io retirement, bounded improvement
 measurement, and npm-generated client projections. These additions reopen every affected release gate.
 
@@ -19,7 +19,7 @@ No evidence in this dossier authorizes package publication, tag creation, branch
 | Exact candidate               | Not selected; current `main` is a characterization base.                 |
 | Deterministic qualification   | Must repeat after all re-baseline implementation changes.                |
 | VS Code qualification         | Must repeat against the new bundle and exact candidate.                  |
-| Copilot CLI qualification     | Not run; supported version selection is pending.                         |
+| Copilot CLI qualification     | Version `1.0.73` selected; cross-client qualification has not run.       |
 | ARM MCP qualification         | Not run; typed adapter, authentication, and allowlist proof are pending. |
 | MCP and Draw.io retirement    | Not implemented; each replacement gate must pass before removal.         |
 | Improvement measurement       | Not implemented; prior evidence covers observe-and-propose only.         |
