@@ -129,7 +129,9 @@ export function verifyBundleDeclarations(
   const component = components?.customizationBundle;
   const mapping = manifest.composition.mappings.find(({ id }) => id === "customizations");
   if (
-    bundle?.id !== "apex-managed-workspace" ||
+    bundle === undefined ||
+    component === undefined ||
+    bundle.id !== "apex-managed-workspace" ||
     bundle.authority !== manifest.composition.authority ||
     bundle.composition !== mapping?.mode ||
     bundle.sourceRoot !== mapping?.sourceRoot ||
@@ -137,8 +139,8 @@ export function verifyBundleDeclarations(
     customizationManifest.version !== manifest.sources.customizations ||
     runtimeBundle.bundleVersion !== manifest.sources.customizations ||
     runtimeBundle.schemaVersion !== manifest.sources.config ||
-    component?.version !== manifest.sources.customizations ||
-    component?.manifest !== "@apex/cli/assets/customizations/manifest.json" ||
+    component.version !== manifest.sources.customizations ||
+    component.manifest !== "@apex/cli/assets/customizations/manifest.json" ||
     component.assetManifest !== "@apex/cli/assets/manifest.json" ||
     component.compositionId !== bundle.id
   ) {
