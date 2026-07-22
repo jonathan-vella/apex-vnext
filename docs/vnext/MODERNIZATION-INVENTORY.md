@@ -119,6 +119,10 @@ Issue #103 adds a read-only hosted workflow contract over the existing owners. I
 permissions, concurrency, action versions, external-runtime visibility, artifacts, and exact-head denial boundaries;
 workflow YAML and branch protection remain authoritative and unchanged.
 
+Issue #107 extracts the duplicated Python validation bootstrap into one digest-bound local action used by required
+external tests and exact-head qualification. Required check names, workflow permissions, artifacts, commands, and
+release-authority denial remain unchanged and are enforced by the hosted workflow contract.
+
 ### Dependencies
 
 The candidate lockfile SHA-256 is `5727e5fd6353b31b347cffaf6c537a5c0a6be20ce2460d66125d09b118f8b525`. Workspace

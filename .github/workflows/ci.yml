@@ -92,26 +92,8 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-repo
 
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.14"
-          cache: "pip"
-
-      - name: Install Python test dependencies
-        run: |
-          python -m pip install --upgrade pip
-          # apex-recall ships its own deps via pyproject; install in editable mode
-          # so its tests can import the package without sys.path hacks.
-          python -m pip install -e tools/apex-recall
-          # Keep ruff available to the root lint command.
-          python -m pip install -e 'tools/mcp-servers/azure-pricing[dev]'
-          python -m pip install pytest
-          # The npm test command deliberately uses the component-owned venv.
-          python -m venv tools/mcp-servers/azure-pricing/.venv
-          tools/mcp-servers/azure-pricing/.venv/bin/python -m pip install --upgrade pip
-          tools/mcp-servers/azure-pricing/.venv/bin/python -m pip install \
-            -e 'tools/mcp-servers/azure-pricing[admin,dev]'
+      - name: Setup Python validation
+        uses: ./.github/actions/setup-python-validation
 
       - name: Lint Python (ruff)
         # ruff ships via the azure-pricing[dev] extra installed above. Mirrors

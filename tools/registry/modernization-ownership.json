@@ -1,7 +1,7 @@
 {
   "$schema": "schemas/modernization-ownership.schema.json",
   "schemaVersion": "1.0.0",
-  "candidate": "8d6118912a42073d249fad4d475b82d72f26c884",
+  "candidate": "94c6a89fd27e53a911528d917f09a44e438575cd",
   "surfaces": [
     {
       "id": "workspace-operating-frame",
