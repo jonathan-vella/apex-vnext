@@ -14,8 +14,9 @@
 ## Current State
 
 PR #90 merged the `0.10.0` re-baseline. PR #92 pinned the supported Copilot CLI and merged the client qualification
-contract. PR #94 completed the guidance and automation characterization without changing active behavior. Runtime-managed
-APEX agents and skills remain under `customizations/`, with `customizations/manifest.json` as their canonical manifest.
+contract. PR #94 completed the guidance and automation characterization without changing active behavior.
+Runtime-managed APEX agents and skills remain under `customizations/`, with `customizations/manifest.json` as their
+canonical manifest.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an

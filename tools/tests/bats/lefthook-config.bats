@@ -21,7 +21,8 @@ create_markdown_fixture() {
   git -C "$fixture" config user.name "Hook Tests"
   printf '## Fixture\n' >"$fixture/docs/fixture.md"
   git -C "$fixture" add docs/fixture.md
-  hook_script=$(extract_markdown_lint_hook)
+  hook_script="$TEST_LOG_DIR/markdown-lint-hook.sh"
+  extract_markdown_lint_hook >"$hook_script"
 }
 
 @test "post-commit block contains only the allow-listed stamp-sku-manifest hook" {
@@ -56,7 +57,7 @@ create_markdown_fixture() {
   printf '#!/usr/bin/env bash\nprintf "simulated lint command failure\\n" >&2\nexit 127\n' >"$fake_bin/npm"
   chmod +x "$fake_bin/npm"
 
-  run env PATH="$fake_bin:$PATH" bash -c "cd \"$fixture\" && $hook_script"
+  run env PATH="$fake_bin:$PATH" bash -c 'cd "$1" && bash "$2"' _ "$fixture" "$hook_script"
 
   [ "$status" -ne 0 ]
   [[ "$output" == *"simulated lint command failure"* ]]
@@ -67,7 +68,8 @@ create_markdown_fixture() {
   printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >"$HOOK_ARGS_FILE"\n' >"$fake_bin/npm"
   chmod +x "$fake_bin/npm"
 
-  run env HOOK_ARGS_FILE="$TEST_LOG_DIR/npm-args" PATH="$fake_bin:$PATH" bash -c "cd \"$fixture\" && $hook_script"
+  run env HOOK_ARGS_FILE="$TEST_LOG_DIR/npm-args" PATH="$fake_bin:$PATH" \
+    bash -c 'cd "$1" && bash "$2"' _ "$fixture" "$hook_script"
 
   [ "$status" -eq 0 ]
   [ "$(cat "$TEST_LOG_DIR/npm-args")" = "run lint:md -- --no-globs docs/fixture.md" ]
