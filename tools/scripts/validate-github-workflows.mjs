@@ -5,6 +5,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import process from "node:process";
 import Ajv2020 from "ajv/dist/2020.js";
 import * as yaml from "js-yaml";
+import { reportRegistryValidation, requestedReportFormat } from "./_lib/registry-validator-reporter.mjs";
 
 const CONTRACT_PATH = "tools/registry/github-workflow-contract.json";
 const SCHEMA_PATH = "tools/registry/schemas/github-workflow-contract.schema.json";
@@ -417,10 +418,13 @@ function main() {
     workflowTexts: loadWorkflowTexts(),
     localActionTexts,
   });
-  if (errors.length > 0) {
-    for (const error of errors) console.error(`ERROR: ${error}`);
-    process.exitCode = 1;
-  } else console.log("GitHub workflow contracts are valid");
+  process.exitCode = reportRegistryValidation({
+    title: "GitHub Workflow Contract Validator",
+    source: CONTRACT_PATH,
+    errors,
+    passMessage: "GitHub workflow contracts are valid",
+    format: requestedReportFormat(process.argv.slice(2)),
+  });
 }
 
 if (process.argv[1]?.endsWith("validate-github-workflows.mjs")) main();

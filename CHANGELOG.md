@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Standardized text and JSON diagnostics for registry and hosted-workflow contract validators while preserving their
+  validation rules and failure exits.
 - Derived runtime and compact artifact heading metadata from canonical templates with explicit non-template exceptions,
   byte-parity validation, and mutation coverage.
 - Reduced pre-commit Git-index writers to the two genuine generators and delegated Terraform formatting to its canonical

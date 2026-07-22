@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { globSync } from "node:fs";
 import process from "node:process";
 import Ajv2020 from "ajv/dist/2020.js";
+import { reportRegistryValidation, requestedReportFormat } from "./_lib/registry-validator-reporter.mjs";
 
 const MANIFEST = "tools/registry/modernization-ownership.json";
 const SCHEMA = "tools/registry/schemas/modernization-ownership.schema.json";
@@ -56,12 +57,13 @@ function main() {
   const document = readFileSync(DOCUMENT, "utf8");
   const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts ?? {};
   const errors = validateModernizationOwnership({ manifest, schema, document, scripts });
-  if (errors.length > 0) {
-    for (const error of errors) console.error(`ERROR: ${error}`);
-    process.exitCode = 1;
-  } else {
-    console.log("Modernization ownership inventory is valid");
-  }
+  process.exitCode = reportRegistryValidation({
+    title: "Modernization Ownership Validator",
+    source: MANIFEST,
+    errors,
+    passMessage: "Modernization ownership inventory is valid",
+    format: requestedReportFormat(process.argv.slice(2)),
+  });
 }
 
 if (process.argv[1]?.endsWith("validate-modernization-ownership.mjs")) main();

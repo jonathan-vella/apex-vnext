@@ -251,6 +251,13 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "test-registry-validator-reporter",
+      "script": "test:registry-validator-reporter",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "test-retired-automation",
       "script": "test:retired-automation",
       "profile": "node-test",
@@ -536,6 +543,7 @@
         "test:repository-validator-graph",
         "validate:github-workflows",
         "test:github-workflows",
+        "test:registry-validator-reporter",
         "test:retired-automation",
         "validate:iac-security-baseline",
         "validate:policy-precheck",
@@ -606,6 +614,7 @@
         "test:repository-validator-graph",
         "validate:github-workflows",
         "test:github-workflows",
+        "test:registry-validator-reporter",
         "test:retired-automation",
         "validate:policy-precheck",
         "lint:js:ci",

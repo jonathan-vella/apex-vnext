@@ -3,6 +3,7 @@
 import { readFileSync } from "node:fs";
 import process from "node:process";
 import Ajv2020 from "ajv/dist/2020.js";
+import { reportRegistryValidation, requestedReportFormat } from "./_lib/registry-validator-reporter.mjs";
 
 const GRAPH_PATH = "tools/registry/repository-validator-graph.json";
 const SCHEMA_PATH = "tools/registry/schemas/repository-validator-graph.schema.json";
@@ -193,12 +194,13 @@ function main() {
   const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts ?? {};
   const consumers = collectConsumerEvidence(graph);
   const errors = validateRepositoryValidatorGraph({ graph, schema, scripts, consumers });
-  if (errors.length > 0) {
-    for (const error of errors) console.error(`ERROR: ${error}`);
-    process.exitCode = 1;
-  } else {
-    console.log("Repository validator dependency graph is valid");
-  }
+  process.exitCode = reportRegistryValidation({
+    title: "Repository Validator Graph Validator",
+    source: GRAPH_PATH,
+    errors,
+    passMessage: "Repository validator dependency graph is valid",
+    format: requestedReportFormat(process.argv.slice(2)),
+  });
 }
 
 if (process.argv[1]?.endsWith("validate-repository-validator-graph.mjs")) main();
