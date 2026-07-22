@@ -1,7 +1,7 @@
 {
   "$schema": "schemas/modernization-ownership.schema.json",
   "schemaVersion": "1.0.0",
-  "candidate": "364109710477c11c5f31907cb2d094d73cf73a35",
+  "candidate": "0137ef8dca9d6631cce3bdfd7dfa6c83611dcf02",
   "surfaces": [
     {
       "id": "workspace-operating-frame",
@@ -305,12 +305,16 @@
       "classification": "keep",
       "canonicalOwner": "GitHub branch protection and .github/workflows/ci.yml",
       "sourceRefs": [
+        "tools/registry/github-workflow-contract.json",
+        "tools/registry/schemas/github-workflow-contract.schema.json",
         ".github/workflows/ci.yml",
         ".github/workflows/docs.yml",
         ".github/workflows/branch-enforcement.yml"
       ],
       "consumers": ["branch protection", "pull requests", "release qualification"],
       "proofCommands": [
+        "npm run validate:github-workflows",
+        "npm run test:github-workflows",
         "npm run validate:_node-ci",
         "npm run validate:docs",
         "npm run test:apex-recall",
@@ -325,12 +329,18 @@
       "classification": "keep",
       "canonicalOwner": ".github/workflows/release-candidate-qualification.yml",
       "sourceRefs": [
+        "tools/registry/github-workflow-contract.json",
         ".github/workflows/release-candidate-qualification.yml",
         "tools/scripts/qualify-vnext-release.mjs",
         "tools/scripts/pack-vnext.mjs"
       ],
       "consumers": ["release reviewers", "pull requests", "exact-candidate evidence consumers"],
-      "proofCommands": ["npm run qualify:vnext-release", "npm run test:vnext-pack"],
+      "proofCommands": [
+        "npm run validate:github-workflows",
+        "npm run test:github-workflows",
+        "npm run qualify:vnext-release",
+        "npm run test:vnext-pack"
+      ],
       "removalGate": "A replacement checks out the exact candidate without persisted credentials and preserves compact evidence, checksums, retention, denial of release authority, and separate hosted visibility.",
       "rationale": "Release qualification has a longer evidence-producing trust boundary than required deterministic CI and must remain independently visible."
     },
