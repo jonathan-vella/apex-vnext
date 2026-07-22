@@ -26,6 +26,7 @@ const r = new Reporter("No Hard-Coded Counts Validator");
 // ─── Part 1: Manifest validation ────────────────────────────────────────────
 
 const MANIFEST_PATH = path.join(ROOT, "tools", "registry", "count-manifest.json");
+const VALIDATOR_GRAPH_PATH = path.join(ROOT, "tools", "registry", "repository-validator-graph.json");
 
 function loadManifest() {
   if (!fs.existsSync(MANIFEST_PATH)) {
@@ -49,16 +50,18 @@ function countFiles(globPattern) {
 }
 
 function computeActualCounts() {
-  const pkgPath = path.join(ROOT, "package.json");
-  let validatorCount = 0;
-  if (fs.existsSync(pkgPath)) {
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-    const nodeScripts = pkg.scripts?.["validate:_node"] || "";
-    const extScripts = pkg.scripts?.["validate:_external"] || "";
-    const all = [...nodeScripts.split(/\s+/), ...extScripts.split(/\s+/)].filter(
-      (s) => s.startsWith("lint:") || s.startsWith("validate:"),
-    );
-    validatorCount = all.length;
+  let validatorCount = -1;
+  if (fs.existsSync(VALIDATOR_GRAPH_PATH)) {
+    try {
+      const graph = JSON.parse(fs.readFileSync(VALIDATOR_GRAPH_PATH, "utf-8"));
+      validatorCount = graph.commands.filter(
+        ({ script, retirement }) => retirement.status === "active" && /^(lint|validate):/.test(script),
+      ).length;
+    } catch (error) {
+      r.error("tools/registry/repository-validator-graph.json", `Cannot derive validator count: ${error.message}`);
+    }
+  } else {
+    r.error("tools/registry/repository-validator-graph.json", "File not found");
   }
 
   let extensionCount = 0;

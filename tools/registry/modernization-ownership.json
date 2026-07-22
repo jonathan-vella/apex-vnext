@@ -1,7 +1,7 @@
 {
   "$schema": "schemas/modernization-ownership.schema.json",
   "schemaVersion": "1.0.0",
-  "candidate": "b27d17350870a0ed3d5411346701cbb2eb6a4d4b",
+  "candidate": "39d1d787e4f645b84609e3392d213d108661ba8c",
   "surfaces": [
     {
       "id": "workspace-operating-frame",
@@ -223,13 +223,19 @@
       "id": "repository-validator-graph",
       "category": "validation",
       "classification": "consolidate",
-      "canonicalOwner": "package.json scripts",
-      "sourceRefs": ["package.json", ".github/workflows/ci.yml"],
-      "consumers": ["pull-request CI", "contributors", "pre-push validation"],
-      "proofCommands": ["npm run validate:_node-ci"],
-      "removalGate": "A generated dependency graph preserves command names, prerequisites, parallel safety, and check diagnostics.",
-      "rationale": "The node, node-CI, external, workflow, and hook command lists currently repeat dependency knowledge.",
-      "followUp": "Characterize command inputs and outputs before generating orchestration views.",
+      "canonicalOwner": "tools/registry/repository-validator-graph.json",
+      "sourceRefs": [
+        "tools/registry/repository-validator-graph.json",
+        "tools/registry/schemas/repository-validator-graph.schema.json",
+        "package.json",
+        ".github/workflows/ci.yml",
+        "lefthook.yml"
+      ],
+      "consumers": ["package script projections", "pull-request CI", "contributors", "pre-push validation"],
+      "proofCommands": ["npm run validate:repository-validator-graph", "npm run test:repository-validator-graph"],
+      "removalGate": "Graph-backed projections preserve command names, prerequisites, parallel safety, aliases, consumers, and check diagnostics before duplicate orchestration is removed.",
+      "rationale": "The graph owns validation metadata while package scripts remain the executable projection and hooks/workflows retain environment-specific behavior.",
+      "followUp": "Migrate aggregate and thin-hook projections independently after output and timing baselines are captured.",
       "decisionRef": "OWN-002"
     },
     {

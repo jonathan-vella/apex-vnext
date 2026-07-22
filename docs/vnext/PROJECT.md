@@ -1,12 +1,12 @@
 ## APEX vNext Checkpoint
 
 - **Updated:** 2026-07-22 UTC
-- **Milestone:** H - release re-baseline and characterization
+- **Milestone:** N - bundle and automation simplification
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
-- **Active issue:** [#95](https://github.com/jonathan-vella/apex-vnext/issues/95)
-- **Working branch:** `fix/95-markdown-hook-fail-closed`
+- **Active issue:** [#97](https://github.com/jonathan-vella/apex-vnext/issues/97)
+- **Working branch:** `feat/97-validator-dependency-graph`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -15,8 +15,8 @@
 
 PR #90 merged the `0.10.0` re-baseline. PR #92 pinned the supported Copilot CLI and merged the client qualification
 contract. PR #94 completed the guidance and automation characterization without changing active behavior.
-Runtime-managed APEX agents and skills remain under `customizations/`, with `customizations/manifest.json` as their
-canonical manifest.
+PR #96 repaired the Markdown pre-commit failure path with executable regression coverage. Runtime-managed APEX agents
+and skills remain under `customizations/`, with `customizations/manifest.json` as their canonical manifest.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
@@ -35,7 +35,7 @@ qualification has run, and no ARM MCP version has been selected or qualified.
 | Prior exact candidate `25530c339410e9758ae34538427f24bddfd83e1d`         | Historical characterization for the earlier contract          |
 | Prior VS Code, package, security, and live Azure results                 | Preserved in [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md) |
 | Copilot CLI `1.0.73` and cross-client matrix                             | Contract defined; execution pending                           |
-| Guidance, Markdown, lint, hook, and workflow ownership                   | Characterized on `b27d173`; implementation deferred           |
+| Guidance, Markdown, lint, hook, and workflow ownership                   | Characterized; first hook repair merged                       |
 | ARM MCP adapters and MCP retirements                                     | Pending                                                       |
 | Diagram, improvement-measurement, and bundle changes                     | Pending                                                       |
 | Final deterministic, client, package, security, and live qualification   | Reopened                                                      |
@@ -50,8 +50,8 @@ qualification has run, and no ARM MCP version has been selected or qualified.
 
 ## Immediate Sequence
 
-1. Complete issue #95's fail-closed Markdown hook repair with direct-command parity and regression coverage.
-2. Capture the remaining Milestone H MCP, pricing, diagram, bundle, diagnostic, timing, and context baselines.
+1. Complete issue #97's schema-backed repository validator graph without changing command execution.
+2. Continue Milestone N through independently revertible bundle, validator, hook, and workflow slices.
 3. Retire the selected MCP and Draw.io surfaces only after each replacement gate passes.
 4. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.
 5. Complete ARM pricing evidence, diagram routing, bounded improvement measurement, bundle generation, and guidance
@@ -62,6 +62,6 @@ qualification has run, and no ARM MCP version has been selected or qualified.
 
 1. Read [PRD.md](PRD.md), [ROADMAP.md](ROADMAP.md), and [REGISTER.md](REGISTER.md).
 2. Verify the current `main` head, open pull requests, worktrees, and dirty files before selecting a slice.
-3. Resume issue #95 from the `markdown-policy-enforcement` and `precommit-hooks` ownership records; keep later
-   implementation in independently revertible Milestone N and O slices.
+3. Resume issue #97 from the `repository-validator-graph` ownership record; keep later implementation in independently
+   revertible Milestone N and O slices.
 4. Treat [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md) as historical evidence until a new candidate is declared.
