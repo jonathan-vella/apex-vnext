@@ -9,6 +9,7 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(packageRoot, "../..");
 const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
+const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
 
 function bytewise(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -124,6 +125,30 @@ export function validateBundleDeclarations(customizationManifest, runtimeBundle)
     throw new Error("Bundle composition declarations are inconsistent");
   }
   return bundle;
+}
+
+export function validateClientProjectionDeclarations(customizationManifest) {
+  const sharedFiles = customizationManifest.sharedFiles;
+  const clientProjections = customizationManifest.clientProjections;
+  if (
+    !Array.isArray(sharedFiles) ||
+    sharedFiles.some((path) => typeof path !== "string") ||
+    sharedFiles.length !== new Set(sharedFiles).size ||
+    !Array.isArray(clientProjections) ||
+    clientProjections.some(
+      (projection) =>
+        projection === null ||
+        typeof projection !== "object" ||
+        typeof projection.id !== "string" ||
+        !Array.isArray(projection.files) ||
+        projection.files.some((path) => typeof path !== "string") ||
+        projection.files.length !== new Set(projection.files).size,
+    ) ||
+    clientProjections.length !== new Set(clientProjections.map(({ id }) => id)).size
+  ) {
+    throw new Error("Client projection declarations are invalid");
+  }
+  return { sharedFiles, clientProjections };
 }
 
 async function walkFiles(root, directory = root, expectedIdentity) {
@@ -426,7 +451,31 @@ async function prepareAssets() {
   const files = inventory.sort((left, right) => bytewise(left.path, right.path));
   const paths = new Set(files.map(({ path }) => path));
   if (paths.size !== files.length) throw new Error("Bundled asset generator produced duplicate destination paths");
-  const lockInput = { sources: sourcesMetadata, composition, files };
+  const { sharedFiles, clientProjections } = validateClientProjectionDeclarations(customizationManifest);
+  const fileMetadata = new Map(files.map((file) => [file.path, file]));
+  const projections = clientProjections
+    .map((projection) => {
+      const projectionFiles = [...sharedFiles, ...(projection.files ?? [])]
+        .map((path) => `customizations/${path}`)
+        .sort(bytewise);
+      const digestInput = projectionFiles.map((path) => {
+        const file = fileMetadata.get(path);
+        if (file === undefined) throw new Error(`Client projection references missing asset: ${path}`);
+        return { path, sha256: file.sha256 };
+      });
+      return {
+        id: projection.id,
+        files: projectionFiles,
+        digest: createHash("sha256")
+          .update(`${PROJECTION_DOMAIN}${canonicalJson({ id: projection.id, files: digestInput })}`)
+          .digest("hex"),
+      };
+    })
+    .sort((left, right) => bytewise(left.id, right.id));
+  if (projections.length !== new Set(projections.map(({ id }) => id)).size) {
+    throw new Error("Client projection declarations contain duplicate IDs");
+  }
+  const lockInput = { sources: sourcesMetadata, composition, projections, files };
   const manifest = {
     version: 1,
     ...lockInput,

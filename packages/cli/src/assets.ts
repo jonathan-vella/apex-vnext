@@ -26,6 +26,12 @@ export interface BundledAssetFile {
   bytes: number;
 }
 
+export interface BundledClientProjection {
+  id: "github-copilot-cli" | "github-copilot-vscode";
+  files: string[];
+  digest: string;
+}
+
 export interface BundledAssetManifest {
   version: 1;
   sources: { customizations: string; config: string };
@@ -35,6 +41,7 @@ export interface BundledAssetManifest {
     formatVersion: 1;
     mappings: BundledAssetMapping[];
   };
+  projections: BundledClientProjection[];
   files: BundledAssetFile[];
   lock: {
     algorithm: "sha256";
@@ -53,6 +60,7 @@ export interface BundledAssets {
 }
 
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
+const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
 const SHA256 = /^[a-f0-9]{64}$/u;
 
 function portablePath(path: string): string {
@@ -148,8 +156,33 @@ export function verifyBundleDeclarations(
   }
 }
 
-export function bundleLockDigest(input: Pick<BundledAssetManifest, "sources" | "composition" | "files">): string {
-  const payload = { sources: input.sources, composition: input.composition, files: input.files };
+export function clientProjectionDigest(
+  projection: Pick<BundledClientProjection, "id" | "files">,
+  files: BundledAssetFile[],
+): string {
+  const metadata = new Map(files.map((file) => [file.path, file.sha256]));
+  const projectionFiles = projection.files.map((path) => {
+    const sha256 = metadata.get(path);
+    if (sha256 === undefined) throw new Error(`Client projection references missing asset: ${path}`);
+    return { path, sha256 };
+  });
+  return sha256Bytes(
+    Buffer.concat([
+      Buffer.from(PROJECTION_DOMAIN, "utf8"),
+      canonicalJsonBytes({ id: projection.id, files: projectionFiles }),
+    ]),
+  );
+}
+
+export function bundleLockDigest(
+  input: Pick<BundledAssetManifest, "sources" | "composition" | "projections" | "files">,
+): string {
+  const payload = {
+    sources: input.sources,
+    composition: input.composition,
+    projections: input.projections,
+    files: input.files,
+  };
   return sha256Bytes(Buffer.concat([Buffer.from(LOCK_DOMAIN, "utf8"), canonicalJsonBytes(payload)]));
 }
 
@@ -204,6 +237,7 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
     typeof manifest.sources.config !== "string" ||
     manifest.sources.config.length === 0 ||
     !Array.isArray(manifest.files) ||
+    !Array.isArray(manifest.projections) ||
     !Array.isArray(manifest.composition.mappings)
   ) {
     throw new Error("Unsupported bundled asset manifest");
@@ -268,6 +302,22 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
       }
     } else throw new Error(`Invalid bundled asset source: ${file.path}`);
   }
+  const projectionIds = new Set<string>();
+  for (const projection of manifest.projections) {
+    if (
+      !["github-copilot-cli", "github-copilot-vscode"].includes(projection.id) ||
+      projectionIds.has(projection.id) ||
+      !Array.isArray(projection.files) ||
+      projection.files.length !== new Set(projection.files).size ||
+      projection.files.some((path) => !safeRelativePath(path) || !paths.has(path)) ||
+      !SHA256.test(projection.digest) ||
+      clientProjectionDigest(projection, manifest.files) !== projection.digest
+    ) {
+      throw new Error(`Invalid bundled client projection: ${projection.id}`);
+    }
+    projectionIds.add(projection.id);
+  }
+  if (projectionIds.size !== 2) throw new Error("Bundled client projections are incomplete");
   const actualFiles = (await bundledPayloadFiles(root)).sort((left, right) =>
     left.path < right.path ? -1 : left.path > right.path ? 1 : 0,
   );
@@ -288,6 +338,27 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
     (await readBundledFile(root, "config/runtime-bundle.v1.json")).toString("utf8"),
   ) as Record<string, unknown>;
   verifyBundleDeclarations(manifest, customizationManifest, runtimeBundle);
+  const sharedFiles = customizationManifest.sharedFiles as string[];
+  const declarations = customizationManifest.clientProjections as Array<{ id: string; files: string[] }>;
+  if (
+    !Array.isArray(sharedFiles) ||
+    sharedFiles.length !== new Set(sharedFiles).size ||
+    !Array.isArray(declarations) ||
+    declarations.length !== manifest.projections.length ||
+    declarations.length !== new Set(declarations.map(({ id }) => id)).size
+  ) {
+    throw new Error("Client projection declarations are missing");
+  }
+  for (const declaration of declarations) {
+    const projection = manifest.projections.find(({ id }) => id === declaration.id);
+    if (!Array.isArray(declaration.files) || declaration.files.length !== new Set(declaration.files).size) {
+      throw new Error(`Bundled client projection disagrees with its declaration: ${declaration.id}`);
+    }
+    const expected = [...sharedFiles, ...declaration.files].map((path) => `customizations/${path}`).sort();
+    if (projection === undefined || JSON.stringify(projection.files) !== JSON.stringify(expected)) {
+      throw new Error(`Bundled client projection disagrees with its declaration: ${declaration.id}`);
+    }
+  }
   if (!SHA256.test(manifest.lock.digest) || bundleLockDigest(manifest) !== manifest.lock.digest) {
     throw new Error("Bundled asset lock mismatch");
   }
