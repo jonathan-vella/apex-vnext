@@ -81,7 +81,9 @@ test("rejects a PATH-dependent MCP launch", () => {
 
 test("rejects client projection declaration and CLI allowlist drift", () => {
   const projectionResult = mutate((model) => {
-    model.customization.manifest.clientProjections[0].files = [".github/mcp.json"];
+    model.customization.manifest.clientProjections.find(({ id }) => id === "github-copilot-vscode").files = [
+      ".github/mcp.json",
+    ];
   });
   assert.ok(hasRule(projectionResult, "customization.client-projection"));
 

@@ -127,6 +127,30 @@ export function validateBundleDeclarations(customizationManifest, runtimeBundle)
   return bundle;
 }
 
+export function validateClientProjectionDeclarations(customizationManifest) {
+  const sharedFiles = customizationManifest.sharedFiles;
+  const clientProjections = customizationManifest.clientProjections;
+  if (
+    !Array.isArray(sharedFiles) ||
+    sharedFiles.some((path) => typeof path !== "string") ||
+    sharedFiles.length !== new Set(sharedFiles).size ||
+    !Array.isArray(clientProjections) ||
+    clientProjections.some(
+      (projection) =>
+        projection === null ||
+        typeof projection !== "object" ||
+        typeof projection.id !== "string" ||
+        !Array.isArray(projection.files) ||
+        projection.files.some((path) => typeof path !== "string") ||
+        projection.files.length !== new Set(projection.files).size,
+    ) ||
+    clientProjections.length !== new Set(clientProjections.map(({ id }) => id)).size
+  ) {
+    throw new Error("Client projection declarations are invalid");
+  }
+  return { sharedFiles, clientProjections };
+}
+
 async function walkFiles(root, directory = root, expectedIdentity) {
   const before = await lstat(directory, { bigint: true });
   const identity = expectedIdentity ?? { dev: before.dev, ino: before.ino };
@@ -427,11 +451,7 @@ async function prepareAssets() {
   const files = inventory.sort((left, right) => bytewise(left.path, right.path));
   const paths = new Set(files.map(({ path }) => path));
   if (paths.size !== files.length) throw new Error("Bundled asset generator produced duplicate destination paths");
-  const sharedFiles = customizationManifest.sharedFiles;
-  const clientProjections = customizationManifest.clientProjections;
-  if (!Array.isArray(sharedFiles) || !Array.isArray(clientProjections)) {
-    throw new Error("Client projection declarations are missing");
-  }
+  const { sharedFiles, clientProjections } = validateClientProjectionDeclarations(customizationManifest);
   const fileMetadata = new Map(files.map((file) => [file.path, file]));
   const projections = clientProjections
     .map((projection) => {
