@@ -1,7 +1,7 @@
 {
   "$schema": "schemas/modernization-ownership.schema.json",
   "schemaVersion": "1.0.0",
-  "candidate": "39d1d787e4f645b84609e3392d213d108661ba8c",
+  "candidate": "364109710477c11c5f31907cb2d094d73cf73a35",
   "surfaces": [
     {
       "id": "workspace-operating-frame",
@@ -153,7 +153,7 @@
       "proofCommands": ["npm run validate:vnext", "npm run test:vnext", "npm run test:vnext-pack"],
       "removalGate": "Both client projections install, update, roll back, and uninstall atomically from one npm-owned manifest and content lock.",
       "rationale": "The approved lifecycle extends the existing npm and manifest authority rather than adding APM or another installer.",
-      "followUp": "Add deterministic client projections, content locks, composition provenance, and two-client lifecycle tests.",
+      "followUp": "Issue #99 adds the npm composition lock and source mappings; deterministic client projections and two-client lifecycle tests remain later slices.",
       "decisionRef": "OWN-006"
     },
     {
@@ -421,7 +421,7 @@
       "proofCommands": ["npm run prepare:vnext-assets", "npm run validate:vnext", "npm run test:vnext-pack"],
       "removalGate": "One deterministic generation path records source mappings, client projections, hashes, versions, composition provenance, and package inventory.",
       "rationale": "Generated install payloads must stay derived from canonical customizations inside the npm lifecycle.",
-      "followUp": "Extend asset preparation and pack tests; do not add APM metadata or a second package authority.",
+      "followUp": "Issue #99 adds source mappings, composition provenance, and the aggregate content lock; client projections remain a later slice without APM or a second authority.",
       "decisionRef": "OWN-016"
     },
     {

@@ -152,6 +152,10 @@ validation without replacing those specialized checks.
 - `OWN-016`: keep npm and CLI asset preparation as the only bundle-generation path, with client locks and provenance.
 - `OWN-017`: consolidate shipped consumer guidance in managed instructions generated consistently for both clients.
 
+Issue #99 owns the metadata-only first bundle slice for `OWN-006` and `OWN-016`: source-to-generated mappings,
+composition provenance, per-file source metadata, and an aggregate content lock. Client projections and lifecycle
+extensions remain separate work; npm stays the sole package and installation authority.
+
 ## Removal And Change Gates
 
 Every surface has a specific gate in the machine-readable manifest. The common rule is stricter than "no references":

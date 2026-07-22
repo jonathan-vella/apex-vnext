@@ -1,5 +1,12 @@
 {
   "version": "0.10.0",
+  "bundle": {
+    "id": "apex-managed-workspace",
+    "authority": "npm:@apex/cli",
+    "composition": "copy-tree",
+    "sourceRoot": "customizations",
+    "generatedRoot": "customizations"
+  },
   "managedFiles": [
     ".github/agents/apex.agent.md",
     ".github/agents/apex-requirements.agent.md",
