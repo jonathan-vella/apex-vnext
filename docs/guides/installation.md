@@ -47,8 +47,13 @@ npx apex init --project demo --name "Demo workload" \
 ```
 
 By default, `apex init` installs the customization bundle embedded in the CLI. It materializes workspace agents and
-skills under `.github/`, writes `.vscode/mcp.json`, creates the `.apex` runtime and project state, and records managed
-file hashes in `.apex/customizations.lock.json`.
+skills under `.github/`, writes the VS Code `.vscode/mcp.json` and Copilot CLI `.github/mcp.json` projections, creates
+the `.apex` runtime and project state, and records managed file hashes in `.apex/customizations.lock.json`. Both clients
+share one agent, skill, and guidance source set; only their workspace MCP discovery files are client-specific.
+
+The generated npm asset manifest records an independently verifiable digest for each client projection and binds both
+digests into the aggregate bundle lock. These hashes prove package composition; they do not replace live client
+discovery and normalized-outcome qualification.
 
 Use `--customizations-source /absolute/path` only when testing a deliberate local bundle override. The same flag on
 `apex update` performs a three-way managed-file update. A modified managed file is never silently replaced; resolve the

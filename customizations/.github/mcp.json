@@ -1,0 +1,34 @@
+{
+  "mcpServers": {
+    "apex": {
+      "type": "local",
+      "command": "node",
+      "args": ["node_modules/@apex/cli/dist/cli.js", "mcp", "serve"],
+      "env": {},
+      "tools": [
+        "status",
+        "capabilityList",
+        "capabilityStatus",
+        "nextTask",
+        "taskContext",
+        "recordRequirementsInput",
+        "stageArtifact",
+        "stageFile",
+        "generateIac",
+        "validateTask",
+        "completeTask",
+        "preview",
+        "reconcile",
+        "inventory",
+        "diagnose",
+        "improvementObserve",
+        "improvementObservations",
+        "improvementProposals",
+        "render",
+        "promote",
+        "doctor",
+        "submitEvidence"
+      ]
+    }
+  }
+}

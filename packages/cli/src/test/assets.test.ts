@@ -3,14 +3,24 @@ import { mkdir, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { sha256Bytes } from "@apex/kernel";
-import { bundleLockDigest, readBundledFile, verifyBundledAssetManifest, type BundledAssetManifest } from "../assets.js";
+import {
+  bundleLockDigest,
+  clientProjectionDigest,
+  readBundledFile,
+  verifyBundledAssetManifest,
+  type BundledAssetManifest,
+} from "../assets.js";
 import { tempRoot } from "./helpers.js";
 
 async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest }> {
   const root = await tempRoot();
   await mkdir(join(root, "config"), { recursive: true });
-  await mkdir(join(root, "customizations"), { recursive: true });
+  await mkdir(join(root, "customizations", ".github"), { recursive: true });
+  await mkdir(join(root, "customizations", ".vscode"), { recursive: true });
   const bytes = Buffer.from('{"schemaVersion":"1.0.0"}\n', "utf8");
+  const sharedBytes = Buffer.from("shared\n", "utf8");
+  const cliBytes = Buffer.from('{"mcpServers":{}}\n', "utf8");
+  const vscodeBytes = Buffer.from('{"servers":{}}\n', "utf8");
   await writeFile(join(root, "config", "example.json"), bytes);
   const customizationBytes = Buffer.from(
     `${JSON.stringify({
@@ -22,6 +32,11 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
         sourceRoot: "customizations",
         generatedRoot: "customizations",
       },
+      sharedFiles: ["README.md"],
+      clientProjections: [
+        { id: "github-copilot-vscode", files: [".vscode/mcp.json"] },
+        { id: "github-copilot-cli", files: [".github/mcp.json"] },
+      ],
     })}\n`,
   );
   const runtimeBytes = Buffer.from(
@@ -39,6 +54,9 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
     })}\n`,
   );
   await writeFile(join(root, "customizations", "manifest.json"), customizationBytes);
+  await writeFile(join(root, "customizations", "README.md"), sharedBytes);
+  await writeFile(join(root, "customizations", ".github", "mcp.json"), cliBytes);
+  await writeFile(join(root, "customizations", ".vscode", "mcp.json"), vscodeBytes);
   await writeFile(join(root, "config", "runtime-bundle.v1.json"), runtimeBytes);
   const sources = { customizations: "0.10.0", config: "1.0.0" };
   const composition = {
@@ -78,6 +96,36 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
       bytes: runtimeBytes.byteLength,
     },
     {
+      path: "customizations/.github/mcp.json",
+      source: {
+        kind: "repository-file" as const,
+        path: "customizations/.github/mcp.json",
+        mapping: "customizations",
+      },
+      sha256: sha256Bytes(cliBytes),
+      bytes: cliBytes.byteLength,
+    },
+    {
+      path: "customizations/.vscode/mcp.json",
+      source: {
+        kind: "repository-file" as const,
+        path: "customizations/.vscode/mcp.json",
+        mapping: "customizations",
+      },
+      sha256: sha256Bytes(vscodeBytes),
+      bytes: vscodeBytes.byteLength,
+    },
+    {
+      path: "customizations/README.md",
+      source: {
+        kind: "repository-file" as const,
+        path: "customizations/README.md",
+        mapping: "customizations",
+      },
+      sha256: sha256Bytes(sharedBytes),
+      bytes: sharedBytes.byteLength,
+    },
+    {
       path: "customizations/manifest.json",
       source: {
         kind: "repository-file" as const,
@@ -89,13 +137,27 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
     },
   ];
   files.sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0));
-  const lockInput = { sources, composition, files };
+  const projections = [
+    {
+      id: "github-copilot-cli" as const,
+      files: ["customizations/.github/mcp.json", "customizations/README.md"],
+      digest: "",
+    },
+    {
+      id: "github-copilot-vscode" as const,
+      files: ["customizations/.vscode/mcp.json", "customizations/README.md"],
+      digest: "",
+    },
+  ];
+  for (const projection of projections) projection.digest = clientProjectionDigest(projection, files);
+  const lockInput = { sources, composition, projections, files };
   return {
     root,
     manifest: {
       version: 1,
       sources,
       composition,
+      projections,
       files,
       lock: {
         algorithm: "sha256",
@@ -160,9 +222,45 @@ test("canonical lock ignores object insertion order", async (context) => {
       generator: manifest.composition.generator,
       authority: manifest.composition.authority,
     },
+    projections: manifest.projections.map((projection) => ({
+      digest: projection.digest,
+      files: projection.files,
+      id: projection.id,
+    })),
     sources: { config: manifest.sources.config, customizations: manifest.sources.customizations },
-  } as Pick<BundledAssetManifest, "sources" | "composition" | "files">;
+  } as Pick<BundledAssetManifest, "sources" | "composition" | "projections" | "files">;
   assert.equal(bundleLockDigest(reordered), manifest.lock.digest);
+});
+
+test("rejects client projection digest and declaration drift after aggregate rebaselining", async (context) => {
+  const { root, manifest } = await fixture();
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const digestDrift = structuredClone(manifest);
+  digestDrift.projections[0]!.digest = "0".repeat(64);
+  digestDrift.lock.digest = bundleLockDigest(digestDrift);
+  await assert.rejects(verifyBundledAssetManifest(root, digestDrift), /Invalid bundled client projection/);
+
+  const declarationDrift = structuredClone(manifest);
+  const declarationPath = join(root, "customizations", "manifest.json");
+  const declaration = JSON.parse(
+    await import("node:fs/promises").then(({ readFile }) => readFile(declarationPath, "utf8")),
+  );
+  declaration.clientProjections[0].files = [".github/mcp.json"];
+  const changed = Buffer.from(`${JSON.stringify(declaration)}\n`);
+  await writeFile(declarationPath, changed);
+  const entry = declarationDrift.files.find(({ path }) => path === "customizations/manifest.json")!;
+  entry.sha256 = sha256Bytes(changed);
+  entry.bytes = changed.byteLength;
+  declarationDrift.lock.digest = bundleLockDigest(declarationDrift);
+  await assert.rejects(verifyBundledAssetManifest(root, declarationDrift), /disagrees with its declaration/);
+
+  declaration.clientProjections.pop();
+  const incomplete = Buffer.from(`${JSON.stringify(declaration)}\n`);
+  await writeFile(declarationPath, incomplete);
+  entry.sha256 = sha256Bytes(incomplete);
+  entry.bytes = incomplete.byteLength;
+  declarationDrift.lock.digest = bundleLockDigest(declarationDrift);
+  await assert.rejects(verifyBundledAssetManifest(root, declarationDrift), /declarations are missing/);
 });
 
 test("rejects symlinks and false source mapping provenance", async (context) => {

@@ -5,8 +5,8 @@
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
-- **Active issue:** [#109](https://github.com/jonathan-vella/apex-vnext/issues/109)
-- **Working branch:** `chore/109-archive-workflow-sync`
+- **Active issue:** [#111](https://github.com/jonathan-vella/apex-vnext/issues/111)
+- **Working branch:** `feat/111-client-projections`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -22,6 +22,7 @@ the deterministic npm bundle composition lock and source/generated provenance wi
 PR #104 added the read-only hosted workflow contract without changing workflow YAML.
 PR #106 delegated public validation aliases to canonical npm scripts without removing compatibility names.
 PR #108 extracted the shared Python validation bootstrap while preserving required and exact-head hosted boundaries.
+PR #110 archived obsolete workflow synchronization with provenance and a durable retirement regression.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
@@ -42,7 +43,7 @@ qualification has run, and no ARM MCP version has been selected or qualified.
 | Copilot CLI `1.0.73` and cross-client matrix                             | Contract defined; execution pending                           |
 | Guidance, Markdown, lint, hook, and workflow ownership                   | Characterized; first hook repair merged                       |
 | ARM MCP adapters and MCP retirements                                     | Pending                                                       |
-| Bundle composition mappings and lock                                     | Implemented; client projections remain pending                |
+| Bundle composition mappings, aggregate lock, and client projections      | Implemented; live client qualification remains pending        |
 | Diagram and improvement-measurement changes                              | Pending                                                       |
 | Final deterministic, client, package, security, and live qualification   | Reopened                                                      |
 
@@ -56,7 +57,7 @@ qualification has run, and no ARM MCP version has been selected or qualified.
 
 ## Immediate Sequence
 
-1. Complete issue #109's provenance-preserving retirement of obsolete workflow synchronization.
+1. Complete issue #111's deterministic VS Code and Copilot CLI bundle projections.
 2. Continue Milestone N through independently revertible bundle, validator, hook, and workflow slices.
 3. Retire the selected MCP and Draw.io surfaces only after each replacement gate passes.
 4. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.
@@ -68,6 +69,6 @@ qualification has run, and no ARM MCP version has been selected or qualified.
 
 1. Read [PRD.md](PRD.md), [ROADMAP.md](ROADMAP.md), and [REGISTER.md](REGISTER.md).
 2. Verify the current `main` head, open pull requests, worktrees, and dirty files before selecting a slice.
-3. Resume issue #109 from the `upstream-workflow-synchronization` ownership record; keep later implementation in
-   independently revertible Milestone N and O slices.
+3. Resume issue #111 from the `copilot-client-projections` and `client-bundle-generation` ownership records; keep later
+   implementation in independently revertible Milestone N and O slices.
 4. Treat [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md) as historical evidence until a new candidate is declared.

@@ -198,7 +198,8 @@ export function loadRepositoryModel(root = process.cwd()) {
         content: readFileSync(file, "utf8"),
         frontmatter: parseFrontmatter(readFileSync(file, "utf8")),
       })),
-      mcp: readJson(path.join(root, "customizations", ".vscode", "mcp.json")),
+      vscodeMcp: readJson(path.join(root, "customizations", ".vscode", "mcp.json")),
+      cliMcp: readJson(path.join(root, "customizations", ".github", "mcp.json")),
     },
     contracts: {
       registry: parseContractRegistry(contractSource),
@@ -522,12 +523,16 @@ function validateConfig(model, findings) {
 
 function validateCustomizations(model, findings) {
   const customization = model.customization;
-  const expectedFiles = new Set([
+  const expectedSharedFiles = new Set([
     ...customization.agents.map(({ path: file }) => file),
     ...customization.skills.map(({ path: file }) => file),
     ".github/copilot-instructions.md",
-    ".vscode/mcp.json",
   ]);
+  const expectedProjectionFiles = new Map([
+    ["github-copilot-vscode", [".vscode/mcp.json"]],
+    ["github-copilot-cli", [".github/mcp.json"]],
+  ]);
+  const expectedFiles = new Set([...expectedSharedFiles, ...[...expectedProjectionFiles.values()].flat()]);
   const managedFiles = array(customization.manifest.managedFiles);
   if (
     managedFiles.length !== new Set(managedFiles).size ||
@@ -538,6 +543,49 @@ function validateCustomizations(model, findings) {
       findings,
       "customization.coverage",
       "Managed-file manifest must exactly cover agents, skills, instructions, and MCP config",
+      "customizations/manifest.json",
+    );
+  const sharedFiles = array(customization.manifest.sharedFiles);
+  if (
+    sharedFiles.length !== new Set(sharedFiles).size ||
+    sharedFiles.some((file) => !expectedSharedFiles.has(file)) ||
+    [...expectedSharedFiles].some((file) => !sharedFiles.includes(file))
+  )
+    finding(
+      findings,
+      "customization.shared-coverage",
+      "Shared files must exactly cover agents, skills, and managed guidance once",
+      "customizations/manifest.json",
+    );
+  const projections = array(customization.manifest.clientProjections);
+  const projectedFiles = [];
+  for (const projection of projections) {
+    const expected = expectedProjectionFiles.get(projection.id);
+    const files = array(projection.files);
+    projectedFiles.push(...files);
+    if (
+      expected === undefined ||
+      files.length !== new Set(files).size ||
+      files.length !== expected.length ||
+      files.some((file) => !expected.includes(file))
+    )
+      finding(
+        findings,
+        "customization.client-projection",
+        `Client projection ${projection.id ?? "<missing>"} has invalid files`,
+        "customizations/manifest.json",
+      );
+  }
+  if (
+    projections.length !== expectedProjectionFiles.size ||
+    projections.length !== new Set(projections.map(({ id }) => id)).size ||
+    projectedFiles.length !== new Set(projectedFiles).size ||
+    [...expectedProjectionFiles.keys()].some((id) => !projections.some((projection) => projection.id === id))
+  )
+    finding(
+      findings,
+      "customization.client-projection",
+      "Client projections must uniquely cover the supported VS Code and Copilot CLI files",
       "customizations/manifest.json",
     );
   const roles = new Map(array(customization.manifest.roles).map((role) => [role.agent, role]));
@@ -670,7 +718,7 @@ function validateCustomizations(model, findings) {
 }
 
 function validateMcp(model, findings) {
-  const servers = model.customization.mcp.servers;
+  const servers = model.customization.vscodeMcp.servers;
   const apex = servers && Object.keys(servers).length === 1 ? servers.apex : undefined;
   if (
     !apex ||
@@ -686,6 +734,22 @@ function validateMcp(model, findings) {
       "mcp.launch",
       "Managed MCP config must launch the workspace-local APEX CLI through Node without environment secrets",
       "customizations/.vscode/mcp.json",
+    );
+  const cliServers = model.customization.cliMcp.mcpServers;
+  const cliApex = cliServers && Object.keys(cliServers).length === 1 ? cliServers.apex : undefined;
+  if (
+    !cliApex ||
+    cliApex.type !== "local" ||
+    cliApex.command !== "node" ||
+    JSON.stringify(cliApex.args) !== JSON.stringify(["node_modules/@apex/cli/dist/cli.js", "mcp", "serve"]) ||
+    Object.keys(cliApex.env ?? {}).length > 0 ||
+    JSON.stringify(cliApex.tools) !== JSON.stringify(model.mcpTools)
+  )
+    finding(
+      findings,
+      "mcp.cli-launch",
+      "Managed Copilot CLI MCP config must launch the workspace-local APEX CLI with the exact tool allowlist",
+      "customizations/.github/mcp.json",
     );
 }
 

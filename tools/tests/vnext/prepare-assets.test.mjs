@@ -8,6 +8,7 @@ import {
   pinSourceRoot,
   readSourceFile,
   validateBundleDeclarations,
+  validateClientProjectionDeclarations,
 } from "../../../packages/cli/scripts/prepare-assets.mjs";
 
 test("asset generator canonical JSON ignores object insertion order", () => {
@@ -94,4 +95,33 @@ test("asset generator rejects inconsistent bundle declarations", () => {
   assert.throws(() => validateBundleDeclarations(customization, missingVersions), /declarations are inconsistent/);
   runtime.components.customizationBundle.compositionId = "other";
   assert.throws(() => validateBundleDeclarations(customization, runtime), /declarations are inconsistent/);
+});
+
+test("asset generator rejects malformed and duplicate client projection declarations", () => {
+  const valid = {
+    sharedFiles: [".github/copilot-instructions.md"],
+    clientProjections: [
+      { id: "github-copilot-vscode", files: [".vscode/mcp.json"] },
+      { id: "github-copilot-cli", files: [".github/mcp.json"] },
+    ],
+  };
+  assert.deepEqual(validateClientProjectionDeclarations(valid), valid);
+  for (const mutate of [
+    (manifest) => {
+      manifest.sharedFiles.push(manifest.sharedFiles[0]);
+    },
+    (manifest) => {
+      manifest.clientProjections[0].files = ".vscode/mcp.json";
+    },
+    (manifest) => {
+      manifest.clientProjections[0].files.push(manifest.clientProjections[0].files[0]);
+    },
+    (manifest) => {
+      manifest.clientProjections[1].id = manifest.clientProjections[0].id;
+    },
+  ]) {
+    const invalid = structuredClone(valid);
+    mutate(invalid);
+    assert.throws(() => validateClientProjectionDeclarations(invalid), /declarations are invalid/);
+  }
 });

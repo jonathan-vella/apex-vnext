@@ -171,8 +171,9 @@ name, canonical implementation, argument path, diagnostic, and exit status. Fixe
 their argument-forwarding contract is outside the validation graph.
 
 Issue #99 owns the metadata-only first bundle slice for `OWN-006` and `OWN-016`: source-to-generated mappings,
-composition provenance, per-file source metadata, and an aggregate content lock. Client projections and lifecycle
-extensions remain separate work; npm stays the sole package and installation authority.
+composition provenance, per-file source metadata, and an aggregate content lock. Issue #111 adds one shared managed
+source set, explicit VS Code and Copilot CLI MCP projections, per-client content digests, and shared transactional
+lifecycle coverage. npm stays the sole package and installation authority; live client outcome parity remains pending.
 
 ## Removal And Change Gates
 

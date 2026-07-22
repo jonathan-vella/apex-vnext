@@ -73,10 +73,24 @@ test("rejects a missing MCP tool", () => {
 
 test("rejects a PATH-dependent MCP launch", () => {
   const result = mutate((model) => {
-    model.customization.mcp.servers.apex.command = "apex";
-    model.customization.mcp.servers.apex.args = ["mcp", "serve"];
+    model.customization.vscodeMcp.servers.apex.command = "apex";
+    model.customization.vscodeMcp.servers.apex.args = ["mcp", "serve"];
   });
   assert.ok(hasRule(result, "mcp.launch"));
+});
+
+test("rejects client projection declaration and CLI allowlist drift", () => {
+  const projectionResult = mutate((model) => {
+    model.customization.manifest.clientProjections.find(({ id }) => id === "github-copilot-vscode").files = [
+      ".github/mcp.json",
+    ];
+  });
+  assert.ok(hasRule(projectionResult, "customization.client-projection"));
+
+  const allowlistResult = mutate((model) => {
+    model.customization.cliMcp.mcpServers.apex.tools.pop();
+  });
+  assert.ok(hasRule(allowlistResult, "mcp.cli-launch"));
 });
 
 test("rejects an unsafe managed path", () => {

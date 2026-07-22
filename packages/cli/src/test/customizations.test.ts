@@ -54,6 +54,40 @@ test("init installs bundled customizations and runtime config by default", async
       },
     },
   });
+  assert.deepEqual(JSON.parse(await readFile(join(root, ".github", "mcp.json"), "utf8")), {
+    mcpServers: {
+      apex: {
+        type: "local",
+        command: "node",
+        args: ["node_modules/@apex/cli/dist/cli.js", "mcp", "serve"],
+        env: {},
+        tools: [
+          "status",
+          "capabilityList",
+          "capabilityStatus",
+          "nextTask",
+          "taskContext",
+          "recordRequirementsInput",
+          "stageArtifact",
+          "stageFile",
+          "generateIac",
+          "validateTask",
+          "completeTask",
+          "preview",
+          "reconcile",
+          "inventory",
+          "diagnose",
+          "improvementObserve",
+          "improvementObservations",
+          "improvementProposals",
+          "render",
+          "promote",
+          "doctor",
+          "submitEvidence",
+        ],
+      },
+    },
+  });
   assert.equal(
     await readFile(join(root, ".apex", ".gitignore"), "utf8"),
     "/cache/\n/local/\n/work/\n/runtime/capability-packs/\n",
@@ -92,10 +126,12 @@ test("init installs bundled customizations and runtime config by default", async
     }
   }
   const lock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
-    files: Array<{ sourceHash: string }>;
+    files: Array<{ path: string; sourceHash: string }>;
     runtime: Array<{ sourceHash: string }>;
   };
   assert.ok([...lock.files, ...lock.runtime].every(({ sourceHash }) => /^[a-f0-9]{64}$/.test(sourceHash)));
+  assert.ok(lock.files.some(({ path }) => path === ".vscode/mcp.json"));
+  assert.ok(lock.files.some(({ path }) => path === ".github/mcp.json"));
 });
 
 test("update refuses local managed-file conflicts", async () => {

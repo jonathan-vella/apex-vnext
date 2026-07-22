@@ -23,7 +23,35 @@
     ".github/skills/apex-codegen/SKILL.md",
     ".github/skills/apex-operations/SKILL.md",
     ".github/copilot-instructions.md",
+    ".github/mcp.json",
     ".vscode/mcp.json"
+  ],
+  "sharedFiles": [
+    ".github/agents/apex.agent.md",
+    ".github/agents/apex-requirements.agent.md",
+    ".github/agents/apex-architect.agent.md",
+    ".github/agents/apex-planner.agent.md",
+    ".github/agents/apex-operator.agent.md",
+    ".github/agents/apex-codegen.agent.md",
+    ".github/agents/apex-reviewer.agent.md",
+    ".github/agents/apex-validator.agent.md",
+    ".github/skills/apex-workflow/SKILL.md",
+    ".github/skills/apex-requirements/SKILL.md",
+    ".github/skills/apex-architecture/SKILL.md",
+    ".github/skills/apex-planning/SKILL.md",
+    ".github/skills/apex-codegen/SKILL.md",
+    ".github/skills/apex-operations/SKILL.md",
+    ".github/copilot-instructions.md"
+  ],
+  "clientProjections": [
+    {
+      "id": "github-copilot-vscode",
+      "files": [".vscode/mcp.json"]
+    },
+    {
+      "id": "github-copilot-cli",
+      "files": [".github/mcp.json"]
+    }
   ],
   "roles": [
     {

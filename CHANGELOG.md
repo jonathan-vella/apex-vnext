@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Added deterministic VS Code and Copilot CLI workspace projections from one managed customization manifest, with
+  explicit MCP discovery files, per-client content digests, and one transactional npm lifecycle.
 - Archived the obsolete upstream workflow synchronization command with provenance and rollback guidance; standalone
   workflow files and hosted contracts remain authoritative.
 - Reopened every `0.10.0` release gate for the expanded product contract. No
