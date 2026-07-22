@@ -19,9 +19,11 @@ pre-commit:
           COUNT=$(echo "$STAGED_MD" | wc -l | tr -d ' ')
           echo "📝 Validating $COUNT markdown file(s)..."
           # Lint staged files only, suppress verbose Finding: output
-          RESULT=$(echo "$STAGED_MD" | xargs markdownlint-cli2 --no-globs 2>&1)
+          RESULT=$(printf '%s\n' "$STAGED_MD" | xargs npm run lint:md -- --no-globs 2>&1)
+          STATUS=$?
           # Show only Summary and errors, skip Finding/Linting lines
-          echo "$RESULT" | grep -v -E '^(Finding:|Linting:)' || true
+          printf '%s\n' "$RESULT" | grep -v -E '^(Finding:|Linting:)' || true
+          exit "$STATUS"
         else
           echo "ℹ️  No markdown files to validate"
         fi

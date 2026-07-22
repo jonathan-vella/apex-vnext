@@ -5,17 +5,18 @@
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
-- **Active issue:** [#93](https://github.com/jonathan-vella/apex-vnext/issues/93)
-- **Working branch:** `chore/93-guidance-automation-characterization`
+- **Active issue:** [#95](https://github.com/jonathan-vella/apex-vnext/issues/95)
+- **Working branch:** `fix/95-markdown-hook-fail-closed`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
 
 ## Current State
 
-PR #90 merged the `0.10.0` re-baseline. PR #92 then pinned the supported Copilot CLI and merged the client qualification
-contract, guidance/automation review contract, and current `main` characterization base. Runtime-managed APEX agents
-and skills remain under `customizations/`, with `customizations/manifest.json` as their canonical manifest.
+PR #90 merged the `0.10.0` re-baseline. PR #92 pinned the supported Copilot CLI and merged the client qualification
+contract. PR #94 completed the guidance and automation characterization without changing active behavior.
+Runtime-managed APEX agents and skills remain under `customizations/`, with `customizations/manifest.json` as their
+canonical manifest.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
@@ -49,7 +50,7 @@ qualification has run, and no ARM MCP version has been selected or qualified.
 
 ## Immediate Sequence
 
-1. Complete issue #93's four-surface guidance and automation review without changing active behavior.
+1. Complete issue #95's fail-closed Markdown hook repair with direct-command parity and regression coverage.
 2. Capture the remaining Milestone H MCP, pricing, diagram, bundle, diagnostic, timing, and context baselines.
 3. Retire the selected MCP and Draw.io surfaces only after each replacement gate passes.
 4. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.
@@ -61,6 +62,6 @@ qualification has run, and no ARM MCP version has been selected or qualified.
 
 1. Read [PRD.md](PRD.md), [ROADMAP.md](ROADMAP.md), and [REGISTER.md](REGISTER.md).
 2. Verify the current `main` head, open pull requests, worktrees, and dirty files before selecting a slice.
-3. Resume issue #93 from [GUIDANCE-AUTOMATION-CHARACTERIZATION.md](GUIDANCE-AUTOMATION-CHARACTERIZATION.md); future
-   implementation remains deferred to independently revertible Milestone N and O slices.
+3. Resume issue #95 from the `markdown-policy-enforcement` and `precommit-hooks` ownership records; keep later
+   implementation in independently revertible Milestone N and O slices.
 4. Treat [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md) as historical evidence until a new candidate is declared.

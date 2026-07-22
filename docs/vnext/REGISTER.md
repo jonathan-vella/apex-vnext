@@ -156,7 +156,8 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
   diagnostics or exits, hook failure propagation, required checks, workflow permissions, or release evidence.
 - **Evidence:** [GUIDANCE-AUTOMATION-CHARACTERIZATION.md](GUIDANCE-AUTOMATION-CHARACTERIZATION.md) maps the distributed
   owners and reproduces the Markdown pre-commit wrapper reporting missing tooling while exiting successfully.
-- **Related issue:** [#93](https://github.com/jonathan-vella/apex-vnext/issues/93)
+- **Related issues:** [#93](https://github.com/jonathan-vella/apex-vnext/issues/93),
+  [#95](https://github.com/jonathan-vella/apex-vnext/issues/95)
 - **Mitigation:** Complete the four-surface characterization before implementation; migrate independently by owner and
   require behavior, diagnostic, security, timing/context, rollback, and hosted-check parity.
 - **State:** Open
