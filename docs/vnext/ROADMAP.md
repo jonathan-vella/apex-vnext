@@ -310,6 +310,9 @@ automatic adapter remains disabled without weakening manual observation or the e
 **Outcome:** One npm-owned bundle and one characterized validation graph replace duplicate orchestration without a new
 framework.
 
+**Status:** Complete. Issue #119 records representative hook-selection, exit, and timing parity against `b27d173`; the
+dynamic two-client context and cache samples remain explicitly assigned to Milestone O.
+
 **Requirements:** `REQ-DIST-001`, `REQ-QUALITY-001`, `REQ-SECURITY-001`, `REQ-DETERMINISM-001`, `REQ-DOCS-001`.
 
 **Dependency-complete slices:**
