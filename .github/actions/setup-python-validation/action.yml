@@ -1,5 +1,5 @@
 # Composite action: shared Python validation environment.
-# Callers must check out the repository and install Node dependencies first.
+# Callers must check out the repository first so this local action can be resolved.
 
 name: Setup Python Validation
 description: Install Python 3.14 validation dependencies and the component-owned pricing test environment

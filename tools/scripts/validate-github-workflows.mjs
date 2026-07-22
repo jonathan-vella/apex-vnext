@@ -241,8 +241,11 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
       errors.push(`${path}: local action content drift`);
     }
   }
-  const pythonAction = localActionTexts[".github/actions/setup-python-validation/action.yml"];
-  if (pythonAction !== undefined) errors.push(...validatePythonSetupAction(pythonAction));
+  const pythonActionPath = ".github/actions/setup-python-validation/action.yml";
+  const pythonAction = localActionTexts[pythonActionPath];
+  if (pythonAction !== undefined) {
+    errors.push(...validatePythonSetupAction(pythonAction).map((error) => `${pythonActionPath}: ${error}`));
+  }
 
   const values = new Map();
   const referencedLocalActions = new Set();

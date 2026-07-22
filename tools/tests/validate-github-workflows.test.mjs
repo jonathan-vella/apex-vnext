@@ -126,6 +126,7 @@ test("rejects Python validation setup weakening and caller removal", () => {
     ],
     ["      shell: bash", "      working-directory: tools\n      shell: bash", "dependency bootstrap drift"],
   ]) {
+    assert.ok(localActionTexts[actionPath].includes(search), `${search} missing from ${actionPath}`);
     const changed = { ...localActionTexts, [actionPath]: localActionTexts[actionPath].replace(search, replacement) };
     const changedContract = structuredClone(contract);
     changedContract.localActions[actionPath] = createHash("sha256").update(changed[actionPath]).digest("hex");
@@ -135,7 +136,7 @@ test("rejects Python validation setup weakening and caller removal", () => {
       workflowTexts,
       localActionTexts: changed,
     });
-    assert.ok(errors.some((error) => error.includes(expected)));
+    assert.ok(errors.some((error) => error.startsWith(`${actionPath}: `) && error.includes(expected)));
   }
 
   for (const path of [".github/workflows/ci.yml", ".github/workflows/release-candidate-qualification.yml"]) {
