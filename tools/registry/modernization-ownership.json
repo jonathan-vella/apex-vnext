@@ -1,7 +1,7 @@
 {
   "$schema": "schemas/modernization-ownership.schema.json",
   "schemaVersion": "1.0.0",
-  "candidate": "d27951a575347d05ca3c36aa3f9b7ae87117bf9d",
+  "candidate": "4e989e87348914dc9901846ee9eb3b40d57b6d77",
   "surfaces": [
     {
       "id": "workspace-operating-frame",
@@ -95,13 +95,20 @@
       "sourceRefs": [
         "customizations/manifest.json",
         "customizations/.github/agents/*.agent.md",
+        "customizations/.github/mcp.json",
         "customizations/.vscode/mcp.json"
       ],
       "consumers": ["GitHub Copilot in VS Code", "GitHub Copilot CLI", "client parity qualification"],
-      "proofCommands": ["npm run validate:vnext", "npm run validate:agents", "npm run validate:vscode"],
+      "proofCommands": [
+        "npm run validate:vnext",
+        "npm run test:vnext",
+        "npm run test:vnext-pack",
+        "npm run validate:agents",
+        "npm run validate:vscode"
+      ],
       "removalGate": "Generated VS Code and Copilot CLI projections preserve roles, interaction boundaries, MCP allowlists, and equivalent typed outcomes.",
       "rationale": "One managed role graph must produce client-specific mechanics without creating separate workflow authorities.",
-      "followUp": "Add a client-neutral interaction contract and generate both client projections from the managed manifest.",
+      "followUp": "Issue #111 generates and locks both workspace projections; live normalized outcome parity remains a qualification gate.",
       "decisionRef": "OWN-011"
     },
     {
@@ -153,7 +160,7 @@
       "proofCommands": ["npm run validate:vnext", "npm run test:vnext", "npm run test:vnext-pack"],
       "removalGate": "Both client projections install, update, roll back, and uninstall atomically from one npm-owned manifest and content lock.",
       "rationale": "The approved lifecycle extends the existing npm and manifest authority rather than adding APM or another installer.",
-      "followUp": "Issue #99 adds the npm composition lock and source mappings; deterministic client projections and two-client lifecycle tests remain later slices.",
+      "followUp": "Issue #111 adds deterministic client projections and shared lifecycle coverage; live two-client outcome qualification remains pending.",
       "decisionRef": "OWN-006"
     },
     {
@@ -448,7 +455,7 @@
       "proofCommands": ["npm run prepare:vnext-assets", "npm run validate:vnext", "npm run test:vnext-pack"],
       "removalGate": "One deterministic generation path records source mappings, client projections, hashes, versions, composition provenance, and package inventory.",
       "rationale": "Generated install payloads must stay derived from canonical customizations inside the npm lifecycle.",
-      "followUp": "Issue #99 adds source mappings, composition provenance, and the aggregate content lock; client projections remain a later slice without APM or a second authority.",
+      "followUp": "Issues #99 and #111 add source mappings, composition provenance, aggregate and per-client locks, and deterministic projections without APM or a second authority.",
       "decisionRef": "OWN-016"
     },
     {

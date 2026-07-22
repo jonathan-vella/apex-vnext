@@ -9,6 +9,7 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(packageRoot, "../..");
 const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
+const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
 
 function bytewise(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -426,7 +427,35 @@ async function prepareAssets() {
   const files = inventory.sort((left, right) => bytewise(left.path, right.path));
   const paths = new Set(files.map(({ path }) => path));
   if (paths.size !== files.length) throw new Error("Bundled asset generator produced duplicate destination paths");
-  const lockInput = { sources: sourcesMetadata, composition, files };
+  const sharedFiles = customizationManifest.sharedFiles;
+  const clientProjections = customizationManifest.clientProjections;
+  if (!Array.isArray(sharedFiles) || !Array.isArray(clientProjections)) {
+    throw new Error("Client projection declarations are missing");
+  }
+  const fileMetadata = new Map(files.map((file) => [file.path, file]));
+  const projections = clientProjections
+    .map((projection) => {
+      const projectionFiles = [...sharedFiles, ...(projection.files ?? [])]
+        .map((path) => `customizations/${path}`)
+        .sort(bytewise);
+      const digestInput = projectionFiles.map((path) => {
+        const file = fileMetadata.get(path);
+        if (file === undefined) throw new Error(`Client projection references missing asset: ${path}`);
+        return { path, sha256: file.sha256 };
+      });
+      return {
+        id: projection.id,
+        files: projectionFiles,
+        digest: createHash("sha256")
+          .update(`${PROJECTION_DOMAIN}${canonicalJson({ id: projection.id, files: digestInput })}`)
+          .digest("hex"),
+      };
+    })
+    .sort((left, right) => bytewise(left.id, right.id));
+  if (projections.length !== new Set(projections.map(({ id }) => id)).size) {
+    throw new Error("Client projection declarations contain duplicate IDs");
+  }
+  const lockInput = { sources: sourcesMetadata, composition, projections, files };
   const manifest = {
     version: 1,
     ...lockInput,
