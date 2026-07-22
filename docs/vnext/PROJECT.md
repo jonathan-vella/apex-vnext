@@ -68,6 +68,6 @@ qualification has run, and no ARM MCP version has been selected or qualified.
 
 1. Read [PRD.md](PRD.md), [ROADMAP.md](ROADMAP.md), and [REGISTER.md](REGISTER.md).
 2. Verify the current `main` head, open pull requests, worktrees, and dirty files before selecting a slice.
-3. Resume issue #109 from the `upstream-workflow-synchronization` ownership record; keep later implementation in independently
-   revertible Milestone N and O slices.
+3. Resume issue #109 from the `upstream-workflow-synchronization` ownership record; keep later implementation in
+   independently revertible Milestone N and O slices.
 4. Treat [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md) as historical evidence until a new candidate is declared.

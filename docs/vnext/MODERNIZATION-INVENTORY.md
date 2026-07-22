@@ -125,8 +125,8 @@ release-authority denial remain unchanged and are enforced by the hosted workflo
 
 Issue #109 retires the unconsumed upstream workflow synchronization command. Its source, hash, introduction commit,
 rationale, replacement owners, and rollback steps remain under `.archive/retired-automation/`; every active workflow
-file remains byte-identical and owned by this standalone repository. The `upstream-workflow-synchronization` surface and
-`OWN-019` decision record this separate retirement without changing the active `maintenance-workflows` owner.
+file remains byte-identical and owned by this standalone repository. The `upstream-workflow-synchronization` surface
+and `OWN-019` decision record this separate retirement without changing the active `maintenance-workflows` owner.
 
 ### Dependencies
 

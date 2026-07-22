@@ -362,7 +362,11 @@
       "canonicalOwner": ".archive/retired-automation/sync-workflows.mjs",
       "sourceRefs": [".archive/retired-automation/sync-workflows.mjs", ".archive/retired-automation/README.md"],
       "consumers": ["historical provenance and rollback review"],
-      "proofCommands": ["npm run validate:github-workflows", "npm run lint:deprecated-refs"],
+      "proofCommands": [
+        "npm run test:retired-automation",
+        "npm run validate:github-workflows",
+        "npm run lint:deprecated-refs"
+      ],
       "removalGate": "No active package command, source path, or repository consumer remains; workflow files stay byte-identical and archive provenance records source hash and rollback.",
       "rationale": "Upstream workflow copying belongs to the former accelerator model and conflicts with standalone repository workflow ownership.",
       "followUp": "Retain archive bytes and provenance; restore only through the documented rollback after a new ownership decision.",
