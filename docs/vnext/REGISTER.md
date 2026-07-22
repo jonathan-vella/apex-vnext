@@ -148,6 +148,21 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **State:** Open
 - **Closure proof:** Byte-reproducible exact-candidate packages whose client projections pass parity and lifecycle tests.
 
+### RISK-013: Guidance And Automation Consolidation Could Change Enforcement
+
+- **Type:** `RISK`
+- **Owner:** Developer experience and validation engineering
+- **Impact:** Deduplication could change agent discovery, effective instructions, Markdown/artifact contracts, validator
+  diagnostics or exits, hook failure propagation, required checks, workflow permissions, or release evidence.
+- **Evidence:** Ownership is distributed across instructions, skills, agents, formatter/linter config, package scripts,
+  hooks, and workflows. The Markdown pre-commit command can miss `markdownlint-cli2` while reporting success.
+- **Related issue:** [#93](https://github.com/jonathan-vella/apex-vnext/issues/93)
+- **Mitigation:** Complete the four-surface characterization before implementation; migrate independently by owner and
+  require behavior, diagnostic, security, timing/context, rollback, and hosted-check parity.
+- **State:** Open
+- **Closure proof:** Issue #93 provides complete maps and gates; later Milestone N/O slices pass their characterized
+  parity and removal tests on the exact candidate.
+
 ### ASSUMPTION-001: Both Copilot Clients Can Project One Workflow Contract
 
 - **Type:** `ASSUMPTION`

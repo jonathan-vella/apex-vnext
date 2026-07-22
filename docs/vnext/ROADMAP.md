@@ -188,19 +188,22 @@ context. Automated issue creation requires a later explicit decision.
 release-relevant implementation resumes.
 
 **Requirements:** All requirements in [PRD.md](PRD.md), with emphasis on `REQ-CUSTOMIZATION-001`,
-`REQ-CAPABILITY-001`, `REQ-DETERMINISM-001`, `REQ-DOCS-001`, and `REQ-IMPROVE-001`.
+`REQ-CAPABILITY-001`, `REQ-DETERMINISM-001`, `REQ-MAINTAINABILITY-001`, `REQ-DOCS-001`, and `REQ-IMPROVE-001`.
 
 **Dependency-complete slices:**
 
 1. Record DECISION-012 through DECISION-018 and revise all project-control documents.
 2. Mark prior exact-main and live evidence as historical characterization rather than current release proof.
 3. Pin a supported Copilot CLI version and define per-client qualification scenarios.
-4. Capture active MCP tools, pricing semantics, diagram scenarios, bundle contents, validators, hooks, workflows,
+4. Complete the [guidance and automation review](GUIDANCE-AUTOMATION-REVIEW.md) for agent skills/instructions,
+   Markdown, linting, and workflows before implementing client projections or automation consolidation.
+5. Capture active MCP tools, pricing semantics, diagram scenarios, bundle contents, validators, hooks, workflows,
    diagnostics, timings, and context baselines.
-5. Bind every removal or ownership move to a machine-readable replacement and rollback gate.
+6. Bind every removal or ownership move to a machine-readable replacement and rollback gate.
 
 **Exit gate:** Project controls validate; every new requirement has an implementation owner, dependency, risk, proof
-method, and removal gate; frozen Phase 0A evidence and existing archives remain byte-stable.
+method, and removal gate; the four guidance/automation consumer maps and behavior baselines are complete; frozen Phase
+0A evidence and existing archives remain byte-stable.
 
 ## Milestone I: Independent Legacy MCP Retirement
 
@@ -313,10 +316,14 @@ framework.
 
 1. Add source-to-generated mappings, client projections, composition metadata, content locks, and deterministic manifests
    to the npm bundle; do not add APM or a second installer.
-2. Complete the machine-readable validator dependency graph and retain externally consumed aliases until proven unused.
-3. Make lefthook a thin consumer of canonical validators; retain serial execution until Git-index evidence permits change.
-4. Consolidate workflow setup and responsibility only where characterization proves duplicate ownership.
-5. Archive obsolete scripts and workflows with provenance instead of retaining successful no-op compatibility paths.
+2. Apply the characterized linting owner map by validator family; preserve focused commands, diagnostics, exit codes,
+   language-native parsing, and externally consumed aliases until proven unused.
+3. Repair the Markdown pre-commit lookup so missing executables fail closed and match direct repository lint behavior.
+4. Make lefthook a thin consumer of canonical validators; retain serial execution until Git-index evidence permits
+   change.
+5. Consolidate workflow setup and responsibility only where characterization proves duplicate ownership while keeping
+   required check names, triggers, permissions, pins, artifacts, and independent external-runtime visibility stable.
+6. Archive obsolete scripts and workflows with provenance instead of retaining successful no-op compatibility paths.
 
 **Exit gate:** Canonical owners and duplicate definitions decrease; required checks, permissions, triggers, pins,
 diagnostics, artifacts, coverage, and exact-head behavior remain stable; CI, hook, and context baselines do not regress.
@@ -325,17 +332,24 @@ diagnostics, artifacts, coverage, and exact-head behavior remain stable; CI, hoo
 
 **Outcome:** Repository and managed guidance describe the implemented two-client system and point to canonical owners.
 
-**Requirements:** `REQ-CUSTOMIZATION-001`, `REQ-CAPABILITY-001`, `REQ-DETERMINISM-001`, `REQ-DOCS-001`.
+**Requirements:** `REQ-CUSTOMIZATION-001`, `REQ-CAPABILITY-001`, `REQ-DETERMINISM-001`,
+`REQ-MAINTAINABILITY-001`, `REQ-DOCS-001`.
 
 **Dependency-complete slices:**
 
-1. Rewrite `.github/copilot-instructions.md` around supported clients, cloud-agent exclusion, kernel and Gate 4 authority,
+1. Apply the characterized owner map: stable repository facts in root guidance, path-specific rules in scoped
+   instructions, detailed procedures in skills, executable role data in agent frontmatter/manifest, and consumer
+   behavior in managed guidance.
+2. Reconcile Markdown guidance for human docs, prompts/agents, generated artifacts, templates, and historical evidence;
+   route new diagrams to Mermaid/Python without invalidating historical Draw.io readability.
+3. Rewrite `.github/copilot-instructions.md` around supported clients, cloud-agent exclusion, kernel and Gate 4 authority,
    MCP distinctions, source/generated boundaries, validation ownership, and release controls.
-2. Rewrite root `AGENTS.md` for common setup, build, validation, and client qualification.
-3. Keep scoped `AGENTS.md` files limited to directory-specific IaC rules and update them only where ownership changed.
-4. Update managed instructions, agents, skills, prompts, templates, guides, workflow documentation, changelog, and
-   provenance.
-5. Regenerate packaged assets only from canonical sources and validate instruction discovery in both clients.
+4. Rewrite root `AGENTS.md` for common setup, build, validation, and client qualification; keep scoped `AGENTS.md` files
+   limited to directory-specific IaC rules.
+5. Update managed instructions, agents, skills, prompts, templates, guides, workflow documentation, changelog, and
+   provenance only after their implementation owners stabilize.
+6. Regenerate packaged assets only from canonical sources and validate effective instruction/skill discovery, context
+   budgets, and semantic rule presence in both clients.
 
 **Exit gate:** Active guidance contains no obsolete MCP, Draw.io, VS Code-only, APM-adoption, or per-IaC SBOM claim;
 generated assets match canonical sources; both clients discover the intended instructions without conflict.

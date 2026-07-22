@@ -60,6 +60,10 @@ is collected through `vscode/askQuestions` or `ask_user` are explicitly excluded
 
 ## Execution Rules
 
+Client-projection implementation begins only after the
+[guidance and automation review](GUIDANCE-AUTOMATION-REVIEW.md) identifies canonical guidance, discovery, linting, and
+workflow owners. The review does not block this qualification contract or version selection.
+
 1. Run each client from a clean consumer workspace against the same exact candidate and generated bundle.
 2. Record supported stable client versions before the first model interaction; an automatic update invalidates the run.
 3. Use interactive mode for `CLIENT-003`. Programmatic mode is allowed only for scenarios that cannot request input.

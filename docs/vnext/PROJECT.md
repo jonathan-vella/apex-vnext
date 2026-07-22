@@ -6,6 +6,7 @@
 - **Default and integration branch:** `main`
 - **Characterization base:** `2256e8311c5440185c1255296c2f72bd5adc9b60`
 - **Active issue:** [#91](https://github.com/jonathan-vella/apex-vnext/issues/91)
+- **Next characterization issue:** [#93](https://github.com/jonathan-vella/apex-vnext/issues/93)
 - **Working branch:** `chore/91-client-qualification-contract`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
@@ -48,13 +49,13 @@ qualification has run, and no ARM MCP version has been selected or qualified.
 ## Immediate Sequence
 
 1. Complete issue #91 and merge the supported-client version and qualification contract.
-2. Capture the remaining Milestone H MCP, pricing, diagram, bundle, validation, workflow, diagnostic, timing, and
-   context baselines.
-3. Retire the selected MCP and Draw.io surfaces only after each replacement gate passes.
-4. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.
-5. Complete ARM pricing evidence, diagram routing, bounded improvement measurement, bundle generation, and guidance
+2. Complete issue #93's four-surface guidance and automation review without changing active behavior.
+3. Capture the remaining Milestone H MCP, pricing, diagram, bundle, diagnostic, timing, and context baselines.
+4. Retire the selected MCP and Draw.io surfaces only after each replacement gate passes.
+5. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.
+6. Complete ARM pricing evidence, diagram routing, bounded improvement measurement, bundle generation, and guidance
    consolidation in roadmap order.
-6. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.
+7. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.
 
 ## Resume Pointer
 

@@ -26,6 +26,7 @@ build is required to read, review, or validate it.
 - [Risk and issue register](vnext/REGISTER.md)
 - [Decision log](vnext/DECISIONS.md)
 - [Supported client qualification contract](vnext/CLIENT-QUALIFICATION.md)
+- [Guidance and automation review contract](vnext/GUIDANCE-AUTOMATION-REVIEW.md)
 - [Historical qualification dossier and reopened gates](vnext/FINAL-QUALIFICATION.md)
 - [Live qualification procedure](vnext/LIVE-QUALIFICATION.md)
 
