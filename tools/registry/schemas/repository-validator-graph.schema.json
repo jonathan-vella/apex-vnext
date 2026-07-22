@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.apexops.dev/repository-validator-graph-v1.json",
+  "title": "APEX repository validator dependency graph",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "profiles", "commands", "aggregates", "consumers"],
+  "properties": {
+    "$schema": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "const": "1.0.0" },
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "category", "owner", "inputs", "ciSafety", "parallelSafety"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "category": { "enum": ["build", "lint", "validation", "test"] },
+          "owner": { "type": "string", "minLength": 1 },
+          "inputs": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "ciSafety": { "enum": ["safe", "conditional", "forbidden"] },
+          "parallelSafety": { "enum": ["safe", "serial-only"] }
+        }
+      }
+    },
+    "commands": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "script", "profile", "aliases", "retirement"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "script": { "$ref": "#/$defs/script" },
+          "profile": { "$ref": "#/$defs/id" },
+          "aliases": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/script" }
+          },
+          "retirement": { "$ref": "#/$defs/retirement" }
+        }
+      }
+    },
+    "aggregates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "script", "prerequisites", "members", "continueOnError", "epilogue"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "script": { "$ref": "#/$defs/script" },
+          "prerequisites": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/script" }
+          },
+          "members": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/script" }
+          },
+          "continueOnError": { "type": "boolean" },
+          "epilogue": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "consumers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "path", "name", "script"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "kind": { "enum": ["github-actions", "lefthook"] },
+          "path": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "script": { "$ref": "#/$defs/script" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "script": { "type": "string", "pattern": "^[a-z0-9:_-]+$" },
+    "retirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "replacementIds"],
+      "properties": {
+        "status": { "enum": ["active", "deprecated", "retired"] },
+        "replacementIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,668 @@
+{
+  "$schema": "schemas/repository-validator-graph.schema.json",
+  "schemaVersion": "1.0.0",
+  "profiles": [
+    {
+      "id": "build",
+      "category": "build",
+      "owner": "Package build engineering",
+      "inputs": ["TypeScript projects and workspace manifests"],
+      "ciSafety": "safe",
+      "parallelSafety": "safe"
+    },
+    {
+      "id": "node-lint",
+      "category": "lint",
+      "owner": "Repository validation engineering",
+      "inputs": ["Repository source and configuration"],
+      "ciSafety": "safe",
+      "parallelSafety": "safe"
+    },
+    {
+      "id": "node-validation",
+      "category": "validation",
+      "owner": "Repository validation engineering",
+      "inputs": ["Repository contracts, configuration, and generated metadata"],
+      "ciSafety": "safe",
+      "parallelSafety": "safe"
+    },
+    {
+      "id": "node-test",
+      "category": "test",
+      "owner": "Repository validation engineering",
+      "inputs": ["Repository test fixtures and source"],
+      "ciSafety": "safe",
+      "parallelSafety": "safe"
+    },
+    {
+      "id": "external-lint",
+      "category": "lint",
+      "owner": "Language and infrastructure validation",
+      "inputs": ["Language-native source trees and toolchains"],
+      "ciSafety": "conditional",
+      "parallelSafety": "safe"
+    },
+    {
+      "id": "external-validation",
+      "category": "validation",
+      "owner": "Language and infrastructure validation",
+      "inputs": ["Infrastructure projects and external toolchains"],
+      "ciSafety": "conditional",
+      "parallelSafety": "safe"
+    },
+    {
+      "id": "external-test",
+      "category": "test",
+      "owner": "Component test engineering",
+      "inputs": ["Component source, fixtures, and isolated runtimes"],
+      "ciSafety": "conditional",
+      "parallelSafety": "safe"
+    },
+    {
+      "id": "network-lint",
+      "category": "lint",
+      "owner": "Documentation validation",
+      "inputs": ["Versioned documentation links"],
+      "ciSafety": "conditional",
+      "parallelSafety": "safe"
+    }
+  ],
+  "commands": [
+    {
+      "id": "build-vnext",
+      "script": "build:vnext",
+      "profile": "build",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "lint-bicep-fmt",
+      "script": "lint:bicep-fmt",
+      "profile": "external-lint",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "lint-deprecated-refs",
+      "script": "lint:deprecated-refs",
+      "profile": "node-lint",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "lint-docs-freshness",
+      "script": "lint:docs-freshness",
+      "profile": "node-lint",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "lint-drawio",
+      "script": "lint:drawio",
+      "profile": "node-lint",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "lint-glob-audit",
+      "script": "lint:glob-audit",
+      "profile": "node-lint",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "lint-js-ci",
+      "script": "lint:js:ci",
+      "profile": "node-lint",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "lint-json",
+      "script": "lint:json",
+      "profile": "node-lint",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "lint-json-schemas",
+      "script": "lint:json-schemas",
+      "profile": "node-lint",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "lint-links",
+      "script": "lint:links",
+      "profile": "network-lint",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "lint-mcp-config",
+      "script": "lint:mcp-config",
+      "profile": "node-lint",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "lint-md",
+      "script": "lint:md",
+      "profile": "external-lint",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "lint-orphaned-content",
+      "script": "lint:orphaned-content",
+      "profile": "node-lint",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "lint-python",
+      "script": "lint:python",
+      "profile": "external-lint",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "lint-safe-shell",
+      "script": "lint:safe-shell",
+      "profile": "node-lint",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "lint-terraform-fmt",
+      "script": "lint:terraform-fmt",
+      "profile": "external-lint",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "lint-version-sync",
+      "script": "lint:version-sync",
+      "profile": "node-lint",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "lint-workflow-handoffs",
+      "script": "lint:workflow-handoffs",
+      "profile": "node-lint",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "lint-workflow-table-sync",
+      "script": "lint:workflow-table-sync",
+      "profile": "node-lint",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "test-apex-recall",
+      "script": "test:apex-recall",
+      "profile": "external-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "test-azure-pricing-mcp",
+      "script": "test:azure-pricing-mcp",
+      "profile": "external-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "test-classify-model",
+      "script": "test:classify-model",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "test-devcontainer-verdicts",
+      "script": "test:devcontainer-verdicts",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "test-modernization-ownership",
+      "script": "test:modernization-ownership",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "test-repository-validator-graph",
+      "script": "test:repository-validator-graph",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-agents",
+      "script": "validate:agents",
+      "profile": "node-validation",
+      "aliases": ["lint:agent-checks", "lint:agent-frontmatter", "lint:model-alignment"],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-artifacts",
+      "script": "validate:artifacts",
+      "profile": "node-validation",
+      "aliases": ["lint:artifact-templates", "lint:h2-sync"],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-banned-phrases",
+      "script": "validate:banned-phrases",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-challenger-findings",
+      "script": "validate:challenger-findings",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-challenger-presence",
+      "script": "validate:challenger-presence",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-context-budget",
+      "script": "validate:context-budget",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-deprecated-models",
+      "script": "validate:deprecated-models",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-extension-bloat",
+      "script": "validate:extension-bloat",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-headings-summary",
+      "script": "validate:headings-summary",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-hooks",
+      "script": "validate:hooks",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-iac-security-baseline",
+      "script": "validate:iac-security-baseline",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-instruction-checks",
+      "script": "validate:instruction-checks",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-lens-references",
+      "script": "validate:lens-references",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-model-catalog",
+      "script": "validate:model-catalog",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-model-consistency",
+      "script": "validate:model-consistency",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-modernization-ownership",
+      "script": "validate:modernization-ownership",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-no-hardcoded-counts",
+      "script": "validate:no-hardcoded-counts",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-policy-precheck",
+      "script": "validate:policy-precheck",
+      "profile": "node-validation",
+      "aliases": ["lint:policy-precheck"],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-region-canonical",
+      "script": "validate:region-canonical",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-repository-validator-graph",
+      "script": "validate:repository-validator-graph",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-session-state",
+      "script": "validate:session-state",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-skill-checks",
+      "script": "validate:skill-checks",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-skills",
+      "script": "validate:skills",
+      "profile": "node-validation",
+      "aliases": ["lint:skill-references", "lint:skills-format", "validate:stale-refs"],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-sku-iac-coverage",
+      "script": "validate:sku-iac-coverage",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-sku-manifest",
+      "script": "validate:sku-manifest",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-terminology",
+      "script": "validate:terminology",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-terraform",
+      "script": "validate:terraform",
+      "profile": "external-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-tool-versions",
+      "script": "validate:tool-versions",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-v1-compatibility-matrix",
+      "script": "validate:v1-compatibility-matrix",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-vnext-live-workflow",
+      "script": "validate:vnext-live-workflow",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-vnext-project-controls",
+      "script": "validate:vnext-project-controls",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-vscode",
+      "script": "validate:vscode",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-workflow-graph",
+      "script": "validate:workflow-graph",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    }
+  ],
+  "aggregates": [
+    {
+      "id": "validate-node",
+      "script": "validate:_node",
+      "prerequisites": [],
+      "members": [
+        "validate:artifacts",
+        "validate:agents",
+        "validate:skills",
+        "lint:version-sync",
+        "lint:deprecated-refs",
+        "lint:mcp-config",
+        "validate:extension-bloat",
+        "validate:headings-summary",
+        "validate:instruction-checks",
+        "validate:session-state",
+        "validate:workflow-graph",
+        "validate:v1-compatibility-matrix",
+        "validate:vnext-project-controls",
+        "validate:vnext-live-workflow",
+        "validate:lens-references",
+        "validate:challenger-findings",
+        "validate:challenger-presence",
+        "lint:workflow-table-sync",
+        "lint:workflow-handoffs",
+        "validate:skill-checks",
+        "lint:json",
+        "lint:json-schemas",
+        "lint:glob-audit",
+        "lint:orphaned-content",
+        "lint:docs-freshness",
+        "validate:no-hardcoded-counts",
+        "validate:hooks",
+        "validate:context-budget",
+        "validate:modernization-ownership",
+        "test:modernization-ownership",
+        "validate:repository-validator-graph",
+        "test:repository-validator-graph",
+        "validate:iac-security-baseline",
+        "validate:policy-precheck",
+        "validate:sku-manifest",
+        "validate:sku-iac-coverage",
+        "validate:banned-phrases",
+        "validate:vscode",
+        "lint:drawio",
+        "validate:terminology",
+        "validate:model-consistency",
+        "validate:deprecated-models",
+        "validate:model-catalog",
+        "validate:region-canonical",
+        "test:classify-model",
+        "test:devcontainer-verdicts",
+        "lint:safe-shell",
+        "validate:tool-versions"
+      ],
+      "continueOnError": false,
+      "epilogue": null
+    },
+    {
+      "id": "validate-node-ci",
+      "script": "validate:_node-ci",
+      "prerequisites": ["build:vnext"],
+      "members": [
+        "validate:artifacts",
+        "validate:agents",
+        "validate:skills",
+        "lint:version-sync",
+        "lint:deprecated-refs",
+        "lint:mcp-config",
+        "validate:extension-bloat",
+        "validate:headings-summary",
+        "validate:instruction-checks",
+        "validate:session-state",
+        "validate:workflow-graph",
+        "validate:v1-compatibility-matrix",
+        "validate:vnext-project-controls",
+        "validate:vnext-live-workflow",
+        "validate:lens-references",
+        "validate:challenger-findings",
+        "validate:challenger-presence",
+        "lint:workflow-table-sync",
+        "lint:workflow-handoffs",
+        "validate:skill-checks",
+        "lint:json",
+        "lint:json-schemas",
+        "lint:glob-audit",
+        "lint:orphaned-content",
+        "validate:vscode",
+        "lint:drawio",
+        "validate:model-consistency",
+        "validate:deprecated-models",
+        "validate:model-catalog",
+        "validate:region-canonical",
+        "test:classify-model",
+        "test:devcontainer-verdicts",
+        "validate:no-hardcoded-counts",
+        "validate:terminology",
+        "validate:sku-manifest",
+        "validate:sku-iac-coverage",
+        "validate:banned-phrases",
+        "validate:context-budget",
+        "validate:modernization-ownership",
+        "test:modernization-ownership",
+        "validate:repository-validator-graph",
+        "test:repository-validator-graph",
+        "validate:policy-precheck",
+        "lint:js:ci",
+        "lint:safe-shell"
+      ],
+      "continueOnError": false,
+      "epilogue": null
+    },
+    {
+      "id": "validate-external",
+      "script": "validate:_external",
+      "prerequisites": [],
+      "members": [
+        "lint:md",
+        "lint:python",
+        "lint:terraform-fmt",
+        "lint:bicep-fmt",
+        "validate:terraform",
+        "test:apex-recall",
+        "test:azure-pricing-mcp"
+      ],
+      "continueOnError": false,
+      "epilogue": null
+    },
+    {
+      "id": "validate-all",
+      "script": "validate:all",
+      "prerequisites": [],
+      "members": ["validate:_node", "validate:_external"],
+      "continueOnError": true,
+      "epilogue": "echo '✅ All validations passed'"
+    },
+    {
+      "id": "validate-docs",
+      "script": "validate:docs",
+      "prerequisites": [],
+      "members": ["lint:md", "lint:links", "lint:docs-freshness"],
+      "continueOnError": false,
+      "epilogue": null
+    },
+    {
+      "id": "audit-quarterly",
+      "script": "audit:quarterly",
+      "prerequisites": [],
+      "members": ["lint:glob-audit", "lint:orphaned-content", "lint:docs-freshness"],
+      "continueOnError": false,
+      "epilogue": null
+    }
+  ],
+  "consumers": [
+    {
+      "id": "ci-node-validation",
+      "kind": "github-actions",
+      "path": ".github/workflows/ci.yml",
+      "name": "Build vNext and run Node.js validators (CI-safe)",
+      "script": "validate:_node-ci"
+    },
+    {
+      "id": "ci-apex-recall-tests",
+      "kind": "github-actions",
+      "path": ".github/workflows/ci.yml",
+      "name": "Run apex-recall test suite",
+      "script": "test:apex-recall"
+    },
+    {
+      "id": "ci-pricing-tests",
+      "kind": "github-actions",
+      "path": ".github/workflows/ci.yml",
+      "name": "Run azure-pricing MCP test suite",
+      "script": "test:azure-pricing-mcp"
+    },
+    {
+      "id": "docs-validation",
+      "kind": "github-actions",
+      "path": ".github/workflows/docs.yml",
+      "name": "Validate Markdown documentation",
+      "script": "validate:docs"
+    },
+    {
+      "id": "hook-markdown-lint",
+      "kind": "lefthook",
+      "path": "lefthook.yml",
+      "name": "markdown-lint",
+      "script": "lint:md"
+    }
+  ]
+}

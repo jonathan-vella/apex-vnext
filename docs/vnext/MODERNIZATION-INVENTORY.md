@@ -42,7 +42,7 @@ baselines before the related ownership entries move.
 | `schema-libraries`              | investigate | contracts plus repository schemas | `OWN-005`                  |
 | `customization-distribution`    | rewrite     | customization manifest            | `OWN-006`                  |
 | `workflow-validator-ownership`  | keep        | kernel ownership table            | Runtime authorization map  |
-| `repository-validator-graph`    | consolidate | package scripts                   | `OWN-002`                  |
+| `repository-validator-graph`    | consolidate | validator graph registry          | `OWN-002`                  |
 | `language-validator-boundaries` | keep        | language-native tools             | Preserve native parsing    |
 | `artifact-template-validation`  | consolidate | artifact templates                | `OWN-004`                  |
 
@@ -103,9 +103,9 @@ Hook validation and characterization tests pass. Hook timing remains a gap becau
 representative staged documentation, code, workflow, and artifact changes. Serial execution remains required while
 multiple `stage_fixed` commands can race on the Git index.
 
-The characterized pre-commit Markdown wrapper reports missing tooling while returning success. Issue #95 owns the first
-Milestone N repair: invoke the repository-owned lint command, preserve diagnostics, and propagate a nonzero result with
-executable regression coverage. Serial execution remains unchanged.
+PR #96 repaired the characterized pre-commit Markdown failure path: the hook now invokes the repository-owned lint
+command, preserves diagnostics, and propagates a nonzero result with executable regression coverage. Serial execution
+remains unchanged; representative hook timing and Git-index coordination remain later gates.
 
 The `markdown-policy-enforcement` cluster records the split between audience-specific authoring guidance and the shared
 executable lint contract. `OWN-018` keeps those guidance audiences separate while requiring hooks, editor integration,
@@ -135,7 +135,7 @@ validation without replacing those specialized checks.
 ## Ownership Decisions
 
 - `OWN-001`: keep skill and instruction frontmatter canonical; generate audit views.
-- `OWN-002`: consolidate validator orchestration through an explicit generated dependency graph.
+- `OWN-002`: keep validator metadata in the schema-backed repository graph and package scripts as executable projections.
 - `OWN-003`: retain serial hooks until Git index coordination and representative benchmarks pass.
 - `OWN-004`: derive artifact heading metadata from canonical templates.
 - `OWN-005`: defer schema-library consolidation until source and consumer provenance is mapped.
