@@ -35,7 +35,7 @@
     "check:h2-order": "node tools/scripts/check-h2-order.mjs",
     "check:context-redundancy": "node tools/scripts/check-context-redundancy.mjs",
     "render:headings-summary": "node tools/scripts/render-headings-summary.mjs",
-    "validate:headings-summary": "node tools/scripts/validate-headings-summary.mjs",
+    "validate:headings-summary": "node tools/scripts/validate-headings-summary.mjs && node --test tools/tests/artifact-heading-generation.test.mjs",
     "lint:version-sync": "node tools/scripts/validate-version-sync.mjs",
     "lint:deprecated-refs": "node tools/scripts/validate-no-deprecated-refs.mjs",
     "lint:mcp-config": "node tools/scripts/validate-mcp-config.mjs",
