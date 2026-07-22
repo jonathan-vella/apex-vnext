@@ -272,6 +272,13 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "test-client-context-samples",
+      "script": "test:client-context-samples",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "test-retired-automation",
       "script": "test:retired-automation",
       "profile": "node-test",
@@ -559,6 +566,7 @@
         "test:github-workflows",
         "test:registry-validator-reporter",
         "test:precommit-baseline",
+        "test:client-context-samples",
         "test:retired-automation",
         "validate:iac-security-baseline",
         "validate:policy-precheck",
@@ -631,6 +639,7 @@
         "test:github-workflows",
         "test:registry-validator-reporter",
         "test:precommit-baseline",
+        "test:client-context-samples",
         "test:retired-automation",
         "validate:policy-precheck",
         "lint:js:ci",

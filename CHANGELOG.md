@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Added a privacy-safe, fixture-qualified two-client context/cache sample contract and deterministic aggregation for
+  Milestone O; representative live evidence remains pending.
 - Closed Milestone N with isolated documentation, JavaScript, workflow, and artifact pre-commit parity measurements,
   preserving serial Git-index ownership and deferring dynamic context sampling to Milestone O.
 - Standardized text and JSON diagnostics for registry and hosted-workflow contract validators while preserving their

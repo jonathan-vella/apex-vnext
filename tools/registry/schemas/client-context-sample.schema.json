@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.apexops.dev/client-context-sample-v1.json",
+  "title": "APEX client context sample",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "client", "scenario", "evidence", "metrics", "sampleId"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "client": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "enum": ["github-copilot-vscode", "github-copilot-cli"] },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tier", "iacTrack", "retry"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "tier": { "enum": ["simple", "standard", "complex"] },
+        "iacTrack": { "enum": ["neutral", "bicep", "terraform"] },
+        "retry": { "type": "boolean" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "sourceFormat", "contentCapture"],
+      "properties": {
+        "kind": { "enum": ["fixture", "live"] },
+        "sourceFormat": { "const": "apex-debug-profile" },
+        "contentCapture": { "const": false }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputTokens", "outputTokens", "chatCalls", "cacheReadTokens", "cacheWriteTokens", "cacheHits"],
+      "properties": {
+        "inputTokens": { "$ref": "#/$defs/measuredCounter" },
+        "outputTokens": { "$ref": "#/$defs/measuredCounter" },
+        "chatCalls": { "$ref": "#/$defs/measuredCounter" },
+        "cacheReadTokens": { "$ref": "#/$defs/optionalCounter" },
+        "cacheWriteTokens": { "$ref": "#/$defs/optionalCounter" },
+        "cacheHits": { "$ref": "#/$defs/optionalCounter" }
+      }
+    },
+    "sampleId": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "$defs": {
+    "measuredCounter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "value"],
+      "properties": {
+        "status": { "const": "measured" },
+        "value": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "optionalCounter": {
+      "oneOf": [
+        { "$ref": "#/$defs/measuredCounter" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": { "status": { "const": "unavailable" } }
+        }
+      ]
+    }
+  }
+}
