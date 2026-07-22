@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Closed Milestone N with isolated documentation, JavaScript, workflow, and artifact pre-commit parity measurements,
+  preserving serial Git-index ownership and deferring dynamic context sampling to Milestone O.
 - Standardized text and JSON diagnostics for registry and hosted-workflow contract validators while preserving their
   validation rules and failure exits.
 - Derived runtime and compact artifact heading metadata from canonical templates with explicit non-template exceptions,

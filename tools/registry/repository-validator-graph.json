@@ -258,6 +258,20 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "measure-precommit-baseline",
+      "script": "measure:precommit-baseline",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "test-precommit-baseline",
+      "script": "test:precommit-baseline",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "test-retired-automation",
       "script": "test:retired-automation",
       "profile": "node-test",
@@ -544,6 +558,7 @@
         "validate:github-workflows",
         "test:github-workflows",
         "test:registry-validator-reporter",
+        "test:precommit-baseline",
         "test:retired-automation",
         "validate:iac-security-baseline",
         "validate:policy-precheck",
@@ -615,6 +630,7 @@
         "validate:github-workflows",
         "test:github-workflows",
         "test:registry-validator-reporter",
+        "test:precommit-baseline",
         "test:retired-automation",
         "validate:policy-precheck",
         "lint:js:ci",

@@ -1,7 +1,7 @@
 {
   "$schema": "schemas/modernization-ownership.schema.json",
   "schemaVersion": "1.0.0",
-  "candidate": "ada8ae1b21b1eca227fa97dba1a1944158f99f24",
+  "candidate": "75ac46e8e49f257d041318f9680caa14b1516fd1",
   "surfaces": [
     {
       "id": "workspace-operating-frame",
@@ -572,11 +572,17 @@
     },
     {
       "id": "hooks",
-      "status": "gap",
-      "sourceRefs": ["lefthook.yml", "tools/scripts/validate-hooks.mjs", "tools/tests/test-hooks.sh"],
-      "measurement": "npm run validate:hooks; npm run test:hooks",
-      "evidence": "At b27d173, direct missing Markdown tooling exits 127 while the current hook wrapper pattern prints the same lookup error and exits 0; serial stage_fixed execution also lacks a representative timing benchmark.",
-      "followUp": "Issue #95 owns the fail-closed regression and repair; representative documentation, code, workflow, and artifact timing benchmarks remain a later Milestone N slice."
+      "status": "captured",
+      "sourceRefs": [
+        "lefthook.yml",
+        "tools/scripts/measure-precommit-baseline.mjs",
+        "tools/registry/precommit-baseline.json",
+        "tools/tests/test-hooks.sh",
+        "tools/tests/measure-precommit-baseline.test.mjs"
+      ],
+      "measurement": "npm run validate:hooks; npm run test:hooks; npm run test:precommit-baseline; npm run measure:precommit-baseline -- --base b27d17350870a0ed3d5411346701cbb2eb6a4d4b --candidate 75ac46e8e49f257d041318f9680caa14b1516fd1",
+      "evidence": "Issue #119 measured three isolated samples for staged documentation, JavaScript, workflow, and artifact changes. Base/candidate medians were 1349/1358 ms, 1759/1799 ms, 615/629 ms, and 1450/1477 ms; selected hooks matched, all exits were zero, and every delta stayed within the 25% or 250 ms material-regression tolerance.",
+      "followUp": "Keep pre-commit serial while the model-catalog and SKU-manifest generators share Git-index write ownership; require new timing and lock evidence before changing coordination."
     },
     {
       "id": "dependencies",
@@ -587,11 +593,11 @@
     },
     {
       "id": "diagnostics",
-      "status": "gap",
+      "status": "captured",
       "sourceRefs": ["tools/scripts/_lib/reporter.mjs", "tools/scripts/validate-*.mjs"],
       "measurement": "Reporter import scan; npm run test:lib-json; npm run test:lib-ajv; npm run test:registry-validator-reporter",
       "evidence": "Shared diagnostic library tests pass. Issue #117 snapshots stable text and JSON diagnostics for the modernization ownership, repository validator graph, and hosted workflow contract family; repository-wide reporter adoption remains partial.",
-      "followUp": "Migrate each remaining validator family only after capturing its output and exit contract."
+      "followUp": "Migrate each remaining validator family only after capturing its output and exit contract; partial adoption is not a release blocker while current diagnostics remain stable."
     },
     {
       "id": "drift",

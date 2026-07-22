@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "1.0.0",
+  "base": "b27d17350870a0ed3d5411346701cbb2eb6a4d4b",
+  "candidate": "75ac46e8e49f257d041318f9680caa14b1516fd1",
+  "sampleCount": 3,
+  "tolerance": {
+    "relative": 0.25,
+    "minimumMilliseconds": 250
+  },
+  "scenarios": [
+    {
+      "id": "documentation",
+      "file": "CHANGELOG.md",
+      "selectedHooks": ["markdown-lint", "secrets-baseline"],
+      "baseSamplesMilliseconds": [1426, 1220, 1349],
+      "candidateSamplesMilliseconds": [1449, 1351, 1358],
+      "baseMedianMilliseconds": 1349,
+      "candidateMedianMilliseconds": 1358,
+      "baseExitStatuses": [0, 0, 0],
+      "candidateExitStatuses": [0, 0, 0],
+      "status": "pass"
+    },
+    {
+      "id": "javascript",
+      "file": "tools/scripts/validate-hooks.mjs",
+      "selectedHooks": ["js-format", "js-lint", "secrets-baseline"],
+      "baseSamplesMilliseconds": [1759, 1741, 1862],
+      "candidateSamplesMilliseconds": [1819, 1762, 1799],
+      "baseMedianMilliseconds": 1759,
+      "candidateMedianMilliseconds": 1799,
+      "baseExitStatuses": [0, 0, 0],
+      "candidateExitStatuses": [0, 0, 0],
+      "status": "pass"
+    },
+    {
+      "id": "workflow",
+      "file": ".github/workflows/ci.yml",
+      "selectedHooks": ["secrets-baseline"],
+      "baseSamplesMilliseconds": [615, 619, 615],
+      "candidateSamplesMilliseconds": [625, 629, 704],
+      "baseMedianMilliseconds": 615,
+      "candidateMedianMilliseconds": 629,
+      "baseExitStatuses": [0, 0, 0],
+      "candidateExitStatuses": [0, 0, 0],
+      "status": "pass"
+    },
+    {
+      "id": "artifact",
+      "file": "agent-output/vnext-qualification/03-des-adr-0001-use-split-encrypted-ci-transport.md",
+      "selectedHooks": ["artifact-validation", "markdown-lint", "secrets-baseline"],
+      "baseSamplesMilliseconds": [1623, 1386, 1450],
+      "candidateSamplesMilliseconds": [1455, 1477, 1544],
+      "baseMedianMilliseconds": 1450,
+      "candidateMedianMilliseconds": 1477,
+      "baseExitStatuses": [0, 0, 0],
+      "candidateExitStatuses": [0, 0, 0],
+      "status": "pass"
+    }
+  ],
+  "status": "pass"
+}
