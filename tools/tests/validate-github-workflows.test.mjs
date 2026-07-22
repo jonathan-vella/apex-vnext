@@ -109,6 +109,20 @@ test("rejects local composite action drift", () => {
   assert.ok(errors.includes(".github/actions/setup-node-repo/action.yml: local action content drift"));
 });
 
+test("reports a missing local composite action without throwing", () => {
+  const missingPath = ".github/actions/does-not-exist/action.yml";
+  const changedContract = structuredClone(contract);
+  changedContract.localActions = { [missingPath]: "0".repeat(64) };
+  const changedTexts = loadLocalActionTexts([missingPath]);
+  const errors = validateGithubWorkflowContract({
+    contract: changedContract,
+    schema,
+    workflowTexts,
+    localActionTexts: changedTexts,
+  });
+  assert.ok(errors.includes(`${missingPath}: local action is missing`));
+});
+
 test("rejects release exact-head, credential, artifact, and authority drift", () => {
   const path = ".github/workflows/release-candidate-qualification.yml";
   assert.ok(
@@ -282,4 +296,9 @@ test("rejects missing workflow files", () => {
   const errors = validate(texts);
   assert.ok(errors.includes("workflow file inventory drift"));
   assert.ok(errors.includes(".github/workflows/docs.yml: workflow file is missing"));
+
+  const missingRelease = structuredClone(workflowTexts);
+  delete missingRelease[".github/workflows/release-candidate-qualification.yml"];
+  const releaseErrors = validate(missingRelease);
+  assert.ok(releaseErrors.includes(".github/workflows/release-candidate-qualification.yml: workflow file is missing"));
 });

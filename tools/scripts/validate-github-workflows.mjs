@@ -72,7 +72,10 @@ function workflowLocalActions(value) {
 }
 
 function workflowScripts(value) {
-  return Object.values(value.jobs ?? {})
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return "";
+  const jobs = value.jobs;
+  if (jobs === null || typeof jobs !== "object" || Array.isArray(jobs)) return "";
+  return Object.values(jobs)
     .filter((job) => job !== null && typeof job === "object" && !Array.isArray(job))
     .flatMap((job) => (Array.isArray(job.steps) ? job.steps : []))
     .filter((step) => step !== null && typeof step === "object")
@@ -140,7 +143,18 @@ export function loadWorkflowTexts(directory = WORKFLOW_DIRECTORY) {
 }
 
 export function loadLocalActionTexts(paths) {
-  return Object.fromEntries(paths.map((path) => [path, readFileSync(path, "utf8")]));
+  return Object.fromEntries(
+    paths.map((path) => {
+      try {
+        return [path, readFileSync(path, "utf8")];
+      } catch (error) {
+        if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+          return [path, undefined];
+        }
+        throw error;
+      }
+    }),
+  );
 }
 
 export function validateGithubWorkflowContract({ contract, schema, workflowTexts, localActionTexts = {} }) {
