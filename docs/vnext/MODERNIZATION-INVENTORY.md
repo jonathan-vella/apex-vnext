@@ -107,8 +107,11 @@ the model-catalog and SKU-manifest generators both re-stage output through that 
 
 PR #96 repaired the characterized pre-commit Markdown failure path: the hook now invokes the repository-owned lint
 command, preserves diagnostics, and propagates a nonzero result with executable regression coverage. Issue #113 keeps
-that scope and failure contract while reducing index writers to the two genuine generators. Representative timing
-remains a later optimization gate; no global parallelism claim is made.
+that scope and failure contract while reducing index writers to the two genuine generators. Issue #119 compares three
+isolated samples at `b27d173` and `75ac46e` for staged documentation, JavaScript, workflow, and artifact changes. The
+base/candidate medians are 1349/1358 ms, 1759/1799 ms, 615/629 ms, and 1450/1477 ms respectively; selected hooks match,
+all exits are zero, and every delta is within the 25% or 250 ms material-regression tolerance. No global parallelism
+claim is made.
 
 The `markdown-policy-enforcement` cluster records the split between audience-specific authoring guidance and the shared
 executable lint contract. `OWN-018` keeps those guidance audiences separate while requiring hooks, editor integration,
@@ -159,8 +162,8 @@ validation without replacing those specialized checks.
 
 - `OWN-001`: keep skill and instruction frontmatter canonical; generate audit views.
 - `OWN-002`: keep validator metadata in the schema-backed repository graph and package scripts as executable projections.
-- `OWN-003`: keep only genuine generators as index writers and retain serial hooks until explicit Git index coordination
-  and representative timing benchmarks pass.
+- `OWN-003`: keep only genuine generators as index writers. Representative timings pass, but serial hooks remain until
+  explicit Git index coordination also passes.
 - `OWN-004`: derive artifact heading metadata from canonical templates.
 - `OWN-005`: defer schema-library consolidation until source and consumer provenance is mapped.
 - `OWN-006`: keep npm and the customization manifest authoritative while extending the transactional client lifecycle.
