@@ -123,6 +123,11 @@ Issue #107 extracts the duplicated Python validation bootstrap into one digest-b
 external tests and exact-head qualification. Required check names, workflow permissions, artifacts, commands, and
 release-authority denial remain unchanged and are enforced by the hosted workflow contract.
 
+Issue #109 retires the unconsumed upstream workflow synchronization command. Its source, hash, introduction commit,
+rationale, replacement owners, and rollback steps remain under `.archive/retired-automation/`; every active workflow
+file remains byte-identical and owned by this standalone repository. The `upstream-workflow-synchronization` surface and
+`OWN-019` decision record this separate retirement without changing the active `maintenance-workflows` owner.
+
 ### Dependencies
 
 The candidate lockfile SHA-256 is `5727e5fd6353b31b347cffaf6c537a5c0a6be20ce2460d66125d09b118f8b525`. Workspace
@@ -159,6 +164,7 @@ validation without replacing those specialized checks.
 - `OWN-015`: feed only allowlisted structured outcomes into the existing inert improvement lifecycle.
 - `OWN-016`: keep npm and CLI asset preparation as the only bundle-generation path, with client locks and provenance.
 - `OWN-017`: consolidate shipped consumer guidance in managed instructions generated consistently for both clients.
+- `OWN-019`: retire upstream workflow synchronization and preserve source only as provenance with rollback guidance.
 
 Issue #105 converts graph-governed validation aliases into exact one-hop npm delegates while preserving every public
 name, canonical implementation, argument path, diagnostic, and exit status. Fixer aliases remain unchanged because

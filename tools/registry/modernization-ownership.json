@@ -1,7 +1,7 @@
 {
   "$schema": "schemas/modernization-ownership.schema.json",
   "schemaVersion": "1.0.0",
-  "candidate": "94c6a89fd27e53a911528d917f09a44e438575cd",
+  "candidate": "d27951a575347d05ca3c36aa3f9b7ae87117bf9d",
   "surfaces": [
     {
       "id": "workspace-operating-frame",
@@ -354,6 +354,19 @@
       "proofCommands": ["npm run validate:tool-versions", "npm run lint:docs-freshness"],
       "removalGate": "Equivalent scheduled ownership exists for every freshness and maintenance task.",
       "rationale": "Scheduled automation is distinct from required pull-request checks."
+    },
+    {
+      "id": "upstream-workflow-synchronization",
+      "category": "automation",
+      "classification": "retire",
+      "canonicalOwner": ".archive/retired-automation/sync-workflows.mjs",
+      "sourceRefs": [".archive/retired-automation/sync-workflows.mjs", ".archive/retired-automation/README.md"],
+      "consumers": ["historical provenance and rollback review"],
+      "proofCommands": ["npm run validate:github-workflows", "npm run lint:deprecated-refs"],
+      "removalGate": "No active package command, source path, or repository consumer remains; workflow files stay byte-identical and archive provenance records source hash and rollback.",
+      "rationale": "Upstream workflow copying belongs to the former accelerator model and conflicts with standalone repository workflow ownership.",
+      "followUp": "Retain archive bytes and provenance; restore only through the documented rollback after a new ownership decision.",
+      "decisionRef": "OWN-019"
     },
     {
       "id": "model-catalog-generation",
@@ -719,6 +732,14 @@
       "rationale": "Human docs, agents, skills, templates, and frozen artifacts need different authoring rules, but hook and CI failure behavior must not fork.",
       "owner": "Markdown policy and validation modernization",
       "gate": "Direct, hook, editor, and hosted checks preserve scope and diagnostics and fail nonzero when the executable is missing."
+    },
+    {
+      "id": "OWN-019",
+      "status": "decided",
+      "decision": "Retire upstream workflow synchronization and preserve its source only as provenance.",
+      "rationale": "Standalone workflow files and their validated hosted contract replace network-dependent copying from the former upstream repository.",
+      "owner": "Issue #109 workflow synchronization retirement",
+      "gate": "Active references and command entrypoints are absent, workflow bytes remain unchanged, and archived source hash plus rollback are recorded."
     }
   ]
 }
