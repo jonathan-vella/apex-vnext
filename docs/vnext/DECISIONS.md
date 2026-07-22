@@ -326,3 +326,23 @@ when a decision has lasting architectural consequences that need alternatives an
   Every slice must reduce canonical owners without worsening CI, hook, context, coverage, or diagnostic baselines.
 - **ADR:** Not required unless a slice changes a public command or hosted trust boundary.
 - **Issue/PR:** Pending work-item creation.
+
+## DECISION-019: Characterize Guidance And Automation Before Rewriting
+
+- **Date:** 2026-07-22
+- **Owner:** Developer experience and validation engineering
+- **Context:** Agent guidance, Markdown rules, linting configuration, and workflow configuration affect both supported
+  clients, generated bundles, local hooks, CI diagnostics, and release evidence. Existing ownership is distributed and
+  includes known conflicts and a non-failing Markdown hook lookup defect.
+- **Options:** Rewrite each area immediately; combine all four into one implementation; leave current duplication; first
+  characterize the four boundaries, then implement independently revertible migrations.
+- **Choice:** Make a four-surface characterization and ownership review a Milestone H prerequisite. Defer production
+  consolidation to Milestone N and active guidance rewrites to Milestone O.
+- **Rationale:** Effective behavior, consumers, and trust boundaries must be known before deduplication can prove that it
+  preserves semantics rather than merely reducing file or command counts.
+- **Consequences:** Issue #93 produces consumer maps, duplicate/conflict clusters, baselines, canonical-owner proposals,
+  proof commands, and rollback/removal gates without changing active rules. Client projections and automation rewrites
+  may not hard-code unresolved ownership. No universal task runner, generated workflow framework, or second guidance
+  registry is introduced.
+- **ADR:** Not required unless a later slice changes a hosted trust boundary or public command contract.
+- **Issue/PR:** [#93](https://github.com/jonathan-vella/apex-vnext/issues/93).

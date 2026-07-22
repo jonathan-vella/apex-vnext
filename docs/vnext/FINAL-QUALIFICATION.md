@@ -24,6 +24,7 @@ No evidence in this dossier authorizes package publication, tag creation, branch
 | MCP and Draw.io retirement    | Not implemented; each replacement gate must pass before removal.         |
 | Improvement measurement       | Not implemented; prior evidence covers observe-and-propose only.         |
 | Package, SBOM, and provenance | Must cover the new generated client projections on the exact candidate.  |
+| Guidance and automation       | Characterization and later N/O parity gates are incomplete.              |
 | Security and live Azure       | Must repeat after dependency and authority surfaces stabilize.           |
 
 ## Historical Candidate Boundary
@@ -191,13 +192,15 @@ The dispositions below apply only to the product contract bound to
 ## Current Requalification Gates
 
 1. Complete Milestone H characterization and bind ownership records to the current `main` base.
-2. Implement and prove each selected MCP and Draw.io replacement before removing its old surface.
-3. Qualify equivalent typed outcomes and authority denials in supported VS Code and Copilot CLI versions.
-4. Qualify ARM MCP authentication, typed evidence adapters, tool allowlists, drift rejection, and failure handling.
-5. Prove Mermaid and Python diagram routing, bounded improvement measurement, and deterministic bundle generation.
-6. Repeat package reproducibility, clean lifecycle, APEX-level SBOM, provenance, security review, and live Azure tracks
+2. Complete the four-surface guidance and automation review, then prove each later consolidation against its captured
+   behavior, diagnostics, security, context/timing, rollback, and hosted-check gates.
+3. Implement and prove each selected MCP and Draw.io replacement before removing its old surface.
+4. Qualify equivalent typed outcomes and authority denials in supported VS Code and Copilot CLI versions.
+5. Qualify ARM MCP authentication, typed evidence adapters, tool allowlists, drift rejection, and failure handling.
+6. Prove Mermaid and Python diagram routing, bounded improvement measurement, and deterministic bundle generation.
+7. Repeat package reproducibility, clean lifecycle, APEX-level SBOM, provenance, security review, and live Azure tracks
    on one new exact candidate.
-7. Configure trusted publication only after a reviewed release workflow exists, then obtain separate explicit
+8. Configure trusted publication only after a reviewed release workflow exists, then obtain separate explicit
    authorization for publication, tags, support dates, and cutover.
 
-Until all seven gates are recorded in a new exact-candidate dossier, `0.10.0` remains unqualified for promotion.
+Until all eight gates are recorded in a new exact-candidate dossier, `0.10.0` remains unqualified for promotion.

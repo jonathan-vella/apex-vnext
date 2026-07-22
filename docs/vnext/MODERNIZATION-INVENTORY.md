@@ -16,6 +16,10 @@ does not copy their entries. New owners below are planned migration targets and 
 No classification authorizes implementation by itself. Milestones I through O apply each change as an independently
 revertible slice with characterization tests and baseline comparison.
 
+The [guidance and automation review contract](GUIDANCE-AUTOMATION-REVIEW.md) defines the required Milestone H
+characterization for agent guidance, Markdown, linting, and workflows. Issue #93 must complete those consumer maps and
+behavior baselines before the related ownership entries move.
+
 ## Guidance And Invocation
 
 | Surface                        | Class       | Canonical owner         | Decision                               |
@@ -98,6 +102,10 @@ files and package scripts.
 Hook validation and characterization tests pass. Hook timing remains a gap because no benchmark currently exercises
 representative staged documentation, code, workflow, and artifact changes. Serial execution remains required while
 multiple `stage_fixed` commands can race on the Git index.
+
+The pre-commit Markdown command currently reports `markdownlint-cli2: No such file or directory` while the hook summary
+still reports success. Issue #93 must capture a reproducer and assign the fail-closed repair to Milestone N; the review
+does not change hook behavior.
 
 ### Dependencies
 

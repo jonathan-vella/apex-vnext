@@ -138,6 +138,15 @@ manifest, SBOM, and provenance. Validators must have executable registry ownersh
 local, hook, and CI behavior. Validator, hook, and workflow consolidation must reduce duplicate ownership without
 changing required check names, permissions, triggers, diagnostics, release authority, or exact-head semantics.
 
+### REQ-MAINTAINABILITY-001: Guidance And Automation Ownership
+
+Before client projection, lint/hook consolidation, workflow simplification, or active guidance rewrite, APEX must
+characterize agent-related skills and instructions, Markdown guidance, linting configuration, and workflow
+configuration. Every rule and duplicate cluster must have a current owner, consumers, effective behavior, diagnostics,
+security boundary, proposed disposition, proof test, and rollback or removal gate. Consolidation must reduce editable
+owners or measured duplication without flattening audience-specific guidance, weakening language-native validation,
+changing required checks, or introducing a generic task/workflow framework.
+
 ### REQ-DOCS-001: Documentation And Lifecycle
 
 Installation, workflow, CLI, security, operations, testing, capability packs, upgrade, downgrade, rollback, uninstall,
@@ -170,6 +179,8 @@ and triage outcomes; a noisy automatic adapter remains disabled without weakenin
 - **Accessibility:** User-facing CLI and documentation provide clear text status, actionable diagnostics, and no
   color-only meaning.
 - **Privacy:** Telemetry is separate, optional, exportable, and deletable; raw chat history is never scraped or replayed.
+- **Maintainability:** Repository guidance and automation have one canonical owner per concern; generated views and
+  compatibility aliases are validated derivatives rather than parallel editable sources.
 
 ## Exclusions
 
@@ -208,6 +219,8 @@ Cutover requires all of the following on the exact candidate head:
 - ARM pricing and Python diagram replacements satisfy their measured compatibility, reliability, security, and
   maintainability gates.
 - Automatic improvement ingestion meets its precision and privacy thresholds while proposals remain inert.
+- The guidance and automation review gate is complete; every consolidation or retirement has characterized consumers,
+  behavior, diagnostics, security boundaries, rollback, and proof tests.
 - Bicep and Terraform preview, approval, apply, inventory, diagnosis, destroy, and recovery scenarios are qualified.
 - Local APEX Gate 4 approval, GitHub OIDC, and local-to-CI writer transfer are proven.
 - Scorecard sample requirements and unavailable-data dispositions are satisfied.

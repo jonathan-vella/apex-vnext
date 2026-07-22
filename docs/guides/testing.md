@@ -8,7 +8,8 @@ credentials or model calls; manual qualification covers VS Code interaction and 
 
 > [!IMPORTANT]
 > The manual checklist below characterizes the current VS Code implementation. Final `0.10.0` acceptance also requires
-> an equivalent Copilot CLI matrix and repeat qualification after all re-baseline changes.
+> the [supported client qualification matrix](../vnext/CLIENT-QUALIFICATION.md) and repeat qualification after all
+> re-baseline changes.
 
 ## Run the Full Qualification
 
