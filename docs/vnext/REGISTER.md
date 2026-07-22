@@ -154,8 +154,8 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Owner:** Developer experience and validation engineering
 - **Impact:** Deduplication could change agent discovery, effective instructions, Markdown/artifact contracts, validator
   diagnostics or exits, hook failure propagation, required checks, workflow permissions, or release evidence.
-- **Evidence:** Ownership is distributed across instructions, skills, agents, formatter/linter config, package scripts,
-  hooks, and workflows. The Markdown pre-commit command can miss `markdownlint-cli2` while reporting success.
+- **Evidence:** [GUIDANCE-AUTOMATION-CHARACTERIZATION.md](GUIDANCE-AUTOMATION-CHARACTERIZATION.md) maps the distributed
+  owners and reproduces the Markdown pre-commit wrapper reporting missing tooling while exiting successfully.
 - **Related issue:** [#93](https://github.com/jonathan-vella/apex-vnext/issues/93)
 - **Mitigation:** Complete the four-surface characterization before implementation; migrate independently by owner and
   require behavior, diagnostic, security, timing/context, rollback, and hosted-check parity.

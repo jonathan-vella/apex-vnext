@@ -107,6 +107,14 @@ The pre-commit Markdown command currently reports `markdownlint-cli2: No such fi
 still reports success. Issue #93 must capture a reproducer and assign the fail-closed repair to Milestone N; the review
 does not change hook behavior.
 
+The `markdown-policy-enforcement` cluster records the split between audience-specific authoring guidance and the shared
+executable lint contract. `OWN-018` keeps those guidance audiences separate while requiring hooks, editor integration,
+and hosted checks to consume repository-owned commands with equivalent diagnostics and failure propagation.
+
+The `exact-head-release-qualification` surface remains separate from `github-required-checks`: deterministic pull-request
+checks protect integration, while exact-head qualification emits candidate-bound release evidence without merge,
+publication, deployment, tag, or cutover authority.
+
 ### Dependencies
 
 The candidate lockfile SHA-256 is `5727e5fd6353b31b347cffaf6c537a5c0a6be20ce2460d66125d09b118f8b525`. Workspace

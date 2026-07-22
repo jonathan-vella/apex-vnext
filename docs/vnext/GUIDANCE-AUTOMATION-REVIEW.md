@@ -6,6 +6,10 @@ independently revertible work in Milestones N and O.
 
 Issue [#93](https://github.com/jonathan-vella/apex-vnext/issues/93) owns this gate.
 
+The completed review evidence is recorded in
+[GUIDANCE-AUTOMATION-CHARACTERIZATION.md](GUIDANCE-AUTOMATION-CHARACTERIZATION.md); structured classifications and
+removal gates remain in the modernization ownership registry.
+
 ## Objectives
 
 - Identify the effective behavior and all consumers before changing an owner.
