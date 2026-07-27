@@ -30,13 +30,13 @@ PR #118 standardized text and JSON diagnostics for the registry and hosted-workf
 Issue #119 closes Milestone N with representative pre-commit hook selection, exit, and timing parity evidence.
 PR #125 completes issue #121 with a privacy-safe normalized context/cache sample contract and deterministic aggregate.
 PR #128 adds a strict Copilot CLI JSONL adapter and hardens normalized sample validation against forged identity,
-partial cache evidence, unsafe totals, mixed fixture/live groups, and content-capture ambiguity.
-PR #128 adds the strict Copilot CLI source adapter, and PR #132 adds the VS Code source adapter with exact-byte provenance.
-PR #133 makes the version-bound stratified matrix immutable. Issue #126 completes all 12 live normal/retry cells across
-simple-neutral, standard-Bicep, and standard-Terraform scenarios for both supported clients. The final aggregate reports
-`coverage.complete: true` and 12 unique sample IDs; aggregation accepted 12 distinct exact-byte source digests. A tracked
-content-free receipt preserves those identifiers and the aggregate digest. Required input/output/chat-call counters are
-measured; unavailable cache counters remain report-only and no comparative improvement claim is made.
+partial cache evidence, unsafe totals, mixed fixture/live groups, and content-capture ambiguity. PR #132 adds the VS Code
+source adapter with exact-byte provenance. PR #133 makes the version-bound stratified matrix immutable. Issue #126
+completes all 12 live normal/retry cells across simple-neutral, standard-Bicep, and standard-Terraform scenarios for both
+supported clients. The final aggregate reports `coverage.complete: true` and 12 unique sample IDs; aggregation accepted
+12 distinct exact-byte source digests. A tracked content-free receipt preserves those identifiers and the aggregate
+digest. Required input/output/chat-call counters are measured; unavailable cache counters remain report-only and no
+comparative improvement claim is made.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
