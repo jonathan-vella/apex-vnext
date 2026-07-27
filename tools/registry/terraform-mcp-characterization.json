@@ -1,0 +1,138 @@
+{
+  "$schema": "schemas/terraform-mcp-characterization.schema.json",
+  "schemaVersion": "1.0.0",
+  "observedAt": "2026-07-27",
+  "runtime": {
+    "binaryPath": "/go/bin/terraform-mcp-server",
+    "version": "1.1.0",
+    "moduleVersion": "v0.0.0-20260715173312-5585f452bf76",
+    "commit": "5585f452bf7672bebccf2809dbcf0f88efbd2693",
+    "vcsTime": "2026-07-15T17:33:12Z",
+    "vcsModified": false,
+    "buildDate": "1970-01-01T00:00:01Z",
+    "binarySha256": "4a5c40dde2c36ea01cbf47144495a1c4403951dd49cc205abaca726dffc8bd2f",
+    "binaryBytes": 30347713,
+    "provenanceStatus": "observed-source-attributed-unpinned-acquisition"
+  },
+  "workspaceConfig": {
+    "path": ".vscode/mcp.json",
+    "sha256": "9d6bd471ccde5acaad6c13e0a31437c3be439671812454c6c244098dd8e19b5a",
+    "server": "terraform",
+    "transport": "stdio",
+    "toolsets": ["registry"]
+  },
+  "toolsFixture": {
+    "path": "tools/registry/terraform-mcp-tools-list.fixture.json",
+    "sha256": "0559fd51a2c05f08c2f74c1b64591a2f74837e416eb73cb1904d9b76f3cbfaec"
+  },
+  "toolsListSha256": "55d7e67785b463d67728136201f9027a604c8e5e90cf359de4f59b2ae97432ce",
+  "tools": [
+    {
+      "name": "get_latest_module_version",
+      "required": ["module_name", "module_provider", "module_publisher"],
+      "schemaSha256": "96b2ae2efbd4334cdb5b10508e1f055ad09dae601878708eb3c9956044f2950a"
+    },
+    {
+      "name": "get_latest_provider_version",
+      "required": ["name", "namespace"],
+      "schemaSha256": "d157777045a0af24f3aae1f98c53468cf931e7a93af23f9e06c68282567f0e51"
+    },
+    {
+      "name": "get_module_details",
+      "required": ["module_id"],
+      "schemaSha256": "c8c8141780cccf332cccd5ac08c2870a176446c2c39cf47e8e32d3d10c13f9a7"
+    },
+    {
+      "name": "get_policy_details",
+      "required": ["terraform_policy_id"],
+      "schemaSha256": "a4cdafefa9146cb53b463ca22a01c3610c1d2b423d41766ad9117bc134bd2a9d"
+    },
+    {
+      "name": "get_provider_capabilities",
+      "required": ["name", "namespace"],
+      "schemaSha256": "bd6caa9c7e644dc9c9fd4a9c37886526a156cebaa9dea7578ed9729d24d129cc"
+    },
+    {
+      "name": "get_provider_details",
+      "required": ["provider_doc_id"],
+      "schemaSha256": "a3898a9f413731bce253a16bc74624895fe22824737ee76079dbe6006b68245c"
+    },
+    {
+      "name": "search_modules",
+      "required": ["module_query"],
+      "schemaSha256": "72465eca5b8bed74483389b456156dc3dc33f2530bb2d35f7f79ee2e2c5d2822"
+    },
+    {
+      "name": "search_policies",
+      "required": ["policy_query"],
+      "schemaSha256": "d8f5e64283d92109d26eb1b72a87de70631d44f70927945d4285a8fae6c1515d"
+    },
+    {
+      "name": "search_providers",
+      "required": ["provider_document_type", "provider_name", "provider_namespace", "service_slug"],
+      "schemaSha256": "fbfeb1a946076fac17015c12174d86722c329aa7411df46676b19cf604dcf494"
+    }
+  ],
+  "consumers": [
+    { "path": ".vscode/mcp.json", "kind": "active-config", "marker": "--toolsets" },
+    { "path": ".devcontainer/post-create.sh", "kind": "installer", "marker": "terraform-mcp-server" },
+    { "path": ".devcontainer/post-start.sh", "kind": "fallback-installer", "marker": "terraform-mcp-server" },
+    { "path": ".devcontainer/README.md", "kind": "setup-doc", "marker": "Terraform MCP Server" },
+    {
+      "path": "tools/scripts/validate-devcontainer.sh",
+      "kind": "compatibility-check",
+      "marker": "check_terraform_mcp"
+    },
+    {
+      "path": ".github/skills/terraform-search-import/SKILL.md",
+      "kind": "skill",
+      "marker": "mcp_terraform_search_providers"
+    },
+    { "path": ".github/skills/terraform-test/SKILL.md", "kind": "skill", "marker": "mcp_terraform_search_providers" },
+    {
+      "path": ".github/skills/iac-common/references/codegen-shared-workflow.md",
+      "kind": "workflow-guidance",
+      "marker": "terraform/search_modules"
+    },
+    {
+      "path": ".github/skills/azure-defaults/references/avm-modules.md",
+      "kind": "guidance",
+      "marker": "terraform MCP"
+    },
+    {
+      "path": ".github/instructions/iac-terraform-best-practices.instructions.md",
+      "kind": "instruction",
+      "marker": "mcp_terraform_get_latest_module_version"
+    },
+    {
+      "path": ".github/skills/azure-defaults/references/terraform-conventions.md",
+      "kind": "guidance",
+      "marker": "mcp_terraform_get_latest_module_version"
+    },
+    {
+      "path": ".github/skills/terraform-patterns/references/tf-best-practices-examples.md",
+      "kind": "guidance",
+      "marker": "mcp_terraform_get_latest_module_version"
+    },
+    {
+      "path": ".github/skills/iac-common/references/contract-emission-and-handoff.md",
+      "kind": "workflow-guidance",
+      "marker": "terraform/get_module_details"
+    },
+    {
+      "path": "tools/tests/validate-mcp-config.test.mjs",
+      "kind": "config-regression",
+      "marker": "terraform-mcp-server"
+    }
+  ],
+  "replacementOwners": [
+    { "capability": "registry-search-details-versions", "owner": "bounded Terraform Registry API client" },
+    { "capability": "installed-provider-schemas", "owner": "terraform providers schema -json" },
+    { "capability": "import-guidance", "owner": "official provider documentation" }
+  ],
+  "lifecycleAuthority": {
+    "owner": "native Terraform CLI and APEX Gate 4",
+    "deniedToMcp": ["init", "state", "plan", "import", "apply", "destroy", "workspace-mutation"]
+  },
+  "removalGate": "Implement and test deterministic Registry/native replacements, migrate all declared consumers, remove setup/config references, and prove Terraform lifecycle behavior unchanged."
+}
