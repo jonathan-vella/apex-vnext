@@ -213,7 +213,8 @@ method, and removal gate; the four guidance/automation consumer maps and behavio
 
 **Dependency-complete slices:**
 
-1. Remove Astro MCP from active workspace configuration and reject its reintroduction.
+1. Remove Astro MCP from active workspace configuration and reject its reintroduction. Issue #136 owns this completed
+   independent slice.
 2. Characterize the Terraform MCP registry-only tools and their active consumers.
 3. Implement bounded Terraform Registry API lookup with deterministic fixtures, caching, and unavailable results.
 4. Route installed provider schemas through native Terraform CLI and import guidance through official provider docs.

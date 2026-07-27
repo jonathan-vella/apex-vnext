@@ -110,12 +110,13 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 
 - **Type:** `RISK`
 - **Owner:** Runtime integration
-- **Impact:** Removing Astro, Azure Pricing, Terraform, or Draw.io MCP surfaces before replacement proof could break
-  supported workflows, packaging, documentation, or tests.
-- **Evidence:** Retirement is approved in the roadmap, but replacement behavior is not yet implemented.
+- **Impact:** Removing Azure Pricing, Terraform, or Draw.io MCP surfaces before replacement proof could break supported
+  workflows, packaging, documentation, or tests.
+- **Evidence:** Issue #136 retires Astro independently because it has no active product consumer. Replacement behavior
+  for Azure Pricing, Terraform, and Draw.io is not yet implemented.
 - **Related issue:** Pending Milestones I, K, and L issues.
-- **Mitigation:** Inventory references and retire one surface at a time only after its named replacement gate passes;
-  verify package contents and a clean consumer after each removal.
+- **Mitigation:** Retire one surface at a time only after its named gate passes; verify active references, package
+  contents, and a clean consumer after each removal.
 - **State:** Open
 - **Closure proof:** Zero active references, passing replacement tests, and clean package/install evidence for every
   retired surface.
