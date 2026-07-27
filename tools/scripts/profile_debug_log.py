@@ -55,6 +55,23 @@ BENIGN_ERROR_FRAGMENTS = (
     "ENOENT",
     "no such file or directory",
 )
+MAX_SAFE_INTEGER = 2**53 - 1
+
+
+def _token_counter(attrs: dict[str, Any], key: str) -> int:
+    """Return one required non-negative JavaScript-safe token counter."""
+    value = attrs.get(key)
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= MAX_SAFE_INTEGER:
+        raise ValueError(f"{key} must be a present non-negative safe integer")
+    return value
+
+
+def _safe_add(total: int, value: int, name: str) -> int:
+    """Add counters without exceeding the normalized JSON contract."""
+    result = total + value
+    if result > MAX_SAFE_INTEGER:
+        raise ValueError(f"{name} total exceeds the safe integer range")
+    return result
 
 
 def load_spans(path: Path) -> list[dict[str, Any]]:
@@ -212,15 +229,12 @@ def profile(
         # Chat spans → token + per-model accounting.
         if name.startswith("chat:"):
             model = attrs.get("gen_ai.request.model") or name.split(":", 1)[1]
-            try:
-                in_tok = int(attrs.get("gen_ai.usage.input_tokens", 0))
-                out_tok = int(attrs.get("gen_ai.usage.output_tokens", 0))
-            except TypeError, ValueError:
-                in_tok = out_tok = 0
+            in_tok = _token_counter(attrs, "gen_ai.usage.input_tokens")
+            out_tok = _token_counter(attrs, "gen_ai.usage.output_tokens")
             row = tokens_by_model[model]
-            row["input"] += in_tok
-            row["output"] += out_tok
-            row["calls"] += 1
+            row["input"] = _safe_add(row["input"], in_tok, "input_tokens")
+            row["output"] = _safe_add(row["output"], out_tok, "output_tokens")
+            row["calls"] = _safe_add(row["calls"], 1, "chat_calls")
             input_buckets[_bucket(in_tok)] += 1
             per_call_inputs.append(in_tok)
             max_input_per_call = max(max_input_per_call, in_tok)
@@ -279,9 +293,13 @@ def profile(
             f"threshold {max_askquestions_per_phase} (Phase 4: batching compliance)",
         )
 
-    total_input = sum(row["input"] for row in tokens_by_model.values())
-    total_output = sum(row["output"] for row in tokens_by_model.values())
-    total_calls = sum(row["calls"] for row in tokens_by_model.values())
+    total_input = 0
+    total_output = 0
+    total_calls = 0
+    for row in tokens_by_model.values():
+        total_input = _safe_add(total_input, row["input"], "input_tokens")
+        total_output = _safe_add(total_output, row["output"], "output_tokens")
+        total_calls = _safe_add(total_calls, row["calls"], "chat_calls")
     avg_in = round(total_input / total_calls) if total_calls else 0
     p50_in = int(median(per_call_inputs)) if per_call_inputs else 0
     session_wall = (session_end - session_start) / 1e9 if session_start and session_end else 0.0

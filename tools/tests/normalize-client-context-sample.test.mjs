@@ -272,6 +272,8 @@ test("parses required CLI metadata and rejects missing values", () => {
   assert.throws(() => parseArgs(["--source"]), /--source requires a value/u);
   assert.throws(() => parseArgs([]), /--source is required/u);
   assert.throws(() => parseArgs(["--__proto__", "polluted"]), /unsupported option/u);
+  assert.throws(() => parseArgs(["--clientVersion", "1.0.73"]), /unsupported option/u);
+  assert.throws(() => parseArgs(["--retry", "--retry"]), /may be specified only once/u);
 });
 
 test("aggregates samples deterministically without claiming partial cache metrics", () => {
@@ -308,41 +310,68 @@ test("rejects malformed normalized samples before aggregation", () => {
   );
   assert.throws(
     () => aggregateClientContextSamples([{ ...sample, client: { ...sample.client, id: "unknown" } }]),
-    /missing grouping or metric fields/u,
+    /normalized client context sample/u,
   );
   assert.throws(
     () =>
       aggregateClientContextSamples([
         { ...sample, metrics: { ...sample.metrics, inputTokens: { status: "unavailable" } } },
       ]),
-    /requires a measured inputTokens/u,
+    /normalized client context sample/u,
   );
   assert.throws(
     () =>
       aggregateClientContextSamples([
         { ...sample, metrics: { ...sample.metrics, cacheHits: { status: "measured", value: -1 } } },
       ]),
-    /invalid cacheHits value/u,
+    /normalized client context sample/u,
+  );
+  const maximum = normalizeClientContextSample(source({ input_tokens: Number.MAX_SAFE_INTEGER }), metadata());
+  const one = normalizeClientContextSample(source({ input_tokens: 1 }), metadata());
+  assert.throws(() => aggregateClientContextSamples([maximum, one]), /aggregate exceeds the safe integer range/u);
+  assert.throws(
+    () => aggregateClientContextSamples([{ ...sample, evidence: undefined }]),
+    /normalized client context sample/u,
+  );
+  assert.throws(
+    () => aggregateClientContextSamples([{ ...sample, unexpected: true }]),
+    /normalized client context sample/u,
   );
   assert.throws(
     () =>
       aggregateClientContextSamples([
-        {
-          ...sample,
-          sampleId: "a".repeat(64),
-          metrics: {
-            ...sample.metrics,
-            inputTokens: { status: "measured", value: Number.MAX_SAFE_INTEGER },
-          },
-        },
-        {
-          ...sample,
-          sampleId: "b".repeat(64),
-          metrics: { ...sample.metrics, inputTokens: { status: "measured", value: 1 } },
-        },
+        { ...sample, metrics: { ...sample.metrics, inputTokens: { status: "measured", value: 99 } } },
       ]),
-    /aggregate exceeds the safe integer range/u,
+    /sampleId does not match/u,
   );
+});
+
+test("keeps fixture and live evidence in separate aggregate groups", () => {
+  const fixture = normalizeClientContextSample(source(), metadata("github-copilot-cli"));
+  const live = normalizeClientContextSample(source(), {
+    ...metadata("github-copilot-cli"),
+    evidenceKind: "live",
+  });
+  const aggregate = aggregateClientContextSamples([fixture, live]);
+
+  assert.deepEqual(
+    aggregate.summaries.map(({ evidenceKind, sampleCount }) => ({ evidenceKind, sampleCount })),
+    [
+      { evidenceKind: "fixture", sampleCount: 1 },
+      { evidenceKind: "live", sampleCount: 1 },
+    ],
+  );
+});
+
+test("schema rejects counters above the JavaScript safe integer range", () => {
+  const sample = normalizeClientContextSample(source(), metadata());
+  sample.metrics.inputTokens.value = Number.MAX_SAFE_INTEGER + 1;
+  assert.equal(validateSample(sample), false);
+});
+
+test("rejects inherited profiler contract fields", () => {
+  const inherited = Object.create(source());
+  assert.throws(() => normalizeClientContextSample(inherited, metadata()), /source must be a plain object/u);
 });
 
 test("keeps distinct scenarios in separate aggregate groups", () => {
