@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Added bounded native Terraform provider schema inspection and version-pinned official documentation routing with exact
+  shell-free commands, deterministic statuses, execution limits, and no initialization or lifecycle authority.
 - Added a bounded, fixed-origin Terraform Registry client with deterministic fixtures, pagination/cache/transport limits,
   explicit missing/unavailable results, and no Terraform lifecycle or arbitrary-URL surface.
 - Characterized the installed Terraform MCP registry-only tools, active consumers, schema hashes, provenance gap,
