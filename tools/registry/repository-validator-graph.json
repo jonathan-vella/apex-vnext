@@ -146,6 +146,13 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "test-mcp-config",
+      "script": "test:mcp-config",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "lint-md",
       "script": "lint:md",
       "profile": "external-lint",
@@ -550,6 +557,7 @@
         "lint:version-sync",
         "lint:deprecated-refs",
         "lint:mcp-config",
+        "test:mcp-config",
         "validate:extension-bloat",
         "validate:headings-summary",
         "validate:instruction-checks",
@@ -613,6 +621,7 @@
         "lint:version-sync",
         "lint:deprecated-refs",
         "lint:mcp-config",
+        "test:mcp-config",
         "validate:extension-bloat",
         "validate:headings-summary",
         "validate:instruction-checks",
