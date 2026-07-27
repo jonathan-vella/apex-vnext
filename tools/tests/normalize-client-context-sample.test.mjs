@@ -5,6 +5,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 import { aggregateClientContextSamples } from "../scripts/aggregate-client-context-samples.mjs";
 import { normalizeClientContextSample, parseArgs } from "../scripts/normalize-client-context-sample.mjs";
 import { parseArgs as parseProfilerArgs, profileCopilotCliOtel } from "../scripts/profile-copilot-cli-otel.mjs";
+import { parseArgs as parseVscodeArgs, profileVscodeOtel } from "../scripts/profile-vscode-otel.mjs";
 
 const schema = JSON.parse(
   readFileSync(new URL("../registry/schemas/client-context-sample.schema.json", import.meta.url), "utf8"),
@@ -50,6 +51,64 @@ function cliRecord(name, attributes = {}) {
 function profileCli(text) {
   return profileCopilotCliOtel(text, { contentCapture: false });
 }
+
+function vscodeRecord(eventName, attributes = {}) {
+  return JSON.stringify({
+    _body: "must never be copied",
+    attributes: { "event.name": eventName, ...attributes },
+  });
+}
+
+test("profiles only VS Code inference records without double-counting turns", () => {
+  const profile = profileVscodeOtel(
+    [
+      vscodeRecord("gen_ai.client.inference.operation.details", {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.usage.input_tokens": 1_000,
+        "gen_ai.usage.output_tokens": 50,
+        "gen_ai.response.id": "must never be copied",
+      }),
+      vscodeRecord("copilot_chat.agent.turn", {
+        "gen_ai.usage.input_tokens": 1_000,
+        "gen_ai.usage.output_tokens": 50,
+      }),
+      JSON.stringify({ scopeMetrics: [{ metrics: [{ name: "gen_ai.client.token.usage" }] }] }),
+    ].join("\n"),
+    { contentCapture: false },
+  );
+
+  assert.deepEqual(profile, source({ input_tokens: 1_000, output_tokens: 50, chat_calls: 1 }));
+  assert.doesNotMatch(JSON.stringify(profile), /body|model|response|scopeMetrics/iu);
+});
+
+test("fails closed on malformed VS Code inference records and options", () => {
+  assert.throws(() => profileVscodeOtel("{}"), /content capture must be explicitly attested as disabled/u);
+  assert.throws(
+    () =>
+      profileVscodeOtel(
+        vscodeRecord("gen_ai.client.inference.operation.details", {
+          "gen_ai.operation.name": "chat",
+          "gen_ai.usage.input_tokens": 1,
+        }),
+        { contentCapture: false },
+      ),
+    /output_tokens must be a non-negative safe integer/u,
+  );
+  assert.throws(
+    () =>
+      profileVscodeOtel(
+        vscodeRecord("gen_ai.client.inference.operation.details", {
+          "gen_ai.operation.name": "embed",
+          "gen_ai.usage.input_tokens": 1,
+          "gen_ai.usage.output_tokens": 1,
+        }),
+        { contentCapture: false },
+      ),
+    /must use the chat operation/u,
+  );
+  assert.throws(() => parseVscodeArgs(["--ouptut", "profile.json"]), /unsupported option/u);
+  assert.throws(() => parseVscodeArgs(["--source", "otel.jsonl"]), /--content-capture false is required/u);
+});
 
 test("profiles only allowlisted Copilot CLI counters", () => {
   const profile = profileCli(

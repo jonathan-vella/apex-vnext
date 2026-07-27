@@ -279,6 +279,13 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "profile-vscode-otel",
+      "script": "profile:vscode-otel",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "test-client-context-samples",
       "script": "test:client-context-samples",
       "profile": "node-test",

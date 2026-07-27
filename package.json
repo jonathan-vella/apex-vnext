@@ -76,6 +76,7 @@
     "diff:baseline": "bash tools/scripts/diff-context-baseline.sh",
     "profile:debug-log": "python3 tools/scripts/profile_debug_log.py",
     "profile:copilot-cli-otel": "node tools/scripts/profile-copilot-cli-otel.mjs",
+    "profile:vscode-otel": "node tools/scripts/profile-vscode-otel.mjs",
     "normalize:client-context-sample": "node tools/scripts/normalize-client-context-sample.mjs",
     "aggregate:client-context-samples": "node tools/scripts/aggregate-client-context-samples.mjs",
     "assess:agents": "node tools/scripts/assess-agents.mjs",

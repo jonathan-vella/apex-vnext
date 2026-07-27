@@ -22,10 +22,10 @@ calls. Aggregates publish totals and averages only when every sample in a group 
 
 ## Adapter Status
 
-| Client                 | Raw source status                           | Contract           |
-| ---------------------- | ------------------------------------------- | ------------------ |
-| GitHub Copilot VS Code | Exact OTel token fields are characterized.  | Fixture-qualified  |
-| GitHub Copilot CLI     | Version `1.0.73` local JSONL characterized. | Live-characterized |
+| Client                 | Raw source status                                  | Contract           |
+| ---------------------- | -------------------------------------------------- | ------------------ |
+| GitHub Copilot VS Code | Versions `1.130.0` / `0.58.0` JSONL characterized. | Live-characterized |
+| GitHub Copilot CLI     | Version `1.0.73` local JSONL characterized.        | Live-characterized |
 
 Fixture qualification proves schema, privacy rejection, unavailable handling, and deterministic aggregation. A bounded
 live Copilot CLI sample additionally proves that version `1.0.73` emits exact input, output, and cache-creation token
@@ -38,12 +38,11 @@ counters with content capture disabled. It does not provide representative matri
 3. Create an aggregate-only profile with the client-specific adapter:
 
    ```bash
-   # VS Code resourceSpans export
-   npm run --silent profile:debug-log -- \
-     path/to/redacted-otel.json \
-     --json \
-     --metrics-only \
-     --content-capture-disabled > tmp/vscode-profile.json
+    # VS Code 1.130.0 / Copilot Chat 0.58.0 local JSONL export
+    npm run --silent profile:vscode-otel -- \
+       --source tmp/vscode-copilot-otel.jsonl \
+       --content-capture false \
+       --output tmp/vscode-profile.json
 
    # Copilot CLI 1.0.73 local JSONL export
    npm run --silent profile:copilot-cli-otel -- \
@@ -57,11 +56,11 @@ counters with content capture disabled. It does not provide representative matri
 5. Normalize one sample with explicit scenario metadata:
 
    ```bash
-   npm run normalize:client-context-sample -- \
+    npm run --silent normalize:client-context-sample -- \
      --source tmp/vscode-profile.json \
      --client github-copilot-vscode \
-   --client-version VS_CODE_VERSION \
-   --extension-version COPILOT_CHAT_VERSION \
+       --client-version VS_CODE_VERSION \
+       --extension-version COPILOT_CHAT_VERSION \
      --scenario-id requirements-standard-bicep \
      --tier standard \
      --iac-track bicep \
