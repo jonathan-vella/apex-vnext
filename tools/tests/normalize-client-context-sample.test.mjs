@@ -1,12 +1,18 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import Ajv2020 from "ajv/dist/2020.js";
 import { aggregateClientContextSamples } from "../scripts/aggregate-client-context-samples.mjs";
 import { normalizeClientContextSample, parseArgs } from "../scripts/normalize-client-context-sample.mjs";
 import { parseArgs as parseProfilerArgs, profileCopilotCliOtel } from "../scripts/profile-copilot-cli-otel.mjs";
-import { parseArgs as parseVscodeArgs, profileVscodeOtel } from "../scripts/profile-vscode-otel.mjs";
+import {
+  assertDistinctPaths,
+  parseArgs as parseVscodeArgs,
+  profileVscodeOtel,
+} from "../scripts/profile-vscode-otel.mjs";
 
 const schema = JSON.parse(
   readFileSync(new URL("../registry/schemas/client-context-sample.schema.json", import.meta.url), "utf8"),
@@ -141,6 +147,35 @@ test("fails closed on malformed VS Code inference records and options", () => {
     () => parseVscodeArgs(["--source", "otel.jsonl", "--content-capture", "false"]),
     /--producer-version is required/u,
   );
+});
+
+test("hashes exact VS Code source bytes and rejects source aliases", (context) => {
+  const valid = Buffer.from(
+    vscodeRecord("gen_ai.client.inference.operation.details", {
+      "gen_ai.operation.name": "chat",
+      "gen_ai.usage.input_tokens": 1,
+      "gen_ai.usage.output_tokens": 1,
+    }),
+  );
+  const profile = profileVscodeOtel(valid, { contentCapture: false, producerVersion: "0.58.0" });
+  assert.equal(profile.source_sha256, createHash("sha256").update(valid).digest("hex"));
+  assert.throws(
+    () =>
+      profileVscodeOtel(Buffer.concat([valid, Buffer.from([0xff])]), {
+        contentCapture: false,
+        producerVersion: "0.58.0",
+      }),
+    /valid UTF-8/u,
+  );
+
+  const root = mkdtempSync(join(tmpdir(), "apex-vscode-otel-paths-"));
+  context.after(() => rmSync(root, { recursive: true, force: true }));
+  const sourcePath = join(root, "source.jsonl");
+  const aliasPath = join(root, "alias.jsonl");
+  writeFileSync(sourcePath, valid);
+  symlinkSync(sourcePath, aliasPath);
+  assert.throws(() => assertDistinctPaths(sourcePath, sourcePath), /must not overwrite/u);
+  assert.throws(() => assertDistinctPaths(sourcePath, aliasPath), /must not alias/u);
 });
 
 test("profiles only allowlisted Copilot CLI counters", () => {

@@ -56,7 +56,7 @@ counters with content capture disabled. It does not provide representative matri
        --source tmp/vscode-SCENARIO-otel.snapshot.jsonl \
        --content-capture false \
        --producer-version COPILOT_CHAT_VERSION \
-       --output tmp/vscode-profile.json
+       --output tmp/vscode-SCENARIO-profile.json
 
    # Copilot CLI 1.0.73 local JSONL export
    npm run --silent profile:copilot-cli-otel -- \
@@ -72,7 +72,7 @@ counters with content capture disabled. It does not provide representative matri
 
    ```bash
     npm run --silent normalize:client-context-sample -- \
-     --source tmp/vscode-profile.json \
+       --source tmp/vscode-SCENARIO-profile.json \
      --client github-copilot-vscode \
        --client-version VS_CODE_VERSION \
        --extension-version COPILOT_CHAT_VERSION \
@@ -80,7 +80,7 @@ counters with content capture disabled. It does not provide representative matri
      --tier standard \
      --iac-track bicep \
      --evidence-kind live \
-     --output tmp/vscode-sample.json
+       --output tmp/vscode-SCENARIO-sample.json
    ```
 
 8. Repeat across the approved scenario matrix, retries, tiers, tracks, and both clients. If a client has no

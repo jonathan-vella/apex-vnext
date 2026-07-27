@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import process from "node:process";
+import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const INFERENCE_EVENT = "gen_ai.client.inference.operation.details";
@@ -25,11 +26,35 @@ function addCounter(total, value, name) {
   return result;
 }
 
-export function profileVscodeOtel(text, { contentCapture, producerVersion } = {}) {
+function decodeSource(source) {
+  const bytes = Buffer.isBuffer(source) ? source : Buffer.from(source, "utf8");
+  try {
+    return { bytes, text: new TextDecoder("utf-8", { fatal: true }).decode(bytes) };
+  } catch (error) {
+    throw new Error("telemetry source must be valid UTF-8", { cause: error });
+  }
+}
+
+export function assertDistinctPaths(source, output) {
+  if (!output) return;
+  const sourcePath = realpathSync(source);
+  const outputPath = resolve(output);
+  if (sourcePath === outputPath) throw new Error("--output must not overwrite --source");
+  if (existsSync(outputPath)) {
+    const sourceStat = statSync(sourcePath);
+    const outputStat = statSync(realpathSync(outputPath));
+    if (sourceStat.dev === outputStat.dev && sourceStat.ino === outputStat.ino) {
+      throw new Error("--output must not alias --source");
+    }
+  }
+}
+
+export function profileVscodeOtel(source, { contentCapture, producerVersion } = {}) {
   if (contentCapture !== false) throw new Error("content capture must be explicitly attested as disabled");
   if (typeof producerVersion !== "string" || producerVersion.trim() === "") {
     throw new Error("producer version must be explicitly attested");
   }
+  const { bytes, text } = decodeSource(source);
   const totals = { input_tokens: 0, output_tokens: 0, chat_calls: 0 };
 
   for (const [index, line] of text.split(/\r?\n/u).entries()) {
@@ -69,7 +94,7 @@ export function profileVscodeOtel(text, { contentCapture, producerVersion } = {}
     schemaVersion: "1.0.0",
     format: "apex-debug-profile",
     content_capture: false,
-    source_sha256: createHash("sha256").update(text).digest("hex"),
+    source_sha256: createHash("sha256").update(bytes).digest("hex"),
     producer: { name: PRODUCER_NAME, version: producerVersion },
     totals,
   };
@@ -97,7 +122,8 @@ export function parseArgs(args) {
 function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
-    const profile = profileVscodeOtel(readFileSync(options.source, "utf8"), {
+    assertDistinctPaths(options.source, options.output);
+    const profile = profileVscodeOtel(readFileSync(options.source), {
       contentCapture: false,
       producerVersion: options["producer-version"],
     });
