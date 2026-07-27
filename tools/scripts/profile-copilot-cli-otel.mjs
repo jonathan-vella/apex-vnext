@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 const INPUT_TOKENS = "gen_ai.usage.input_tokens";
 const OUTPUT_TOKENS = "gen_ai.usage.output_tokens";
 const CACHE_WRITE_TOKENS = "gen_ai.usage.cache_creation.input_tokens";
+const ALLOWED_OPTIONS = new Set(["source", "output", "content-capture"]);
 
 function counter(attributes, key, lineNumber) {
   if (!(key in attributes)) return null;
@@ -17,13 +18,21 @@ function counter(attributes, key, lineNumber) {
   return value;
 }
 
-export function profileCopilotCliOtel(text) {
+function addCounter(total, value, name) {
+  const result = total + value;
+  if (!Number.isSafeInteger(result)) throw new Error(`${name} total exceeds the safe integer range`);
+  return result;
+}
+
+export function profileCopilotCliOtel(text, { contentCapture } = {}) {
+  if (contentCapture !== false) throw new Error("content capture must be explicitly attested as disabled");
   const totals = { input_tokens: 0, output_tokens: 0, chat_calls: 0 };
   let cacheWriteTokens = 0;
-  let measuredCacheWrites = false;
-  const lines = text.split(/\r?\n/u).filter((line) => line.trim() !== "");
+  let allCacheWritesMeasured = true;
+  const lines = text.split(/\r?\n/u);
 
   for (const [index, line] of lines.entries()) {
+    if (line.trim() === "") continue;
     let record;
     try {
       record = JSON.parse(line);
@@ -44,41 +53,42 @@ export function profileCopilotCliOtel(text) {
     if (inputTokens === null || outputTokens === null) {
       throw new Error(`line ${index + 1}: chat record is missing exact token counters`);
     }
-    totals.input_tokens += inputTokens;
-    totals.output_tokens += outputTokens;
-    totals.chat_calls += 1;
+    totals.input_tokens = addCounter(totals.input_tokens, inputTokens, INPUT_TOKENS);
+    totals.output_tokens = addCounter(totals.output_tokens, outputTokens, OUTPUT_TOKENS);
+    totals.chat_calls = addCounter(totals.chat_calls, 1, "chat_calls");
 
     const cacheTokens = counter(attributes, CACHE_WRITE_TOKENS, index + 1);
-    if (cacheTokens !== null) {
-      cacheWriteTokens += cacheTokens;
-      measuredCacheWrites = true;
-    }
+    if (cacheTokens === null) allCacheWritesMeasured = false;
+    else cacheWriteTokens = addCounter(cacheWriteTokens, cacheTokens, CACHE_WRITE_TOKENS);
   }
 
   if (totals.chat_calls === 0) throw new Error("telemetry contains no chat records");
-  if (measuredCacheWrites) totals.cache_write_tokens = cacheWriteTokens;
-  return { schemaVersion: "1.0.0", format: "apex-debug-profile", totals };
+  if (allCacheWritesMeasured) totals.cache_write_tokens = cacheWriteTokens;
+  return { schemaVersion: "1.0.0", format: "apex-debug-profile", content_capture: false, totals };
 }
 
 export function parseArgs(args) {
-  const options = {};
+  const options = Object.create(null);
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
     if (!argument.startsWith("--")) throw new Error(`unexpected argument: ${argument}`);
     const name = argument.slice(2);
+    if (!ALLOWED_OPTIONS.has(name)) throw new Error(`unsupported option: ${argument}`);
     const value = args[index + 1];
     if (!value || value.startsWith("--")) throw new Error(`${argument} requires a value`);
+    if (Object.hasOwn(options, name)) throw new Error(`${argument} may be specified only once`);
     options[name] = value;
     index += 1;
   }
   if (!options.source) throw new Error("--source is required");
+  if (options["content-capture"] !== "false") throw new Error("--content-capture false is required");
   return options;
 }
 
 function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
-    const profile = profileCopilotCliOtel(readFileSync(options.source, "utf8"));
+    const profile = profileCopilotCliOtel(readFileSync(options.source, "utf8"), { contentCapture: false });
     const output = `${JSON.stringify(profile, null, 2)}\n`;
     if (options.output) writeFileSync(options.output, output);
     else process.stdout.write(output);

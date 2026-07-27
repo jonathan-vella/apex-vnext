@@ -31,7 +31,8 @@ Issue #119 closes Milestone N with representative pre-commit hook selection, exi
 PR #125 completes issue #121 with a privacy-safe normalized context/cache sample contract and deterministic aggregate.
 Issue #126 owns representative live sampling; no improvement claim is authorized until both supported clients provide
 the required evidence. Copilot CLI `1.0.73` is checksum-verified, operator-authenticated, and live-characterized through
-a local content-disabled JSONL export; VS Code `0.58.0` export and representative matrix coverage remain pending.
+a local content-disabled JSONL export; VS Code `1.130.0` with Copilot Chat `0.58.0` export and representative matrix
+coverage remain pending.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
@@ -40,7 +41,7 @@ retirement after their replacement gates pass.
 
 These are approved requirements, not implementation claims. Copilot CLI `1.0.73` is selected and installed in the
 container user path after its official Linux x64 artifact passed the published SHA-256 check and version command. One
-bounded live telemetry sample is characterization, not client-parity qualification. No ARM MCP version has been selected
+bounded live telemetry sample is a characterization, not client-parity qualification. No ARM MCP version has been selected
 or qualified.
 
 ## Evidence State
@@ -67,7 +68,7 @@ or qualified.
 
 ## Immediate Sequence
 
-1. Flush and normalize the content-disabled VS Code `0.58.0` local export under issue #126.
+1. Flush and normalize the content-disabled VS Code `1.130.0` and Copilot Chat `0.58.0` local export under issue #126.
 2. Expand the bounded sample corpus across representative tiers, tracks, retries, and cache states.
 3. Retire the selected MCP and Draw.io surfaces only after each replacement gate passes.
 4. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.

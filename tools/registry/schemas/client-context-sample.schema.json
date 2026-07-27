@@ -13,8 +13,15 @@
       "required": ["id", "version"],
       "properties": {
         "id": { "enum": ["github-copilot-vscode", "github-copilot-cli"] },
-        "version": { "type": "string", "minLength": 1 }
-      }
+        "version": { "type": "string", "minLength": 1 },
+        "extensionVersion": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "id": { "const": "github-copilot-vscode" } }, "required": ["id"] },
+          "then": { "required": ["extensionVersion"] }
+        }
+      ]
     },
     "scenario": {
       "type": "object",

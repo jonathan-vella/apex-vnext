@@ -17,13 +17,18 @@ function summarizeMetric(samples, metric) {
     .map((sample) => sample.metrics[metric])
     .filter((measurement) => measurement.status === "measured")
     .map((measurement) => measurement.value);
+  const total = values.reduce((sum, value) => {
+    const result = sum + value;
+    if (!Number.isSafeInteger(result)) throw new Error(`${metric} aggregate exceeds the safe integer range`);
+    return result;
+  }, 0);
   return {
     measuredSamples: values.length,
     unavailableSamples: samples.length - values.length,
     ...(values.length === samples.length
       ? {
-          total: values.reduce((total, value) => total + value, 0),
-          average: Math.round(values.reduce((total, value) => total + value, 0) / values.length),
+          total,
+          average: Math.round(total / values.length),
         }
       : {}),
   };
@@ -37,6 +42,8 @@ function assertSample(sample) {
     !CLIENTS.has(sample.client?.id) ||
     typeof sample.client?.version !== "string" ||
     sample.client.version.trim() === "" ||
+    (sample.client.id === "github-copilot-vscode" &&
+      (typeof sample.client.extensionVersion !== "string" || sample.client.extensionVersion.trim() === "")) ||
     !SCENARIO_ID.test(sample.scenario?.id) ||
     !TIERS.has(sample.scenario?.tier) ||
     !IAC_TRACKS.has(sample.scenario?.iacTrack) ||
@@ -65,6 +72,8 @@ function assertSample(sample) {
 function groupKey(sample) {
   return JSON.stringify([
     sample.client.id,
+    sample.client.version,
+    sample.client.extensionVersion ?? null,
     sample.scenario.id,
     sample.scenario.tier,
     sample.scenario.iacTrack,
@@ -88,9 +97,11 @@ export function aggregateClientContextSamples(samples) {
   const summaries = [...groups.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([key, groupedSamples]) => {
-      const [client, scenarioId, tier, iacTrack, retry] = JSON.parse(key);
+      const [client, clientVersion, extensionVersion, scenarioId, tier, iacTrack, retry] = JSON.parse(key);
       return {
         client,
+        clientVersion,
+        ...(extensionVersion === null ? {} : { extensionVersion }),
         scenarioId,
         tier,
         iacTrack,

@@ -85,14 +85,20 @@ def test_cli_text_and_json(profiler, capsys):
     parsed = json.loads(json_out)
     assert parsed["totals"]["input_tokens"] == 45000
 
-    rc = profiler.main([str(FIXTURE), "--json", "--metrics-only"])
+    rc = profiler.main([str(FIXTURE), "--json", "--metrics-only", "--content-capture-disabled"])
     assert rc == 0
     metrics_out = json.loads(capsys.readouterr().out)
     assert metrics_out == {
         "schemaVersion": "1.0.0",
         "format": "apex-debug-profile",
+        "content_capture": False,
         "totals": {"chat_calls": 1, "input_tokens": 45000, "output_tokens": 1200},
     }
+
+
+def test_metrics_only_requires_content_capture_attestation(profiler):
+    with pytest.raises(SystemExit):
+        profiler.main([str(FIXTURE), "--json", "--metrics-only"])
 
 
 def test_cli_handles_missing_file(profiler, capsys):

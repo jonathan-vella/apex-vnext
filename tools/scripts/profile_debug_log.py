@@ -30,7 +30,8 @@ Two informational warning checks (no exit-code impact):
 Usage:
 
     python3 tools/scripts/profile_debug_log.py LOG.json [--json]
-    python3 tools/scripts/profile_debug_log.py LOG.json --json > out.json
+    python3 tools/scripts/profile_debug_log.py LOG.json --json --metrics-only \
+        --content-capture-disabled > out.json
 
 Exit codes: ``0`` on success, ``1`` on malformed/missing log,
 ``2`` on argparse error.
@@ -391,8 +392,10 @@ def render_text(metrics: dict[str, Any], path: Path) -> str:
     return "\n".join(lines)
 
 
-def metrics_only(metrics: dict[str, Any]) -> dict[str, Any]:
+def metrics_only(metrics: dict[str, Any], *, content_capture_disabled: bool) -> dict[str, Any]:
     """Return only aggregate fields accepted by context sample normalization."""
+    if not content_capture_disabled:
+        raise ValueError("content capture must be explicitly attested as disabled")
     totals = metrics["totals"]
     allowed_totals = {
         key: totals[key]
@@ -409,6 +412,7 @@ def metrics_only(metrics: dict[str, Any]) -> dict[str, Any]:
     return {
         "schemaVersion": metrics["schemaVersion"],
         "format": metrics["format"],
+        "content_capture": False,
         "totals": allowed_totals,
     }
 
@@ -421,6 +425,11 @@ def main(argv: list[str] | None = None) -> int:
         "--metrics-only",
         action="store_true",
         help="Emit only allowlisted aggregate fields for context sample normalization",
+    )
+    parser.add_argument(
+        "--content-capture-disabled",
+        action="store_true",
+        help="Attest that the source export was collected with content capture disabled",
     )
     parser.add_argument(
         "--max-spans-between-clears",
@@ -450,9 +459,16 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.metrics_only and not args.json:
         parser.error("--metrics-only requires --json")
+    if args.metrics_only and not args.content_capture_disabled:
+        parser.error("--metrics-only requires --content-capture-disabled")
 
     if args.json:
-        json.dump(metrics_only(metrics) if args.metrics_only else metrics, sys.stdout, indent=2, sort_keys=True)
+        json.dump(
+            metrics_only(metrics, content_capture_disabled=True) if args.metrics_only else metrics,
+            sys.stdout,
+            indent=2,
+            sort_keys=True,
+        )
         sys.stdout.write("\n")
     else:
         print(render_text(metrics, args.log))

@@ -9,16 +9,16 @@ either client, so no context reduction or cache improvement claim is permitted.
 The normalized contract is
 [`client-context-sample.schema.json`](../../tools/registry/schemas/client-context-sample.schema.json). A sample records:
 
-- supported client ID and observed client version;
+- supported client ID and observed client version, plus the Copilot Chat extension version for VS Code;
 - scenario ID, complexity tier, IaC track, and retry state;
 - exact input-token, output-token, chat-call, and available cache counters;
 - whether the source is a fixture or live operator capture; and
 - a deterministic SHA-256 sample ID.
 
 Prompts, responses, messages, transcripts, tool arguments, tool results, credentials, and secrets are prohibited.
-Content capture remains disabled. Missing cache counters are `unavailable`; they are never inferred from latency,
-token totals, or repeated calls. Aggregates publish totals and averages only when every sample in a group measured
-that counter.
+Content capture remains disabled and every aggregate-only profile must carry an explicit operator attestation of that
+setting. Missing cache counters are `unavailable`; they are never inferred from latency, token totals, or repeated
+calls. Aggregates publish totals and averages only when every sample in a group measured that counter.
 
 ## Adapter Status
 
@@ -39,23 +39,29 @@ counters with content capture disabled. It does not provide representative matri
 
    ```bash
    # VS Code resourceSpans export
-   npm run --silent profile:debug-log -- path/to/redacted-otel.json --json --metrics-only > tmp/vscode-profile.json
+   npm run --silent profile:debug-log -- \
+     path/to/redacted-otel.json \
+     --json \
+     --metrics-only \
+     --content-capture-disabled > tmp/vscode-profile.json
 
    # Copilot CLI 1.0.73 local JSONL export
    npm run --silent profile:copilot-cli-otel -- \
      --source tmp/copilot-cli-otel.jsonl \
+     --content-capture false \
      --output tmp/copilot-cli-profile.json
    ```
 
-4. Inspect the profile for the `apex-debug-profile` format and confirm it contains only `schemaVersion`, `format`, and
-   allowlisted aggregate counters under `totals`.
+4. Inspect the profile for the `apex-debug-profile` format and confirm it contains only `schemaVersion`, `format`,
+   `content_capture: false`, and allowlisted aggregate counters under `totals`.
 5. Normalize one sample with explicit scenario metadata:
 
    ```bash
    npm run normalize:client-context-sample -- \
      --source tmp/vscode-profile.json \
      --client github-copilot-vscode \
-     --client-version VERSION \
+   --client-version VS_CODE_VERSION \
+   --extension-version COPILOT_CHAT_VERSION \
      --scenario-id requirements-standard-bicep \
      --tier standard \
      --iac-track bicep \

@@ -9,6 +9,17 @@ const CLIENTS = new Set(["github-copilot-vscode", "github-copilot-cli"]);
 const TIERS = new Set(["simple", "standard", "complex"]);
 const IAC_TRACKS = new Set(["neutral", "bicep", "terraform"]);
 const EVIDENCE_KINDS = new Set(["fixture", "live"]);
+const ALLOWED_OPTIONS = new Set([
+  "source",
+  "client",
+  "clientVersion",
+  "extensionVersion",
+  "scenarioId",
+  "tier",
+  "iacTrack",
+  "evidenceKind",
+  "output",
+]);
 const PROHIBITED_KEYS = /(?:prompt|response|message|content|transcript|tool.*(?:argument|result)|credential|secret)/iu;
 const SCENARIO_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
@@ -69,20 +80,28 @@ export function normalizeClientContextSample(source, metadata) {
   if (source === null || typeof source !== "object" || Array.isArray(source)) {
     throw new Error("source must be a profiler JSON object");
   }
-  rejectContentFields(source);
+  const { content_capture: contentCapture, ...profile } = source;
+  rejectContentFields(profile);
   if (source.schemaVersion !== "1.0.0" || source.format !== "apex-debug-profile") {
     throw new Error("source must use apex-debug-profile schemaVersion 1.0.0");
+  }
+  if (contentCapture !== false) {
+    throw new Error("source must attest content_capture false");
   }
   const totals = source.totals;
   if (totals === null || typeof totals !== "object" || Array.isArray(totals)) {
     throw new Error("source.totals must be an object");
   }
 
+  const clientId = requireChoice(metadata.client, "client", CLIENTS);
   const sample = {
     schemaVersion: "1.0.0",
     client: {
-      id: requireChoice(metadata.client, "client", CLIENTS),
+      id: clientId,
       version: requireString(metadata.clientVersion, "clientVersion"),
+      ...(clientId === "github-copilot-vscode"
+        ? { extensionVersion: requireString(metadata.extensionVersion, "extensionVersion") }
+        : {}),
     },
     scenario: {
       id: requireScenarioId(metadata.scenarioId),
@@ -109,7 +128,7 @@ export function normalizeClientContextSample(source, metadata) {
 }
 
 export function parseArgs(args) {
-  const options = { retry: false };
+  const options = Object.assign(Object.create(null), { retry: false });
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
     if (argument === "--retry") {
@@ -118,14 +137,19 @@ export function parseArgs(args) {
     }
     if (!argument.startsWith("--")) throw new Error(`unexpected argument: ${argument}`);
     const name = argument.slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase());
+    if (!ALLOWED_OPTIONS.has(name)) throw new Error(`unsupported option: ${argument}`);
     const value = args[index + 1];
     if (!value || value.startsWith("--")) throw new Error(`${argument} requires a value`);
+    if (Object.hasOwn(options, name)) throw new Error(`${argument} may be specified only once`);
     options[name] = value;
     index += 1;
   }
   for (const name of ["source", "client", "clientVersion", "scenarioId", "tier", "iacTrack", "evidenceKind"]) {
     if (!options[name])
       throw new Error(`--${name.replace(/[A-Z]/gu, (letter) => `-${letter.toLowerCase()}`)} is required`);
+  }
+  if (options.client === "github-copilot-vscode" && !options.extensionVersion) {
+    throw new Error("--extension-version is required for github-copilot-vscode");
   }
   return options;
 }
