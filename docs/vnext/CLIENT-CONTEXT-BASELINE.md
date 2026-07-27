@@ -12,7 +12,7 @@ The normalized contract is
 - supported client ID and observed client version, plus the Copilot Chat extension version for VS Code;
 - scenario ID, complexity tier, IaC track, and retry state;
 - exact input-token, output-token, chat-call, and available cache counters;
-- the SHA-256 digest of each VS Code source snapshot and the characterized Copilot Chat producer version;
+- the SHA-256 digest of each client source snapshot and the characterized Copilot Chat producer version;
 - whether the source is a fixture or live operator capture; and
 - a deterministic SHA-256 sample ID.
 
@@ -31,6 +31,23 @@ calls. Aggregates publish totals and averages only when every sample in a group 
 Fixture qualification proves schema, privacy rejection, unavailable handling, and deterministic aggregation. A bounded
 live Copilot CLI sample additionally proves that version `1.0.73` emits exact input, output, and cache-creation token
 counters with content capture disabled. It does not provide representative matrix coverage or satisfy the VS Code gate.
+
+## Representative Matrix
+
+The canonical matrix is
+[`client-context-matrix.json`](../../tools/registry/client-context-matrix.json). It binds VS Code `1.130.0`, Copilot
+Chat `0.58.0`, and Copilot CLI `1.0.73` to these cells for each supported client:
+
+| Scenario ID                       | Tier     | IaC track | Retry states     |
+| --------------------------------- | -------- | --------- | ---------------- |
+| `requirements-simple-neutral`     | Simple   | Neutral   | Normal and retry |
+| `architecture-standard-bicep`     | Standard | Bicep     | Normal and retry |
+| `architecture-standard-terraform` | Standard | Terraform | Normal and retry |
+
+This produces six required cells per client and 12 required live samples overall. Optional cache counters use a
+`report-only` policy: unavailable counters are summarized but do not fabricate a cache state or fail coverage. The
+matrix covers client, tier, track, and retry stratification; it does not replace the complete
+[client qualification matrix](CLIENT-QUALIFICATION.md#scenario-matrix).
 
 ## Operator Procedure
 
@@ -58,16 +75,17 @@ counters with content capture disabled. It does not provide representative matri
        --producer-version COPILOT_CHAT_VERSION \
        --output tmp/vscode-SCENARIO-profile.json
 
-   # Copilot CLI 1.0.73 local JSONL export
+    # Copilot CLI 1.0.73 local JSONL export
    npm run --silent profile:copilot-cli-otel -- \
-     --source tmp/copilot-cli-otel.jsonl \
+       --source tmp/copilot-cli-SCENARIO-otel.snapshot.jsonl \
      --content-capture false \
-     --output tmp/copilot-cli-profile.json
+       --producer-version COPILOT_CLI_VERSION \
+       --output tmp/copilot-cli-SCENARIO-profile.json
    ```
 
 6. Inspect the profile for the `apex-debug-profile` format and confirm it contains only `schemaVersion`, `format`,
-   `content_capture: false`, `source_sha256`, the characterized producer identity, and allowlisted aggregate counters
-   under `totals`.
+   `content_capture: false`, `source_sha256`, the applicable characterized producer identity, and allowlisted aggregate
+   counters under `totals`.
 7. Normalize one sample with explicit scenario metadata:
 
    ```bash
@@ -76,24 +94,28 @@ counters with content capture disabled. It does not provide representative matri
      --client github-copilot-vscode \
        --client-version VS_CODE_VERSION \
        --extension-version COPILOT_CHAT_VERSION \
-     --scenario-id requirements-standard-bicep \
+   --scenario-id architecture-standard-bicep \
      --tier standard \
      --iac-track bicep \
      --evidence-kind live \
        --output tmp/vscode-SCENARIO-sample.json
    ```
 
-8. Repeat across the approved scenario matrix, retries, tiers, tracks, and both clients. If a client has no
+8. Repeat across the canonical matrix, retries, tiers, tracks, and both clients. If a client has no
    characterized raw adapter or a metric is absent, record the evidence as unavailable rather than translating or
-   estimating it.
+   estimating it. Every matrix cell requires a distinct stopped source snapshot and source digest in both clients.
 9. Aggregate normalized samples deterministically:
 
    ```bash
-   npm run aggregate:client-context-samples -- tmp/*-sample.json --output tmp/client-context-baseline.json
+    npm run aggregate:client-context-samples -- \
+       tmp/*-sample.json \
+       --matrix tools/registry/client-context-matrix.json \
+       --output tmp/client-context-baseline.json
    ```
 
-10. Review normalized output before moving bounded evidence into a candidate dossier. Raw exports and profiles remain
-    local and must not be committed.
+10. Require `coverage.complete: true`, review optional metric availability, and confirm every sample uses the exact
+    matrix-bound client version. Raw exports, snapshots, profiles, and normalized samples remain local and must not be
+    committed.
 
 ## Validation
 
