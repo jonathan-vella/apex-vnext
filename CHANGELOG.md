@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Added a bounded, fixed-origin Terraform Registry client with deterministic fixtures, pagination/cache/transport limits,
+  explicit missing/unavailable results, and no Terraform lifecycle or arbitrary-URL surface.
 - Characterized the installed Terraform MCP registry-only tools, active consumers, schema hashes, provenance gap,
   lifecycle denials, and deterministic replacement owners without removing the dependency.
 - Removed Astro MCP from active workspace discovery and added mutation coverage that rejects its legacy key and endpoint

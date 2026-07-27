@@ -52,6 +52,11 @@ Terraform preview/apply provider and remains outside this retirement.
   provider set.
 - Import syntax and resource guidance: official provider documentation, linked from the import workflow.
 
+Issue #140 implements the bounded public Registry client in `@apex/capabilities`. It supports module search, module
+details and stable versions, and provider stable versions with deterministic fixtures, bounded transport/cache behavior,
+and explicit unavailable results. Active MCP consumers remain unchanged until native schema and documentation owners are
+migrated and tested.
+
 Native Terraform CLI and APEX Gate 4 remain the only lifecycle authorities. MCP output cannot initialize, inspect or
 mutate state, create or substitute a saved plan, import resources, apply, destroy, or select workspaces.
 
