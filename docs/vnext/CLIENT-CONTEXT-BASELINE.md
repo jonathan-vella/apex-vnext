@@ -1,8 +1,8 @@
 ## Client Context And Cache Baseline
 
-This document defines the Milestone O measurement boundary for GitHub Copilot in VS Code and GitHub Copilot CLI. The
-repository has fixture-qualified normalization and aggregation. It does not yet contain representative live samples for
-either client, so no context reduction or cache improvement claim is permitted.
+This document defines the Milestone O measurement boundary for GitHub Copilot in VS Code and GitHub Copilot CLI. Issue
+[#126](https://github.com/jonathan-vella/apex-vnext/issues/126) completed the version-bound representative matrix. This
+baseline records observed usage; it does not by itself prove context reduction or cache improvement.
 
 ## Evidence Boundary
 
@@ -30,7 +30,7 @@ calls. Aggregates publish totals and averages only when every sample in a group 
 
 Fixture qualification proves schema, privacy rejection, unavailable handling, and deterministic aggregation. A bounded
 live Copilot CLI sample additionally proves that version `1.0.73` emits exact input, output, and cache-creation token
-counters with content capture disabled. It does not provide representative matrix coverage or satisfy the VS Code gate.
+counters with content capture disabled. The completed matrix additionally covers the supported VS Code source.
 
 ## Representative Matrix
 
@@ -48,6 +48,15 @@ This produces six required cells per client and 12 required live samples overall
 `report-only` policy: unavailable counters are summarized but do not fabricate a cache state or fail coverage. The
 matrix covers client, tier, track, and retry stratification; it does not replace the complete
 [client qualification matrix](CLIENT-QUALIFICATION.md#scenario-matrix).
+
+The completed aggregate has SHA-256
+`0e37d021bdedfc42cc6082ce834259ca37dd43398b848490bb4bb29dcc9dab55`, `coverage.complete: true`, 12 unique
+sample IDs, and accepted 12 distinct exact-byte source digests. The content-free
+[`client-context-baseline-receipt.json`](../../tools/registry/client-context-baseline-receipt.json) preserves those
+identifiers, coverage, client versions, metric availability, and the aggregate digest. Every cell measures input tokens,
+output tokens, and chat calls. Copilot CLI measures cache-write tokens in every cell. Cache-read and cache-hit counters
+are unavailable for both clients, and VS Code cache-write is unavailable; those counters remain report-only and were not
+inferred.
 
 ## Operator Procedure
 
@@ -123,5 +132,5 @@ Run `npm run test:client-context-samples`. The suite covers both supported clien
 sample IDs and aggregates, unavailable cache metrics, duplicate samples, invalid counters, unknown clients, and
 content-bearing input rejection.
 
-Issue [#126](https://github.com/jonathan-vella/apex-vnext/issues/126) owns live collection.
-The context baseline remains a gap until representative live samples exist for both supported clients.
+Issue [#126](https://github.com/jonathan-vella/apex-vnext/issues/126) owns the live receipt. Repeat the same matrix on
+the exact release candidate before making comparative context or cache-improvement claims.
