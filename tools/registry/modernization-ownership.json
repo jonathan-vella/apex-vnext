@@ -172,13 +172,23 @@
         ".vscode/mcp.json",
         "customizations/.vscode/mcp.json",
         "config/capability-packs.v1.json",
-        "tools/scripts/validate-mcp-config.mjs"
+        "tools/scripts/validate-mcp-config.mjs",
+        "tools/registry/terraform-mcp-characterization.json",
+        "tools/registry/terraform-mcp-tools-list.fixture.json",
+        "tools/registry/schemas/terraform-mcp-characterization.schema.json",
+        "tools/scripts/validate-terraform-mcp-characterization.mjs"
       ],
       "consumers": ["developer workspace", "managed clients", "capability packs", "release packaging"],
-      "proofCommands": ["npm run lint:mcp-config", "npm run test:mcp-config", "npm run validate:vnext"],
+      "proofCommands": [
+        "npm run lint:mcp-config",
+        "npm run test:mcp-config",
+        "npm run validate:terraform-mcp-characterization",
+        "npm run test:terraform-mcp-characterization",
+        "npm run validate:vnext"
+      ],
       "removalGate": "Each retired server has a passing replacement gate, zero active discovery or package references, and an explicit negative assertion.",
       "rationale": "MCP ownership is currently distributed across client config, packs, setup, tests, and documentation.",
-      "followUp": "Issue #136 retires Astro with a negative assertion; Terraform, Azure Pricing, and Draw.io retain independent replacement gates.",
+      "followUp": "Issue #136 retires Astro; issue #138 characterizes Terraform MCP consumers and provenance gaps before replacement. Azure Pricing and Draw.io retain independent gates.",
       "decisionRef": "OWN-012"
     },
     {

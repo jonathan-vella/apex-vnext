@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.apexops.dev/terraform-mcp-characterization-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "observedAt",
+    "runtime",
+    "workspaceConfig",
+    "toolsFixture",
+    "toolsListSha256",
+    "tools",
+    "consumers",
+    "replacementOwners",
+    "lifecycleAuthority",
+    "removalGate"
+  ],
+  "properties": {
+    "$schema": { "const": "schemas/terraform-mcp-characterization.schema.json" },
+    "schemaVersion": { "const": "1.0.0" },
+    "observedAt": { "type": "string", "format": "date" },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "binaryPath",
+        "version",
+        "moduleVersion",
+        "commit",
+        "vcsTime",
+        "vcsModified",
+        "buildDate",
+        "binarySha256",
+        "binaryBytes",
+        "provenanceStatus"
+      ],
+      "properties": {
+        "binaryPath": { "const": "/go/bin/terraform-mcp-server" },
+        "version": { "const": "1.1.0" },
+        "moduleVersion": { "const": "v0.0.0-20260715173312-5585f452bf76" },
+        "commit": { "const": "5585f452bf7672bebccf2809dbcf0f88efbd2693" },
+        "vcsTime": { "const": "2026-07-15T17:33:12Z" },
+        "vcsModified": { "const": false },
+        "buildDate": { "const": "1970-01-01T00:00:01Z" },
+        "binarySha256": { "const": "4a5c40dde2c36ea01cbf47144495a1c4403951dd49cc205abaca726dffc8bd2f" },
+        "binaryBytes": { "const": 30347713 },
+        "provenanceStatus": { "const": "observed-source-attributed-unpinned-acquisition" }
+      }
+    },
+    "toolsFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "const": "tools/registry/terraform-mcp-tools-list.fixture.json" },
+        "sha256": { "const": "0559fd51a2c05f08c2f74c1b64591a2f74837e416eb73cb1904d9b76f3cbfaec" }
+      }
+    },
+    "workspaceConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "server", "transport", "toolsets"],
+      "properties": {
+        "path": { "const": ".vscode/mcp.json" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "server": { "const": "terraform" },
+        "transport": { "const": "stdio" },
+        "toolsets": { "const": ["registry"] }
+      }
+    },
+    "toolsListSha256": { "const": "55d7e67785b463d67728136201f9027a604c8e5e90cf359de4f59b2ae97432ce" },
+    "tools": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "required", "schemaSha256"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "required": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+          "schemaSha256": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    },
+    "consumers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "kind", "marker"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "kind": { "type": "string", "minLength": 1 },
+          "marker": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "replacementOwners": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["capability", "owner"],
+        "properties": {
+          "capability": { "type": "string", "minLength": 1 },
+          "owner": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "lifecycleAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "deniedToMcp"],
+      "properties": {
+        "owner": { "const": "native Terraform CLI and APEX Gate 4" },
+        "deniedToMcp": { "type": "array", "minItems": 1, "items": { "type": "string" }, "uniqueItems": true }
+      }
+    },
+    "removalGate": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

@@ -114,7 +114,8 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
   workflows, packaging, documentation, or tests.
 - **Evidence:** Issue #136 retires Astro independently because it has no active product consumer. Replacement behavior
   for Azure Pricing, Terraform, and Draw.io is not yet implemented.
-- **Related issue:** Pending Milestones I, K, and L issues.
+- **Related issue:** [#138](https://github.com/jonathan-vella/apex-vnext/issues/138) for Terraform characterization;
+  pending Milestones K and L issues for pricing and Draw.io.
 - **Mitigation:** Retire one surface at a time only after its named gate passes; verify active references, package
   contents, and a clean consumer after each removal.
 - **State:** Open

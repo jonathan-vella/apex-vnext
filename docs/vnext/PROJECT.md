@@ -5,8 +5,8 @@
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
-- **Active issue:** [#136](https://github.com/jonathan-vella/apex-vnext/issues/136) - remove active Astro MCP dependency
-- **Working branch:** `fix/136-remove-astro-mcp`
+- **Active issue:** [#138](https://github.com/jonathan-vella/apex-vnext/issues/138) - characterize Terraform MCP consumers
+- **Working branch:** `feat/138-terraform-mcp-characterization`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -39,6 +39,8 @@ digest. Required input/output/chat-call counters are measured; unavailable cache
 comparative improvement claim is made.
 PR #135 closes issue #126 with a content-free, validator-pinned context receipt. Issue #136 removes Astro MCP from
 workspace discovery and adds a negative mutation gate without changing the remaining MCP integrations.
+PR #137 closes issue #136. Issue #138 binds the installed Terraform MCP registry-only tool schemas, active consumers,
+replacement owners, lifecycle denials, and the unpinned-clone provenance gap without removing the dependency.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
@@ -52,17 +54,17 @@ or qualified.
 
 ## Evidence State
 
-| Evidence                                                                 | Disposition                                                   |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| PR #88 exact-head receipt for `8b3d9dbbb5beb8d6723c27da56cfd7144cb1cdf8` | Passing regression evidence for the archive change            |
-| Prior exact candidate `25530c339410e9758ae34538427f24bddfd83e1d`         | Historical characterization for the earlier contract          |
-| Prior VS Code, package, security, and live Azure results                 | Preserved in [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md) |
-| VS Code `1.130.0`, Copilot Chat `0.58.0`, and CLI `1.0.73`               | Representative 12-cell context matrix complete                |
-| Guidance, Markdown, lint, hook, and workflow ownership                   | Milestone N complete; Milestone O context baseline captured   |
-| ARM MCP adapters and MCP retirements                                     | Astro retired; Terraform, pricing, and Draw.io pending        |
-| Bundle composition mappings, aggregate lock, and client projections      | Implemented; live client qualification remains pending        |
-| Diagram and improvement-measurement changes                              | Pending                                                       |
-| Final deterministic, client, package, security, and live qualification   | Reopened                                                      |
+| Evidence                                                                 | Disposition                                                     |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| PR #88 exact-head receipt for `8b3d9dbbb5beb8d6723c27da56cfd7144cb1cdf8` | Passing regression evidence for the archive change              |
+| Prior exact candidate `25530c339410e9758ae34538427f24bddfd83e1d`         | Historical characterization for the earlier contract            |
+| Prior VS Code, package, security, and live Azure results                 | Preserved in [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md)   |
+| VS Code `1.130.0`, Copilot Chat `0.58.0`, and CLI `1.0.73`               | Representative 12-cell context matrix complete                  |
+| Guidance, Markdown, lint, hook, and workflow ownership                   | Milestone N complete; Milestone O context baseline captured     |
+| ARM MCP adapters and MCP retirements                                     | Astro retired; Terraform characterized; pricing/Draw.io pending |
+| Bundle composition mappings, aggregate lock, and client projections      | Implemented; live client qualification remains pending          |
+| Diagram and improvement-measurement changes                              | Pending                                                         |
+| Final deterministic, client, package, security, and live qualification   | Reopened                                                        |
 
 ## Release Boundaries
 
@@ -74,8 +76,8 @@ or qualified.
 
 ## Immediate Sequence
 
-1. Merge issue #136's isolated Astro MCP removal and negative regression.
-2. Characterize Terraform MCP registry-only consumers before implementing its replacement.
+1. Merge issue #138's Terraform MCP registry-only characterization.
+2. Implement the bounded Registry API replacement with deterministic fixtures and unavailable results.
 3. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.
 4. Complete ARM pricing evidence, diagram routing, bounded improvement measurement, bundle generation, and guidance
    consolidation in roadmap order.
