@@ -18,6 +18,7 @@ This directory is the durable project hub for completing and releasing APEX vNex
 | Guidance and automation evidence | [GUIDANCE-AUTOMATION-CHARACTERIZATION.md](GUIDANCE-AUTOMATION-CHARACTERIZATION.md) | Preserve consumer maps, baselines, and later change gates. |
 | Terraform MCP characterization | [TERRAFORM-MCP-CHARACTERIZATION.md](TERRAFORM-MCP-CHARACTERIZATION.md) | Preserve registry-only tools, consumers, provenance gaps, and replacement gates. |
 | Terraform Registry client | [TERRAFORM-REGISTRY-CLIENT.md](TERRAFORM-REGISTRY-CLIENT.md) | Define bounded public Registry operations, statuses, cache, and authority exclusions. |
+| Native Terraform provider introspection | [TERRAFORM-PROVIDER-INTROSPECTION.md](TERRAFORM-PROVIDER-INTROSPECTION.md) | Define bounded installed-schema inspection and official documentation routing. |
 | Qualification evidence | [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md) | Preserve historical evidence; replace only with a new exact-candidate dossier. |
 | Modernization ownership | [MODERNIZATION-INVENTORY.md](MODERNIZATION-INVENTORY.md) | Update before ownership moves. |
 | Resume state | [PROJECT.md](PROJECT.md) | Update at checkpoints and milestone transitions. |

@@ -134,6 +134,14 @@ export class BicepCommandAdapter {
 }
 
 export class TerraformCommandAdapter {
+  providerSchemas(cwd: string): CommandPlan {
+    return { executable: "terraform", args: ["providers", "schema", "-json"], cwd };
+  }
+
+  versionJson(cwd: string): CommandPlan {
+    return { executable: "terraform", args: ["version", "-json"], cwd };
+  }
+
   init(cwd: string, backend: boolean): CommandPlan {
     return {
       executable: "terraform",
