@@ -1,10 +1,18 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import Ajv2020 from "ajv/dist/2020.js";
 import { aggregateClientContextSamples } from "../scripts/aggregate-client-context-samples.mjs";
 import { normalizeClientContextSample, parseArgs } from "../scripts/normalize-client-context-sample.mjs";
 import { parseArgs as parseProfilerArgs, profileCopilotCliOtel } from "../scripts/profile-copilot-cli-otel.mjs";
+import {
+  assertDistinctPaths,
+  parseArgs as parseVscodeArgs,
+  profileVscodeOtel,
+} from "../scripts/profile-vscode-otel.mjs";
 
 const schema = JSON.parse(
   readFileSync(new URL("../registry/schemas/client-context-sample.schema.json", import.meta.url), "utf8"),
@@ -22,6 +30,14 @@ function source(totals = {}) {
       chat_calls: 3,
       ...totals,
     },
+  };
+}
+
+function vscodeSource(totals = {}) {
+  return {
+    ...source(totals),
+    source_sha256: "a".repeat(64),
+    producer: { name: "copilot-chat", version: "0.58.0" },
   };
 }
 
@@ -50,6 +66,117 @@ function cliRecord(name, attributes = {}) {
 function profileCli(text) {
   return profileCopilotCliOtel(text, { contentCapture: false });
 }
+
+function vscodeRecord(eventName, attributes = {}) {
+  return JSON.stringify({
+    _body: "must never be copied",
+    attributes: { "event.name": eventName, ...attributes },
+    instrumentationScope: { name: "copilot-chat", version: "0.58.0" },
+  });
+}
+
+test("profiles only VS Code inference records without double-counting turns", () => {
+  const text = [
+    vscodeRecord("gen_ai.client.inference.operation.details", {
+      "gen_ai.operation.name": "chat",
+      "gen_ai.usage.input_tokens": 1_000,
+      "gen_ai.usage.output_tokens": 50,
+      "gen_ai.response.id": "must never be copied",
+    }),
+    vscodeRecord("copilot_chat.agent.turn", {
+      "gen_ai.usage.input_tokens": 1_000,
+      "gen_ai.usage.output_tokens": 50,
+    }),
+    JSON.stringify({ scopeMetrics: [{ metrics: [{ name: "gen_ai.client.token.usage" }] }] }),
+  ].join("\n");
+  const profile = profileVscodeOtel(text, { contentCapture: false, producerVersion: "0.58.0" });
+
+  assert.deepEqual(profile, {
+    ...source({ input_tokens: 1_000, output_tokens: 50, chat_calls: 1 }),
+    source_sha256: profile.source_sha256,
+    producer: { name: "copilot-chat", version: "0.58.0" },
+  });
+  assert.equal(profile.source_sha256, createHash("sha256").update(text).digest("hex"));
+  assert.doesNotMatch(JSON.stringify(profile), /body|model|response|scopeMetrics/iu);
+});
+
+test("fails closed on malformed VS Code inference records and options", () => {
+  assert.throws(() => profileVscodeOtel("{}"), /content capture must be explicitly attested as disabled/u);
+  assert.throws(
+    () =>
+      profileVscodeOtel(
+        vscodeRecord("gen_ai.client.inference.operation.details", {
+          "gen_ai.operation.name": "chat",
+          "gen_ai.usage.input_tokens": 1,
+        }),
+        { contentCapture: false, producerVersion: "0.58.0" },
+      ),
+    /output_tokens must be a non-negative safe integer/u,
+  );
+  assert.throws(
+    () =>
+      profileVscodeOtel(
+        vscodeRecord("gen_ai.client.inference.operation.details", {
+          "gen_ai.operation.name": "embed",
+          "gen_ai.usage.input_tokens": 1,
+          "gen_ai.usage.output_tokens": 1,
+        }),
+        { contentCapture: false, producerVersion: "0.58.0" },
+      ),
+    /must use the chat operation/u,
+  );
+  assert.throws(
+    () =>
+      profileVscodeOtel(
+        JSON.stringify({
+          attributes: {
+            "event.name": "gen_ai.client.inference.operation.details",
+            "gen_ai.operation.name": "chat",
+            "gen_ai.usage.input_tokens": 1,
+            "gen_ai.usage.output_tokens": 1,
+          },
+          instrumentationScope: { name: "foreign-producer", version: "0.58.0" },
+        }),
+        { contentCapture: false, producerVersion: "0.58.0" },
+      ),
+    /unsupported producer/u,
+  );
+  assert.throws(() => parseVscodeArgs(["--ouptut", "profile.json"]), /unsupported option/u);
+  assert.throws(() => parseVscodeArgs(["--source", "otel.jsonl"]), /--content-capture false is required/u);
+  assert.throws(
+    () => parseVscodeArgs(["--source", "otel.jsonl", "--content-capture", "false"]),
+    /--producer-version is required/u,
+  );
+});
+
+test("hashes exact VS Code source bytes and rejects source aliases", (context) => {
+  const valid = Buffer.from(
+    vscodeRecord("gen_ai.client.inference.operation.details", {
+      "gen_ai.operation.name": "chat",
+      "gen_ai.usage.input_tokens": 1,
+      "gen_ai.usage.output_tokens": 1,
+    }),
+  );
+  const profile = profileVscodeOtel(valid, { contentCapture: false, producerVersion: "0.58.0" });
+  assert.equal(profile.source_sha256, createHash("sha256").update(valid).digest("hex"));
+  assert.throws(
+    () =>
+      profileVscodeOtel(Buffer.concat([valid, Buffer.from([0xff])]), {
+        contentCapture: false,
+        producerVersion: "0.58.0",
+      }),
+    /valid UTF-8/u,
+  );
+
+  const root = mkdtempSync(join(tmpdir(), "apex-vscode-otel-paths-"));
+  context.after(() => rmSync(root, { recursive: true, force: true }));
+  const sourcePath = join(root, "source.jsonl");
+  const aliasPath = join(root, "alias.jsonl");
+  writeFileSync(sourcePath, valid);
+  symlinkSync(sourcePath, aliasPath);
+  assert.throws(() => assertDistinctPaths(sourcePath, sourcePath), /must not overwrite/u);
+  assert.throws(() => assertDistinctPaths(sourcePath, aliasPath), /must not alias/u);
+});
 
 test("profiles only allowlisted Copilot CLI counters", () => {
   const profile = profileCli(
@@ -157,8 +284,8 @@ test("strictly parses Copilot CLI profiler options", () => {
 });
 
 test("normalizes deterministic samples for both supported clients", () => {
-  const vscode = normalizeClientContextSample(source(), metadata());
-  const repeated = normalizeClientContextSample(source(), metadata());
+  const vscode = normalizeClientContextSample(vscodeSource(), metadata());
+  const repeated = normalizeClientContextSample(vscodeSource(), metadata());
   const cli = normalizeClientContextSample(source(), metadata("github-copilot-cli"));
 
   assert.deepEqual(vscode, repeated);
@@ -168,6 +295,7 @@ test("normalizes deterministic samples for both supported clients", () => {
   assert.equal(vscode.client.extensionVersion, "0.58.0");
   assert.equal(cli.client.extensionVersion, undefined);
   assert.equal(vscode.evidence.contentCapture, false);
+  assert.equal(vscode.evidence.sourceDigest, "a".repeat(64));
   assert.deepEqual(vscode.metrics.cacheReadTokens, { status: "unavailable" });
   assert.deepEqual(vscode.metrics.cacheWriteTokens, { status: "unavailable" });
   assert.deepEqual(vscode.metrics.cacheHits, { status: "unavailable" });
@@ -192,35 +320,35 @@ test("rejects unsupported clients and malformed counters", () => {
     /client has unsupported value/u,
   );
   assert.throws(
-    () => normalizeClientContextSample(source({ input_tokens: -1 }), metadata()),
+    () => normalizeClientContextSample(vscodeSource({ input_tokens: -1 }), metadata()),
     /input_tokens must be a non-negative safe integer/u,
   );
   assert.throws(
-    () => normalizeClientContextSample(source({ cache_hits: 0.5 }), metadata()),
+    () => normalizeClientContextSample(vscodeSource({ cache_hits: 0.5 }), metadata()),
     /cache_hits must be a non-negative safe integer/u,
   );
   assert.throws(
-    () => normalizeClientContextSample(source({ cache_hits: -1 }), metadata()),
+    () => normalizeClientContextSample(vscodeSource({ cache_hits: -1 }), metadata()),
     /cache_hits must be a non-negative safe integer/u,
   );
   assert.throws(
-    () => normalizeClientContextSample(source(), { ...metadata(), scenarioId: "Step 1 Requirements" }),
+    () => normalizeClientContextSample(vscodeSource(), { ...metadata(), scenarioId: "Step 1 Requirements" }),
     /scenarioId must be a lowercase kebab-case identifier/u,
   );
   assert.throws(
-    () => normalizeClientContextSample({ ...source(), schemaVersion: "2.0.0" }, metadata()),
+    () => normalizeClientContextSample({ ...vscodeSource(), schemaVersion: "2.0.0" }, metadata()),
     /source must use apex-debug-profile schemaVersion 1.0.0/u,
   );
   assert.throws(
-    () => normalizeClientContextSample({ ...source(), format: "unknown-profile" }, metadata()),
+    () => normalizeClientContextSample({ ...vscodeSource(), format: "unknown-profile" }, metadata()),
     /source must use apex-debug-profile schemaVersion 1.0.0/u,
   );
   assert.throws(
-    () => normalizeClientContextSample({ ...source(), content_capture: undefined }, metadata()),
+    () => normalizeClientContextSample({ ...vscodeSource(), content_capture: undefined }, metadata()),
     /source must attest content_capture false/u,
   );
   assert.throws(
-    () => normalizeClientContextSample(source(), { ...metadata(), extensionVersion: undefined }),
+    () => normalizeClientContextSample(vscodeSource(), { ...metadata(), extensionVersion: undefined }),
     /extensionVersion must be a non-empty string/u,
   );
 });
@@ -277,7 +405,7 @@ test("parses required CLI metadata and rejects missing values", () => {
 });
 
 test("aggregates samples deterministically without claiming partial cache metrics", () => {
-  const vscode = normalizeClientContextSample(source(), metadata());
+  const vscode = normalizeClientContextSample(vscodeSource(), metadata());
   const cli = normalizeClientContextSample(
     source({ cache_read_tokens: 20_000, cache_write_tokens: 500, cache_hits: 2 }),
     metadata("github-copilot-cli"),
@@ -298,12 +426,12 @@ test("aggregates samples deterministically without claiming partial cache metric
 });
 
 test("rejects duplicate sample identifiers", () => {
-  const sample = normalizeClientContextSample(source(), metadata());
+  const sample = normalizeClientContextSample(vscodeSource(), metadata());
   assert.throws(() => aggregateClientContextSamples([sample, sample]), /duplicate sampleId/u);
 });
 
 test("rejects malformed normalized samples before aggregation", () => {
-  const sample = normalizeClientContextSample(source(), metadata());
+  const sample = normalizeClientContextSample(vscodeSource(), metadata());
   assert.throws(
     () => aggregateClientContextSamples([{ ...sample, sampleId: "not-a-digest" }]),
     /every input must be a normalized client context sample/u,
@@ -326,8 +454,8 @@ test("rejects malformed normalized samples before aggregation", () => {
       ]),
     /normalized client context sample/u,
   );
-  const maximum = normalizeClientContextSample(source({ input_tokens: Number.MAX_SAFE_INTEGER }), metadata());
-  const one = normalizeClientContextSample(source({ input_tokens: 1 }), metadata());
+  const maximum = normalizeClientContextSample(vscodeSource({ input_tokens: Number.MAX_SAFE_INTEGER }), metadata());
+  const one = normalizeClientContextSample(vscodeSource({ input_tokens: 1 }), metadata());
   assert.throws(() => aggregateClientContextSamples([maximum, one]), /aggregate exceeds the safe integer range/u);
   assert.throws(
     () => aggregateClientContextSamples([{ ...sample, evidence: undefined }]),
@@ -364,9 +492,18 @@ test("keeps fixture and live evidence in separate aggregate groups", () => {
 });
 
 test("schema rejects counters above the JavaScript safe integer range", () => {
-  const sample = normalizeClientContextSample(source(), metadata());
+  const sample = normalizeClientContextSample(vscodeSource(), metadata());
   sample.metrics.inputTokens.value = Number.MAX_SAFE_INTEGER + 1;
   assert.equal(validateSample(sample), false);
+});
+
+test("schema requires source digests only for VS Code samples", () => {
+  const vscode = normalizeClientContextSample(vscodeSource(), metadata());
+  const cli = normalizeClientContextSample(source(), metadata("github-copilot-cli"));
+  const { sourceDigest: _, ...evidenceWithoutDigest } = vscode.evidence;
+
+  assert.equal(validateSample({ ...vscode, evidence: evidenceWithoutDigest }), false);
+  assert.equal(validateSample({ ...cli, evidence: { ...cli.evidence, sourceDigest: "a".repeat(64) } }), false);
 });
 
 test("rejects inherited profiler contract fields", () => {
@@ -375,8 +512,8 @@ test("rejects inherited profiler contract fields", () => {
 });
 
 test("keeps distinct scenarios in separate aggregate groups", () => {
-  const requirements = normalizeClientContextSample(source(), metadata());
-  const architecture = normalizeClientContextSample(source(), {
+  const requirements = normalizeClientContextSample(vscodeSource(), metadata());
+  const architecture = normalizeClientContextSample(vscodeSource(), {
     ...metadata(),
     scenarioId: "architecture-standard-bicep",
   });

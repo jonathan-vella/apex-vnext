@@ -138,10 +138,19 @@ export function validateNormalizedClientContextSample(sample) {
   if (typeof sample.scenario.retry !== "boolean") throw new Error("sample.scenario.retry must be a boolean");
 
   requirePlainObject(sample.evidence, "sample.evidence");
-  requireExactKeys(sample.evidence, ["kind", "sourceFormat", "contentCapture"], "sample.evidence");
+  requireExactKeys(
+    sample.evidence,
+    clientId === "github-copilot-vscode"
+      ? ["kind", "sourceFormat", "contentCapture", "sourceDigest"]
+      : ["kind", "sourceFormat", "contentCapture"],
+    "sample.evidence",
+  );
   requireChoice(sample.evidence.kind, "sample.evidence.kind", EVIDENCE_KINDS);
   if (sample.evidence.sourceFormat !== "apex-debug-profile" || sample.evidence.contentCapture !== false) {
     throw new Error("sample.evidence must attest apex-debug-profile with content capture disabled");
+  }
+  if (clientId === "github-copilot-vscode" && !SAMPLE_ID.test(sample.evidence.sourceDigest)) {
+    throw new Error("sample.evidence.sourceDigest must be a SHA-256 digest");
   }
 
   requirePlainObject(sample.metrics, "sample.metrics");
@@ -163,12 +172,29 @@ export function normalizeClientContextSample(source, metadata) {
   requirePlainObject(source, "source");
   const { content_capture: contentCapture, ...profile } = source;
   rejectContentFields(profile);
-  requireExactKeys(source, ["schemaVersion", "format", "content_capture", "totals"], "source");
+  const clientId = requireChoice(metadata.client, "client", CLIENTS);
+  const extensionVersion =
+    clientId === "github-copilot-vscode" ? requireString(metadata.extensionVersion, "extensionVersion") : undefined;
+  requireExactKeys(
+    source,
+    clientId === "github-copilot-vscode"
+      ? ["schemaVersion", "format", "content_capture", "source_sha256", "producer", "totals"]
+      : ["schemaVersion", "format", "content_capture", "totals"],
+    "source",
+  );
   if (source.schemaVersion !== "1.0.0" || source.format !== "apex-debug-profile") {
     throw new Error("source must use apex-debug-profile schemaVersion 1.0.0");
   }
   if (contentCapture !== false) {
     throw new Error("source must attest content_capture false");
+  }
+  if (clientId === "github-copilot-vscode") {
+    if (!SAMPLE_ID.test(source.source_sha256)) throw new Error("source.source_sha256 must be a SHA-256 digest");
+    requirePlainObject(source.producer, "source.producer");
+    requireExactKeys(source.producer, ["name", "version"], "source.producer");
+    if (source.producer.name !== "copilot-chat" || source.producer.version !== extensionVersion) {
+      throw new Error("source producer does not match the VS Code client metadata");
+    }
   }
   const totals = requirePlainObject(source.totals, "source.totals");
   const allowedTotals = [
@@ -182,15 +208,12 @@ export function normalizeClientContextSample(source, metadata) {
   if (Object.keys(totals).some((key) => !allowedTotals.includes(key)))
     throw new Error("source.totals has unsupported fields");
 
-  const clientId = requireChoice(metadata.client, "client", CLIENTS);
   const sample = {
     schemaVersion: "1.0.0",
     client: {
       id: clientId,
       version: requireString(metadata.clientVersion, "clientVersion"),
-      ...(clientId === "github-copilot-vscode"
-        ? { extensionVersion: requireString(metadata.extensionVersion, "extensionVersion") }
-        : {}),
+      ...(clientId === "github-copilot-vscode" ? { extensionVersion } : {}),
     },
     scenario: {
       id: requireScenarioId(metadata.scenarioId),
@@ -202,6 +225,7 @@ export function normalizeClientContextSample(source, metadata) {
       kind: requireChoice(metadata.evidenceKind, "evidenceKind", EVIDENCE_KINDS),
       sourceFormat: source.format,
       contentCapture: false,
+      ...(clientId === "github-copilot-vscode" ? { sourceDigest: source.source_sha256 } : {}),
     },
     metrics: {
       inputTokens: measured(totals.input_tokens, "totals.input_tokens"),
@@ -260,4 +284,4 @@ function main() {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

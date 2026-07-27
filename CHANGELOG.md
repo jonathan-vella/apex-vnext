@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Added a strict VS Code local OTel JSONL adapter for exact, content-disabled token measurements without double-counting
+  repeated turn summaries; cache metrics remain unavailable when the exporter omits them.
 - Added a strict Copilot CLI `1.0.73` JSONL telemetry adapter that emits only allowlisted aggregate token counters;
   local content-disabled characterization succeeds while representative two-client evidence remains pending.
 - Added a privacy-safe, fixture-qualified two-client context/cache sample contract and deterministic aggregation for

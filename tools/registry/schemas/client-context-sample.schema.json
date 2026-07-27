@@ -41,7 +41,8 @@
       "properties": {
         "kind": { "enum": ["fixture", "live"] },
         "sourceFormat": { "const": "apex-debug-profile" },
-        "contentCapture": { "const": false }
+        "contentCapture": { "const": false },
+        "sourceDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
       }
     },
     "metrics": {
@@ -59,6 +60,26 @@
     },
     "sampleId": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "client": {
+            "type": "object",
+            "properties": { "id": { "const": "github-copilot-vscode" } },
+            "required": ["id"]
+          }
+        },
+        "required": ["client"]
+      },
+      "then": { "properties": { "evidence": { "type": "object", "required": ["sourceDigest"] } } },
+      "else": {
+        "properties": {
+          "evidence": { "not": { "type": "object", "required": ["sourceDigest"] } }
+        }
+      }
+    }
+  ],
   "$defs": {
     "measuredCounter": {
       "type": "object",
