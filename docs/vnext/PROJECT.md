@@ -5,8 +5,8 @@
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
-- **Active issue:** [#126](https://github.com/jonathan-vella/apex-vnext/issues/126) - close captured context baseline
-- **Working branch:** `docs/126-close-context-baseline`
+- **Active issue:** [#136](https://github.com/jonathan-vella/apex-vnext/issues/136) - remove active Astro MCP dependency
+- **Working branch:** `fix/136-remove-astro-mcp`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -37,11 +37,13 @@ supported clients. The final aggregate reports `coverage.complete: true` and 12 
 12 distinct exact-byte source digests. A tracked content-free receipt preserves those identifiers and the aggregate
 digest. Required input/output/chat-call counters are measured; unavailable cache counters remain report-only and no
 comparative improvement claim is made.
+PR #135 closes issue #126 with a content-free, validator-pinned context receipt. Issue #136 removes Astro MCP from
+workspace discovery and adds a negative mutation gate without changing the remaining MCP integrations.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
-npm-generated customization bundle. Astro, Azure Pricing, Terraform, and Draw.io MCP dependencies are selected for
-retirement after their replacement gates pass.
+npm-generated customization bundle. Astro MCP is retired independently; Azure Pricing, Terraform, and Draw.io MCP
+dependencies retain their separate replacement gates.
 
 These are approved requirements, not implementation claims. Copilot CLI `1.0.73` is selected and installed in the
 container user path after its official Linux x64 artifact passed the published SHA-256 check and version command. The
@@ -57,7 +59,7 @@ or qualified.
 | Prior VS Code, package, security, and live Azure results                 | Preserved in [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md) |
 | VS Code `1.130.0`, Copilot Chat `0.58.0`, and CLI `1.0.73`               | Representative 12-cell context matrix complete                |
 | Guidance, Markdown, lint, hook, and workflow ownership                   | Milestone N complete; Milestone O context baseline captured   |
-| ARM MCP adapters and MCP retirements                                     | Pending                                                       |
+| ARM MCP adapters and MCP retirements                                     | Astro retired; Terraform, pricing, and Draw.io pending        |
 | Bundle composition mappings, aggregate lock, and client projections      | Implemented; live client qualification remains pending        |
 | Diagram and improvement-measurement changes                              | Pending                                                       |
 | Final deterministic, client, package, security, and live qualification   | Reopened                                                      |
@@ -72,8 +74,8 @@ or qualified.
 
 ## Immediate Sequence
 
-1. Select the next dependency-complete Milestone O active-guidance slice.
-2. Retire the selected MCP and Draw.io surfaces only after each replacement gate passes.
+1. Merge issue #136's isolated Astro MCP removal and negative regression.
+2. Characterize Terraform MCP registry-only consumers before implementing its replacement.
 3. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.
 4. Complete ARM pricing evidence, diagram routing, bounded improvement measurement, bundle generation, and guidance
    consolidation in roadmap order.
