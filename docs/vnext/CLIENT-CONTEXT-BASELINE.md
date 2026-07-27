@@ -9,47 +9,59 @@ either client, so no context reduction or cache improvement claim is permitted.
 The normalized contract is
 [`client-context-sample.schema.json`](../../tools/registry/schemas/client-context-sample.schema.json). A sample records:
 
-- supported client ID and observed client version;
+- supported client ID and observed client version, plus the Copilot Chat extension version for VS Code;
 - scenario ID, complexity tier, IaC track, and retry state;
 - exact input-token, output-token, chat-call, and available cache counters;
 - whether the source is a fixture or live operator capture; and
 - a deterministic SHA-256 sample ID.
 
 Prompts, responses, messages, transcripts, tool arguments, tool results, credentials, and secrets are prohibited.
-Content capture remains disabled. Missing cache counters are `unavailable`; they are never inferred from latency,
-token totals, or repeated calls. Aggregates publish totals and averages only when every sample in a group measured
-that counter.
+Content capture remains disabled and every aggregate-only profile must carry an explicit operator attestation of that
+setting. Missing cache counters are `unavailable`; they are never inferred from latency, token totals, or repeated
+calls. Aggregates publish totals and averages only when every sample in a group measured that counter.
 
 ## Adapter Status
 
-| Client                 | Raw source status                          | Contract          |
-| ---------------------- | ------------------------------------------ | ----------------- |
-| GitHub Copilot VS Code | Exact OTel token fields are characterized. | Fixture-qualified |
-| GitHub Copilot CLI     | No raw telemetry shape is characterized.   | Fixture-qualified |
+| Client                 | Raw source status                           | Contract           |
+| ---------------------- | ------------------------------------------- | ------------------ |
+| GitHub Copilot VS Code | Exact OTel token fields are characterized.  | Fixture-qualified  |
+| GitHub Copilot CLI     | Version `1.0.73` local JSONL characterized. | Live-characterized |
 
-Fixture qualification proves schema, privacy rejection, unavailable handling, and deterministic aggregation. It is not
-evidence that either client emitted those measurements. A Copilot CLI adapter must remain unavailable until a supported
-local client produces a documented, redacted source shape.
+Fixture qualification proves schema, privacy rejection, unavailable handling, and deterministic aggregation. A bounded
+live Copilot CLI sample additionally proves that version `1.0.73` emits exact input, output, and cache-creation token
+counters with content capture disabled. It does not provide representative matrix coverage or satisfy the VS Code gate.
 
 ## Operator Procedure
 
 1. Record the installed client ID and version. Do not install or update a client as part of measurement.
 2. Run an approved representative scenario with OpenTelemetry content capture disabled.
-3. For a characterized VS Code OTel export, create an aggregate-only profile:
+3. Create an aggregate-only profile with the client-specific adapter:
 
    ```bash
-   npm run --silent profile:debug-log -- path/to/redacted-otel.json --json --metrics-only > tmp/vscode-profile.json
+   # VS Code resourceSpans export
+   npm run --silent profile:debug-log -- \
+     path/to/redacted-otel.json \
+     --json \
+     --metrics-only \
+     --content-capture-disabled > tmp/vscode-profile.json
+
+   # Copilot CLI 1.0.73 local JSONL export
+   npm run --silent profile:copilot-cli-otel -- \
+     --source tmp/copilot-cli-otel.jsonl \
+     --content-capture false \
+     --output tmp/copilot-cli-profile.json
    ```
 
-4. Inspect the profile for the `apex-debug-profile` format and confirm it contains only `schemaVersion`, `format`, and
-   allowlisted aggregate counters under `totals`.
+4. Inspect the profile for the `apex-debug-profile` format and confirm it contains only `schemaVersion`, `format`,
+   `content_capture: false`, and allowlisted aggregate counters under `totals`.
 5. Normalize one sample with explicit scenario metadata:
 
    ```bash
    npm run normalize:client-context-sample -- \
      --source tmp/vscode-profile.json \
      --client github-copilot-vscode \
-     --client-version VERSION \
+   --client-version VS_CODE_VERSION \
+   --extension-version COPILOT_CHAT_VERSION \
      --scenario-id requirements-standard-bicep \
      --tier standard \
      --iac-track bicep \
@@ -75,5 +87,5 @@ Run `npm run test:client-context-samples`. The suite covers both supported clien
 sample IDs and aggregates, unavailable cache metrics, duplicate samples, invalid counters, unknown clients, and
 content-bearing input rejection.
 
-Issue [#121](https://github.com/jonathan-vella/apex-vnext/issues/121) owns this slice.
+Issue [#126](https://github.com/jonathan-vella/apex-vnext/issues/126) owns live collection.
 The context baseline remains a gap until representative live samples exist for both supported clients.

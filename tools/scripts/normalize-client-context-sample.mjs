@@ -9,8 +9,36 @@ const CLIENTS = new Set(["github-copilot-vscode", "github-copilot-cli"]);
 const TIERS = new Set(["simple", "standard", "complex"]);
 const IAC_TRACKS = new Set(["neutral", "bicep", "terraform"]);
 const EVIDENCE_KINDS = new Set(["fixture", "live"]);
+const OPTION_NAMES = new Map([
+  ["--source", "source"],
+  ["--client", "client"],
+  ["--client-version", "clientVersion"],
+  ["--extension-version", "extensionVersion"],
+  ["--scenario-id", "scenarioId"],
+  ["--tier", "tier"],
+  ["--iac-track", "iacTrack"],
+  ["--evidence-kind", "evidenceKind"],
+  ["--output", "output"],
+]);
 const PROHIBITED_KEYS = /(?:prompt|response|message|content|transcript|tool.*(?:argument|result)|credential|secret)/iu;
 const SCENARIO_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+const SAMPLE_ID = /^[0-9a-f]{64}$/u;
+const METRICS = ["inputTokens", "outputTokens", "chatCalls", "cacheReadTokens", "cacheWriteTokens", "cacheHits"];
+
+function requirePlainObject(value, name) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error(`${name} must be an object`);
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) throw new Error(`${name} must be a plain object`);
+  return value;
+}
+
+function requireExactKeys(value, keys, name) {
+  const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
+  if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
+    throw new Error(`${name} has unsupported or missing fields`);
+  }
+}
 
 function requireString(value, name) {
   if (typeof value !== "string" || value.trim() === "") throw new Error(`${name} must be a non-empty string`);
@@ -65,24 +93,104 @@ function stableJson(value) {
   return JSON.stringify(value);
 }
 
-export function normalizeClientContextSample(source, metadata) {
-  if (source === null || typeof source !== "object" || Array.isArray(source)) {
-    throw new Error("source must be a profiler JSON object");
+export function clientContextSampleId(sample) {
+  return createHash("sha256").update(stableJson(sample)).digest("hex");
+}
+
+function validateMeasurement(measurement, name, required) {
+  requirePlainObject(measurement, name);
+  if (measurement.status === "measured") {
+    requireExactKeys(measurement, ["status", "value"], name);
+    requireCounter(measurement.value, `${name}.value`);
+    return;
   }
-  rejectContentFields(source);
+  if (measurement.status === "unavailable" && !required) {
+    requireExactKeys(measurement, ["status"], name);
+    return;
+  }
+  throw new Error(`${name} has an invalid status`);
+}
+
+export function validateNormalizedClientContextSample(sample) {
+  requirePlainObject(sample, "sample");
+  requireExactKeys(sample, ["schemaVersion", "client", "scenario", "evidence", "metrics", "sampleId"], "sample");
+  if (sample.schemaVersion !== "1.0.0" || !SAMPLE_ID.test(sample.sampleId)) {
+    throw new Error("sample must use client-context-sample schemaVersion 1.0.0");
+  }
+
+  requirePlainObject(sample.client, "sample.client");
+  const clientId = requireChoice(sample.client.id, "sample.client.id", CLIENTS);
+  requireExactKeys(
+    sample.client,
+    clientId === "github-copilot-vscode" ? ["id", "version", "extensionVersion"] : ["id", "version"],
+    "sample.client",
+  );
+  requireString(sample.client.version, "sample.client.version");
+  if (clientId === "github-copilot-vscode") {
+    requireString(sample.client.extensionVersion, "sample.client.extensionVersion");
+  }
+
+  requirePlainObject(sample.scenario, "sample.scenario");
+  requireExactKeys(sample.scenario, ["id", "tier", "iacTrack", "retry"], "sample.scenario");
+  requireScenarioId(sample.scenario.id);
+  requireChoice(sample.scenario.tier, "sample.scenario.tier", TIERS);
+  requireChoice(sample.scenario.iacTrack, "sample.scenario.iacTrack", IAC_TRACKS);
+  if (typeof sample.scenario.retry !== "boolean") throw new Error("sample.scenario.retry must be a boolean");
+
+  requirePlainObject(sample.evidence, "sample.evidence");
+  requireExactKeys(sample.evidence, ["kind", "sourceFormat", "contentCapture"], "sample.evidence");
+  requireChoice(sample.evidence.kind, "sample.evidence.kind", EVIDENCE_KINDS);
+  if (sample.evidence.sourceFormat !== "apex-debug-profile" || sample.evidence.contentCapture !== false) {
+    throw new Error("sample.evidence must attest apex-debug-profile with content capture disabled");
+  }
+
+  requirePlainObject(sample.metrics, "sample.metrics");
+  requireExactKeys(sample.metrics, METRICS, "sample.metrics");
+  for (const metric of METRICS) {
+    validateMeasurement(
+      sample.metrics[metric],
+      `sample.metrics.${metric}`,
+      ["inputTokens", "outputTokens", "chatCalls"].includes(metric),
+    );
+  }
+
+  const { sampleId, ...body } = sample;
+  if (sampleId !== clientContextSampleId(body)) throw new Error("sampleId does not match normalized sample content");
+  return sample;
+}
+
+export function normalizeClientContextSample(source, metadata) {
+  requirePlainObject(source, "source");
+  const { content_capture: contentCapture, ...profile } = source;
+  rejectContentFields(profile);
+  requireExactKeys(source, ["schemaVersion", "format", "content_capture", "totals"], "source");
   if (source.schemaVersion !== "1.0.0" || source.format !== "apex-debug-profile") {
     throw new Error("source must use apex-debug-profile schemaVersion 1.0.0");
   }
-  const totals = source.totals;
-  if (totals === null || typeof totals !== "object" || Array.isArray(totals)) {
-    throw new Error("source.totals must be an object");
+  if (contentCapture !== false) {
+    throw new Error("source must attest content_capture false");
   }
+  const totals = requirePlainObject(source.totals, "source.totals");
+  const allowedTotals = [
+    "input_tokens",
+    "output_tokens",
+    "chat_calls",
+    "cache_read_tokens",
+    "cache_write_tokens",
+    "cache_hits",
+  ];
+  if (Object.keys(totals).some((key) => !allowedTotals.includes(key)))
+    throw new Error("source.totals has unsupported fields");
 
+  const clientId = requireChoice(metadata.client, "client", CLIENTS);
   const sample = {
     schemaVersion: "1.0.0",
     client: {
-      id: requireChoice(metadata.client, "client", CLIENTS),
+      id: clientId,
       version: requireString(metadata.clientVersion, "clientVersion"),
+      ...(clientId === "github-copilot-vscode"
+        ? { extensionVersion: requireString(metadata.extensionVersion, "extensionVersion") }
+        : {}),
     },
     scenario: {
       id: requireScenarioId(metadata.scenarioId),
@@ -104,28 +212,36 @@ export function normalizeClientContextSample(source, metadata) {
       cacheHits: optionalCounter(totals.cache_hits, "totals.cache_hits"),
     },
   };
-  const sampleId = createHash("sha256").update(stableJson(sample)).digest("hex");
-  return { ...sample, sampleId };
+  return validateNormalizedClientContextSample({ ...sample, sampleId: clientContextSampleId(sample) });
 }
 
 export function parseArgs(args) {
-  const options = { retry: false };
+  const options = Object.assign(Object.create(null), { retry: false });
+  const seen = new Set();
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
     if (argument === "--retry") {
+      if (seen.has(argument)) throw new Error(`${argument} may be specified only once`);
+      seen.add(argument);
       options.retry = true;
       continue;
     }
     if (!argument.startsWith("--")) throw new Error(`unexpected argument: ${argument}`);
-    const name = argument.slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase());
+    const name = OPTION_NAMES.get(argument);
+    if (!name) throw new Error(`unsupported option: ${argument}`);
     const value = args[index + 1];
     if (!value || value.startsWith("--")) throw new Error(`${argument} requires a value`);
+    if (seen.has(argument)) throw new Error(`${argument} may be specified only once`);
+    seen.add(argument);
     options[name] = value;
     index += 1;
   }
   for (const name of ["source", "client", "clientVersion", "scenarioId", "tier", "iacTrack", "evidenceKind"]) {
     if (!options[name])
       throw new Error(`--${name.replace(/[A-Z]/gu, (letter) => `-${letter.toLowerCase()}`)} is required`);
+  }
+  if (options.client === "github-copilot-vscode" && !options.extensionVersion) {
+    throw new Error("--extension-version is required for github-copilot-vscode");
   }
   return options;
 }

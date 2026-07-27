@@ -4,6 +4,7 @@ import test from "node:test";
 import Ajv2020 from "ajv/dist/2020.js";
 import { aggregateClientContextSamples } from "../scripts/aggregate-client-context-samples.mjs";
 import { normalizeClientContextSample, parseArgs } from "../scripts/normalize-client-context-sample.mjs";
+import { parseArgs as parseProfilerArgs, profileCopilotCliOtel } from "../scripts/profile-copilot-cli-otel.mjs";
 
 const schema = JSON.parse(
   readFileSync(new URL("../registry/schemas/client-context-sample.schema.json", import.meta.url), "utf8"),
@@ -14,6 +15,7 @@ function source(totals = {}) {
   return {
     schemaVersion: "1.0.0",
     format: "apex-debug-profile",
+    content_capture: false,
     totals: {
       input_tokens: 45_000,
       output_tokens: 1_200,
@@ -26,7 +28,8 @@ function source(totals = {}) {
 function metadata(client = "github-copilot-vscode") {
   return {
     client,
-    clientVersion: client === "github-copilot-cli" ? "1.0.73" : "1.109.0",
+    clientVersion: client === "github-copilot-cli" ? "1.0.73" : "1.130.0",
+    ...(client === "github-copilot-vscode" ? { extensionVersion: "0.58.0" } : {}),
     scenarioId: "requirements-standard-bicep",
     tier: "standard",
     iacTrack: "bicep",
@@ -34,6 +37,124 @@ function metadata(client = "github-copilot-vscode") {
     retry: false,
   };
 }
+
+function cliRecord(name, attributes = {}) {
+  return JSON.stringify({
+    type: "span",
+    name,
+    attributes,
+    events: [{ message: "must never be copied" }],
+  });
+}
+
+function profileCli(text) {
+  return profileCopilotCliOtel(text, { contentCapture: false });
+}
+
+test("profiles only allowlisted Copilot CLI counters", () => {
+  const profile = profileCli(
+    [
+      cliRecord("invoke_agent", { "gen_ai.tool.definitions": "must never be copied" }),
+      cliRecord("chat model-a", {
+        "gen_ai.usage.input_tokens": 12_000,
+        "gen_ai.usage.output_tokens": 300,
+        "gen_ai.usage.cache_creation.input_tokens": 11_500,
+        "gen_ai.response.id": "must never be copied",
+      }),
+      cliRecord("chat model-b", {
+        "gen_ai.usage.input_tokens": 2_000,
+        "gen_ai.usage.output_tokens": 100,
+        "gen_ai.usage.cache_creation.input_tokens": 1_800,
+      }),
+    ].join("\n"),
+  );
+
+  assert.deepEqual(
+    profile,
+    source({
+      input_tokens: 14_000,
+      output_tokens: 400,
+      chat_calls: 2,
+      cache_write_tokens: 13_300,
+    }),
+  );
+  assert.doesNotMatch(JSON.stringify(profile), /model|message|response|tool/iu);
+});
+
+test("rejects malformed Copilot CLI counters without inferring missing values", () => {
+  assert.throws(() => profileCopilotCliOtel("{}"), /content capture must be explicitly attested as disabled/u);
+  assert.throws(() => profileCli("not-json"), /line 1: invalid JSON/u);
+  assert.throws(() => profileCli(`\n\nnot-json`), /line 3: invalid JSON/u);
+  assert.throws(() => profileCli(cliRecord("invoke_agent")), /no chat records/u);
+  assert.throws(
+    () => profileCli(cliRecord("chat model", { "gen_ai.usage.input_tokens": 1 })),
+    /missing exact token counters/u,
+  );
+  assert.throws(
+    () =>
+      profileCli(
+        cliRecord("chat model", {
+          "gen_ai.usage.input_tokens": -1,
+          "gen_ai.usage.output_tokens": 1,
+        }),
+      ),
+    /input_tokens must be a non-negative safe integer/u,
+  );
+  assert.throws(
+    () =>
+      profileCli(
+        [
+          cliRecord("chat model", {
+            "gen_ai.usage.input_tokens": Number.MAX_SAFE_INTEGER,
+            "gen_ai.usage.output_tokens": 1,
+          }),
+          cliRecord("chat model", {
+            "gen_ai.usage.input_tokens": 1,
+            "gen_ai.usage.output_tokens": 1,
+          }),
+        ].join("\n"),
+      ),
+    /total exceeds the safe integer range/u,
+  );
+});
+
+test("reports cache writes only when every chat record measures them", () => {
+  const profile = profileCli(
+    [
+      cliRecord("chat model", {
+        "gen_ai.usage.input_tokens": 10,
+        "gen_ai.usage.output_tokens": 2,
+        "gen_ai.usage.cache_creation.input_tokens": 8,
+      }),
+      cliRecord("chat model", {
+        "gen_ai.usage.input_tokens": 5,
+        "gen_ai.usage.output_tokens": 1,
+      }),
+    ].join("\n"),
+  );
+
+  assert.equal(profile.totals.cache_write_tokens, undefined);
+});
+
+test("strictly parses Copilot CLI profiler options", () => {
+  const options = parseProfilerArgs([
+    "--source",
+    "otel.jsonl",
+    "--content-capture",
+    "false",
+    "--output",
+    "profile.json",
+  ]);
+  assert.equal(Object.getPrototypeOf(options), null);
+  assert.equal(options.output, "profile.json");
+  assert.throws(() => parseProfilerArgs(["--source", "otel.jsonl"]), /--content-capture false is required/u);
+  assert.throws(
+    () => parseProfilerArgs(["--source", "otel.jsonl", "--content-capture", "true"]),
+    /--content-capture false is required/u,
+  );
+  assert.throws(() => parseProfilerArgs(["--ouptut", "profile.json"]), /unsupported option/u);
+  assert.throws(() => parseProfilerArgs(["--__proto__", "polluted"]), /unsupported option/u);
+});
 
 test("normalizes deterministic samples for both supported clients", () => {
   const vscode = normalizeClientContextSample(source(), metadata());
@@ -43,6 +164,9 @@ test("normalizes deterministic samples for both supported clients", () => {
   assert.deepEqual(vscode, repeated);
   assert.match(vscode.sampleId, /^[0-9a-f]{64}$/u);
   assert.notEqual(vscode.sampleId, cli.sampleId);
+  assert.equal(vscode.client.version, "1.130.0");
+  assert.equal(vscode.client.extensionVersion, "0.58.0");
+  assert.equal(cli.client.extensionVersion, undefined);
   assert.equal(vscode.evidence.contentCapture, false);
   assert.deepEqual(vscode.metrics.cacheReadTokens, { status: "unavailable" });
   assert.deepEqual(vscode.metrics.cacheWriteTokens, { status: "unavailable" });
@@ -91,6 +215,14 @@ test("rejects unsupported clients and malformed counters", () => {
     () => normalizeClientContextSample({ ...source(), format: "unknown-profile" }, metadata()),
     /source must use apex-debug-profile schemaVersion 1.0.0/u,
   );
+  assert.throws(
+    () => normalizeClientContextSample({ ...source(), content_capture: undefined }, metadata()),
+    /source must attest content_capture false/u,
+  );
+  assert.throws(
+    () => normalizeClientContextSample(source(), { ...metadata(), extensionVersion: undefined }),
+    /extensionVersion must be a non-empty string/u,
+  );
 });
 
 test("rejects content-bearing and secret-bearing source fields", () => {
@@ -134,10 +266,14 @@ test("parses required CLI metadata and rejects missing values", () => {
   ]);
 
   assert.equal(args.retry, true);
+  assert.equal(Object.getPrototypeOf(args), null);
   assert.equal(args.clientVersion, "1.0.73");
   assert.equal(args.output, "sample.json");
   assert.throws(() => parseArgs(["--source"]), /--source requires a value/u);
   assert.throws(() => parseArgs([]), /--source is required/u);
+  assert.throws(() => parseArgs(["--__proto__", "polluted"]), /unsupported option/u);
+  assert.throws(() => parseArgs(["--clientVersion", "1.0.73"]), /unsupported option/u);
+  assert.throws(() => parseArgs(["--retry", "--retry"]), /may be specified only once/u);
 });
 
 test("aggregates samples deterministically without claiming partial cache metrics", () => {
@@ -174,22 +310,68 @@ test("rejects malformed normalized samples before aggregation", () => {
   );
   assert.throws(
     () => aggregateClientContextSamples([{ ...sample, client: { ...sample.client, id: "unknown" } }]),
-    /missing grouping or metric fields/u,
+    /normalized client context sample/u,
   );
   assert.throws(
     () =>
       aggregateClientContextSamples([
         { ...sample, metrics: { ...sample.metrics, inputTokens: { status: "unavailable" } } },
       ]),
-    /requires a measured inputTokens/u,
+    /normalized client context sample/u,
   );
   assert.throws(
     () =>
       aggregateClientContextSamples([
         { ...sample, metrics: { ...sample.metrics, cacheHits: { status: "measured", value: -1 } } },
       ]),
-    /invalid cacheHits value/u,
+    /normalized client context sample/u,
   );
+  const maximum = normalizeClientContextSample(source({ input_tokens: Number.MAX_SAFE_INTEGER }), metadata());
+  const one = normalizeClientContextSample(source({ input_tokens: 1 }), metadata());
+  assert.throws(() => aggregateClientContextSamples([maximum, one]), /aggregate exceeds the safe integer range/u);
+  assert.throws(
+    () => aggregateClientContextSamples([{ ...sample, evidence: undefined }]),
+    /normalized client context sample/u,
+  );
+  assert.throws(
+    () => aggregateClientContextSamples([{ ...sample, unexpected: true }]),
+    /normalized client context sample/u,
+  );
+  assert.throws(
+    () =>
+      aggregateClientContextSamples([
+        { ...sample, metrics: { ...sample.metrics, inputTokens: { status: "measured", value: 99 } } },
+      ]),
+    /sampleId does not match/u,
+  );
+});
+
+test("keeps fixture and live evidence in separate aggregate groups", () => {
+  const fixture = normalizeClientContextSample(source(), metadata("github-copilot-cli"));
+  const live = normalizeClientContextSample(source(), {
+    ...metadata("github-copilot-cli"),
+    evidenceKind: "live",
+  });
+  const aggregate = aggregateClientContextSamples([fixture, live]);
+
+  assert.deepEqual(
+    aggregate.summaries.map(({ evidenceKind, sampleCount }) => ({ evidenceKind, sampleCount })),
+    [
+      { evidenceKind: "fixture", sampleCount: 1 },
+      { evidenceKind: "live", sampleCount: 1 },
+    ],
+  );
+});
+
+test("schema rejects counters above the JavaScript safe integer range", () => {
+  const sample = normalizeClientContextSample(source(), metadata());
+  sample.metrics.inputTokens.value = Number.MAX_SAFE_INTEGER + 1;
+  assert.equal(validateSample(sample), false);
+});
+
+test("rejects inherited profiler contract fields", () => {
+  const inherited = Object.create(source());
+  assert.throws(() => normalizeClientContextSample(inherited, metadata()), /source must be a plain object/u);
 });
 
 test("keeps distinct scenarios in separate aggregate groups", () => {

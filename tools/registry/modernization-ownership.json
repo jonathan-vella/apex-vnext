@@ -523,13 +523,21 @@
       "id": "debug-log-profiling",
       "category": "diagnostics",
       "classification": "investigate",
-      "canonicalOwner": "tools/scripts/profile_debug_log.py",
-      "sourceRefs": ["tools/scripts/profile_debug_log.py", "docs/guides/testing.md"],
+      "canonicalOwner": "client-specific profilers emitting apex-debug-profile",
+      "sourceRefs": [
+        "tools/scripts/profile_debug_log.py",
+        "tools/scripts/profile-copilot-cli-otel.mjs",
+        "docs/vnext/CLIENT-CONTEXT-BASELINE.md"
+      ],
       "consumers": ["context optimization", "local investigations"],
-      "proofCommands": ["npm run profile:debug-log", "npm run test:client-context-samples"],
+      "proofCommands": [
+        "npm run profile:debug-log",
+        "npm run profile:copilot-cli-otel",
+        "npm run test:client-context-samples"
+      ],
       "removalGate": "A privacy-safe supported source supplies repeatable context measurements or the profiler is explicitly retired.",
-      "rationale": "The profiler depends on local debug logs; normalized fixture proof is portable, but live client evidence is not yet a CI baseline.",
-      "followUp": "Issue #121 qualifies normalized samples and deterministic aggregation; collect representative live samples before changing the baseline status.",
+      "rationale": "Client-specific profilers read only allowlisted counters and emit one shared aggregate-only contract; raw local telemetry is never a portable CI baseline.",
+      "followUp": "Issue #126 characterized Copilot CLI 1.0.73; collect representative live samples from both clients before changing the baseline status.",
       "decisionRef": "OWN-009"
     },
     {
@@ -557,6 +565,7 @@
       "sourceRefs": [
         "tools/scripts/validate-context-budget.mjs",
         "tools/scripts/measure-workflow-baseline.mjs",
+        "tools/scripts/profile-copilot-cli-otel.mjs",
         "tools/scripts/normalize-client-context-sample.mjs",
         "tools/scripts/aggregate-client-context-samples.mjs",
         "tools/registry/schemas/client-context-sample.schema.json"
