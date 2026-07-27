@@ -11,6 +11,142 @@ const CLIENTS = new Set(["github-copilot-vscode", "github-copilot-cli"]);
 const TIERS = new Set(["simple", "standard", "complex"]);
 const IAC_TRACKS = new Set(["neutral", "bicep", "terraform"]);
 const SCENARIO_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+const MATRIX_ID = "milestone-o-stratified-v1";
+const MATRIX_SAMPLE_COUNT = 12;
+const APPROVED_CLIENTS = [
+  { id: "github-copilot-vscode", version: "1.130.0", extensionVersion: "0.58.0" },
+  { id: "github-copilot-cli", version: "1.0.73" },
+];
+const APPROVED_CELLS = [
+  {
+    id: "simple-neutral-normal",
+    scenarioId: "requirements-simple-neutral",
+    tier: "simple",
+    iacTrack: "neutral",
+    retry: false,
+  },
+  {
+    id: "simple-neutral-retry",
+    scenarioId: "requirements-simple-neutral",
+    tier: "simple",
+    iacTrack: "neutral",
+    retry: true,
+  },
+  {
+    id: "standard-bicep-normal",
+    scenarioId: "architecture-standard-bicep",
+    tier: "standard",
+    iacTrack: "bicep",
+    retry: false,
+  },
+  {
+    id: "standard-bicep-retry",
+    scenarioId: "architecture-standard-bicep",
+    tier: "standard",
+    iacTrack: "bicep",
+    retry: true,
+  },
+  {
+    id: "standard-terraform-normal",
+    scenarioId: "architecture-standard-terraform",
+    tier: "standard",
+    iacTrack: "terraform",
+    retry: false,
+  },
+  {
+    id: "standard-terraform-retry",
+    scenarioId: "architecture-standard-terraform",
+    tier: "standard",
+    iacTrack: "terraform",
+    retry: true,
+  },
+];
+const MATRIX_KEYS = new Set([
+  "$schema",
+  "schemaVersion",
+  "id",
+  "evidenceKind",
+  "requiredSamples",
+  "optionalMetricsPolicy",
+  "clients",
+  "cells",
+]);
+
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function matrixCellKey(client, cell) {
+  return JSON.stringify([
+    client.id,
+    client.version,
+    client.extensionVersion ?? null,
+    cell.scenarioId ?? cell.id,
+    cell.tier,
+    cell.iacTrack,
+    cell.retry,
+  ]);
+}
+
+export function validateClientContextMatrix(matrix) {
+  if (matrix === null || typeof matrix !== "object" || Array.isArray(matrix)) {
+    throw new Error("matrix must be an object");
+  }
+  if (
+    Object.keys(matrix).length !== MATRIX_KEYS.size ||
+    Object.keys(matrix).some((key) => !MATRIX_KEYS.has(key)) ||
+    matrix.$schema !== "schemas/client-context-matrix.schema.json" ||
+    matrix.schemaVersion !== "1.0.0" ||
+    matrix.id !== MATRIX_ID ||
+    matrix.evidenceKind !== "live" ||
+    matrix.requiredSamples !== MATRIX_SAMPLE_COUNT ||
+    matrix.optionalMetricsPolicy !== "report-only" ||
+    stableJson(matrix.clients) !== stableJson(APPROVED_CLIENTS) ||
+    stableJson(matrix.cells) !== stableJson(APPROVED_CELLS)
+  ) {
+    throw new Error("matrix must match the approved milestone-o-stratified-v1 contract");
+  }
+  return matrix;
+}
+
+export function evaluateClientContextCoverage(samples, matrix) {
+  validateClientContextMatrix(matrix);
+  const expected = new Set(matrix.clients.flatMap((client) => matrix.cells.map((cell) => matrixCellKey(client, cell))));
+  const covered = new Set();
+  const sourceDigests = new Set();
+  for (const sample of samples) {
+    if (sample.evidence.kind !== matrix.evidenceKind) throw new Error("matrix aggregation accepts live samples only");
+    const key = matrixCellKey(sample.client, sample.scenario);
+    if (!expected.has(key)) throw new Error(`sample ${sample.sampleId} is outside the approved matrix`);
+    if (covered.has(key)) throw new Error(`multiple samples cover the same approved matrix cell: ${sample.sampleId}`);
+    if (sourceDigests.has(sample.evidence.sourceDigest)) {
+      throw new Error(`source digest is reused across approved matrix cells: ${sample.evidence.sourceDigest}`);
+    }
+    covered.add(key);
+    sourceDigests.add(sample.evidence.sourceDigest);
+  }
+  const missing = [];
+  for (const client of matrix.clients) {
+    for (const cell of matrix.cells) {
+      if (!covered.has(matrixCellKey(client, cell))) missing.push({ client, ...cell });
+    }
+  }
+  return {
+    matrixId: matrix.id,
+    requiredSamples: matrix.requiredSamples,
+    coveredSamples: matrix.requiredSamples - missing.length,
+    complete: missing.length === 0,
+    optionalMetricsPolicy: matrix.optionalMetricsPolicy,
+    missing,
+  };
+}
 
 function summarizeMetric(samples, metric) {
   const values = samples
@@ -84,7 +220,7 @@ function groupKey(sample) {
   ]);
 }
 
-export function aggregateClientContextSamples(samples) {
+export function aggregateClientContextSamples(samples, matrix) {
   if (!Array.isArray(samples) || samples.length === 0) throw new Error("at least one sample is required");
   const ids = new Set();
   const groups = new Map();
@@ -121,18 +257,38 @@ export function aggregateClientContextSamples(samples) {
     sampleCount: samples.length,
     sampleIds: [...ids].sort(),
     summaries,
+    ...(matrix ? { coverage: evaluateClientContextCoverage(samples, matrix) } : {}),
   };
+}
+
+export function parseAggregateArgs(args) {
+  const options = Object.create(null);
+  const samples = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    if (!argument.startsWith("--")) {
+      samples.push(argument);
+      continue;
+    }
+    if (!new Set(["--matrix", "--output"]).has(argument)) throw new Error(`unsupported option: ${argument}`);
+    if (Object.hasOwn(options, argument)) throw new Error(`${argument} may be specified only once`);
+    const value = args[index + 1];
+    if (!value || value.startsWith("--")) throw new Error(`${argument} requires a value`);
+    options[argument] = value;
+    index += 1;
+  }
+  if (samples.length === 0) throw new Error("at least one sample path is required");
+  if (!options["--matrix"]) throw new Error("--matrix is required");
+  return { samples, matrixPath: options["--matrix"], outputPath: options["--output"] };
 }
 
 function main() {
   try {
-    const args = process.argv.slice(2);
-    const outputIndex = args.indexOf("--output");
-    const outputPath = outputIndex >= 0 ? args.splice(outputIndex, 2)[1] : undefined;
-    if (outputIndex >= 0 && !outputPath) throw new Error("--output requires a value");
-    const samples = args.map((path) => JSON.parse(readFileSync(path, "utf8")));
-    const output = `${JSON.stringify(aggregateClientContextSamples(samples), null, 2)}\n`;
-    if (outputPath) writeFileSync(outputPath, output);
+    const options = parseAggregateArgs(process.argv.slice(2));
+    const samples = options.samples.map((path) => JSON.parse(readFileSync(path, "utf8")));
+    const matrix = JSON.parse(readFileSync(options.matrixPath, "utf8"));
+    const output = `${JSON.stringify(aggregateClientContextSamples(samples, matrix), null, 2)}\n`;
+    if (options.outputPath) writeFileSync(options.outputPath, output);
     else process.stdout.write(output);
   } catch (error) {
     process.stderr.write(`client context aggregate: ${error.message}\n`);
@@ -140,4 +296,4 @@ function main() {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

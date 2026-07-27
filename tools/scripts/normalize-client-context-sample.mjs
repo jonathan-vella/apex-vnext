@@ -138,18 +138,12 @@ export function validateNormalizedClientContextSample(sample) {
   if (typeof sample.scenario.retry !== "boolean") throw new Error("sample.scenario.retry must be a boolean");
 
   requirePlainObject(sample.evidence, "sample.evidence");
-  requireExactKeys(
-    sample.evidence,
-    clientId === "github-copilot-vscode"
-      ? ["kind", "sourceFormat", "contentCapture", "sourceDigest"]
-      : ["kind", "sourceFormat", "contentCapture"],
-    "sample.evidence",
-  );
+  requireExactKeys(sample.evidence, ["kind", "sourceFormat", "contentCapture", "sourceDigest"], "sample.evidence");
   requireChoice(sample.evidence.kind, "sample.evidence.kind", EVIDENCE_KINDS);
   if (sample.evidence.sourceFormat !== "apex-debug-profile" || sample.evidence.contentCapture !== false) {
     throw new Error("sample.evidence must attest apex-debug-profile with content capture disabled");
   }
-  if (clientId === "github-copilot-vscode" && !SAMPLE_ID.test(sample.evidence.sourceDigest)) {
+  if (!SAMPLE_ID.test(sample.evidence.sourceDigest)) {
     throw new Error("sample.evidence.sourceDigest must be a SHA-256 digest");
   }
 
@@ -177,9 +171,7 @@ export function normalizeClientContextSample(source, metadata) {
     clientId === "github-copilot-vscode" ? requireString(metadata.extensionVersion, "extensionVersion") : undefined;
   requireExactKeys(
     source,
-    clientId === "github-copilot-vscode"
-      ? ["schemaVersion", "format", "content_capture", "source_sha256", "producer", "totals"]
-      : ["schemaVersion", "format", "content_capture", "totals"],
+    ["schemaVersion", "format", "content_capture", "source_sha256", "producer", "totals"],
     "source",
   );
   if (source.schemaVersion !== "1.0.0" || source.format !== "apex-debug-profile") {
@@ -188,13 +180,15 @@ export function normalizeClientContextSample(source, metadata) {
   if (contentCapture !== false) {
     throw new Error("source must attest content_capture false");
   }
-  if (clientId === "github-copilot-vscode") {
-    if (!SAMPLE_ID.test(source.source_sha256)) throw new Error("source.source_sha256 must be a SHA-256 digest");
-    requirePlainObject(source.producer, "source.producer");
-    requireExactKeys(source.producer, ["name", "version"], "source.producer");
-    if (source.producer.name !== "copilot-chat" || source.producer.version !== extensionVersion) {
-      throw new Error("source producer does not match the VS Code client metadata");
-    }
+  if (!SAMPLE_ID.test(source.source_sha256)) throw new Error("source.source_sha256 must be a SHA-256 digest");
+  requirePlainObject(source.producer, "source.producer");
+  requireExactKeys(source.producer, ["name", "version"], "source.producer");
+  const expectedProducer =
+    clientId === "github-copilot-vscode"
+      ? { name: "copilot-chat", version: extensionVersion }
+      : { name: "github.copilot", version: metadata.clientVersion };
+  if (source.producer.name !== expectedProducer.name || source.producer.version !== expectedProducer.version) {
+    throw new Error("source producer does not match the client metadata");
   }
   const totals = requirePlainObject(source.totals, "source.totals");
   const allowedTotals = [
@@ -225,7 +219,7 @@ export function normalizeClientContextSample(source, metadata) {
       kind: requireChoice(metadata.evidenceKind, "evidenceKind", EVIDENCE_KINDS),
       sourceFormat: source.format,
       contentCapture: false,
-      ...(clientId === "github-copilot-vscode" ? { sourceDigest: source.source_sha256 } : {}),
+      sourceDigest: source.source_sha256,
     },
     metrics: {
       inputTokens: measured(totals.input_tokens, "totals.input_tokens"),
