@@ -19,14 +19,16 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Captured the version-bound 12-cell VS Code and Copilot CLI context baseline with unique exact-byte sources, complete
+  required counter coverage, and explicit report-only dispositions for unavailable cache counters.
 - Added a version-bound, machine-readable two-client context matrix and deterministic coverage reporting across
   simple-neutral, standard-Bicep, standard-Terraform, normal, and retry sampling cells.
 - Added a strict VS Code local OTel JSONL adapter for exact, content-disabled token measurements without double-counting
   repeated turn summaries; cache metrics remain unavailable when the exporter omits them.
 - Added a strict Copilot CLI `1.0.73` JSONL telemetry adapter that emits only allowlisted aggregate token counters;
-  local content-disabled characterization succeeds while representative two-client evidence remains pending.
+  local content-disabled characterization and the representative two-client matrix now pass.
 - Added a privacy-safe, fixture-qualified two-client context/cache sample contract and deterministic aggregation for
-  Milestone O; representative live evidence remains pending.
+  Milestone O; the version-bound live matrix above now supplies representative baseline evidence.
 - Closed Milestone N with isolated documentation, JavaScript, workflow, and artifact pre-commit parity measurements,
   preserving serial Git-index ownership and deferring dynamic context sampling to Milestone O.
 - Standardized text and JSON diagnostics for registry and hosted-workflow contract validators while preserving their

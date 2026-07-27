@@ -539,7 +539,7 @@
       ],
       "removalGate": "A privacy-safe supported source supplies repeatable context measurements or the profiler is explicitly retired.",
       "rationale": "Client-specific profilers read only allowlisted counters and emit one shared aggregate-only contract; raw local telemetry is never a portable CI baseline.",
-      "followUp": "Issues #126 and #129 characterize both live client sources; collect representative matrix samples before changing the baseline status.",
+      "followUp": "Issue #126 completed the version-bound live matrix; retain the same contract for candidate remeasurement and comparative claims.",
       "decisionRef": "OWN-009"
     },
     {
@@ -563,7 +563,7 @@
   "baselines": [
     {
       "id": "context",
-      "status": "gap",
+      "status": "captured",
       "sourceRefs": [
         "tools/scripts/validate-context-budget.mjs",
         "tools/scripts/measure-workflow-baseline.mjs",
@@ -572,12 +572,13 @@
         "tools/scripts/normalize-client-context-sample.mjs",
         "tools/scripts/aggregate-client-context-samples.mjs",
         "tools/registry/client-context-matrix.json",
+        "tools/registry/client-context-baseline-receipt.json",
         "tools/registry/schemas/client-context-matrix.schema.json",
         "tools/registry/schemas/client-context-sample.schema.json"
       ],
-      "measurement": "npm run validate:context-budget; npm run test:client-context-samples; npm run aggregate:client-context-samples -- tmp/*-sample.json --matrix tools/registry/client-context-matrix.json --output tmp/client-context-baseline.json",
-      "evidence": "At b27d173, active repository and managed guidance Markdown/JSON totals 3793215 bytes. Static budgets pass and issue #121 fixture-qualifies privacy-safe normalized samples, but the repository has no representative live token or cache records from both clients.",
-      "followUp": "Issue #126 must satisfy every version-bound cell in client-context-matrix.json before claiming context improvement."
+      "measurement": "npm run validate:context-budget; npm run test:client-context-samples; npm run test:modernization-ownership; npm run validate:modernization-ownership",
+      "evidence": "Issue #126 completed all 12 version-bound live cells in milestone-o-stratified-v1 for VS Code 1.130.0 with Copilot Chat 0.58.0 and Copilot CLI 1.0.73. Aggregate SHA-256 0e37d021bdedfc42cc6082ce834259ca37dd43398b848490bb4bb29dcc9dab55 reports coverage.complete true with 12 unique sample IDs; aggregation accepted 12 distinct exact-byte source digests. Every cell measures input tokens, output tokens, and chat calls. Copilot CLI measures cache-write tokens; cache-read and cache-hit counters are unavailable for both clients, and VS Code cache-write is unavailable under the report-only policy. The tracked content-free receipt is validated by validate:modernization-ownership.",
+      "followUp": "Rerun the same version-bound matrix on the exact release candidate before making comparative context or cache-improvement claims."
     },
     {
       "id": "ci",
