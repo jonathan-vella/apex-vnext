@@ -19,7 +19,9 @@ function validate(value = characterization, fixture) {
     characterization: value,
     schema,
     read: (path, encoding) =>
-      path === fixturePath && fixture ? Buffer.from(JSON.stringify(fixture)) : readFileSync(path, encoding),
+      path === fixturePath && fixture !== undefined
+        ? Buffer.from(JSON.stringify(fixture))
+        : readFileSync(path, encoding),
   });
 }
 
@@ -44,6 +46,7 @@ test("rejects full input-schema substitution and incomplete consumers", () => {
   const errors = validate(invalid, fixture);
   assert.ok(errors.some((error) => error.includes("tools fixture SHA-256")));
   assert.ok(errors.some((error) => error.includes("complete active Terraform MCP inventory")));
+  assert.ok(validate(characterization, []).some((error) => error.includes("tools fixture SHA-256")));
 });
 
 test("rejects stale config hashes and missing consumer markers", () => {
