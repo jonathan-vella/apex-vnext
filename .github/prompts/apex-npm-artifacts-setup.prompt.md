@@ -16,7 +16,7 @@ provider, and run the selected validation depth. Keep feed routing local to the 
 
 - Collect only credential-free configuration through `vscode/askQuestions`.
 - Route npm through the selected Azure Artifacts feed without modifying shared repository configuration.
-- Authenticate through `artifacts-npm-credprovider` device flow in the terminal or browser.
+- Authenticate through `artifacts-npm-credprovider` device flow or a user-scoped PAT fallback.
 - Verify exact runtime dependencies and optionally run deterministic installs and package qualification.
 - Leave Git clean and never expose credentials in chat, logs, tracked files, or command arguments.
 
@@ -26,6 +26,10 @@ provider, and run the selected validation depth. Keep feed routing local to the 
 - Linux-native Node.js and npm must be on `PATH`; stop if either path begins with `/mnt/c/`.
 - The feed must use HTTPS under `pkgs.dev.azure.com` and have an approved npmjs.org upstream.
 - The project `.npmrc` contains routing only. User authentication belongs in npm's user configuration file.
+- Prefer device flow for interactive use. Use the PAT fallback only for durable headless access or when device flow is
+  unavailable. The fallback PAT requires Packaging Read for installs and Packaging Read & Write only when publishing.
+- Never switch from a device-flow mode to PAT fallback implicitly. If device flow cannot satisfy the requirement, stop
+  and use `vscode/askQuestions` to obtain an explicit `User-scoped PAT fallback` selection before continuing.
 - This prompt configures a developer workstation or devcontainer. It does not configure Azure DevOps Pipelines; those use
   `NpmAuthenticate@0`.
 - Do not commit `.npmrc`, credentials, corporate feed configuration, generated tokens, or identity-cache files.
@@ -51,6 +55,7 @@ Otherwise, call `vscode/askQuestions` once with these three questions:
 - Freeform input: disabled.
 - Recommended option: `SelfDescribing token (recommended)` - avoids PAT generation but may require sign-in more often.
 - Alternative option: `Provider default` - use only when organization policy explicitly permits it.
+- Alternative option: `User-scoped PAT fallback` - use only when durable non-interactive access is required.
 
 ### Verification Depth Question
 
@@ -62,6 +67,8 @@ Otherwise, call `vscode/askQuestions` once with these three questions:
 - Alternative option: `Configure and authenticate only` - stop after token and feed validation.
 
 Never ask for a PAT, password, auth token, encoded password, auth block, or device code through `vscode/askQuestions`.
+If a credential appears in chat, logs, command arguments, or a tracked file, stop using it and tell the user to revoke it
+before generating a replacement.
 
 ## Workflow
 
@@ -134,7 +141,8 @@ Stop if `.npmrc` appears as an untracked or tracked Git change.
 
 ### Step 4 - Install The Official Credential Provider
 
-If `artifacts-npm-credprovider` is unavailable, install the exact supported provider from the unauthenticated Microsoft
+Skip Steps 4 and 5 when the selected token mode is `User-scoped PAT fallback`; continue at Step 5a. Otherwise, if
+`artifacts-npm-credprovider` is unavailable, install the exact supported provider from the unauthenticated Microsoft
 Public Tools feed:
 
 ```bash
@@ -153,6 +161,9 @@ placeholder when absent. Never write a placeholder token or credential value.
 
 ### Step 5 - Authenticate Through Device Flow
 
+Run this step only for `SelfDescribing token (recommended)` or `Provider default`. PAT fallback mode skips directly to
+Step 5a.
+
 First validate existing credentials:
 
 ```bash
@@ -169,12 +180,60 @@ If authentication is canceled, stop and print the exact retry command without a 
 secure keyring storage is unavailable, verify the fallback cache is owned by the current user with mode `700` and the
 user npm configuration is mode `600`.
 
+### Step 5a - Configure The User-Scoped PAT Fallback
+
+Perform this step only when the selected token mode is explicitly `User-scoped PAT fallback`.
+
+- Tell the user to create a replacement Azure DevOps PAT directly in Azure DevOps. Request Packaging Read for installs;
+  request Packaging Read & Write only when publishing is required.
+- Do not receive, display, copy, encode, decode, log, or pass the PAT in a command argument. The user enters and encodes
+  it only in a private terminal outside Copilot tools.
+- Give the user the matching credential-free template below. They replace the uppercase placeholders only in their
+  private terminal. `<BASE64_PAT>` is the base64 encoding of the PAT, and `<USERNAME>` may be any non-empty value
+  accepted by Azure Artifacts. Never read or edit the resulting user configuration through Copilot tools.
+
+  For a project-scoped feed URL containing `/<ORG>/<PROJECT>/_packaging/`:
+
+  ```ini
+  //pkgs.dev.azure.com/<ORG>/<PROJECT>/_packaging/<FEED>/npm/registry/:username=<USERNAME>
+  //pkgs.dev.azure.com/<ORG>/<PROJECT>/_packaging/<FEED>/npm/registry/:_password=<BASE64_PAT>
+  //pkgs.dev.azure.com/<ORG>/<PROJECT>/_packaging/<FEED>/npm/registry/:email=npm requires email to be set but does not use the value
+  //pkgs.dev.azure.com/<ORG>/<PROJECT>/_packaging/<FEED>/npm/:username=<USERNAME>
+  //pkgs.dev.azure.com/<ORG>/<PROJECT>/_packaging/<FEED>/npm/:_password=<BASE64_PAT>
+  //pkgs.dev.azure.com/<ORG>/<PROJECT>/_packaging/<FEED>/npm/:email=npm requires email to be set but does not use the value
+  ```
+
+  For an organization-scoped feed URL containing `/<ORG>/_packaging/`:
+
+  ```ini
+  //pkgs.dev.azure.com/<ORG>/_packaging/<FEED>/npm/registry/:username=<USERNAME>
+  //pkgs.dev.azure.com/<ORG>/_packaging/<FEED>/npm/registry/:_password=<BASE64_PAT>
+  //pkgs.dev.azure.com/<ORG>/_packaging/<FEED>/npm/registry/:email=npm requires email to be set but does not use the value
+  //pkgs.dev.azure.com/<ORG>/_packaging/<FEED>/npm/:username=<USERNAME>
+  //pkgs.dev.azure.com/<ORG>/_packaging/<FEED>/npm/:_password=<BASE64_PAT>
+  //pkgs.dev.azure.com/<ORG>/_packaging/<FEED>/npm/:email=npm requires email to be set but does not use the value
+  ```
+
+  Derive the placeholders from the already validated credential-free registry URL. Preserve whether that URL is project
+  scoped or organization scoped. Do not include a leading `https:` in authentication keys.
+
+- Tell the user to preserve unrelated user configuration and replace only the feed-specific Azure Artifacts credential
+  block instead of appending duplicate credentials.
+- Require mode `600` on the user configuration file. Verify only its path, owner, and mode after the user confirms the
+  private update; never read or display its contents.
+- Validate access only through the exact `npm view` checks in Step 6. If validation fails with `E401`, stop and tell the
+  user to verify the PAT's status, organization, expiration, and Packaging scope in Azure DevOps.
+
 ### Step 6 - Verify Feed And Policy Eligibility
 
-Run credential validation again, then verify the configured registry and APEX runtime pins:
+For device-flow modes, run credential-provider validation again. Skip that command for PAT fallback mode. Then verify the
+configured registry and APEX runtime pins for either mode:
 
 ```bash
+# Device-flow modes only:
 artifacts-npm-credprovider -c .npmrc --validate-only --verbosity minimal
+
+# All modes:
 npm config get registry
 npm view @sinclair/typebox@0.34.52 version
 npm view @modelcontextprotocol/sdk@1.29.0 version
@@ -183,7 +242,9 @@ npm view zod@4.4.3 version
 
 Classify failures precisely:
 
-- `E401`: authentication is absent or expired; rerun Step 5 once.
+- `E401` in a device-flow mode: authentication is absent or expired; rerun Step 5 once.
+- `E401` in PAT fallback mode: stop and tell the user to verify the PAT's status, organization, expiration, Packaging
+  scope, base64 encoding, and both feed-path credential entries in their private terminal.
 - `E404` for an exact version: the version may be quarantined, unavailable in the feed, or blocked by upstream policy.
   Stop without changing registries or dependency pins.
 - TLS or certificate errors: stop and report the endpoint and error category without dumping npm configuration.
@@ -228,6 +289,7 @@ Report:
 
 - normalized feed host and path, without credentials;
 - credential-provider version and token mode;
+- whether device flow or the user-scoped PAT fallback provided the validated access;
 - token validation result;
 - exact dependency eligibility results;
 - root install, site install, and package qualification results when selected;
@@ -235,7 +297,8 @@ Report:
 - any quarantine, authentication, TLS, script-approval, or timeout blocker;
 - the exact next safe command when user interaction or policy eligibility blocks completion.
 
-Never include a PAT, token, encoded password, auth block, device code, user npmrc contents, or identity-cache contents.
+Never include a PAT, token, encoded password, credential-bearing auth block, device code, user npmrc contents, or
+identity-cache contents. The placeholder-only templates in Step 5a are safe to repeat without substituted values.
 Do not commit, push, open a pull request, publish a package, change dependency pins, or alter organization policy.
 
 ## Quality Assurance
@@ -243,6 +306,6 @@ Do not commit, push, open a pull request, publish a package, change dependency p
 - Feed input is credential-free and validated before writing.
 - `.npmrc` is local to the clone and ignored by Git.
 - Credentials remain outside the repository with restrictive permissions.
-- Device authentication occurs only through the official provider.
+- Device authentication occurs only through the official provider; the PAT fallback is user-scoped and terminal-only.
 - Every selected executable check ran, or the output identifies the precise blocking boundary.
 - Final Git status contains no change created by this prompt.
