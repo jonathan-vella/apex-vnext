@@ -220,6 +220,7 @@ method, and removal gate; the four guidance/automation consumer maps and behavio
 3. Implement bounded Terraform Registry API lookup with deterministic fixtures, caching, and unavailable results. Issue
    #140 owns this completed implementation slice; consumer migration remains pending.
 4. Route installed provider schemas through native Terraform CLI and import guidance through official provider docs.
+   Issue #145 owns this bounded implementation slice; active consumer migration remains pending.
 5. Update active Terraform instructions and skills, then remove Terraform MCP setup and configuration.
 6. Remove Go from the devcontainer only if no independent active consumer remains.
 

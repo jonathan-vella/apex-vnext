@@ -49,6 +49,16 @@ test("Bicep and Azure read adapters generate safe argv arrays", () => {
 
 test("Terraform requires and applies an exact saved plan", () => {
   const terraform = new TerraformCommandAdapter();
+  assert.deepEqual(terraform.providerSchemas("/iac"), {
+    executable: "terraform",
+    args: ["providers", "schema", "-json"],
+    cwd: "/iac",
+  });
+  assert.deepEqual(terraform.versionJson("/iac"), {
+    executable: "terraform",
+    args: ["version", "-json"],
+    cwd: "/iac",
+  });
   assert.deepEqual(terraform.preview("/iac", ".apex/local/run.tfplan").args, [
     "plan",
     "-out=.apex/local/run.tfplan",

@@ -57,6 +57,11 @@ details and stable versions, and provider stable versions with deterministic fix
 and explicit unavailable results. Active MCP consumers remain unchanged until native schema and documentation owners are
 migrated and tested.
 
+Issue #145 adds the bounded native provider-introspection owner in `@apex/capabilities`. It uses exact native schema and
+version commands against an already initialized root, validates compatible output, preserves schema metadata, and routes
+explicit resource/import slugs to version-pinned official provider documentation. Active consumers, MCP setup, and Go
+remain unchanged until the following migration and retirement slice.
+
 Native Terraform CLI and APEX Gate 4 remain the only lifecycle authorities. MCP output cannot initialize, inspect or
 mutate state, create or substitute a saved plan, import resources, apply, destroy, or select workspaces.
 
