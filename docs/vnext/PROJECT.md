@@ -1,12 +1,12 @@
 ## APEX vNext Checkpoint
 
-- **Updated:** 2026-07-22 UTC
+- **Updated:** 2026-07-27 UTC
 - **Milestone:** O - active guidance rewrite
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
 - **Active issue:** [#126](https://github.com/jonathan-vella/apex-vnext/issues/126) - live two-client context/cache samples
-- **Working branch:** `feat/126-live-client-context`
+- **Working branch:** `fix/129-vscode-otel-export`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -29,10 +29,15 @@ PR #116 derived runtime and compact artifact heading metadata from canonical tem
 PR #118 standardized text and JSON diagnostics for the registry and hosted-workflow contract validator family.
 Issue #119 closes Milestone N with representative pre-commit hook selection, exit, and timing parity evidence.
 PR #125 completes issue #121 with a privacy-safe normalized context/cache sample contract and deterministic aggregate.
+PR #128 adds a strict Copilot CLI JSONL adapter and hardens normalized sample validation against forged identity,
+partial cache evidence, unsafe totals, mixed fixture/live groups, and content-capture ambiguity.
 Issue #126 owns representative live sampling; no improvement claim is authorized until both supported clients provide
 the required evidence. Copilot CLI `1.0.73` is checksum-verified, operator-authenticated, and live-characterized through
-a local content-disabled JSONL export; VS Code `1.130.0` with Copilot Chat `0.58.0` export and representative matrix
-coverage remain pending.
+a local content-disabled JSONL export. Issue #129 observes that VS Code `1.130.0` with Copilot Chat `0.58.0` emits a
+local content-disabled JSONL export when the application-scoped OTel values use the exact
+[User Settings procedure](CLIENT-CONTEXT-BASELINE.md#operator-procedure). PR #132 binds the characterized producer and
+immutable source digest before normalization. Both raw shapes are now characterized; representative matrix coverage
+remains pending.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
@@ -51,7 +56,7 @@ or qualified.
 | PR #88 exact-head receipt for `8b3d9dbbb5beb8d6723c27da56cfd7144cb1cdf8` | Passing regression evidence for the archive change            |
 | Prior exact candidate `25530c339410e9758ae34538427f24bddfd83e1d`         | Historical characterization for the earlier contract          |
 | Prior VS Code, package, security, and live Azure results                 | Preserved in [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md) |
-| Copilot CLI `1.0.73` and cross-client matrix                             | CLI source characterized; representative matrix pending       |
+| VS Code `1.130.0`, Copilot Chat `0.58.0`, and CLI `1.0.73`               | Both sources characterized; representative matrix pending     |
 | Guidance, Markdown, lint, hook, and workflow ownership                   | Milestone N complete; dynamic context sampling remains in O   |
 | ARM MCP adapters and MCP retirements                                     | Pending                                                       |
 | Bundle composition mappings, aggregate lock, and client projections      | Implemented; live client qualification remains pending        |
@@ -68,8 +73,8 @@ or qualified.
 
 ## Immediate Sequence
 
-1. Flush and normalize the content-disabled VS Code `1.130.0` and Copilot Chat `0.58.0` local export under issue #126.
-2. Expand the bounded sample corpus across representative tiers, tracks, retries, and cache states.
+1. Merge the strict VS Code JSONL adapter and close exporter blocker issue #129.
+2. Expand issue #126's bounded sample corpus across representative tiers, tracks, retries, and cache states.
 3. Retire the selected MCP and Draw.io surfaces only after each replacement gate passes.
 4. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.
 5. Complete ARM pricing evidence, diagram routing, bounded improvement measurement, bundle generation, and guidance
