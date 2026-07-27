@@ -2,7 +2,7 @@
 
 This inventory freezes repository ownership surfaces before consolidation. The machine-readable source is
 [`modernization-ownership.json`](../../tools/registry/modernization-ownership.json), bound to candidate
-`1a1de02a3a17f496c713dd3c4e425c8df8d30d0e`. Existing registries remain canonical; this inventory references them and
+`75ac46e8e49f257d041318f9680caa14b1516fd1`. Existing registries remain canonical; this inventory references them and
 does not copy their entries. New owners below are planned migration targets and do not claim implemented behavior.
 
 ## Classification Rules
@@ -87,9 +87,11 @@ manual improvement submission, and single-client bundle remain active until thei
 ### Context
 
 Static context-budget validation passes for frozen-artifact consumers. Issue #121 adds a fixture-qualified, privacy-safe
-normalized sample contract and deterministic aggregation with explicit unavailable cache metrics. Dynamic workflow
-telemetry remains a gap: the current candidate contains no representative live records from both supported clients. No
-context-size, token-savings, or cache-improvement claim is permitted until those samples exist.
+normalized sample contract and deterministic aggregation with explicit unavailable cache metrics. Issue #126 completes
+the version-bound 12-cell live matrix for both supported clients with unique exact-byte sources and complete required
+counter coverage. Cache-read and cache-hit counters remain unavailable for both clients, and VS Code cache-write is
+unavailable under the report-only policy. Comparative context-size, token-savings, or cache-improvement claims require
+remeasurement against the exact candidate using the same matrix.
 
 ### CI
 

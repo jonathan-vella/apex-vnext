@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0.0",
+  "matrixId": "milestone-o-stratified-v1",
+  "aggregateSha256": "0e37d021bdedfc42cc6082ce834259ca37dd43398b848490bb4bb29dcc9dab55",
+  "sampleCount": 12,
+  "coverageComplete": true,
+  "optionalMetricsPolicy": "report-only",
+  "clients": [
+    {
+      "id": "github-copilot-vscode",
+      "version": "1.130.0",
+      "extensionVersion": "0.58.0"
+    },
+    {
+      "id": "github-copilot-cli",
+      "version": "1.0.73"
+    }
+  ],
+  "sampleIds": [
+    "05381ff2836cb0fe8430507b3fcf475a932ea8f5ccb0bce3a5415251c60e4315",
+    "0791bbd54e988c5ba02906d6e424bde522567ea1982f68a8434ab3c9b592903a",
+    "07ccb4873141f71b1ea80dd544399bb763881ce514141ed6144959bf8fceebda",
+    "12ea313772a9b901002075165fd06191131a8acc99d0cd4432342ab6e4b6703f",
+    "24b4eea20c78204de8cd167706a838d0c03c941099075c2b0e18ab1ea44bbef3",
+    "7da2365b2aa7dfeca16e14ae6df94374769f848db8ba2b7b71b668f34d61bf17",
+    "99c4b61ebf1a19dc46fd71a726f1563f00144d33ff2c9e3024da20bd692c199e",
+    "a94fefb57d040cd7d8bd02a16d9092b8864571ba73dee8d12254c44b84bca030",
+    "bb8da7699376f507d37181aed3e197fe61b85872b5a09343610054be9b2f9b0c",
+    "be10850933f3681257d9fdcb3adcc61041372ab748a47f92ace3af4f7f75ab8c",
+    "dc3b79201393d60e55a099baf0fbce38bd1f15cfa95c23d523edaf99a2d1a1ca",
+    "dd082f478b147e520faea1aea268f52c195787d047a3d6140a653aa4d44e9f80"
+  ],
+  "sourceDigests": [
+    "05b0689994c054b66dc69bcb8cb1fd8d37b365b16474653a29bd1472cdbafb18",
+    "06a5552b686544ab04de43a0f64e987c0042314cadab5680c1a148351f909309",
+    "0e54b2c852eab9c62f883b1466ef53fcdce1472c0041b4d061187d60c8057b94",
+    "5d986a9334bb75f8699e1f92ee4562c9f0c8d0e353461fdcd52fa865150b7e65",
+    "5fb911bc571e195aa5b576e39cf75e4ba056e3e3b7c84eaf9fd848a51eb21e20",
+    "666c88f3a531511f2bcb61180f695ab788e7c5614af84c3f7e3e8024a00ed88d",
+    "8128875491aaf9c77ac49584a934204ccab4d075b684c26a4955e995db434ba0",
+    "9048c225c392841db973e9192f9c2eae9485ba7deb334d37f362205ee370f7df",
+    "99f2f2432e7c5978d29d83aceb8f9c1177a90856880647b2d9a32b3092c8bfe3",
+    "c53b7240f3a0ed2eec775c82754ec41658f1314ce20f18d530077a3b77f690eb",
+    "d318e2fff2fdb78928fd7bbcce02905c8d27aa1e86fb94586d1e3242c13067f9",
+    "f8b1d1b696d50844494d98369e219e9b41d03904012c1357b78a5986722ba448"
+  ],
+  "requiredMetrics": {
+    "inputTokens": 12,
+    "outputTokens": 12,
+    "chatCalls": 12
+  },
+  "optionalMetrics": {
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 6,
+    "cacheHits": 0
+  }
+}
