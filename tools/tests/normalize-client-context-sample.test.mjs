@@ -5,9 +5,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import Ajv2020 from "ajv/dist/2020.js";
-import { aggregateClientContextSamples } from "../scripts/aggregate-client-context-samples.mjs";
+import {
+  aggregateClientContextSamples,
+  evaluateClientContextCoverage,
+  parseAggregateArgs,
+  validateClientContextMatrix,
+} from "../scripts/aggregate-client-context-samples.mjs";
 import { normalizeClientContextSample, parseArgs } from "../scripts/normalize-client-context-sample.mjs";
-import { parseArgs as parseProfilerArgs, profileCopilotCliOtel } from "../scripts/profile-copilot-cli-otel.mjs";
+import {
+  assertDistinctPaths as assertDistinctCliPaths,
+  parseArgs as parseProfilerArgs,
+  profileCopilotCliOtel,
+} from "../scripts/profile-copilot-cli-otel.mjs";
 import {
   assertDistinctPaths,
   parseArgs as parseVscodeArgs,
@@ -18,12 +27,20 @@ const schema = JSON.parse(
   readFileSync(new URL("../registry/schemas/client-context-sample.schema.json", import.meta.url), "utf8"),
 );
 const validateSample = new Ajv2020({ allErrors: true }).compile(schema);
+const matrix = JSON.parse(readFileSync(new URL("../registry/client-context-matrix.json", import.meta.url), "utf8"));
+const matrixSchema = JSON.parse(
+  readFileSync(new URL("../registry/schemas/client-context-matrix.schema.json", import.meta.url), "utf8"),
+);
+const validateMatrix = new Ajv2020({ allErrors: true }).compile(matrixSchema);
+const toolchain = JSON.parse(readFileSync(new URL("../../config/toolchain.v1.json", import.meta.url), "utf8"));
 
-function source(totals = {}) {
+function source(totals = {}, sourceDigest = "c".repeat(64)) {
   return {
     schemaVersion: "1.0.0",
     format: "apex-debug-profile",
     content_capture: false,
+    source_sha256: sourceDigest,
+    producer: { name: "github.copilot", version: "1.0.73" },
     totals: {
       input_tokens: 45_000,
       output_tokens: 1_200,
@@ -60,11 +77,12 @@ function cliRecord(name, attributes = {}) {
     name,
     attributes,
     events: [{ message: "must never be copied" }],
+    instrumentationScope: { name: "github.copilot", version: "1.0.73" },
   });
 }
 
 function profileCli(text) {
-  return profileCopilotCliOtel(text, { contentCapture: false });
+  return profileCopilotCliOtel(text, { contentCapture: false, producerVersion: "1.0.73" });
 }
 
 function vscodeRecord(eventName, attributes = {}) {
@@ -196,16 +214,47 @@ test("profiles only allowlisted Copilot CLI counters", () => {
     ].join("\n"),
   );
 
-  assert.deepEqual(
-    profile,
-    source({
-      input_tokens: 14_000,
-      output_tokens: 400,
-      chat_calls: 2,
-      cache_write_tokens: 13_300,
+  assert.deepEqual(profile, {
+    ...source(
+      {
+        input_tokens: 14_000,
+        output_tokens: 400,
+        chat_calls: 2,
+        cache_write_tokens: 13_300,
+      },
+      profile.source_sha256,
+    ),
+    producer: { name: "github.copilot", version: "1.0.73" },
+  });
+  assert.doesNotMatch(JSON.stringify(profile), /model|message|response|tool/iu);
+});
+
+test("hashes exact Copilot CLI source bytes and rejects source aliases", (context) => {
+  const valid = Buffer.from(
+    cliRecord("chat model", {
+      "gen_ai.usage.input_tokens": 1,
+      "gen_ai.usage.output_tokens": 1,
     }),
   );
-  assert.doesNotMatch(JSON.stringify(profile), /model|message|response|tool/iu);
+  const profile = profileCopilotCliOtel(valid, { contentCapture: false, producerVersion: "1.0.73" });
+  assert.equal(profile.source_sha256, createHash("sha256").update(valid).digest("hex"));
+  assert.throws(
+    () =>
+      profileCopilotCliOtel(Buffer.concat([valid, Buffer.from([0xff])]), {
+        contentCapture: false,
+        producerVersion: "1.0.73",
+      }),
+    /valid UTF-8/u,
+  );
+
+  const root = mkdtempSync(join(tmpdir(), "apex-cli-otel-paths-"));
+  context.after(() => rmSync(root, { recursive: true, force: true }));
+  const sourcePath = join(root, "source.jsonl");
+  const aliasPath = join(root, "alias.jsonl");
+  writeFileSync(sourcePath, valid);
+  symlinkSync(sourcePath, aliasPath);
+  assert.throws(() => assertDistinctCliPaths(sourcePath, sourcePath), /must not overwrite/u);
+  assert.throws(() => assertDistinctCliPaths(sourcePath, aliasPath), /must not alias/u);
 });
 
 test("rejects malformed Copilot CLI counters without inferring missing values", () => {
@@ -245,6 +294,23 @@ test("rejects malformed Copilot CLI counters without inferring missing values", 
   );
 });
 
+test("rejects foreign Copilot CLI producers and mismatched versions", () => {
+  const foreign = JSON.stringify({
+    ...JSON.parse(
+      cliRecord("chat model", {
+        "gen_ai.usage.input_tokens": 1,
+        "gen_ai.usage.output_tokens": 1,
+      }),
+    ),
+    instrumentationScope: { name: "foreign-producer", version: "1.0.73" },
+  });
+  assert.throws(() => profileCli(foreign), /unsupported producer/u);
+  assert.throws(
+    () => normalizeClientContextSample(source(), { ...metadata("github-copilot-cli"), clientVersion: "1.0.72" }),
+    /source producer does not match/u,
+  );
+});
+
 test("reports cache writes only when every chat record measures them", () => {
   const profile = profileCli(
     [
@@ -269,6 +335,8 @@ test("strictly parses Copilot CLI profiler options", () => {
     "otel.jsonl",
     "--content-capture",
     "false",
+    "--producer-version",
+    "1.0.73",
     "--output",
     "profile.json",
   ]);
@@ -278,6 +346,10 @@ test("strictly parses Copilot CLI profiler options", () => {
   assert.throws(
     () => parseProfilerArgs(["--source", "otel.jsonl", "--content-capture", "true"]),
     /--content-capture false is required/u,
+  );
+  assert.throws(
+    () => parseProfilerArgs(["--source", "otel.jsonl", "--content-capture", "false"]),
+    /--producer-version is required/u,
   );
   assert.throws(() => parseProfilerArgs(["--ouptut", "profile.json"]), /unsupported option/u);
   assert.throws(() => parseProfilerArgs(["--__proto__", "polluted"]), /unsupported option/u);
@@ -497,13 +569,17 @@ test("schema rejects counters above the JavaScript safe integer range", () => {
   assert.equal(validateSample(sample), false);
 });
 
-test("schema requires source digests only for VS Code samples", () => {
+test("schema requires source digests for both client samples", () => {
   const vscode = normalizeClientContextSample(vscodeSource(), metadata());
   const cli = normalizeClientContextSample(source(), metadata("github-copilot-cli"));
   const { sourceDigest: _, ...evidenceWithoutDigest } = vscode.evidence;
 
   assert.equal(validateSample({ ...vscode, evidence: evidenceWithoutDigest }), false);
-  assert.equal(validateSample({ ...cli, evidence: { ...cli.evidence, sourceDigest: "a".repeat(64) } }), false);
+  const { sourceDigest: __, ...cliEvidenceWithoutDigest } = cli.evidence;
+  assert.equal(validateSample({ ...cli, evidence: cliEvidenceWithoutDigest }), false);
+  assert.equal(validateSample({ ...cli, client: { ...cli.client, extensionVersion: "0.58.0" } }), false);
+  assert.equal(validateSample({ ...cli, client: { ...cli.client, version: " " } }), false);
+  assert.equal(validateSample({ ...vscode, client: { ...vscode.client, extensionVersion: " " } }), false);
 });
 
 test("rejects inherited profiler contract fields", () => {
@@ -523,4 +599,129 @@ test("keeps distinct scenarios in separate aggregate groups", () => {
     aggregate.summaries.map(({ scenarioId }) => scenarioId),
     ["architecture-standard-bicep", "requirements-standard-bicep"],
   );
+});
+
+test("reports deterministic coverage for the approved stratified matrix", () => {
+  assert.equal(validateMatrix(matrix), true, JSON.stringify(validateMatrix.errors));
+  assert.equal(validateClientContextMatrix(matrix), matrix);
+  const emptyCoverage = evaluateClientContextCoverage([], matrix);
+  assert.equal(emptyCoverage.requiredSamples, matrix.clients.length * matrix.cells.length);
+  assert.equal(emptyCoverage.coveredSamples, 0);
+  assert.equal(emptyCoverage.complete, false);
+
+  let digestIndex = 0;
+  const samples = matrix.clients.flatMap((client) =>
+    matrix.cells.map((cell) => {
+      digestIndex += 1;
+      const digest = digestIndex.toString(16).padStart(64, "0");
+      return normalizeClientContextSample(
+        client.id === "github-copilot-vscode" ? { ...vscodeSource(), source_sha256: digest } : source({}, digest),
+        {
+          ...metadata(client.id),
+          clientVersion: client.version,
+          ...(client.extensionVersion ? { extensionVersion: client.extensionVersion } : {}),
+          scenarioId: cell.scenarioId,
+          tier: cell.tier,
+          iacTrack: cell.iacTrack,
+          retry: cell.retry,
+          evidenceKind: "live",
+        },
+      );
+    }),
+  );
+  const aggregate = aggregateClientContextSamples(samples, matrix);
+  assert.equal(aggregate.coverage.complete, true);
+  assert.equal(aggregate.coverage.coveredSamples, aggregate.coverage.requiredSamples);
+  assert.deepEqual(aggregate.coverage.missing, []);
+});
+
+test("binds matrix client versions to observed and selected toolchain owners", () => {
+  const vscode = matrix.clients.find(({ id }) => id === "github-copilot-vscode");
+  const cli = matrix.clients.find(({ id }) => id === "github-copilot-cli");
+  assert.equal(vscode.version, toolchain.core.vscode.postCutoffObservation.version);
+  assert.equal(vscode.extensionVersion, toolchain.core.vscode.postCutoffObservation.copilotChatVersion);
+  assert.equal(toolchain.core.vscode.installedVersion, null);
+  assert.equal(toolchain.core.vscode.newestObservedVersion, null);
+  assert.equal(toolchain.core.vscode.selectedExactVersion, null);
+  assert.equal(toolchain.core.vscode.selectionStatus, "qualification-required");
+  assert.equal(toolchain.core.vscode.postCutoffObservation.disposition, "next-candidate-qualification-input");
+  assert.equal(cli.version, toolchain.core.copilotCli.selectedExactVersion);
+});
+
+test("rejects weakened or modified matrix contracts", () => {
+  const weakened = { ...matrix, clients: matrix.clients.slice(0, 1), requiredSamples: 6 };
+  assert.equal(validateMatrix(weakened), false);
+  assert.throws(
+    () => validateClientContextMatrix({ ...matrix, requiredSamples: matrix.requiredSamples + 1 }),
+    /must match the approved/u,
+  );
+  assert.throws(() => validateClientContextMatrix(weakened), /must match the approved/u);
+  assert.throws(
+    () => validateClientContextMatrix({ ...matrix, cells: matrix.cells.slice(0, 1), requiredSamples: 2 }),
+    /must match the approved/u,
+  );
+  assert.throws(() => validateClientContextMatrix({ ...matrix, unexpected: true }), /must match the approved/u);
+});
+
+test("rejects duplicate, extra, wrong-version, and fixture matrix samples", () => {
+  const cell = matrix.cells[0];
+  const vscodeMetadata = {
+    ...metadata("github-copilot-vscode"),
+    scenarioId: cell.scenarioId,
+    tier: cell.tier,
+    iacTrack: cell.iacTrack,
+    retry: cell.retry,
+    evidenceKind: "live",
+  };
+  const sample = normalizeClientContextSample(vscodeSource(), vscodeMetadata);
+  const duplicate = normalizeClientContextSample({ ...vscodeSource(), source_sha256: "b".repeat(64) }, vscodeMetadata);
+  assert.throws(() => aggregateClientContextSamples([sample, duplicate], matrix), /multiple samples cover the same/u);
+
+  const extra = normalizeClientContextSample(vscodeSource(), {
+    ...vscodeMetadata,
+    scenarioId: "unapproved-scenario",
+  });
+  assert.throws(() => aggregateClientContextSamples([extra], matrix), /outside the approved matrix/u);
+
+  const wrongVersion = normalizeClientContextSample(vscodeSource(), {
+    ...vscodeMetadata,
+    clientVersion: "1.129.0",
+  });
+  assert.throws(() => aggregateClientContextSamples([wrongVersion], matrix), /outside the approved matrix/u);
+
+  const fixture = normalizeClientContextSample(vscodeSource(), {
+    ...vscodeMetadata,
+    evidenceKind: "fixture",
+  });
+  assert.throws(() => aggregateClientContextSamples([fixture], matrix), /accepts live samples only/u);
+
+  const otherCell = matrix.cells[1];
+  const reusedSource = normalizeClientContextSample(vscodeSource(), {
+    ...vscodeMetadata,
+    scenarioId: otherCell.scenarioId,
+    tier: otherCell.tier,
+    iacTrack: otherCell.iacTrack,
+    retry: otherCell.retry,
+  });
+  assert.throws(() => aggregateClientContextSamples([sample, reusedSource], matrix), /source digest is reused/u);
+});
+
+test("strictly parses aggregate CLI options and requires the matrix", () => {
+  const parsed = parseAggregateArgs([
+    "sample-a.json",
+    "--matrix",
+    "tools/registry/client-context-matrix.json",
+    "--output",
+    "tmp/aggregate.json",
+  ]);
+  assert.deepEqual(parsed.samples, ["sample-a.json"]);
+  assert.equal(parsed.matrixPath, "tools/registry/client-context-matrix.json");
+  assert.equal(parsed.outputPath, "tmp/aggregate.json");
+  assert.throws(() => parseAggregateArgs(["sample.json"]), /--matrix is required/u);
+  assert.throws(() => parseAggregateArgs(["sample.json", "--unknown", "value"]), /unsupported option/u);
+  assert.throws(
+    () => parseAggregateArgs(["sample.json", "--matrix", "a.json", "--matrix", "b.json"]),
+    /may be specified only once/u,
+  );
+  assert.throws(() => parseAggregateArgs(["sample.json", "--matrix", "--output"]), /requires a value/u);
 });

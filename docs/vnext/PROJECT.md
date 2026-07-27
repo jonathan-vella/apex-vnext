@@ -6,7 +6,7 @@
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
 - **Active issue:** [#126](https://github.com/jonathan-vella/apex-vnext/issues/126) - live two-client context/cache samples
-- **Working branch:** `fix/129-vscode-otel-export`
+- **Working branch:** `feat/126-representative-context-matrix`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -37,7 +37,9 @@ a local content-disabled JSONL export. Issue #129 observes that VS Code `1.130.0
 local content-disabled JSONL export when the application-scoped OTel values use the exact
 [User Settings procedure](CLIENT-CONTEXT-BASELINE.md#operator-procedure). PR #132 binds the characterized producer and
 immutable source digest before normalization. Both raw shapes are now characterized; representative matrix coverage
-remains pending.
+remains pending. Issue #126 now uses a version-bound stratified matrix with normal and retry samples for simple-neutral,
+standard-Bicep, and standard-Terraform cells in both clients; optional cache counters remain report-only when a supported
+exporter omits them.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
@@ -73,8 +75,8 @@ or qualified.
 
 ## Immediate Sequence
 
-1. Merge the strict VS Code JSONL adapter and close exporter blocker issue #129.
-2. Expand issue #126's bounded sample corpus across representative tiers, tracks, retries, and cache states.
+1. Merge the version-bound issue #126 sampling matrix and deterministic coverage report.
+2. Collect all required live samples with unique stopped snapshots and require complete coverage.
 3. Retire the selected MCP and Draw.io surfaces only after each replacement gate passes.
 4. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.
 5. Complete ARM pricing evidence, diagram routing, bounded improvement measurement, bundle generation, and guidance

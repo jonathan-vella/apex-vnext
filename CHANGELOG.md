@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Added a version-bound, machine-readable two-client context matrix and deterministic coverage reporting across
+  simple-neutral, standard-Bicep, standard-Terraform, normal, and retry sampling cells.
 - Added a strict VS Code local OTel JSONL adapter for exact, content-disabled token measurements without double-counting
   repeated turn summaries; cache metrics remain unavailable when the exporter omits them.
 - Added a strict Copilot CLI `1.0.73` JSONL telemetry adapter that emits only allowlisted aggregate token counters;

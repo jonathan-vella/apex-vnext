@@ -571,11 +571,13 @@
         "tools/scripts/profile-vscode-otel.mjs",
         "tools/scripts/normalize-client-context-sample.mjs",
         "tools/scripts/aggregate-client-context-samples.mjs",
+        "tools/registry/client-context-matrix.json",
+        "tools/registry/schemas/client-context-matrix.schema.json",
         "tools/registry/schemas/client-context-sample.schema.json"
       ],
-      "measurement": "npm run validate:context-budget; npm run test:client-context-samples; node tools/scripts/measure-workflow-baseline.mjs --json",
+      "measurement": "npm run validate:context-budget; npm run test:client-context-samples; npm run aggregate:client-context-samples -- tmp/*-sample.json --matrix tools/registry/client-context-matrix.json --output tmp/client-context-baseline.json",
       "evidence": "At b27d173, active repository and managed guidance Markdown/JSON totals 3793215 bytes. Static budgets pass and issue #121 fixture-qualifies privacy-safe normalized samples, but the repository has no representative live token or cache records from both clients.",
-      "followUp": "Milestone O must collect both-client live token and cache samples before claiming context improvement."
+      "followUp": "Issue #126 must satisfy every version-bound cell in client-context-matrix.json before claiming context improvement."
     },
     {
       "id": "ci",

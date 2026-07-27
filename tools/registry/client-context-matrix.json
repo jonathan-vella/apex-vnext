@@ -1,0 +1,63 @@
+{
+  "$schema": "schemas/client-context-matrix.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "milestone-o-stratified-v1",
+  "evidenceKind": "live",
+  "requiredSamples": 12,
+  "optionalMetricsPolicy": "report-only",
+  "clients": [
+    {
+      "id": "github-copilot-vscode",
+      "version": "1.130.0",
+      "extensionVersion": "0.58.0"
+    },
+    {
+      "id": "github-copilot-cli",
+      "version": "1.0.73"
+    }
+  ],
+  "cells": [
+    {
+      "id": "simple-neutral-normal",
+      "scenarioId": "requirements-simple-neutral",
+      "tier": "simple",
+      "iacTrack": "neutral",
+      "retry": false
+    },
+    {
+      "id": "simple-neutral-retry",
+      "scenarioId": "requirements-simple-neutral",
+      "tier": "simple",
+      "iacTrack": "neutral",
+      "retry": true
+    },
+    {
+      "id": "standard-bicep-normal",
+      "scenarioId": "architecture-standard-bicep",
+      "tier": "standard",
+      "iacTrack": "bicep",
+      "retry": false
+    },
+    {
+      "id": "standard-bicep-retry",
+      "scenarioId": "architecture-standard-bicep",
+      "tier": "standard",
+      "iacTrack": "bicep",
+      "retry": true
+    },
+    {
+      "id": "standard-terraform-normal",
+      "scenarioId": "architecture-standard-terraform",
+      "tier": "standard",
+      "iacTrack": "terraform",
+      "retry": false
+    },
+    {
+      "id": "standard-terraform-retry",
+      "scenarioId": "architecture-standard-terraform",
+      "tier": "standard",
+      "iacTrack": "terraform",
+      "retry": true
+    }
+  ]
+}

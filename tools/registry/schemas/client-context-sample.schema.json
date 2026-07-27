@@ -13,13 +13,14 @@
       "required": ["id", "version"],
       "properties": {
         "id": { "enum": ["github-copilot-vscode", "github-copilot-cli"] },
-        "version": { "type": "string", "minLength": 1 },
-        "extensionVersion": { "type": "string", "minLength": 1 }
+        "version": { "type": "string", "pattern": ".*\\S.*" },
+        "extensionVersion": { "type": "string", "pattern": ".*\\S.*" }
       },
       "allOf": [
         {
           "if": { "properties": { "id": { "const": "github-copilot-vscode" } }, "required": ["id"] },
-          "then": { "required": ["extensionVersion"] }
+          "then": { "required": ["extensionVersion"] },
+          "else": { "not": { "required": ["extensionVersion"] } }
         }
       ]
     },
@@ -37,7 +38,7 @@
     "evidence": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "sourceFormat", "contentCapture"],
+      "required": ["kind", "sourceFormat", "contentCapture", "sourceDigest"],
       "properties": {
         "kind": { "enum": ["fixture", "live"] },
         "sourceFormat": { "const": "apex-debug-profile" },
@@ -60,26 +61,6 @@
     },
     "sampleId": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
   },
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "client": {
-            "type": "object",
-            "properties": { "id": { "const": "github-copilot-vscode" } },
-            "required": ["id"]
-          }
-        },
-        "required": ["client"]
-      },
-      "then": { "properties": { "evidence": { "type": "object", "required": ["sourceDigest"] } } },
-      "else": {
-        "properties": {
-          "evidence": { "not": { "type": "object", "required": ["sourceDigest"] } }
-        }
-      }
-    }
-  ],
   "$defs": {
     "measuredCounter": {
       "type": "object",
