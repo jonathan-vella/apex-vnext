@@ -12,6 +12,7 @@ The normalized contract is
 - supported client ID and observed client version, plus the Copilot Chat extension version for VS Code;
 - scenario ID, complexity tier, IaC track, and retry state;
 - exact input-token, output-token, chat-call, and available cache counters;
+- the SHA-256 digest of each VS Code source snapshot and the characterized Copilot Chat producer version;
 - whether the source is a fixture or live operator capture; and
 - a deterministic SHA-256 sample ID.
 
@@ -34,14 +35,27 @@ counters with content capture disabled. It does not provide representative matri
 ## Operator Procedure
 
 1. Record the installed client ID and version. Do not install or update a client as part of measurement.
-2. Run an approved representative scenario with OpenTelemetry content capture disabled.
-3. Create an aggregate-only profile with the client-specific adapter:
+2. For VS Code, set these application-scoped values in **User Settings (JSON)**. Use a new output filename for each
+   scenario; workspace settings are ignored for these values.
+
+   ```jsonc
+   "github.copilot.chat.otel.enabled": true,
+   "github.copilot.chat.otel.captureContent": false,
+   "github.copilot.chat.otel.outfile": "/workspaces/apex-vnext/tmp/vscode-SCENARIO-otel.jsonl"
+   ```
+
+3. Confirm the destination is under ignored `tmp/` and does not already exist, then run **Developer: Reload Window**.
+   Run only the approved scenario in a fresh chat. Set `github.copilot.chat.otel.enabled` to `false` and reload again to
+   flush and stop the exporter before profiling. Do not append another scenario to the same file.
+4. Copy the stopped file to an immutable ignored snapshot and record its SHA-256. Raw exports and snapshots remain local.
+5. Create an aggregate-only profile with the client-specific adapter:
 
    ```bash
     # VS Code 1.130.0 / Copilot Chat 0.58.0 local JSONL export
     npm run --silent profile:vscode-otel -- \
-       --source tmp/vscode-copilot-otel.jsonl \
+       --source tmp/vscode-SCENARIO-otel.snapshot.jsonl \
        --content-capture false \
+       --producer-version COPILOT_CHAT_VERSION \
        --output tmp/vscode-profile.json
 
    # Copilot CLI 1.0.73 local JSONL export
@@ -51,9 +65,10 @@ counters with content capture disabled. It does not provide representative matri
      --output tmp/copilot-cli-profile.json
    ```
 
-4. Inspect the profile for the `apex-debug-profile` format and confirm it contains only `schemaVersion`, `format`,
-   `content_capture: false`, and allowlisted aggregate counters under `totals`.
-5. Normalize one sample with explicit scenario metadata:
+6. Inspect the profile for the `apex-debug-profile` format and confirm it contains only `schemaVersion`, `format`,
+   `content_capture: false`, `source_sha256`, the characterized producer identity, and allowlisted aggregate counters
+   under `totals`.
+7. Normalize one sample with explicit scenario metadata:
 
    ```bash
     npm run --silent normalize:client-context-sample -- \
@@ -68,17 +83,17 @@ counters with content capture disabled. It does not provide representative matri
      --output tmp/vscode-sample.json
    ```
 
-6. Repeat across the approved scenario matrix, retries, tiers, tracks, and both clients. If a client has no
+8. Repeat across the approved scenario matrix, retries, tiers, tracks, and both clients. If a client has no
    characterized raw adapter or a metric is absent, record the evidence as unavailable rather than translating or
    estimating it.
-7. Aggregate normalized samples deterministically:
+9. Aggregate normalized samples deterministically:
 
    ```bash
    npm run aggregate:client-context-samples -- tmp/*-sample.json --output tmp/client-context-baseline.json
    ```
 
-8. Review normalized output before moving bounded evidence into a candidate dossier. Raw exports and profiles remain
-   local and must not be committed.
+10. Review normalized output before moving bounded evidence into a candidate dossier. Raw exports and profiles remain
+    local and must not be committed.
 
 ## Validation
 

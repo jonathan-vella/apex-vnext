@@ -33,9 +33,10 @@ PR #128 adds a strict Copilot CLI JSONL adapter and hardens normalized sample va
 partial cache evidence, unsafe totals, mixed fixture/live groups, and content-capture ambiguity.
 Issue #126 owns representative live sampling; no improvement claim is authorized until both supported clients provide
 the required evidence. Copilot CLI `1.0.73` is checksum-verified, operator-authenticated, and live-characterized through
-a local content-disabled JSONL export. Issue #129 proves VS Code `1.130.0` with Copilot Chat `0.58.0` emits a local
-content-disabled JSONL export when the application-scoped OTel values are set in User Settings. Both raw shapes are now
-characterized; representative matrix coverage remains pending.
+a local content-disabled JSONL export. Issue #129 observes that VS Code `1.130.0` with Copilot Chat `0.58.0` emits a
+local content-disabled JSONL export when the application-scoped OTel values are set in User Settings. PR #132 binds the
+characterized producer and immutable source digest before normalization. Both raw shapes are now characterized;
+representative matrix coverage remains pending.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
