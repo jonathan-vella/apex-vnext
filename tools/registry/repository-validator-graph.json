@@ -272,6 +272,13 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "profile-copilot-cli-otel",
+      "script": "profile:copilot-cli-otel",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "test-client-context-samples",
       "script": "test:client-context-samples",
       "profile": "node-test",

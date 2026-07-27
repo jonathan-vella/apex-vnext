@@ -9,6 +9,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -57,6 +58,37 @@ def test_profile_totals(profiler):
     assert t["error_spans_non_benign"] == 0
 
 
+def _chat_span(spans):
+    return next(span for span in spans if span.get("name", "").startswith("chat:"))
+
+
+def _set_attribute(span, key, value):
+    attribute = next(entry for entry in span["attributes"] if entry["key"] == key)
+    attribute["value"] = {"intValue": value}
+
+
+def test_profile_rejects_missing_invalid_and_overflowing_token_counters(profiler):
+    missing = profiler.load_spans(FIXTURE)
+    chat = _chat_span(missing)
+    chat["attributes"] = [entry for entry in chat["attributes"] if entry["key"] != "gen_ai.usage.input_tokens"]
+    with pytest.raises(ValueError, match="present non-negative safe integer"):
+        profiler.profile(missing)
+
+    negative = profiler.load_spans(FIXTURE)
+    _set_attribute(_chat_span(negative), "gen_ai.usage.input_tokens", -1)
+    with pytest.raises(ValueError, match="present non-negative safe integer"):
+        profiler.profile(negative)
+
+    overflowing = profiler.load_spans(FIXTURE)
+    first = _chat_span(overflowing)
+    _set_attribute(first, "gen_ai.usage.input_tokens", profiler.MAX_SAFE_INTEGER)
+    second = deepcopy(first)
+    _set_attribute(second, "gen_ai.usage.input_tokens", 1)
+    overflowing.append(second)
+    with pytest.raises(ValueError, match="total exceeds the safe integer range"):
+        profiler.profile(overflowing)
+
+
 def test_profile_tokens_by_model(profiler):
     spans = profiler.load_spans(FIXTURE)
     m = profiler.profile(spans)
@@ -85,14 +117,20 @@ def test_cli_text_and_json(profiler, capsys):
     parsed = json.loads(json_out)
     assert parsed["totals"]["input_tokens"] == 45000
 
-    rc = profiler.main([str(FIXTURE), "--json", "--metrics-only"])
+    rc = profiler.main([str(FIXTURE), "--json", "--metrics-only", "--content-capture-disabled"])
     assert rc == 0
     metrics_out = json.loads(capsys.readouterr().out)
     assert metrics_out == {
         "schemaVersion": "1.0.0",
         "format": "apex-debug-profile",
+        "content_capture": False,
         "totals": {"chat_calls": 1, "input_tokens": 45000, "output_tokens": 1200},
     }
+
+
+def test_metrics_only_requires_content_capture_attestation(profiler):
+    with pytest.raises(SystemExit):
+        profiler.main([str(FIXTURE), "--json", "--metrics-only"])
 
 
 def test_cli_handles_missing_file(profiler, capsys):
