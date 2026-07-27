@@ -10,3 +10,4 @@ export * from "./native-iac-providers.js";
 export * from "./pack-manager.js";
 export * from "./packs.js";
 export * from "./process-runner.js";
+export * from "./terraform-registry-client.js";

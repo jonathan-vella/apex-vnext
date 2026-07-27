@@ -176,7 +176,10 @@
         "tools/registry/terraform-mcp-characterization.json",
         "tools/registry/terraform-mcp-tools-list.fixture.json",
         "tools/registry/schemas/terraform-mcp-characterization.schema.json",
-        "tools/scripts/validate-terraform-mcp-characterization.mjs"
+        "tools/scripts/validate-terraform-mcp-characterization.mjs",
+        "packages/capabilities/src/terraform-registry-client.ts",
+        "packages/capabilities/src/test/terraform-registry-client.test.ts",
+        "packages/capabilities/src/test/fixtures/terraform-registry.ts"
       ],
       "consumers": ["developer workspace", "managed clients", "capability packs", "release packaging"],
       "proofCommands": [
@@ -188,7 +191,7 @@
       ],
       "removalGate": "Each retired server has a passing replacement gate, zero active discovery or package references, and an explicit negative assertion.",
       "rationale": "MCP ownership is currently distributed across client config, packs, setup, tests, and documentation.",
-      "followUp": "Issue #136 retires Astro; issue #138 characterizes Terraform MCP consumers and provenance gaps before replacement. Azure Pricing and Draw.io retain independent gates.",
+      "followUp": "Issue #140 implements the bounded Registry client after issue #138 characterization. Native schema/import guidance migration and Terraform MCP removal remain separate gates; Azure Pricing and Draw.io retain independent gates.",
       "decisionRef": "OWN-012"
     },
     {
