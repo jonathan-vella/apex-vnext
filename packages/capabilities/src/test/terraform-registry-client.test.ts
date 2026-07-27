@@ -197,6 +197,29 @@ test("fails closed on timeout and response byte limits", async () => {
   assert.equal(tooLarge.status === "unavailable" && tooLarge.reason, "response-too-large");
 });
 
+test("does not await non-cooperative oversized-body cancellation", async () => {
+  let canceled = false;
+  const client = new TerraformRegistryClient({
+    maxResponseBytes: 1,
+    fetch: async () =>
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode("too large"));
+          },
+          cancel() {
+            canceled = true;
+            return new Promise<void>(() => undefined);
+          },
+        }),
+      ),
+  });
+
+  const result = await client.searchModules("module");
+  assert.equal(result.status === "unavailable" && result.reason, "response-too-large");
+  assert.equal(canceled, true);
+});
+
 test("times out non-cooperative fetch and response streams", async () => {
   const stalledFetch = new TerraformRegistryClient({
     timeoutMs: 5,

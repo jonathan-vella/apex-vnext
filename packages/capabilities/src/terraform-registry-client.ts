@@ -98,7 +98,9 @@ function compareStableVersions(left: ParsedSemver, right: ParsedSemver): number 
     if (left[key] < right[key]) return 1;
     if (left[key] > right[key]) return -1;
   }
-  return right.value.localeCompare(left.value);
+  if (left.value < right.value) return 1;
+  if (left.value > right.value) return -1;
+  return 0;
 }
 
 function stableVersions(values: readonly string[]): readonly string[] | null {
@@ -144,7 +146,7 @@ async function boundedText(response: Response, maxBytes: number, signal: AbortSi
       if (part.done) break;
       bytes += part.value.byteLength;
       if (bytes > maxBytes) {
-        await reader.cancel();
+        void reader.cancel().catch(() => undefined);
         throw new RangeError("response-too-large");
       }
       chunks.push(part.value);
