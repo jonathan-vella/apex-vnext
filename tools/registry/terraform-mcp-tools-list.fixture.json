@@ -1,0 +1,162 @@
+[
+  {
+    "name": "get_latest_module_version",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "module_name": {
+          "description": "The name of the module, this is usually the service or group of service the user is deploying e.g., 'security-group', 'secrets-manager' etc.",
+          "type": "string"
+        },
+        "module_provider": {
+          "description": "The name of the Terraform provider for the module, e.g., 'aws', 'google', 'azurerm' etc.",
+          "type": "string"
+        },
+        "module_publisher": {
+          "description": "The publisher of the module, e.g., 'hashicorp', 'aws-ia', 'terraform-google-modules', 'Azure' etc.",
+          "type": "string"
+        }
+      },
+      "required": ["module_publisher", "module_name", "module_provider"]
+    }
+  },
+  {
+    "name": "get_latest_provider_version",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "The name of the Terraform provider, e.g., 'aws', 'azurerm', 'google', etc.",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace of the Terraform provider, typically the name of the company, or their GitHub organization name that created the provider e.g., 'hashicorp'",
+          "type": "string"
+        }
+      },
+      "required": ["namespace", "name"]
+    }
+  },
+  {
+    "name": "get_module_details",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "module_id": {
+          "description": "Exact valid and compatible module_id retrieved from search_modules (e.g., 'squareops/terraform-kubernetes-mongodb/mongodb/2.1.1', 'GoogleCloudPlatform/vertex-ai/google/0.2.0')",
+          "type": "string"
+        }
+      },
+      "required": ["module_id"]
+    }
+  },
+  {
+    "name": "get_policy_details",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "terraform_policy_id": {
+          "description": "Matching terraform_policy_id retrieved from the 'search_policies' tool (e.g., 'policies/hashicorp/CIS-Policy-Set-for-AWS-Terraform/1.0.1')",
+          "type": "string"
+        }
+      },
+      "required": ["terraform_policy_id"]
+    }
+  },
+  {
+    "name": "get_provider_capabilities",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "The name of the Terraform provider, e.g., 'aws', 'azurerm', 'google', etc.",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "The namespace of the Terraform provider, typically the name of the company, or their GitHub organization name that created the provider e.g., 'hashicorp'",
+          "type": "string"
+        },
+        "version": {
+          "description": "The version of the provider to analyze (defaults to 'latest')",
+          "type": "string"
+        }
+      },
+      "required": ["namespace", "name"]
+    }
+  },
+  {
+    "name": "get_provider_details",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "provider_doc_id": {
+          "description": "Exact tfprovider-compatible provider_doc_id, (e.g., '8894603', '8906901') retrieved from 'search_providers'",
+          "type": "string"
+        }
+      },
+      "required": ["provider_doc_id"]
+    }
+  },
+  {
+    "name": "search_modules",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "current_offset": {
+          "default": 0,
+          "description": "Current offset for pagination",
+          "minimum": 0,
+          "type": "number"
+        },
+        "module_query": {
+          "description": "The query to search for Terraform modules.",
+          "type": "string"
+        }
+      },
+      "required": ["module_query"]
+    }
+  },
+  {
+    "name": "search_policies",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "policy_query": {
+          "description": "The query to search for Terraform modules.",
+          "type": "string"
+        }
+      },
+      "required": ["policy_query"]
+    }
+  },
+  {
+    "name": "search_providers",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "provider_document_type": {
+          "description": "The type of the document to retrieve,\nfor general overview of the provider use 'overview',\nfor guidance on upgrading a provider or custom configuration information use 'guides',\nfor deploying resources use 'resources', for reading pre-deployed resources use 'data-sources',\nfor functions use 'functions',\nfor Terraform actions use 'actions',\nfor listing resources using Terraform Search use 'list-resources'",
+          "enum": ["resources", "data-sources", "functions", "guides", "overview", "actions", "list-resources"],
+          "type": "string"
+        },
+        "provider_name": {
+          "description": "The name of the Terraform provider to perform the read or deployment operation",
+          "type": "string"
+        },
+        "provider_namespace": {
+          "description": "The publisher of the Terraform provider, typically the name of the company, or their GitHub organization name that created the provider",
+          "type": "string"
+        },
+        "provider_version": {
+          "description": "The version of the Terraform provider to retrieve in the format 'x.y.z', or 'latest' to get the latest version",
+          "type": "string"
+        },
+        "service_slug": {
+          "description": "The slug of the service you want to deploy or read using the Terraform provider, prefer using a single word, use underscores for multiple words and if unsure about the service_slug, use the provider_name for its value",
+          "type": "string"
+        }
+      },
+      "required": ["provider_name", "provider_namespace", "service_slug", "provider_document_type"]
+    }
+  }
+]

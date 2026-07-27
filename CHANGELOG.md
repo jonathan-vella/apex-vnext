@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Characterized the installed Terraform MCP registry-only tools, active consumers, schema hashes, provenance gap,
+  lifecycle denials, and deterministic replacement owners without removing the dependency.
 - Removed Astro MCP from active workspace discovery and added mutation coverage that rejects its legacy key and endpoint
   without changing GitHub, Azure Pricing, Terraform, or Draw.io MCP behavior.
 - Captured the version-bound 12-cell VS Code and Copilot CLI context baseline with unique exact-byte sources, complete

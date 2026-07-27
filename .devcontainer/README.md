@@ -56,7 +56,7 @@ graphviz, dos2unix, bats, uv
 | Azure Pricing MCP | stdio             | Real-time SKU pricing for cost estimates         |
 | GitHub MCP        | http              | Copilot-provided GitHub context                  |
 | Draw.io MCP       | stdio (Deno)      | Architecture diagram generation with Azure icons |
-| Terraform MCP     | stdio (Go)        | HashiCorp registry, module, and workspace tools  |
+| Terraform MCP     | stdio (Go)        | Public Registry provider, module, and policy lookup |
 | Azure MCP Server  | VS Code extension | RBAC-aware Azure context for agents              |
 
 ### VS Code Extensions
