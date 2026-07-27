@@ -161,7 +161,8 @@ placeholder when absent. Never write a placeholder token or credential value.
 
 ### Step 5 - Authenticate Through Device Flow
 
-Run this step only for `SelfDescribing token` or `Provider default`. PAT fallback mode skips directly to Step 5a.
+Run this step only for `SelfDescribing token (recommended)` or `Provider default`. PAT fallback mode skips directly to
+Step 5a.
 
 First validate existing credentials:
 
