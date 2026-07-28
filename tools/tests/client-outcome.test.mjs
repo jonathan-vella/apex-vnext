@@ -32,7 +32,10 @@ import {
 import { parseStrictJson } from "../scripts/_lib/strict-json.mjs";
 import { validateClientRuntimeEvidence, validateEvidencePayloads } from "../scripts/live-qualification.mjs";
 import { resolveInputPath } from "../scripts/qualify-client-outcomes.mjs";
-import { validateClientOutcomeScenarios } from "../scripts/validate-client-outcome-scenarios.mjs";
+import {
+  canonicalContextReceiptDigest,
+  validateClientOutcomeScenarios,
+} from "../scripts/validate-client-outcome-scenarios.mjs";
 
 const hash = (character) => character.repeat(64);
 const canonicalToolchain = parseStrictJson(
@@ -199,6 +202,9 @@ test("the corpus defines exact scenario-specific proof and valid equality paths"
 });
 
 test("exact VS Code selection is bound to the complete context receipt", () => {
+  assert.equal(canonicalContextReceiptDigest(contextReceipt), contextReceiptHash);
+  assert.throws(() => canonicalContextReceiptDigest({ value: undefined }), /CONTEXT_RECEIPT_NON_JSON_VALUE/);
+  assert.throws(() => canonicalContextReceiptDigest({ value: Number.NaN }), /CONTEXT_RECEIPT_NON_JSON_VALUE/);
   assert.deepEqual(
     validateClientOutcomeScenarios(
       CLIENT_OUTCOME_SCENARIO_CORPUS,

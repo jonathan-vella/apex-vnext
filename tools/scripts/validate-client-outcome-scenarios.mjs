@@ -29,13 +29,25 @@ const CODE_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/;
 
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
-  if (value !== null && typeof value === "object") {
+  if (value !== null && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) {
     return `{${Object.keys(value)
       .sort()
       .map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`)
       .join(",")}}`;
   }
-  return JSON.stringify(value);
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "boolean" ||
+    (typeof value === "number" && Number.isFinite(value))
+  ) {
+    return JSON.stringify(value);
+  }
+  throw new TypeError("CONTEXT_RECEIPT_NON_JSON_VALUE");
+}
+
+export function canonicalContextReceiptDigest(receipt) {
+  return createHash("sha256").update(stableJson(receipt)).digest("hex");
 }
 
 function validStringSet(values, pattern) {
@@ -122,7 +134,7 @@ function main() {
   const corpus = parseStrictJson(fs.readFileSync(CORPUS_PATH, "utf8"));
   const toolchain = parseStrictJson(fs.readFileSync(TOOLCHAIN_PATH, "utf8"));
   const receipt = parseStrictJson(fs.readFileSync(CONTEXT_RECEIPT_PATH, "utf8"));
-  const receiptHash = createHash("sha256").update(stableJson(receipt)).digest("hex");
+  const receiptHash = canonicalContextReceiptDigest(receipt);
   const errors = validateClientOutcomeScenarios(corpus, toolchain, receipt, receiptHash);
   if (errors.length > 0) {
     errors.forEach((error) => console.error(`❌ ${CORPUS_PATH}: ${error}`));
