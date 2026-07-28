@@ -1,0 +1,509 @@
+{
+  "$id": "https://schemas.apexops.dev/client-outcome-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "candidate": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$",
+          "type": "string"
+        },
+        "commit": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "customizationBundleHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "packageLockHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "releaseManifestHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "repository": {
+          "maxLength": 128,
+          "pattern": "^[a-z0-9_.-]+/[a-z0-9_.-]+$",
+          "type": "string"
+        },
+        "runtimeBundleHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "scenarioCorpusHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "toolchainHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repository",
+        "branch",
+        "commit",
+        "packageLockHash",
+        "releaseManifestHash",
+        "runtimeBundleHash",
+        "customizationBundleHash",
+        "scenarioCorpusHash",
+        "toolchainHash"
+      ],
+      "type": "object"
+    },
+    "client": {
+      "additionalProperties": false,
+      "properties": {
+        "architecture": {
+          "anyOf": [
+            {
+              "const": "x64",
+              "type": "string"
+            },
+            {
+              "const": "arm64",
+              "type": "string"
+            }
+          ]
+        },
+        "extensionVersion": {
+          "maxLength": 32,
+          "pattern": "^[0-9]+(?:\\.[0-9]+){1,3}(?:-[0-9A-Za-z.-]+)?$",
+          "type": "string"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "const": "github-copilot-vscode",
+              "type": "string"
+            },
+            {
+              "const": "github-copilot-cli",
+              "type": "string"
+            }
+          ]
+        },
+        "os": {
+          "anyOf": [
+            {
+              "const": "linux",
+              "type": "string"
+            },
+            {
+              "const": "macos",
+              "type": "string"
+            },
+            {
+              "const": "windows",
+              "type": "string"
+            }
+          ]
+        },
+        "version": {
+          "maxLength": 32,
+          "pattern": "^[0-9]+(?:\\.[0-9]+){1,3}(?:-[0-9A-Za-z.-]+)?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "os",
+        "architecture"
+      ],
+      "type": "object"
+    },
+    "disposition": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "reasonCode": {
+              "maxLength": 64,
+              "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+              "type": "string"
+            },
+            "status": {
+              "anyOf": [
+                {
+                  "const": "pass",
+                  "type": "string"
+                },
+                {
+                  "const": "fail",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "nextActionCode": {
+              "maxLength": 64,
+              "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+              "type": "string"
+            },
+            "ownerCode": {
+              "maxLength": 64,
+              "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+              "type": "string"
+            },
+            "reasonCode": {
+              "maxLength": 64,
+              "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+              "type": "string"
+            },
+            "status": {
+              "const": "unavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "reasonCode",
+            "ownerCode",
+            "nextActionCode"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "attestationHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "contentCapture": {
+          "const": false,
+          "type": "boolean"
+        },
+        "refs": {
+          "items": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "sourceDigest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceDigest",
+        "attestationHash",
+        "refs",
+        "contentCapture"
+      ],
+      "type": "object"
+    },
+    "evidenceKind": {
+      "anyOf": [
+        {
+          "const": "fixture",
+          "type": "string"
+        },
+        {
+          "const": "live",
+          "type": "string"
+        }
+      ]
+    },
+    "execution": {
+      "additionalProperties": false,
+      "properties": {
+        "ownerEpoch": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "projectId": {
+          "allOf": [
+            {
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "maxLength": 64,
+              "type": "string"
+            }
+          ]
+        },
+        "rawJournalHead": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "rawJournalSourceDigest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "runId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+          "type": "string"
+        },
+        "semanticJournalHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "taskId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+          "type": "string"
+        },
+        "taskState": {
+          "anyOf": [
+            {
+              "const": "completed",
+              "type": "string"
+            },
+            {
+              "const": "failed",
+              "type": "string"
+            },
+            {
+              "const": "blocked",
+              "type": "string"
+            },
+            {
+              "const": "unavailable",
+              "type": "string"
+            }
+          ]
+        },
+        "workflowNode": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9.-]{0,63}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "projectId",
+        "runId",
+        "workflowNode",
+        "taskId",
+        "taskState",
+        "rawJournalHead",
+        "rawJournalSourceDigest",
+        "semanticJournalHash",
+        "ownerEpoch"
+      ],
+      "type": "object"
+    },
+    "observations": {
+      "additionalProperties": false,
+      "properties": {
+        "artifacts": {
+          "maxProperties": 32,
+          "patternProperties": {
+            "^[a-z][a-z0-9.-]{0,63}$": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "assertions": {
+          "maxProperties": 32,
+          "patternProperties": {
+            "^[a-z][a-z0-9.-]{0,63}$": {
+              "anyOf": [
+                {
+                  "const": "pass",
+                  "type": "string"
+                },
+                {
+                  "const": "fail",
+                  "type": "string"
+                },
+                {
+                  "const": "unavailable",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "denialCodes": {
+          "items": {
+            "maxLength": 64,
+            "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+            "type": "string"
+          },
+          "maxItems": 32,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "evidence": {
+          "maxProperties": 32,
+          "patternProperties": {
+            "^[a-z][a-z0-9.-]{0,63}$": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "gates": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "gate": {
+                "maximum": 4,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "const": "approved",
+                    "type": "string"
+                  },
+                  {
+                    "const": "denied",
+                    "type": "string"
+                  },
+                  {
+                    "const": "pending",
+                    "type": "string"
+                  },
+                  {
+                    "const": "not-applicable",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "gate",
+              "state"
+            ],
+            "type": "object"
+          },
+          "maxItems": 4,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "transfer": {
+          "additionalProperties": false,
+          "properties": {
+            "ownerEpochDelta": {
+              "type": "integer"
+            },
+            "result": {
+              "anyOf": [
+                {
+                  "const": "succeeded",
+                  "type": "string"
+                },
+                {
+                  "const": "denied",
+                  "type": "string"
+                },
+                {
+                  "const": "not-applicable",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "required": [
+            "result",
+            "ownerEpochDelta"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "gates",
+        "artifacts",
+        "evidence",
+        "denialCodes",
+        "transfer",
+        "assertions"
+      ],
+      "type": "object"
+    },
+    "outcomeId": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "scenarioId": {
+      "anyOf": [
+        {
+          "const": "CLIENT-001",
+          "type": "string"
+        },
+        {
+          "const": "CLIENT-002",
+          "type": "string"
+        },
+        {
+          "const": "CLIENT-003",
+          "type": "string"
+        },
+        {
+          "const": "CLIENT-004",
+          "type": "string"
+        },
+        {
+          "const": "CLIENT-005",
+          "type": "string"
+        },
+        {
+          "const": "CLIENT-006",
+          "type": "string"
+        },
+        {
+          "const": "CLIENT-007",
+          "type": "string"
+        },
+        {
+          "const": "CLIENT-008",
+          "type": "string"
+        },
+        {
+          "const": "CLIENT-009",
+          "type": "string"
+        },
+        {
+          "const": "CLIENT-010",
+          "type": "string"
+        }
+      ]
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "scenarioId",
+    "evidenceKind",
+    "candidate",
+    "client",
+    "execution",
+    "observations",
+    "disposition",
+    "evidence",
+    "outcomeId"
+  ],
+  "type": "object"
+}

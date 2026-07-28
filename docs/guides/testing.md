@@ -59,6 +59,8 @@ npm run test:vnext-validator
 npm run test:vnext-pack
 npm run lint:vnext
 npm run test:bounded-improvement
+npm run validate:client-outcomes
+npm run test:client-outcomes
 ```
 
 `test:vnext-pack` builds tarballs, verifies manifest digests and package contents, installs the runtime package set into

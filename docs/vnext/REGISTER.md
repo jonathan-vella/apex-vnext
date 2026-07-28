@@ -84,8 +84,8 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Type:** `RISK`
 - **Owner:** Client experience
 - **Impact:** VS Code and Copilot CLI could produce different workflow outcomes or expose different authority.
-- **Evidence:** The previous contract qualified VS Code only. Copilot CLI `1.0.73` is selected and the shared matrix is
-  defined, but neither client has run the re-baselined corpus.
+- **Evidence:** Copilot CLI `1.0.73` is selected. The deterministic corpus, normalized contracts, proof-complete aggregate,
+  and fail-closed live evidence binding are implemented, but neither client has run the re-baselined corpus.
 - **Related issue:** [#91](https://github.com/jonathan-vella/apex-vnext/issues/91)
 - **Mitigation:** Generate thin projections from one bundle contract and compare normalized typed outcomes,
   authorization denials, restart/resume behavior, and evidence hashes rather than UI mechanics.
@@ -171,8 +171,8 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Type:** `ASSUMPTION`
 - **Owner:** Client experience
 - **Impact:** Failure would require a product-contract or projection redesign before release.
-- **Evidence:** VS Code supports direct handoffs and `askQuestions`; Copilot CLI uses different delegation and input
-  mechanics. Typed kernel outcomes and authority boundaries are intended to remain shared.
+- **Evidence:** Generated client-specific projections preserve different handoff, delegation, and input mechanics. The
+  deterministic two-client fixture matrix produces equivalent typed outcomes, but live client proof is still absent.
 - **Related issue:** [#91](https://github.com/jonathan-vella/apex-vnext/issues/91)
 - **Mitigation:** Characterize real supported clients, preserve client-specific interaction mechanics, and compare their
   normalized outcomes using one scenario corpus.

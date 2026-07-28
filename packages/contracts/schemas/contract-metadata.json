@@ -19,6 +19,21 @@
     "maxBytes": 262144,
     "sensitivity": "public"
   },
+  "https://schemas.apexops.dev/client-outcome-comparison-v1.json": {
+    "compatibility": "strict-v1",
+    "maxBytes": 65536,
+    "sensitivity": "confidential"
+  },
+  "https://schemas.apexops.dev/client-outcome-qualification-v1.json": {
+    "compatibility": "strict-v1",
+    "maxBytes": 65536,
+    "sensitivity": "confidential"
+  },
+  "https://schemas.apexops.dev/client-outcome-v1.json": {
+    "compatibility": "strict-v1",
+    "maxBytes": 262144,
+    "sensitivity": "confidential"
+  },
   "https://schemas.apexops.dev/cost-estimate-v1.json": {
     "compatibility": "strict-v1",
     "maxBytes": 1048576,
