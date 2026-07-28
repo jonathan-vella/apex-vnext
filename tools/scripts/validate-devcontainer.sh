@@ -144,17 +144,6 @@ check_post_create_log() {
     [[ "$summary" != *"with errors"* ]]
 }
 
-check_terraform_mcp() {
-    if command -v terraform-mcp-server >/dev/null 2>&1; then
-        terraform-mcp-server --version
-    elif [[ -x /go/bin/terraform-mcp-server ]]; then
-        /go/bin/terraform-mcp-server --version
-    else
-        printf 'terraform-mcp-server not found\n'
-        return 1
-    fi
-}
-
 prepare_test_dependencies() {
     npm ci
     npm ci --prefix site
@@ -246,7 +235,6 @@ run_check "tflint" "compatibility" tflint --version
 run_check "azd" "compatibility" azd version
 run_check "ruff" "compatibility" ruff --version
 run_check "apex-recall" "compatibility" apex-recall --version
-run_check "terraform-mcp-server" "compatibility" check_terraform_mcp
 run_check "python-package-imports" "compatibility" python3 -c \
     'import diagrams, matplotlib, PIL, checkov; from azure_pricing_mcp import server'
 

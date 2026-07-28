@@ -54,9 +54,9 @@ npm --workspace @apex/capabilities test
 A bounded live compatibility smoke test on 2026-07-27 returned normalized `ok` results for all four supported operations.
 Live results are compatibility evidence only; deterministic fixtures own regression behavior.
 
-## Migration Gate
+## Retirement Status
 
-Do not remove Terraform MCP yet. Active consumers listed in
-[TERRAFORM-MCP-CHARACTERIZATION.md](TERRAFORM-MCP-CHARACTERIZATION.md) must migrate independently. Provider schemas and
-import guidance must move to their declared native/documentation owners, then setup/config references can be removed only
-after lifecycle parity tests pass.
+Issue #147 migrated active consumers and retired Terraform MCP after native lifecycle parity passed. The prior
+characterization, replacement owners, archive hashes, and rollback procedure are recorded in
+[TERRAFORM-MCP-CHARACTERIZATION.md](TERRAFORM-MCP-CHARACTERIZATION.md). Active reintroduction is blocked by
+`validate:terraform-mcp-retirement` and MCP config mutation tests.

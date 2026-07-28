@@ -314,7 +314,7 @@
         },
         "lookup_source": {
           "type": "string",
-          "enum": ["mcr", "terraform-registry", "mcp-bicep", "mcp-terraform", "cache"],
+          "enum": ["mcr", "terraform-registry", "mcp-bicep", "cache"],
           "description": "Where latest_seen came from. 'cache' means the resolver used the checked-in cache file because the live registry was unreachable."
         },
         "lookup_timestamp": {

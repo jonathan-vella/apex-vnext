@@ -20,7 +20,6 @@ with AI agents.
 | Node.js                   | LTS     | Validation scripts, npm tooling   |
 | GitHub CLI                | latest  | Repository operations             |
 | Terraform                 | latest  | Signed HashiCorp APT repository    |
-| Go                        | 1.26    | Build Terraform MCP Server binary  |
 | Deno                      | latest  | Draw.io MCP server runtime        |
 | Azure Developer CLI (azd) | latest  | Standardized Azure deployments    |
 
@@ -36,7 +35,6 @@ with AI agents.
 | 6    | Python packages                | `uv pip install` — diagrams, matplotlib, pillow, checkov, ruff, pytest       |
 | 7    | PowerShell Az modules          | `Install-Module` — Accounts, Resources, Storage, Network, KeyVault, Websites |
 | 8    | Azure Pricing MCP Server       | Clean `.venv` rebuild + `pip install -e .[admin,dev]` (always, per policy)   |
-| 9    | Terraform MCP Server           | `git clone` + `go build` to `/go/bin/`                                       |
 | 9.4  | TFLint v0.63.1                | GitHub release with SHA-256 verification                                     |
 | 9.5  | Terraform CLI hardening        | Ensures `TF_PLUGIN_CACHE_DIR` exists; `terraform version` smoke test         |
 | 10   | Python dependency verification | Validates imports against `requirements.txt`                                 |
@@ -56,7 +54,6 @@ graphviz, dos2unix, bats, uv
 | Azure Pricing MCP | stdio             | Real-time SKU pricing for cost estimates         |
 | GitHub MCP        | http              | Copilot-provided GitHub context                  |
 | Draw.io MCP       | stdio (Deno)      | Architecture diagram generation with Azure icons |
-| Terraform MCP     | stdio (Go)        | Public Registry provider, module, and policy lookup |
 | Azure MCP Server  | VS Code extension | RBAC-aware Azure context for agents              |
 
 ### VS Code Extensions
@@ -222,7 +219,6 @@ Runs on every container start. Lightweight updates only:
 
 | Tool                 | Method                                                                   |
 | -------------------- | ------------------------------------------------------------------------ |
-| terraform-mcp-server | Clone + build (if missing)                                               |
 | Azure Pricing MCP    | `pip install -e .` in its venv                                           |
 | npm local deps       | Root and site `npm install`                                              |
 | Python packages      | `uv pip install --upgrade` (checkov, ruff, diagrams, matplotlib, pillow) |

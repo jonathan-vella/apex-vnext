@@ -112,10 +112,10 @@ terraform test -no-cleanup                  # Debug: keep resources
 7. **Negative testing**: Use `expect_failures` for validation rule coverage
 8. **Sequential only when needed**: Only chain run blocks via `run.<name>` when required
 
-## Terraform MCP Integration
+## Provider Schema Validation
 
-Use `mcp_terraform_search_providers` to validate that resource types used in
-test assertions exist in the target provider version.
+Run `terraform providers schema -json` against the initialized test root to confirm resource and data-source schemas.
+Use the exact installed provider version's official Registry documentation as the authority for provider behavior.
 
 ---
 

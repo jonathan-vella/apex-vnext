@@ -19,14 +19,16 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Retired Terraform MCP after migrating active consumers to bounded Registry/native/documentation owners; removed its
+  discovery, setup, Go feature, and health checks; archived provenance-bound evidence; and added negative regression gates.
 - Added bounded native Terraform provider schema inspection and version-pinned official documentation routing with exact
   shell-free commands, deterministic statuses, execution limits, and no initialization or lifecycle authority.
 - Added a bounded, fixed-origin Terraform Registry client with deterministic fixtures, pagination/cache/transport limits,
   explicit missing/unavailable results, and no Terraform lifecycle or arbitrary-URL surface.
-- Characterized the installed Terraform MCP registry-only tools, active consumers, schema hashes, provenance gap,
-  lifecycle denials, and deterministic replacement owners without removing the dependency.
+- Characterized the former Terraform MCP registry-only tools, consumers, schema hashes, provenance gap, lifecycle
+  denials, and deterministic replacement owners before retirement.
 - Removed Astro MCP from active workspace discovery and added mutation coverage that rejects its legacy key and endpoint
-  without changing GitHub, Azure Pricing, Terraform, or Draw.io MCP behavior.
+  without changing GitHub, Azure Pricing, or Draw.io MCP behavior.
 - Captured the version-bound 12-cell VS Code and Copilot CLI context baseline with unique exact-byte sources, complete
   required counter coverage, and explicit report-only dispositions for unavailable cache counters.
 - Added a version-bound, machine-readable two-client context matrix and deterministic coverage reporting across

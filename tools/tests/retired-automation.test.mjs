@@ -6,6 +6,7 @@ import test from "node:test";
 const archivePath = ".archive/retired-automation/sync-workflows.mjs";
 const provenancePath = ".archive/retired-automation/README.md";
 const expectedHash = "e1111eb1f9a60e4273c1302a9af8666a555f7b5c6f079451ecaa37f50ec4cffa";
+const terraformArchivePath = ".archive/retired-automation/terraform-mcp";
 
 test("workflow synchronization remains provenance-only retired automation", () => {
   const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts ?? {};
@@ -30,4 +31,19 @@ test("workflow synchronization remains provenance-only retired automation", () =
     return content.includes("sync:workflows") || content.includes("tools/scripts/sync-workflows.mjs");
   });
   assert.deepEqual(activeReferences, [], `active retirement references: ${activeReferences.join(", ")}`);
+});
+
+test("Terraform MCP characterization remains provenance-only retired automation", () => {
+  const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts ?? {};
+  assert.equal(scripts["validate:terraform-mcp-characterization"], undefined);
+  assert.equal(scripts["test:terraform-mcp-characterization"], undefined);
+  assert.equal(existsSync("tools/scripts/validate-terraform-mcp-characterization.mjs"), false);
+  assert.equal(existsSync("tools/registry/terraform-mcp-characterization.json"), false);
+  assert.equal(existsSync(`${terraformArchivePath}/README.md`), true);
+
+  const provenance = readFileSync(`${terraformArchivePath}/README.md`, "utf8");
+  assert.match(provenance, /69bac4e1d6e463a72d4a16111d1163ec30589094/u);
+  assert.match(provenance, /7b3dee20b2713430c7302f5cdfc7b4a19e5a73e4/u);
+  assert.match(provenance, /## Replacement Owners/u);
+  assert.match(provenance, /## Rollback/u);
 });

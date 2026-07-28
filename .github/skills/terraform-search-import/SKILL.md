@@ -65,16 +65,14 @@ Terraform-resource ↔ `az` CLI mapping table for the 8 most common services liv
 After importing raw `azurerm_*` resources, refactor to AVM modules using `moved {}` blocks.
 See `terraform-patterns` skill `references/refactor-module.md` for guidance.
 
-## Integration with Terraform MCP
+## Provider And Module Validation
 
-Use Terraform MCP tools during import workflows:
-
-| Tool                                      | Purpose                                      |
-| ----------------------------------------- | -------------------------------------------- |
-| `mcp_terraform_search_providers`          | Validate resource type support in provider   |
-| `mcp_terraform_get_provider_details`      | Get resource schemas and import ID format    |
-| `mcp_terraform_search_modules`            | Find AVM modules for post-import refactoring |
-| `mcp_terraform_get_latest_module_version` | Get latest AVM module version                |
+- Run `terraform providers schema -json` against the initialized root to confirm installed resource and list-resource
+   schemas.
+- Read import syntax and provider behavior from the exact installed provider version's official Registry documentation.
+- Resolve public AVM module search, details, and versions through `TerraformRegistryClient` in `@apex/capabilities`.
+- Validate the exact post-import AVM pins with
+   `npm run validate:avm-versions:freeze -- agent-output/{project}/04-iac-contract.json`.
 
 ---
 

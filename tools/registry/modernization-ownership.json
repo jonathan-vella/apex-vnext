@@ -173,10 +173,9 @@
         "customizations/.vscode/mcp.json",
         "config/capability-packs.v1.json",
         "tools/scripts/validate-mcp-config.mjs",
-        "tools/registry/terraform-mcp-characterization.json",
-        "tools/registry/terraform-mcp-tools-list.fixture.json",
-        "tools/registry/schemas/terraform-mcp-characterization.schema.json",
-        "tools/scripts/validate-terraform-mcp-characterization.mjs",
+        ".archive/retired-automation/terraform-mcp/README.md",
+        "tools/scripts/validate-terraform-mcp-retirement.mjs",
+        "tools/tests/validate-terraform-mcp-retirement.test.mjs",
         "packages/capabilities/src/terraform-registry-client.ts",
         "packages/capabilities/src/test/terraform-registry-client.test.ts",
         "packages/capabilities/src/test/fixtures/terraform-registry.ts",
@@ -188,13 +187,13 @@
       "proofCommands": [
         "npm run lint:mcp-config",
         "npm run test:mcp-config",
-        "npm run validate:terraform-mcp-characterization",
-        "npm run test:terraform-mcp-characterization",
+        "npm run validate:terraform-mcp-retirement",
+        "npm run test:terraform-mcp-retirement",
         "npm run validate:vnext"
       ],
       "removalGate": "Each retired server has a passing replacement gate, zero active discovery or package references, and an explicit negative assertion.",
       "rationale": "MCP ownership is currently distributed across client config, packs, setup, tests, and documentation.",
-      "followUp": "Issues #140 and #145 implement bounded Registry and native provider-introspection owners after issue #138 characterization. Active consumer migration and Terraform MCP removal remain separate gates; Azure Pricing and Draw.io retain independent gates.",
+      "followUp": "Issues #140, #145, and #147 complete Terraform replacement, consumer migration, and retirement. Azure Pricing and Draw.io retain independent gates.",
       "decisionRef": "OWN-012"
     },
     {

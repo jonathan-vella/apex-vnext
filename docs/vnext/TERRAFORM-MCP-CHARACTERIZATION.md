@@ -1,8 +1,9 @@
-# Terraform MCP Registry-Only Characterization
+# Retired Terraform MCP Characterization
 
-This record characterizes the Terraform MCP dependency before replacement work. It does not authorize removal or change
-Terraform lifecycle authority. The machine-readable source is
-[`terraform-mcp-characterization.json`](../../tools/registry/terraform-mcp-characterization.json).
+This historical record characterizes the Terraform MCP dependency retired by issue #147 after bounded replacements and
+consumer migration passed. The original machine-readable evidence, schema, fixture, validator, tests, hashes, and
+rollback procedure are preserved under
+[`terraform-mcp/`](../../.archive/retired-automation/terraform-mcp/README.md).
 
 ## Observed Runtime
 
@@ -22,24 +23,16 @@ lookup. It contains no state, plan, import, apply, destroy, or workspace mutatio
 The tracked `terraform-mcp-tools-list.fixture.json` preserves every observed input schema, including optional properties,
 types, descriptions, enum values, defaults, and bounds. Summary hashes are derived from that fixture during validation.
 
-## Active Consumers
+## Migrated Consumers
 
-| Consumer                                 | Role                       | Current dependency                          |
-| ---------------------------------------- | -------------------------- | ------------------------------------------- |
-| `.vscode/mcp.json`                       | Active workspace discovery | Launches the registry-only stdio server     |
-| `.devcontainer/post-create.sh`           | Installer                  | Shallow clone and local Go build            |
-| `.devcontainer/post-start.sh`            | Fallback installer         | Rebuilds when the binary is absent          |
-| `.devcontainer/README.md`                | Setup documentation        | Describes Go and Terraform MCP installation |
-| `tools/scripts/validate-devcontainer.sh` | Compatibility check        | Requires a runnable version command         |
-| `terraform-search-import` skill          | Import guidance            | Provider details and module discovery       |
-| `terraform-test` skill                   | Test guidance              | Provider resource-type lookup               |
-| Shared codegen workflow                  | Preflight guidance         | Module search, details, and latest version  |
-| AVM module guidance                      | Version discovery          | Prefers Terraform MCP as one lookup path    |
-| Terraform IaC instruction                | Version discovery          | Uses latest-module-version MCP lookup       |
-| Terraform conventions                    | Version discovery          | Names the latest-module-version MCP tool    |
-| Terraform patterns examples              | Version discovery          | Offers MCP or Registry lookup               |
-| Shared contract/handoff guidance         | Schema cross-check         | Uses module details during handoff checks   |
-| MCP config regression                    | Preservation test          | Retains Terraform while retiring servers    |
+| Consumer group                                | Retirement disposition                                                         |
+| --------------------------------------------- | ------------------------------------------------------------------------------ |
+| Workspace discovery                           | Server removed; config validation rejects renamed or disguised reintroduction. |
+| Devcontainer setup and health checks          | Clone, build, fallback install, and version checks removed.                    |
+| Devcontainer Go feature                       | Removed after the active-consumer audit found no independent toolchain owner.  |
+| Import and test skills                        | Native installed-provider schemas and exact-version official documentation.    |
+| Codegen, AVM, Terraform, and handoff guidance | Exact contract pins, bounded Registry ownership, and freeze validation.        |
+| MCP config regression                         | Converted from preservation to negative retirement assertions.                 |
 
 The provider configuration example in `docs/guides/operations.md` is not an MCP consumer. It configures APEX's native
 Terraform preview/apply provider and remains outside this retirement.
@@ -52,34 +45,32 @@ Terraform preview/apply provider and remains outside this retirement.
   provider set.
 - Import syntax and resource guidance: official provider documentation, linked from the import workflow.
 
-Issue #140 implements the bounded public Registry client in `@apex/capabilities`. It supports module search, module
+Issue #140 implemented the bounded public Registry client in `@apex/capabilities`. It supports module search, module
 details and stable versions, and provider stable versions with deterministic fixtures, bounded transport/cache behavior,
-and explicit unavailable results. Active MCP consumers remain unchanged until native schema and documentation owners are
-migrated and tested.
+and explicit unavailable results.
 
-Issue #145 adds the bounded native provider-introspection owner in `@apex/capabilities`. It uses exact native schema and
+Issue #145 added the bounded native provider-introspection owner in `@apex/capabilities`. It uses exact native schema and
 version commands against an already initialized root, validates compatible output, preserves schema metadata, and routes
-explicit resource/import slugs to version-pinned official provider documentation. Active consumers, MCP setup, and Go
-remain unchanged until the following migration and retirement slice.
+explicit resource/import slugs to version-pinned official provider documentation. Issue #147 migrated active consumers,
+removed discovery and setup, archived the characterization evidence, and installed negative retirement gates.
 
 Native Terraform CLI and APEX Gate 4 remain the only lifecycle authorities. MCP output cannot initialize, inspect or
 mutate state, create or substitute a saved plan, import resources, apply, destroy, or select workspaces.
 
-## Removal Gate
+## Retirement Gate
 
-Do not remove Terraform MCP, its setup, or Go until all declared consumers use passing replacements. The replacement
-slice must preserve deterministic unavailable behavior, migrate active guidance, remove setup/config/version checks,
-and prove that state, saved-plan, Gate 4, apply, and destroy behavior is unchanged.
+`validate:terraform-mcp-retirement` rejects active executable, source, tool, and Go-feature markers while verifying every
+archived evidence hash and required provenance field. MCP config mutation tests independently reject renamed servers,
+legacy paths, upstream source markers, and registry-toolset signatures.
 
 ## Validation
 
 Run:
 
 ```bash
-npm run validate:terraform-mcp-characterization
-npm run test:terraform-mcp-characterization
+npm run validate:terraform-mcp-retirement
+npm run test:terraform-mcp-retirement
 ```
 
-The validator checks observed binary provenance constants, the full-schema fixture and all derived hashes, exact
-registry-only tool summaries, current workspace configuration digest, the complete consumer inventory and markers, and
-lifecycle denials without requiring the binary in CI.
+The active retirement validator checks archived provenance and forbidden active markers. Native Terraform lifecycle and
+Gate 4 tests remain the authority for state, saved-plan, apply, destroy, and workspace behavior.

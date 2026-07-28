@@ -51,17 +51,13 @@ CAF abbreviations (see `AGENTS.md` for the full table).
 ## AVM Modules
 
 Use `Azure/avm-res-{service}-{resource}/azurerm` for all resources.
-Raw `azurerm_*` only with approval. Lookup: `mcp_terraform_get_latest_module_version`.
+Raw `azurerm_*` only with approval. Resolve the exact stable version through `TerraformRegistryClient` in
+`@apex/capabilities` and enforce the contract pin with `validate:avm-versions:freeze`.
 
 **Pin AVM-TF modules to exact semver** (`version = "X.Y.Z"`), resolved at
 plan time. Range constraints (`~> X.Y`, `>= X.Y.Z`) are NOT allowed in
 APEX-generated `04-iac-contract.json` and are flagged by
-`npm run validate:avm-versions`. CLI lookup:
-
-```bash
-curl -sf https://registry.terraform.io/v1/modules/Azure/avm-res-{path}/azurerm/versions \
-  | jq -r '.modules[0].versions[0].version'
-```
+`npm run validate:avm-versions`.
 
 Stale pins require a `pin_policy.mode = "exception"` block in
 `04-iac-contract.json` (rationale + evidence + future `review_after`).

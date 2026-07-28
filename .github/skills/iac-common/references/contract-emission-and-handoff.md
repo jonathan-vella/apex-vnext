@@ -35,9 +35,9 @@ npm run validate:policy-property-map -- agent-output/{project}/04-policy-propert
 Any non-zero exit ⇒ STOP. Run `validate:environment-manifest` too if
 the workload uses identity / app regs / alerts / budgets.
 
-Cross-check module source + version pins in `modules.<tool>[]` against
-the resolved AVM schema (`bicep-resolve-avm-module` or
-`terraform/get_module_details`); pin mismatches block Phase 2.
+Cross-check module source + version pins in `modules.<tool>[]` against the resolved AVM schema. For Terraform, run
+`validate:avm-versions:freeze` for the exact source/version and use native installed-provider introspection plus
+exact-version official documentation for provider arguments. Pin mismatches block Phase 2.
 
 ## Phase 4.6 — Validate Gate (MANDATORY)
 
