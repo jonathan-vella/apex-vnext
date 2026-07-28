@@ -1,7 +1,7 @@
 ## APEX Workspace
 
-Use the visible `APEX` agent to start, orient, or resume a project. It routes work by direct handoff to Requirements,
-Architect, Planner, or Operator.
+Use the visible `APEX` agent to start, orient, or resume a project. It routes work through the active client projection
+to Requirements, Architect, Planner, or Operator.
 
 The APEX kernel is authoritative for project state, the next task, bounded context, validation, gates, approvals, and
 external operations. Fetch current state through `apex/*` MCP tools. Do not infer workflow progress from chat history or

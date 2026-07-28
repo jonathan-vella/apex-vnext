@@ -15,7 +15,7 @@ Use this skill only for an active requirements task.
 ## Workflow
 
 1. Use the task envelope's required fields and existing values as the question plan.
-2. Ask independent questions in small batches through `vscode/askQuestions`.
+2. Ask independent questions in small batches through the active client projection's question mechanism.
 3. Record each field as supplied, unknown, or explicitly deferred with its owner.
 4. Check workload scope, environment, target scope, NFRs, compliance, budget, recovery, operations, and IaC preference
    only when those fields are required by the envelope.

@@ -94,8 +94,8 @@ Adopt a policy-controlled observe-and-propose subsystem with these properties:
 
 <div align="center">
 
-| ⬅️ [Previous ADR](03-des-adr-0003-use-bounded-entra-only-handoff-session.md) | 🏠 [Project Index](README.md) | Next ADR ➡️ |
+| ⬅️ [Previous ADR](03-des-adr-0003-use-bounded-entra-only-handoff-session.md) | 🏠 [Project Index](README.md) | ➡️ [Next ADR](03-des-adr-0005-use-selected-client-agent-projections.md) |
 | --- | --- | --- |
-| [ADR-0003](03-des-adr-0003-use-bounded-entra-only-handoff-session.md) | [README](README.md) | None |
+| [ADR-0003](03-des-adr-0003-use-bounded-entra-only-handoff-session.md) | [README](README.md) | [ADR-0005](03-des-adr-0005-use-selected-client-agent-projections.md) |
 
 </div>

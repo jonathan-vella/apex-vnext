@@ -47,6 +47,10 @@ Issue #150 implements the shared kernel boundary for `CLIENT-003`. Input request
 journal-head-bound, writer-epoch-bound, replay-safe, and recorded through `apex/recordInput`. VS Code and Copilot CLI UI
 mapping remains a separate client-projection slice; neither client may infer answers from conversation history.
 
+Issue #152 implements deterministic client-valid agent generation and selected-client transactional materialization.
+ADR-0005 records why installing both projections or one polyglot definition would weaken client validity or authority.
+Live `CLIENT-002`, `CLIENT-003`, `CLIENT-005`, `CLIENT-009`, and `CLIENT-010` evidence remains required.
+
 ## Scenario Matrix
 
 | ID           | Required outcome                                                                                           | VS Code mechanism                                                  | Copilot CLI mechanism                                                                                         |

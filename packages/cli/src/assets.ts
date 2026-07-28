@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 export interface BundledAssetMapping {
   id: string;
-  mode: "copy-tree" | "copy-entries" | "compose-json";
+  mode: "copy-tree" | "copy-entries" | "compose-json" | "render-client-projections";
   sourceRoot?: string;
   generatedRoot?: string;
   generatedPath?: string;
@@ -17,6 +17,12 @@ export interface BundledAssetSource {
   path?: string;
   mapping?: string;
   composition?: string;
+  roleId?: string;
+  sourcePath?: string;
+  sourceHash?: string;
+  clientId?: string;
+  target?: string;
+  adapterVersion?: string;
 }
 
 export interface BundledAssetFile {
@@ -53,6 +59,7 @@ export interface BundledAssetManifest {
 export interface BundledAssets {
   root: string;
   customizations: string;
+  clientProjections: Readonly<Record<BundledClientProjection["id"], string>>;
   config: string;
   capabilityPacks: string;
   capabilityPackRegistry: string;
@@ -246,7 +253,7 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
   if (mappings.size !== manifest.composition.mappings.length) throw new Error("Duplicate bundled asset mapping ID");
   const generatedDestinations: string[] = [];
   for (const mapping of mappings.values()) {
-    if (!(["copy-tree", "copy-entries", "compose-json"] as const).includes(mapping.mode)) {
+    if (!(["copy-tree", "copy-entries", "compose-json", "render-client-projections"] as const).includes(mapping.mode)) {
       throw new Error(`Invalid bundled asset mapping: ${mapping.id}`);
     }
     if (mapping.mode === "compose-json") {
@@ -297,8 +304,27 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
       }
     } else if (file.source.kind === "generated") {
       const mapping = mappings.get(file.source.composition ?? "");
-      if (mapping?.mode !== "compose-json" || mapping.generatedPath !== file.path) {
+      if (
+        mapping === undefined ||
+        (mapping.mode === "compose-json"
+          ? mapping.generatedPath !== file.path
+          : mapping.mode !== "render-client-projections" || !file.path.startsWith(`${mapping.generatedRoot}/`))
+      ) {
         throw new Error(`Invalid bundled asset source: ${file.path}`);
+      }
+      if (mapping.mode === "render-client-projections") {
+        const expectedPrefix = `${mapping.generatedRoot}/${file.source.clientId}/`;
+        if (
+          !["github-copilot-cli", "github-copilot-vscode"].includes(file.source.clientId ?? "") ||
+          file.source.adapterVersion !== "1.0.0" ||
+          !safeRelativePath(file.source.target ?? "") ||
+          !file.path.startsWith(expectedPrefix) ||
+          file.path !== `${expectedPrefix}${file.source.target}` ||
+          !safeRelativePath(file.source.sourcePath ?? "") ||
+          !SHA256.test(file.source.sourceHash ?? "")
+        ) {
+          throw new Error(`Invalid generated client projection provenance: ${file.path}`);
+        }
       }
     } else throw new Error(`Invalid bundled asset source: ${file.path}`);
   }
@@ -339,23 +365,52 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
   ) as Record<string, unknown>;
   verifyBundleDeclarations(manifest, customizationManifest, runtimeBundle);
   const sharedFiles = customizationManifest.sharedFiles as string[];
-  const declarations = customizationManifest.clientProjections as Array<{ id: string; files: string[] }>;
+  const roles = customizationManifest.roles as Array<{ id: string; source: string; agent: string }>;
+  const declarations = customizationManifest.clientProjections as Array<{
+    id: string;
+    generatedRoot: string;
+    files: string[];
+  }>;
   if (
     !Array.isArray(sharedFiles) ||
     sharedFiles.length !== new Set(sharedFiles).size ||
     !Array.isArray(declarations) ||
+    !Array.isArray(roles) ||
     declarations.length !== manifest.projections.length ||
     declarations.length !== new Set(declarations.map(({ id }) => id)).size
   ) {
     throw new Error("Client projection declarations are missing");
+  }
+  const sourceMetadata = new Map(manifest.files.map((file) => [file.path, file]));
+  for (const file of manifest.files.filter(
+    ({ source }) => source.kind === "generated" && source.composition === "client-projections",
+  )) {
+    const role = file.source.roleId === undefined ? undefined : roles.find(({ id }) => id === file.source.roleId);
+    const canonical = sourceMetadata.get(`customizations/${file.source.sourcePath}`);
+    if (
+      (file.source.roleId !== undefined && (role === undefined || role.source !== file.source.sourcePath)) ||
+      canonical?.source.kind !== "repository-file" ||
+      canonical.sha256 !== file.source.sourceHash
+    ) {
+      throw new Error(`Generated client projection source binding mismatch: ${file.path}`);
+    }
   }
   for (const declaration of declarations) {
     const projection = manifest.projections.find(({ id }) => id === declaration.id);
     if (!Array.isArray(declaration.files) || declaration.files.length !== new Set(declaration.files).size) {
       throw new Error(`Bundled client projection disagrees with its declaration: ${declaration.id}`);
     }
-    const expected = [...sharedFiles, ...declaration.files].map((path) => `customizations/${path}`).sort();
-    if (projection === undefined || JSON.stringify(projection.files) !== JSON.stringify(expected)) {
+    const expectedTargets = [
+      ...sharedFiles,
+      ...declaration.files,
+      ...(customizationManifest.roles as Array<{ source: string }>).map(({ source }) => source),
+    ];
+    const expected = expectedTargets.map((path) => `${declaration.generatedRoot}/${path}`).sort();
+    if (
+      !safeRelativePath(declaration.generatedRoot) ||
+      projection === undefined ||
+      JSON.stringify(projection.files) !== JSON.stringify(expected)
+    ) {
       throw new Error(`Bundled client projection disagrees with its declaration: ${declaration.id}`);
     }
   }
@@ -371,6 +426,10 @@ export async function resolveBundledAssets(): Promise<BundledAssets> {
   return {
     root: dirname(join(root, "manifest.json")),
     customizations: join(root, "customizations"),
+    clientProjections: {
+      "github-copilot-cli": join(root, "client-projections", "github-copilot-cli"),
+      "github-copilot-vscode": join(root, "client-projections", "github-copilot-vscode"),
+    },
     config: join(root, "config"),
     capabilityPacks: join(root, "capability-packs"),
     capabilityPackRegistry: join(root, "capability-packs", "registry.v1.json"),

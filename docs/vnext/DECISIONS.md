@@ -208,9 +208,8 @@ when a decision has lasting architectural consequences that need alternatives an
   `vscode/askQuestions`; Copilot CLI may use custom-agent delegation and `ask_user`. Both must record typed answers through
   APEX and pass client-specific discovery, MCP, resume, hidden-worker, model, and cross-device qualification. ARM MCP
   support in cloud coding-agent sessions is not a requirement and needs no fallback.
-- **ADR:** Required before implementation if one canonical agent definition cannot generate both client projections
-  without weakening tool or invocation boundaries.
-- **Issue/PR:** Pending work-item creation.
+- **ADR:** [ADR-0005](../../agent-output/vnext-qualification/03-des-adr-0005-use-selected-client-agent-projections.md).
+- **Issue/PR:** Destination issue `#152`.
 
 ## DECISION-013: Re-Baseline The 0.10.0 Release Candidate
 

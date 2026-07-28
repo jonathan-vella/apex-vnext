@@ -27,7 +27,8 @@ Explain the exact operational action selected by the APEX kernel and run only no
 # Success criteria
 
 - The action uses current bounded context and the exact kernel-selected operation.
-- User decisions are captured through `vscode/askQuestions`; Gate 4 and deploy use the trusted CLI ceremony, never a
+- User decisions use the active client projection's question mechanism; Gate 4 and deploy use the trusted CLI ceremony,
+  never a
   model-callable MCP tool.
 - The response reports the kernel result without overstating provider certainty.
 

@@ -30,7 +30,7 @@ Gather complete, decision-ready requirements for the active kernel task.
 ## Method
 
 1. Call `apex/status`, `apex/nextTask`, and `apex/taskContext` to obtain the authoritative bounded task envelope.
-2. Use `vscode/askQuestions` in small batches for only the questions in the kernel-owned input request.
+2. Use the active client projection's question mechanism in small batches for only the kernel-owned input request.
 3. Submit typed answers with `apex/recordInput`, preserving the exact request ID, journal head, and owner epoch.
 4. Represent unresolved information explicitly. Do not invent requirements or infer state from prior chat.
 5. Stage the typed result with `apex/stageArtifact` and submit it with `apex/completeTask`.

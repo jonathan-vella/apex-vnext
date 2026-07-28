@@ -36,7 +36,7 @@ assumptions.
 
 1. Call `apex/status`, `apex/nextTask`, and `apex/taskContext`.
 2. Resolve only the architecture choices assigned by the task envelope.
-3. Use `vscode/askQuestions` for user-owned trade-offs and explicit risk decisions.
+3. Use the active client projection's question mechanism for user-owned trade-offs and explicit risk decisions.
 4. Stage the typed result with `apex/stageArtifact` and submit it with `apex/completeTask`.
 5. Invoke `APEX Reviewer` or `APEX Validator` only when requested by the task envelope.
 

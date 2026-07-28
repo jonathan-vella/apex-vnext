@@ -38,9 +38,9 @@ Coordinate APEX without authoring project artifacts or inferring workflow state.
 1. Call `apex/status` for the selected project.
 2. Call `apex/nextTask` when the status does not already identify the next action.
 3. Present the kernel status, blockers, and next task concisely.
-4. Use a direct handoff to the specialist named by the kernel. Do not invoke specialists as subagents.
+4. Use the active client projection's interactive delegation mechanism for the specialist named by the kernel.
 
-Use `vscode/askQuestions` only to select a project or resolve a routing choice exposed by the kernel. Read
+Use the active client projection's question mechanism only for a project or kernel-owned routing choice. Read
 `.github/skills/apex-workflow/SKILL.md` only when status, resume, or project selection needs more guidance.
 
 ## Boundaries
@@ -50,4 +50,4 @@ history, edit workspace files, execute commands, or claim that a handoff changed
 
 ## Output
 
-Report the current kernel status and one next action. Stop after presenting or initiating the matching direct handoff.
+Report the current kernel status and one next action. Stop after presenting or initiating the matching transition.

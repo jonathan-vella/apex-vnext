@@ -5,8 +5,8 @@
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
-- **Active issue:** [#150](https://github.com/jonathan-vella/apex-vnext/issues/150) - kernel-owned typed input recording
-- **Working branch:** `feat/150-kernel-typed-input`
+- **Active issue:** [#152](https://github.com/jonathan-vella/apex-vnext/issues/152) - client-specific agent projections
+- **Working branch:** `feat/152-client-agent-projections`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -50,6 +50,8 @@ PR #146 closes issue #145. Issue #147 migrates the characterized consumers, remo
 archives the original evidence, rejects active reintroduction, and removes Go after its independent-consumer audit.
 PR #148 closes issue #147 and completes Milestone I. Issue #150 adds versioned kernel-owned input requests and typed,
 exact-state answer recording through APEX MCP; client-specific question mechanics and live outcome parity remain pending.
+PR #151 closes issue #150. Issue #152 generates client-valid VS Code and Copilot CLI agents from one semantic role graph
+and installs exactly one selected projection through the shared transactional lifecycle under ADR-0005.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
@@ -85,8 +87,8 @@ or qualified.
 
 ## Immediate Sequence
 
-1. Merge issue #150's kernel-owned typed input request and recording contract.
-2. Generate real client-specific question/delegation projections and normalized outcome evidence.
+1. Merge issue #152's client-specific agent projections and selected-client lifecycle.
+2. Generate normalized client-outcome evidence and run the blocking paired scenarios.
 3. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.
 4. Complete ARM pricing evidence, diagram routing, bounded improvement measurement, bundle generation, and guidance
    consolidation in roadmap order.

@@ -4,12 +4,14 @@ import { constants } from "node:fs";
 import { lstat, mkdir, open, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { dump as dumpYaml, load as loadYaml } from "js-yaml";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(packageRoot, "../..");
 const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
+const CLIENT_ADAPTER_VERSION = "1.0.0";
 
 function bytewise(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -17,6 +19,103 @@ function bytewise(left, right) {
 
 function portablePath(path) {
   return path.split(sep).join("/");
+}
+
+function safeRelativePath(path) {
+  return (
+    typeof path === "string" &&
+    path.length > 0 &&
+    !path.includes("\\") &&
+    !path.includes("\0") &&
+    !path.includes(":") &&
+    !isAbsolute(path) &&
+    path.split("/").every((segment) => segment.length > 0 && segment !== "." && segment !== "..")
+  );
+}
+
+function parseAgentSource(source) {
+  const match = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/u.exec(source.replaceAll("\r\n", "\n"));
+  if (match === null) throw new Error("Agent source must contain YAML frontmatter");
+  const frontmatter = loadYaml(match[1]);
+  if (frontmatter === null || typeof frontmatter !== "object" || Array.isArray(frontmatter)) {
+    throw new Error("Agent frontmatter must be an object");
+  }
+  return { frontmatter, body: match[2].replace(/^\n/u, "") };
+}
+
+function serializeAgent(frontmatter, mechanics, body) {
+  return `---\n${dumpYaml(frontmatter, {
+    noRefs: true,
+    lineWidth: 120,
+    noCompatMode: true,
+    quotingType: '"',
+  })}---\n\n${mechanics}<!-- apex-shared-body -->\n${body}`;
+}
+
+export function renderClientAgentProjection(source, clientId, toolInventory, options = {}) {
+  const { frontmatter, body } = parseAgentSource(source);
+  if (clientId === "github-copilot-vscode") {
+    const mechanics = [
+      Array.isArray(frontmatter.tools) && frontmatter.tools.includes("vscode/askQuestions")
+        ? "Use `vscode/askQuestions` for kernel-owned input requests."
+        : null,
+      Array.isArray(frontmatter.handoffs) && frontmatter.handoffs.length > 0
+        ? "Use the declared direct handoffs for interactive transitions."
+        : null,
+    ].filter(Boolean);
+    return serializeAgent(
+      frontmatter,
+      mechanics.length === 0 ? "" : `## Client Mechanics\n\n${mechanics.join(" ")}\n\n`,
+      body,
+    );
+  }
+  if (clientId !== "github-copilot-cli") throw new Error(`Unsupported client projection: ${clientId}`);
+  const inventory = toolInventory ?? {
+    interactiveTools: { askUser: "ask_user", delegate: "task" },
+    workspaceServer: "apex",
+    operationIds: ["status", "recordInput"],
+  };
+  const model = Array.isArray(frontmatter.model) ? frontmatter.model[0] : frontmatter.model;
+  if (typeof model !== "string" || model.length === 0) throw new Error("CLI agent projection requires one model");
+  const sourceTools = Array.isArray(frontmatter.tools) ? frontmatter.tools : [];
+  const tools = [
+    ...new Set(
+      sourceTools.map((tool) => {
+        if (tool === "vscode/askQuestions") return inventory.interactiveTools.askUser;
+        if (tool === "agent") return inventory.interactiveTools.delegate;
+        if (typeof tool === "string" && tool.startsWith("apex/")) {
+          const operation = tool.slice("apex/".length);
+          if (!inventory.operationIds.includes(operation)) throw new Error(`Unpinned CLI APEX operation: ${operation}`);
+          return `${inventory.workspaceServer}/${operation}`;
+        }
+        return tool;
+      }),
+    ),
+  ];
+  if (options.delegates === true && !tools.includes(inventory.interactiveTools.delegate)) {
+    tools.push(inventory.interactiveTools.delegate);
+  }
+  const cliFrontmatter = {
+    name: frontmatter.name,
+    description: frontmatter.description,
+    model,
+    "user-invocable": frontmatter["user-invocable"] ?? true,
+    "disable-model-invocation": frontmatter["disable-model-invocation"] ?? frontmatter["user-invocable"] === false,
+    tools,
+  };
+  const mechanics = [
+    tools.includes(inventory.interactiveTools.askUser)
+      ? `Use \`${inventory.interactiveTools.askUser}\` for kernel-owned input requests.`
+      : null,
+    tools.includes(inventory.interactiveTools.delegate)
+      ? `Use \`${inventory.interactiveTools.delegate}\` for declared worker delegation.`
+      : null,
+  ].filter(Boolean);
+  return serializeAgent(
+    cliFrontmatter,
+    mechanics.length === 0 ? "" : `## Client Mechanics\n\n${mechanics.join(" ")}\n\n`,
+    body,
+  );
 }
 
 function assertContained(root, path) {
@@ -130,6 +229,7 @@ export function validateBundleDeclarations(customizationManifest, runtimeBundle)
 export function validateClientProjectionDeclarations(customizationManifest) {
   const sharedFiles = customizationManifest.sharedFiles;
   const clientProjections = customizationManifest.clientProjections;
+  const roles = customizationManifest.roles;
   if (
     !Array.isArray(sharedFiles) ||
     sharedFiles.some((path) => typeof path !== "string") ||
@@ -140,15 +240,131 @@ export function validateClientProjectionDeclarations(customizationManifest) {
         projection === null ||
         typeof projection !== "object" ||
         typeof projection.id !== "string" ||
+        !safeRelativePath(projection.generatedRoot) ||
+        !projection.generatedRoot.startsWith(`client-projections/${projection.id}`) ||
         !Array.isArray(projection.files) ||
-        projection.files.some((path) => typeof path !== "string") ||
+        projection.files.some((path) => !safeRelativePath(path)) ||
         projection.files.length !== new Set(projection.files).size,
     ) ||
-    clientProjections.length !== new Set(clientProjections.map(({ id }) => id)).size
+    clientProjections.length !== new Set(clientProjections.map(({ id }) => id)).size ||
+    !Array.isArray(roles) ||
+    roles.some(
+      (role) =>
+        role === null ||
+        typeof role !== "object" ||
+        typeof role.id !== "string" ||
+        !safeRelativePath(role.source) ||
+        typeof role.agent !== "string",
+    ) ||
+    roles.length !== new Set(roles.map(({ id }) => id)).size ||
+    roles.length !== new Set(roles.map(({ source }) => source)).size ||
+    roles.length !== new Set(roles.map(({ agent }) => agent)).size
   ) {
     throw new Error("Client projection declarations are invalid");
   }
-  return { sharedFiles, clientProjections };
+  return { sharedFiles, clientProjections, roles };
+}
+
+function validateCliToolInventory(value) {
+  if (
+    value?.schemaVersion !== "1.0.0" ||
+    value.client !== "github-copilot-cli" ||
+    value.clientVersion !== "1.0.73" ||
+    !/^[a-f0-9]{64}$/u.test(value.clientBinarySha256 ?? "") ||
+    value.workspaceServer !== "apex" ||
+    value.interactiveTools?.askUser !== "ask_user" ||
+    value.interactiveTools?.delegate !== "task" ||
+    value.mcpSelectorFormat !== "{server}/{operation}" ||
+    !Array.isArray(value.operationIds) ||
+    value.operationIds.length !== new Set(value.operationIds).size ||
+    !Array.isArray(value.verifiedSelectors) ||
+    value.verifiedSelectors.length !== value.operationIds.length ||
+    value.operationIds.some((operation) => !value.verifiedSelectors.includes(`apex/${operation}`)) ||
+    !/^[a-f0-9]{64}$/u.test(value.evidence?.probeSha256 ?? "")
+  ) {
+    throw new Error("Copilot CLI agent tool inventory is invalid");
+  }
+  return value;
+}
+
+async function prepareClientProjections(customizationManifest, pinnedCustomizations, inventory) {
+  const { sharedFiles, clientProjections, roles } = validateClientProjectionDeclarations(customizationManifest);
+  const toolInventoryPath = join(repositoryRoot, "tools", "registry", "copilot-cli-agent-tools.json");
+  const toolInventory = validateCliToolInventory(JSON.parse(await readFile(toolInventoryPath, "utf8")));
+  const metadataDestination = join(assetsRoot, "client-projection-metadata", "copilot-cli-agent-tools.json");
+  await mkdir(dirname(metadataDestination), { recursive: true });
+  const metadataBytes = await readFile(toolInventoryPath);
+  await writeFile(metadataDestination, metadataBytes);
+  inventory.push({
+    path: portablePath(relative(assetsRoot, metadataDestination)),
+    source: {
+      kind: "repository-file",
+      path: "tools/registry/copilot-cli-agent-tools.json",
+      mapping: "copilot-cli-tool-inventory",
+    },
+    sha256: createHash("sha256").update(metadataBytes).digest("hex"),
+    bytes: metadataBytes.byteLength,
+  });
+
+  for (const projection of clientProjections) {
+    const generatedRoot = join(assetsRoot, projection.generatedRoot);
+    assertContained(assetsRoot, generatedRoot);
+    const sources = [...sharedFiles, ...projection.files];
+    for (const relativePath of sources) {
+      const bytes = await readSourceFile(
+        pinnedCustomizations.resolvedRoot,
+        join(repositoryRoot, "customizations", relativePath),
+      );
+      const sourceHash = createHash("sha256").update(bytes).digest("hex");
+      const destination = join(generatedRoot, relativePath);
+      assertContained(generatedRoot, destination);
+      await mkdir(dirname(destination), { recursive: true });
+      await writeFile(destination, bytes);
+      inventory.push({
+        path: portablePath(relative(assetsRoot, destination)),
+        source: {
+          kind: "generated",
+          composition: "client-projections",
+          clientId: projection.id,
+          target: relativePath,
+          adapterVersion: CLIENT_ADAPTER_VERSION,
+          sourcePath: relativePath,
+          sourceHash,
+        },
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+        bytes: bytes.byteLength,
+      });
+    }
+    for (const role of roles) {
+      const sourcePath = join(repositoryRoot, "customizations", role.source);
+      const source = (await readSourceFile(pinnedCustomizations.resolvedRoot, sourcePath)).toString("utf8");
+      const sourceHash = createHash("sha256").update(source).digest("hex");
+      const delegates = customizationManifest.invocationEdges.some(({ from }) => from === role.agent);
+      const rendered = Buffer.from(
+        renderClientAgentProjection(source, projection.id, toolInventory, { delegates }),
+        "utf8",
+      );
+      const destination = join(generatedRoot, role.source);
+      assertContained(generatedRoot, destination);
+      await mkdir(dirname(destination), { recursive: true });
+      await writeFile(destination, rendered);
+      inventory.push({
+        path: portablePath(relative(assetsRoot, destination)),
+        source: {
+          kind: "generated",
+          composition: "client-projections",
+          roleId: role.id,
+          sourcePath: role.source,
+          sourceHash,
+          clientId: projection.id,
+          target: role.source,
+          adapterVersion: CLIENT_ADAPTER_VERSION,
+        },
+        sha256: createHash("sha256").update(rendered).digest("hex"),
+        bytes: rendered.byteLength,
+      });
+    }
+  }
 }
 
 async function walkFiles(root, directory = root, expectedIdentity) {
@@ -369,6 +585,7 @@ async function prepareAssets() {
   );
   const runtimeBundle = JSON.parse(await readFile(join(repositoryRoot, "config", "runtime-bundle.v1.json"), "utf8"));
   const bundleDeclaration = validateBundleDeclarations(customizationManifest, runtimeBundle);
+  validateClientProjectionDeclarations(customizationManifest);
   const sourceRoots = [
     { name: "customizations", root: join(repositoryRoot, "customizations") },
     { name: "config", root: join(repositoryRoot, "config") },
@@ -409,6 +626,11 @@ async function prepareAssets() {
     }
   }
 
+  await prepareClientProjections(
+    customizationManifest,
+    sources.find(({ name }) => name === "customizations").pinnedRoot,
+    inventory,
+  );
   await prepareCapabilityPacks(inventory);
 
   const sourcesMetadata = {
@@ -427,6 +649,18 @@ async function prepareAssets() {
         generatedRoot: bundleDeclaration.generatedRoot,
       },
       { id: "config", mode: "copy-tree", sourceRoot: "config", generatedRoot: "config" },
+      {
+        id: "copilot-cli-tool-inventory",
+        mode: "copy-entries",
+        sourceRoot: "tools/registry",
+        generatedRoot: "client-projection-metadata",
+      },
+      {
+        id: "client-projections",
+        mode: "render-client-projections",
+        sourceRoot: "customizations",
+        generatedRoot: "client-projections",
+      },
       {
         id: "azure-pricing",
         mode: "copy-entries",
@@ -451,12 +685,13 @@ async function prepareAssets() {
   const files = inventory.sort((left, right) => bytewise(left.path, right.path));
   const paths = new Set(files.map(({ path }) => path));
   if (paths.size !== files.length) throw new Error("Bundled asset generator produced duplicate destination paths");
-  const { sharedFiles, clientProjections } = validateClientProjectionDeclarations(customizationManifest);
+  const { clientProjections } = validateClientProjectionDeclarations(customizationManifest);
   const fileMetadata = new Map(files.map((file) => [file.path, file]));
   const projections = clientProjections
     .map((projection) => {
-      const projectionFiles = [...sharedFiles, ...(projection.files ?? [])]
-        .map((path) => `customizations/${path}`)
+      const projectionFiles = files
+        .map(({ path }) => path)
+        .filter((path) => path.startsWith(`${projection.generatedRoot}/`))
         .sort(bytewise);
       const digestInput = projectionFiles.map((path) => {
         const file = fileMetadata.get(path);
