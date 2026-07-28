@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Constrained Azure Pricing MCP to the supported Python MCP SDK v1 API family after the v2 stable release,
+  preserving fresh-install CI compatibility and adding a dependency-contract regression.
 - Added versioned, content-free normalized Copilot client outcomes, scenario-specific comparison and qualification
   contracts, strict bounded collection, proof-complete evidence closure verification, and fail-closed live release
   binding. Deterministic fixture parity never grants release authority; paired exact-candidate execution remains open.
