@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -31,6 +31,7 @@ import {
 } from "../scripts/compare-client-outcomes.mjs";
 import { parseStrictJson } from "../scripts/_lib/strict-json.mjs";
 import { validateClientRuntimeEvidence, validateEvidencePayloads } from "../scripts/live-qualification.mjs";
+import { resolveInputPath } from "../scripts/qualify-client-outcomes.mjs";
 
 const hash = (character) => character.repeat(64);
 
@@ -653,6 +654,26 @@ test("strict JSON accepts only JSON whitespace and rejects dangerous keys and to
   }
   assert.throws(() => parseStrictJson('{"value":NaN}'), /INVALID_JSON_VALUE/);
   assert.throws(() => parseStrictJson('{"value":1,"value":2}'), /DUPLICATE_JSON_KEY/);
+});
+
+test("qualification manifest inputs cannot escape their directory", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "apex-qualification-path-"));
+  const manifestPath = path.join(directory, "manifest.json");
+  const inputPath = path.join(directory, "outcome.json");
+  const outsidePath = path.join(path.dirname(directory), `${path.basename(directory)}-outside.json`);
+  try {
+    writeFileSync(manifestPath, "{}", "utf8");
+    writeFileSync(inputPath, "{}", "utf8");
+    writeFileSync(outsidePath, "{}", "utf8");
+    symlinkSync(outsidePath, path.join(directory, "outside-link.json"));
+    assert.equal(resolveInputPath(manifestPath, "outcome.json"), inputPath);
+    assert.throws(() => resolveInputPath(manifestPath, outsidePath), /MANIFEST_PATH_INVALID/);
+    assert.throws(() => resolveInputPath(manifestPath, `../${path.basename(outsidePath)}`), /MANIFEST_PATH_INVALID/);
+    assert.throws(() => resolveInputPath(manifestPath, "outside-link.json"), /MANIFEST_PATH_INVALID/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+    rmSync(outsidePath, { force: true });
+  }
 });
 
 test("CLI rejects duplicate keys and oversized files with sanitized errors and writes 0600 exclusively", () => {

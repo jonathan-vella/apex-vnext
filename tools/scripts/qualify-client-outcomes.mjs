@@ -3,6 +3,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { CLIENT_OUTCOME_SCENARIO_IDS, contractMetadata } from "../../packages/contracts/dist/index.js";
 import { canonicalJson } from "../../packages/kernel/dist/index.js";
 import { qualifyClientOutcomes } from "./compare-client-outcomes.mjs";
@@ -12,11 +13,19 @@ const COMPARISON_SCHEMA_ID = "https://schemas.apexops.dev/client-outcome-compari
 const OUTCOME_SCHEMA_ID = "https://schemas.apexops.dev/client-outcome-v1.json";
 const MANIFEST_MAX_BYTES = 65_536;
 
-function resolveInputPath(manifestPath, value) {
+export function resolveInputPath(manifestPath, value) {
   if (typeof value !== "string" || value.length === 0 || value.length > 4_096 || value.includes("\0")) {
     throw new TypeError("MANIFEST_PATH_INVALID");
   }
-  return path.resolve(path.dirname(manifestPath), value);
+  if (path.isAbsolute(value)) throw new TypeError("MANIFEST_PATH_INVALID");
+  const manifestDirectory = fs.realpathSync(path.dirname(path.resolve(manifestPath)));
+  const inputPath = fs.realpathSync(path.resolve(manifestDirectory, value));
+  const relative = path.relative(manifestDirectory, inputPath);
+  if (relative === "" || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new TypeError("MANIFEST_PATH_INVALID");
+  }
+  if (!fs.statSync(inputPath).isFile()) throw new TypeError("MANIFEST_PATH_INVALID");
+  return inputPath;
 }
 
 function readTriplets(manifestPath) {
@@ -73,4 +82,4 @@ function main() {
   }
 }
 
-process.exitCode = main();
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) process.exitCode = main();
