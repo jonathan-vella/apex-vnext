@@ -32,8 +32,18 @@ import {
 import { parseStrictJson } from "../scripts/_lib/strict-json.mjs";
 import { validateClientRuntimeEvidence, validateEvidencePayloads } from "../scripts/live-qualification.mjs";
 import { resolveInputPath } from "../scripts/qualify-client-outcomes.mjs";
+import {
+  canonicalContextReceiptDigest,
+  validateClientOutcomeScenarios,
+} from "../scripts/validate-client-outcome-scenarios.mjs";
 
 const hash = (character) => character.repeat(64);
+const canonicalToolchain = parseStrictJson(
+  readFileSync(new URL("../../config/toolchain.v1.json", import.meta.url), "utf8"),
+);
+const contextReceiptBytes = readFileSync(new URL("../registry/client-context-baseline-receipt.json", import.meta.url));
+const contextReceipt = parseStrictJson(contextReceiptBytes.toString("utf8"));
+const contextReceiptHash = createHash("sha256").update(canonicalJson(contextReceipt)).digest("hex");
 
 function merge(base, overrides) {
   if (overrides === null || typeof overrides !== "object" || Array.isArray(overrides)) return overrides;
@@ -191,6 +201,35 @@ test("the corpus defines exact scenario-specific proof and valid equality paths"
   }
 });
 
+test("exact VS Code selection is bound to the complete context receipt", () => {
+  assert.equal(canonicalContextReceiptDigest(contextReceipt), contextReceiptHash);
+  assert.throws(() => canonicalContextReceiptDigest({ value: undefined }), /CONTEXT_RECEIPT_NON_JSON_VALUE/);
+  assert.throws(() => canonicalContextReceiptDigest({ value: Number.NaN }), /CONTEXT_RECEIPT_NON_JSON_VALUE/);
+  assert.deepEqual(
+    validateClientOutcomeScenarios(
+      CLIENT_OUTCOME_SCENARIO_CORPUS,
+      canonicalToolchain,
+      contextReceipt,
+      contextReceiptHash,
+    ),
+    [],
+  );
+  for (const toolchain of [
+    merge(canonicalToolchain, { core: { vscode: { selectedExactVersion: "1.129.0" } } }),
+    merge(canonicalToolchain, { core: { vscode: { selectedExactCopilotChatVersion: "0.57.0" } } }),
+    merge(canonicalToolchain, { core: { vscode: { selectionEvidence: { sha256: hash("f") } } } }),
+  ]) {
+    assert.ok(
+      validateClientOutcomeScenarios(
+        CLIENT_OUTCOME_SCENARIO_CORPUS,
+        toolchain,
+        contextReceipt,
+        contextReceiptHash,
+      ).includes("selected VS Code versions must match the complete bound context receipt"),
+    );
+  }
+});
+
 test("all fixture comparisons pass but no per-scenario comparison qualifies", () => {
   for (const { id } of CLIENT_OUTCOME_SCENARIO_CORPUS.scenarios) {
     const comparison = compareClientOutcomes(...pair(id));
@@ -321,7 +360,7 @@ test("scenario proof requires pass disposition and matching execution state", ()
   );
 });
 
-test("exact fixture versions and toolchain hash are required while live collection is blocked", () => {
+test("exact fixture and selected live versions are required", () => {
   assert.throws(
     () => collectClientOutcome(input("CLIENT-001", "github-copilot-cli", { client: { version: "1.0.72" } })),
     /FIXTURE_CLIENT_VERSION_MISMATCH/,
@@ -330,9 +369,23 @@ test("exact fixture versions and toolchain hash are required while live collecti
     () => collectClientOutcome(input("CLIENT-001", "github-copilot-cli", { candidate: { toolchainHash: hash("f") } })),
     /TOOLCHAIN_HASH_MISMATCH/,
   );
+  assert.equal(
+    collectClientOutcome(input("CLIENT-001", "github-copilot-cli", { evidenceKind: "live" })).evidenceKind,
+    "live",
+  );
+  assert.equal(
+    collectClientOutcome(input("CLIENT-001", "github-copilot-vscode", { evidenceKind: "live" })).evidenceKind,
+    "live",
+  );
   assert.throws(
-    () => collectClientOutcome(input("CLIENT-001", "github-copilot-cli", { evidenceKind: "live" })),
-    /LIVE_TOOLCHAIN_UNAVAILABLE/,
+    () =>
+      collectClientOutcome(
+        input("CLIENT-001", "github-copilot-vscode", {
+          evidenceKind: "live",
+          client: { extensionVersion: "0.57.0" },
+        }),
+      ),
+    /LIVE_CLIENT_VERSION_MISMATCH/,
   );
 });
 
@@ -426,7 +479,7 @@ test("collection and comparison are order-independent and deterministic", () => 
 test("complete verified fixture aggregate proves parity but never release authority", () => {
   const triplets = CLIENT_OUTCOME_SCENARIO_CORPUS.scenarios.map(({ id }) => triplet(id));
   const context = fixtureQualificationContext();
-  assert.throws(() => qualifyClientOutcomes(triplets), /LIVE_TOOLCHAIN_UNAVAILABLE/);
+  assert.throws(() => qualifyClientOutcomes(triplets), /QUALIFICATION_BINDING_MISMATCH/);
   const qualification = qualifyClientOutcomes([...triplets].reverse(), context);
   assert.equal(qualification.matrixComplete, true);
   assert.equal(qualification.qualifiesClientParity, true);
@@ -455,6 +508,36 @@ test("complete verified fixture aggregate proves parity but never release author
     qualificationId: calculateQualificationId({ ...qualification, status: "fail" }),
   };
   assert.throws(() => verifyClientOutcomeQualification(forgedId, triplets, context), /QUALIFICATION_ID_INVALID/);
+});
+
+test("selected live versions compare and aggregate without release authority", () => {
+  const triplets = CLIENT_OUTCOME_SCENARIO_CORPUS.scenarios.map(({ id }) =>
+    triplet(id, { evidenceKind: "live" }, { evidenceKind: "live" }),
+  );
+  for (const { comparison } of triplets) {
+    assert.equal(comparison.evidenceKind, "live");
+    assert.equal(comparison.binding.clients.vscodeVersion, "1.130.0");
+    assert.equal(comparison.binding.clients.vscodeExtensionVersion, "0.58.0");
+    assert.equal(comparison.binding.clients.cliVersion, "1.0.73");
+    assert.equal(comparison.status, "pass");
+    assert.equal(comparison.qualifiesRelease, false);
+  }
+  const qualification = qualifyClientOutcomes(triplets);
+  assert.equal(qualification.evidenceKind, "live");
+  assert.equal(qualification.matrixComplete, true);
+  assert.equal(qualification.qualifiesClientParity, true);
+  assert.equal(qualification.qualifiesRelease, false);
+  assert.equal(verifyClientOutcomeQualification(qualification, triplets), true);
+  assert.throws(
+    () =>
+      collectClientOutcome(
+        input("CLIENT-001", "github-copilot-cli", {
+          evidenceKind: "live",
+          client: { version: "1.0.72" },
+        }),
+      ),
+    /LIVE_CLIENT_VERSION_MISMATCH/,
+  );
 });
 
 test("client parity integrates into evidence manifest without becoming release authority", () => {
@@ -747,7 +830,7 @@ test("CLI rejects duplicate keys and oversized files with sanitized errors and w
       { cwd: process.cwd(), encoding: "utf8" },
     );
     assert.equal(qualified.status, 2);
-    assert.match(qualified.stderr, /LIVE_TOOLCHAIN_UNAVAILABLE/);
+    assert.match(qualified.stderr, /QUALIFICATION_BINDING_MISMATCH/);
     assert.throws(() => statSync(qualificationPath));
   } finally {
     rmSync(directory, { recursive: true, force: true });

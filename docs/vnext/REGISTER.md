@@ -84,8 +84,8 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Type:** `RISK`
 - **Owner:** Client experience
 - **Impact:** VS Code and Copilot CLI could produce different workflow outcomes or expose different authority.
-- **Evidence:** Copilot CLI `1.0.73` is selected. The deterministic corpus, normalized contracts, proof-complete aggregate,
-  and fail-closed live evidence binding are implemented, but neither client has run the re-baselined corpus.
+- **Evidence:** Copilot CLI `1.0.73`, VS Code `1.130.0`, and Copilot Chat `0.58.0` are selected exactly. The deterministic
+  corpus, proof-complete aggregate, and fail-closed binding are implemented, but live paired execution has not run.
 - **Related issue:** [#91](https://github.com/jonathan-vella/apex-vnext/issues/91)
 - **Mitigation:** Generate thin projections from one bundle contract and compare normalized typed outcomes,
   authorization denials, restart/resume behavior, and evidence hashes rather than UI mechanics.

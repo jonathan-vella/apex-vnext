@@ -249,8 +249,8 @@ pass; Terraform state, saved-plan, apply, destroy, and Gate 4 behavior is unchan
    Issue #152 implements the shared selected-client lifecycle; live consumption remains part of slice 6.
 6. Qualify agent, skill, instruction, model, question, hidden-worker, MCP, gate, restart, and cross-device behavior in both
    clients against equivalent typed outcomes. Issue #154 implements the deterministic corpus, normalized contracts,
-   strict collector, pair comparator, proof-complete aggregate, and live evidence-manifest binding. Exact supported
-   VS Code/Copilot Chat selection and paired live execution remain open.
+   strict collector, pair comparator, proof-complete aggregate, and live evidence-manifest binding. Issue #156 selects
+   exact VS Code/Copilot Chat versions from the completed context receipt. Paired live execution remains open.
 
 **Exit gate:** Both pinned clients produce equivalent journal, task, artifact, gate, denial, resume, and transfer results.
 GitHub Copilot cloud coding-agent sessions, Copilot code review, and `/delegate` are not implementation or release gates.
