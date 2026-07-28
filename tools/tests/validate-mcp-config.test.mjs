@@ -11,11 +11,6 @@ function validConfig() {
         command: "python",
         args: ["-m", "azure_pricing_mcp"],
       },
-      terraform: {
-        type: "stdio",
-        command: "/go/bin/terraform-mcp-server",
-        args: ["stdio", "--toolsets", "registry"],
-      },
       drawio: {
         type: "stdio",
         command: "deno",
@@ -50,10 +45,31 @@ test("rejects Astro by legacy key or retired URL under another key", () => {
   }
 });
 
-test("preserves GitHub, Azure Pricing, Terraform, and Draw.io requirements", () => {
+test("rejects Terraform MCP by key, executable, source, path, or toolset signature", () => {
+  const cases = [
+    ["terraform", { type: "stdio", command: "other" }, "legacy server key"],
+    ["renamed", { type: "stdio", command: "terraform-mcp-server" }, "server executable"],
+    ["renamed", { type: "stdio", command: "C:\\tools\\terraform-mcp-server" }, "server executable"],
+    ["renamed", { type: "stdio", command: "other", args: ["hashicorp/terraform-mcp-server"] }, "upstream source"],
+    ["renamed", { type: "stdio", command: "other", args: ["/go/bin/terraform-mcp-server"] }, "legacy executable path"],
+    [
+      "renamed",
+      { type: "stdio", command: "other", args: ["stdio", "--toolsets", "registry"] },
+      "registry toolset signature",
+    ],
+  ];
+  for (const [name, server, marker] of cases) {
+    const config = validConfig();
+    config.servers[name] = server;
+    assert.deepEqual(validateMcpConfig(config), [
+      `Retired Terraform MCP server must not be active: servers.${name} (${marker})`,
+    ]);
+  }
+});
+
+test("preserves GitHub, Azure Pricing, and Draw.io requirements", () => {
   const config = validConfig();
   const azurePricing = structuredClone(config.servers["azure-pricing"]);
-  const terraform = structuredClone(config.servers.terraform);
   delete config.servers.github;
   config.servers.drawio.command = "node";
   assert.deepEqual(validateMcpConfig(config), [
@@ -61,7 +77,6 @@ test("preserves GitHub, Azure Pricing, Terraform, and Draw.io requirements", () 
     'drawio command must be "deno", got "node"',
   ]);
   assert.deepEqual(config.servers["azure-pricing"], azurePricing);
-  assert.deepEqual(config.servers.terraform, terraform);
 });
 
 test("malformed server maps fail without valid-server assumptions", () => {

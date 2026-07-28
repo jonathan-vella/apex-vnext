@@ -259,36 +259,6 @@ else
     step_fail "MCP directory not found at $MCP_DIR"
 fi
 
-# ─── Step 9: Terraform MCP Server binary ────────────────────────────────────
-# Uses clone+build instead of go install because the module's go.mod contains
-# replace directives, which go install rejects for non-main modules.
-
-step_start "🏗️ " "Installing Terraform MCP Server binary (clone & build)..."
-if command -v go &> /dev/null; then
-    TF_MCP_TMP=$(mktemp -d)
-    if git clone --depth=1 --quiet https://github.com/hashicorp/terraform-mcp-server.git "$TF_MCP_TMP" 2>&1; then
-        pushd "$TF_MCP_TMP" > /dev/null
-        if go build -o /go/bin/terraform-mcp-server ./cmd/terraform-mcp-server/ 2>&1 | tail -2; then
-            popd > /dev/null
-            rm -rf "$TF_MCP_TMP"
-            if command -v terraform-mcp-server &>/dev/null || [ -x /go/bin/terraform-mcp-server ]; then
-                step_done "terraform-mcp-server built and installed at /go/bin/"
-            else
-                step_warn "build ran but binary not found at expected path"
-            fi
-        else
-            popd > /dev/null
-            rm -rf "$TF_MCP_TMP"
-            step_warn "go build failed — MCP server unavailable until fixed"
-        fi
-    else
-        rm -rf "$TF_MCP_TMP"
-        step_warn "git clone failed — check network access to github.com"
-    fi
-else
-    step_warn "Go not found — Terraform MCP Server not installed"
-fi
-
 # ─── Step 9.4: TFLint (cosign-free install) ─────────────────────────────────
 # TFLint is installed separately from Terraform because cosign 3.x is
 # incompatible with the Rekor log-query API and aborts signature validation
@@ -506,8 +476,6 @@ printf "        %-15s %s\n" "dos2unix:" "$(dos2unix --version 2>&1 | head -n1 ||
 printf "        %-15s %s\n" "k6:" "$(k6 version 2>/dev/null || echo '❌ not installed')"
 printf "        %-15s %s\n" "Deno:" "$(deno --version 2>/dev/null | head -n1 || echo '❌ not installed')"
 printf "        %-15s %s\n" "gitleaks:" "$(gitleaks version 2>/dev/null || echo '❌ not installed')"
-printf "        %-15s %s\n" "terraform-mcp:" "$(( terraform-mcp-server --version 2>/dev/null || /go/bin/terraform-mcp-server --version 2>/dev/null ) | head -2 | tr '\n' ' ' || echo '❌ not installed')"
-
 # Wave 1+: assert minimum tool versions for IaC contract pipeline
 if [ -f "tools/scripts/validate-tool-versions.mjs" ]; then
     node tools/scripts/validate-tool-versions.mjs --json > /tmp/tool-versions.json 2>/dev/null \
