@@ -9,7 +9,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createMcpServer } from "../mcp.js";
 import { execute } from "../cli.js";
 import { ApexService } from "../service.js";
-import { requirements, skuManifest, tempRoot, writeJson } from "./helpers.js";
+import { nextTaskAfterInput, requirements, skuManifest, tempRoot, writeJson } from "./helpers.js";
 import { sha256Json } from "@apex/kernel";
 
 test("CLI emits a stable JSON envelope", async () => {
@@ -52,7 +52,7 @@ test("MCP registers only narrow tools and calls the service", async () => {
     "preview",
     "promote",
     "reconcile",
-    "recordRequirementsInput",
+    "recordInput",
     "render",
     "stageArtifact",
     "stageFile",
@@ -64,12 +64,40 @@ test("MCP registers only narrow tools and calls the service", async () => {
   const response = await client.callTool({ name: "status", arguments: {} });
   assert.equal(response.isError, undefined);
   assert.equal((response.structuredContent as { run: { projectId: string } }).run.projectId, "demo");
-  const recorded = await client.callTool({
-    name: "recordRequirementsInput",
-    arguments: { value: { workload: "test" } },
+  const pending = await client.callTool({ name: "nextTask", arguments: {} });
+  const request = (
+    pending.structuredContent as {
+      request: { schemaVersion: string; requestId: string; expectedHead: string; ownerEpoch: number };
+    }
+  ).request;
+  const submission = {
+    schemaVersion: request.schemaVersion,
+    requestId: request.requestId,
+    expectedHead: request.expectedHead,
+    ownerEpoch: request.ownerEpoch,
+    answers: [
+      { questionId: "workload", value: "test workload" },
+      { questionId: "requirements", value: "test requirements" },
+    ],
+  };
+  const unknownFields = await client.callTool({
+    name: "recordInput",
+    arguments: {
+      ...submission,
+      unknownOuter: true,
+      answers: [
+        { questionId: "workload", value: "test workload", unknownAnswer: true },
+        { questionId: "requirements", value: "test requirements" },
+      ],
+    },
   });
-  assert.equal(recorded.isError, undefined);
-  assert.deepEqual(recorded.structuredContent, { recorded: true });
+  assert.equal(unknownFields.isError, true);
+  const recorded = await client.callTool({
+    name: "recordInput",
+    arguments: submission,
+  });
+  assert.equal(recorded.isError, undefined, JSON.stringify(recorded));
+  assert.equal((recorded.structuredContent as { recorded: boolean }).recorded, true);
   assert.equal((await service.nextTask()).status, "task");
   const improvement = await client.callTool({
     name: "improvementObserve",
@@ -109,8 +137,7 @@ test("CLI completes an artifact bundle from JSON", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
   await service.init({ projectId: "demo" });
-  await service.nextTask();
-  const issued = await service.nextTask();
+  const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
   const path = join(root, "bundle.json");
@@ -131,8 +158,7 @@ test("CLI task complete accepts repeated self-describing files", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
   await service.init({ projectId: "demo" });
-  await service.nextTask();
-  const issued = await service.nextTask();
+  const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
   const requirementsPath = join(root, "requirements-output.json");

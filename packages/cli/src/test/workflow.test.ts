@@ -5,7 +5,7 @@ import test from "node:test";
 import { EventJournal } from "@apex/kernel";
 import { ApexError } from "../errors.js";
 import { ApexService } from "../service.js";
-import { prepareValidatedRun, requirements, tempRoot } from "./helpers.js";
+import { nextTaskAfterInput, prepareValidatedRun, requirements, tempRoot } from "./helpers.js";
 
 test("full requirements to fake deploy workflow survives restart", async () => {
   const root = await tempRoot();
@@ -62,25 +62,171 @@ test("full requirements to fake deploy workflow survives restart", async () => {
   assert.equal((await restarted.status()).run.gates[3]?.state, "approved");
 });
 
-test("stale task is rejected after journal advances", async () => {
+test("requirements task remains blocked until pending input is recorded", async () => {
   const service = new ApexService(await tempRoot());
   await service.init({ projectId: "demo" });
-  await service.nextTask();
-  const issued = await service.nextTask();
-  assert.equal(issued.status, "task");
-  if (issued.status !== "task") return;
-  await service.recordRequirementsInput({ changed: true });
+  const requested = await service.nextTask();
+  assert.equal(requested.status, "needs_input");
+  const stillWaiting = await service.nextTask();
+  assert.equal(stillWaiting.status, "needs_input");
+});
+
+test("typed input recording rejects premature, stale, malformed, duplicate, and replayed answers", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo" });
   await assert.rejects(
-    service.completeTask(issued.task.taskId, { kind: "requirements", value: requirements() }),
-    (error: unknown) => error instanceof Error && /stale/i.test(error.message),
+    service.recordInput({
+      schemaVersion: "1.0.0",
+      requestId: "missing",
+      expectedHead: "a".repeat(64),
+      ownerEpoch: 1,
+      answers: [{ questionId: "workload", value: "demo" }],
+    }),
+    (error: unknown) => error instanceof ApexError && error.code === "APEX_CONFLICT",
   );
+  const pending = await service.nextTask();
+  assert.equal(pending.status, "needs_input");
+  if (pending.status !== "needs_input") return;
+  const valid = {
+    schemaVersion: "1.0.0" as const,
+    requestId: pending.request.requestId,
+    expectedHead: pending.request.expectedHead,
+    ownerEpoch: pending.request.ownerEpoch,
+    answers: [
+      { questionId: "workload", value: "demo" },
+      { questionId: "requirements", value: "secure and bounded" },
+    ],
+  };
+  await assert.rejects(
+    service.recordInput({ ...valid, expectedHead: "b".repeat(64) }),
+    (error: unknown) => error instanceof ApexError && error.code === "APEX_STALE",
+  );
+  await assert.rejects(
+    service.recordInput({ ...valid, ownerEpoch: valid.ownerEpoch + 1 }),
+    (error: unknown) => error instanceof ApexError && error.code === "APEX_STALE",
+  );
+  await assert.rejects(
+    service.recordInput({ ...valid, answers: [valid.answers[0]!] }),
+    (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
+  );
+  await assert.rejects(
+    service.recordInput({ ...valid, answers: [valid.answers[0]!, valid.answers[0]!] }),
+    (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
+  );
+  const recorded = await service.recordInput(valid);
+  assert.deepEqual(recorded, { recorded: true, requestId: pending.request.requestId });
+  await assert.rejects(
+    service.recordInput(valid),
+    (error: unknown) => error instanceof ApexError && error.code === "APEX_CONFLICT",
+  );
+  const events = await new EventJournal(
+    join(root, ".apex", "projects", "demo", "runs", (await service.status()).run.runId, "journal"),
+  ).replay();
+  const inputEvents = events.filter((event) => event.type === "requirements.input-recorded");
+  assert.equal(inputEvents.length, 1);
+  assert.deepEqual((inputEvents[0]?.payload as { answers?: unknown }).answers, valid.answers);
+});
+
+test("pending input is reissued after writer transfer", async () => {
+  const service = new ApexService(await tempRoot());
+  await service.init({ projectId: "demo" });
+  const before = await service.nextTask();
+  assert.equal(before.status, "needs_input");
+  if (before.status !== "needs_input") return;
+  const transfer = (await service.createWriterTransfer({
+    repository: "owner/repository",
+    branch: "main",
+    commit: "abc",
+    workflowId: "qualification.yml",
+    sender: "local",
+    recipient: "ci",
+    currentHead: "abc",
+    ttlMs: 60_000,
+  })) as { hash: string };
+  await service.acceptWriterTransfer(transfer.hash, "ci", "abc");
+  const after = await service.nextTask();
+  assert.equal(after.status, "needs_input");
+  if (after.status !== "needs_input") return;
+  assert.notEqual(after.request.requestId, before.request.requestId);
+  assert.notEqual(after.request.expectedHead, before.request.expectedHead);
+  assert.equal(after.request.ownerEpoch, before.request.ownerEpoch + 1);
+  await service.recordInput({
+    schemaVersion: "1.0.0",
+    requestId: after.request.requestId,
+    expectedHead: after.request.expectedHead,
+    ownerEpoch: after.request.ownerEpoch,
+    answers: after.request.questions.map(({ id }) => ({ questionId: id, value: id })),
+  });
+  assert.equal((await service.nextTask()).status, "task");
+});
+
+test("compatibility input requires every declared field and journals no unrelated values", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo" });
+  await assert.rejects(
+    service.recordRequirementsInput({ workload: "demo", secretToken: "do-not-journal" }),
+    (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
+  );
+  await service.recordRequirementsInput({
+    workload: "demo",
+    requirements: "bounded",
+    secretToken: "do-not-journal",
+  });
+  const events = await new EventJournal(
+    join(root, ".apex", "projects", "demo", "runs", (await service.status()).run.runId, "journal"),
+  ).replay();
+  const recorded = events.find((event) => event.type === "requirements.input-recorded");
+  assert.equal(JSON.stringify(recorded?.payload).includes("do-not-journal"), false);
+});
+
+test("concurrent input submissions return only stable Apex errors", async () => {
+  const service = new ApexService(await tempRoot());
+  await service.init({ projectId: "demo" });
+  const pending = await service.nextTask();
+  assert.equal(pending.status, "needs_input");
+  if (pending.status !== "needs_input") return;
+  const submission = {
+    schemaVersion: "1.0.0" as const,
+    requestId: pending.request.requestId,
+    expectedHead: pending.request.expectedHead,
+    ownerEpoch: pending.request.ownerEpoch,
+    answers: pending.request.questions.map(({ id }) => ({ questionId: id, value: id })),
+  };
+  const results = await Promise.allSettled([service.recordInput(submission), service.recordInput(submission)]);
+  assert.equal(results.filter(({ status }) => status === "fulfilled").length, 1);
+  const rejected = results.find(({ status }) => status === "rejected");
+  assert.equal(rejected?.status, "rejected");
+  if (rejected?.status === "rejected") {
+    assert.equal(rejected.reason instanceof ApexError, true);
+    assert.equal(["APEX_STALE", "APEX_CONFLICT"].includes((rejected.reason as ApexError).code), true);
+  }
+});
+
+test("malformed persisted input requests fail closed", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const initialized = await service.init({ projectId: "demo" });
+  const journalDirectory = join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal");
+  const journal = new EventJournal(journalDirectory);
+  await journal.append({
+    eventId: "malformed-request",
+    projectId: "demo",
+    runId: initialized.runId,
+    type: "requirements.input-requested",
+    timestamp: "2026-01-01T00:00:00.000Z",
+    ownerEpoch: 1,
+    expectedHead: await journal.head(),
+    payload: { requestId: "", questions: [] },
+  });
+  await assert.rejects(service.nextTask(), /Persisted input request is invalid/u);
 });
 
 test("a task remains current across stage then complete", async () => {
   const service = new ApexService(await tempRoot());
   await service.init({ projectId: "demo" });
-  await service.nextTask();
-  const issued = await service.nextTask();
+  const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
 
@@ -113,8 +259,7 @@ test("gate approval rejects stale dependencies while explicit rejection remains 
   const root = await tempRoot();
   const service = new ApexService(root);
   const initialized = await service.init({ projectId: "demo" });
-  await service.nextTask();
-  const issued = await service.nextTask();
+  const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
   await service.completeTask(issued.task.taskId, { kind: "requirements", value: requirements() });

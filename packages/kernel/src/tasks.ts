@@ -1,4 +1,4 @@
-import type { ProjectId, QuestionV1Schema, RunId, TaskEnvelopeV1, TaskResultV1 } from "@apex/contracts";
+import type { InputAnswerV1, ProjectId, QuestionV1Schema, RunId, TaskEnvelopeV1, TaskResultV1 } from "@apex/contracts";
 import { CONTRACT_VERSION } from "@apex/contracts";
 import type { Static } from "@sinclair/typebox";
 import type { Clock } from "./lease-store.js";
@@ -42,6 +42,39 @@ export function needsInput(taskId: string, questions: QuestionV1[]): TaskResultV
     throw new Error("needs_input requires at least one question");
   }
   return { schemaVersion: CONTRACT_VERSION, taskId, status: "needs_input", questions };
+}
+
+export function validateInputAnswers(questions: QuestionV1[], submitted: InputAnswerV1[]): InputAnswerV1[] {
+  const answers = new Map<string, InputAnswerV1["value"]>();
+  for (const answer of submitted) {
+    if (answers.has(answer.questionId)) throw new Error(`Duplicate answer: ${answer.questionId}`);
+    answers.set(answer.questionId, answer.value);
+  }
+  for (const answerId of answers.keys()) {
+    if (!questions.some(({ id }) => id === answerId)) throw new Error(`Unknown answer: ${answerId}`);
+  }
+  if (answers.size !== questions.length || questions.some(({ id }) => !answers.has(id))) {
+    throw new Error("Every requested question requires exactly one answer");
+  }
+  return questions.map((question) => {
+    const value = answers.get(question.id)!;
+    if (question.multiSelect === true ? !Array.isArray(value) : typeof value !== "string") {
+      throw new Error(`Answer shape does not match question: ${question.id}`);
+    }
+    if (question.options !== undefined) {
+      const selected = Array.isArray(value) ? value : [value];
+      if (selected.some((item) => !question.options!.includes(item))) {
+        throw new Error(`Answer is not a declared option: ${question.id}`);
+      }
+    }
+    return {
+      questionId: question.id,
+      value:
+        Array.isArray(value) && question.options !== undefined
+          ? question.options.filter((option) => value.includes(option))
+          : value,
+    };
+  });
 }
 
 export type { ProjectId, RunId };
