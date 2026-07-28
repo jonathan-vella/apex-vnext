@@ -1,12 +1,12 @@
 ## APEX vNext Checkpoint
 
-- **Updated:** 2026-07-27 UTC
+- **Updated:** 2026-07-28 UTC
 - **Milestone:** I - independent legacy MCP retirement
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
-- **Active issue:** [#145](https://github.com/jonathan-vella/apex-vnext/issues/145) - native provider schema and docs routing
-- **Working branch:** `feat/145-terraform-provider-schema`
+- **Active issue:** [#147](https://github.com/jonathan-vella/apex-vnext/issues/147) - Terraform MCP retirement
+- **Working branch:** `feat/147-retire-terraform-mcp`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -46,6 +46,8 @@ explicit unavailable results, bounded caching/pagination/transport, and no lifec
 PR #141 closes issue #140. PR #142 refreshes the AVM module index and version cache. PR #144 adds the user-scoped Azure
 Artifacts PAT fallback captured from preserved local work. Issue #145 implements bounded native installed-provider
 schema inspection and version-pinned official documentation routing before active Terraform MCP consumer migration.
+PR #146 closes issue #145. Issue #147 migrates the characterized consumers, removes Terraform MCP discovery and setup,
+archives the original evidence, rejects active reintroduction, and removes Go after its independent-consumer audit.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
@@ -66,7 +68,7 @@ or qualified.
 | Prior VS Code, package, security, and live Azure results                 | Preserved in [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md)            |
 | VS Code `1.130.0`, Copilot Chat `0.58.0`, and CLI `1.0.73`               | Representative 12-cell context matrix complete                           |
 | Guidance, Markdown, lint, hook, and workflow ownership                   | Milestone N complete; Milestone O context baseline captured              |
-| ARM MCP adapters and MCP retirements                                     | Astro retired; Terraform replacement APIs implemented; migration pending |
+| ARM MCP adapters and MCP retirements                                     | Astro and Terraform retired; Azure Pricing and Draw.io gates remain open |
 | Bundle composition mappings, aggregate lock, and client projections      | Implemented; live client qualification remains pending                   |
 | Diagram and improvement-measurement changes                              | Pending                                                                  |
 | Final deterministic, client, package, security, and live qualification   | Reopened                                                                 |
@@ -81,12 +83,11 @@ or qualified.
 
 ## Immediate Sequence
 
-1. Merge issue #145's bounded native provider schema and official documentation routing.
-2. Migrate active Terraform consumers, then retire Terraform MCP only after replacement and authority gates pass.
-3. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.
-4. Complete ARM pricing evidence, diagram routing, bounded improvement measurement, bundle generation, and guidance
+1. Merge issue #147's Terraform consumer migration and retirement gates.
+2. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.
+3. Complete ARM pricing evidence, diagram routing, bounded improvement measurement, bundle generation, and guidance
    consolidation in roadmap order.
-5. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.
+4. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.
 
 ## Resume Pointer
 

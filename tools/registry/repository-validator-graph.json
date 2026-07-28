@@ -153,15 +153,15 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
-      "id": "validate-terraform-mcp-characterization",
-      "script": "validate:terraform-mcp-characterization",
+      "id": "validate-terraform-mcp-retirement",
+      "script": "validate:terraform-mcp-retirement",
       "profile": "node-validation",
       "aliases": [],
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
-      "id": "test-terraform-mcp-characterization",
-      "script": "test:terraform-mcp-characterization",
+      "id": "test-terraform-mcp-retirement",
+      "script": "test:terraform-mcp-retirement",
       "profile": "node-test",
       "aliases": [],
       "retirement": { "status": "active", "replacementIds": [] }
@@ -572,8 +572,8 @@
         "lint:deprecated-refs",
         "lint:mcp-config",
         "test:mcp-config",
-        "validate:terraform-mcp-characterization",
-        "test:terraform-mcp-characterization",
+        "validate:terraform-mcp-retirement",
+        "test:terraform-mcp-retirement",
         "validate:extension-bloat",
         "validate:headings-summary",
         "validate:instruction-checks",
@@ -638,8 +638,8 @@
         "lint:deprecated-refs",
         "lint:mcp-config",
         "test:mcp-config",
-        "validate:terraform-mcp-characterization",
-        "test:terraform-mcp-characterization",
+        "validate:terraform-mcp-retirement",
+        "test:terraform-mcp-retirement",
         "validate:extension-bloat",
         "validate:headings-summary",
         "validate:instruction-checks",

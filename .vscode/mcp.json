@@ -19,16 +19,6 @@
         "AZURE_PRICING_DEDUP_MAX_ENTRIES": "512"
       }
     },
-    "terraform": {
-      "type": "stdio",
-      "command": "/go/bin/terraform-mcp-server",
-      "args": [
-        "stdio",
-        "--toolsets",
-        "registry"
-      ],
-      "env": {}
-    },
     "drawio": {
       "type": "stdio",
       "command": "deno",

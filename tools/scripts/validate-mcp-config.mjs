@@ -11,6 +11,7 @@ const __dirname = dirname(__filename);
 const repoRoot = resolve(__dirname, "../..");
 const mcpConfigPath = resolve(repoRoot, ".vscode/mcp.json");
 const RETIRED_ASTRO_HOST = "mcp.docs.astro.build";
+const RETIRED_TERRAFORM_EXECUTABLE = "terraform-mcp-server";
 
 function isRetiredAstroEndpoint(value) {
   if (typeof value !== "string") return false;
@@ -19,6 +20,22 @@ function isRetiredAstroEndpoint(value) {
   } catch {
     return false;
   }
+}
+
+function retiredTerraformMarker(name, server) {
+  if (name.toLowerCase() === "terraform") return "legacy server key";
+  const command = typeof server?.command === "string" ? server.command.replaceAll("\\", "/").toLowerCase() : "";
+  const executable = command
+    .split("/")
+    .at(-1)
+    ?.replace(/\.exe$/u, "");
+  if (executable === RETIRED_TERRAFORM_EXECUTABLE) return "server executable";
+  const serialized = JSON.stringify(server).toLowerCase().replaceAll("\\", "/");
+  if (serialized.includes("hashicorp/terraform-mcp-server")) return "upstream source";
+  if (serialized.includes("/go/bin/terraform-mcp-server")) return "legacy executable path";
+  const args = Array.isArray(server?.args) ? server.args.map((argument) => String(argument).toLowerCase()) : [];
+  if (args.includes("--toolsets") && args.includes("registry")) return "registry toolset signature";
+  return null;
 }
 
 export function validateMcpConfig(mcpConfig) {
@@ -40,6 +57,10 @@ export function validateMcpConfig(mcpConfig) {
   for (const [name, server] of Object.entries(servers)) {
     if (name === "astro-docs" || isRetiredAstroEndpoint(server?.url)) {
       errors.push(`Retired Astro MCP server must not be active: servers.${name}`);
+    }
+    const terraformMarker = retiredTerraformMarker(name, server);
+    if (terraformMarker !== null) {
+      errors.push(`Retired Terraform MCP server must not be active: servers.${name} (${terraformMarker})`);
     }
   }
   return errors;
@@ -77,6 +98,10 @@ function main() {
   r.tick();
   if (hasServerMap && !errors.some((error) => error.startsWith("Retired Astro MCP"))) {
     r.ok("Retired Astro MCP server is absent from active discovery");
+  }
+  r.tick();
+  if (hasServerMap && !errors.some((error) => error.startsWith("Retired Terraform MCP"))) {
+    r.ok("Retired Terraform MCP server is absent from active discovery");
   }
 
   r.summary();

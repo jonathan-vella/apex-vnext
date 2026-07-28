@@ -139,7 +139,7 @@ module "key_vault" {
 
 ```hcl
 source  = "Azure/avm-res-{service}-{resource}/azurerm"
-version = "~> {major}.{minor}"
+version = "<EXACT_SEMVER>"
 ```
 
 ### Common AVM Modules
@@ -151,8 +151,8 @@ version = "~> {major}.{minor}"
 | Virtual Network | `Azure/avm-res-network-virtualnetwork/azurerm` |
 | App Service     | `Azure/avm-res-web-site/azurerm`               |
 
-Use `mcp_terraform_get_latest_module_version` or the Terraform registry
-to find the latest version. Update pinned minor version (`~> X.Y`).
+Resolve the exact stable version through `TerraformRegistryClient` in `@apex/capabilities`, record it in the IaC
+contract, and enforce it with `npm run validate:avm-versions:freeze`. Do not use a range constraint.
 
 ## Variables
 

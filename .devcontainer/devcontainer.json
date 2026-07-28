@@ -22,9 +22,6 @@
       "version": "latest"
     },
     "./features/terraform": {},
-    "ghcr.io/devcontainers/features/go:1": {
-      "version": "1.26"
-    },
     "ghcr.io/devcontainers-community/features/deno": {
       "version": "latest"
     },
