@@ -29,6 +29,7 @@ const candidate = {
   packageLockHash: hash,
   releaseManifestHash: otherHash,
   runtimeBundleHash: "d".repeat(64),
+  customizationBundleHash: "e".repeat(64),
 };
 const dependencies = {
   qualificationSchemaErrors: () => [],
@@ -181,6 +182,14 @@ test("validator binds evidence manifest entries to supplied payload bytes", () =
   assert.match(validateEvidencePayloads({ entries: [null] }, [payload])[0], /manifest entries are invalid/);
   assert.deepEqual(validateEvidencePayloads(evidenceManifest, [payload]), []);
   assert.match(validateEvidencePayloads(evidenceManifest, [])[0], /payload is missing/);
+  assert.match(
+    validateEvidencePayloads(evidenceManifest, [payload], {
+      requireClientQualification: true,
+      projectId: "live-test",
+      candidate,
+    })[0],
+    /requires client qualification evidence/,
+  );
 
   const tampered = validateEvidencePayloads(evidenceManifest, [
     { path: payload.path, bytes: Buffer.concat([bytes, Buffer.from("\n")]) },

@@ -49,7 +49,15 @@ mapping remains a separate client-projection slice; neither client may infer ans
 
 Issue #152 implements deterministic client-valid agent generation and selected-client transactional materialization.
 ADR-0005 records why installing both projections or one polyglot definition would weaken client validity or authority.
-Live `CLIENT-002`, `CLIENT-003`, `CLIENT-005`, `CLIENT-009`, and `CLIENT-010` evidence remains required.
+Issue #154 implements the versioned normalized outcome, comparison, and matrix-qualification contracts for every
+scenario. The collector derives content-free semantic receipts from the hash-linked journal; the comparator verifies
+each VS Code/CLI pair; and aggregate verification requires the exact comparison and outcome payload closure.
+Fixture evidence proves deterministic behavior only and always records `qualifiesRelease: false`.
+
+Live evidence remains required for every scenario. Production live qualification requires the complete client evidence
+closure, binds it to the exact project and release candidate, and rejects fixture, partial, stale, substituted, duplicate,
+or unreferenced evidence. Collection remains blocked until canonical toolchain configuration selects exact supported
+VS Code and Copilot Chat versions.
 
 ## Scenario Matrix
 
@@ -92,8 +100,11 @@ Human-owned client evidence then records only bounded results:
 - managed-file lifecycle results and hashes;
 - pass, fail, or unavailable disposition for every scenario.
 
-A future implementation slice may add a versioned machine-readable client-evidence schema. It must extend or compose the
-existing live-qualification boundary rather than creating a second release authority.
+The machine-readable evidence path uses `client-outcome-v1`, `client-outcome-comparison-v1`, and
+`client-outcome-qualification-v1`. Supporting outcomes and comparisons are immutable evidence-manifest entries; the
+aggregate is bound through the dedicated `clientQualification` entry and must be referenced by a live scenario.
+`npm run validate:client-outcomes` validates the canonical scenario corpus, and `npm run test:client-outcomes` exercises
+collection, comparison, aggregation, strict parsing, confidentiality, and authority-denial mutations.
 
 ## Completion Gate
 

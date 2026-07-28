@@ -5,8 +5,8 @@
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
-- **Active issue:** [#152](https://github.com/jonathan-vella/apex-vnext/issues/152) - client-specific agent projections
-- **Working branch:** `feat/152-client-agent-projections`
+- **Active issue:** [#154](https://github.com/jonathan-vella/apex-vnext/issues/154) - normalized client outcomes
+- **Working branch:** `feat/154-client-outcomes`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -52,6 +52,8 @@ PR #148 closes issue #147 and completes Milestone I. Issue #150 adds versioned k
 exact-state answer recording through APEX MCP; client-specific question mechanics and live outcome parity remain pending.
 PR #151 closes issue #150. Issue #152 generates client-valid VS Code and Copilot CLI agents from one semantic role graph
 and installs exactly one selected projection through the shared transactional lifecycle under ADR-0005.
+PR #153 closes issue #152. Issue #154 adds deterministic normalized client outcomes, per-scenario comparisons, and a
+proof-complete matrix aggregate that extends the existing live-qualification authority without granting release authority.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
@@ -74,6 +76,7 @@ or qualified.
 | Guidance, Markdown, lint, hook, and workflow ownership                   | Milestone N complete; Milestone O context baseline captured              |
 | ARM MCP adapters and MCP retirements                                     | Astro and Terraform retired; Azure Pricing and Draw.io gates remain open |
 | Bundle composition mappings, aggregate lock, and client projections      | Implemented; live client qualification remains pending                   |
+| Normalized client outcome contracts, corpus, and deterministic harness   | Implemented; exact-candidate paired live execution remains pending       |
 | Diagram and improvement-measurement changes                              | Pending                                                                  |
 | Final deterministic, client, package, security, and live qualification   | Reopened                                                                 |
 
@@ -87,9 +90,9 @@ or qualified.
 
 ## Immediate Sequence
 
-1. Merge issue #152's client-specific agent projections and selected-client lifecycle.
-2. Generate normalized client-outcome evidence and run the blocking paired scenarios.
-3. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.
+1. Merge issue #154's normalized client-outcome evidence harness.
+2. Select exact supported VS Code and Copilot Chat versions in the canonical toolchain.
+3. Run all paired client scenarios and prove equivalent typed outcomes and authority denials.
 4. Complete ARM pricing evidence, diagram routing, bounded improvement measurement, bundle generation, and guidance
    consolidation in roadmap order.
 5. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.
@@ -98,5 +101,5 @@ or qualified.
 
 1. Read [PRD.md](PRD.md), [ROADMAP.md](ROADMAP.md), and [REGISTER.md](REGISTER.md).
 2. Verify the current `main` head, open pull requests, worktrees, and dirty files before selecting a slice.
-3. Start Milestone O from the active-guidance owner map; keep each implementation independently revertible.
+3. Resume Milestone J live qualification, then continue the roadmap in dependency order.
 4. Treat [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md) as historical evidence until a new candidate is declared.

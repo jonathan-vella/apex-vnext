@@ -3,6 +3,39 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "clientQualification": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "kind": {
+          "const": "client-qualification",
+          "type": "string"
+        },
+        "required": {
+          "const": true,
+          "type": "boolean"
+        },
+        "retention": {
+          "const": "immutable",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "hash",
+        "bytes",
+        "required",
+        "retention"
+      ],
+      "type": "object"
+    },
     "createdAt": {
       "format": "date-time",
       "type": "string"

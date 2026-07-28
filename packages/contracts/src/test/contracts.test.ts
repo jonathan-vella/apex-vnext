@@ -139,6 +139,7 @@ describe("Wave 1 contracts", () => {
         packageLockHash: hash,
         releaseManifestHash: otherHash,
         runtimeBundleHash: "c".repeat(64),
+        customizationBundleHash: "e".repeat(64),
       },
       createdAt: timestamp,
       evidenceManifestHash: "d".repeat(64),

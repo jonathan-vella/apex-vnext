@@ -101,7 +101,12 @@
         "packages/cli/src/service.ts",
         "packages/cli/src/mcp.ts",
         "packages/cli/scripts/prepare-assets.mjs",
-        "tools/registry/copilot-cli-agent-tools.json"
+        "tools/registry/copilot-cli-agent-tools.json",
+        "packages/contracts/src/evidence.ts",
+        "tools/registry/client-outcome-scenarios.v1.json",
+        "tools/scripts/collect-client-outcome.mjs",
+        "tools/scripts/compare-client-outcomes.mjs",
+        "tools/scripts/qualify-client-outcomes.mjs"
       ],
       "consumers": ["GitHub Copilot in VS Code", "GitHub Copilot CLI", "client parity qualification"],
       "proofCommands": [
@@ -109,7 +114,9 @@
         "npm run test:vnext",
         "npm run test:vnext-pack",
         "npm run validate:agents",
-        "npm run validate:vscode"
+        "npm run validate:vscode",
+        "npm run validate:client-outcomes",
+        "npm run test:client-outcomes"
       ],
       "removalGate": "Generated VS Code and Copilot CLI projections preserve roles, interaction boundaries, MCP allowlists, and equivalent typed outcomes.",
       "rationale": "One managed role graph must produce client-specific mechanics without creating separate workflow authorities.",
