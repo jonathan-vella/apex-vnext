@@ -3651,9 +3651,7 @@ export class ApexService {
           }
           const destination = resolve(file.root, file.path);
           await this.assertSafeDestination(file.root, destination);
-          const actual = (await this.exists(destination))
-            ? sha256Bytes(await readFile(destination))
-            : "missing";
+          const actual = (await this.exists(destination)) ? sha256Bytes(await readFile(destination)) : "missing";
           const hashesValid = [file.sourceHash, file.baseHash, file.currentHash].every((hash) =>
             /^[0-9a-f]{64}$/.test(hash),
           );

@@ -129,6 +129,9 @@ test("asset generator rejects malformed and duplicate client projection declarat
     (manifest) => {
       manifest.clientProjections[1].id = manifest.clientProjections[0].id;
     },
+    (manifest) => {
+      manifest.roles.push({ id: "other", source: ".github/agents/other.agent.md", agent: "APEX" });
+    },
   ]) {
     const invalid = structuredClone(valid);
     mutate(invalid);

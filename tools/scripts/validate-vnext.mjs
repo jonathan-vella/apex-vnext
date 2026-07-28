@@ -610,8 +610,19 @@ function validateCustomizations(model, findings) {
       "Client projections must uniquely cover the supported VS Code and Copilot CLI files",
       "customizations/manifest.json",
     );
-  const roles = new Map(array(customization.manifest.roles).map((role) => [role.agent, role]));
-  const roleSources = array(customization.manifest.roles).map(({ source }) => source);
+  const manifestRoles = array(customization.manifest.roles);
+  const roleAgents = manifestRoles.map(({ agent }) => agent);
+  if (roleAgents.length !== new Set(roleAgents).size) {
+    finding(
+      findings,
+      "customization.role-agents",
+      "Manifest role agent names must be unique",
+      "customizations/manifest.json",
+    );
+    return;
+  }
+  const roles = new Map(manifestRoles.map((role) => [role.agent, role]));
+  const roleSources = manifestRoles.map(({ source }) => source);
   if (
     roleSources.length !== expectedAgentFiles.size ||
     roleSources.length !== new Set(roleSources).size ||

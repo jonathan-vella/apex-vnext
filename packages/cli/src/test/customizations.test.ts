@@ -214,13 +214,18 @@ test("doctor does not read lock-controlled paths outside the workspace", async (
   await service.init({ projectId: "demo" });
   const outside = join(root, "..", "doctor-outside.txt");
   await writeFile(outside, "external sentinel\n");
-  const outsideHash = createHash("sha256").update(await readFile(outside)).digest("hex");
+  const outsideHash = createHash("sha256")
+    .update(await readFile(outside))
+    .digest("hex");
   const lockPath = join(root, ".apex", "customizations.lock.json");
   const lock = JSON.parse(await readFile(lockPath, "utf8")) as { files: Array<{ path: string }> };
   lock.files[0]!.path = "../doctor-outside.txt";
   await writeFile(lockPath, `${JSON.stringify(lock)}\n`);
   const result = await service.doctor();
-  assert.equal(result.checks.some(({ value }) => value === outsideHash), false);
+  assert.equal(
+    result.checks.some(({ value }) => value === outsideHash),
+    false,
+  );
   assert.match(result.checks.find(({ id }) => id === "managed-files")?.value ?? "", /unsafe/u);
   await rm(outside, { force: true });
 });

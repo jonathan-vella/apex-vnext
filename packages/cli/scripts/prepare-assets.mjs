@@ -257,7 +257,8 @@ export function validateClientProjectionDeclarations(customizationManifest) {
         typeof role.agent !== "string",
     ) ||
     roles.length !== new Set(roles.map(({ id }) => id)).size ||
-    roles.length !== new Set(roles.map(({ source }) => source)).size
+    roles.length !== new Set(roles.map(({ source }) => source)).size ||
+    roles.length !== new Set(roles.map(({ agent }) => agent)).size
   ) {
     throw new Error("Client projection declarations are invalid");
   }
