@@ -43,20 +43,23 @@ Initialize one project and one environment-scoped run:
 
 ```bash
 npx apex init --project demo --name "Demo workload" \
-  --environment dev --target local --iac bicep --json
+  --environment dev --target local --iac bicep \
+  --client github-copilot-vscode --json
 ```
 
-By default, `apex init` installs the customization bundle embedded in the CLI. It materializes workspace agents and
-skills under `.github/`, writes the VS Code `.vscode/mcp.json` and Copilot CLI `.github/mcp.json` projections, creates
-the `.apex` runtime and project state, and records managed file hashes in `.apex/customizations.lock.json`. Both clients
-share one agent, skill, and guidance source set; only their workspace MCP discovery files are client-specific.
+By default, `apex init` selects `github-copilot-vscode` for backward compatibility. Pass
+`--client github-copilot-cli` for Copilot CLI. APEX installs exactly one client-valid agent/MCP projection plus shared
+skills and guidance. It records managed hashes in `.apex/customizations.lock.json` and persists the selected client in
+`.apex/customizations.selection.json` through update, rollback, uninstall, and reinstall.
 
 The generated npm asset manifest records an independently verifiable digest for each client projection and binds both
-digests into the aggregate bundle lock. These hashes prove package composition; they do not replace live client
+digests, source role hashes, adapter version, target paths, and tool-inventory evidence into the aggregate bundle lock.
+These hashes prove package composition; they do not replace live client
 discovery and normalized-outcome qualification.
 
 Use `--customizations-source /absolute/path` only when testing a deliberate local bundle override. The same flag on
-`apex update` performs a three-way managed-file update. A modified managed file is never silently replaced; resolve the
+`apex update` performs a three-way managed-file update and remains required for later custom-source updates. A modified
+managed file is never silently replaced; resolve the
 reported conflict or restore the recorded base before retrying.
 
 ## Upgrade And Roll Back
@@ -68,6 +71,8 @@ approved version, verify the installed bundle, and then apply its transactional 
 npm install --save-exact @apex/cli@<approved-version>
 npx apex version --json
 npx apex update --json
+npx apex customizations uninstall --json
+npx apex customizations reinstall --json
 npx apex doctor --json
 ```
 

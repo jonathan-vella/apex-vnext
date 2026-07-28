@@ -11,6 +11,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import Ajv2020 from "ajv/dist/2020.js";
 import * as yaml from "js-yaml";
 
 const REQUIRED_PACKAGES = ["contracts", "kernel", "capabilities", "renderers", "testkit", "cli"];
@@ -188,6 +189,7 @@ export function loadRepositoryModel(root = process.cwd()) {
     packages: packageEntries,
     customization: {
       manifest: readJson(path.join(root, "customizations", "manifest.json")),
+      schema: readJson(path.join(root, "tools", "registry", "schemas", "customization-manifest.schema.json")),
       agents: agentFiles.map((file) => ({
         path: relative(path.join(root, "customizations"), file),
         content: readFileSync(file, "utf8"),
@@ -523,16 +525,35 @@ function validateConfig(model, findings) {
 
 function validateCustomizations(model, findings) {
   const customization = model.customization;
+  const ajv = new Ajv2020({ allErrors: true, strict: true });
+  if (!ajv.validate(customization.schema, customization.manifest)) {
+    for (const error of ajv.errors ?? []) {
+      finding(
+        findings,
+        "customization.schema",
+        `Customization manifest ${error.instancePath || "/"}: ${error.message}`,
+        "customizations/manifest.json",
+      );
+    }
+    return;
+  }
   const expectedSharedFiles = new Set([
-    ...customization.agents.map(({ path: file }) => file),
     ...customization.skills.map(({ path: file }) => file),
     ".github/copilot-instructions.md",
   ]);
   const expectedProjectionFiles = new Map([
-    ["github-copilot-vscode", [".vscode/mcp.json"]],
-    ["github-copilot-cli", [".github/mcp.json"]],
+    [
+      "github-copilot-vscode",
+      { files: [".vscode/mcp.json"], generatedRoot: "client-projections/github-copilot-vscode" },
+    ],
+    ["github-copilot-cli", { files: [".github/mcp.json"], generatedRoot: "client-projections/github-copilot-cli" }],
   ]);
-  const expectedFiles = new Set([...expectedSharedFiles, ...[...expectedProjectionFiles.values()].flat()]);
+  const expectedAgentFiles = new Set(customization.agents.map(({ path: file }) => file));
+  const expectedFiles = new Set([
+    ...expectedSharedFiles,
+    ...expectedAgentFiles,
+    ...[...expectedProjectionFiles.values()].flatMap(({ files }) => files),
+  ]);
   const managedFiles = array(customization.manifest.managedFiles);
   if (
     managedFiles.length !== new Set(managedFiles).size ||
@@ -554,7 +575,7 @@ function validateCustomizations(model, findings) {
     finding(
       findings,
       "customization.shared-coverage",
-      "Shared files must exactly cover agents, skills, and managed guidance once",
+      "Shared files must exactly cover client-neutral skills and managed guidance once",
       "customizations/manifest.json",
     );
   const projections = array(customization.manifest.clientProjections);
@@ -566,8 +587,9 @@ function validateCustomizations(model, findings) {
     if (
       expected === undefined ||
       files.length !== new Set(files).size ||
-      files.length !== expected.length ||
-      files.some((file) => !expected.includes(file))
+      files.length !== expected.files.length ||
+      files.some((file) => !expected.files.includes(file)) ||
+      projection.generatedRoot !== expected.generatedRoot
     )
       finding(
         findings,
@@ -588,7 +610,30 @@ function validateCustomizations(model, findings) {
       "Client projections must uniquely cover the supported VS Code and Copilot CLI files",
       "customizations/manifest.json",
     );
-  const roles = new Map(array(customization.manifest.roles).map((role) => [role.agent, role]));
+  const manifestRoles = array(customization.manifest.roles);
+  const roleAgents = manifestRoles.map(({ agent }) => agent);
+  if (roleAgents.length !== new Set(roleAgents).size) {
+    finding(
+      findings,
+      "customization.role-agents",
+      "Manifest role agent names must be unique",
+      "customizations/manifest.json",
+    );
+    return;
+  }
+  const roles = new Map(manifestRoles.map((role) => [role.agent, role]));
+  const roleSources = manifestRoles.map(({ source }) => source);
+  if (
+    roleSources.length !== expectedAgentFiles.size ||
+    roleSources.length !== new Set(roleSources).size ||
+    roleSources.some((source) => !expectedAgentFiles.has(source))
+  )
+    finding(
+      findings,
+      "customization.role-sources",
+      "Manifest role sources must exactly cover canonical agent definitions",
+      "customizations/manifest.json",
+    );
   const agents = new Map(customization.agents.map((agent) => [agent.frontmatter?.name, agent]));
   const allowedMcp = new Set(model.mcpTools.map((tool) => `apex/${tool}`));
   for (const skill of customization.skills)
@@ -656,6 +701,54 @@ function validateCustomizations(model, findings) {
       if (!agents.has(child))
         finding(findings, "customization.agent-reference", `${name} references unknown child ${child}`, agent.path);
   }
+
+  const declaredEdges = array(customization.manifest.invocationEdges);
+  const cliRoot = path.join(model.root, "packages", "cli", "assets", "client-projections", "github-copilot-cli");
+  const cliAgents = walk(path.join(cliRoot, ".github", "agents"), (file) => file.endsWith(".agent.md"));
+  for (const file of cliAgents) {
+    const relativePath = relative(cliRoot, file);
+    const frontmatter = yaml.load(readFileSync(file, "utf8").match(/^---\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? "");
+    const role = array(customization.manifest.roles).find(({ source }) => source === relativePath);
+    const tools = array(frontmatter?.tools);
+    if (
+      !frontmatter ||
+      typeof frontmatter !== "object" ||
+      Array.isArray(frontmatter.model) ||
+      typeof frontmatter.model !== "string" ||
+      "handoffs" in frontmatter ||
+      "agents" in frontmatter ||
+      "argument-hint" in frontmatter ||
+      tools.includes("vscode/askQuestions") ||
+      role === undefined
+    ) {
+      finding(findings, "customization.cli-agent", `${relativePath} is not a valid CLI agent projection`, relativePath);
+      continue;
+    }
+    const interactive = role.interactionType === "interactive-handoff";
+    const sourceAgent = customization.agents.find(({ path: sourcePath }) => sourcePath === relativePath);
+    const expectedDisableModelInvocation = sourceAgent?.frontmatter?.["disable-model-invocation"] ?? !interactive;
+    if (
+      frontmatter["user-invocable"] !== interactive ||
+      frontmatter["disable-model-invocation"] !== expectedDisableModelInvocation ||
+      (!interactive && tools.includes("ask_user"))
+    ) {
+      finding(
+        findings,
+        "customization.cli-authority",
+        `${relativePath} disagrees with its manifest interaction boundary`,
+        relativePath,
+      );
+    }
+    const delegates = declaredEdges.some(({ from }) => from === role.agent);
+    if (tools.includes("task") !== delegates) {
+      finding(
+        findings,
+        "customization.cli-delegation",
+        `${relativePath} task delegation disagrees with manifest edges`,
+        relativePath,
+      );
+    }
+  }
   for (const roleName of roles.keys())
     if (!agents.has(roleName))
       finding(
@@ -664,7 +757,30 @@ function validateCustomizations(model, findings) {
         `Manifest role ${roleName} has no agent`,
         "customizations/manifest.json",
       );
-  for (const edge of array(customization.manifest.invocationEdges)) {
+  const declaredEdgeKeys = declaredEdges.map(({ from, to, type }) => `${from}\0${to}\0${type}`);
+  if (declaredEdgeKeys.length !== new Set(declaredEdgeKeys).size) {
+    finding(
+      findings,
+      "customization.edge-duplicate",
+      "Manifest invocation edges must be unique",
+      "customizations/manifest.json",
+    );
+  }
+  const sourceEdgeKeys = customization.agents.flatMap(({ frontmatter }) => [
+    ...array(frontmatter?.handoffs).map(({ agent }) => `${frontmatter.name}\0${agent}\0handoff`),
+    ...array(frontmatter?.agents).map((agent) => `${frontmatter.name}\0${agent}\0subagent`),
+  ]);
+  for (const key of new Set([...declaredEdgeKeys, ...sourceEdgeKeys])) {
+    if (!declaredEdgeKeys.includes(key) || !sourceEdgeKeys.includes(key)) {
+      finding(
+        findings,
+        "customization.edge-source-drift",
+        `Manifest and source invocation edge disagree: ${key.replaceAll("\0", " -> ")}`,
+        "customizations/manifest.json",
+      );
+    }
+  }
+  for (const edge of declaredEdges) {
     const parent = roles.get(edge.from);
     const child = roles.get(edge.to);
     if (!parent || !child || !["handoff", "subagent"].includes(edge.type)) {
