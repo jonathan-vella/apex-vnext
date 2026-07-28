@@ -1,8 +1,8 @@
 ## Supported Client Qualification Contract
 
 This document defines the client-neutral acceptance contract for GitHub Copilot in VS Code and GitHub Copilot CLI.
-It selects a Copilot CLI release and defines future qualification evidence. It does not claim either client has passed
-against the re-baselined `0.10.0` implementation.
+It selects exact client versions and defines qualification evidence. It does not claim either client has passed against
+the re-baselined `0.10.0` implementation.
 
 ## Version Selection
 
@@ -14,11 +14,15 @@ against the re-baselined `0.10.0` implementation.
 | Artifact SHA-256    | `8f9bb5f7e364c267265d1e24ac2aea69ed559ddb956719c6db12a353de6c5970`                                       |
 | Verification        | Published digest matched; `copilot version` reported `GitHub Copilot CLI 1.0.73`                         |
 | npm observation     | `@github/copilot` tag `latest` resolved to `1.0.71-1` on 2026-07-21                                      |
-| VS Code release     | Qualification-required; select and record the exact stable host and extension versions at execution time |
+| VS Code release     | `1.130.0`                                                                                               |
+| Copilot Chat        | `0.58.0`                                                                                                 |
+| Selection evidence | Content-free completed context matrix receipt, canonical SHA-256 `197cbc48...013f42a`                    |
 
 The GitHub release is selected because it was the newest non-draft, non-prerelease release observed at the cutoff and
 its platform artifact was independently digest-checked and executed. The npm channel lag is recorded rather than hidden.
 Final qualification must disable automatic updates and prove the exact selected binary before starting a scenario.
+The VS Code pair is selected from the completed version-bound context matrix and the current stable host observation.
+Selection removes a configuration blocker; it is not live scenario evidence.
 
 ## Support Boundary
 

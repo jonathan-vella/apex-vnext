@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Selected VS Code `1.130.0` and Copilot Chat `0.58.0` exactly from the completed content-free context receipt, with
+  validator-enforced version and provenance binding. Paired live client qualification remains open.
 - Added versioned, content-free normalized Copilot client outcomes, scenario-specific comparison and qualification
   contracts, strict bounded collection, proof-complete evidence closure verification, and fail-closed live release
   binding. Deterministic fixture parity never grants release authority; paired exact-candidate execution remains open.

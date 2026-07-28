@@ -39,16 +39,22 @@
     "vscode": {
       "authoritativeSource": "https://code.visualstudio.com/updates",
       "releaseChannel": "stable",
-      "newestObservedVersion": null,
-      "selectedExactVersion": null,
-      "installedVersion": null,
-      "observedAt": "2026-07-13",
-      "selectionStatus": "qualification-required",
+      "newestObservedVersion": "1.130.0",
+      "selectedExactVersion": "1.130.0",
+      "installedVersion": "1.130.0",
+      "selectedExactCopilotChatVersion": "0.58.0",
+      "installedCopilotChatVersion": "0.58.0",
+      "observedAt": "2026-07-28",
+      "selectionStatus": "selected-qualification-required",
+      "selectionEvidence": {
+        "receipt": "tools/registry/client-context-baseline-receipt.json",
+        "sha256": "197cbc48abfebc3d01c8511557d7b852ed35b5169e8cb2fdcb747d1dc013f42a"
+      },
       "postCutoffObservation": {
         "version": "1.130.0",
         "copilotChatVersion": "0.58.0",
         "observedAt": "2026-07-27",
-        "disposition": "next-candidate-qualification-input"
+        "disposition": "selected-next-candidate-input"
       },
       "requiredQualification": [
         "workspace-agent-discovery",
@@ -95,7 +101,7 @@
     "node": "24.18.0",
     "npm": "11.16.0",
     "typescript": "7.0.2",
-    "vscode": "qualified-stable-release-to-be-pinned",
+    "vscode": "1.130.0",
     "copilotCli": "1.0.73"
   },
   "optionalCapabilityPackRuntimes": {
