@@ -38,10 +38,10 @@ For each resource in `04-implementation-plan.md`:
 
 1. Query AVM availability using the IaC-specific tool
    - Bicep: `mcp_bicep_list_avm_metadata` → `mcp_bicep_resolve_avm_module`
-  - Terraform: consume the exact source/version from `04-iac-contract.json`, then run
-    `npm run validate:avm-versions:freeze -- agent-output/{project}/04-iac-contract.json`
+   - Terraform: consume the exact source/version from `04-iac-contract.json`, then run
+     `npm run validate:avm-versions:freeze -- agent-output/{project}/04-iac-contract.json`
 2. Cross-check planned parameters against exact-version official module documentation. For installed provider arguments,
-  run `terraform providers schema -json` against the initialized root; flag type mismatches.
+   run `terraform providers schema -json` against the initialized root; flag type mismatches.
 3. Check region limitations
 4. Save results to `agent-output/{project}/04-preflight-check.md`
 5. If blockers found, use `askQuestions` to present them and collect the user's decision

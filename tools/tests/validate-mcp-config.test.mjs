@@ -50,6 +50,8 @@ test("rejects Terraform MCP by key, executable, source, path, or toolset signatu
     ["terraform", { type: "stdio", command: "other" }, "legacy server key"],
     ["renamed", { type: "stdio", command: "terraform-mcp-server" }, "server executable"],
     ["renamed", { type: "stdio", command: "C:\\tools\\terraform-mcp-server" }, "server executable"],
+    ["renamed", { type: "stdio", command: "terraform-mcp-server.exe" }, "server executable"],
+    ["renamed", { type: "stdio", command: "C:\\tools\\terraform-mcp-server.exe" }, "server executable"],
     ["renamed", { type: "stdio", command: "other", args: ["hashicorp/terraform-mcp-server"] }, "upstream source"],
     ["renamed", { type: "stdio", command: "other", args: ["/go/bin/terraform-mcp-server"] }, "legacy executable path"],
     [

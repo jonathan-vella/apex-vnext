@@ -25,7 +25,11 @@ function isRetiredAstroEndpoint(value) {
 function retiredTerraformMarker(name, server) {
   if (name.toLowerCase() === "terraform") return "legacy server key";
   const command = typeof server?.command === "string" ? server.command.replaceAll("\\", "/").toLowerCase() : "";
-  if (command.split("/").at(-1) === RETIRED_TERRAFORM_EXECUTABLE) return "server executable";
+  const executable = command
+    .split("/")
+    .at(-1)
+    ?.replace(/\.exe$/u, "");
+  if (executable === RETIRED_TERRAFORM_EXECUTABLE) return "server executable";
   const serialized = JSON.stringify(server).toLowerCase().replaceAll("\\", "/");
   if (serialized.includes("hashicorp/terraform-mcp-server")) return "upstream source";
   if (serialized.includes("/go/bin/terraform-mcp-server")) return "legacy executable path";

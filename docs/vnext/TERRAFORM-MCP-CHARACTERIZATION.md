@@ -25,14 +25,14 @@ types, descriptions, enum values, defaults, and bounds. Summary hashes are deriv
 
 ## Migrated Consumers
 
-| Consumer group | Retirement disposition |
-| --- | --- |
-| Workspace discovery | Server removed; config validation rejects renamed or disguised reintroduction. |
-| Devcontainer setup and health checks | Clone, build, fallback install, and version checks removed. |
-| Devcontainer Go feature | Removed after the active-consumer audit found no independent toolchain owner. |
-| Import and test skills | Native installed-provider schemas and exact-version official documentation. |
-| Codegen, AVM, Terraform, and handoff guidance | Exact contract pins, bounded Registry ownership, and freeze validation. |
-| MCP config regression | Converted from preservation to negative retirement assertions. |
+| Consumer group                                | Retirement disposition                                                         |
+| --------------------------------------------- | ------------------------------------------------------------------------------ |
+| Workspace discovery                           | Server removed; config validation rejects renamed or disguised reintroduction. |
+| Devcontainer setup and health checks          | Clone, build, fallback install, and version checks removed.                    |
+| Devcontainer Go feature                       | Removed after the active-consumer audit found no independent toolchain owner.  |
+| Import and test skills                        | Native installed-provider schemas and exact-version official documentation.    |
+| Codegen, AVM, Terraform, and handoff guidance | Exact contract pins, bounded Registry ownership, and freeze validation.        |
+| MCP config regression                         | Converted from preservation to negative retirement assertions.                 |
 
 The provider configuration example in `docs/guides/operations.md` is not an MCP consumer. It configures APEX's native
 Terraform preview/apply provider and remains outside this retirement.
