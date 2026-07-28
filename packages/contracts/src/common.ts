@@ -13,7 +13,7 @@ export const EnvironmentSchema = Type.String({ pattern: "^[a-z0-9]+(?:-[a-z0-9]+
 export const IacToolSchema = Type.Union([Type.Literal("bicep"), Type.Literal("terraform")]);
 export const OperationSchema = Type.Union([Type.Literal("apply"), Type.Literal("destroy")]);
 export const SECRET_FIELD_PATTERN =
-  /(?:secret|password|passphrase|token|authorization|auth[-_]?header|api[-_]?key|private[-_]?key|connection[-_]?string|credential|session[-_]?cookie|sas[-_]?token)/i;
+  /(?:secret|password|passphrase|token|authorization|auth[-_]?header|api[-_]?key|private[-_]?key|connection[-_]?string|credential(?:s)?(?:$|[-_]|value|data)|session[-_]?cookie|sas[-_]?token)/i;
 export const SECRET_VALUE_PATTERN =
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|\bBearer\s+[A-Za-z0-9._~+\/-]{16,}|\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b|\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b|(?:AccountKey|SharedAccessSignature|ClientSecret)=|[?&](?:sig|signature|access_token)=[^&\s]{8,}|https?:\/\/[^/\s:@]+:[^@\s/]+@/i;
 
