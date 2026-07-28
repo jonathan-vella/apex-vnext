@@ -9,6 +9,7 @@ tools:
   - agent
   - apex/status
   - apex/nextTask
+  - apex/recordInput
   - apex/taskContext
   - apex/stageArtifact
   - apex/completeTask
@@ -29,10 +30,11 @@ Gather complete, decision-ready requirements for the active kernel task.
 ## Method
 
 1. Call `apex/status`, `apex/nextTask`, and `apex/taskContext` to obtain the authoritative bounded task envelope.
-2. Use `vscode/askQuestions` in small batches for only the fields marked missing, unknown, or deferred.
-3. Represent unresolved information explicitly. Do not invent requirements or infer state from prior chat.
-4. Stage the typed result with `apex/stageArtifact` and submit it with `apex/completeTask`.
-5. Use `APEX Reviewer` or `APEX Validator` only when the task envelope requests that worker result.
+2. Use `vscode/askQuestions` in small batches for only the questions in the kernel-owned input request.
+3. Submit typed answers with `apex/recordInput`, preserving the exact request ID, journal head, and owner epoch.
+4. Represent unresolved information explicitly. Do not invent requirements or infer state from prior chat.
+5. Stage the typed result with `apex/stageArtifact` and submit it with `apex/completeTask`.
+6. Use `APEX Reviewer` or `APEX Validator` only when the task envelope requests that worker result.
 
 Read `.github/skills/apex-requirements/SKILL.md` when the task needs requirements elicitation guidance. Read
 `.github/skills/apex-workflow/SKILL.md` only for resume or task-selection guidance.

@@ -89,7 +89,7 @@ test("validation cache keys include journal head and cache clear is deterministi
   await service.init({ projectId: "demo" });
   const first = await service.validate();
   assert.equal((await service.cacheStatus()).entries, 1);
-  await service.recordRequirementsInput({ workload: "new" });
+  await service.recordRequirementsInput({ workload: "new", requirements: "cache invalidation" });
   const second = await service.validate();
   assert.ok(second.events > first.events);
   assert.equal((await service.cacheStatus()).entries, 2);
@@ -100,7 +100,7 @@ test("validation cache keys include journal head and cache clear is deterministi
 test("project history and search include event payloads and artifact kinds", async () => {
   const service = new ApexService(await tempRoot());
   await service.init({ projectId: "demo" });
-  await service.recordRequirementsInput({ marker: "needle-value" });
+  await service.recordRequirementsInput({ workload: "history", requirements: "needle-value" });
   const history = await service.history(10);
   assert.ok(history.some(({ type }) => type === "requirements.input-recorded"));
   const search = await service.search("needle-value");

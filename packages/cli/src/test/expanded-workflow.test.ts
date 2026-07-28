@@ -24,6 +24,7 @@ import {
   codegenBundle,
   costEstimate,
   governance,
+  nextTaskAfterInput,
   planBundle,
   policyMap,
   qualityReport,
@@ -36,7 +37,7 @@ import {
 } from "./helpers.js";
 
 async function task(service: ApexService, expected: string): Promise<string> {
-  const next = await service.nextTask();
+  const next = await nextTaskAfterInput(service);
   assert.equal(next.status, "task");
   if (next.status !== "task") throw new Error("Expected task");
   assert.equal(next.task.taskType, expected);
@@ -366,8 +367,7 @@ test("task validation refuses workflow bytes outside the run lock", async () => 
   const root = await tempRoot();
   const service = new ApexService(root);
   await service.init({ projectId: "demo" });
-  await service.nextTask();
-  const issued = await service.nextTask();
+  const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
   const workflowPath = join(root, ".apex", "runtime", "workflow.v1.json");
@@ -1377,8 +1377,7 @@ test("plan rejects wrong track and secret literals", async () => {
 test("MCP completeTask accepts an output bundle", async () => {
   const service = new ApexService(await tempRoot());
   await service.init({ projectId: "demo" });
-  await service.nextTask();
-  const issued = await service.nextTask();
+  const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
   const server = createMcpServer(service);

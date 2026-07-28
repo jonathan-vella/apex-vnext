@@ -16,12 +16,15 @@ import {
   EnvironmentInputsV1Schema,
   ExecutionPlanAttestationV1Schema,
   GovernanceConstraintsV1Schema,
+  hasValidInputRequestQuestions,
   IacHandoffV1Schema,
   ImprovementDecisionV1Schema,
   ImprovementObservationV1Schema,
   ImprovementPolicyV1Schema,
   ImprovementProposalV1Schema,
   ImprovementRecurrenceV1Schema,
+  InputRequestV1Schema,
+  InputSubmissionV1Schema,
   LogicalResourceManifestV1Schema,
   LiveQualificationV1Schema,
   LIVE_QUALIFICATION_SCENARIO_IDS,
@@ -653,6 +656,50 @@ describe("target family contracts", () => {
     for (const [schema, fixture] of fixtures) {
       assert.equal(Value.Check(schema, fixture), true, schema.$id ?? "unidentified schema");
     }
+  });
+
+  it("validates journal-bound input requests and submissions", () => {
+    const request = {
+      schemaVersion: CONTRACT_VERSION,
+      requestId: "request-1",
+      expectedHead: hash,
+      ownerEpoch: 2,
+      questions: [{ id: "region", prompt: "Which region?", options: ["sweden", "germany"] }],
+    };
+    assert.equal(Value.Check(InputRequestV1Schema, request), true);
+    assert.equal(
+      Value.Check(InputSubmissionV1Schema, {
+        schemaVersion: CONTRACT_VERSION,
+        requestId: request.requestId,
+        expectedHead: request.expectedHead,
+        ownerEpoch: request.ownerEpoch,
+        answers: [{ questionId: "region", value: "sweden" }],
+      }),
+      true,
+    );
+    assert.equal(Value.Check(InputSubmissionV1Schema, { ...request, answers: [] }), false);
+    assert.equal(
+      hasValidInputRequestQuestions([
+        { id: "one", prompt: "One?" },
+        { id: "two", prompt: "Two?", options: ["a", "b"], multiSelect: true },
+      ]),
+      true,
+    );
+    assert.equal(
+      hasValidInputRequestQuestions([
+        { id: "same", prompt: "One?" },
+        { id: "same", prompt: "Two?" },
+      ]),
+      false,
+    );
+    assert.equal(hasValidInputRequestQuestions([{ id: "bad", prompt: "Bad?", multiSelect: true }]), false);
+    assert.equal(
+      Value.Check(InputRequestV1Schema, {
+        ...request,
+        questions: [{ id: "bad", prompt: "Bad?", options: ["same", "same"] }],
+      }),
+      false,
+    );
   });
 
   it("validates reproducible cost arithmetic and uncertainty bounds", () => {

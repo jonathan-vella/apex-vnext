@@ -11,7 +11,7 @@
         "capabilityStatus",
         "nextTask",
         "taskContext",
-        "recordRequirementsInput",
+        "recordInput",
         "stageArtifact",
         "stageFile",
         "generateIac",

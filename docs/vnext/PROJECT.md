@@ -1,12 +1,12 @@
 ## APEX vNext Checkpoint
 
 - **Updated:** 2026-07-28 UTC
-- **Milestone:** I - independent legacy MCP retirement
+- **Milestone:** J - supported Copilot client parity
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
-- **Active issue:** [#147](https://github.com/jonathan-vella/apex-vnext/issues/147) - Terraform MCP retirement
-- **Working branch:** `feat/147-retire-terraform-mcp`
+- **Active issue:** [#150](https://github.com/jonathan-vella/apex-vnext/issues/150) - kernel-owned typed input recording
+- **Working branch:** `feat/150-kernel-typed-input`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -48,6 +48,8 @@ Artifacts PAT fallback captured from preserved local work. Issue #145 implements
 schema inspection and version-pinned official documentation routing before active Terraform MCP consumer migration.
 PR #146 closes issue #145. Issue #147 migrates the characterized consumers, removes Terraform MCP discovery and setup,
 archives the original evidence, rejects active reintroduction, and removes Go after its independent-consumer audit.
+PR #148 closes issue #147 and completes Milestone I. Issue #150 adds versioned kernel-owned input requests and typed,
+exact-state answer recording through APEX MCP; client-specific question mechanics and live outcome parity remain pending.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
@@ -83,11 +85,12 @@ or qualified.
 
 ## Immediate Sequence
 
-1. Merge issue #147's Terraform consumer migration and retirement gates.
-2. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.
-3. Complete ARM pricing evidence, diagram routing, bounded improvement measurement, bundle generation, and guidance
+1. Merge issue #150's kernel-owned typed input request and recording contract.
+2. Generate real client-specific question/delegation projections and normalized outcome evidence.
+3. Prove equivalent typed outcomes and authority denials across VS Code and Copilot CLI.
+4. Complete ARM pricing evidence, diagram routing, bounded improvement measurement, bundle generation, and guidance
    consolidation in roadmap order.
-4. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.
+5. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.
 
 ## Resume Pointer
 

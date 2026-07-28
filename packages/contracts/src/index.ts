@@ -29,6 +29,8 @@ import {
 } from "./improvement.js";
 import {
   EventV1Schema,
+  InputRequestV1Schema,
+  InputSubmissionV1Schema,
   ProjectConfigV1Schema,
   RunConfigV1Schema,
   RuntimeBundleLockV1Schema,
@@ -58,6 +60,8 @@ export const contractSchemas = [
   ProjectConfigV1Schema,
   RunConfigV1Schema,
   TaskEnvelopeV1Schema,
+  InputRequestV1Schema,
+  InputSubmissionV1Schema,
   EventV1Schema,
   RequirementsV1Schema,
   ImplementationIntentV1Schema,
@@ -114,6 +118,8 @@ export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
   "https://schemas.apexops.dev/project-config-v1.json": metadata(16_384),
   "https://schemas.apexops.dev/run-config-v1.json": metadata(65_536, "confidential"),
   "https://schemas.apexops.dev/task-envelope-v1.json": metadata(131_072, "confidential"),
+  "https://schemas.apexops.dev/input-request-v1.json": metadata(65_536, "confidential"),
+  "https://schemas.apexops.dev/input-submission-v1.json": metadata(65_536, "confidential"),
   "https://schemas.apexops.dev/event-v1.json": metadata(262_144, "confidential"),
   "https://schemas.apexops.dev/requirements-v1.json": metadata(524_288, "confidential"),
   "https://schemas.apexops.dev/implementation-intent-v1.json": metadata(524_288),
