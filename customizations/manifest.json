@@ -27,14 +27,6 @@
     ".vscode/mcp.json"
   ],
   "sharedFiles": [
-    ".github/agents/apex.agent.md",
-    ".github/agents/apex-requirements.agent.md",
-    ".github/agents/apex-architect.agent.md",
-    ".github/agents/apex-planner.agent.md",
-    ".github/agents/apex-operator.agent.md",
-    ".github/agents/apex-codegen.agent.md",
-    ".github/agents/apex-reviewer.agent.md",
-    ".github/agents/apex-validator.agent.md",
     ".github/skills/apex-workflow/SKILL.md",
     ".github/skills/apex-requirements/SKILL.md",
     ".github/skills/apex-architecture/SKILL.md",
@@ -46,15 +38,19 @@
   "clientProjections": [
     {
       "id": "github-copilot-vscode",
+      "generatedRoot": "client-projections/github-copilot-vscode",
       "files": [".vscode/mcp.json"]
     },
     {
       "id": "github-copilot-cli",
+      "generatedRoot": "client-projections/github-copilot-cli",
       "files": [".github/mcp.json"]
     }
   ],
   "roles": [
     {
+      "id": "coordinator",
+      "source": ".github/agents/apex.agent.md",
       "agent": "APEX",
       "role": "coordinator",
       "interactionType": "interactive-handoff",
@@ -62,6 +58,8 @@
       "costTier": "fast"
     },
     {
+      "id": "requirements",
+      "source": ".github/agents/apex-requirements.agent.md",
       "agent": "APEX Requirements",
       "role": "requirements",
       "interactionType": "interactive-handoff",
@@ -69,6 +67,8 @@
       "costTier": "standard"
     },
     {
+      "id": "architecture",
+      "source": ".github/agents/apex-architect.agent.md",
       "agent": "APEX Architect",
       "role": "architecture",
       "interactionType": "interactive-handoff",
@@ -76,6 +76,8 @@
       "costTier": "premium"
     },
     {
+      "id": "planning",
+      "source": ".github/agents/apex-planner.agent.md",
       "agent": "APEX Planner",
       "role": "planning",
       "interactionType": "interactive-handoff",
@@ -83,6 +85,8 @@
       "costTier": "premium"
     },
     {
+      "id": "operations",
+      "source": ".github/agents/apex-operator.agent.md",
       "agent": "APEX Operator",
       "role": "operations",
       "interactionType": "interactive-handoff",
@@ -90,6 +94,8 @@
       "costTier": "premium"
     },
     {
+      "id": "code-generation",
+      "source": ".github/agents/apex-codegen.agent.md",
       "agent": "APEX CodeGen",
       "role": "code-generation",
       "interactionType": "autonomous-subagent",
@@ -97,6 +103,8 @@
       "costTier": "standard"
     },
     {
+      "id": "review",
+      "source": ".github/agents/apex-reviewer.agent.md",
       "agent": "APEX Reviewer",
       "role": "review",
       "interactionType": "autonomous-subagent",
@@ -104,6 +112,8 @@
       "costTier": "standard"
     },
     {
+      "id": "validation",
+      "source": ".github/agents/apex-validator.agent.md",
       "agent": "APEX Validator",
       "role": "validation",
       "interactionType": "autonomous-subagent",

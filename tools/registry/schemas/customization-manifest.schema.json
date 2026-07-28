@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.apexops.dev/repository/customization-manifest-v1.json",
+  "title": "APEX customization manifest",
+  "type": "object",
+  "required": ["version", "bundle", "managedFiles", "sharedFiles", "clientProjections", "roles", "invocationEdges"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "bundle": {
+      "type": "object",
+      "required": ["id", "authority", "composition", "sourceRoot", "generatedRoot"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "const": "apex-managed-workspace" },
+        "authority": { "const": "npm:@apex/cli" },
+        "composition": { "const": "copy-tree" },
+        "sourceRoot": { "const": "customizations" },
+        "generatedRoot": { "const": "customizations" }
+      }
+    },
+    "managedFiles": { "$ref": "#/$defs/uniquePaths" },
+    "sharedFiles": { "$ref": "#/$defs/uniquePaths" },
+    "clientProjections": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["id", "generatedRoot", "files"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "enum": ["github-copilot-vscode", "github-copilot-cli"] },
+          "generatedRoot": { "type": "string", "pattern": "^client-projections/[a-z0-9-]+$" },
+          "files": { "$ref": "#/$defs/uniquePaths" }
+        }
+      }
+    },
+    "roles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "source", "agent", "role", "interactionType", "model", "costTier"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+          "source": { "type": "string", "pattern": "^\\.github/agents/[a-z0-9-]+\\.agent\\.md$" },
+          "agent": { "type": "string", "minLength": 1 },
+          "role": { "type": "string", "minLength": 1 },
+          "interactionType": { "enum": ["interactive-handoff", "autonomous-subagent"] },
+          "model": { "type": "string", "minLength": 1 },
+          "costTier": { "enum": ["fast", "standard", "premium"] }
+        }
+      }
+    },
+    "invocationEdges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "to", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "from": { "type": "string", "minLength": 1 },
+          "to": { "type": "string", "minLength": 1 },
+          "type": { "enum": ["handoff", "subagent"] }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "uniquePaths": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"
+      }
+    }
+  }
+}

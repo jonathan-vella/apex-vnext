@@ -36,7 +36,7 @@ missing, or contradictory inputs instead of filling gaps from memory.
 
 1. Call `apex/status`, `apex/nextTask`, and `apex/taskContext`.
 2. Plan the logical resources, controls, dependencies, environment obligations, and selected-track binding requested.
-3. Use `vscode/askQuestions` for user-owned implementation choices that the kernel marks unresolved.
+3. Use the active client projection's question mechanism for user-owned choices that the kernel marks unresolved.
 4. Stage and complete the typed planning result through APEX MCP.
 5. Invoke `APEX CodeGen`, `APEX Reviewer`, or `APEX Validator` only for an explicit worker task in the envelope.
 

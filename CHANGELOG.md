@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Added schema-backed, deterministic VS Code and Copilot CLI agent projections with pinned tool selectors, source-bound
+  provenance, explicit selected-client installation, and transactional update, rollback, uninstall, and reinstall.
 - Added versioned kernel-owned input requests and typed APEX MCP answer recording bound to the exact journal head and
   writer epoch, with deterministic option validation, replay denial, transfer reissue, and no chat-history dependency.
 - Retired Terraform MCP after migrating active consumers to bounded Registry/native/documentation owners; removed its

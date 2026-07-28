@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { sha256Bytes } from "@apex/kernel";
@@ -16,11 +16,17 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
   const root = await tempRoot();
   await mkdir(join(root, "config"), { recursive: true });
   await mkdir(join(root, "customizations", ".github"), { recursive: true });
+  await mkdir(join(root, "customizations", ".github", "agents"), { recursive: true });
   await mkdir(join(root, "customizations", ".vscode"), { recursive: true });
+  await mkdir(join(root, "client-projections", "github-copilot-cli", ".github", "agents"), { recursive: true });
+  await mkdir(join(root, "client-projections", "github-copilot-vscode", ".github", "agents"), { recursive: true });
+  await mkdir(join(root, "client-projections", "github-copilot-cli", ".github"), { recursive: true });
+  await mkdir(join(root, "client-projections", "github-copilot-vscode", ".vscode"), { recursive: true });
   const bytes = Buffer.from('{"schemaVersion":"1.0.0"}\n', "utf8");
   const sharedBytes = Buffer.from("shared\n", "utf8");
   const cliBytes = Buffer.from('{"mcpServers":{}}\n', "utf8");
   const vscodeBytes = Buffer.from('{"servers":{}}\n', "utf8");
+  const agentBytes = Buffer.from("---\nname: APEX\ndescription: Test\n---\n\nBody\n", "utf8");
   await writeFile(join(root, "config", "example.json"), bytes);
   const customizationBytes = Buffer.from(
     `${JSON.stringify({
@@ -34,9 +40,18 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
       },
       sharedFiles: ["README.md"],
       clientProjections: [
-        { id: "github-copilot-vscode", files: [".vscode/mcp.json"] },
-        { id: "github-copilot-cli", files: [".github/mcp.json"] },
+        {
+          id: "github-copilot-vscode",
+          generatedRoot: "client-projections/github-copilot-vscode",
+          files: [".vscode/mcp.json"],
+        },
+        {
+          id: "github-copilot-cli",
+          generatedRoot: "client-projections/github-copilot-cli",
+          files: [".github/mcp.json"],
+        },
       ],
+      roles: [{ id: "coordinator", source: ".github/agents/apex.agent.md", agent: "APEX" }],
     })}\n`,
   );
   const runtimeBytes = Buffer.from(
@@ -56,7 +71,16 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
   await writeFile(join(root, "customizations", "manifest.json"), customizationBytes);
   await writeFile(join(root, "customizations", "README.md"), sharedBytes);
   await writeFile(join(root, "customizations", ".github", "mcp.json"), cliBytes);
+  await writeFile(join(root, "customizations", ".github", "agents", "apex.agent.md"), agentBytes);
   await writeFile(join(root, "customizations", ".vscode", "mcp.json"), vscodeBytes);
+  for (const [client, mcpPath, mcpBytes] of [
+    ["github-copilot-cli", join(".github", "mcp.json"), cliBytes],
+    ["github-copilot-vscode", join(".vscode", "mcp.json"), vscodeBytes],
+  ] as const) {
+    await writeFile(join(root, "client-projections", client, mcpPath), mcpBytes);
+    await writeFile(join(root, "client-projections", client, ".github", "agents", "apex.agent.md"), agentBytes);
+    await writeFile(join(root, "client-projections", client, "README.md"), sharedBytes);
+  }
   await writeFile(join(root, "config", "runtime-bundle.v1.json"), runtimeBytes);
   const sources = { customizations: "0.10.0", config: "1.0.0" };
   const composition = {
@@ -76,9 +100,25 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
         sourceRoot: "customizations",
         generatedRoot: "customizations",
       },
+      {
+        id: "client-projections",
+        mode: "render-client-projections" as const,
+        sourceRoot: "customizations",
+        generatedRoot: "client-projections",
+      },
     ],
   };
-  const files = [
+  const files: BundledAssetManifest["files"] = [
+    {
+      path: "customizations/.github/agents/apex.agent.md",
+      source: {
+        kind: "repository-file" as const,
+        path: "customizations/.github/agents/apex.agent.md",
+        mapping: "customizations",
+      },
+      sha256: sha256Bytes(agentBytes),
+      bytes: agentBytes.byteLength,
+    },
     {
       path: "config/example.json",
       source: { kind: "repository-file" as const, path: "config/example.json", mapping: "config" },
@@ -136,16 +176,58 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
       bytes: customizationBytes.byteLength,
     },
   ];
+  for (const [client, mcpPath, mcpBytes] of [
+    ["github-copilot-cli", ".github/mcp.json", cliBytes],
+    ["github-copilot-vscode", ".vscode/mcp.json", vscodeBytes],
+  ] as const) {
+    for (const [path, content] of [
+      [`client-projections/${client}/${mcpPath}`, mcpBytes],
+      [`client-projections/${client}/.github/agents/apex.agent.md`, agentBytes],
+      [`client-projections/${client}/README.md`, sharedBytes],
+    ] as const) {
+      const target = path.slice(`client-projections/${client}/`.length);
+      const agent = target === ".github/agents/apex.agent.md";
+      files.push({
+        path,
+        source: {
+          kind: "generated" as const,
+          composition: "client-projections",
+          clientId: client,
+          target,
+          adapterVersion: "1.0.0",
+          sourcePath: target,
+          sourceHash: sha256Bytes(content),
+          ...(agent
+            ? {
+                roleId: "coordinator",
+                sourcePath: ".github/agents/apex.agent.md",
+                sourceHash: sha256Bytes(agentBytes),
+              }
+            : {}),
+        },
+        sha256: sha256Bytes(content),
+        bytes: content.byteLength,
+      });
+    }
+  }
   files.sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0));
   const projections = [
     {
       id: "github-copilot-cli" as const,
-      files: ["customizations/.github/mcp.json", "customizations/README.md"],
+      files: [
+        "client-projections/github-copilot-cli/.github/agents/apex.agent.md",
+        "client-projections/github-copilot-cli/.github/mcp.json",
+        "client-projections/github-copilot-cli/README.md",
+      ],
       digest: "",
     },
     {
       id: "github-copilot-vscode" as const,
-      files: ["customizations/.vscode/mcp.json", "customizations/README.md"],
+      files: [
+        "client-projections/github-copilot-vscode/.github/agents/apex.agent.md",
+        "client-projections/github-copilot-vscode/.vscode/mcp.json",
+        "client-projections/github-copilot-vscode/README.md",
+      ],
       digest: "",
     },
   ];
@@ -208,13 +290,14 @@ test("canonical lock ignores object insertion order", async (context) => {
     files: manifest.files.map((file) => ({
       bytes: file.bytes,
       sha256: file.sha256,
-      source: { mapping: file.source.mapping, path: file.source.path, kind: file.source.kind },
+      source: Object.fromEntries(Object.entries(file.source).reverse()) as typeof file.source,
       path: file.path,
     })),
     composition: {
       mappings: manifest.composition.mappings.map((mapping) => ({
-        generatedRoot: mapping.generatedRoot,
-        sourceRoot: mapping.sourceRoot,
+        ...(mapping.generatedRoot === undefined ? {} : { generatedRoot: mapping.generatedRoot }),
+        ...(mapping.generatedPath === undefined ? {} : { generatedPath: mapping.generatedPath }),
+        ...(mapping.sourceRoot === undefined ? {} : { sourceRoot: mapping.sourceRoot }),
         mode: mapping.mode,
         id: mapping.id,
       })),
@@ -275,9 +358,12 @@ test("rejects symlinks and false source mapping provenance", async (context) => 
   });
   linked.lock.digest = bundleLockDigest(linked);
   await assert.rejects(verifyBundledAssetManifest(root, linked), /contains a symlink/);
+  await unlink(join(root, "config", "linked.json"));
 
   const falseSource = structuredClone(manifest);
-  falseSource.files[0]!.source.path = "config/other.json";
+  const falseSourceEntry = falseSource.files.find(({ path }) => path === "config/example.json")!;
+  if (falseSourceEntry.source.kind !== "repository-file") throw new Error("Expected repository source fixture");
+  falseSourceEntry.source.path = "config/other.json";
   falseSource.lock.digest = bundleLockDigest(falseSource);
   await assert.rejects(verifyBundledAssetManifest(root, falseSource), /Invalid bundled asset source/);
 

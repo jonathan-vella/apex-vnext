@@ -106,7 +106,7 @@ manifest. Follow [Record vNext Live Qualification](live-qualification.md) to cre
 
 Use a fresh consumer repository and a supported VS Code release. Record pass/fail evidence for each action:
 
-- Install the freshly packed runtime tarballs and run `apex init` with the default managed customization bundle.
+- Install the freshly packed runtime tarballs and run `apex init --client github-copilot-vscode`.
 - Confirm `APEX` and the interactive Requirements, Architect, Planner, and Operator specialists are visible.
 - Start with `APEX`; confirm it reads status and directly hands requirements to `APEX Requirements`.
 - Confirm Requirements uses `vscode/askQuestions` for missing workload decisions and submits through MCP.
@@ -121,6 +121,10 @@ Use a fresh consumer repository and a supported VS Code release. Record pass/fai
 See the [VS Code custom agents documentation][vscode-custom-agents] for product-level discovery and handoff behavior.
 Record the results with the [live qualification procedure](live-qualification.md); the checklist alone is not release
 evidence.
+
+Repeat client discovery, questions, delegation, lifecycle, and fake-workflow outcomes in a separate clean consumer with
+`--client github-copilot-cli`. Confirm scalar models, `ask_user`, `task`, hidden-worker visibility, workspace APEX MCP,
+and the exact managed tool allowlist before comparing normalized kernel outcomes.
 
 ## Capture Expected Evidence
 

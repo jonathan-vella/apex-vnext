@@ -106,7 +106,7 @@ import {
 import { constants } from "node:fs";
 import { access, cp, lstat, mkdir, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
 import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { resolveBundledAssets } from "./assets.js";
+import { resolveBundledAssets, type BundledClientProjection } from "./assets.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
 import { ApexError, EXIT_CODES } from "./errors.js";
 import {
@@ -145,9 +145,17 @@ interface ManagedFile {
 interface CustomizationLock {
   version: 1;
   source: string;
+  clientId?: BundledClientProjection["id"];
   runtime: ManagedFile[];
   files: ManagedFile[];
   previousLockRef?: string;
+}
+
+interface CustomizationSelection {
+  version: 1;
+  clientId: BundledClientProjection["id"];
+  sourceMode: "bundled-projection" | "custom-source";
+  customSource?: string;
 }
 
 interface CustomizationTransactionEntry {
@@ -449,13 +457,28 @@ export class ApexService {
     targetScope?: string;
     iacTool?: "bicep" | "terraform";
     customizationsSource?: string;
+    clientId?: BundledClientProjection["id"];
   }): Promise<{ projectId: ProjectId; runId: RunId }> {
     await this.assertCleanInitialization();
     await mkdir(join(this.root, ".apex"), { recursive: true });
     try {
       await this.ensureLocalGitBoundary();
       const assets = await resolveBundledAssets();
-      await this.installCustomizations(input.customizationsSource ?? assets.customizations, false, assets.config);
+      const clientId = input.clientId ?? "github-copilot-vscode";
+      const selection: CustomizationSelection = {
+        version: 1,
+        clientId,
+        sourceMode: input.customizationsSource === undefined ? "bundled-projection" : "custom-source",
+        ...(input.customizationsSource === undefined ? {} : { customSource: resolve(input.customizationsSource) }),
+      };
+      await atomicWriteJson(join(this.root, ".apex", "customizations.selection.json"), selection);
+      await this.installCustomizations(
+        input.customizationsSource ?? assets.clientProjections[clientId],
+        false,
+        assets.config,
+        false,
+        clientId,
+      );
       await this.installCapabilityAssets(assets);
       const runtimeLock = await this.createRuntimeLock(assets);
       const runtimeLockHash = sha256Json(runtimeLock);
@@ -486,8 +509,16 @@ export class ApexService {
     const selection = await this.selection();
     await this.ensureLocalGitBoundary();
     const assets = await resolveBundledAssets();
-    const source = customizationsSource ?? assets.customizations;
-    const updated = await this.installCustomizations(source, true, assets.config);
+    const lock = JSON.parse(
+      await readFile(join(this.root, ".apex", "customizations.lock.json"), "utf8"),
+    ) as CustomizationLock;
+    const persisted = await this.customizationSelection(lock.clientId);
+    const clientId = persisted.clientId;
+    if (persisted.sourceMode === "custom-source" && customizationsSource === undefined) {
+      throw new ApexError("APEX_USAGE", "Custom-source updates require --customizations-source", EXIT_CODES.usage);
+    }
+    const source = customizationsSource ?? assets.clientProjections[clientId];
+    const updated = await this.installCustomizations(source, true, assets.config, false, clientId);
     await this.append(await this.run(selection), "customizations.updated", { source: resolve(source), updated });
     return { updated };
   }
@@ -498,7 +529,12 @@ export class ApexService {
     const current = JSON.parse(await readFile(lockPath, "utf8")) as CustomizationLock;
     if (current.previousLockRef === undefined)
       throw new ApexError("APEX_NOT_FOUND", "No prior customization bundle is available", EXIT_CODES.notFound);
-    const previous = JSON.parse(await readFile(join(this.root, current.previousLockRef), "utf8")) as CustomizationLock;
+    if (!this.safeManagedRelativePath(current.previousLockRef)) {
+      throw new ApexError("APEX_VALIDATION", "Previous customization lock path is unsafe", EXIT_CODES.validation);
+    }
+    const previousPath = resolve(this.root, current.previousLockRef);
+    await this.assertSafeExistingPath(this.root, previousPath);
+    const previous = JSON.parse(await readFile(previousPath, "utf8")) as CustomizationLock;
     const restored: string[] = [];
     const conflicts: string[] = [];
     for (const [root, desired, installed] of [
@@ -506,10 +542,13 @@ export class ApexService {
       [join(this.root, ".apex", "runtime"), previous.runtime, current.runtime],
     ] as const) {
       for (const file of desired) {
-        const destination = join(root, file.path);
+        if (!this.safeManagedRelativePath(file.path)) {
+          throw new ApexError("APEX_VALIDATION", "Managed customization path is unsafe", EXIT_CODES.validation);
+        }
+        const destination = resolve(root, file.path);
+        await this.assertSafeDestination(root, destination);
         const installedFile = installed.find(({ path }) => path === file.path);
-        const incoming =
-          file.baseRef === undefined ? undefined : await this.readOptional(join(this.root, file.baseRef));
+        const incoming = await this.readManagedBase(file.baseRef);
         if (incoming === undefined) {
           conflicts.push(file.path);
           continue;
@@ -522,10 +561,7 @@ export class ApexService {
             localHash !== installedFile.currentHash &&
             localHash !== installedFile.baseHash
           ) {
-            const base =
-              installedFile.baseRef === undefined
-                ? undefined
-                : await this.readOptional(join(this.root, installedFile.baseRef));
+            const base = await this.readManagedBase(installedFile.baseRef);
             const merged = base === undefined ? undefined : this.mergeText(base, local, incoming);
             if (merged === undefined) {
               conflicts.push(file.path);
@@ -560,6 +596,24 @@ export class ApexService {
     }
     await rm(lockPath, { force: true });
     return { removed, conflicts };
+  }
+
+  async reinstallCustomizations(
+    customizationsSource?: string,
+  ): Promise<{ installed: string[]; clientId: BundledClientProjection["id"] }> {
+    await this.recoverCustomizationTransaction();
+    const lockPath = join(this.root, ".apex", "customizations.lock.json");
+    if (await this.exists(lockPath)) {
+      throw new ApexError("APEX_CONFLICT", "Managed customizations are already installed", EXIT_CODES.conflict);
+    }
+    const selection = await this.customizationSelection();
+    if (selection.sourceMode === "custom-source" && customizationsSource === undefined) {
+      throw new ApexError("APEX_USAGE", "Custom-source reinstall requires --customizations-source", EXIT_CODES.usage);
+    }
+    const assets = await resolveBundledAssets();
+    const source = customizationsSource ?? assets.clientProjections[selection.clientId];
+    const installed = await this.installCustomizations(source, false, assets.config, false, selection.clientId);
+    return { installed, clientId: selection.clientId };
   }
 
   async listProjects(): Promise<Array<{ projectId: string; displayName: string }>> {
@@ -1867,7 +1921,19 @@ export class ApexService {
     if (fix && yes && apexExists) {
       await this.ensureLocalGitBoundary(true);
       const assets = await resolveBundledAssets();
-      await this.installCustomizations(assets.customizations, true, assets.config, true);
+      const lock = JSON.parse(
+        await readFile(join(this.root, ".apex", "customizations.lock.json"), "utf8"),
+      ) as CustomizationLock;
+      const selection = await this.customizationSelection(lock.clientId);
+      if (selection.sourceMode === "custom-source") {
+        throw new ApexError(
+          "APEX_USAGE",
+          "Custom-source repair requires an explicit customization source update",
+          EXIT_CODES.usage,
+        );
+      }
+      const clientId = selection.clientId;
+      await this.installCustomizations(assets.clientProjections[clientId], true, assets.config, true, clientId);
       await this.installCapabilityAssets(assets);
       await atomicWriteJson(join(this.root, ".apex", "apex.lock.json"), await this.createRuntimeLock(assets));
     }
@@ -3400,6 +3466,28 @@ export class ApexService {
     return latest.runId;
   }
 
+  private async customizationSelection(
+    legacyClientId: BundledClientProjection["id"] = "github-copilot-vscode",
+  ): Promise<CustomizationSelection> {
+    try {
+      const value = JSON.parse(
+        await readFile(join(this.root, ".apex", "customizations.selection.json"), "utf8"),
+      ) as CustomizationSelection;
+      if (
+        value.version !== 1 ||
+        !["github-copilot-cli", "github-copilot-vscode"].includes(value.clientId) ||
+        !["bundled-projection", "custom-source"].includes(value.sourceMode) ||
+        (value.sourceMode === "custom-source" && typeof value.customSource !== "string")
+      ) {
+        throw new ApexError("APEX_VALIDATION", "Customization selection is invalid", EXIT_CODES.validation);
+      }
+      return value;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      return { version: 1, clientId: legacyClientId, sourceMode: "bundled-projection" };
+    }
+  }
+
   private async assertCleanInitialization(): Promise<void> {
     if (await this.exists(join(this.root, ".apex")))
       throw new ApexError("APEX_CONFLICT", "Workspace is already initialized", EXIT_CODES.conflict);
@@ -3553,19 +3641,24 @@ export class ApexService {
     const path = join(this.root, ".apex", "customizations.lock.json");
     try {
       const lock = JSON.parse(await readFile(path, "utf8")) as CustomizationLock;
+      const workspaceFiles = lock.files.map((file) => ({ ...file, root: this.root }));
+      const runtimeRoot = join(this.root, ".apex", "runtime");
+      const runtimeFiles = lock.runtime.map((file) => ({ ...file, root: runtimeRoot }));
       return await Promise.all(
-        [
-          ...lock.files.map((file) => ({ ...file, destination: join(this.root, file.path) })),
-          ...lock.runtime.map((file) => ({ ...file, destination: join(this.root, ".apex", "runtime", file.path) })),
-        ].map(async (file): Promise<DoctorCheck> => {
-          const actual = (await this.exists(file.destination))
-            ? sha256Bytes(await readFile(file.destination))
+        [...workspaceFiles, ...runtimeFiles].map(async (file): Promise<DoctorCheck> => {
+          if (!this.safeManagedRelativePath(file.path)) {
+            throw new ApexError("APEX_VALIDATION", "Managed customization path is unsafe", EXIT_CODES.validation);
+          }
+          const destination = resolve(file.root, file.path);
+          await this.assertSafeDestination(file.root, destination);
+          const actual = (await this.exists(destination))
+            ? sha256Bytes(await readFile(destination))
             : "missing";
           const hashesValid = [file.sourceHash, file.baseHash, file.currentHash].every((hash) =>
             /^[0-9a-f]{64}$/.test(hash),
           );
           return {
-            id: `managed:${relative(this.root, file.destination)}`,
+            id: `managed:${relative(this.root, destination)}`,
             ok: hashesValid && actual === file.currentHash,
             value: actual,
             remedy: "Run doctor --fix --yes to reinstall bundled managed files",
@@ -3624,6 +3717,7 @@ export class ApexService {
     update: boolean,
     runtimeSource?: string,
     repair = false,
+    clientId: BundledClientProjection["id"] = "github-copilot-vscode",
   ): Promise<string[]> {
     await this.recoverCustomizationTransaction();
     const source = resolve(sourcePath);
@@ -3667,7 +3761,7 @@ export class ApexService {
               EXIT_CODES.conflict,
             );
           if (!repair && old !== undefined && currentHash !== old.currentHash && currentHash !== old.baseHash) {
-            const base = old.baseRef === undefined ? undefined : await this.readOptional(join(this.root, old.baseRef));
+            const base = await this.readManagedBase(old.baseRef);
             const merged = base === undefined ? undefined : this.mergeText(base, current, incoming);
             if (merged === undefined)
               throw new ApexError("APEX_CONFLICT", `Managed ${label} conflict: ${path}`, EXIT_CODES.conflict);
@@ -3731,6 +3825,7 @@ export class ApexService {
     const nextLock = {
       version: 1,
       source,
+      clientId,
       runtime,
       files: managed,
       ...(previousLockRef === undefined ? {} : { previousLockRef }),
@@ -3791,9 +3886,12 @@ export class ApexService {
     const pointer = join(this.root, ".apex", "local", "customization-transaction.json");
     try {
       const { transactionPath } = JSON.parse(await readFile(pointer, "utf8")) as { transactionPath: string };
-      const transaction = JSON.parse(await readFile(transactionPath, "utf8")) as CustomizationTransaction;
+      const localRoot = join(this.root, ".apex", "local");
+      const resolvedTransaction = resolve(transactionPath);
+      await this.assertSafeExistingPath(localRoot, resolvedTransaction);
+      const transaction = JSON.parse(await readFile(resolvedTransaction, "utf8")) as CustomizationTransaction;
       await this.rollbackCustomizationTransaction(transaction);
-      await rm(resolve(transactionPath, ".."), { recursive: true, force: true });
+      await rm(resolve(resolvedTransaction, ".."), { recursive: true, force: true });
       await rm(pointer, { force: true });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
@@ -3802,10 +3900,35 @@ export class ApexService {
 
   private async rollbackCustomizationTransaction(transaction: CustomizationTransaction): Promise<void> {
     for (const entry of [...transaction.entries].reverse()) {
+      await this.assertSafeDestination(this.root, resolve(entry.destination));
+      if (entry.backup !== undefined && (await this.pathExistsLstat(entry.backup))) {
+        await this.assertSafeExistingPath(join(this.root, ".apex", "local"), resolve(entry.backup));
+      }
       if (entry.existed && entry.backup !== undefined && (await this.pathExistsLstat(entry.backup)))
         await atomicWriteBytes(entry.destination, await readFile(entry.backup));
       else if (!entry.existed) await rm(entry.destination, { force: true });
     }
+  }
+
+  private safeManagedRelativePath(path: string): boolean {
+    return (
+      path.length > 0 &&
+      !path.includes("\\") &&
+      !path.includes("\0") &&
+      !isAbsolute(path) &&
+      path.split("/").every((segment) => segment.length > 0 && segment !== "." && segment !== "..")
+    );
+  }
+
+  private async readManagedBase(baseRef: string | undefined): Promise<Buffer | undefined> {
+    if (baseRef === undefined) return undefined;
+    if (!this.safeManagedRelativePath(baseRef)) {
+      throw new ApexError("APEX_VALIDATION", "Managed customization base path is unsafe", EXIT_CODES.validation);
+    }
+    const path = resolve(this.root, baseRef);
+    if (!(await this.pathExistsLstat(path))) return undefined;
+    await this.assertSafeExistingPath(this.root, path);
+    return await readFile(path);
   }
 
   private mergeText(base: Buffer, local: Buffer, incoming: Buffer): Buffer | undefined {

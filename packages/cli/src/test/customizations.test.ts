@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, readdir, stat, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import test from "node:test";
 import { ApexError } from "../errors.js";
@@ -54,40 +54,7 @@ test("init installs bundled customizations and runtime config by default", async
       },
     },
   });
-  assert.deepEqual(JSON.parse(await readFile(join(root, ".github", "mcp.json"), "utf8")), {
-    mcpServers: {
-      apex: {
-        type: "local",
-        command: "node",
-        args: ["node_modules/@apex/cli/dist/cli.js", "mcp", "serve"],
-        env: {},
-        tools: [
-          "status",
-          "capabilityList",
-          "capabilityStatus",
-          "nextTask",
-          "taskContext",
-          "recordInput",
-          "stageArtifact",
-          "stageFile",
-          "generateIac",
-          "validateTask",
-          "completeTask",
-          "preview",
-          "reconcile",
-          "inventory",
-          "diagnose",
-          "improvementObserve",
-          "improvementObservations",
-          "improvementProposals",
-          "render",
-          "promote",
-          "doctor",
-          "submitEvidence",
-        ],
-      },
-    },
-  });
+  await assert.rejects(readFile(join(root, ".github", "mcp.json"), "utf8"), /ENOENT/u);
   assert.equal(
     await readFile(join(root, ".apex", ".gitignore"), "utf8"),
     "/cache/\n/local/\n/work/\n/runtime/capability-packs/\n",
@@ -126,12 +93,136 @@ test("init installs bundled customizations and runtime config by default", async
     }
   }
   const lock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
+    clientId?: string;
     files: Array<{ path: string; sourceHash: string }>;
     runtime: Array<{ sourceHash: string }>;
   };
   assert.ok([...lock.files, ...lock.runtime].every(({ sourceHash }) => /^[a-f0-9]{64}$/.test(sourceHash)));
   assert.ok(lock.files.some(({ path }) => path === ".vscode/mcp.json"));
+  assert.ok(!lock.files.some(({ path }) => path === ".github/mcp.json"));
+  assert.equal(lock.clientId, "github-copilot-vscode");
+});
+
+test("init installs only the selected Copilot CLI projection and records it in the lock", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+  await assert.rejects(readFile(join(root, ".vscode", "mcp.json"), "utf8"), /ENOENT/u);
+  assert.match(await readFile(join(root, ".github", "mcp.json"), "utf8"), /"recordInput"/u);
+  const requirementsAgent = await readFile(join(root, ".github", "agents", "apex-requirements.agent.md"), "utf8");
+  assert.match(requirementsAgent, /model: Claude Sonnet 5/u);
+  assert.match(requirementsAgent, /- ask_user/u);
+  assert.match(requirementsAgent, /- task/u);
+  assert.doesNotMatch(requirementsAgent, /vscode\/askQuestions|handoffs:|agents:/u);
+  const lock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
+    clientId?: string;
+    files: Array<{ path: string }>;
+  };
+  assert.equal(lock.clientId, "github-copilot-cli");
   assert.ok(lock.files.some(({ path }) => path === ".github/mcp.json"));
+  assert.ok(!lock.files.some(({ path }) => path === ".vscode/mcp.json"));
+  await writeFile(join(root, "unrelated.txt"), "preserve\n");
+  await service.update();
+  const updatedLock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
+    clientId?: string;
+  };
+  assert.equal(updatedLock.clientId, "github-copilot-cli");
+  assert.deepEqual((await service.rollbackCustomizations()).conflicts, []);
+  const rolledBackLock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
+    clientId?: string;
+  };
+  assert.equal(rolledBackLock.clientId, "github-copilot-cli");
+  assert.deepEqual((await service.uninstallCustomizations()).conflicts, []);
+  assert.equal(await readFile(join(root, "unrelated.txt"), "utf8"), "preserve\n");
+  await assert.rejects(readFile(join(root, ".github", "mcp.json"), "utf8"), /ENOENT/u);
+  const reinstalled = await service.reinstallCustomizations();
+  assert.equal(reinstalled.clientId, "github-copilot-cli");
+  assert.match(await readFile(join(root, ".github", "mcp.json"), "utf8"), /"recordInput"/u);
+});
+
+test("legacy locks default to VS Code and custom sources require explicit updates", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo" });
+  await rm(join(root, ".apex", "customizations.selection.json"));
+  const lockPath = join(root, ".apex", "customizations.lock.json");
+  const lock = JSON.parse(await readFile(lockPath, "utf8")) as Record<string, unknown>;
+  delete lock.clientId;
+  await writeFile(lockPath, `${JSON.stringify(lock)}\n`);
+  await service.update();
+  assert.ok(await stat(join(root, ".vscode", "mcp.json")));
+
+  const customRoot = await tempRoot();
+  const customSource = await tempRoot();
+  await writeFile(join(customSource, "custom.txt"), "custom\n");
+  const custom = new ApexService(customRoot);
+  await custom.init({ projectId: "custom", customizationsSource: customSource });
+  await assert.rejects(custom.update(), (error: unknown) => error instanceof ApexError && error.code === "APEX_USAGE");
+  await assert.rejects(
+    custom.doctor(true, true),
+    (error: unknown) => error instanceof ApexError && error.code === "APEX_USAGE",
+  );
+  assert.equal(await readFile(join(customRoot, "custom.txt"), "utf8"), "custom\n");
+  await custom.uninstallCustomizations();
+  await custom.reinstallCustomizations(customSource);
+  assert.equal(await readFile(join(customRoot, "custom.txt"), "utf8"), "custom\n");
+});
+
+test("rollback and recovery reject lock-controlled path escapes", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo" });
+  const lockPath = join(root, ".apex", "customizations.lock.json");
+  const lock = JSON.parse(await readFile(lockPath, "utf8")) as Record<string, unknown>;
+  await writeFile(lockPath, `${JSON.stringify({ ...lock, previousLockRef: "../outside.json" })}\n`);
+  await assert.rejects(
+    service.rollbackCustomizations(),
+    (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
+  );
+
+  const pointer = join(root, ".apex", "local", "customization-transaction.json");
+  await mkdir(join(root, ".apex", "local"), { recursive: true });
+  await writeFile(pointer, `${JSON.stringify({ transactionPath: join(root, "outside-transaction.json") })}\n`);
+  await writeFile(
+    join(root, "outside-transaction.json"),
+    `${JSON.stringify({ version: 1, status: "applying", entries: [] })}\n`,
+  );
+  await assert.rejects(service.uninstallCustomizations(), /escapes|unsafe|outside/iu);
+});
+
+test("update rejects lock-controlled customization base escapes", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo" });
+  const lockPath = join(root, ".apex", "customizations.lock.json");
+  const lock = JSON.parse(await readFile(lockPath, "utf8")) as {
+    files: Array<{ path: string; baseRef?: string }>;
+  };
+  const agent = lock.files.find(({ path }) => path === ".github/agents/apex.agent.md")!;
+  agent.baseRef = "../outside-review.txt";
+  await writeFile(lockPath, `${JSON.stringify(lock)}\n`);
+  await writeFile(join(root, ".github", "agents", "apex.agent.md"), "local edit\n");
+  await assert.rejects(
+    service.update(),
+    (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
+  );
+});
+
+test("doctor does not read lock-controlled paths outside the workspace", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo" });
+  const outside = join(root, "..", "doctor-outside.txt");
+  await writeFile(outside, "external sentinel\n");
+  const outsideHash = createHash("sha256").update(await readFile(outside)).digest("hex");
+  const lockPath = join(root, ".apex", "customizations.lock.json");
+  const lock = JSON.parse(await readFile(lockPath, "utf8")) as { files: Array<{ path: string }> };
+  lock.files[0]!.path = "../doctor-outside.txt";
+  await writeFile(lockPath, `${JSON.stringify(lock)}\n`);
+  const result = await service.doctor();
+  assert.equal(result.checks.some(({ value }) => value === outsideHash), false);
+  assert.match(result.checks.find(({ id }) => id === "managed-files")?.value ?? "", /unsafe/u);
+  await rm(outside, { force: true });
 });
 
 test("update refuses local managed-file conflicts", async () => {

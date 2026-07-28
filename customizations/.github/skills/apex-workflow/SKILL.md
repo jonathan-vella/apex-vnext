@@ -18,10 +18,10 @@ Use this skill to orient an interactive agent without reconstructing workflow st
 2. Call `apex/nextTask` when status does not already include an actionable task.
 3. Treat the returned state, blockers, gate status, and task owner as authoritative.
 4. For resume, fetch fresh status instead of relying on an earlier conversation.
-5. Route interactive work by direct handoff to the kernel-selected specialist.
+5. Route interactive work through the active client projection to the kernel-selected specialist.
 
 Do not infer progress from generated files, conversation history, or handoff completion. If selection is ambiguous, the
-interactive agent may use `vscode/askQuestions` before repeating `apex/status`.
+interactive agent may use its active client question mechanism before repeating `apex/status`.
 
 ## Output
 

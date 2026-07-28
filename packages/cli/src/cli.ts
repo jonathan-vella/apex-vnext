@@ -52,6 +52,14 @@ function confirmed(flags: Flags, command: string): void {
   if (flags.yes !== true) throw new ApexError("APEX_USAGE", `${command} requires --yes`, EXIT_CODES.usage);
 }
 
+function clientId(flags: Flags): "github-copilot-cli" | "github-copilot-vscode" {
+  const value = flags.client ?? "github-copilot-vscode";
+  if (value !== "github-copilot-cli" && value !== "github-copilot-vscode") {
+    throw new ApexError("APEX_USAGE", "--client must be github-copilot-vscode or github-copilot-cli", EXIT_CODES.usage);
+  }
+  return value;
+}
+
 async function inputJson(flags: Flags): Promise<unknown> {
   return JSON.parse(await readFile(required(flags, "file"), "utf8")) as unknown;
 }
@@ -391,6 +399,7 @@ export async function execute(argv: string[], root = process.cwd()): Promise<unk
         ...(typeof flags.environment === "string" ? { environment: flags.environment } : {}),
         ...(typeof flags.target === "string" ? { targetScope: flags.target } : {}),
         iacTool: flags.iac === "terraform" ? "terraform" : "bicep",
+        clientId: clientId(flags),
         ...(typeof flags["customizations-source"] === "string"
           ? { customizationsSource: flags["customizations-source"] }
           : {}),
@@ -586,6 +595,10 @@ export async function execute(argv: string[], root = process.cwd()): Promise<unk
       return service.rollbackCustomizations();
     case "customizations uninstall":
       return service.uninstallCustomizations();
+    case "customizations reinstall":
+      return service.reinstallCustomizations(
+        typeof flags["customizations-source"] === "string" ? flags["customizations-source"] : undefined,
+      );
     case "writer transfer-create":
       return service.createWriterTransfer({
         repository: required(flags, "repo"),
