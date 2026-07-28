@@ -106,6 +106,15 @@ test("kernel validates freeform, single-select, and multi-select answers", () =>
     () =>
       validateInputAnswers(questions, [
         { questionId: "name", value: "demo" },
+        { questionId: "unknown", value: "value" },
+        { questionId: "features", value: ["logs"] },
+      ]),
+    /Unknown answer: unknown/u,
+  );
+  assert.throws(
+    () =>
+      validateInputAnswers(questions, [
+        { questionId: "name", value: "demo" },
         { questionId: "region", value: "invalid" },
         { questionId: "features", value: ["logs"] },
       ]),

@@ -204,6 +204,25 @@ test("concurrent input submissions return only stable Apex errors", async () => 
   }
 });
 
+test("malformed persisted input requests fail closed", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const initialized = await service.init({ projectId: "demo" });
+  const journalDirectory = join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal");
+  const journal = new EventJournal(journalDirectory);
+  await journal.append({
+    eventId: "malformed-request",
+    projectId: "demo",
+    runId: initialized.runId,
+    type: "requirements.input-requested",
+    timestamp: "2026-01-01T00:00:00.000Z",
+    ownerEpoch: 1,
+    expectedHead: await journal.head(),
+    payload: { requestId: "", questions: [] },
+  });
+  await assert.rejects(service.nextTask(), /Persisted input request is invalid/u);
+});
+
 test("a task remains current across stage then complete", async () => {
   const service = new ApexService(await tempRoot());
   await service.init({ projectId: "demo" });

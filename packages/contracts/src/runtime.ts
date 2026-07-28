@@ -210,6 +210,10 @@ export type InputSubmissionV1 = Static<typeof InputSubmissionV1Schema>;
 export function hasValidInputRequestQuestions(questions: QuestionV1[]): boolean {
   return (
     new Set(questions.map(({ id }) => id)).size === questions.length &&
-    questions.every(({ multiSelect, options }) => multiSelect !== true || options !== undefined)
+    questions.every(
+      ({ multiSelect, options }) =>
+        (multiSelect !== true || options !== undefined) &&
+        (options === undefined || (options.length > 0 && new Set(options).size === options.length)),
+    )
   );
 }

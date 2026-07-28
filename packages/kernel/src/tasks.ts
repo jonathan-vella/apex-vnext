@@ -50,11 +50,11 @@ export function validateInputAnswers(questions: QuestionV1[], submitted: InputAn
     if (answers.has(answer.questionId)) throw new Error(`Duplicate answer: ${answer.questionId}`);
     answers.set(answer.questionId, answer.value);
   }
-  if (answers.size !== questions.length || questions.some(({ id }) => !answers.has(id))) {
-    throw new Error("Every requested question requires exactly one answer");
-  }
   for (const answerId of answers.keys()) {
     if (!questions.some(({ id }) => id === answerId)) throw new Error(`Unknown answer: ${answerId}`);
+  }
+  if (answers.size !== questions.length || questions.some(({ id }) => !answers.has(id))) {
+    throw new Error("Every requested question requires exactly one answer");
   }
   return questions.map((question) => {
     const value = answers.get(question.id)!;

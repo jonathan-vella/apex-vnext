@@ -12,6 +12,7 @@ import {
   GovernanceConstraintsV1Schema,
   IacBindingV1Schema,
   IacHandoffV1Schema,
+  InputRequestV1Schema,
   InputSubmissionV1Schema,
   ImplementationIntentV1Schema,
   LogicalResourceManifestV1Schema,
@@ -2324,13 +2325,17 @@ export class ApexService {
 
   private inputRequest(event: EventV1, ownerEpoch: number): InputRequestV1 {
     const payload = event.payload as { requestId: string; questions: InputRequestV1["questions"] };
-    return {
+    const request = {
       schemaVersion: CONTRACT_VERSION,
       requestId: payload.requestId,
       expectedHead: event.hash,
       ownerEpoch,
       questions: payload.questions,
     };
+    if (!Value.Check(InputRequestV1Schema, request) || !hasValidInputRequestQuestions(request.questions)) {
+      throw new ApexError("APEX_INTERNAL", "Persisted input request is invalid", EXIT_CODES.internal);
+    }
+    return request;
   }
 
   private async append(

@@ -693,6 +693,8 @@ describe("target family contracts", () => {
       false,
     );
     assert.equal(hasValidInputRequestQuestions([{ id: "bad", prompt: "Bad?", multiSelect: true }]), false);
+    assert.equal(hasValidInputRequestQuestions([{ id: "bad", prompt: "Bad?", options: [] }]), false);
+    assert.equal(hasValidInputRequestQuestions([{ id: "bad", prompt: "Bad?", options: ["same", "same"] }]), false);
     assert.equal(
       Value.Check(InputRequestV1Schema, {
         ...request,
