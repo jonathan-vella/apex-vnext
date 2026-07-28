@@ -19,6 +19,9 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Added versioned, content-free normalized Copilot client outcomes, scenario-specific comparison and qualification
+  contracts, strict bounded collection, proof-complete evidence closure verification, and fail-closed live release
+  binding. Deterministic fixture parity never grants release authority; paired exact-candidate execution remains open.
 - Added schema-backed, deterministic VS Code and Copilot CLI agent projections with pinned tool selectors, source-bound
   provenance, explicit selected-client installation, and transactional update, rollback, uninstall, and reinstall.
 - Added versioned kernel-owned input requests and typed APEX MCP answer recording bound to the exact journal head and

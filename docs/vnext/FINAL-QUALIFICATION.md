@@ -19,7 +19,7 @@ No evidence in this dossier authorizes package publication, tag creation, branch
 | Exact candidate               | Not selected; current `main` is a characterization base.                 |
 | Deterministic qualification   | Must repeat after all re-baseline implementation changes.                |
 | VS Code qualification         | Must repeat against the new bundle and exact candidate.                  |
-| Copilot CLI qualification     | Version `1.0.73` selected; cross-client qualification has not run.       |
+| Client parity qualification   | Deterministic harness complete; paired exact-candidate runs not started. |
 | ARM MCP qualification         | Not run; typed adapter, authentication, and allowlist proof are pending. |
 | MCP and Draw.io retirement    | Not implemented; each replacement gate must pass before removal.         |
 | Improvement measurement       | Not implemented; prior evidence covers observe-and-propose only.         |

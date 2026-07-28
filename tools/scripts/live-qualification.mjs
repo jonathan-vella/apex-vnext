@@ -16,6 +16,15 @@ import {
   VNEXT_QUALIFICATION_REPOSITORY,
   VNEXT_QUALIFICATION_REPOSITORY_IDENTITY,
 } from "./_lib/vnext-qualification.mjs";
+import { parseStrictJson } from "./_lib/strict-json.mjs";
+import { hasBoundClientQualification } from "../../packages/contracts/dist/index.js";
+import { verifyClientOutcomeQualification } from "./compare-client-outcomes.mjs";
+import {
+  CLIENT_OUTCOME_SCENARIO_CORPUS,
+  CLIENT_OUTCOME_SCENARIO_CORPUS_HASH,
+  CLIENT_OUTCOME_TOOLCHAIN_HASH,
+  verifyClientOutcomeRuntimeReceipt,
+} from "./collect-client-outcome.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const COMMAND_OPTIONS = {
@@ -144,8 +153,12 @@ export function validateLiveQualification(qualification, evidenceManifest, actua
     findings.push(`projectId: expected evidence manifest project ${evidenceManifest.projectId}`);
   if (qualification.runId !== evidenceManifest.runId)
     findings.push(`runId: expected evidence manifest run ${evidenceManifest.runId}`);
-  const knownEvidence = new Set(evidenceManifest.entries.map(({ hash }) => hash));
-  if (knownEvidence.size !== evidenceManifest.entries.length)
+  const evidenceEntries = [
+    ...evidenceManifest.entries,
+    ...(evidenceManifest.clientQualification === undefined ? [] : [evidenceManifest.clientQualification]),
+  ];
+  const knownEvidence = new Set(evidenceEntries.map(({ hash }) => hash));
+  if (knownEvidence.size !== evidenceEntries.length)
     findings.push("evidence manifest: duplicate entry hashes are not allowed");
   for (const scenario of qualification.scenarios) {
     for (const reference of scenario.evidenceRefs) {
@@ -153,11 +166,19 @@ export function validateLiveQualification(qualification, evidenceManifest, actua
         findings.push(`scenarios/${scenario.id}: unknown evidence reference ${reference}`);
     }
   }
+  if (
+    evidenceManifest.clientQualification !== undefined &&
+    !qualification.scenarios.some(({ evidenceRefs }) =>
+      evidenceRefs.includes(evidenceManifest.clientQualification.hash),
+    )
+  ) {
+    findings.push("client qualification: no live scenario references the bound qualification");
+  }
   findings.push(...secretIssues(qualification, dependencies.secretFieldPattern, dependencies.secretValuePattern));
   return findings.sort();
 }
 
-export function validateEvidencePayloads(evidenceManifest, payloads) {
+export function validateEvidencePayloads(evidenceManifest, payloads, releaseContext) {
   if (
     !Array.isArray(evidenceManifest?.entries) ||
     evidenceManifest.entries.some(
@@ -167,13 +188,45 @@ export function validateEvidencePayloads(evidenceManifest, payloads) {
         typeof entry.kind !== "string" ||
         typeof entry.hash !== "string" ||
         !Number.isInteger(entry.bytes),
-    )
+    ) ||
+    (evidenceManifest.clientQualification !== undefined &&
+      (evidenceManifest.clientQualification === null ||
+        typeof evidenceManifest.clientQualification !== "object" ||
+        evidenceManifest.clientQualification.kind !== "client-qualification" ||
+        typeof evidenceManifest.clientQualification.hash !== "string" ||
+        !Number.isInteger(evidenceManifest.clientQualification.bytes)))
   ) {
     return ["evidence payloads: evidence manifest entries are invalid"];
   }
   const findings = [];
-  const entriesByHash = new Map(evidenceManifest.entries.map((entry) => [entry.hash, entry]));
+  if (releaseContext?.requireClientQualification && evidenceManifest.clientQualification === undefined) {
+    findings.push("evidence manifest: live release qualification requires client qualification evidence");
+  }
+  const supportingClientEntries = evidenceManifest.entries.filter(
+    ({ kind }) => kind === "client-outcome" || kind === "client-outcome-comparison",
+  );
+  if (evidenceManifest.entries.some(({ kind }) => kind === "client-qualification")) {
+    findings.push("evidence manifest: client-qualification is only allowed in the dedicated property");
+  }
+  if (supportingClientEntries.length > 0 && evidenceManifest.clientQualification === undefined) {
+    findings.push("evidence manifest: client outcome evidence requires a bound client qualification");
+  }
+  const entries = [
+    ...evidenceManifest.entries,
+    ...(evidenceManifest.clientQualification === undefined ? [] : [evidenceManifest.clientQualification]),
+  ];
+  const uniqueHashes = new Set(entries.map(({ hash }) => hash));
+  if (uniqueHashes.size !== entries.length) {
+    findings.push("evidence manifest: duplicate entry hashes are not allowed");
+  }
+  const entriesByHash = new Map(entries.map((entry) => [entry.hash, entry]));
   const matchedHashes = new Set();
+  const payloadBytesByHash = new Map();
+  const clientPayloads = {
+    qualification: [],
+    comparisons: [],
+    outcomes: [],
+  };
   for (const { path, bytes } of payloads) {
     const hash = sha256(bytes);
     const entry = entriesByHash.get(hash);
@@ -186,12 +239,108 @@ export function validateEvidencePayloads(evidenceManifest, payloads) {
       continue;
     }
     matchedHashes.add(hash);
+    payloadBytesByHash.set(hash, bytes);
     if (bytes.byteLength !== entry.bytes) {
       findings.push(`evidence payload ${path}: expected ${entry.bytes} bytes, found ${bytes.byteLength}`);
     }
+    if (
+      entry === evidenceManifest.clientQualification ||
+      entry.kind === "client-outcome-comparison" ||
+      entry.kind === "client-outcome"
+    ) {
+      let value;
+      try {
+        value = parseStrictJson(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+      } catch {
+        const label = entry === evidenceManifest.clientQualification ? "client qualification" : entry.kind;
+        findings.push(`evidence payload ${path}: ${label} must be strict UTF-8 JSON`);
+        continue;
+      }
+      if (entry === evidenceManifest.clientQualification) {
+        if (!hasBoundClientQualification(evidenceManifest, bytes)) {
+          findings.push(`evidence payload ${path}: client qualification contract or binding is invalid`);
+        } else {
+          clientPayloads.qualification.push(value);
+        }
+      } else if (entry.kind === "client-outcome-comparison") {
+        clientPayloads.comparisons.push(value);
+      } else {
+        clientPayloads.outcomes.push(value);
+      }
+    }
   }
-  for (const entry of evidenceManifest.entries) {
+  for (const entry of entries) {
     if (!matchedHashes.has(entry.hash)) findings.push(`evidence manifest entry ${entry.kind}: payload is missing`);
+  }
+  if (evidenceManifest.clientQualification !== undefined && clientPayloads.qualification.length === 1) {
+    try {
+      const qualification = clientPayloads.qualification[0];
+      const comparisons = new Map(clientPayloads.comparisons.map((value) => [value?.comparisonId, value]));
+      const outcomes = new Map(clientPayloads.outcomes.map((value) => [value?.outcomeId, value]));
+      if (comparisons.size !== clientPayloads.comparisons.length || outcomes.size !== clientPayloads.outcomes.length) {
+        throw new TypeError("CLIENT_QUALIFICATION_DUPLICATE_PAYLOAD_ID");
+      }
+      const referencedComparisons = new Set(qualification.comparisons.map(({ comparisonId }) => comparisonId));
+      const referencedOutcomes = new Set(
+        qualification.comparisons.flatMap(({ outcomeIds }) => [outcomeIds.vscode, outcomeIds.cli]),
+      );
+      if (
+        referencedComparisons.size !== comparisons.size ||
+        referencedOutcomes.size !== outcomes.size ||
+        [...comparisons.keys()].some((id) => !referencedComparisons.has(id)) ||
+        [...outcomes.keys()].some((id) => !referencedOutcomes.has(id))
+      ) {
+        throw new TypeError("CLIENT_QUALIFICATION_PAYLOAD_SET_INVALID");
+      }
+      const triplets = qualification.comparisons.map(({ comparisonId, outcomeIds }) => ({
+        comparison: comparisons.get(comparisonId),
+        outcomes: [outcomes.get(outcomeIds.vscode), outcomes.get(outcomeIds.cli)],
+      }));
+      if (releaseContext !== undefined) {
+        const expectedCandidate = releaseContext.candidate;
+        const expectedRepository = repositoryIdentity(expectedCandidate.repository);
+        const outcomesInClosure = triplets.flatMap(({ outcomes: values }) => values);
+        if (
+          qualification.evidenceKind !== "live" ||
+          outcomesInClosure.some(
+            (outcome) =>
+              outcome?.evidenceKind !== "live" ||
+              outcome.execution?.projectId !== releaseContext.projectId ||
+              repositoryIdentity(outcome.candidate?.repository) !== expectedRepository ||
+              outcome.candidate?.branch !== expectedCandidate.branch ||
+              outcome.candidate?.commit !== expectedCandidate.commit ||
+              outcome.candidate?.packageLockHash !== expectedCandidate.packageLockHash ||
+              outcome.candidate?.releaseManifestHash !== expectedCandidate.releaseManifestHash ||
+              outcome.candidate?.runtimeBundleHash !== expectedCandidate.runtimeBundleHash ||
+              outcome.candidate?.customizationBundleHash !== expectedCandidate.customizationBundleHash ||
+              outcome.candidate?.scenarioCorpusHash !== CLIENT_OUTCOME_SCENARIO_CORPUS_HASH ||
+              outcome.candidate?.toolchainHash !== CLIENT_OUTCOME_TOOLCHAIN_HASH,
+          )
+        ) {
+          throw new TypeError("CLIENT_QUALIFICATION_RELEASE_BINDING_INVALID");
+        }
+        if (validateClientRuntimeEvidence(outcomesInClosure, entriesByHash, payloadBytesByHash).length > 0) {
+          throw new TypeError("CLIENT_RUNTIME_EVIDENCE_INVALID");
+        }
+      }
+      const context =
+        qualification.evidenceKind === "fixture"
+          ? {
+              mode: "fixture-only",
+              scenarioIds: CLIENT_OUTCOME_SCENARIO_CORPUS.scenarios.map(({ id }) => id),
+              scenarioCorpusHash: CLIENT_OUTCOME_SCENARIO_CORPUS_HASH,
+              toolchainHash: CLIENT_OUTCOME_TOOLCHAIN_HASH,
+              clients: {
+                vscodeVersion: CLIENT_OUTCOME_SCENARIO_CORPUS.fixtureClients.vscodeVersion,
+                vscodeExtensionVersion: CLIENT_OUTCOME_SCENARIO_CORPUS.fixtureClients.vscodeExtensionVersion,
+                cliVersion: CLIENT_OUTCOME_SCENARIO_CORPUS.fixtureClients.cliVersion,
+              },
+            }
+          : undefined;
+      verifyClientOutcomeQualification(qualification, triplets, context);
+    } catch {
+      findings.push("client qualification: supporting comparison/outcome closure is invalid");
+    }
   }
   return findings.sort();
 }
@@ -227,6 +376,72 @@ export function renderLiveQualification(qualification) {
 }
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+
+export function validateClientRuntimeEvidence(outcomes, entriesByHash, payloadBytesByHash) {
+  const findings = [];
+  const requireImmutablePayload = (hash, expectedKind, label) => {
+    const entry = entriesByHash.get(hash);
+    if (
+      entry === undefined ||
+      entry.kind !== expectedKind ||
+      entry.retention !== "immutable" ||
+      !payloadBytesByHash.has(hash)
+    ) {
+      findings.push(`${label}: immutable evidence payload ${hash} is missing`);
+      return false;
+    }
+    return true;
+  };
+  for (const outcome of outcomes) {
+    const prefix = `client outcome ${outcome?.outcomeId ?? "unknown"}`;
+    const sourceDigest = outcome?.evidence?.sourceDigest;
+    const attestationHash = outcome?.evidence?.attestationHash;
+    const semanticJournalHash = outcome?.execution?.semanticJournalHash;
+    const references = [
+      ["journal source", sourceDigest, "client-journal-source"],
+      ["journal attestation", attestationHash, "client-journal-attestation"],
+      ["semantic journal", semanticJournalHash, "client-semantic-journal"],
+      ...Object.entries(outcome?.observations?.artifacts ?? {}).map(([name, value]) => [
+        `artifact ${name}`,
+        value,
+        `client-artifact:${name}`,
+      ]),
+      ...Object.entries(outcome?.observations?.evidence ?? {}).map(([name, value]) => [
+        `evidence ${name}`,
+        value,
+        `client-evidence:${name}`,
+      ]),
+      ...(outcome?.evidence?.refs ?? []).map((value) => ["evidence ref", value, "client-evidence-ref"]),
+    ];
+    for (const [label, hash, expectedKind] of references) {
+      if (typeof hash === "string") requireImmutablePayload(hash, expectedKind, `${prefix} ${label}`);
+    }
+    if (typeof sourceDigest !== "string" || !payloadBytesByHash.has(sourceDigest)) continue;
+    try {
+      const source = parseStrictJson(
+        new TextDecoder("utf-8", { fatal: true }).decode(payloadBytesByHash.get(sourceDigest)),
+      );
+      if (source?.schemaVersion !== "1.0.0" || !Array.isArray(source.records) || source.records.length === 0) {
+        throw new TypeError("SOURCE_SHAPE_INVALID");
+      }
+      for (const record of source.records) {
+        if (
+          !requireImmutablePayload(
+            record?.payloadHash,
+            "client-journal-payload",
+            `${prefix} journal record ${record?.sequence ?? "unknown"}`,
+          )
+        ) {
+          throw new TypeError("SOURCE_PAYLOAD_MISSING");
+        }
+      }
+      verifyClientOutcomeRuntimeReceipt(outcome, source);
+    } catch {
+      findings.push(`${prefix}: journal source evidence is invalid`);
+    }
+  }
+  return findings.sort();
+}
 
 async function readJsonBytes(path) {
   const bytes = await readFile(path);
@@ -272,6 +487,7 @@ export function assertCleanGitStatus(status) {
 
 function repositoryIdentity(value) {
   if (typeof value !== "string" || value.length === 0) return null;
+  if (/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i.test(value)) return `github.com/${value.toLowerCase()}`;
   const remote = value.replace(/^git\+/, "");
   const normalized = /^git@[^:]+:/.test(remote) ? remote.replace(/^git@([^:]+):/, "ssh://git@$1/") : remote;
   try {
@@ -340,6 +556,12 @@ async function currentCandidate(options) {
   const commit = gitValue(["rev-parse", "HEAD"]);
   const releaseManifestBytes = await readFile(releaseManifestPath);
   const releaseManifest = JSON.parse(releaseManifestBytes.toString("utf8"));
+  const customizationAssetManifest = JSON.parse(
+    await readFile(join(ROOT, "packages", "cli", "assets", "manifest.json"), "utf8"),
+  );
+  if (!/^[0-9a-f]{64}$/.test(customizationAssetManifest?.lock?.digest ?? "")) {
+    throw new Error("Generated customization asset lock is missing or invalid");
+  }
   assertReleaseManifest(releaseManifest, commit, repository);
   return {
     repository,
@@ -348,6 +570,7 @@ async function currentCandidate(options) {
     packageLockHash: sha256(await readFile(packageLockPath)),
     releaseManifestHash: sha256(releaseManifestBytes),
     runtimeBundleHash: sha256(await readFile(runtimeBundlePath)),
+    customizationBundleHash: customizationAssetManifest.lock.digest,
   };
 }
 
@@ -432,17 +655,22 @@ async function main() {
   const evidencePayloads = await Promise.all(
     (options["evidence-file"] ?? []).map(async (path) => ({ path, bytes: await readFile(resolve(path)) })),
   );
+  const candidate = await currentCandidate(options);
   const findings = [
     ...validateLiveQualification(
       qualification.value,
       evidenceManifest.value,
       {
-        candidate: await currentCandidate(options),
+        candidate,
         evidenceManifestHash: sha256(evidenceManifest.bytes),
       },
       dependencies,
     ),
-    ...validateEvidencePayloads(evidenceManifest.value, evidencePayloads),
+    ...validateEvidencePayloads(evidenceManifest.value, evidencePayloads, {
+      requireClientQualification: true,
+      projectId: qualification.value.projectId,
+      candidate,
+    }),
   ].sort();
   if (findings.length > 0) {
     for (const finding of findings) process.stderr.write(`❌ ${finding}\n`);

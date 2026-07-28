@@ -1,0 +1,187 @@
+{
+  "$id": "https://schemas.apexops.dev/client-outcome-comparison-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "binding": {
+      "additionalProperties": false,
+      "properties": {
+        "candidateId": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "clients": {
+          "additionalProperties": false,
+          "properties": {
+            "cliVersion": {
+              "maxLength": 32,
+              "pattern": "^[0-9]+(?:\\.[0-9]+){1,3}(?:-[0-9A-Za-z.-]+)?$",
+              "type": "string"
+            },
+            "vscodeExtensionVersion": {
+              "maxLength": 32,
+              "pattern": "^[0-9]+(?:\\.[0-9]+){1,3}(?:-[0-9A-Za-z.-]+)?$",
+              "type": "string"
+            },
+            "vscodeVersion": {
+              "maxLength": 32,
+              "pattern": "^[0-9]+(?:\\.[0-9]+){1,3}(?:-[0-9A-Za-z.-]+)?$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "vscodeVersion",
+            "vscodeExtensionVersion",
+            "cliVersion"
+          ],
+          "type": "object"
+        },
+        "toolchainHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidateId",
+        "toolchainHash",
+        "clients"
+      ],
+      "type": "object"
+    },
+    "blockers": {
+      "items": {
+        "maxLength": 64,
+        "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+        "type": "string"
+      },
+      "maxItems": 32,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "comparisonId": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "evidenceKind": {
+      "anyOf": [
+        {
+          "const": "fixture",
+          "type": "string"
+        },
+        {
+          "const": "live",
+          "type": "string"
+        }
+      ]
+    },
+    "mismatches": {
+      "items": {
+        "maxLength": 160,
+        "pattern": "^/(?:[a-z][a-zA-Z0-9.-]*)(?:/(?:[a-z][a-zA-Z0-9.-]*|[0-9]+))*$",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "outcomeIds": {
+      "additionalProperties": false,
+      "properties": {
+        "cli": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "vscode": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "vscode",
+        "cli"
+      ],
+      "type": "object"
+    },
+    "qualifiesRelease": {
+      "const": false,
+      "type": "boolean"
+    },
+    "scenarioId": {
+      "anyOf": [
+        {
+          "const": "CLIENT-001",
+          "type": "string"
+        },
+        {
+          "const": "CLIENT-002",
+          "type": "string"
+        },
+        {
+          "const": "CLIENT-003",
+          "type": "string"
+        },
+        {
+          "const": "CLIENT-004",
+          "type": "string"
+        },
+        {
+          "const": "CLIENT-005",
+          "type": "string"
+        },
+        {
+          "const": "CLIENT-006",
+          "type": "string"
+        },
+        {
+          "const": "CLIENT-007",
+          "type": "string"
+        },
+        {
+          "const": "CLIENT-008",
+          "type": "string"
+        },
+        {
+          "const": "CLIENT-009",
+          "type": "string"
+        },
+        {
+          "const": "CLIENT-010",
+          "type": "string"
+        }
+      ]
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "status": {
+      "anyOf": [
+        {
+          "const": "pass",
+          "type": "string"
+        },
+        {
+          "const": "fail",
+          "type": "string"
+        },
+        {
+          "const": "unavailable",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "scenarioId",
+    "evidenceKind",
+    "outcomeIds",
+    "binding",
+    "status",
+    "qualifiesRelease",
+    "mismatches",
+    "blockers",
+    "comparisonId"
+  ],
+  "type": "object"
+}

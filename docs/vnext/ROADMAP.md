@@ -239,7 +239,7 @@ pass; Terraform state, saved-plan, apply, destroy, and Gate 4 behavior is unchan
 **Dependency-complete slices:**
 
 1. Keep questions and `needs_input` kernel-owned; map VS Code to `vscode/askQuestions` and Copilot CLI to `ask_user`.
-   Issue #150 completes the shared kernel request boundary; client-specific mapping remains pending.
+   Issue #150 completes the shared kernel request boundary; issue #152 completes client-specific projection mapping.
 2. Record typed answers through APEX MCP instead of relying on client chat history. Issue #150 completes the versioned,
    exact-head and writer-epoch-bound recording contract.
 3. Generate VS Code and Copilot CLI agent projections from `customizations/manifest.json`. Issue #152 implements
@@ -248,7 +248,9 @@ pass; Terraform state, saved-plan, apply, destroy, and Gate 4 behavior is unchan
 5. Extend transactional customization install, update, rollback, uninstall, locks, and conflict handling to both clients.
    Issue #152 implements the shared selected-client lifecycle; live consumption remains part of slice 6.
 6. Qualify agent, skill, instruction, model, question, hidden-worker, MCP, gate, restart, and cross-device behavior in both
-   clients against equivalent typed outcomes.
+   clients against equivalent typed outcomes. Issue #154 implements the deterministic corpus, normalized contracts,
+   strict collector, pair comparator, proof-complete aggregate, and live evidence-manifest binding. Exact supported
+   VS Code/Copilot Chat selection and paired live execution remain open.
 
 **Exit gate:** Both pinned clients produce equivalent journal, task, artifact, gate, denial, resume, and transfer results.
 GitHub Copilot cloud coding-agent sessions, Copilot code review, and `/delegate` are not implementation or release gates.

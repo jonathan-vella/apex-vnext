@@ -1,0 +1,228 @@
+{
+  "schemaVersion": "1.0.0",
+  "fixtureClients": {
+    "vscodeVersion": "1.130.0",
+    "vscodeExtensionVersion": "0.58.0",
+    "cliVersion": "1.0.73",
+    "cliArtifactHash": "8f9bb5f7e364c267265d1e24ac2aea69ed559ddb956719c6db12a353de6c5970"
+  },
+  "scenarios": [
+    {
+      "id": "CLIENT-001",
+      "expectedTaskState": "completed",
+      "requiredAssertions": ["exact-bindings"],
+      "requiredGates": [],
+      "requiredArtifacts": [],
+      "requiredEvidence": ["toolchain-attestation"],
+      "requiredDenialCodes": [],
+      "transferPredicate": { "result": "not-applicable", "ownerEpochDelta": 0 },
+      "equalityPaths": [
+        "/candidate",
+        "/execution/projectId",
+        "/execution/workflowNode",
+        "/execution/taskState",
+        "/execution/semanticJournalHash",
+        "/execution/ownerEpoch",
+        "/observations/evidence",
+        "/observations/assertions",
+        "/disposition"
+      ]
+    },
+    {
+      "id": "CLIENT-002",
+      "expectedTaskState": "completed",
+      "requiredAssertions": ["agent-discovery", "instruction-discovery", "skill-discovery"],
+      "requiredGates": [],
+      "requiredArtifacts": ["customization-manifest"],
+      "requiredEvidence": ["discovery-attestation"],
+      "requiredDenialCodes": [],
+      "transferPredicate": { "result": "not-applicable", "ownerEpochDelta": 0 },
+      "equalityPaths": [
+        "/candidate",
+        "/execution/projectId",
+        "/execution/workflowNode",
+        "/execution/taskState",
+        "/execution/semanticJournalHash",
+        "/observations/artifacts",
+        "/observations/evidence",
+        "/observations/assertions",
+        "/disposition"
+      ]
+    },
+    {
+      "id": "CLIENT-003",
+      "expectedTaskState": "completed",
+      "requiredAssertions": ["needs-input", "typed-answer"],
+      "requiredGates": [],
+      "requiredArtifacts": [],
+      "requiredEvidence": ["input-event-attestation"],
+      "requiredDenialCodes": [],
+      "transferPredicate": { "result": "not-applicable", "ownerEpochDelta": 0 },
+      "equalityPaths": [
+        "/candidate",
+        "/execution/projectId",
+        "/execution/workflowNode",
+        "/execution/taskState",
+        "/execution/semanticJournalHash",
+        "/observations/evidence",
+        "/observations/assertions",
+        "/disposition"
+      ]
+    },
+    {
+      "id": "CLIENT-004",
+      "expectedTaskState": "completed",
+      "requiredAssertions": ["mcp-startup", "tool-allowlist"],
+      "requiredGates": [],
+      "requiredArtifacts": ["mcp-config"],
+      "requiredEvidence": ["tools-list-attestation"],
+      "requiredDenialCodes": ["UNKNOWN_TOOL_DENIED"],
+      "transferPredicate": { "result": "not-applicable", "ownerEpochDelta": 0 },
+      "equalityPaths": [
+        "/candidate",
+        "/execution/projectId",
+        "/execution/workflowNode",
+        "/execution/taskState",
+        "/execution/semanticJournalHash",
+        "/observations/artifacts",
+        "/observations/evidence",
+        "/observations/denialCodes",
+        "/observations/assertions",
+        "/disposition"
+      ]
+    },
+    {
+      "id": "CLIENT-005",
+      "expectedTaskState": "completed",
+      "requiredAssertions": ["hidden-worker", "specialist-routing"],
+      "requiredGates": [],
+      "requiredArtifacts": [],
+      "requiredEvidence": ["delegation-attestation"],
+      "requiredDenialCodes": ["HIDDEN_WORKER_DIRECT_DENIED"],
+      "transferPredicate": { "result": "not-applicable", "ownerEpochDelta": 0 },
+      "equalityPaths": [
+        "/candidate",
+        "/execution/projectId",
+        "/execution/workflowNode",
+        "/execution/taskState",
+        "/execution/semanticJournalHash",
+        "/observations/evidence",
+        "/observations/denialCodes",
+        "/observations/assertions",
+        "/disposition"
+      ]
+    },
+    {
+      "id": "CLIENT-006",
+      "expectedTaskState": "completed",
+      "requiredAssertions": ["gate-enforcement", "release-denial"],
+      "requiredGates": [1, 2, 3, 4],
+      "requiredArtifacts": [],
+      "requiredEvidence": ["gate-attestation"],
+      "requiredDenialCodes": ["RELEASE_AUTHORITY_DENIED"],
+      "transferPredicate": { "result": "not-applicable", "ownerEpochDelta": 0 },
+      "equalityPaths": [
+        "/candidate",
+        "/execution/projectId",
+        "/execution/workflowNode",
+        "/execution/taskState",
+        "/execution/semanticJournalHash",
+        "/observations/gates",
+        "/observations/evidence",
+        "/observations/denialCodes",
+        "/observations/assertions",
+        "/disposition"
+      ]
+    },
+    {
+      "id": "CLIENT-007",
+      "expectedTaskState": "completed",
+      "requiredAssertions": ["repository-resume", "restart-resume"],
+      "requiredGates": [],
+      "requiredArtifacts": ["session-state"],
+      "requiredEvidence": ["restart-attestation"],
+      "requiredDenialCodes": [],
+      "transferPredicate": { "result": "not-applicable", "ownerEpochDelta": 0 },
+      "equalityPaths": [
+        "/candidate",
+        "/execution/projectId",
+        "/execution/workflowNode",
+        "/execution/taskState",
+        "/execution/semanticJournalHash",
+        "/execution/ownerEpoch",
+        "/observations/artifacts",
+        "/observations/evidence",
+        "/observations/assertions",
+        "/disposition"
+      ]
+    },
+    {
+      "id": "CLIENT-008",
+      "expectedTaskState": "completed",
+      "requiredAssertions": ["owner-transfer", "writer-rejection"],
+      "requiredGates": [],
+      "requiredArtifacts": [],
+      "requiredEvidence": ["ownership-attestation"],
+      "requiredDenialCodes": ["STALE_WRITER_DENIED"],
+      "transferPredicate": { "result": "succeeded", "ownerEpochDelta": 1 },
+      "equalityPaths": [
+        "/candidate",
+        "/execution/projectId",
+        "/execution/workflowNode",
+        "/execution/taskState",
+        "/execution/semanticJournalHash",
+        "/execution/ownerEpoch",
+        "/observations/evidence",
+        "/observations/denialCodes",
+        "/observations/transfer",
+        "/observations/assertions",
+        "/disposition"
+      ]
+    },
+    {
+      "id": "CLIENT-009",
+      "expectedTaskState": "completed",
+      "requiredAssertions": ["install", "rollback", "uninstall", "update"],
+      "requiredGates": [],
+      "requiredArtifacts": ["customization-lock"],
+      "requiredEvidence": ["lifecycle-attestation"],
+      "requiredDenialCodes": [],
+      "transferPredicate": { "result": "not-applicable", "ownerEpochDelta": 0 },
+      "equalityPaths": [
+        "/candidate",
+        "/execution/projectId",
+        "/execution/workflowNode",
+        "/execution/taskState",
+        "/execution/semanticJournalHash",
+        "/observations/artifacts",
+        "/observations/evidence",
+        "/observations/assertions",
+        "/disposition"
+      ]
+    },
+    {
+      "id": "CLIENT-010",
+      "expectedTaskState": "completed",
+      "requiredAssertions": ["terminal-workflow"],
+      "requiredGates": [1, 2, 3, 4],
+      "requiredArtifacts": ["workflow-output"],
+      "requiredEvidence": ["validation-attestation"],
+      "requiredDenialCodes": ["UNAPPROVED_OPERATION_DENIED"],
+      "transferPredicate": { "result": "not-applicable", "ownerEpochDelta": 0 },
+      "equalityPaths": [
+        "/candidate",
+        "/execution/projectId",
+        "/execution/workflowNode",
+        "/execution/taskState",
+        "/execution/semanticJournalHash",
+        "/execution/ownerEpoch",
+        "/observations/gates",
+        "/observations/artifacts",
+        "/observations/evidence",
+        "/observations/denialCodes",
+        "/observations/assertions",
+        "/disposition"
+      ]
+    }
+  ]
+}

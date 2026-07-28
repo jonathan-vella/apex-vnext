@@ -314,6 +314,13 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "test-client-outcomes",
+      "script": "test:client-outcomes",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "test-retired-automation",
       "script": "test:retired-automation",
       "profile": "node-test",
@@ -428,6 +435,13 @@
     {
       "id": "validate-modernization-ownership",
       "script": "validate:modernization-ownership",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-client-outcomes",
+      "script": "validate:client-outcomes",
       "profile": "node-validation",
       "aliases": [],
       "retirement": { "status": "active", "replacementIds": [] }
@@ -605,6 +619,8 @@
         "test:registry-validator-reporter",
         "test:precommit-baseline",
         "test:client-context-samples",
+        "validate:client-outcomes",
+        "test:client-outcomes",
         "test:retired-automation",
         "validate:iac-security-baseline",
         "validate:policy-precheck",
@@ -681,6 +697,8 @@
         "test:registry-validator-reporter",
         "test:precommit-baseline",
         "test:client-context-samples",
+        "validate:client-outcomes",
+        "test:client-outcomes",
         "test:retired-automation",
         "validate:policy-precheck",
         "lint:js:ci",
