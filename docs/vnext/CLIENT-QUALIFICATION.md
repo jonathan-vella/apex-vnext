@@ -6,17 +6,17 @@ the re-baselined `0.10.0` implementation.
 
 ## Version Selection
 
-| Property            | Selected value                                                                                           |
-| ------------------- | -------------------------------------------------------------------------------------------------------- |
-| Copilot CLI release | `1.0.73`                                                                                                 |
-| Release source      | [GitHub Copilot CLI v1.0.73](https://github.com/github/copilot-cli/releases/tag/v1.0.73)                 |
-| Linux x64 artifact  | `copilot-linux-x64.tar.gz`                                                                               |
-| Artifact SHA-256    | `8f9bb5f7e364c267265d1e24ac2aea69ed559ddb956719c6db12a353de6c5970`                                       |
-| Verification        | Published digest matched; `copilot version` reported `GitHub Copilot CLI 1.0.73`                         |
-| npm observation     | `@github/copilot` tag `latest` resolved to `1.0.71-1` on 2026-07-21                                      |
-| VS Code release     | `1.130.0`                                                                                               |
-| Copilot Chat        | `0.58.0`                                                                                                 |
-| Selection evidence | Content-free completed context matrix receipt, canonical SHA-256 `197cbc48...013f42a`                    |
+| Property            | Selected value                                                                           |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| Copilot CLI release | `1.0.73`                                                                                 |
+| Release source      | [GitHub Copilot CLI v1.0.73](https://github.com/github/copilot-cli/releases/tag/v1.0.73) |
+| Linux x64 artifact  | `copilot-linux-x64.tar.gz`                                                               |
+| Artifact SHA-256    | `8f9bb5f7e364c267265d1e24ac2aea69ed559ddb956719c6db12a353de6c5970`                       |
+| Verification        | Published digest matched; `copilot version` reported `GitHub Copilot CLI 1.0.73`         |
+| npm observation     | `@github/copilot` tag `latest` resolved to `1.0.71-1` on 2026-07-21                      |
+| VS Code release     | `1.130.0`                                                                                |
+| Copilot Chat        | `0.58.0`                                                                                 |
+| Selection evidence  | Content-free completed context matrix receipt, canonical SHA-256 `197cbc48...013f42a`    |
 
 The GitHub release is selected because it was the newest non-draft, non-prerelease release observed at the cutoff and
 its platform artifact was independently digest-checked and executed. The npm channel lag is recorded rather than hidden.
