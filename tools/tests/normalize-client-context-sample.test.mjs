@@ -640,11 +640,18 @@ test("binds matrix client versions to observed and selected toolchain owners", (
   const cli = matrix.clients.find(({ id }) => id === "github-copilot-cli");
   assert.equal(vscode.version, toolchain.core.vscode.postCutoffObservation.version);
   assert.equal(vscode.extensionVersion, toolchain.core.vscode.postCutoffObservation.copilotChatVersion);
-  assert.equal(toolchain.core.vscode.installedVersion, null);
-  assert.equal(toolchain.core.vscode.newestObservedVersion, null);
-  assert.equal(toolchain.core.vscode.selectedExactVersion, null);
-  assert.equal(toolchain.core.vscode.selectionStatus, "qualification-required");
-  assert.equal(toolchain.core.vscode.postCutoffObservation.disposition, "next-candidate-qualification-input");
+  assert.equal(toolchain.core.vscode.installedVersion, vscode.version);
+  assert.equal(toolchain.core.vscode.installedCopilotChatVersion, vscode.extensionVersion);
+  assert.equal(toolchain.core.vscode.newestObservedVersion, vscode.version);
+  assert.equal(toolchain.core.vscode.selectedExactVersion, vscode.version);
+  assert.equal(toolchain.core.vscode.selectedExactCopilotChatVersion, vscode.extensionVersion);
+  assert.equal(toolchain.core.vscode.selectionStatus, "selected-qualification-required");
+  assert.equal(toolchain.core.vscode.postCutoffObservation.disposition, "selected-next-candidate-input");
+  assert.equal(toolchain.core.vscode.selectionEvidence.receipt, "tools/registry/client-context-baseline-receipt.json");
+  assert.equal(
+    toolchain.core.vscode.selectionEvidence.sha256,
+    "197cbc48abfebc3d01c8511557d7b852ed35b5169e8cb2fdcb747d1dc013f42a",
+  );
   assert.equal(cli.version, toolchain.core.copilotCli.selectedExactVersion);
 });
 

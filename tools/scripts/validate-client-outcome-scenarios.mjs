@@ -2,10 +2,12 @@
 /** Validate the canonical client outcome scenario corpus without runtime build dependencies. */
 
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import { parseStrictJson } from "./_lib/strict-json.mjs";
 
 const CORPUS_PATH = "tools/registry/client-outcome-scenarios.v1.json";
 const TOOLCHAIN_PATH = "config/toolchain.v1.json";
+const CONTEXT_RECEIPT_PATH = "tools/registry/client-context-baseline-receipt.json";
 const EXPECTED_IDS = Array.from({ length: 10 }, (_, index) => `CLIENT-${String(index + 1).padStart(3, "0")}`);
 const ALLOWED_PATHS = new Set([
   "/candidate",
@@ -25,13 +27,36 @@ const ALLOWED_PATHS = new Set([
 const IDENTIFIER_PATTERN = /^[a-z][a-z0-9.-]{0,63}$/;
 const CODE_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/;
 
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value !== null && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`)
+      .join(",")}}`;
+  }
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "boolean" ||
+    (typeof value === "number" && Number.isFinite(value))
+  ) {
+    return JSON.stringify(value);
+  }
+  throw new TypeError("CONTEXT_RECEIPT_NON_JSON_VALUE");
+}
+
+export function canonicalContextReceiptDigest(receipt) {
+  return createHash("sha256").update(stableJson(receipt)).digest("hex");
+}
+
 function validStringSet(values, pattern) {
   return (
     Array.isArray(values) && new Set(values).size === values.length && values.every((value) => pattern.test(value))
   );
 }
 
-export function validateClientOutcomeScenarios(corpus, toolchain) {
+export function validateClientOutcomeScenarios(corpus, toolchain, receipt, receiptHash) {
   const errors = [];
   if (corpus?.schemaVersion !== "1.0.0") errors.push("schemaVersion must be 1.0.0");
   if (!Array.isArray(corpus?.scenarios)) return [...errors, "scenarios must be an array"];
@@ -75,9 +100,8 @@ export function validateClientOutcomeScenarios(corpus, toolchain) {
   }
   const vscode = toolchain?.core?.vscode;
   const cli = toolchain?.core?.copilotCli;
-  const expectedVscodeVersion = vscode?.selectedExactVersion ?? vscode?.postCutoffObservation?.version;
-  const expectedExtensionVersion =
-    vscode?.selectedExactCopilotChatVersion ?? vscode?.postCutoffObservation?.copilotChatVersion;
+  const expectedVscodeVersion = vscode?.selectedExactVersion;
+  const expectedExtensionVersion = vscode?.selectedExactCopilotChatVersion;
   if (
     corpus.fixtureClients?.vscodeVersion !== expectedVscodeVersion ||
     corpus.fixtureClients?.vscodeExtensionVersion !== expectedExtensionVersion ||
@@ -86,13 +110,32 @@ export function validateClientOutcomeScenarios(corpus, toolchain) {
   ) {
     errors.push("fixtureClients must match canonical toolchain fixture and pinned values");
   }
+  const receiptVscode = receipt?.clients?.find(({ id }) => id === "github-copilot-vscode");
+  const receiptCli = receipt?.clients?.find(({ id }) => id === "github-copilot-cli");
+  if (
+    vscode?.selectionStatus !== "selected-qualification-required" ||
+    vscode?.installedVersion !== expectedVscodeVersion ||
+    vscode?.installedCopilotChatVersion !== expectedExtensionVersion ||
+    vscode?.newestObservedVersion !== expectedVscodeVersion ||
+    toolchain?.compatibilitySet?.vscode !== expectedVscodeVersion ||
+    vscode?.selectionEvidence?.receipt !== CONTEXT_RECEIPT_PATH ||
+    vscode?.selectionEvidence?.sha256 !== receiptHash ||
+    receipt?.coverageComplete !== true ||
+    receiptVscode?.version !== expectedVscodeVersion ||
+    receiptVscode?.extensionVersion !== expectedExtensionVersion ||
+    receiptCli?.version !== cli?.selectedExactVersion
+  ) {
+    errors.push("selected VS Code versions must match the complete bound context receipt");
+  }
   return errors;
 }
 
 function main() {
   const corpus = parseStrictJson(fs.readFileSync(CORPUS_PATH, "utf8"));
   const toolchain = parseStrictJson(fs.readFileSync(TOOLCHAIN_PATH, "utf8"));
-  const errors = validateClientOutcomeScenarios(corpus, toolchain);
+  const receipt = parseStrictJson(fs.readFileSync(CONTEXT_RECEIPT_PATH, "utf8"));
+  const receiptHash = canonicalContextReceiptDigest(receipt);
+  const errors = validateClientOutcomeScenarios(corpus, toolchain, receipt, receiptHash);
   if (errors.length > 0) {
     errors.forEach((error) => console.error(`❌ ${CORPUS_PATH}: ${error}`));
     return 1;

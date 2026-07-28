@@ -5,8 +5,8 @@
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
-- **Active issue:** [#154](https://github.com/jonathan-vella/apex-vnext/issues/154) - normalized client outcomes
-- **Working branch:** `feat/154-client-outcomes`
+- **Active issue:** [#156](https://github.com/jonathan-vella/apex-vnext/issues/156) - exact VS Code selection
+- **Working branch:** `feat/156-pin-vscode-client`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -54,16 +54,17 @@ PR #151 closes issue #150. Issue #152 generates client-valid VS Code and Copilot
 and installs exactly one selected projection through the shared transactional lifecycle under ADR-0005.
 PR #153 closes issue #152. Issue #154 adds deterministic normalized client outcomes, per-scenario comparisons, and a
 proof-complete matrix aggregate that extends the existing live-qualification authority without granting release authority.
+PR #155 closes issue #154. Issue #156 promotes VS Code `1.130.0` and Copilot Chat `0.58.0` from the completed content-free
+context receipt into the exact canonical toolchain selection; paired live execution remains pending.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
 npm-generated customization bundle. Astro MCP is retired independently; Azure Pricing, Terraform, and Draw.io MCP
 dependencies retain their separate replacement gates.
 
-These are approved requirements, not implementation claims. Copilot CLI `1.0.73` is selected and installed in the
-container user path after its official Linux x64 artifact passed the published SHA-256 check and version command. The
-completed context matrix is a usage baseline, not full client-parity qualification. No ARM MCP version has been selected
-or qualified.
+These are approved requirements, not live-parity claims. Copilot CLI `1.0.73`, VS Code `1.130.0`, and Copilot Chat
+`0.58.0` are selected exactly. The completed context matrix supplies version-selection provenance and a usage baseline,
+not full client-parity qualification. No ARM MCP version has been selected or qualified.
 
 ## Evidence State
 
@@ -90,12 +91,11 @@ or qualified.
 
 ## Immediate Sequence
 
-1. Merge issue #154's normalized client-outcome evidence harness.
-2. Select exact supported VS Code and Copilot Chat versions in the canonical toolchain.
-3. Run all paired client scenarios and prove equivalent typed outcomes and authority denials.
-4. Complete ARM pricing evidence, diagram routing, bounded improvement measurement, bundle generation, and guidance
+1. Merge issue #156's receipt-bound exact VS Code and Copilot Chat selection.
+2. Run all paired client scenarios and prove equivalent typed outcomes and authority denials.
+3. Complete ARM pricing evidence, diagram routing, bounded improvement measurement, bundle generation, and guidance
    consolidation in roadmap order.
-5. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.
+4. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.
 
 ## Resume Pointer
 
