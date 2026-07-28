@@ -239,7 +239,9 @@ pass; Terraform state, saved-plan, apply, destroy, and Gate 4 behavior is unchan
 **Dependency-complete slices:**
 
 1. Keep questions and `needs_input` kernel-owned; map VS Code to `vscode/askQuestions` and Copilot CLI to `ask_user`.
-2. Record typed answers through APEX MCP instead of relying on client chat history.
+   Issue #150 completes the shared kernel request boundary; client-specific mapping remains pending.
+2. Record typed answers through APEX MCP instead of relying on client chat history. Issue #150 completes the versioned,
+   exact-head and writer-epoch-bound recording contract.
 3. Generate VS Code and Copilot CLI agent projections from `customizations/manifest.json`.
 4. Add workspace-owned Copilot CLI MCP configuration with an explicit APEX tool allowlist.
 5. Extend transactional customization install, update, rollback, uninstall, locks, and conflict handling to both clients.

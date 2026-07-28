@@ -356,13 +356,12 @@ export async function qualityReport(root: string, runId: string, projectId = "de
 
 export async function prepareValidatedRun(service: ApexService, runId: string, track: "bicep" | "terraform") {
   const nextTask = async (expected: string) => {
-    const next = await service.nextTask();
+    const next = await nextTaskAfterInput(service);
     if (next.status !== "task" || next.task.taskType !== expected) throw new Error(`Expected ${expected}`);
     return next.task.taskId;
   };
   const complete = async (expected: string, outputs: TaskOutput[]) =>
     service.completeTaskOutputs(await nextTask(expected), outputs);
-  await service.nextTask();
   const requirementHashes = await complete("requirements", [
     { kind: "requirements", value: requirements() },
     { kind: "sku-manifest", value: skuManifest(sha256Json(requirements())) },
@@ -413,4 +412,17 @@ export async function prepareValidatedRun(service: ApexService, runId: string, t
   await service.decideGateNumber(3, "approved", "tester");
   await complete(`codegen-${track}`, codegenBundle(runId, track, plan));
   await complete(`validation-${track}`, [{ kind: "validation-evidence", value: validationEvidence(runId, track) }]);
+}
+
+export async function nextTaskAfterInput(service: ApexService) {
+  const next = await service.nextTask();
+  if (next.status !== "needs_input") return next;
+  await service.recordInput({
+    schemaVersion: "1.0.0",
+    requestId: next.request.requestId,
+    expectedHead: next.request.expectedHead,
+    ownerEpoch: next.request.ownerEpoch,
+    answers: next.request.questions.map(({ id }) => ({ questionId: id, value: `test-${id}` })),
+  });
+  return await service.nextTask();
 }

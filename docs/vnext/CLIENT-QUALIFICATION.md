@@ -43,6 +43,10 @@ Each scenario result must bind these fields before clients are compared:
 Equivalent outcomes require equality of the applicable normalized fields. UI wording, panel placement, and whether input
 is collected through `vscode/askQuestions` or `ask_user` are explicitly excluded from equality.
 
+Issue #150 implements the shared kernel boundary for `CLIENT-003`. Input requests and submissions are versioned,
+journal-head-bound, writer-epoch-bound, replay-safe, and recorded through `apex/recordInput`. VS Code and Copilot CLI UI
+mapping remains a separate client-projection slice; neither client may infer answers from conversation history.
+
 ## Scenario Matrix
 
 | ID           | Required outcome                                                                                           | VS Code mechanism                                                  | Copilot CLI mechanism                                                                                         |

@@ -10,6 +10,24 @@ const artifactKind = z.enum(
   ],
 );
 const taskOutput = z.object({ kind: artifactKind, value: z.unknown(), summary: z.string().optional() });
+const inputSubmission = z
+  .object({
+    schemaVersion: z.literal("1.0.0"),
+    requestId: z.string().min(1),
+    expectedHead: z.string().regex(/^[0-9a-f]{64}$/),
+    ownerEpoch: z.number().int().positive(),
+    answers: z
+      .array(
+        z
+          .object({
+            questionId: z.string().min(1),
+            value: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]),
+          })
+          .strict(),
+      )
+      .min(1),
+  })
+  .strict();
 const normalizeOutputs = (outputs: z.infer<typeof taskOutput>[]) =>
   outputs.map(({ kind, value, summary }) => ({
     kind,
@@ -40,10 +58,11 @@ export function createMcpServer(service: ApexService): McpServer {
   server.registerTool("taskContext", { inputSchema: { taskId: z.string() } }, async ({ taskId }) =>
     result(await service.taskContext(taskId)),
   );
-  server.registerTool("recordRequirementsInput", { inputSchema: { value: z.unknown() } }, async ({ value }) => {
-    await service.recordRequirementsInput(value);
-    return result({ recorded: true });
-  });
+  server.registerTool(
+    "recordInput",
+    { description: "Record answers for the exact pending kernel input request", inputSchema: inputSubmission },
+    async (input) => result(await service.recordInput(input)),
+  );
   server.registerTool(
     "stageArtifact",
     {

@@ -189,31 +189,31 @@ dependency revision; target, runtime lock, or accepted artifact changes do.
 
 The managed agents receive only tools declared in their definitions. The MCP server implements these exact names:
 
-| Tool                      | Input                                                                         |
-| ------------------------- | ----------------------------------------------------------------------------- |
-| `status`                  | None                                                                          |
-| `nextTask`                | None                                                                          |
-| `taskContext`             | `taskId`                                                                      |
-| `recordRequirementsInput` | `value`                                                                       |
-| `stageArtifact`           | `taskId` plus `kind`/`value` or `outputs[]`; optional summaries               |
-| `stageFile`               | `taskId`, safe relative `path`, and `content`; optional `expectedSha`         |
-| `generateIac`             | `taskId`; optional existing resources, provider constraints, and lock content |
-| `validateTask`            | `taskId`; optional single output or `outputs[]`                               |
-| `completeTask`            | `taskId` plus a single output or `outputs[]`                                  |
-| `reviewResolve`           | `reviewId`, `resolution`                                                      |
-| `gateDecide`              | `gate`, approved/rejected decision, and `actor`                               |
-| `preview`                 | apply/destroy operation and fake/bicep/terraform provider                     |
-| `deploy`                  | Optional `previewHash`                                                        |
-| `reconcile`               | None                                                                          |
-| `inventory`               | None                                                                          |
-| `diagnose`                | None                                                                          |
-| `render`                  | status/requirements/preview/approval/inventory kind                           |
-| `promote`                 | `environment`, `target`                                                       |
-| `doctor`                  | Optional `fix`, `yes`                                                         |
-| `submitEvidence`          | `taskId`, `kind`, JSON object `value`; optional `required`                    |
-| `improvementObserve`      | Structured source, category, severity, statement, and evidence references     |
-| `improvementObservations` | None                                                                          |
-| `improvementProposals`    | None                                                                          |
+| Tool                      | Input                                                                             |
+| ------------------------- | --------------------------------------------------------------------------------- |
+| `status`                  | None                                                                              |
+| `nextTask`                | None                                                                              |
+| `taskContext`             | `taskId`                                                                          |
+| `recordInput`             | `schemaVersion`, `requestId`, `expectedHead`, `ownerEpoch`, and typed `answers[]` |
+| `stageArtifact`           | `taskId` plus `kind`/`value` or `outputs[]`; optional summaries                   |
+| `stageFile`               | `taskId`, safe relative `path`, and `content`; optional `expectedSha`             |
+| `generateIac`             | `taskId`; optional existing resources, provider constraints, and lock content     |
+| `validateTask`            | `taskId`; optional single output or `outputs[]`                                   |
+| `completeTask`            | `taskId` plus a single output or `outputs[]`                                      |
+| `reviewResolve`           | `reviewId`, `resolution`                                                          |
+| `gateDecide`              | `gate`, approved/rejected decision, and `actor`                                   |
+| `preview`                 | apply/destroy operation and fake/bicep/terraform provider                         |
+| `deploy`                  | Optional `previewHash`                                                            |
+| `reconcile`               | None                                                                              |
+| `inventory`               | None                                                                              |
+| `diagnose`                | None                                                                              |
+| `render`                  | status/requirements/preview/approval/inventory kind                               |
+| `promote`                 | `environment`, `target`                                                           |
+| `doctor`                  | Optional `fix`, `yes`                                                             |
+| `submitEvidence`          | `taskId`, `kind`, JSON object `value`; optional `required`                        |
+| `improvementObserve`      | Structured source, category, severity, statement, and evidence references         |
+| `improvementObservations` | None                                                                              |
+| `improvementProposals`    | None                                                                              |
 
 Tool results contain both JSON text content and structured content. Agents should pass hashes and task IDs exactly as
 returned rather than reconstructing them from prose.

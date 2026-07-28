@@ -361,6 +361,10 @@ function restart(context: TrackContext): void {
 async function completeCreativeWorkflow(context: TrackContext): Promise<void> {
   const { service, runId, track } = context;
   await service.nextTask();
+  await service.recordRequirementsInput({
+    workload: `${track} qualification workload`,
+    requirements: "deterministic qualification requirements",
+  });
   const requirementValue = requirements(track);
   const requirementHashes = await complete(context, "requirements", [
     { kind: "requirements", value: requirementValue },
@@ -728,9 +732,13 @@ async function faultStaleTask(
   const service = new ApexService(join(root, ".scenarios", "stale-task"), { clock: clock.now, idSource: ids.next });
   await service.init({ projectId: `stale-${track}`, iacTool: track });
   await service.nextTask();
+  await service.recordRequirementsInput({
+    workload: `${track} stale task workload`,
+    requirements: "stale task fault injection",
+  });
   const issued = await service.nextTask();
   if (issued.status !== "task") throw new Error("Expected fault task");
-  await service.recordRequirementsInput({ marker: "advance journal" });
+  await service.cancelTask(issued.task.taskId);
   await expectFailure(
     () =>
       service.completeTaskOutputs(issued.task.taskId, [

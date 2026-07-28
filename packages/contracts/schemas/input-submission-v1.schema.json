@@ -1,0 +1,66 @@
+{
+  "$id": "https://schemas.apexops.dev/input-submission-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "answers": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "questionId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              }
+            ]
+          }
+        },
+        "required": [
+          "questionId",
+          "value"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "expectedHead": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "ownerEpoch": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "requestId": {
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "expectedHead",
+    "ownerEpoch",
+    "answers"
+  ],
+  "type": "object"
+}

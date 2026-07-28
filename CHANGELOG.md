@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Added versioned kernel-owned input requests and typed APEX MCP answer recording bound to the exact journal head and
+  writer epoch, with deterministic option validation, replay denial, transfer reissue, and no chat-history dependency.
 - Retired Terraform MCP after migrating active consumers to bounded Registry/native/documentation owners; removed its
   discovery, setup, Go feature, and health checks; archived provenance-bound evidence; and added negative regression gates.
 - Added bounded native Terraform provider schema inspection and version-pinned official documentation routing with exact

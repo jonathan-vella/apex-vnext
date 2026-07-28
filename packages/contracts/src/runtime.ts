@@ -108,10 +108,40 @@ export const QuestionV1Schema = Type.Object(
   {
     id: NonEmptyStringSchema,
     prompt: NonEmptyStringSchema,
-    options: Type.Optional(Type.Array(NonEmptyStringSchema, { minItems: 1 })),
+    options: Type.Optional(Type.Array(NonEmptyStringSchema, { minItems: 1, uniqueItems: true })),
     multiSelect: Type.Optional(Type.Boolean()),
   },
   { additionalProperties: false },
+);
+
+export const InputRequestV1Schema = Type.Object(
+  {
+    schemaVersion: ContractVersionSchema,
+    requestId: TaskIdSchema,
+    expectedHead: Sha256Schema,
+    ownerEpoch: Type.Integer({ minimum: 1 }),
+    questions: Type.Array(QuestionV1Schema, { minItems: 1, uniqueItems: true }),
+  },
+  { $id: "https://schemas.apexops.dev/input-request-v1.json", additionalProperties: false },
+);
+
+export const InputAnswerV1Schema = Type.Object(
+  {
+    questionId: NonEmptyStringSchema,
+    value: Type.Union([NonEmptyStringSchema, Type.Array(NonEmptyStringSchema, { minItems: 1, uniqueItems: true })]),
+  },
+  { additionalProperties: false },
+);
+
+export const InputSubmissionV1Schema = Type.Object(
+  {
+    schemaVersion: ContractVersionSchema,
+    requestId: TaskIdSchema,
+    expectedHead: Sha256Schema,
+    ownerEpoch: Type.Integer({ minimum: 1 }),
+    answers: Type.Array(InputAnswerV1Schema, { minItems: 1 }),
+  },
+  { $id: "https://schemas.apexops.dev/input-submission-v1.json", additionalProperties: false },
 );
 
 export const TaskResultV1Schema = Type.Union([
@@ -172,3 +202,18 @@ export type RunConfigV1 = Static<typeof RunConfigV1Schema>;
 export type TaskEnvelopeV1 = Static<typeof TaskEnvelopeV1Schema>;
 export type TaskResultV1 = Static<typeof TaskResultV1Schema>;
 export type EventV1 = Static<typeof EventV1Schema>;
+export type QuestionV1 = Static<typeof QuestionV1Schema>;
+export type InputRequestV1 = Static<typeof InputRequestV1Schema>;
+export type InputAnswerV1 = Static<typeof InputAnswerV1Schema>;
+export type InputSubmissionV1 = Static<typeof InputSubmissionV1Schema>;
+
+export function hasValidInputRequestQuestions(questions: QuestionV1[]): boolean {
+  return (
+    new Set(questions.map(({ id }) => id)).size === questions.length &&
+    questions.every(
+      ({ multiSelect, options }) =>
+        (multiSelect !== true || options !== undefined) &&
+        (options === undefined || (options.length > 0 && new Set(options).size === options.length)),
+    )
+  );
+}

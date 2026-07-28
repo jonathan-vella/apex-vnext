@@ -67,7 +67,7 @@ test("init installs bundled customizations and runtime config by default", async
           "capabilityStatus",
           "nextTask",
           "taskContext",
-          "recordRequirementsInput",
+          "recordInput",
           "stageArtifact",
           "stageFile",
           "generateIac",

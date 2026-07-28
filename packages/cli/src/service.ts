@@ -12,6 +12,8 @@ import {
   GovernanceConstraintsV1Schema,
   IacBindingV1Schema,
   IacHandoffV1Schema,
+  InputRequestV1Schema,
+  InputSubmissionV1Schema,
   ImplementationIntentV1Schema,
   LogicalResourceManifestV1Schema,
   OperationRecordV1Schema,
@@ -24,6 +26,7 @@ import {
   RuntimeBundleLockV1Schema,
   SkuManifestV1Schema,
   hasOnlyTypedSecretReferences,
+  hasValidInputRequestQuestions,
   hasValidCostArithmetic,
   hasValidLogicalResourceReferences,
   type ApprovalEvidenceV1,
@@ -32,6 +35,8 @@ import {
   type DeploymentPreviewV1,
   type EnvironmentInputsV1,
   type IacBindingV1,
+  type InputRequestV1,
+  type InputSubmissionV1,
   type ImprovementCategory,
   type ImprovementDecisionV1,
   type ImprovementObservationV1,
@@ -51,8 +56,10 @@ import {
   type RunId,
   type RuntimeBundleLockV1,
   type TaskEnvelopeV1,
+  type EventV1,
   type ExecutionPlanAttestationV1,
 } from "@apex/contracts";
+import { Value } from "@sinclair/typebox/value";
 import {
   CapabilityPackManager,
   FakeIaCProvider,
@@ -85,6 +92,7 @@ import {
   openGate,
   sha256Bytes,
   sha256Json,
+  validateInputAnswers,
   workflowValidatorOwnership,
   type JsonValue,
 } from "@apex/kernel";
@@ -674,26 +682,45 @@ export class ApexService {
   }
 
   async nextTask(): Promise<
-    { status: "needs_input"; questions: unknown[] } | { status: "task"; task: TaskEnvelopeV1 }
+    { status: "needs_input"; request: InputRequestV1 } | { status: "task"; task: TaskEnvelopeV1 }
   > {
     const selection = await this.selection();
     const run = await this.run(selection);
     const events = await this.journal(run).replay();
     const requirements = this.artifactHash(events, "requirements");
     if (requirements === undefined) {
-      if (
-        !events.some(
-          (event) => event.type === "requirements.input-requested" || event.type === "requirements.input-recorded",
-        )
-      ) {
-        await this.append(run, "requirements.input-requested", { questionIds: ["workload", "requirements"] });
-        return {
-          status: "needs_input",
-          questions: [
-            { id: "workload", prompt: "What workload should this project deliver?" },
-            { id: "requirements", prompt: "What outcomes and constraints are required?" },
-          ],
-        };
+      const requested = [...events].reverse().find((event) => event.type === "requirements.input-requested");
+      const requestId = (requested?.payload as { requestId?: unknown } | undefined)?.requestId;
+      const recorded = events.some(
+        (event) =>
+          event.type === "requirements.input-recorded" &&
+          (event.payload as { requestId?: unknown }).requestId === requestId,
+      );
+      if (requested === undefined) {
+        const questions = [
+          { id: "workload", prompt: "What workload should this project deliver?" },
+          { id: "requirements", prompt: "What outcomes and constraints are required?" },
+        ];
+        if (!hasValidInputRequestQuestions(questions)) {
+          throw new ApexError("APEX_INTERNAL", "Kernel input questions are invalid", EXIT_CODES.internal);
+        }
+        const event = await this.append(run, "requirements.input-requested", {
+          requestId: this.idSource(),
+          questions,
+        });
+        return { status: "needs_input", request: this.inputRequest(event, run.ownerEpoch) };
+      }
+      if (!recorded) {
+        if (requested.hash === events.at(-1)?.hash && requested.ownerEpoch === run.ownerEpoch) {
+          return { status: "needs_input", request: this.inputRequest(requested, run.ownerEpoch) };
+        }
+        const prior = this.inputRequest(requested, requested.ownerEpoch);
+        const event = await this.append(run, "requirements.input-requested", {
+          requestId: this.idSource(),
+          questions: prior.questions,
+          supersedesRequestId: prior.requestId,
+        });
+        return { status: "needs_input", request: this.inputRequest(event, run.ownerEpoch) };
       }
       return { status: "task", task: await this.issueTask(run, TASKS[0]!, []) };
     }
@@ -705,9 +732,97 @@ export class ApexService {
     return { status: "task", task: await this.issueTask(run, route.task, this.inputRefs(events, route.task)) };
   }
 
+  async recordInput(input: InputSubmissionV1): Promise<{ recorded: true; requestId: string }> {
+    let run: RunConfigV1;
+    try {
+      const selection = await this.selection();
+      run = await this.run(selection);
+    } catch (error) {
+      if (error instanceof Error && /mutation is already in progress/i.test(error.message)) {
+        throw new ApexError("APEX_STALE", "Input request is being recorded by another writer", EXIT_CODES.stale);
+      }
+      throw error;
+    }
+    if (!Value.Check(InputSubmissionV1Schema, input)) {
+      throw new ApexError("APEX_VALIDATION", "Input submission is malformed", EXIT_CODES.validation);
+    }
+    const events = await this.journal(run).replay();
+    const requested = [...events].reverse().find((event) => event.type === "requirements.input-requested");
+    if (requested === undefined) {
+      throw new ApexError("APEX_CONFLICT", "No input request is pending", EXIT_CODES.conflict);
+    }
+    const request = this.inputRequest(requested, run.ownerEpoch);
+    if (
+      events.some(
+        (event) =>
+          event.type === "requirements.input-recorded" &&
+          (event.payload as { requestId?: unknown }).requestId === request.requestId,
+      )
+    ) {
+      throw new ApexError("APEX_CONFLICT", "Input request was already recorded", EXIT_CODES.conflict);
+    }
+    if (input.requestId !== request.requestId) {
+      throw new ApexError("APEX_CONFLICT", "Input request ID does not match the pending request", EXIT_CODES.conflict);
+    }
+    if (input.expectedHead !== request.expectedHead || events.at(-1)?.hash !== request.expectedHead) {
+      throw new ApexError("APEX_STALE", "Input request journal head is stale", EXIT_CODES.stale);
+    }
+    if (input.ownerEpoch !== request.ownerEpoch || run.ownerEpoch !== request.ownerEpoch) {
+      throw new ApexError("APEX_STALE", "Input request owner epoch is stale", EXIT_CODES.stale);
+    }
+    let normalizedAnswers;
+    try {
+      normalizedAnswers = validateInputAnswers(request.questions, input.answers);
+    } catch (error) {
+      throw new ApexError(
+        "APEX_VALIDATION",
+        error instanceof Error ? error.message : "Input answers are invalid",
+        EXIT_CODES.validation,
+      );
+    }
+    try {
+      await this.append(
+        run,
+        "requirements.input-recorded",
+        { requestId: request.requestId, answers: normalizedAnswers },
+        request.expectedHead,
+      );
+    } catch (error) {
+      if (error instanceof Error && /stale journal head|mutation is already in progress/i.test(error.message)) {
+        throw new ApexError("APEX_STALE", "Input request journal head is stale", EXIT_CODES.stale, undefined, error);
+      }
+      throw error;
+    }
+    return { recorded: true, requestId: request.requestId };
+  }
+
   async recordRequirementsInput(value: unknown): Promise<void> {
-    const selection = await this.selection();
-    await this.append(await this.run(selection), "requirements.input-recorded", { value: value as JsonValue });
+    const pending = await this.nextTask();
+    if (pending.status !== "needs_input") {
+      throw new ApexError("APEX_CONFLICT", "No requirements input request is pending", EXIT_CODES.conflict);
+    }
+    const source =
+      value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+    const missing = pending.request.questions.filter(
+      ({ id }) => typeof source[id] !== "string" || (source[id] as string).length === 0,
+    );
+    if (missing.length > 0) {
+      throw new ApexError(
+        "APEX_VALIDATION",
+        `Missing requirements input: ${missing.map(({ id }) => id).join(", ")}`,
+        EXIT_CODES.validation,
+      );
+    }
+    await this.recordInput({
+      schemaVersion: CONTRACT_VERSION,
+      requestId: pending.request.requestId,
+      expectedHead: pending.request.expectedHead,
+      ownerEpoch: pending.request.ownerEpoch,
+      answers: pending.request.questions.map(({ id }) => ({
+        questionId: id,
+        value: source[id] as string,
+      })),
+    });
   }
 
   async taskContext(
@@ -2208,16 +2323,36 @@ export class ApexService {
     }
   }
 
-  private async append(run: RunConfigV1, type: string, payload: JsonValue): Promise<void> {
+  private inputRequest(event: EventV1, ownerEpoch: number): InputRequestV1 {
+    const payload = event.payload as { requestId: string; questions: InputRequestV1["questions"] };
+    const request = {
+      schemaVersion: CONTRACT_VERSION,
+      requestId: payload.requestId,
+      expectedHead: event.hash,
+      ownerEpoch,
+      questions: payload.questions,
+    };
+    if (!Value.Check(InputRequestV1Schema, request) || !hasValidInputRequestQuestions(request.questions)) {
+      throw new ApexError("APEX_INTERNAL", "Persisted input request is invalid", EXIT_CODES.internal);
+    }
+    return request;
+  }
+
+  private async append(
+    run: RunConfigV1,
+    type: string,
+    payload: JsonValue,
+    expectedHead?: string | null,
+  ): Promise<EventV1> {
     const journal = this.journal(run);
-    await journal.append({
+    return await journal.append({
       eventId: this.idSource(),
       projectId: run.projectId,
       runId: run.runId,
       type,
       timestamp: this.clock().toISOString(),
       ownerEpoch: run.ownerEpoch,
-      expectedHead: await journal.head(),
+      expectedHead: expectedHead === undefined ? await journal.head() : expectedHead,
       payload,
     });
   }

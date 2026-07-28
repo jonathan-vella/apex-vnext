@@ -10,6 +10,7 @@ import {
   inheritGate,
   needsInput,
   ProjectStore,
+  validateInputAnswers,
   ValidatorRegistry,
 } from "../index.js";
 
@@ -71,6 +72,63 @@ test("task guards reject expiry, stale head, and stale epoch and provide typed n
   now = new Date("2026-01-01T00:00:02.000Z");
   assert.throws(() => assertTaskCurrent(task, hash, 2, clock), /expired/);
   assert.equal(needsInput(task.taskId, [{ id: "region", prompt: "Which region?" }]).status, "needs_input");
+});
+
+test("kernel validates freeform, single-select, and multi-select answers", () => {
+  const questions = [
+    { id: "name", prompt: "Name?" },
+    { id: "region", prompt: "Region?", options: ["sweden", "germany"] },
+    { id: "features", prompt: "Features?", options: ["logs", "backup"], multiSelect: true },
+  ];
+  assert.deepEqual(
+    validateInputAnswers(questions, [
+      { questionId: "features", value: ["backup", "logs"] },
+      { questionId: "name", value: "demo" },
+      { questionId: "region", value: "sweden" },
+    ]),
+    [
+      { questionId: "name", value: "demo" },
+      { questionId: "region", value: "sweden" },
+      { questionId: "features", value: ["logs", "backup"] },
+    ],
+  );
+  assert.throws(() => validateInputAnswers(questions, [{ questionId: "name", value: "one" }]), /exactly one answer/u);
+  assert.throws(
+    () =>
+      validateInputAnswers(questions, [
+        { questionId: "name", value: "one" },
+        { questionId: "name", value: "two" },
+        { questionId: "region", value: "sweden" },
+      ]),
+    /Duplicate answer/u,
+  );
+  assert.throws(
+    () =>
+      validateInputAnswers(questions, [
+        { questionId: "name", value: "demo" },
+        { questionId: "unknown", value: "value" },
+        { questionId: "features", value: ["logs"] },
+      ]),
+    /Unknown answer: unknown/u,
+  );
+  assert.throws(
+    () =>
+      validateInputAnswers(questions, [
+        { questionId: "name", value: "demo" },
+        { questionId: "region", value: "invalid" },
+        { questionId: "features", value: ["logs"] },
+      ]),
+    /declared option/u,
+  );
+  assert.throws(
+    () =>
+      validateInputAnswers(questions, [
+        { questionId: "name", value: "demo" },
+        { questionId: "region", value: ["sweden"] },
+        { questionId: "features", value: "logs" },
+      ]),
+    /shape does not match/u,
+  );
 });
 
 test("validator registry caches pure results by content and never caches freshness or authorization", () => {

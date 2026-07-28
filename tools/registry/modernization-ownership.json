@@ -96,7 +96,10 @@
         "customizations/manifest.json",
         "customizations/.github/agents/*.agent.md",
         "customizations/.github/mcp.json",
-        "customizations/.vscode/mcp.json"
+        "customizations/.vscode/mcp.json",
+        "packages/contracts/src/runtime.ts",
+        "packages/cli/src/service.ts",
+        "packages/cli/src/mcp.ts"
       ],
       "consumers": ["GitHub Copilot in VS Code", "GitHub Copilot CLI", "client parity qualification"],
       "proofCommands": [
@@ -108,7 +111,7 @@
       ],
       "removalGate": "Generated VS Code and Copilot CLI projections preserve roles, interaction boundaries, MCP allowlists, and equivalent typed outcomes.",
       "rationale": "One managed role graph must produce client-specific mechanics without creating separate workflow authorities.",
-      "followUp": "Issue #111 generates and locks both workspace projections; live normalized outcome parity remains a qualification gate.",
+      "followUp": "Issue #111 generates and locks both workspace projections. Issue #150 adds kernel-owned typed input recording. Client-specific question/delegation projection and live normalized outcome parity remain qualification gates.",
       "decisionRef": "OWN-011"
     },
     {
