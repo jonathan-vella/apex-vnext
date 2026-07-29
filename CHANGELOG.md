@@ -40,6 +40,9 @@ prior qualification is retained as historical characterization. See
   provenance, explicit selected-client installation, and transactional update, rollback, uninstall, and reinstall.
 - Added manifest-owned managed-agent target support and explicit `target: vscode` / `target: github-copilot` projection
   rendering with fail-closed source, schema, generator, installation, and drift validation.
+- Characterized hidden-worker visibility and delegation without changing projection flags. The observed Copilot CLI
+  exposes no tested combination that is both unavailable for direct selection and explicitly `task`-callable; exact
+  paired-client qualification remains blocked pending the architecture decision in issue #180.
 - Added versioned kernel-owned input requests and typed APEX MCP answer recording bound to the exact journal head and
   writer epoch, with deterministic option validation, replay denial, transfer reissue, and no chat-history dependency.
 - Retired Terraform MCP after migrating active consumers to bounded Registry/native/documentation owners; removed its

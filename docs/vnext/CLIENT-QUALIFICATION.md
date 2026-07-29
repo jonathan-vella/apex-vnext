@@ -58,6 +58,12 @@ scenario. The collector derives content-free semantic receipts from the hash-lin
 each VS Code/CLI pair; and aggregate verification requires the exact comparison and outcome payload closure.
 Fixture evidence proves deterministic behavior only and always records `qualifiesRelease: false`.
 
+Issue #179 characterized hidden-worker controls without changing projections. In the observed Copilot CLI `1.0.73`
+binary, workers unavailable for direct model invocation were absent from the `task` catalog, while task-callable workers
+remained directly selectable. The binary hash did not match the selected artifact and the selected VS Code pair was
+unavailable, so this is non-release evidence. Issue #180 blocks `CLIENT-002` and `CLIENT-005` qualification until it
+selects and proves a supported worker architecture.
+
 Live evidence remains required for every scenario. Production live qualification requires the complete client evidence
 closure, binds it to the exact project and release candidate, and rejects fixture, partial, stale, substituted, duplicate,
 or unreferenced evidence. Collection remains blocked until canonical toolchain configuration selects exact supported

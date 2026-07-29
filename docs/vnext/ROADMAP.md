@@ -374,6 +374,10 @@ diagnostics, artifacts, coverage, and exact-head behavior remain stable; CI, hoo
    `target` values in selected-client projections, reject retired or unsupported fields, characterize hidden-worker
    invocation, and prove prompt/tool, discovery, and delegation boundaries in both supported clients.
 
+Issue #179 found that observed Copilot CLI `1.0.73` behavior cannot make a custom-agent worker both non-selectable and
+explicitly `task`-callable. Issue #180 must resolve that contract gap before Milestone O or paired qualification can
+complete.
+
 **Exit gate:** Active guidance contains no obsolete MCP, Draw.io, VS Code-only, APM-adoption, or per-IaC SBOM claim;
 generated assets match canonical sources; both clients discover the intended instructions and agents without conflict.
 
