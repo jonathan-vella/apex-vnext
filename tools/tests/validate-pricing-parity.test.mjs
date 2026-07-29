@@ -221,6 +221,8 @@ test("pricing evidence rejects secret values and prose/raw authority fields", ()
   assert.equal(hasValidPricingEvidence(request, { ...evidence, message: "selected first result" }, evaluatedAt), false);
   assert.equal(hasValidPricingEvidence(request, { ...evidence, rawPayload: {} }, evaluatedAt), false);
   assert.equal(hasValidPricingEvidence(request, { ...evidence, qualifiesGate: true }, evaluatedAt), false);
+  assert.equal(hasValidPricingEvidence({ ...request, unexpected: undefined }, evidence, evaluatedAt), false);
+  assert.equal(hasValidPricingEvidence(request, { ...evidence, unexpected: Number.NaN }, evaluatedAt), false);
   assert.equal(
     hasValidPricingEvidence(
       request,

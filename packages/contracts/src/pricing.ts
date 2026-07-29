@@ -293,7 +293,19 @@ export function hasValidPricingEvidence(
   evidence: PricingEvidenceV1,
   evaluatedAt: number | string = Date.now(),
 ): boolean {
-  registerContractFormats();
+  try {
+    registerContractFormats();
+    return validatePricingEvidence(request, evidence, evaluatedAt);
+  } catch {
+    return false;
+  }
+}
+
+function validatePricingEvidence(
+  request: PricingRequestV1,
+  evidence: PricingEvidenceV1,
+  evaluatedAt: number | string,
+): boolean {
   if (!Value.Check(PricingRequestV1Schema, request) || !Value.Check(PricingEvidenceV1Schema, evidence)) return false;
   if (containsSecret(request) || containsSecret(evidence)) return false;
   const validCommitment = (
