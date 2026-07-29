@@ -9,7 +9,7 @@ import addFormats from "ajv-formats";
 
 const REGISTRY_PATH = "tools/registry/arm-mcp-cost-pricing.v1.json";
 const SCHEMA_PATH = "tools/registry/schemas/arm-mcp-cost-pricing.schema.json";
-const EXPECTED_SHA256 = "06f719bbf142747957c5ff6c748244c5b42c06ba8554c8be6ffd7d0ec9069457";
+const EXPECTED_SHA256 = "108006651fd445cc995f2aac1341237de04d761610936b5e96d5c2757a1e0659";
 const EXPECTED_COST_READ = [
   "query_costs",
   "query_aks_costs",
@@ -66,8 +66,8 @@ export function validateArmMcpCostPricing(registry, schema) {
       JSON.stringify(registry.managedPolicy.denyBeforeTransport) !== JSON.stringify(EXPECTED_DENIED) ||
       registry.managedPolicy.unknownToolDisposition !== "deny-before-transport" ||
       registry.qualification.documentationCharacterized !== true ||
-      registry.qualification.authenticatedToolsListCaptured !== true ||
-      registry.qualification.outputFixturesCaptured !== true ||
+      registry.qualification.authenticatedToolsListCaptured !== false ||
+      registry.qualification.outputFixturesCaptured !== false ||
       registry.qualification.directClientConfigured !== true ||
       registry.qualification.customAdapterRequired !== false ||
       registry.qualification.customPricingServerRetired !== true

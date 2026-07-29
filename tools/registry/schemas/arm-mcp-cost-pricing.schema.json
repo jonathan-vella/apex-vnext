@@ -103,8 +103,8 @@
       ],
       "properties": {
         "documentationCharacterized": { "const": true },
-        "authenticatedToolsListCaptured": { "const": true },
-        "outputFixturesCaptured": { "const": true },
+        "authenticatedToolsListCaptured": { "const": false },
+        "outputFixturesCaptured": { "const": false },
         "directClientConfigured": { "const": true },
         "customAdapterRequired": { "const": false },
         "customPricingServerRetired": { "const": true }
