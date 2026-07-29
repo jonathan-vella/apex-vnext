@@ -92,11 +92,11 @@ development efforts.
 
 ### 2.1 Architecture Diagram
 
-![System Context Diagram - {project-name}](./03-des-diagram.drawio.svg)
+![System Context Diagram - {project-name}](./07-ab-diagram.png)
 
-Source: [03-des-diagram.drawio](./03-des-diagram.drawio)
+Source: [07-ab-diagram.py](./07-ab-diagram.py)
 
-> Replace with actual generated Draw.io architecture diagram for the project.
+> Replace with the rendered as-built architecture diagram for the project.
 
 ### 2.2 Resource Summary
 

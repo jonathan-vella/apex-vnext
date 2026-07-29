@@ -41,11 +41,11 @@ Create a comprehensive, machine-readable implementation plan based on the approv
    `agent-output/{project}/04-implementation-plan.md` (machine-readable
    structure: H2 sections, resource tables, parameter manifest).
 5. Generate the dependency diagram:
-   `agent-output/{project}/04-dependency-diagram.py` (and rendered
-   `04-dependency-diagram.png`).
+  `agent-output/{project}/04-dependency-diagram.py` plus rendered
+  `04-dependency-diagram.png` and `04-dependency-diagram.svg`.
 6. Generate the runtime diagram:
-   `agent-output/{project}/04-runtime-diagram.py` (and rendered
-   `04-runtime-diagram.png`).
+  `agent-output/{project}/04-runtime-diagram.py` plus rendered
+  `04-runtime-diagram.png` and `04-runtime-diagram.svg`.
 7. Run challenger review per the complexity matrix (opt-in; default skip
    for Step 4 when `complexity == simple`).
 8. Update `agent-output/{project}/00-session-state.json`: mark Step 4
@@ -58,16 +58,16 @@ Create a comprehensive, machine-readable implementation plan based on the approv
   justified.
 - The plan must be machine-readable enough that Step 5 (IaC Code) can be
   executed without re-interpreting the architecture.
-- Diagrams use the Python `diagrams` library; Draw.io is reserved for
-  Step 3 design diagrams.
+- Standalone diagrams use the Python `diagrams` library and the shared
+  `diagram_io.py` helper. Emit only the declared Python formats.
 </rules>
 
 <output_contract>
 
 - `agent-output/{project}/04-implementation-plan.md` (resource manifest,
   deployment order, parameter contract)
-- `agent-output/{project}/04-dependency-diagram.py` + `.png`
-- `agent-output/{project}/04-runtime-diagram.py` + `.png`
+- `agent-output/{project}/04-dependency-diagram.py` + `.png` + `.svg`
+- `agent-output/{project}/04-runtime-diagram.py` + `.png` + `.svg`
 - Updated `agent-output/{project}/00-session-state.json`
 - Handoff: route control to Step 5 (`06b-Bicep CodeGen` OR
   `06t-Terraform CodeGen`) based on `decisions.iac_tool`.

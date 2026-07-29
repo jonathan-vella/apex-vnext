@@ -3,7 +3,7 @@
   "$id": "https://schemas.apexops.dev/diagram-semantics-v1.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["$schema", "schemaVersion", "routing", "scenarios", "authority"],
+  "required": ["$schema", "schemaVersion", "routing", "activeConsumers", "scenarios", "authority"],
   "properties": {
     "$schema": { "const": "schemas/diagram-semantics.schema.json" },
     "schemaVersion": { "const": "1.0.0" },
@@ -27,6 +27,11 @@
         }
       }
     },
+    "activeConsumers": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/activeConsumer" }
+    },
     "scenarios": {
       "type": "array",
       "minItems": 7,
@@ -36,14 +41,42 @@
     "authority": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["migrationReady", "drawioRemovalAllowed"],
+      "required": ["activeConsumersMigrated", "migrationReady", "drawioRemovalAllowed"],
       "properties": {
+        "activeConsumersMigrated": { "const": true },
         "migrationReady": { "const": false },
         "drawioRemovalAllowed": { "const": false }
       }
     }
   },
   "$defs": {
+    "activeConsumer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "outputClass", "requiredMarkers"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "path": { "type": "string", "minLength": 1 },
+        "outputClass": {
+          "enum": [
+            "architecture",
+            "dependency-runtime",
+            "as-built",
+            "workflow",
+            "documentation",
+            "routing",
+            "validation"
+          ]
+        },
+        "requiredMarkers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "allowTransitionalReferences": { "const": true }
+      }
+    },
     "route": {
       "type": "object",
       "additionalProperties": false,

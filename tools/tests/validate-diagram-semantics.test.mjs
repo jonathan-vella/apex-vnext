@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { validateDiagramSemantics } from "../scripts/validate-diagram-semantics.mjs";
+import { validateActiveConsumers, validateDiagramSemantics } from "../scripts/validate-diagram-semantics.mjs";
 
 const registry = JSON.parse(readFileSync("tools/registry/diagram-semantics.v1.json", "utf8"));
 const schema = JSON.parse(readFileSync("tools/registry/schemas/diagram-semantics.schema.json", "utf8"));
@@ -21,6 +21,7 @@ test("routing, format, authority, accessibility, and scenario drift fail closed"
     (value) => value.routing.standalone.outputClasses.pop(),
     (value) => value.routing.standalone.formats.push("drawio"),
     (value) => (value.routing.transitional.newOutputAllowed = true),
+    (value) => (value.authority.activeConsumersMigrated = false),
     (value) => (value.authority.migrationReady = true),
     (value) => (value.authority.drawioRemovalAllowed = true),
     (value) => (value.scenarios[0].accessibility.nodeLabelsRequired = false),
@@ -59,6 +60,20 @@ test("required edge labels match exact slash-delimited segments", () => {
     validateDiagramSemantics(drifted, schema).includes(
       "g1-three-tier-web: required edge label SQL has no semantic edge",
     ),
+  );
+});
+
+test("active consumers reject Draw.io output and missing Python markers", () => {
+  const files = new Map(registry.activeConsumers.map(({ path }) => [path, readFileSync(path, "utf8")]));
+  const designPrompt = registry.activeConsumers.find(({ id }) => id === "step-3-design-prompt");
+  files.set(designPrompt.path, files.get(designPrompt.path).replaceAll("03-des-diagram.py", "03-des-diagram.drawio"));
+
+  assert.deepEqual(
+    validateActiveConsumers(registry.activeConsumers, (filePath) => files.get(filePath)),
+    [
+      "step-3-design-prompt: active consumer references transitional Draw.io output",
+      "step-3-design-prompt: required marker 03-des-diagram.py is missing",
+    ],
   );
 });
 
