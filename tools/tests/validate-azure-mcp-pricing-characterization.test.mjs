@@ -46,6 +46,14 @@ test("schema-only consumers reject fabricated authority and incomplete shapes", 
   const incomplete = structuredClone(registry);
   delete incomplete.inventory.evidence;
   assert.ok(validateAzureMcpPricingCharacterization(incomplete, schema).length > 0);
+  const traversal = mutate((value) => {
+    value.inventory.evidence.readOnlyToolNames.path = "tools/registry/evidence/../package.json";
+  });
+  assert.ok(
+    validateAzureMcpPricingCharacterization(traversal, schema).some(
+      (error) => error.includes("/inventory/evidence/readOnlyToolNames/path") && error.includes("must match pattern"),
+    ),
+  );
 });
 
 test("tracked inventories prove pricing exposure, capability absence, and read-only exclusions", () => {

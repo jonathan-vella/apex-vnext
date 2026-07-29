@@ -23,7 +23,10 @@
       "additionalProperties": false,
       "required": ["path", "sha256", "bytes", "producer"],
       "properties": {
-        "path": { "type": "string", "pattern": "^tools/registry/evidence/[A-Za-z0-9._/-]+\\.json$" },
+        "path": {
+          "type": "string",
+          "pattern": "^(?!.*\\.\\.)tools/registry/evidence/[A-Za-z0-9._/-]+\\.json$"
+        },
         "sha256": { "$ref": "#/$defs/sha256" },
         "bytes": { "type": "integer", "minimum": 1 },
         "producer": { "type": "string", "minLength": 1, "maxLength": 128 }
