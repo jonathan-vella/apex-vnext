@@ -1,0 +1,440 @@
+{
+  "$schema": "schemas/diagram-semantics.schema.json",
+  "schemaVersion": "1.0.0",
+  "routing": {
+    "inline": {
+      "owner": "mermaid",
+      "outputClasses": ["flow", "sequence", "state", "er", "compact-documentation"],
+      "formats": ["mmd", "markdown"]
+    },
+    "standalone": {
+      "owner": "python-diagrams",
+      "outputClasses": ["architecture", "network", "dependency", "runtime", "as-built", "waf", "cost", "compliance"],
+      "formats": ["py", "png", "svg"]
+    },
+    "transitional": {
+      "owner": "drawio",
+      "newOutputAllowed": false,
+      "historicalReadable": true,
+      "formats": ["drawio"]
+    }
+  },
+  "scenarios": [
+    {
+      "id": "g1-three-tier-web",
+      "title": "Three-Tier Web App (small)",
+      "sourceExpectation": "tools/tests/drawio-golden/g1-three-tier-web/expected.json",
+      "outputClass": "architecture",
+      "diagramType": "logical",
+      "scope": { "subscriptions": 1, "regions": 1, "managementGroups": 0 },
+      "resources": { "minimum": 6, "maximum": 10 },
+      "nodes": [
+        { "id": "user", "label": "User", "kind": "actor", "zone": "Resource Group" },
+        { "id": "app-plan", "label": "App Service Plan S1", "kind": "resource", "zone": "Resource Group" },
+        { "id": "web-app", "label": "Web App", "kind": "resource", "zone": "Resource Group" },
+        { "id": "sql-database", "label": "Azure SQL Database S1", "kind": "resource", "zone": "Resource Group" },
+        { "id": "storage", "label": "Storage Account", "kind": "resource", "zone": "Resource Group" },
+        { "id": "key-vault", "label": "Key Vault", "kind": "resource", "zone": "Resource Group" },
+        { "id": "app-insights", "label": "Application Insights", "kind": "resource", "zone": "Resource Group" },
+        { "id": "log-analytics", "label": "Log Analytics", "kind": "resource", "zone": "Resource Group" }
+      ],
+      "edges": [
+        { "id": "user-web", "source": "user", "target": "web-app", "label": "HTTPS" },
+        { "id": "web-sql", "source": "web-app", "target": "sql-database", "label": "SQL" },
+        { "id": "web-storage", "source": "web-app", "target": "storage", "label": "HTTPS" },
+        { "id": "web-vault", "source": "web-app", "target": "key-vault", "label": "HTTPS / Managed Identity" },
+        { "id": "insights-logs", "source": "app-insights", "target": "log-analytics", "label": "Telemetry" }
+      ],
+      "zones": ["Resource Group"],
+      "edgeLabels": ["HTTPS", "SQL"],
+      "legendRequired": true,
+      "pages": 1,
+      "accessibility": { "titleRequired": true, "nodeLabelsRequired": true, "edgeLabelsRequired": true },
+      "dimensions": { "minimumWidth": 1024, "minimumHeight": 768, "maximumWidth": 4096, "maximumHeight": 4096 },
+      "legacyReconciliations": []
+    },
+    {
+      "id": "g2-hub-spoke-landing-zone",
+      "title": "Hub-Spoke Landing Zone (medium)",
+      "sourceExpectation": "tools/tests/drawio-golden/g2-hub-spoke-landing-zone/expected.json",
+      "outputClass": "network",
+      "diagramType": "network",
+      "scope": { "subscriptions": 3, "regions": 1, "managementGroups": 0 },
+      "resources": { "minimum": 12, "maximum": 18 },
+      "nodes": [
+        { "id": "on-premises", "label": "On-Premises", "kind": "actor", "zone": "Trust Boundary" },
+        {
+          "id": "expressroute",
+          "label": "ExpressRoute Circuit",
+          "kind": "resource",
+          "zone": "Connectivity Subscription"
+        },
+        { "id": "er-gateway", "label": "ExpressRoute Gateway", "kind": "resource", "zone": "Hub VNet" },
+        { "id": "hub-vnet", "label": "Hub VNet", "kind": "resource", "zone": "Hub VNet" },
+        { "id": "firewall", "label": "Azure Firewall Premium", "kind": "resource", "zone": "Hub VNet" },
+        { "id": "bastion", "label": "Azure Bastion", "kind": "resource", "zone": "Hub VNet" },
+        { "id": "app-vnet", "label": "App Spoke VNet", "kind": "resource", "zone": "App Spoke VNet" },
+        { "id": "app-web", "label": "App Service Workloads", "kind": "resource", "zone": "App Workload Subscription" },
+        { "id": "key-vault-pe", "label": "Key Vault Private Endpoint", "kind": "resource", "zone": "App Spoke VNet" },
+        { "id": "storage-pe", "label": "Storage Private Endpoint", "kind": "resource", "zone": "App Spoke VNet" },
+        { "id": "data-vnet", "label": "Data Spoke VNet", "kind": "resource", "zone": "Data Spoke VNet" },
+        {
+          "id": "sql-mi",
+          "label": "Azure SQL Managed Instance",
+          "kind": "resource",
+          "zone": "Data Workload Subscription"
+        },
+        { "id": "cosmos", "label": "Azure Cosmos DB", "kind": "resource", "zone": "Data Workload Subscription" }
+      ],
+      "edges": [
+        { "id": "onprem-er", "source": "on-premises", "target": "expressroute", "label": "ExpressRoute" },
+        { "id": "er-gateway-link", "source": "expressroute", "target": "er-gateway", "label": "ExpressRoute" },
+        { "id": "hub-app-peering", "source": "hub-vnet", "target": "app-vnet", "label": "VNet Peering" },
+        { "id": "hub-data-peering", "source": "hub-vnet", "target": "data-vnet", "label": "VNet Peering" },
+        { "id": "app-firewall-route", "source": "app-vnet", "target": "firewall", "label": "Forced routing" },
+        { "id": "data-firewall-route", "source": "data-vnet", "target": "firewall", "label": "Forced routing" }
+      ],
+      "zones": [
+        "Connectivity Subscription",
+        "App Workload Subscription",
+        "Data Workload Subscription",
+        "Hub VNet",
+        "App Spoke VNet",
+        "Data Spoke VNet",
+        "Trust Boundary"
+      ],
+      "edgeLabels": ["VNet Peering", "ExpressRoute"],
+      "legendRequired": true,
+      "pages": 1,
+      "accessibility": { "titleRequired": true, "nodeLabelsRequired": true, "edgeLabelsRequired": true },
+      "dimensions": { "minimumWidth": 1400, "minimumHeight": 900, "maximumWidth": 4096, "maximumHeight": 4096 },
+      "legacyReconciliations": []
+    },
+    {
+      "id": "g3-event-driven-microservices",
+      "title": "Event-Driven Microservices (medium)",
+      "sourceExpectation": "tools/tests/drawio-golden/g3-event-driven-microservices/expected.json",
+      "outputClass": "runtime",
+      "diagramType": "runtime-flow",
+      "scope": { "subscriptions": 1, "regions": 1, "managementGroups": 0 },
+      "resources": { "minimum": 10, "maximum": 14 },
+      "nodes": [
+        { "id": "client", "label": "Client", "kind": "actor", "zone": "Ingress" },
+        { "id": "apim", "label": "API Management", "kind": "resource", "zone": "Ingress" },
+        { "id": "orders-api", "label": "orders-api", "kind": "resource", "zone": "Processing" },
+        { "id": "orders-worker", "label": "orders-worker", "kind": "resource", "zone": "Processing" },
+        { "id": "notifications-worker", "label": "notifications-worker", "kind": "resource", "zone": "Processing" },
+        { "id": "service-bus", "label": "Service Bus orders topic", "kind": "resource", "zone": "Processing" },
+        { "id": "event-grid", "label": "Event Grid System Topic", "kind": "resource", "zone": "Processing" },
+        { "id": "cosmos", "label": "Cosmos DB for NoSQL", "kind": "resource", "zone": "Persistence" },
+        { "id": "redis", "label": "Azure Cache for Redis", "kind": "resource", "zone": "Persistence" },
+        { "id": "container-apps-env", "label": "Container Apps Environment", "kind": "resource", "zone": "Processing" },
+        { "id": "log-analytics", "label": "Log Analytics", "kind": "resource", "zone": "Persistence" },
+        { "id": "app-insights", "label": "Application Insights", "kind": "resource", "zone": "Persistence" }
+      ],
+      "edges": [
+        { "id": "client-apim", "source": "client", "target": "apim", "label": "HTTPS / OAuth2" },
+        { "id": "apim-api", "source": "apim", "target": "orders-api", "label": "HTTPS / OAuth2" },
+        { "id": "api-cosmos", "source": "orders-api", "target": "cosmos", "label": "HTTPS / 443" },
+        { "id": "api-bus", "source": "orders-api", "target": "service-bus", "label": "AMQP" },
+        { "id": "bus-worker", "source": "service-bus", "target": "orders-worker", "label": "AMQP" },
+        { "id": "worker-redis", "source": "orders-worker", "target": "redis", "label": "TLS / 6380" },
+        { "id": "cosmos-events", "source": "cosmos", "target": "event-grid", "label": "Change feed" },
+        {
+          "id": "events-notifications",
+          "source": "event-grid",
+          "target": "notifications-worker",
+          "label": "Event delivery"
+        }
+      ],
+      "zones": ["Ingress", "Processing", "Persistence"],
+      "edgeLabels": ["HTTPS", "AMQP", "443", "OAuth2"],
+      "legendRequired": false,
+      "pages": 1,
+      "accessibility": { "titleRequired": true, "nodeLabelsRequired": true, "edgeLabelsRequired": true },
+      "dimensions": { "minimumWidth": 1024, "minimumHeight": 768, "maximumWidth": 4096, "maximumHeight": 4096 },
+      "legacyReconciliations": [
+        {
+          "field": "diagramType",
+          "legacy": "sequence",
+          "resolved": "runtime-flow",
+          "rationale": "The prompt requests a standalone runtime-flow artifact; sequence remains an inline route only."
+        }
+      ]
+    },
+    {
+      "id": "g4-ml-training-pipeline",
+      "title": "ML Training Pipeline (medium)",
+      "sourceExpectation": "tools/tests/drawio-golden/g4-ml-training-pipeline/expected.json",
+      "outputClass": "architecture",
+      "diagramType": "deployment",
+      "scope": { "subscriptions": 1, "regions": 1, "managementGroups": 0 },
+      "resources": { "minimum": 9, "maximum": 12 },
+      "nodes": [
+        {
+          "id": "aml-workspace",
+          "label": "Azure Machine Learning Workspace",
+          "kind": "resource",
+          "zone": "ML Workspace"
+        },
+        {
+          "id": "gpu-cluster",
+          "label": "GPU Compute Cluster NC24ads A100 v4",
+          "kind": "resource",
+          "zone": "ML Workspace"
+        },
+        { "id": "adls-gen2", "label": "Azure Data Lake Storage Gen2", "kind": "resource", "zone": "Data Zone" },
+        { "id": "acr-premium", "label": "Container Registry Premium", "kind": "resource", "zone": "ML Workspace" },
+        { "id": "key-vault", "label": "Key Vault", "kind": "resource", "zone": "ML Workspace" },
+        { "id": "app-insights", "label": "Application Insights", "kind": "resource", "zone": "ML Workspace" },
+        { "id": "default-storage", "label": "Workspace Storage Account", "kind": "resource", "zone": "ML Workspace" },
+        { "id": "log-analytics", "label": "Log Analytics", "kind": "resource", "zone": "ML Workspace" },
+        {
+          "id": "managed-identity",
+          "label": "User-Assigned Managed Identity",
+          "kind": "resource",
+          "zone": "ML Workspace"
+        }
+      ],
+      "edges": [
+        { "id": "sdk-workspace", "source": "managed-identity", "target": "aml-workspace", "label": "AML SDK" },
+        { "id": "cluster-data", "source": "gpu-cluster", "target": "adls-gen2", "label": "ABFS" },
+        { "id": "cluster-images", "source": "gpu-cluster", "target": "acr-premium", "label": "Pull" },
+        { "id": "workspace-vault", "source": "aml-workspace", "target": "key-vault", "label": "Managed Identity" },
+        { "id": "workspace-telemetry", "source": "aml-workspace", "target": "app-insights", "label": "Telemetry" }
+      ],
+      "zones": ["ML Workspace", "Data Zone"],
+      "edgeLabels": ["AML SDK", "ABFS", "Pull"],
+      "legendRequired": true,
+      "pages": 1,
+      "accessibility": { "titleRequired": true, "nodeLabelsRequired": true, "edgeLabelsRequired": true },
+      "dimensions": { "minimumWidth": 1024, "minimumHeight": 768, "maximumWidth": 4096, "maximumHeight": 4096 },
+      "legacyReconciliations": []
+    },
+    {
+      "id": "g5-enterprise-landing-zone",
+      "title": "Enterprise Landing Zone (large)",
+      "sourceExpectation": "tools/tests/drawio-golden/g5-enterprise-landing-zone/expected.json",
+      "outputClass": "architecture",
+      "diagramType": "logical+network",
+      "scope": { "subscriptions": 5, "regions": 1, "managementGroups": 6 },
+      "resources": { "minimum": 22, "maximum": 28 },
+      "nodes": [
+        { "id": "tenant-root", "label": "Tenant Root MG", "kind": "scope", "zone": "Tenant Root" },
+        { "id": "platform-mg", "label": "Platform MG", "kind": "scope", "zone": "Platform MG" },
+        { "id": "connectivity-mg", "label": "Connectivity MG", "kind": "scope", "zone": "Platform MG" },
+        { "id": "identity-mg", "label": "Identity MG", "kind": "scope", "zone": "Platform MG" },
+        { "id": "landing-zones-mg", "label": "Landing Zones MG", "kind": "scope", "zone": "Landing Zones MG" },
+        { "id": "sandbox-mg", "label": "Sandbox MG", "kind": "scope", "zone": "Sandbox MG" },
+        { "id": "platform-sub", "label": "Platform Subscription", "kind": "scope", "zone": "Platform Subscription" },
+        {
+          "id": "connectivity-sub",
+          "label": "Connectivity Subscription",
+          "kind": "scope",
+          "zone": "Connectivity Subscription"
+        },
+        { "id": "identity-sub", "label": "Identity Subscription", "kind": "scope", "zone": "Identity Subscription" },
+        {
+          "id": "app-shared-sub",
+          "label": "App Shared Subscription",
+          "kind": "scope",
+          "zone": "App Shared Subscription"
+        },
+        {
+          "id": "app-workload-sub",
+          "label": "App Workload Subscription",
+          "kind": "scope",
+          "zone": "App Workload Subscription"
+        },
+        { "id": "hub-vnet", "label": "Hub VNet", "kind": "resource", "zone": "Hub VNet" },
+        { "id": "firewall", "label": "Azure Firewall Premium", "kind": "resource", "zone": "Trust Boundary" },
+        { "id": "bastion", "label": "Azure Bastion", "kind": "resource", "zone": "Hub VNet" },
+        { "id": "vpn-gateway", "label": "VPN Gateway", "kind": "resource", "zone": "Hub VNet" },
+        {
+          "id": "spoke-vnet",
+          "label": "App Workload Spoke VNet",
+          "kind": "resource",
+          "zone": "App Workload Subscription"
+        },
+        { "id": "aks", "label": "Private AKS Cluster", "kind": "resource", "zone": "App Workload Subscription" },
+        { "id": "acr", "label": "Container Registry Premium", "kind": "resource", "zone": "App Shared Subscription" },
+        { "id": "key-vault", "label": "Key Vault Premium", "kind": "resource", "zone": "App Workload Subscription" },
+        {
+          "id": "log-analytics",
+          "label": "Central Log Analytics",
+          "kind": "resource",
+          "zone": "Platform Subscription"
+        },
+        { "id": "sentinel", "label": "Microsoft Sentinel", "kind": "resource", "zone": "Platform Subscription" },
+        { "id": "defender", "label": "Defender for Cloud", "kind": "resource", "zone": "Platform Subscription" }
+      ],
+      "edges": [
+        { "id": "root-platform", "source": "tenant-root", "target": "platform-mg", "label": "Management hierarchy" },
+        {
+          "id": "root-landing-zones",
+          "source": "tenant-root",
+          "target": "landing-zones-mg",
+          "label": "Management hierarchy"
+        },
+        { "id": "root-sandbox", "source": "tenant-root", "target": "sandbox-mg", "label": "Management hierarchy" },
+        {
+          "id": "platform-connectivity",
+          "source": "platform-mg",
+          "target": "connectivity-mg",
+          "label": "Management hierarchy"
+        },
+        {
+          "id": "platform-identity",
+          "source": "platform-mg",
+          "target": "identity-mg",
+          "label": "Management hierarchy"
+        },
+        { "id": "hub-spoke", "source": "hub-vnet", "target": "spoke-vnet", "label": "VNet Peering" },
+        { "id": "aks-vault", "source": "aks", "target": "key-vault", "label": "Private Link" },
+        { "id": "aks-acr", "source": "aks", "target": "acr", "label": "Private Link" }
+      ],
+      "zones": [
+        "Tenant Root",
+        "Platform MG",
+        "Landing Zones MG",
+        "Sandbox MG",
+        "Platform Subscription",
+        "Connectivity Subscription",
+        "Identity Subscription",
+        "App Shared Subscription",
+        "App Workload Subscription",
+        "Hub VNet",
+        "Trust Boundary"
+      ],
+      "edgeLabels": ["VNet Peering", "Private Link"],
+      "legendRequired": true,
+      "pages": 1,
+      "accessibility": { "titleRequired": true, "nodeLabelsRequired": true, "edgeLabelsRequired": true },
+      "dimensions": { "minimumWidth": 1800, "minimumHeight": 1100, "maximumWidth": 6144, "maximumHeight": 6144 },
+      "legacyReconciliations": [
+        {
+          "field": "scope.managementGroups",
+          "legacy": 4,
+          "resolved": 6,
+          "rationale": "The prompt names Tenant Root, Platform, Connectivity, Identity, Landing Zones, and Sandbox."
+        }
+      ]
+    },
+    {
+      "id": "g6-hyperscale-platform",
+      "title": "Hyperscale Platform (extra-large)",
+      "sourceExpectation": "tools/tests/drawio-golden/g6-hyperscale-platform/expected.json",
+      "outputClass": "architecture",
+      "diagramType": "decomposed",
+      "scope": { "subscriptions": 6, "regions": 2, "managementGroups": 0 },
+      "resources": { "minimum": 28, "maximum": 32 },
+      "nodes": [
+        { "id": "front-door", "label": "Azure Front Door Premium", "kind": "resource" },
+        { "id": "traffic-manager", "label": "Azure Traffic Manager", "kind": "resource" },
+        { "id": "cosmos-global", "label": "Cosmos DB Multi-Master", "kind": "resource" },
+        { "id": "event-hubs", "label": "Event Hubs Dedicated Cluster", "kind": "resource" },
+        { "id": "sentinel", "label": "Microsoft Sentinel", "kind": "resource" },
+        { "id": "defender", "label": "Defender for Cloud", "kind": "resource" },
+        { "id": "se-aks-prod", "label": "SE AKS Production", "kind": "resource", "zone": "App Sub (SE)" },
+        { "id": "se-aks-canary", "label": "SE AKS Canary", "kind": "resource", "zone": "App Sub (SE)" },
+        { "id": "se-acr", "label": "SE Container Registry Premium", "kind": "resource", "zone": "Platform Sub (SE)" },
+        { "id": "se-vault", "label": "SE Key Vault Premium", "kind": "resource", "zone": "Platform Sub (SE)" },
+        { "id": "se-law-one", "label": "SE Log Analytics One", "kind": "resource", "zone": "Platform Sub (SE)" },
+        { "id": "se-law-two", "label": "SE Log Analytics Two", "kind": "resource", "zone": "Platform Sub (SE)" },
+        { "id": "se-storage", "label": "SE Storage ZRS", "kind": "resource", "zone": "Data Sub (SE)" },
+        { "id": "se-synapse", "label": "SE Synapse Workspace", "kind": "resource", "zone": "Data Sub (SE)" },
+        { "id": "se-purview", "label": "SE Purview", "kind": "resource", "zone": "Data Sub (SE)" },
+        { "id": "se-origin", "label": "SE Front Door Origin", "kind": "resource", "zone": "Sweden Central" },
+        { "id": "se-insights", "label": "SE Application Insights", "kind": "resource", "zone": "App Sub (SE)" },
+        { "id": "de-aks-prod", "label": "DE AKS Production", "kind": "resource", "zone": "App Sub (DE)" },
+        { "id": "de-aks-canary", "label": "DE AKS Canary", "kind": "resource", "zone": "App Sub (DE)" },
+        { "id": "de-acr", "label": "DE Container Registry Premium", "kind": "resource", "zone": "Platform Sub (DE)" },
+        { "id": "de-vault", "label": "DE Key Vault Premium", "kind": "resource", "zone": "Platform Sub (DE)" },
+        { "id": "de-law-one", "label": "DE Log Analytics One", "kind": "resource", "zone": "Platform Sub (DE)" },
+        { "id": "de-law-two", "label": "DE Log Analytics Two", "kind": "resource", "zone": "Platform Sub (DE)" },
+        { "id": "de-storage", "label": "DE Storage ZRS", "kind": "resource", "zone": "Data Sub (DE)" },
+        { "id": "de-synapse", "label": "DE Synapse Workspace", "kind": "resource", "zone": "Data Sub (DE)" },
+        { "id": "de-purview", "label": "DE Purview", "kind": "resource", "zone": "Data Sub (DE)" },
+        { "id": "de-origin", "label": "DE Front Door Origin", "kind": "resource", "zone": "Germany West Central" },
+        { "id": "de-insights", "label": "DE Application Insights", "kind": "resource", "zone": "App Sub (DE)" }
+      ],
+      "edges": [
+        { "id": "frontdoor-se", "source": "front-door", "target": "se-origin", "label": "Front Door routing" },
+        { "id": "frontdoor-de", "source": "front-door", "target": "de-origin", "label": "Front Door routing" },
+        {
+          "id": "cosmos-replication",
+          "source": "se-aks-prod",
+          "target": "de-aks-prod",
+          "label": "Multi-master replication"
+        },
+        { "id": "acr-georeplication", "source": "se-acr", "target": "de-acr", "label": "Geo-replication" },
+        { "id": "traffic-fallback", "source": "traffic-manager", "target": "front-door", "label": "DNS fallback" }
+      ],
+      "zones": [
+        "Sweden Central",
+        "Germany West Central",
+        "Platform Sub (SE)",
+        "App Sub (SE)",
+        "Data Sub (SE)",
+        "Platform Sub (DE)",
+        "App Sub (DE)",
+        "Data Sub (DE)"
+      ],
+      "edgeLabels": ["Multi-master replication", "Front Door routing"],
+      "legendRequired": true,
+      "pages": 3,
+      "accessibility": { "titleRequired": true, "nodeLabelsRequired": true, "edgeLabelsRequired": true },
+      "dimensions": { "minimumWidth": 1800, "minimumHeight": 1100, "maximumWidth": 8192, "maximumHeight": 8192 },
+      "legacyReconciliations": [
+        {
+          "field": "resources",
+          "legacy": { "minimum": 50, "maximum": 60 },
+          "resolved": { "minimum": 28, "maximum": 32 },
+          "rationale": "The prompt names 28 concrete global and per-region resources; workload-level instances may add four."
+        }
+      ]
+    },
+    {
+      "id": "g7-multi-region-active-active",
+      "title": "Multi-Region Active-Active (medium)",
+      "sourceExpectation": "tools/tests/drawio-golden/g7-multi-region-active-active/expected.json",
+      "outputClass": "architecture",
+      "diagramType": "logical",
+      "scope": { "subscriptions": 1, "regions": 2, "managementGroups": 0 },
+      "resources": { "minimum": 16, "maximum": 20 },
+      "nodes": [
+        { "id": "client", "label": "Client", "kind": "actor", "zone": "Trust Boundary" },
+        { "id": "front-door", "label": "Azure Front Door Premium", "kind": "resource", "zone": "Trust Boundary" },
+        { "id": "dns", "label": "Azure DNS Zone", "kind": "resource" },
+        { "id": "se-plan", "label": "SE App Service Plan P1v3", "kind": "resource", "zone": "Sweden Central" },
+        { "id": "se-web", "label": "SE Web App", "kind": "resource", "zone": "Sweden Central" },
+        { "id": "se-cosmos", "label": "SE Cosmos DB Region", "kind": "resource", "zone": "Sweden Central" },
+        { "id": "se-storage", "label": "SE Storage GZRS", "kind": "resource", "zone": "Sweden Central" },
+        { "id": "se-vault", "label": "SE Key Vault", "kind": "resource", "zone": "Sweden Central" },
+        { "id": "se-insights", "label": "SE Application Insights", "kind": "resource", "zone": "Sweden Central" },
+        { "id": "de-plan", "label": "DE App Service Plan P1v3", "kind": "resource", "zone": "Germany West Central" },
+        { "id": "de-web", "label": "DE Web App", "kind": "resource", "zone": "Germany West Central" },
+        { "id": "de-cosmos", "label": "DE Cosmos DB Region", "kind": "resource", "zone": "Germany West Central" },
+        { "id": "de-storage", "label": "DE Storage GZRS", "kind": "resource", "zone": "Germany West Central" },
+        { "id": "de-vault", "label": "DE Key Vault", "kind": "resource", "zone": "Germany West Central" },
+        { "id": "de-insights", "label": "DE Application Insights", "kind": "resource", "zone": "Germany West Central" },
+        { "id": "log-analytics", "label": "Shared Log Analytics", "kind": "resource", "zone": "Sweden Central" }
+      ],
+      "edges": [
+        { "id": "client-frontdoor", "source": "client", "target": "front-door", "label": "HTTPS" },
+        { "id": "frontdoor-se", "source": "front-door", "target": "se-web", "label": "Weighted routing" },
+        { "id": "frontdoor-de", "source": "front-door", "target": "de-web", "label": "Weighted routing" },
+        { "id": "cosmos-writes", "source": "se-cosmos", "target": "de-cosmos", "label": "Multi-region writes" },
+        { "id": "storage-replication", "source": "se-storage", "target": "de-storage", "label": "Geo-replication" }
+      ],
+      "zones": ["Sweden Central", "Germany West Central", "Trust Boundary"],
+      "edgeLabels": ["Multi-region writes", "Geo-replication"],
+      "legendRequired": true,
+      "pages": 1,
+      "accessibility": { "titleRequired": true, "nodeLabelsRequired": true, "edgeLabelsRequired": true },
+      "dimensions": { "minimumWidth": 1400, "minimumHeight": 900, "maximumWidth": 4096, "maximumHeight": 4096 },
+      "legacyReconciliations": []
+    }
+  ],
+  "authority": { "migrationReady": false, "drawioRemovalAllowed": false }
+}

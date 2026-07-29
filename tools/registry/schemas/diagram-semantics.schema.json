@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.apexops.dev/diagram-semantics-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "routing", "scenarios", "authority"],
+  "properties": {
+    "$schema": { "const": "schemas/diagram-semantics.schema.json" },
+    "schemaVersion": { "const": "1.0.0" },
+    "routing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inline", "standalone", "transitional"],
+      "properties": {
+        "inline": { "$ref": "#/$defs/route" },
+        "standalone": { "$ref": "#/$defs/route" },
+        "transitional": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["owner", "newOutputAllowed", "historicalReadable", "formats"],
+          "properties": {
+            "owner": { "const": "drawio" },
+            "newOutputAllowed": { "const": false },
+            "historicalReadable": { "const": true },
+            "formats": { "const": ["drawio"] }
+          }
+        }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": { "$ref": "#/$defs/scenario" }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["migrationReady", "drawioRemovalAllowed"],
+      "properties": {
+        "migrationReady": { "const": false },
+        "drawioRemovalAllowed": { "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "outputClasses", "formats"],
+      "properties": {
+        "owner": { "enum": ["mermaid", "python-diagrams"] },
+        "outputClasses": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+        "formats": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "sourceExpectation",
+        "outputClass",
+        "diagramType",
+        "scope",
+        "resources",
+        "nodes",
+        "edges",
+        "zones",
+        "edgeLabels",
+        "legendRequired",
+        "pages",
+        "accessibility",
+        "dimensions",
+        "legacyReconciliations"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^g[1-9][0-9]*-[a-z0-9-]+$" },
+        "title": { "type": "string", "minLength": 1 },
+        "sourceExpectation": { "type": "string", "pattern": "^tools/tests/drawio-golden/[a-z0-9-]+/expected\\.json$" },
+        "outputClass": { "enum": ["architecture", "network", "runtime"] },
+        "diagramType": {
+          "enum": ["logical", "network", "runtime-flow", "deployment", "logical+network", "decomposed"]
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["subscriptions", "regions", "managementGroups"],
+          "properties": {
+            "subscriptions": { "type": "integer", "minimum": 1 },
+            "regions": { "type": "integer", "minimum": 1 },
+            "managementGroups": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["minimum", "maximum"],
+          "properties": {
+            "minimum": { "type": "integer", "minimum": 1 },
+            "maximum": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/node" }
+        },
+        "edges": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/edge" }
+        },
+        "zones": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "edgeLabels": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "legendRequired": { "type": "boolean" },
+        "pages": { "type": "integer", "minimum": 1 },
+        "accessibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["titleRequired", "nodeLabelsRequired", "edgeLabelsRequired"],
+          "properties": {
+            "titleRequired": { "const": true },
+            "nodeLabelsRequired": { "const": true },
+            "edgeLabelsRequired": { "const": true }
+          }
+        },
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["minimumWidth", "minimumHeight", "maximumWidth", "maximumHeight"],
+          "properties": {
+            "minimumWidth": { "type": "integer", "minimum": 640 },
+            "minimumHeight": { "type": "integer", "minimum": 480 },
+            "maximumWidth": { "type": "integer", "maximum": 8192 },
+            "maximumHeight": { "type": "integer", "maximum": 8192 }
+          }
+        },
+        "legacyReconciliations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/reconciliation" }
+        }
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "kind"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "label": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["actor", "resource", "scope"] },
+        "zone": { "type": "string", "minLength": 1 }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "target", "label"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "source": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "target": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "label": { "type": "string", "minLength": 1 }
+      }
+    },
+    "reconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "legacy", "resolved", "rationale"],
+      "properties": {
+        "field": { "enum": ["diagramType", "scope.managementGroups", "resources"] },
+        "legacy": {},
+        "resolved": {},
+        "rationale": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

@@ -480,13 +480,22 @@
         ".github/skills/mermaid/SKILL.md",
         ".github/skills/python-diagrams/SKILL.md",
         ".github/skills/drawio/SKILL.md",
-        "tools/tests/drawio-golden/**/expected.json"
+        "tools/tests/drawio-golden/**/expected.json",
+        "tools/registry/diagram-semantics.v1.json",
+        "tools/registry/schemas/diagram-semantics.schema.json",
+        "tools/scripts/validate-diagram-semantics.mjs",
+        "tools/tests/validate-diagram-semantics.test.mjs"
       ],
       "consumers": ["design workflow", "IaC planning", "as-built output", "documentation"],
-      "proofCommands": ["npm run validate:skills", "npm run lint:drawio"],
+      "proofCommands": [
+        "npm run validate:skills",
+        "npm run validate:diagram-semantics",
+        "npm run test:diagram-semantics",
+        "npm run lint:drawio"
+      ],
       "removalGate": "Format-neutral scenarios prove editable Mermaid or Python source, semantic and visual quality, deterministic rendering, and historical Draw.io readability.",
       "rationale": "New inline and standalone diagrams need explicit format owners before the Draw.io toolchain can retire.",
-      "followUp": "Generalize golden scenarios, route inline output to Mermaid, route standalone output to Python, then archive Draw.io after measured parity.",
+      "followUp": "Issue #168 freezes format-neutral semantics and routing. Migrate active consumers, qualify rendering, then archive Draw.io only after measured parity.",
       "decisionRef": "OWN-014"
     },
     {
@@ -778,10 +787,10 @@
     {
       "id": "OWN-013",
       "status": "decided",
-      "decision": "Make versioned normalized evidence contracts authoritative for managed Azure pricing.",
-      "rationale": "Typed attestation can preserve pricing semantics and provenance while restricting raw ARM MCP output and denying writes.",
+      "decision": "Use direct Microsoft ARM MCP reads with versioned evidence contracts for managed Azure pricing.",
+      "rationale": "Microsoft owns transport and pricing retrieval while APEX retains evidence acceptance, workflow, and gate authority.",
       "owner": "ARM pricing replacement",
-      "gate": "The ARM adapter passes parity, reliability, latency, security, determinism, arithmetic, and maintenance criteria."
+      "gate": "Both supported clients pass OAuth discovery, read allowlists, excluded-tool behavior, arithmetic, and evidence checks."
     },
     {
       "id": "OWN-014",

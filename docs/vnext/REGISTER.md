@@ -113,10 +113,10 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Owner:** Runtime integration
 - **Impact:** Removing Terraform, custom pricing, or Draw.io MCP surfaces before replacement proof could break supported
   workflows, packaging, documentation, or tests.
-- **Evidence:** Issue #136 retires Astro independently because it has no active product consumer. Replacement behavior
-  for Azure Pricing, Terraform, and Draw.io is not yet implemented.
-- **Related issue:** [#138](https://github.com/jonathan-vella/apex-vnext/issues/138) for Terraform characterization;
-  pending Milestones K and L issues for pricing and Draw.io.
+- **Evidence:** Astro and Terraform are retired through separate gates. Issue #168 freezes format-neutral Draw.io
+  semantics and Mermaid/Python routes, but active consumer migration and measured rendering parity remain pending.
+- **Related issue:** [#164](https://github.com/jonathan-vella/apex-vnext/issues/164) for pricing and
+  [#168](https://github.com/jonathan-vella/apex-vnext/issues/168) for diagrams.
 - **Mitigation:** Retire one surface at a time only after its named gate passes; verify active references, package
   contents, and a clean consumer after each removal.
 - **State:** Open
