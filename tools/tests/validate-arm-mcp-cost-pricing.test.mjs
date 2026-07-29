@@ -39,16 +39,17 @@ test("Azure MCP Server product names cannot substitute for ARM MCP", () => {
   }
 });
 
-test("write, operation, unknown, and premature authority drift fail closed", () => {
+test("write, operation, unknown, and direct-client retirement drift fail closed", () => {
   for (const mutation of [
     (value) => value.managedPolicy.candidateReadAllowlist.push("create_budget"),
     (value) => value.managedPolicy.candidateReadAllowlist.push("start_pricesheet_download"),
     (value) => value.managedPolicy.denyBeforeTransport.pop(),
     (value) => (value.managedPolicy.unknownToolDisposition = "allow"),
-    (value) => (value.qualification.authenticatedToolsListCaptured = true),
-    (value) => (value.qualification.outputFixturesCaptured = true),
-    (value) => (value.qualification.adapterReady = true),
-    (value) => (value.qualification.managedAuthority = true),
+    (value) => (value.qualification.authenticatedToolsListCaptured = false),
+    (value) => (value.qualification.outputFixturesCaptured = false),
+    (value) => (value.qualification.directClientConfigured = false),
+    (value) => (value.qualification.customAdapterRequired = true),
+    (value) => (value.qualification.customPricingServerRetired = false),
   ]) {
     assert.ok(validateArmMcpCostPricing(mutate(mutation), schema).length > 0);
   }

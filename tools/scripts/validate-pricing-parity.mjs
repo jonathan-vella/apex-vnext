@@ -9,7 +9,7 @@ import { PRICING_PARITY_SCENARIO_IDS } from "../../packages/contracts/dist/index
 
 const REGISTRY_PATH = "tools/registry/pricing-parity-scenarios.v1.json";
 const SCHEMA_PATH = "tools/registry/schemas/pricing-parity-scenarios.schema.json";
-const EXPECTED_REGISTRY_SHA256 = "0991bfa1b7f242226f88492950f944ad53c5e28c28c705173dbbc320336ce324";
+const EXPECTED_REGISTRY_SHA256 = "e36012e2de5251f9187cef5e31f26f95e581daa9b223df448b2b3a7a7cf526e4";
 const EXPECTED = {
   "PRICING-001-retail": ["retail-lookup", "matched", "unit-price-only"],
   "PRICING-002-meter-aware": [

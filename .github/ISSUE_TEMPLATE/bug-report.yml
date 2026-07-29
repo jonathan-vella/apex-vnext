@@ -23,7 +23,7 @@ body:
         - Managed agent definitions (customizations/.github/agents/)
         - Documentation (docs/, README files)
         - GitHub Actions workflows
-        - MCP Server (tools/mcp-servers/azure-pricing/)
+        - ARM MCP client configuration
         - Devcontainer configuration
         - APEX vNext runtime (packages/, config/, customizations/)
         - Other

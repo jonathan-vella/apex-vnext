@@ -183,7 +183,7 @@ test("every scenario rejects semantic drift", () => {
   }
   for (const field of ["sourceOwners", "requiredSemantics"]) {
     const drifted = mutate((value) => {
-      value.scenarios[0][field] = value.scenarios[0][field].slice(1);
+      value.scenarios[0][field][0] = `${value.scenarios[0][field][0]}-drift`;
     });
     assert.ok(validatePricingParity(drifted, schema).some((error) => error.includes("registry content drifted")));
   }
@@ -368,11 +368,11 @@ test("pricing evidence enforces target, disposition, freshness, and scenario sum
   assert.equal(hasValidPricingEvidence(commitmentRequest, rehashEvidence(hourlyMisprojection), evaluatedAt), false);
 });
 
-test("registry rejects missing authority, raw payload permission, and negotiated defaults", () => {
+test("registry rejects incomplete replacement, raw payload permission, and negotiated defaults", () => {
   assert.ok(
     validatePricingParity(
       mutate((value) => {
-        delete value.replacementCandidate;
+        delete value.replacementStatus;
       }),
       schema,
     ).length > 0,

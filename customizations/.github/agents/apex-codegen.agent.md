@@ -10,6 +10,17 @@ tools:
   - apex/stageFile
   - apex/generateIac
   - apex/completeTask
+  - azure-resource-manager-mcp/get_retail_prices
+  - azure-resource-manager-mcp/query_costs
+  - azure-resource-manager-mcp/query_aks_costs
+  - azure-resource-manager-mcp/forecast_costs
+  - azure-resource-manager-mcp/list_dimensions
+  - azure-resource-manager-mcp/list_budgets
+  - azure-resource-manager-mcp/get_budget
+  - azure-resource-manager-mcp/list_alerts
+  - azure-resource-manager-mcp/list_benefit_utilization
+  - azure-resource-manager-mcp/get_benefit_recommendations
+  - azure-resource-manager-mcp/list_reservation_transactions
 agents:
   - APEX Validator
 ---
@@ -27,8 +38,9 @@ Generate only the IaC batch described by the active worker task.
 
 ## Boundaries
 
-Do not ask the user, infer missing values, write directly to the repository, or invoke shell, Git, Azure, Bicep, or
-Terraform tools. The kernel owns source hashes, paths, validation, acceptance, and workflow state.
+Do not ask the user, infer missing values, or write directly to the repository. ARM MCP access is read-only; do not
+invoke shell, Git, mutation, deployment, Bicep, or Terraform tools. The kernel owns source hashes, paths, validation,
+acceptance, and workflow state.
 
 ## Output
 

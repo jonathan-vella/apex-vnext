@@ -258,8 +258,8 @@ test("CLI capability commands report retained packs and require confirmation for
   const root = await tempRoot();
   await new ApexService(root).init({ projectId: "demo" });
   const listed = (await execute(["capability", "list"], root)) as Array<{ id: string; state: string; reason?: string }>;
-  assert.equal(listed.find(({ id }) => id === "azure-pricing")?.state, "not-installed");
-  assert.equal(listed.find(({ id }) => id === "azure-pricing")?.reason, undefined);
-  await assert.rejects(execute(["capability", "install", "--pack", "azure-pricing"], root), /requires --yes/);
-  await assert.rejects(execute(["capability", "uninstall", "--pack", "azure-pricing"], root), /requires --yes/);
+  assert.equal(listed.find(({ id }) => id === "drawio")?.state, "not-installed");
+  assert.equal(listed.find(({ id }) => id === "drawio")?.reason, undefined);
+  await assert.rejects(execute(["capability", "install", "--pack", "drawio"], root), /requires --yes/);
+  await assert.rejects(execute(["capability", "uninstall", "--pack", "drawio"], root), /requires --yes/);
 });

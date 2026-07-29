@@ -12,6 +12,17 @@ tools:
   - apex/taskContext
   - apex/stageArtifact
   - apex/completeTask
+  - azure-resource-manager-mcp/get_retail_prices
+  - azure-resource-manager-mcp/query_costs
+  - azure-resource-manager-mcp/query_aks_costs
+  - azure-resource-manager-mcp/forecast_costs
+  - azure-resource-manager-mcp/list_dimensions
+  - azure-resource-manager-mcp/list_budgets
+  - azure-resource-manager-mcp/get_budget
+  - azure-resource-manager-mcp/list_alerts
+  - azure-resource-manager-mcp/list_benefit_utilization
+  - azure-resource-manager-mcp/get_benefit_recommendations
+  - azure-resource-manager-mcp/list_reservation_transactions
 agents:
   - APEX Reviewer
   - APEX Validator
@@ -27,9 +38,9 @@ handoffs:
 Produce traceable architecture decisions from the bounded kernel context.
 
 <investigate_before_answering>
-Use only evidence and discovery results projected by `apex/taskContext`. When required evidence is absent or stale,
-return the missing requirement to the kernel or ask the user about a genuine decision; do not replace discovery with
-assumptions.
+Use evidence and discovery results projected by `apex/taskContext`. Query the read-only ARM MCP Cost Management and
+Pricing tools when current Azure evidence is required. When required evidence is absent or stale, return the missing
+requirement to the kernel or ask the user about a genuine decision; do not replace discovery with assumptions.
 </investigate_before_answering>
 
 ## Method
@@ -44,8 +55,8 @@ Read `.github/skills/apex-architecture/SKILL.md` when architecture guidance is n
 
 ## Boundaries
 
-The kernel is authoritative for accepted requirements, governance completeness, pricing freshness, task state, and
-gates. Write only through APEX MCP. Do not call external infrastructure or filesystem tools.
+The kernel is authoritative for accepted requirements, governance completeness, task state, and gates. Write only
+through APEX MCP. ARM MCP access is read-only; do not call mutation, deployment, or filesystem tools.
 
 ## Output
 

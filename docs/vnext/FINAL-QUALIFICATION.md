@@ -7,7 +7,7 @@ candidate `25530c339410e9758ae34538427f24bddfd83e1d`. The evidence remains valid
 contract, but the commit is no longer a release candidate.
 
 The current characterization base is `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`. The `0.10.0` contract now adds
-GitHub Copilot CLI parity, typed Azure Resource Manager MCP evidence, MCP and Draw.io retirement, bounded improvement
+GitHub Copilot CLI parity, direct Azure Resource Manager MCP access, MCP and Draw.io retirement, bounded improvement
 measurement, and npm-generated client projections. These additions reopen every affected release gate.
 
 No evidence in this dossier authorizes package publication, tag creation, branch changes, or production cutover.
@@ -20,8 +20,8 @@ No evidence in this dossier authorizes package publication, tag creation, branch
 | Deterministic qualification   | Must repeat after all re-baseline implementation changes.                 |
 | VS Code qualification         | Versions selected; must run against the new bundle and exact candidate.   |
 | Client parity qualification   | Deterministic harness complete; paired exact-candidate runs not started.  |
-| ARM MCP qualification         | Endpoint/toolsets documented; authenticated schemas and fixtures pending. |
-| MCP and Draw.io retirement    | Not implemented; each replacement gate must pass before removal.          |
+| ARM MCP qualification         | Direct clients configured; paired live OAuth discovery remains pending.   |
+| MCP and Draw.io retirement    | Terraform/custom pricing retired; Draw.io replacement remains pending.     |
 | Improvement measurement       | Not implemented; prior evidence covers observe-and-propose only.          |
 | Package, SBOM, and provenance | Must cover the new generated client projections on the exact candidate.   |
 | Guidance and automation       | Characterized on `b27d173`; later N/O parity gates remain incomplete.     |
@@ -194,9 +194,9 @@ The dispositions below apply only to the product contract bound to
 1. Complete Milestone H characterization and bind ownership records to the current `main` base.
 2. Preserve the four-surface guidance and automation characterization, then prove each later consolidation against its
    captured behavior, diagnostics, security, context/timing, rollback, and hosted-check gates.
-3. Implement and prove each selected MCP and Draw.io replacement before removing its old surface.
+3. Complete paired live ARM MCP checks and prove the Draw.io replacement before removing its old surface.
 4. Qualify equivalent typed outcomes and authority denials in supported VS Code and Copilot CLI versions.
-5. Qualify ARM MCP authentication, typed evidence adapters, tool allowlists, drift rejection, and failure handling.
+5. Qualify ARM MCP OAuth discovery, direct read allowlists, excluded-tool behavior, and failure handling.
 6. Prove Mermaid and Python diagram routing, bounded improvement measurement, and deterministic bundle generation.
 7. Repeat package reproducibility, clean lifecycle, APEX-level SBOM, provenance, security review, and live Azure tracks
    on one new exact candidate.

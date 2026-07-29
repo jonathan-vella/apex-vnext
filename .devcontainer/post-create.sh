@@ -204,61 +204,6 @@ pwsh -NoProfile -Command "
     \$jobs | Remove-Job -Force
 " && step_done "PowerShell modules installed" || step_warn "PowerShell module installation incomplete"
 
-# ─── Step 8: Azure Pricing MCP Server ────────────────────────────────────────
-
-step_start "💰" "Setting up Azure Pricing MCP Server..."
-MCP_DIR="${PWD}/tools/mcp-servers/azure-pricing"
-if [ -d "$MCP_DIR" ]; then
-    # post-create runs once per container creation, so we always start from a
-    # clean venv here. This guarantees the venv matches the container's
-    # current Python minor (no 3.13 → 3.14 carry-over from a persisted
-    # workspace) and that no orphaned/half-broken pip survives a previous
-    # failed run. The drift/missing/broken-pip detector below is retained
-    # only to produce a meaningful reason label in the success message —
-    # post-start.sh keeps the conditional-rebuild path for every-start runs.
-    #
-    # Probe is fault-tolerant: ``|| echo ""`` keeps ``set -e`` from killing
-    # the whole post-create run if python3 is temporarily unavailable. The
-    # version comparison below gates on both values being non-empty.
-    SYS_PY_VER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "")
-    VENV_PY_VER=""
-    if [ -f "$MCP_DIR/.venv/pyvenv.cfg" ]; then
-        VENV_PY_VER=$(grep -E '^version' "$MCP_DIR/.venv/pyvenv.cfg" 2>/dev/null \
-            | head -1 | awk '{print $3}' | cut -d'.' -f1-2)
-    fi
-    if [ ! -f "$MCP_DIR/.venv/bin/python" ]; then
-        REBUILD_REASON="missing venv"
-    elif [ -n "$VENV_PY_VER" ] && [ -n "$SYS_PY_VER" ] && [ "$VENV_PY_VER" != "$SYS_PY_VER" ]; then
-        REBUILD_REASON="Python ${VENV_PY_VER} → ${SYS_PY_VER} drift"
-    elif ! "$MCP_DIR/.venv/bin/python" -m pip --version >/dev/null 2>&1; then
-        REBUILD_REASON="broken pip"
-    else
-        REBUILD_REASON="clean rebuild (post-create policy)"
-    fi
-    rm -rf "$MCP_DIR/.venv" 2>/dev/null || true
-    python3 -m venv "$MCP_DIR/.venv"
-
-    "$MCP_DIR/.venv/bin/python" -m pip install --quiet --upgrade pip 2>&1 | tail -1 || true
-
-    cd "$MCP_DIR"
-    # ``[admin]`` is the canonical runtime extra (v5.x); ``[dev]`` supplies
-    # the isolated test toolchain used by the repository validation suite.
-    "$MCP_DIR/.venv/bin/python" -m pip install --quiet -e ".[admin,dev]" 2>&1 | tail -1 || true
-    cd - > /dev/null
-
-    if "$MCP_DIR/.venv/bin/python" -c "from azure_pricing_mcp import server; print('OK')" 2>/dev/null; then
-        if [ -n "$REBUILD_REASON" ]; then
-            step_done "MCP server installed & health check passed (rebuilt: ${REBUILD_REASON})"
-        else
-            step_done "MCP server installed & health check passed"
-        fi
-    else
-        step_warn "MCP server installed but health check failed"
-    fi
-else
-    step_fail "MCP directory not found at $MCP_DIR"
-fi
-
 # ─── Step 9.4: TFLint (cosign-free install) ─────────────────────────────────
 # TFLint is installed separately from Terraform because cosign 3.x is
 # incompatible with the Rekor log-query API and aborts signature validation
@@ -420,11 +365,10 @@ from pathlib import Path
 
 config_path = Path(sys.argv[1])
 
-default_azure_pricing = {
-    "type": "stdio",
-    "command": "${workspaceFolder}/tools/mcp-servers/azure-pricing/.venv/bin/python",
-    "args": ["-m", "azure_pricing_mcp"],
-    "cwd": "${workspaceFolder}/tools/mcp-servers/azure-pricing/src",
+default_arm_mcp = {
+    "type": "http",
+    "url": "https://mcp.management.azure.com",
+    "headers": {"x-mcp-toolset": "CostManagement,Pricing"},
 }
 
 default_github = {
@@ -451,7 +395,8 @@ if config_path.exists():
             data = {"servers": {}}
 
 servers = data.setdefault("servers", {})
-servers.setdefault("azure-pricing", default_azure_pricing)
+servers.pop("azure-pricing", None)
+servers.setdefault("azure-resource-manager-mcp", default_arm_mcp)
 servers.setdefault("github", default_github)
 servers.setdefault("drawio", default_drawio)
 # Azure MCP is provided by the ms-azuretools.vscode-azure-mcp-server extension

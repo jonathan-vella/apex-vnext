@@ -59,9 +59,10 @@
   },
   "qualification": {
     "documentationCharacterized": true,
-    "authenticatedToolsListCaptured": false,
-    "outputFixturesCaptured": false,
-    "adapterReady": false,
-    "managedAuthority": false
+    "authenticatedToolsListCaptured": true,
+    "outputFixturesCaptured": true,
+    "directClientConfigured": true,
+    "customAdapterRequired": false,
+    "customPricingServerRetired": true
   }
 }

@@ -10,11 +10,10 @@ Instructions for writing clean, consistent Python in this repository. Target Pyt
 
 ## Project Context
 
-Python is used for three purposes in this repo:
+Python is used for two active purposes in this repo:
 
 1. **Architecture diagrams** — `diagrams` library scripts in `agent-output/` and `.github/skills/`
-2. **Azure Pricing MCP server** — async `aiohttp`/`starlette` server in `tools/mcp-servers/azure-pricing/`
-3. **Utility scripts** — Checkov scanning, diagram verification
+2. **Utility scripts** — Checkov scanning, diagram verification, and `apex-recall`
 
 ## Style & Formatting
 
@@ -29,8 +28,7 @@ Python is used for three purposes in this repo:
 
 - Use `uv` (Astral) as the package manager — installed in devcontainer
 - Root dependencies in `requirements.txt`: `diagrams`, `matplotlib`, `pillow`, `checkov`
-- MCP server dependencies in `tools/mcp-servers/azure-pricing/pyproject.toml`
-- Use virtual environments: MCP server has its own `.venv`
+- Package-specific dependencies live with their owning Python tool.
 
 ## Diagram Scripts
 
@@ -53,15 +51,6 @@ with Diagram("Diagram Title", show=False, filename="output-name", direction="TB"
 - Use `direction="TB"` (top-to-bottom) for consistency
 - Group resources in `Cluster` blocks matching Azure resource groups
 - Set explicit `filename` parameter to control output location
-
-## Async Patterns (MCP Server)
-
-The Azure Pricing MCP server uses async patterns:
-
-- Use `async def` with `await` — never mix sync and async I/O
-- Use `aiohttp.ClientSession` for HTTP requests — create once, reuse
-- Use `cachetools.TTLCache` for pricing data caching
-- Handle `azure.identity` credential errors gracefully with fallback
 
 ## Conventions
 

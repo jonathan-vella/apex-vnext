@@ -56,8 +56,9 @@ requirements and SKU intent, and prevent later stages from silently changing app
 ### REQ-ARCH-001: Architecture, Cost, Quota, And Availability
 
 Architecture must trace resources to requirements and current pricing, quota, regional availability, reliability,
-security, operations, performance, and cost evidence. Managed pricing must use typed, attested evidence collected through
-an allowlisted Azure Resource Manager MCP adapter. Stale or unavailable blocking evidence must prevent approval.
+security, operations, performance, and cost evidence. Agents must query the Microsoft-hosted Azure Resource Manager MCP
+server directly through explicit read-only Cost Management and Pricing tool allowlists. Stale or unavailable blocking
+evidence must prevent approval.
 
 ### REQ-GOV-001: Governance And Policy
 
@@ -110,10 +111,11 @@ must not satisfy deterministic gates.
 ### REQ-CAPABILITY-001: Capabilities And Optional Packs
 
 External operations must pass through a versioned capability protocol with grants, roles, expiry, bounded output,
-timeouts, redaction, and safe argv execution. Astro and Terraform MCP servers must not be active dependencies. Managed
-Azure Resource Manager MCP use must pass through typed, read-allowlisted APEX adapters that reject deployment, budget,
-unknown, and write tools before transport. Direct ARM MCP reads are exploratory and cannot satisfy a gate without APEX
-attestation. Governance and replacement capability packs remain independently locked, verified, and transactional.
+timeouts, redaction, and safe argv execution. Astro, Terraform, and custom Azure Pricing MCP servers must not be active
+dependencies. Supported clients must connect directly to Microsoft ARM MCP with explicit read-only tool grants; managed
+agents must not receive deployment, budget-write, pricesheet-operation, unknown, or renamed tools. APEX remains the
+authority for workflow state, evidence acceptance, and gates. Governance capability packs remain independently locked,
+verified, and transactional.
 
 ### REQ-SECURITY-001: Security And Supply Chain
 

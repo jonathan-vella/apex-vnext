@@ -147,9 +147,7 @@ check_post_create_log() {
 prepare_test_dependencies() {
     npm ci
     npm ci --prefix site
-    uv pip install --system --quiet \
-        -e "${PWD}/tools/apex-recall" \
-        -e "${PWD}/tools/mcp-servers/azure-pricing[dev]"
+    uv pip install --system --quiet -e "${PWD}/tools/apex-recall"
 }
 
 check_bicep_compile() {
@@ -236,7 +234,7 @@ run_check "azd" "compatibility" azd version
 run_check "ruff" "compatibility" ruff --version
 run_check "apex-recall" "compatibility" apex-recall --version
 run_check "python-package-imports" "compatibility" python3 -c \
-    'import diagrams, matplotlib, PIL, checkov; from azure_pricing_mcp import server'
+    'import diagrams, matplotlib, PIL, checkov'
 
 # Existing repository validation gates.
 run_check "format-check" "harness" npm run format:check
@@ -246,10 +244,6 @@ run_check "validate-all" "harness" npm run validate:all
 # Functional checks specific to the container runtime and public integrations.
 run_check "bicep-compile" "compatibility" check_bicep_compile
 run_check "terraform-init-validate" "network" check_terraform_validate
-run_check "azure-pricing-live-integration" "network" python3 -m pytest \
-    tools/mcp-servers/azure-pricing/tests/test_integration.py::test_real_vm_price_search \
-    tools/mcp-servers/azure-pricing/tests/test_integration.py::test_real_storage_price_search \
-    -q -o "addopts="
 run_check "diagram-render" "compatibility" check_diagram_render
 
 END_EPOCH=$(date +%s)

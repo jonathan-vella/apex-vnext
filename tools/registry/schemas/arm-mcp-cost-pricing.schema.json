@@ -97,15 +97,17 @@
         "documentationCharacterized",
         "authenticatedToolsListCaptured",
         "outputFixturesCaptured",
-        "adapterReady",
-        "managedAuthority"
+        "directClientConfigured",
+        "customAdapterRequired",
+        "customPricingServerRetired"
       ],
       "properties": {
         "documentationCharacterized": { "const": true },
-        "authenticatedToolsListCaptured": { "const": false },
-        "outputFixturesCaptured": { "const": false },
-        "adapterReady": { "const": false },
-        "managedAuthority": { "const": false }
+        "authenticatedToolsListCaptured": { "const": true },
+        "outputFixturesCaptured": { "const": true },
+        "directClientConfigured": { "const": true },
+        "customAdapterRequired": { "const": false },
+        "customPricingServerRetired": { "const": true }
       }
     }
   }

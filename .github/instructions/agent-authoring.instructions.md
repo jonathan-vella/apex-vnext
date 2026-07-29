@@ -45,7 +45,9 @@ The source files live under `customizations/.github/skills/` and are packaged by
 
 ## Security Boundaries
 
-- Do not grant shell, Git, Azure, filesystem, publication, approval, or deployment tools to managed agents.
+- Do not grant shell, Git, filesystem, publication, approval, deployment, or other mutating tools to managed agents.
+- Grant direct remote MCP tools only through explicit read-only allowlists; never use a server wildcard when it exposes
+  write or operation tools.
 - Do not let an agent self-approve, decide Gate 4, publish, tag, or bypass kernel authorization.
 - Do not embed secrets, credentials, raw chat history, or secret-bearing logs.
 - Keep hidden-worker output bounded, typed, and suitable for deterministic validation.

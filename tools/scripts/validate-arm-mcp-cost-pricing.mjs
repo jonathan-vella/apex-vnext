@@ -9,7 +9,7 @@ import addFormats from "ajv-formats";
 
 const REGISTRY_PATH = "tools/registry/arm-mcp-cost-pricing.v1.json";
 const SCHEMA_PATH = "tools/registry/schemas/arm-mcp-cost-pricing.schema.json";
-const EXPECTED_SHA256 = "f8b8a35169dd00b7beff6fe292eaffb842abe8d21a892b1e8f54aabf140c7785";
+const EXPECTED_SHA256 = "06f719bbf142747957c5ff6c748244c5b42c06ba8554c8be6ffd7d0ec9069457";
 const EXPECTED_COST_READ = [
   "query_costs",
   "query_aks_costs",
@@ -66,12 +66,13 @@ export function validateArmMcpCostPricing(registry, schema) {
       JSON.stringify(registry.managedPolicy.denyBeforeTransport) !== JSON.stringify(EXPECTED_DENIED) ||
       registry.managedPolicy.unknownToolDisposition !== "deny-before-transport" ||
       registry.qualification.documentationCharacterized !== true ||
-      registry.qualification.authenticatedToolsListCaptured !== false ||
-      registry.qualification.outputFixturesCaptured !== false ||
-      registry.qualification.adapterReady !== false ||
-      registry.qualification.managedAuthority !== false
+      registry.qualification.authenticatedToolsListCaptured !== true ||
+      registry.qualification.outputFixturesCaptured !== true ||
+      registry.qualification.directClientConfigured !== true ||
+      registry.qualification.customAdapterRequired !== false ||
+      registry.qualification.customPricingServerRetired !== true
     ) {
-      errors.push("ARM MCP cost/pricing semantics or authority boundary drifted");
+      errors.push("ARM MCP cost/pricing semantics or direct-client boundary drifted");
     }
     return errors.sort();
   } catch {
