@@ -5,8 +5,8 @@
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
-- **Active issue:** [#162](https://github.com/jonathan-vella/apex-vnext/issues/162) - pricing parity and contracts
-- **Working branch:** `feat/162-pricing-contracts`
+- **Active issue:** [#166](https://github.com/jonathan-vella/apex-vnext/issues/166) - Azure MCP characterization
+- **Working branch:** `feat/166-characterize-azure-mcp`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -58,6 +58,8 @@ PR #155 closes issue #154. Issue #156 promotes VS Code `1.130.0` and Copilot Cha
 context receipt into the exact canonical toolchain selection; paired live execution remains pending.
 PR #158 closes issue #156. Issue #162 freezes normalized pricing replacement semantics and strict request/evidence
 contracts before any ARM MCP adapter or transport is implemented.
+PR #163 closes issue #162. Issue #166 characterizes stable Azure MCP `2.0.5` and its exact `pricing_get` wire contract;
+issue #164 remains blocked by the absence of a fixed host, output schema, and Cost Management tools.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
@@ -80,7 +82,7 @@ not full client-parity qualification. No ARM MCP version has been selected or qu
 | ARM MCP adapters and MCP retirements                                     | Astro and Terraform retired; Azure Pricing and Draw.io gates remain open |
 | Bundle composition mappings, aggregate lock, and client projections      | Implemented; live client qualification remains pending                   |
 | Normalized client outcome contracts, corpus, and deterministic harness   | Implemented; exact-candidate paired live execution remains pending       |
-| Pricing parity registry and strict request/evidence contracts            | Implemented locally; ARM MCP adapter and measured parity remain pending  |
+| Pricing parity contracts and stable Azure MCP characterization           | Contracts merged; artifact characterized; adapter remains blocked        |
 | Diagram and improvement-measurement changes                              | Pending                                                                  |
 | Final deterministic, client, package, security, and live qualification   | Reopened                                                                 |
 
@@ -94,9 +96,9 @@ not full client-parity qualification. No ARM MCP version has been selected or qu
 
 ## Immediate Sequence
 
-1. Complete issue #162's pricing parity and strict evidence contract slice.
+1. Complete issue #166's stable Azure MCP artifact and pricing-tool characterization.
 2. Return to issue #161 when interactive paired client execution and trusted receipt export are available.
-3. Implement and qualify the bounded ARM pricing adapter without retiring the current pricing pack.
+3. Resolve issue #164 host, output-schema, and Cost Management blockers before implementing an adapter.
 4. Complete diagram routing, bounded improvement measurement, bundle generation, and guidance
    consolidation in roadmap order.
 5. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.

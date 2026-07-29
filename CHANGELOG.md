@@ -19,6 +19,9 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Characterized stable Azure MCP `2.0.5` and its read-only `pricing_get` wire schema with content-addressed wrapper,
+  platform, and tool-list provenance. No output schema, fixed host, or Cost Management tools exist; adapter work remains
+  blocked and the current Azure Pricing MCP stays authoritative.
 - Added strict pricing request/evidence contracts and a canonical ARM pricing replacement parity registry covering
   typed arithmetic, meters, commitments, ambiguity, uncertainty, throttling, freshness, and content-free provenance.
   The current Azure Pricing MCP remains authoritative until later adapter qualification and replacement gates pass.
