@@ -270,9 +270,9 @@ authority to agents.
    mutation-tested validator.
 2. Add versioned pricing-request and pricing-evidence contracts. Issue #162 implements strict content-free schemas,
    request/evidence identity binding, typed arithmetic, expiry, provenance, and non-gate dispositions.
-3. Implement a pinned-host ARM MCP client with exact Pricing and Cost Management read allowlists. Issue #166
-   characterizes stable Azure MCP `2.0.5`: `pricing_get` is read-only, but no fixed host, output schema, or Cost
-   Management tool exists, so issue #164 remains blocked rather than guessing the trust contract.
+3. Implement a pinned-host ARM MCP client with exact Pricing and Cost Management read allowlists. Issue #169 binds the
+   managed endpoint `https://mcp.management.azure.com`, optional `CostManagement,Pricing` toolsets, and documented tool
+   inventory. Issue #164 still requires authenticated protocol schemas and output fixtures before adapter qualification.
 4. Reject deployment, cancellation, budget creation, unknown, renamed, and write tools before transport.
 5. Add an operator collection and attestation path that keeps restricted raw evidence out of task context.
 6. Run paired reliability, latency, security, semantic, determinism, and maintenance measurements at the declared pack

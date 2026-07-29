@@ -1,0 +1,67 @@
+{
+  "$schema": "schemas/arm-mcp-cost-pricing.schema.json",
+  "schemaVersion": "1.0.0",
+  "observedAt": "2026-07-29",
+  "product": "azure-resource-manager-mcp",
+  "endpoint": "https://mcp.management.azure.com",
+  "toolsetHeader": {
+    "name": "x-mcp-toolset",
+    "value": "CostManagement,Pricing"
+  },
+  "supportedClients": ["github-copilot-vscode", "github-copilot-cli"],
+  "source": {
+    "repository": "https://github.com/Azure/Azure-Resource-Manager-MCP",
+    "repositoryCommit": "fe70cd2497a8ccc78f1e73330c712a073261a426",
+    "document": "docs/CostManagementAndPricingTools.md",
+    "documentCommit": "74472441fb485e784b56a9f5bc11e5530cbc835c",
+    "rawUrl": "https://raw.githubusercontent.com/Azure/Azure-Resource-Manager-MCP/74472441fb485e784b56a9f5bc11e5530cbc835c/docs/CostManagementAndPricingTools.md",
+    "sha256": "f81aebf0954333e6906b6e1be5fd9ed010746060e1f847e72cbc6983f0e0dec8",
+    "bytes": 9033
+  },
+  "toolsets": {
+    "CostManagement": {
+      "readTools": [
+        "query_costs",
+        "query_aks_costs",
+        "forecast_costs",
+        "list_dimensions",
+        "list_budgets",
+        "get_budget",
+        "list_alerts",
+        "list_benefit_utilization",
+        "get_benefit_recommendations",
+        "list_reservation_transactions"
+      ],
+      "writeTools": ["create_budget"]
+    },
+    "Pricing": {
+      "readTools": ["get_retail_prices", "get_pricesheet_status"],
+      "operationTools": ["start_pricesheet_download"]
+    }
+  },
+  "managedPolicy": {
+    "candidateReadAllowlist": [
+      "get_retail_prices",
+      "query_costs",
+      "query_aks_costs",
+      "forecast_costs",
+      "list_dimensions",
+      "list_budgets",
+      "get_budget",
+      "list_alerts",
+      "list_benefit_utilization",
+      "get_benefit_recommendations",
+      "list_reservation_transactions"
+    ],
+    "deferredTools": ["start_pricesheet_download", "get_pricesheet_status"],
+    "denyBeforeTransport": ["create_budget", "create_template_deployment", "cancel_arm_template_deployment"],
+    "unknownToolDisposition": "deny-before-transport"
+  },
+  "qualification": {
+    "documentationCharacterized": true,
+    "authenticatedToolsListCaptured": false,
+    "outputFixturesCaptured": false,
+    "adapterReady": false,
+    "managedAuthority": false
+  }
+}
