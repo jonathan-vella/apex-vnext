@@ -15,6 +15,7 @@ This directory is the durable project hub for completing and releasing APEX vNex
 | Decisions | [DECISIONS.md](DECISIONS.md) | Append entries; use an ADR for consequential design choices. |
 | Supported client qualification | [CLIENT-QUALIFICATION.md](CLIENT-QUALIFICATION.md) | Pin clients and compare normalized outcomes. |
 | Managed custom-agent contract | [CUSTOM-AGENT-CONTRACT-PLAN.md](CUSTOM-AGENT-CONTRACT-PLAN.md) | Keep shared roles and client projections aligned with official agent schemas. |
+| Hidden-worker characterization | [HIDDEN-WORKER-CHARACTERIZATION.md](HIDDEN-WORKER-CHARACTERIZATION.md) | Preserve client visibility/delegation evidence and the resolution gate. |
 | Guidance and automation review | [GUIDANCE-AUTOMATION-REVIEW.md](GUIDANCE-AUTOMATION-REVIEW.md) | Characterize owners before consolidation. |
 | Guidance and automation evidence | [GUIDANCE-AUTOMATION-CHARACTERIZATION.md](GUIDANCE-AUTOMATION-CHARACTERIZATION.md) | Preserve consumer maps, baselines, and later change gates. |
 | Terraform MCP characterization | [TERRAFORM-MCP-CHARACTERIZATION.md](TERRAFORM-MCP-CHARACTERIZATION.md) | Preserve registry-only tools, consumers, provenance gaps, and replacement gates. |

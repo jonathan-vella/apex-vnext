@@ -56,6 +56,13 @@ that combination appear unreachable. Do not change it from documentation alone: 
 on the pinned CLI and VS Code subagent invocation on the pinned extension, then encode the observed valid combination as
 a validator invariant.
 
+Issue [#179](https://github.com/jonathan-vella/apex-vnext/issues/179) completed the bounded characterization. CLI
+`1.0.73` exposed no field combination that was both unavailable to direct `--agent` selection and available through the
+`task` catalog. The observed binary hash did not match the pinned inventory, and the installed VS Code version did not
+match the selected pair, so the result blocks release qualification without authorizing a flag change. See
+[HIDDEN-WORKER-CHARACTERIZATION.md](HIDDEN-WORKER-CHARACTERIZATION.md); issue
+[#180](https://github.com/jonathan-vella/apex-vnext/issues/180) owns resolution.
+
 ## Implementation Slices
 
 1. **Freeze field ownership.** Extend `customizations/manifest.json` with the intended environment set for each role.
