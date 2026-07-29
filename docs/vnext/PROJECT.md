@@ -1,12 +1,12 @@
 ## APEX vNext Checkpoint
 
 - **Updated:** 2026-07-29 UTC
-- **Milestone:** K - ARM MCP pricing replacement
+- **Milestone:** L - Mermaid and Python diagram migration
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
-- **Active issue:** [#164](https://github.com/jonathan-vella/apex-vnext/issues/164) - direct ARM MCP pricing replacement
-- **Working branch:** `feat/164-arm-pricing-adapter`
+- **Active issue:** [#168](https://github.com/jonathan-vella/apex-vnext/issues/168) - format-neutral diagram semantics
+- **Working branch:** `feat/168-diagram-semantics`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -61,6 +61,8 @@ contracts before any ARM MCP adapter or transport is implemented.
 PR #163 closes issue #162. PR #167 characterized the separate Azure MCP Server under an incorrect ARM MCP assumption.
 Issue #169 removes that unrelated surface from Milestone K and binds the actual ARM MCP endpoint and toolsets. Issue #164
 switches the implementation from a custom adapter to direct supported-client MCP access and retires the Python pack.
+PR #171 closes issue #164. Issue #168 generalizes the existing Draw.io golden expectations into format-neutral semantics
+and freezes Mermaid/Python routing before active consumer migration.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, direct read-only Azure Resource
 Manager MCP access, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement,
@@ -84,7 +86,7 @@ not full client-parity qualification. Direct ARM MCP discovery still requires pa
 | Bundle composition mappings, aggregate lock, and client projections      | Implemented; live client qualification remains pending                 |
 | Normalized client outcome contracts, corpus, and deterministic harness   | Implemented; exact-candidate paired live execution remains pending     |
 | Pricing parity contracts and ARM MCP Cost/Pricing documentation          | Direct authority configured; paired live client checks remain pending  |
-| Diagram and improvement-measurement changes                              | Pending                                                                |
+| Diagram semantics and improvement-measurement changes                    | Semantics frozen; migration and improvement measurement remain pending |
 | Final deterministic, client, package, security, and live qualification   | Reopened                                                               |
 
 ## Release Boundaries
@@ -97,11 +99,10 @@ not full client-parity qualification. Direct ARM MCP discovery still requires pa
 
 ## Immediate Sequence
 
-1. Complete issue #164's direct ARM MCP configuration and custom pricing retirement.
+1. Complete issue #168's format-neutral diagram semantics and routing contract.
 2. Return to issue #161 when interactive paired client execution and trusted receipt export are available.
 3. Run direct ARM MCP discovery and representative read calls in both supported interactive clients.
-4. Complete diagram routing, bounded improvement measurement, bundle generation, and guidance
-   consolidation in roadmap order.
+4. Migrate active diagram consumers and qualify Python/Mermaid rendering before any Draw.io retirement.
 5. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.
 
 ## Resume Pointer

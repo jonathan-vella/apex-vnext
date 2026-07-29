@@ -1,0 +1,175 @@
+#!/usr/bin/env node
+/** Validate format-neutral diagram semantics and routing. */
+
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import process from "node:process";
+import Ajv2020 from "ajv/dist/2020.js";
+
+const REGISTRY_PATH = "tools/registry/diagram-semantics.v1.json";
+const SCHEMA_PATH = "tools/registry/schemas/diagram-semantics.schema.json";
+const EXPECTED_SHA256 = "d5050ddd3d06a8a7503a6a9e4d79e28203ce0925c80c01b9bc20829f939af8eb";
+const EXPECTED_IDS = [
+  "g1-three-tier-web",
+  "g2-hub-spoke-landing-zone",
+  "g3-event-driven-microservices",
+  "g4-ml-training-pipeline",
+  "g5-enterprise-landing-zone",
+  "g6-hyperscale-platform",
+  "g7-multi-region-active-active",
+];
+const EXPECTED_ROUTING = {
+  inline: {
+    owner: "mermaid",
+    outputClasses: ["flow", "sequence", "state", "er", "compact-documentation"],
+    formats: ["mmd", "markdown"],
+  },
+  standalone: {
+    owner: "python-diagrams",
+    outputClasses: ["architecture", "network", "dependency", "runtime", "as-built", "waf", "cost", "compliance"],
+    formats: ["py", "png", "svg"],
+  },
+  transitional: { owner: "drawio", newOutputAllowed: false, historicalReadable: true, formats: ["drawio"] },
+};
+const EXPECTED_RECONCILIATIONS = {
+  "g3-event-driven-microservices": [
+    {
+      field: "diagramType",
+      legacy: "sequence",
+      resolved: "runtime-flow",
+      rationale: "The prompt requests a standalone runtime-flow artifact; sequence remains an inline route only.",
+    },
+  ],
+  "g5-enterprise-landing-zone": [
+    {
+      field: "scope.managementGroups",
+      legacy: 4,
+      resolved: 6,
+      rationale: "The prompt names Tenant Root, Platform, Connectivity, Identity, Landing Zones, and Sandbox.",
+    },
+  ],
+  "g6-hyperscale-platform": [
+    {
+      field: "resources",
+      legacy: { minimum: 50, maximum: 60 },
+      resolved: { minimum: 28, maximum: 32 },
+      rationale: "The prompt names 28 concrete global and per-region resources; workload-level instances may add four.",
+    },
+  ],
+};
+
+function reconciledValue(scenario, field, legacyValue) {
+  const reconciliation = scenario.legacyReconciliations.find((item) => item.field === field);
+  if (reconciliation === undefined) return legacyValue;
+  if (JSON.stringify(reconciliation.legacy) !== JSON.stringify(legacyValue)) return Symbol("invalid-reconciliation");
+  return reconciliation.resolved;
+}
+
+function canonicalValue(value) {
+  if (Array.isArray(value)) return value.map(canonicalValue);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, child]) => [key, canonicalValue(child)]),
+    );
+  }
+  return value;
+}
+
+export function validateDiagramSemantics(registry, schema) {
+  const errors = [];
+  const ajv = new Ajv2020({ allErrors: true, strict: true });
+  if (!ajv.validate(schema, registry)) {
+    return (ajv.errors ?? []).map(({ instancePath, message }) => `${instancePath || "/"}: ${message}`);
+  }
+  const digest = createHash("sha256")
+    .update(JSON.stringify(canonicalValue(registry)))
+    .digest("hex");
+  if (digest !== EXPECTED_SHA256) errors.push("canonical diagram semantic manifest drifted");
+  if (JSON.stringify(registry.routing) !== JSON.stringify(EXPECTED_ROUTING)) errors.push("diagram routing drifted");
+  const ids = registry.scenarios.map(({ id }) => id);
+  if (JSON.stringify(ids) !== JSON.stringify(EXPECTED_IDS) || new Set(ids).size !== ids.length) {
+    errors.push("format-neutral scenario coverage drifted");
+  }
+  for (const scenario of registry.scenarios) {
+    let source;
+    try {
+      source = JSON.parse(readFileSync(scenario.sourceExpectation, "utf8"));
+    } catch {
+      errors.push(`${scenario.id}: source expectation is missing or invalid`);
+      continue;
+    }
+    const expected = {
+      id: source.id,
+      title: source.title,
+      diagramType: reconciledValue(scenario, "diagramType", source.diagram_type),
+      scope: {
+        subscriptions: source.scope.subscriptions,
+        regions: source.scope.regions,
+        managementGroups: reconciledValue(scenario, "scope.managementGroups", source.scope.management_groups),
+      },
+      resources: reconciledValue(scenario, "resources", {
+        minimum: source.min_resources,
+        maximum: source.max_resources,
+      }),
+      zones: source.expected_zones,
+      edgeLabels: source.expected_edge_labels,
+      legendRequired: source.expected_legend_required,
+      pages: source.expected_pages ?? 1,
+    };
+    for (const [field, value] of Object.entries(expected)) {
+      if (JSON.stringify(scenario[field]) !== JSON.stringify(value)) {
+        errors.push(`${scenario.id}: ${field} differs from the legacy semantic source`);
+      }
+    }
+    if (scenario.resources.minimum > scenario.resources.maximum) errors.push(`${scenario.id}: resource bounds invert`);
+    const expectedReconciliations = EXPECTED_RECONCILIATIONS[scenario.id] ?? [];
+    if (JSON.stringify(scenario.legacyReconciliations) !== JSON.stringify(expectedReconciliations)) {
+      errors.push(`${scenario.id}: legacy reconciliation drifted`);
+    }
+    const nodeIds = scenario.nodes.map(({ id }) => id);
+    if (new Set(nodeIds).size !== nodeIds.length) errors.push(`${scenario.id}: duplicate node IDs`);
+    const edgeIds = scenario.edges.map(({ id }) => id);
+    if (new Set(edgeIds).size !== edgeIds.length) errors.push(`${scenario.id}: duplicate edge IDs`);
+    for (const node of scenario.nodes) {
+      if (node.zone !== undefined && !scenario.zones.includes(node.zone)) {
+        errors.push(`${scenario.id}: node ${node.id} references unknown zone ${node.zone}`);
+      }
+    }
+    for (const edge of scenario.edges) {
+      if (!nodeIds.includes(edge.source) || !nodeIds.includes(edge.target)) {
+        errors.push(`${scenario.id}: edge ${edge.id} references an unknown node`);
+      }
+    }
+    for (const label of scenario.edgeLabels) {
+      if (!scenario.edges.some((edge) => edge.label.split("/").some((part) => part.trim() === label))) {
+        errors.push(`${scenario.id}: required edge label ${label} has no semantic edge`);
+      }
+    }
+    if (
+      scenario.dimensions.minimumWidth > scenario.dimensions.maximumWidth ||
+      scenario.dimensions.minimumHeight > scenario.dimensions.maximumHeight
+    ) {
+      errors.push(`${scenario.id}: dimension bounds invert`);
+    }
+    const route = registry.routing.inline.outputClasses.includes(scenario.outputClass)
+      ? registry.routing.inline
+      : registry.routing.standalone.outputClasses.includes(scenario.outputClass)
+        ? registry.routing.standalone
+        : null;
+    if (route === null) errors.push(`${scenario.id}: output class has no active route`);
+  }
+  return errors.sort();
+}
+
+function main() {
+  const registry = JSON.parse(readFileSync(REGISTRY_PATH, "utf8"));
+  const schema = JSON.parse(readFileSync(SCHEMA_PATH, "utf8"));
+  const errors = validateDiagramSemantics(registry, schema);
+  for (const error of errors) console.error(`❌ ${REGISTRY_PATH}: ${error}`);
+  if (errors.length === 0) console.log("✅ Format-neutral diagram semantics are valid");
+  return errors.length === 0 ? 0 : 1;
+}
+
+if (process.argv[1]?.endsWith("validate-diagram-semantics.mjs")) process.exitCode = main();

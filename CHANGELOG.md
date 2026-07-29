@@ -25,6 +25,9 @@ prior qualification is retained as historical characterization. See
 - Corrected the ARM MCP product boundary: Azure Resource Manager MCP is distinct from Azure MCP Server and exposes
   documented CostManagement/Pricing toolsets at `https://mcp.management.azure.com`. Removed the unrelated Azure MCP
   characterization from active pricing ownership.
+- Added a format-neutral diagram semantics manifest covering all existing golden scenarios and froze routing of inline
+  diagrams to Mermaid and standalone diagrams to Python. Draw.io remains transitional pending consumer migration and
+  measured rendering parity.
 - Added strict pricing request/evidence contracts and a canonical ARM pricing replacement parity registry covering
   typed arithmetic, meters, commitments, ambiguity, uncertainty, throttling, freshness, and content-free provenance.
   Microsoft ARM MCP is the direct pricing authority; APEX retains workflow, evidence-acceptance, and gate authority.
