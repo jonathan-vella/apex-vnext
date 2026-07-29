@@ -328,8 +328,8 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
-      "id": "test-azure-mcp-pricing-characterization",
-      "script": "test:azure-mcp-pricing-characterization",
+      "id": "test-arm-mcp-cost-pricing",
+      "script": "test:arm-mcp-cost-pricing",
       "profile": "node-test",
       "aliases": [],
       "retirement": { "status": "active", "replacementIds": [] }
@@ -468,8 +468,8 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
-      "id": "validate-azure-mcp-pricing-characterization",
-      "script": "validate:azure-mcp-pricing-characterization",
+      "id": "validate-arm-mcp-cost-pricing",
+      "script": "validate:arm-mcp-cost-pricing",
       "profile": "node-validation",
       "aliases": [],
       "retirement": { "status": "active", "replacementIds": [] }
@@ -651,8 +651,8 @@
         "test:client-outcomes",
         "validate:pricing-parity",
         "test:pricing-parity",
-        "validate:azure-mcp-pricing-characterization",
-        "test:azure-mcp-pricing-characterization",
+        "validate:arm-mcp-cost-pricing",
+        "test:arm-mcp-cost-pricing",
         "test:retired-automation",
         "validate:iac-security-baseline",
         "validate:policy-precheck",
@@ -733,8 +733,8 @@
         "test:client-outcomes",
         "validate:pricing-parity",
         "test:pricing-parity",
-        "validate:azure-mcp-pricing-characterization",
-        "test:azure-mcp-pricing-characterization",
+        "validate:arm-mcp-cost-pricing",
+        "test:arm-mcp-cost-pricing",
         "test:retired-automation",
         "validate:policy-precheck",
         "lint:js:ci",

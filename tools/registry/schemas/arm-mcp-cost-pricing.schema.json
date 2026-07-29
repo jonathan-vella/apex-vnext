@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.apexops.dev/arm-mcp-cost-pricing-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "observedAt",
+    "product",
+    "endpoint",
+    "toolsetHeader",
+    "supportedClients",
+    "source",
+    "toolsets",
+    "managedPolicy",
+    "qualification"
+  ],
+  "properties": {
+    "$schema": { "const": "schemas/arm-mcp-cost-pricing.schema.json" },
+    "schemaVersion": { "const": "1.0.0" },
+    "observedAt": { "type": "string", "format": "date" },
+    "product": { "const": "azure-resource-manager-mcp" },
+    "endpoint": { "const": "https://mcp.management.azure.com" },
+    "toolsetHeader": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value"],
+      "properties": { "name": { "const": "x-mcp-toolset" }, "value": { "const": "CostManagement,Pricing" } }
+    },
+    "supportedClients": { "const": ["github-copilot-vscode", "github-copilot-cli"] },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "repositoryCommit", "document", "documentCommit", "rawUrl", "sha256", "bytes"],
+      "properties": {
+        "repository": { "const": "https://github.com/Azure/Azure-Resource-Manager-MCP" },
+        "repositoryCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "document": { "const": "docs/CostManagementAndPricingTools.md" },
+        "documentCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "rawUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://raw\\.githubusercontent\\.com/Azure/Azure-Resource-Manager-MCP/"
+        },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "toolsets": {
+      "const": {
+        "CostManagement": {
+          "readTools": [
+            "query_costs",
+            "query_aks_costs",
+            "forecast_costs",
+            "list_dimensions",
+            "list_budgets",
+            "get_budget",
+            "list_alerts",
+            "list_benefit_utilization",
+            "get_benefit_recommendations",
+            "list_reservation_transactions"
+          ],
+          "writeTools": ["create_budget"]
+        },
+        "Pricing": {
+          "readTools": ["get_retail_prices", "get_pricesheet_status"],
+          "operationTools": ["start_pricesheet_download"]
+        }
+      }
+    },
+    "managedPolicy": {
+      "const": {
+        "candidateReadAllowlist": [
+          "get_retail_prices",
+          "query_costs",
+          "query_aks_costs",
+          "forecast_costs",
+          "list_dimensions",
+          "list_budgets",
+          "get_budget",
+          "list_alerts",
+          "list_benefit_utilization",
+          "get_benefit_recommendations",
+          "list_reservation_transactions"
+        ],
+        "deferredTools": ["start_pricesheet_download", "get_pricesheet_status"],
+        "denyBeforeTransport": ["create_budget", "create_template_deployment", "cancel_arm_template_deployment"],
+        "unknownToolDisposition": "deny-before-transport"
+      }
+    },
+    "qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentationCharacterized",
+        "authenticatedToolsListCaptured",
+        "outputFixturesCaptured",
+        "adapterReady",
+        "managedAuthority"
+      ],
+      "properties": {
+        "documentationCharacterized": { "const": true },
+        "authenticatedToolsListCaptured": { "const": false },
+        "outputFixturesCaptured": { "const": false },
+        "adapterReady": { "const": false },
+        "managedAuthority": { "const": false }
+      }
+    }
+  }
+}

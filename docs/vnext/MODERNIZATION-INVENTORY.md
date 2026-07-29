@@ -197,9 +197,9 @@ parity remains pending.
 Issue #162 freezes the `OWN-013` pricing parity registry and strict request/evidence contracts. It binds typed money,
 meter, commitment, ambiguity, uncertainty, throttling, freshness, and content-free provenance semantics. The current
 Azure Pricing MCP remains authoritative until a later ARM adapter passes every measured replacement and denial gate.
-Issue #166 content-addresses stable Azure MCP `2.0.5` and freezes its `pricing_get` input schema and annotations.
-It records the absent output schema and Cost Management tools. This is characterization only and grants no managed
-authority.
+Issue #169 corrects the product boundary: Azure Resource Manager MCP is a managed HTTP server at
+`https://mcp.management.azure.com`, distinct from Azure MCP Server. Its optional CostManagement/Pricing toolsets are
+documented and source-bound; authenticated protocol schemas and fixtures remain required before managed use.
 
 ## Removal And Change Gates
 
