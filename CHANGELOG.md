@@ -43,6 +43,8 @@ prior qualification is retained as historical characterization. See
 - Characterized hidden-worker visibility and delegation without changing projection flags. The observed Copilot CLI
   exposes no tested combination that is both unavailable for direct selection and explicitly `task`-callable; exact
   paired-client qualification remains blocked pending the architecture decision in issue #180.
+- Selected a fail-closed Copilot CLI worker boundary: autonomous workers are generated only for VS Code, unsupported
+  role/client pairs are omitted deterministically, and parent delegation tools require a supported destination.
 - Added versioned kernel-owned input requests and typed APEX MCP answer recording bound to the exact journal head and
   writer epoch, with deterministic option validation, replay denial, transfer reissue, and no chat-history dependency.
 - Retired Terraform MCP after migrating active consumers to bounded Registry/native/documentation owners; removed its

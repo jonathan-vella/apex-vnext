@@ -68,6 +68,10 @@ export interface BundledAssets {
 
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
+const PROJECTION_TARGETS: Readonly<Record<BundledClientProjection["id"], string>> = {
+  "github-copilot-cli": "github-copilot",
+  "github-copilot-vscode": "vscode",
+};
 const SHA256 = /^[a-f0-9]{64}$/u;
 
 function portablePath(path: string): string {
@@ -365,7 +369,12 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
   ) as Record<string, unknown>;
   verifyBundleDeclarations(manifest, customizationManifest, runtimeBundle);
   const sharedFiles = customizationManifest.sharedFiles as string[];
-  const roles = customizationManifest.roles as Array<{ id: string; source: string; agent: string }>;
+  const roles = customizationManifest.roles as Array<{
+    id: string;
+    source: string;
+    agent: string;
+    supportedTargets: string[];
+  }>;
   const declarations = customizationManifest.clientProjections as Array<{
     id: string;
     generatedRoot: string;
@@ -388,7 +397,12 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
     const role = file.source.roleId === undefined ? undefined : roles.find(({ id }) => id === file.source.roleId);
     const canonical = sourceMetadata.get(`customizations/${file.source.sourcePath}`);
     if (
-      (file.source.roleId !== undefined && (role === undefined || role.source !== file.source.sourcePath)) ||
+      (file.source.roleId !== undefined &&
+        (role === undefined ||
+          role.source !== file.source.sourcePath ||
+          !role.supportedTargets.includes(
+            PROJECTION_TARGETS[file.source.clientId as BundledClientProjection["id"]],
+          ))) ||
       canonical?.source.kind !== "repository-file" ||
       canonical.sha256 !== file.source.sourceHash
     ) {
@@ -403,7 +417,11 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
     const expectedTargets = [
       ...sharedFiles,
       ...declaration.files,
-      ...(customizationManifest.roles as Array<{ source: string }>).map(({ source }) => source),
+      ...roles
+        .filter(({ supportedTargets }) =>
+          supportedTargets.includes(PROJECTION_TARGETS[declaration.id as BundledClientProjection["id"]]),
+        )
+        .map(({ source }) => source),
     ];
     const expected = expectedTargets.map((path) => `${declaration.generatedRoot}/${path}`).sort();
     if (

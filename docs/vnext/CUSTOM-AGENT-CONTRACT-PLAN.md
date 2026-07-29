@@ -45,11 +45,11 @@ single-client projections should state `target: vscode` or `target: github-copil
 
 ## Role Projection Matrix
 
-| Role class              | Canonical intent                                                          | VS Code projection                                                                                        | Copilot CLI projection                                                                  | Required proof                                                                                     |
-| ----------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Coordinator             | User-selectable, manual routing, no worker delegation                     | `target: vscode`; retain `argument-hint`, direct `handoffs`, and VS Code question tool                    | `target: github-copilot`; scalar model; native question tool; no VS Code-only fields    | Manual selection works and no model-initiated coordinator invocation occurs.                       |
-| Interactive specialists | User-selectable, direct transitions, declared hidden-worker access only   | `target: vscode`; retain handoffs, `agents`, model priorities, and bounded question access                | `target: github-copilot`; scalar model and manifest-derived `task` delegation           | Direct transitions and worker routing match manifest edges without tool widening.                  |
-| Hidden workers          | Not user-selectable, no user questions, callable only by declared parents | `target: vscode`; preserve parent allowlists and the model-invocation setting required for subagent calls | `target: github-copilot`; preserve explicit `task` reachability and no manual selection | Undeclared parents fail; declared parents succeed; workers never appear as user-selectable agents. |
+| Role class              | Canonical intent                                                          | VS Code projection                                                                                        | Copilot CLI projection                                                               | Required proof                                                                                      |
+| ----------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| Coordinator             | User-selectable, manual routing, no worker delegation                     | `target: vscode`; retain `argument-hint`, direct `handoffs`, and VS Code question tool                    | `target: github-copilot`; scalar model; native question tool; no VS Code-only fields | Manual selection works and no model-initiated coordinator invocation occurs.                        |
+| Interactive specialists | User-selectable, direct transitions, declared hidden-worker access only   | `target: vscode`; retain handoffs, `agents`, model priorities, and bounded question access                | `target: github-copilot`; scalar model and manifest-derived `task` delegation        | Direct transitions and worker routing match manifest edges without tool widening.                   |
+| Hidden workers          | Not user-selectable, no user questions, callable only by declared parents | `target: vscode`; preserve parent allowlists and the model-invocation setting required for subagent calls | Omitted under ADR-0006 until the CLI independently enforces both controls            | VS Code boundaries pass; CLI workers remain absent from files, locks, selection, and task catalogs. |
 
 The current CLI renderer derives `disable-model-invocation: true` for non-user-invocable roles. Official wording can make
 that combination appear unreachable. Do not change it from documentation alone: first test explicit `task` delegation
@@ -61,7 +61,7 @@ Issue [#179](https://github.com/jonathan-vella/apex-vnext/issues/179) completed 
 `task` catalog. The observed binary hash did not match the pinned inventory, and the installed VS Code version did not
 match the selected pair, so the result blocks release qualification without authorizing a flag change. See
 [HIDDEN-WORKER-CHARACTERIZATION.md](HIDDEN-WORKER-CHARACTERIZATION.md); issue
-[#180](https://github.com/jonathan-vella/apex-vnext/issues/180) owns resolution.
+[#180](https://github.com/jonathan-vella/apex-vnext/issues/180) resolves the gap through ADR-0006's fail-closed omission.
 
 ## Implementation Slices
 
@@ -104,12 +104,12 @@ match the selected pair, so the result blocks release qualification without auth
 
 ## Acceptance Gates
 
-- Canonical agents, manifest roles, and both generated projections agree on supported environments and invocation edges.
+- Canonical agents, manifest roles, and each applicable generated projection agree on supported environments and edges.
 - Every generated agent has the correct explicit `target` and contains only fields supported by that projection.
-- Interactive roles remain selectable; hidden workers remain hidden and reachable only through declared parents.
+- Interactive roles remain selectable; unsupported CLI workers are absent rather than directly selectable.
 - Tool lists remain explicit and cannot be broadened unnoticed by a prompt or agent-local MCP configuration.
 - Generated outputs, client locks, and provenance are deterministic and mutation-tested.
-- Pinned VS Code and Copilot CLI sessions discover each intended role once and pass the affected client scenarios.
+- Pinned clients discover each supported role once; unavailable worker-dependent CLI scenarios remain explicit.
 - No result is represented as Copilot cloud-agent support or as release authorization.
 
 ## Sources

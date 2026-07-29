@@ -51,7 +51,14 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
           files: [".github/mcp.json"],
         },
       ],
-      roles: [{ id: "coordinator", source: ".github/agents/apex.agent.md", agent: "APEX" }],
+      roles: [
+        {
+          id: "coordinator",
+          source: ".github/agents/apex.agent.md",
+          agent: "APEX",
+          supportedTargets: ["vscode", "github-copilot"],
+        },
+      ],
     })}\n`,
   );
   const runtimeBytes = Buffer.from(
@@ -354,6 +361,24 @@ test("rejects client projection digest and declaration drift after aggregate reb
   entry.bytes = incomplete.byteLength;
   declarationDrift.lock.digest = bundleLockDigest(declarationDrift);
   await assert.rejects(verifyBundledAssetManifest(root, declarationDrift), /declarations are missing/);
+});
+
+test("rejects a generated role in an unsupported client projection", async (context) => {
+  const { root, manifest } = await fixture();
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const changedManifest = structuredClone(manifest);
+  const declarationPath = join(root, "customizations", "manifest.json");
+  const declaration = JSON.parse(
+    await import("node:fs/promises").then(({ readFile }) => readFile(declarationPath, "utf8")),
+  );
+  declaration.roles[0].supportedTargets = ["vscode"];
+  const changed = Buffer.from(`${JSON.stringify(declaration)}\n`);
+  await writeFile(declarationPath, changed);
+  const entry = changedManifest.files.find(({ path }) => path === "customizations/manifest.json")!;
+  entry.sha256 = sha256Bytes(changed);
+  entry.bytes = changed.byteLength;
+  changedManifest.lock.digest = bundleLockDigest(changedManifest);
+  await assert.rejects(verifyBundledAssetManifest(root, changedManifest), /source binding mismatch/);
 });
 
 test("rejects symlinks and false source mapping provenance", async (context) => {
