@@ -194,7 +194,7 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
           composition: "client-projections",
           clientId: client,
           target,
-          adapterVersion: "1.0.0",
+          adapterVersion: "1.1.0",
           sourcePath: target,
           sourceHash: sha256Bytes(content),
           ...(agent
@@ -322,6 +322,16 @@ test("rejects client projection digest and declaration drift after aggregate reb
   digestDrift.projections[0]!.digest = "0".repeat(64);
   digestDrift.lock.digest = bundleLockDigest(digestDrift);
   await assert.rejects(verifyBundledAssetManifest(root, digestDrift), /Invalid bundled client projection/);
+
+  const adapterDrift = structuredClone(manifest);
+  adapterDrift.files.find(
+    ({ source }) => source.kind === "generated" && source.composition === "client-projections",
+  )!.source.adapterVersion = "1.0.0";
+  adapterDrift.lock.digest = bundleLockDigest(adapterDrift);
+  await assert.rejects(
+    verifyBundledAssetManifest(root, adapterDrift),
+    /Invalid generated client projection provenance/,
+  );
 
   const declarationDrift = structuredClone(manifest);
   const declarationPath = join(root, "customizations", "manifest.json");

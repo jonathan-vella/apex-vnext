@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   generateManagedFileHashInventory,
   loadRepositoryModel,
+  parseProjectionFrontmatter,
   validateRepositoryModel,
 } from "../../scripts/validate-vnext.mjs";
 
@@ -22,6 +23,21 @@ test("repository model satisfies vNext contracts", () => {
   const result = validateRepositoryModel(baseline);
   assert.deepEqual(result.findings, []);
   assert.ok(Object.values(generateManagedFileHashInventory(baseline)).every((hash) => /^[a-f0-9]{64}$/.test(hash)));
+});
+
+test("projection frontmatter parsing fails closed", () => {
+  assert.deepEqual(parseProjectionFrontmatter("body only"), {
+    frontmatter: null,
+    error: "missing YAML frontmatter",
+  });
+  assert.deepEqual(parseProjectionFrontmatter("---\ntools: [unterminated\n---\n"), {
+    frontmatter: null,
+    error: "malformed YAML frontmatter",
+  });
+  assert.deepEqual(parseProjectionFrontmatter("---\n- invalid\n---\n"), {
+    frontmatter: null,
+    error: "frontmatter must be a YAML object",
+  });
 });
 
 test("rejects CI lint before the vNext build", () => {
@@ -62,6 +78,20 @@ test("rejects askQuestions on an autonomous subagent", () => {
       .frontmatter.tools.push("vscode/askQuestions");
   });
   assert.ok(hasRule(result, "customization.subagent-questions"));
+});
+
+test("rejects target declarations in shared managed agent sources", () => {
+  const result = mutate((model) => {
+    model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX").frontmatter.target = "vscode";
+  });
+  assert.ok(hasRule(result, "customization.source-target"));
+});
+
+test("rejects incomplete managed role target support", () => {
+  const result = mutate((model) => {
+    model.customization.manifest.roles[0].supportedTargets.pop();
+  });
+  assert.ok(hasRule(result, "customization.schema"));
 });
 
 test("rejects a missing MCP tool", () => {

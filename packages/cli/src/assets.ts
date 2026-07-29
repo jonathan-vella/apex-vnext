@@ -316,7 +316,7 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
         const expectedPrefix = `${mapping.generatedRoot}/${file.source.clientId}/`;
         if (
           !["github-copilot-cli", "github-copilot-vscode"].includes(file.source.clientId ?? "") ||
-          file.source.adapterVersion !== "1.0.0" ||
+          file.source.adapterVersion !== "1.1.0" ||
           !safeRelativePath(file.source.target ?? "") ||
           !file.path.startsWith(expectedPrefix) ||
           file.path !== `${expectedPrefix}${file.source.target}` ||
