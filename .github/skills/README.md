@@ -22,9 +22,9 @@ domain-specific knowledge modules that activate automatically based on prompt ke
 
 | Skill             | Description                                           | Triggers                                  |
 | ----------------- | ----------------------------------------------------- | ----------------------------------------- |
-| `python-diagrams` | WAF/cost/compliance charts and Python diagrams        | "WAF chart", "cost chart", "create chart" |
+| `python-diagrams` | Standalone architecture and analytical diagrams       | "architecture diagram", "cost chart"      |
 | `mermaid`         | Inline Mermaid diagrams for markdown                  | "mermaid diagram", "flowchart"            |
-| `drawio`          | Draw.io diagrams with Azure icon libraries            | "draw.io diagram"                         |
+| `drawio`          | Transitional maintenance for historical Draw.io files | "repair existing drawio"                   |
 | `azure-adr`       | Create Architecture Decision Records with WAF mapping | "create ADR", "document decision"         |
 
 ### Category 3: Workflow & Tool Integration

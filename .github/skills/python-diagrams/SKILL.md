@@ -1,6 +1,6 @@
 ---
 name: python-diagrams
-description: "**UTILITY SKILL** — Python diagram generation: WAF/cost/compliance charts (matplotlib), architecture diagrams (diagrams lib), ERDs, swimlanes, timelines, wireframes (graphviz). WHEN: 'WAF bar chart', 'cost donut chart', 'compliance gap chart', 'Python architecture diagram', 'ERD diagram', 'swimlane', 'UI wireframe'. DO NOT USE FOR: Draw.io architecture diagrams (drawio), inline Mermaid (mermaid)."
+description: "**UTILITY SKILL** — Python generation for standalone architecture, network, dependency, runtime, as-built, WAF, cost, and compliance diagrams. WHEN: 'architecture diagram', 'network diagram', 'runtime diagram', 'as-built diagram', 'WAF chart', 'cost chart'. DO NOT USE FOR: inline flow, sequence, state, ER, or compact documentation diagrams (use mermaid)."
 compatibility: Works with VS Code Copilot, Claude Code, and any tool capable of running Python scripts.
 license: MIT
 metadata:
@@ -31,7 +31,7 @@ preview, SVG for scalable / accessible / diff-friendly review.
 | WAF bar charts                      | matplotlib | `.py` + `.png` + `.svg` |
 | Cost donut / projection charts      | matplotlib | `.py` + `.png` + `.svg` |
 | Compliance gap charts               | matplotlib | `.py` + `.png` + `.svg` |
-| Architecture diagrams (non-Draw.io) | diagrams   | `.py` + `.png` + `.svg` |
+| Architecture diagrams               | diagrams   | `.py` + `.png` + `.svg` |
 | Swimlane / business process         | graphviz   | `.py` + `.png` + `.svg` |
 | Entity-relationship diagrams        | graphviz   | `.py` + `.png` + `.svg` |
 | Timeline / Gantt charts             | matplotlib | `.py` + `.png` + `.svg` |
@@ -42,9 +42,9 @@ preview, SVG for scalable / accessible / diff-friendly review.
 | Step | Python chart files                                                                  |
 | ---- | ----------------------------------------------------------------------------------- |
 | 2    | `02-waf-scores.py/.png/.svg`                                                        |
-| 3    | `03-des-cost-distribution.py/.png/.svg`, `03-des-cost-projection.py/.png/.svg`      |
+| 3    | `03-des-diagram.py/.png/.svg`, `03-des-cost-*.py/.png/.svg`                         |
 | 4    | `04-dependency-diagram.py/.png/.svg`, `04-runtime-diagram.py/.png/.svg`             |
-| 7    | `07-ab-cost-*.py/.png/.svg`, `07-ab-compliance-gaps.py/.png/.svg`                   |
+| 7    | `07-ab-diagram.py/.png/.svg`, `07-ab-cost-*.py/.png/.svg`, compliance outputs      |
 
 Suffix rules: `-des` for design (Step 3), `-ab` for as-built (Step 7).
 
@@ -76,8 +76,7 @@ scores are assigned.
 
 **DON'T:** Call `plt.savefig(...)`, `Diagram(..., outformat=...)`, or
 `dot.render(...)` directly — always go through `diagram_io` · Use Mermaid
-for charts (use matplotlib) · Use Python `diagrams` for primary architecture
-diagrams (use Draw.io skill) · Let `show=True` open a viewer · Omit
+for standalone diagrams (use Python `diagrams`) · Let `show=True` open a viewer · Omit
 `filename` (produces non-deterministic output names) · Use grouped
 list-to-list edge operators (`[a, b] >> [c, d]`) — use explicit node-to-node
 edges instead (the `diagrams` library may reject grouped expressions with a
@@ -86,7 +85,7 @@ ASCII-safe for portability across container fonts.
 
 ## Scope Exclusions
 
-Does NOT: generate Draw.io architecture diagrams · produce Mermaid diagrams ·
+Does NOT: produce inline Mermaid diagrams ·
 generate Bicep/Terraform · create ADRs · deploy resources.
 
 ## Scripts

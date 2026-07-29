@@ -19,6 +19,127 @@
       "formats": ["drawio"]
     }
   },
+  "activeConsumers": [
+    {
+      "id": "step-3-design-prompt",
+      "path": "tools/apex-prompts/workflow-prompts/04-design.prompt.md",
+      "outputClass": "architecture",
+      "requiredMarkers": ["03-des-diagram.py", "03-des-diagram.png", "03-des-diagram.svg"]
+    },
+    {
+      "id": "step-4-planner-prompt",
+      "path": "tools/apex-prompts/workflow-prompts/05-iac-planner.prompt.md",
+      "outputClass": "dependency-runtime",
+      "requiredMarkers": [
+        "04-dependency-diagram.py",
+        "04-dependency-diagram.png",
+        "04-dependency-diagram.svg",
+        "04-runtime-diagram.py",
+        "04-runtime-diagram.png",
+        "04-runtime-diagram.svg"
+      ]
+    },
+    {
+      "id": "step-7-as-built-prompt",
+      "path": "tools/apex-prompts/workflow-prompts/08-as-built.prompt.md",
+      "outputClass": "as-built",
+      "requiredMarkers": ["07-ab-diagram.py", "07-ab-diagram.png", "07-ab-diagram.svg"]
+    },
+    {
+      "id": "existing-as-built-prompt",
+      "path": "tools/apex-prompts/utility-prompts/as-built-from-azure.prompt.md",
+      "outputClass": "as-built",
+      "requiredMarkers": ["07-ab-diagram.py", "07-ab-diagram.png", "07-ab-diagram.svg"]
+    },
+    {
+      "id": "workflow-graph",
+      "path": ".github/skills/workflow-engine/templates/workflow-graph.json",
+      "outputClass": "workflow",
+      "requiredMarkers": [
+        "03-des-diagram.py",
+        "03-des-diagram.png",
+        "03-des-diagram.svg",
+        "07-ab-diagram.py",
+        "07-ab-diagram.png",
+        "07-ab-diagram.svg"
+      ]
+    },
+    {
+      "id": "as-built-design-template",
+      "path": ".github/skills/azure-artifacts/templates/07-design-document.template.md",
+      "outputClass": "as-built",
+      "requiredMarkers": ["07-ab-diagram.py", "07-ab-diagram.png"]
+    },
+    {
+      "id": "project-readme-template",
+      "path": ".github/skills/azure-artifacts/templates/PROJECT-README.template.md",
+      "outputClass": "documentation",
+      "requiredMarkers": ["03-des-diagram.py", "04-dependency-diagram.py", "04-runtime-diagram.py"]
+    },
+    {
+      "id": "markdown-routing-instruction",
+      "path": ".github/instructions/markdown.instructions.md",
+      "outputClass": "documentation",
+      "requiredMarkers": ["python-diagrams", "mermaid", ".py", ".png", ".svg"]
+    },
+    {
+      "id": "markdown-formatting-guide",
+      "path": ".github/instructions/references/markdown-formatting-guide.md",
+      "outputClass": "documentation",
+      "requiredMarkers": ["03-des-diagram.py", "03-des-diagram.png"]
+    },
+    {
+      "id": "python-diagrams-skill",
+      "path": ".github/skills/python-diagrams/SKILL.md",
+      "outputClass": "routing",
+      "requiredMarkers": ["03-des-diagram.py", "07-ab-diagram.py", "python-diagrams"]
+    },
+    {
+      "id": "mermaid-skill",
+      "path": ".github/skills/mermaid/SKILL.md",
+      "outputClass": "routing",
+      "requiredMarkers": ["inline", "python-diagrams"]
+    },
+    {
+      "id": "artifact-validator",
+      "path": "tools/scripts/validate-artifacts.mjs",
+      "outputClass": "validation",
+      "requiredMarkers": ["07-ab-diagram.py", "07-ab-diagram.png"]
+    },
+    {
+      "id": "drawio-maintenance-skill",
+      "path": ".github/skills/drawio/SKILL.md",
+      "outputClass": "routing",
+      "requiredMarkers": ["disable-model-invocation: true", "historical readability", "python-diagrams", "mermaid"],
+      "allowTransitionalReferences": true
+    },
+    {
+      "id": "e2e-step-validator",
+      "path": "tools/scripts/validate-e2e-step.mjs",
+      "outputClass": "validation",
+      "requiredMarkers": ["03-des-diagram.py", "04-dependency-diagram", "04-runtime-diagram", "07-ab-diagram.py"]
+    },
+    {
+      "id": "e2e-benchmark",
+      "path": "tools/scripts/benchmark-e2e.mjs",
+      "outputClass": "validation",
+      "requiredMarkers": [
+        "04-dependency-diagram.py",
+        "04-dependency-diagram.png",
+        "04-dependency-diagram.svg",
+        "04-runtime-diagram.py",
+        "04-runtime-diagram.png",
+        "04-runtime-diagram.svg"
+      ],
+      "allowTransitionalReferences": true
+    },
+    {
+      "id": "e2e-workflow-prompt",
+      "path": "tools/tests/prompts/e2e-contoso-rfp.prompt.md",
+      "outputClass": "validation",
+      "requiredMarkers": ["03-des-diagram.py", "03-des-diagram.png", "03-des-diagram.svg"]
+    }
+  ],
   "scenarios": [
     {
       "id": "g1-three-tier-web",
@@ -436,5 +557,5 @@
       "legacyReconciliations": []
     }
   ],
-  "authority": { "migrationReady": false, "drawioRemovalAllowed": false }
+  "authority": { "activeConsumersMigrated": true, "migrationReady": false, "drawioRemovalAllowed": false }
 }

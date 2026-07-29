@@ -26,8 +26,11 @@ prior qualification is retained as historical characterization. See
   documented CostManagement/Pricing toolsets at `https://mcp.management.azure.com`. Removed the unrelated Azure MCP
   characterization from active pricing ownership.
 - Added a format-neutral diagram semantics manifest covering all existing golden scenarios and froze routing of inline
-  diagrams to Mermaid and standalone diagrams to Python. Draw.io remains transitional pending consumer migration and
-  measured rendering parity.
+  diagrams to Mermaid and standalone diagrams to Python. Draw.io remains transitional pending measured rendering
+  parity.
+- Migrated active design, planning, as-built, artifact, benchmark, and E2E diagram consumers to editable Python source
+  with PNG/SVG outputs. Added a fail-closed consumer inventory; Draw.io remains available only for historical
+  readability and bounded repair pending measured rendering parity.
 - Added strict pricing request/evidence contracts and a canonical ARM pricing replacement parity registry covering
   typed arithmetic, meters, commitments, ambiguity, uncertainty, throttling, freshness, and content-free provenance.
   Microsoft ARM MCP is the direct pricing authority; APEX retains workflow, evidence-acceptance, and gate authority.

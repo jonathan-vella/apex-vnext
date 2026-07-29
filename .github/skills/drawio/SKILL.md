@@ -1,6 +1,7 @@
 ---
 name: drawio
-description: "**WORKFLOW SKILL** — Generate Azure architecture diagrams in .drawio via simonkurtz-MSFT MCP server (full Azure icon set, batch creation, transactional mode). Covers architecture, dependency, runtime-flow, and as-built diagrams. WHEN: 'draw.io diagram', 'Azure architecture diagram', 'as-built diagram', 'runtime flow diagram', 'dependency diagram'. DO NOT USE FOR: WAF/cost charts (python-diagrams), inline Mermaid (mermaid)."
+description: "**TRANSITIONAL SKILL** — Inspect, repair, and preserve existing .drawio Azure diagrams with the Draw.io MCP server. WHEN: 'open historical draw.io', 'repair existing drawio', 'inspect legacy diagram'. DO NOT USE FOR: new workflow outputs; use python-diagrams for standalone diagrams and mermaid for inline diagrams."
+disable-model-invocation: true
 compatibility: Works with VS Code Copilot, Claude Code, and any MCP-compatible tool. Uses simonkurtz-MSFT/drawio-mcp-server configured in .vscode/mcp.json.
 license: MIT
 metadata:
@@ -8,9 +9,9 @@ metadata:
   version: "2.0"
 ---
 
-# Draw.io Architecture Diagrams
+# Historical Draw.io Architecture Diagrams
 
-Generate Azure architecture diagrams in `.drawio` format using the
+Inspect, repair, and preserve existing Azure architecture diagrams using the
 simonkurtz-MSFT Draw.io MCP server. The server ships the full Azure icon set
 (see [`assets/azure-public-service-icons/`](../../../assets/drawio-libraries/azure-icons)),
 fuzzy shape search, batch operations, group/layer/page management, and
@@ -19,6 +20,10 @@ transactional mode for efficient multi-step workflows.
 The MCP server's own `src/instructions.md` is the authoritative tool reference;
 it is auto-sent to the client at startup. This skill captures project-specific
 conventions that complement (not duplicate) it.
+
+New workflow outputs must use `python-diagrams` for standalone files or
+`mermaid` for inline documentation. Keep this skill for historical readability
+and bounded repair only; do not route new artifacts to `.drawio`.
 
 > **Naming note**: "drawio" can refer to (a) this skill, (b) the MCP server slug
 > `simonkurtz-MSFT/drawio-mcp-server`, or (c) the `mcp_drawio_*` tool family. In
