@@ -73,19 +73,19 @@ not full client-parity qualification. Direct ARM MCP discovery still requires pa
 
 ## Evidence State
 
-| Evidence                                                                 | Disposition                                                              |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| PR #88 exact-head receipt for `8b3d9dbbb5beb8d6723c27da56cfd7144cb1cdf8` | Passing regression evidence for the archive change                       |
-| Prior exact candidate `25530c339410e9758ae34538427f24bddfd83e1d`         | Historical characterization for the earlier contract                     |
-| Prior VS Code, package, security, and live Azure results                 | Preserved in [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md)            |
-| VS Code `1.130.0`, Copilot Chat `0.58.0`, and CLI `1.0.73`               | Representative 12-cell context matrix complete                           |
-| Guidance, Markdown, lint, hook, and workflow ownership                   | Milestone N complete; Milestone O context baseline captured              |
-| ARM MCP access and MCP retirements                                        | Direct access configured; custom pricing retired; Draw.io remains open   |
-| Bundle composition mappings, aggregate lock, and client projections      | Implemented; live client qualification remains pending                   |
-| Normalized client outcome contracts, corpus, and deterministic harness   | Implemented; exact-candidate paired live execution remains pending       |
-| Pricing parity contracts and ARM MCP Cost/Pricing documentation          | Direct authority configured; paired live client checks remain pending    |
-| Diagram and improvement-measurement changes                              | Pending                                                                  |
-| Final deterministic, client, package, security, and live qualification   | Reopened                                                                 |
+| Evidence                                                                 | Disposition                                                            |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| PR #88 exact-head receipt for `8b3d9dbbb5beb8d6723c27da56cfd7144cb1cdf8` | Passing regression evidence for the archive change                     |
+| Prior exact candidate `25530c339410e9758ae34538427f24bddfd83e1d`         | Historical characterization for the earlier contract                   |
+| Prior VS Code, package, security, and live Azure results                 | Preserved in [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md)          |
+| VS Code `1.130.0`, Copilot Chat `0.58.0`, and CLI `1.0.73`               | Representative 12-cell context matrix complete                         |
+| Guidance, Markdown, lint, hook, and workflow ownership                   | Milestone N complete; Milestone O context baseline captured            |
+| ARM MCP access and MCP retirements                                       | Direct access configured; custom pricing retired; Draw.io remains open |
+| Bundle composition mappings, aggregate lock, and client projections      | Implemented; live client qualification remains pending                 |
+| Normalized client outcome contracts, corpus, and deterministic harness   | Implemented; exact-candidate paired live execution remains pending     |
+| Pricing parity contracts and ARM MCP Cost/Pricing documentation          | Direct authority configured; paired live client checks remain pending  |
+| Diagram and improvement-measurement changes                              | Pending                                                                |
+| Final deterministic, client, package, security, and live qualification   | Reopened                                                               |
 
 ## Release Boundaries
 

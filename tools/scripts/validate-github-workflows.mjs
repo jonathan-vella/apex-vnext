@@ -111,7 +111,7 @@ function validatePythonSetupAction(text) {
     "set -euo pipefail",
     "python -m pip install --upgrade pip",
     "python -m pip install -e tools/apex-recall",
-    "python -m pip install pytest",
+    "python -m pip install pytest ruff",
   ];
   const actualInstall = String(install?.run ?? "")
     .split(/\r?\n/u)

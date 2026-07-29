@@ -14,18 +14,18 @@ No evidence in this dossier authorizes package publication, tag creation, branch
 
 ## Reopened Qualification Gates
 
-| Gate                          | Current disposition                                                       |
-| ----------------------------- | ------------------------------------------------------------------------- |
-| Exact candidate               | Not selected; current `main` is a characterization base.                  |
-| Deterministic qualification   | Must repeat after all re-baseline implementation changes.                 |
-| VS Code qualification         | Versions selected; must run against the new bundle and exact candidate.   |
-| Client parity qualification   | Deterministic harness complete; paired exact-candidate runs not started.  |
-| ARM MCP qualification         | Direct clients configured; paired live OAuth discovery remains pending.   |
-| MCP and Draw.io retirement    | Terraform/custom pricing retired; Draw.io replacement remains pending.     |
-| Improvement measurement       | Not implemented; prior evidence covers observe-and-propose only.          |
-| Package, SBOM, and provenance | Must cover the new generated client projections on the exact candidate.   |
-| Guidance and automation       | Characterized on `b27d173`; later N/O parity gates remain incomplete.     |
-| Security and live Azure       | Must repeat after dependency and authority surfaces stabilize.            |
+| Gate                          | Current disposition                                                      |
+| ----------------------------- | ------------------------------------------------------------------------ |
+| Exact candidate               | Not selected; current `main` is a characterization base.                 |
+| Deterministic qualification   | Must repeat after all re-baseline implementation changes.                |
+| VS Code qualification         | Versions selected; must run against the new bundle and exact candidate.  |
+| Client parity qualification   | Deterministic harness complete; paired exact-candidate runs not started. |
+| ARM MCP qualification         | Direct clients configured; paired live OAuth discovery remains pending.  |
+| MCP and Draw.io retirement    | Terraform/custom pricing retired; Draw.io replacement remains pending.   |
+| Improvement measurement       | Not implemented; prior evidence covers observe-and-propose only.         |
+| Package, SBOM, and provenance | Must cover the new generated client projections on the exact candidate.  |
+| Guidance and automation       | Characterized on `b27d173`; later N/O parity gates remain incomplete.    |
+| Security and live Azure       | Must repeat after dependency and authority surfaces stabilize.           |
 
 ## Historical Candidate Boundary
 
