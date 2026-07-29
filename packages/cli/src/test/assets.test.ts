@@ -328,7 +328,10 @@ test("rejects client projection digest and declaration drift after aggregate reb
     ({ source }) => source.kind === "generated" && source.composition === "client-projections",
   )!.source.adapterVersion = "1.0.0";
   adapterDrift.lock.digest = bundleLockDigest(adapterDrift);
-  await assert.rejects(verifyBundledAssetManifest(root, adapterDrift), /Invalid generated client projection provenance/);
+  await assert.rejects(
+    verifyBundledAssetManifest(root, adapterDrift),
+    /Invalid generated client projection provenance/,
+  );
 
   const declarationDrift = structuredClone(manifest);
   const declarationPath = join(root, "customizations", "manifest.json");
