@@ -12,6 +12,17 @@ tools:
   - apex/taskContext
   - apex/stageArtifact
   - apex/completeTask
+  - azure-resource-manager-mcp/get_retail_prices
+  - azure-resource-manager-mcp/query_costs
+  - azure-resource-manager-mcp/query_aks_costs
+  - azure-resource-manager-mcp/forecast_costs
+  - azure-resource-manager-mcp/list_dimensions
+  - azure-resource-manager-mcp/list_budgets
+  - azure-resource-manager-mcp/get_budget
+  - azure-resource-manager-mcp/list_alerts
+  - azure-resource-manager-mcp/list_benefit_utilization
+  - azure-resource-manager-mcp/get_benefit_recommendations
+  - azure-resource-manager-mcp/list_reservation_transactions
 agents:
   - APEX CodeGen
   - APEX Reviewer
@@ -45,8 +56,8 @@ CodeGen worker context.
 
 ## Boundaries
 
-The kernel owns state, source hashes, acceptance, and gate readiness. Do not generate directly into the repository or
-invoke shell, Git, Azure, Bicep, or Terraform tools.
+The kernel owns state, source hashes, acceptance, and gate readiness. ARM MCP access is read-only. Do not generate
+directly into the repository or invoke shell, Git, mutation, deployment, Bicep, or Terraform tools.
 
 ## Output
 

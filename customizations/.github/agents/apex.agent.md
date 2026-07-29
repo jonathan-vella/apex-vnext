@@ -9,6 +9,17 @@ tools:
   - vscode/askQuestions
   - apex/status
   - apex/nextTask
+  - azure-resource-manager-mcp/get_retail_prices
+  - azure-resource-manager-mcp/query_costs
+  - azure-resource-manager-mcp/query_aks_costs
+  - azure-resource-manager-mcp/forecast_costs
+  - azure-resource-manager-mcp/list_dimensions
+  - azure-resource-manager-mcp/list_budgets
+  - azure-resource-manager-mcp/get_budget
+  - azure-resource-manager-mcp/list_alerts
+  - azure-resource-manager-mcp/list_benefit_utilization
+  - azure-resource-manager-mcp/get_benefit_recommendations
+  - azure-resource-manager-mcp/list_reservation_transactions
 agents: []
 handoffs:
   - label: Gather requirements

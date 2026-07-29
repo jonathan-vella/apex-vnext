@@ -216,7 +216,10 @@
       "sourceRefs": [
         "packages/contracts/src/pricing.ts",
         "packages/contracts/schemas/pricing-*-v1.schema.json",
-        "config/capability-packs.v1.json",
+        ".vscode/mcp.json",
+        "customizations/.vscode/mcp.json",
+        "customizations/.github/mcp.json",
+        "customizations/.github/agents/*.agent.md",
         "tools/registry/pricing-parity-scenarios.v1.json",
         "tools/registry/schemas/pricing-parity-scenarios.schema.json",
         "tools/registry/arm-mcp-cost-pricing.v1.json",
@@ -224,8 +227,7 @@
         "tools/scripts/validate-pricing-parity.mjs",
         "tools/tests/validate-pricing-parity.test.mjs",
         "tools/scripts/validate-arm-mcp-cost-pricing.mjs",
-        "tools/tests/validate-arm-mcp-cost-pricing.test.mjs",
-        "tools/mcp-servers/azure-pricing/src/**/*.py"
+        "tools/tests/validate-arm-mcp-cost-pricing.test.mjs"
       ],
       "consumers": ["architecture workflow", "cost evidence", "Gate 2 review", "release qualification"],
       "proofCommands": [
@@ -233,12 +235,13 @@
         "npm run test:pricing-parity",
         "npm run validate:arm-mcp-cost-pricing",
         "npm run test:arm-mcp-cost-pricing",
-        "npm run test:azure-pricing-mcp",
+        "npm run lint:mcp-config",
+        "npm run validate:agents",
         "npm run test:vnext"
       ],
-      "removalGate": "Typed normalized ARM MCP evidence meets pricing parity, reliability, latency, determinism, security, and maintenance gates before the custom pack is archived.",
-      "rationale": "Managed pricing trust should belong to versioned APEX evidence contracts, not raw upstream MCP output.",
-      "followUp": "Issue #162 freezes pricing contracts and parity. Issue #169 binds the ARM MCP endpoint and documented CostManagement/Pricing tools. Capture authenticated protocol schemas and fixtures before adapter qualification.",
+      "removalGate": "Both supported clients configure the exact managed endpoint and toolsets, every managed agent receives only explicit read tools, and the custom pricing pack is absent from runtime packaging, CI, hooks, and active discovery.",
+      "rationale": "Microsoft should own MCP transport, authentication, and pricing retrieval; APEX should own workflow state, evidence acceptance, and gates.",
+      "followUp": "Issue #162 freezes pricing contracts and parity. Issue #169 binds the ARM MCP product boundary. Issue #164 configures direct client access, retires the custom pack, and leaves paired live OAuth qualification open.",
       "decisionRef": "OWN-013"
     },
     {
@@ -370,7 +373,7 @@
         "npm run validate:_node-ci",
         "npm run validate:docs",
         "npm run test:apex-recall",
-        "npm run test:azure-pricing-mcp"
+        "npm run test:arm-mcp-cost-pricing"
       ],
       "removalGate": "Replacement checks retain stable names, least privilege, exact triggers, and equivalent commands.",
       "rationale": "GitHub branch protection owns required contexts, workflows own hosted execution, and npm scripts own reusable command implementation."

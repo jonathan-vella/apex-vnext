@@ -101,8 +101,8 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
   Manager MCP endpoint and its documented CostManagement/Pricing read and write tool inventory.
 - **Related issue:** [#164](https://github.com/jonathan-vella/apex-vnext/issues/164),
   [#169](https://github.com/jonathan-vella/apex-vnext/issues/169)
-- **Mitigation:** Use typed read-allowlisted adapters, normalize versioned fixtures, reject unknown tools and shapes,
-  and keep native Azure and IaC paths authoritative for mutation.
+- **Mitigation:** Configure the exact managed endpoint in both supported clients, grant only explicit read tools to
+  managed agents, exclude unknown and mutating tools, and keep native Azure and IaC paths authoritative for mutation.
 - **State:** Open
 - **Closure proof:** Clean-environment startup, authentication, schema, fault, allowlist, and denial tests on the exact
   selected ARM MCP version.
@@ -111,7 +111,7 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 
 - **Type:** `RISK`
 - **Owner:** Runtime integration
-- **Impact:** Removing Azure Pricing, Terraform, or Draw.io MCP surfaces before replacement proof could break supported
+- **Impact:** Removing Terraform, custom pricing, or Draw.io MCP surfaces before replacement proof could break supported
   workflows, packaging, documentation, or tests.
 - **Evidence:** Issue #136 retires Astro independently because it has no active product consumer. Replacement behavior
   for Azure Pricing, Terraform, and Draw.io is not yet implemented.

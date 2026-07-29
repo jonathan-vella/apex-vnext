@@ -79,6 +79,21 @@ const CONFIG_SHAPES = {
 const FORBIDDEN_TOOL = /(^|\/)(shell|terminal|filesystem|fs|edit|write|git|azure|az|bicep|terraform)(\/|$)/i;
 const SECRET_KEY = /(secret|password|passwd|token|privateKey|clientSecret|connectionString)/i;
 const SOURCE_IMPORT = /(?:from\s+|import\s*\()["']([^"']+)["']/g;
+const ARM_MCP_ENDPOINT = "https://mcp.management.azure.com";
+const ARM_MCP_TOOLSET = "CostManagement,Pricing";
+const ARM_MCP_READ_TOOLS = [
+  "get_retail_prices",
+  "query_costs",
+  "query_aks_costs",
+  "forecast_costs",
+  "list_dimensions",
+  "list_budgets",
+  "get_budget",
+  "list_alerts",
+  "list_benefit_utilization",
+  "get_benefit_recommendations",
+  "list_reservation_transactions",
+];
 
 const clone = (value) => structuredClone(value);
 const array = (value) => (Array.isArray(value) ? value : []);
@@ -635,7 +650,10 @@ function validateCustomizations(model, findings) {
       "customizations/manifest.json",
     );
   const agents = new Map(customization.agents.map((agent) => [agent.frontmatter?.name, agent]));
-  const allowedMcp = new Set(model.mcpTools.map((tool) => `apex/${tool}`));
+  const allowedMcp = new Set([
+    ...model.mcpTools.map((tool) => `apex/${tool}`),
+    ...ARM_MCP_READ_TOOLS.map((tool) => `azure-resource-manager-mcp/${tool}`),
+  ]);
   for (const skill of customization.skills)
     if (!skill.frontmatter?.name || !skill.frontmatter?.description)
       finding(
@@ -835,7 +853,8 @@ function validateCustomizations(model, findings) {
 
 function validateMcp(model, findings) {
   const servers = model.customization.vscodeMcp.servers;
-  const apex = servers && Object.keys(servers).length === 1 ? servers.apex : undefined;
+  const apex = servers && Object.keys(servers).length === 2 ? servers.apex : undefined;
+  const armMcp = servers?.["azure-resource-manager-mcp"];
   if (
     !apex ||
     apex.type !== "stdio" ||
@@ -851,8 +870,21 @@ function validateMcp(model, findings) {
       "Managed MCP config must launch the workspace-local APEX CLI through Node without environment secrets",
       "customizations/.vscode/mcp.json",
     );
+  if (
+    !armMcp ||
+    armMcp.type !== "http" ||
+    armMcp.url !== ARM_MCP_ENDPOINT ||
+    JSON.stringify(armMcp.headers) !== JSON.stringify({ "x-mcp-toolset": ARM_MCP_TOOLSET })
+  )
+    finding(
+      findings,
+      "mcp.arm-launch",
+      "Managed MCP config must connect directly to Microsoft ARM MCP with the exact toolset header",
+      "customizations/.vscode/mcp.json",
+    );
   const cliServers = model.customization.cliMcp.mcpServers;
-  const cliApex = cliServers && Object.keys(cliServers).length === 1 ? cliServers.apex : undefined;
+  const cliApex = cliServers && Object.keys(cliServers).length === 2 ? cliServers.apex : undefined;
+  const cliArmMcp = cliServers?.["azure-resource-manager-mcp"];
   if (
     !cliApex ||
     cliApex.type !== "local" ||
@@ -865,6 +897,19 @@ function validateMcp(model, findings) {
       findings,
       "mcp.cli-launch",
       "Managed Copilot CLI MCP config must launch the workspace-local APEX CLI with the exact tool allowlist",
+      "customizations/.github/mcp.json",
+    );
+  if (
+    !cliArmMcp ||
+    cliArmMcp.type !== "http" ||
+    cliArmMcp.url !== ARM_MCP_ENDPOINT ||
+    JSON.stringify(cliArmMcp.headers) !== JSON.stringify({ "x-mcp-toolset": ARM_MCP_TOOLSET }) ||
+    JSON.stringify(cliArmMcp.tools) !== JSON.stringify(ARM_MCP_READ_TOOLS)
+  )
+    finding(
+      findings,
+      "mcp.cli-arm-launch",
+      "Managed Copilot CLI config must connect directly to ARM MCP with the exact read-only tool allowlist",
       "customizations/.github/mcp.json",
     );
 }

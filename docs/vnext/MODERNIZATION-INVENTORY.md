@@ -195,11 +195,10 @@ and fail-closed evidence-manifest binding. npm stays the sole package and instal
 parity remains pending.
 
 Issue #162 freezes the `OWN-013` pricing parity registry and strict request/evidence contracts. It binds typed money,
-meter, commitment, ambiguity, uncertainty, throttling, freshness, and content-free provenance semantics. The current
-Azure Pricing MCP remains authoritative until a later ARM adapter passes every measured replacement and denial gate.
-Issue #169 corrects the product boundary: Azure Resource Manager MCP is a managed HTTP server at
-`https://mcp.management.azure.com`, distinct from Azure MCP Server. Its optional CostManagement/Pricing toolsets are
-documented and source-bound; authenticated protocol schemas and fixtures remain required before managed use.
+meter, commitment, ambiguity, uncertainty, throttling, freshness, and content-free provenance semantics. Issue #169
+corrects the product boundary: Azure Resource Manager MCP is a managed HTTP server at
+`https://mcp.management.azure.com`, distinct from Azure MCP Server. Issue #164 makes that service the direct pricing
+authority for both supported interactive clients and retires the custom Python pricing pack without adding an adapter.
 
 ## Removal And Change Gates
 

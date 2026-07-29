@@ -12,6 +12,8 @@ const repoRoot = resolve(__dirname, "../..");
 const mcpConfigPath = resolve(repoRoot, ".vscode/mcp.json");
 const RETIRED_ASTRO_HOST = "mcp.docs.astro.build";
 const RETIRED_TERRAFORM_EXECUTABLE = "terraform-mcp-server";
+const ARM_MCP_ENDPOINT = "https://mcp.management.azure.com";
+const ARM_MCP_TOOLSET = "CostManagement,Pricing";
 
 function isRetiredAstroEndpoint(value) {
   if (typeof value !== "string") return false;
@@ -46,6 +48,15 @@ export function validateMcpConfig(mcpConfig) {
   }
   if (!servers.github) errors.push("Missing required MCP server: servers.github");
 
+  const armMcp = servers["azure-resource-manager-mcp"];
+  if (!armMcp) errors.push("Missing required MCP server: servers.azure-resource-manager-mcp");
+  else if (armMcp.type !== "http") errors.push('azure-resource-manager-mcp must use type: "http"');
+  else if (armMcp.url !== ARM_MCP_ENDPOINT) {
+    errors.push(`azure-resource-manager-mcp must use the managed endpoint: ${ARM_MCP_ENDPOINT}`);
+  } else if (armMcp.headers?.["x-mcp-toolset"] !== ARM_MCP_TOOLSET) {
+    errors.push(`azure-resource-manager-mcp must enable x-mcp-toolset: ${ARM_MCP_TOOLSET}`);
+  }
+
   const drawio = servers.drawio;
   if (!drawio) errors.push("Missing required MCP server: servers.drawio");
   else if (drawio.type !== "stdio") errors.push(`drawio server must use type: "stdio", got "${drawio.type}"`);
@@ -55,6 +66,10 @@ export function validateMcpConfig(mcpConfig) {
   }
 
   for (const [name, server] of Object.entries(servers)) {
+    const serialized = JSON.stringify(server).toLowerCase().replaceAll("\\", "/");
+    if (name.toLowerCase() === "azure-pricing" || serialized.includes("azure_pricing_mcp")) {
+      errors.push(`Retired custom Azure Pricing MCP server must not be active: servers.${name}`);
+    }
     if (name === "astro-docs" || isRetiredAstroEndpoint(server?.url)) {
       errors.push(`Retired Astro MCP server must not be active: servers.${name}`);
     }
@@ -91,6 +106,14 @@ function main() {
   for (const error of errors) r.error(error);
   r.tick();
   if (mcpConfig?.servers?.github) r.ok("MCP config includes required server: github");
+  r.tick();
+  if (hasServerMap && !errors.some((error) => error.includes("azure-resource-manager-mcp"))) {
+    r.ok("MCP config includes Microsoft ARM MCP with Cost Management and Pricing");
+  }
+  r.tick();
+  if (hasServerMap && !errors.some((error) => error.startsWith("Retired custom Azure Pricing MCP"))) {
+    r.ok("Retired custom Azure Pricing MCP server is absent from active discovery");
+  }
   r.tick();
   if (hasServerMap && !errors.some((error) => error.startsWith("drawio ") || error.includes("servers.drawio"))) {
     r.ok("MCP config includes valid drawio server (Deno stdio)");

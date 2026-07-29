@@ -463,11 +463,6 @@ async function prepareCapabilityPacks(inventory) {
   const packsRoot = join(assetsRoot, "capability-packs");
   const sources = [
     {
-      id: "azure-pricing",
-      root: join(repositoryRoot, "tools", "mcp-servers", "azure-pricing"),
-      entries: ["pyproject.toml", "uv.lock", "src"],
-    },
-    {
       id: "azure-governance-discovery",
       root: join(repositoryRoot, ".github", "skills", "azure-governance-discovery"),
       entries: [join("scripts", "discover.py"), join("scripts", "render_governance.py")],
@@ -487,14 +482,9 @@ async function prepareCapabilityPacks(inventory) {
   }
 
   const emptyDigest = createHash("sha256").update("").digest("hex");
-  const pricingSource = join(packsRoot, "azure-pricing", "source");
   const governanceSource = join(packsRoot, "azure-governance-discovery", "source");
   const drawioSource = join(packsRoot, "drawio", "source");
-  const pricingPyproject = await readFile(join(pricingSource, "pyproject.toml"), "utf8");
-  const pricingVersion = pricingPyproject.match(/^version\s*=\s*"([^"]+)"/mu)?.[1];
-  if (pricingVersion === undefined) throw new Error("Azure pricing version is missing from pyproject.toml");
   const drawioConfig = JSON.parse(await readFile(join(drawioSource, "deno.json"), "utf8"));
-  const uvDigest = await fileDigest(join(pricingSource, "uv.lock"));
   const denoDigest = await fileDigest(join(drawioSource, "deno.lock"));
   const governanceScriptDigest = await fileDigest(join(governanceSource, "scripts", "discover.py"));
   const metadata = (id) => {
@@ -507,25 +497,6 @@ async function prepareCapabilityPacks(inventory) {
     protocolVersion: policy.protocolVersion,
     installationPolicy: policy.installationPolicy,
     packs: [
-      {
-        ...metadata("azure-pricing"),
-        version: pricingVersion,
-        runtime: "python",
-        artifact: {
-          type: "local-directory",
-          spec: "capability-packs/azure-pricing/source",
-          digest: await treeDigest(pricingSource),
-        },
-        lock: {
-          installer: "uv",
-          path: "capability-packs/azure-pricing/source/uv.lock",
-          digest: uvDigest,
-          directDigest: uvDigest,
-          transitiveDigest: uvDigest,
-        },
-        executable: { command: "uv", args: ["run", "--frozen", "--no-dev", "azure-pricing-mcp"] },
-        capabilities: ["azure-pricing"],
-      },
       {
         ...metadata("azure-governance-discovery"),
         version: "1.0.0",
@@ -660,12 +631,6 @@ async function prepareAssets() {
         mode: "render-client-projections",
         sourceRoot: "customizations",
         generatedRoot: "client-projections",
-      },
-      {
-        id: "azure-pricing",
-        mode: "copy-entries",
-        sourceRoot: "tools/mcp-servers/azure-pricing",
-        generatedRoot: "capability-packs/azure-pricing/source",
       },
       {
         id: "azure-governance-discovery",

@@ -257,8 +257,8 @@ GitHub Copilot cloud coding-agent sessions, Copilot code review, and `/delegate`
 
 ## Milestone K: ARM MCP Pricing Replacement
 
-**Outcome:** Managed architecture pricing uses typed, attested Azure Resource Manager MCP evidence without exposing write
-authority to agents.
+**Outcome:** Every managed agent queries Microsoft ARM MCP directly for read-only Cost Management and Pricing without a
+custom server or adapter.
 
 **Requirements:** `REQ-ARCH-001`, `REQ-CAPABILITY-001`, `REQ-QUALITY-001`, `REQ-SECURITY-001`,
 `REQ-DETERMINISM-001`, `REQ-DOCS-001`.
@@ -270,19 +270,16 @@ authority to agents.
    mutation-tested validator.
 2. Add versioned pricing-request and pricing-evidence contracts. Issue #162 implements strict content-free schemas,
    request/evidence identity binding, typed arithmetic, expiry, provenance, and non-gate dispositions.
-3. Implement a pinned-host ARM MCP client with exact Pricing and Cost Management read allowlists. Issue #169 binds the
-   managed endpoint `https://mcp.management.azure.com`, optional `CostManagement,Pricing` toolsets, and documented tool
-   inventory. Issue #164 still requires authenticated protocol schemas and output fixtures before adapter qualification.
-4. Reject deployment, cancellation, budget creation, unknown, renamed, and write tools before transport.
-5. Add an operator collection and attestation path that keeps restricted raw evidence out of task context.
-6. Run paired reliability, latency, security, semantic, determinism, and maintenance measurements at the declared pack
-   threshold.
-7. Archive and remove the custom pricing pack only after every replacement criterion passes.
-8. Evaluate Resource Graph inventory, deployment observation, actual and forecast cost, and price-sheet retrieval as
-   separately authorized read adapters.
+3. Configure the managed endpoint `https://mcp.management.azure.com` with the `CostManagement,Pricing` toolsets in both
+   supported client projections.
+4. Grant every managed agent explicit read-only ARM MCP tools. Exclude deployment, cancellation, resource mutation,
+   budget creation, pricesheet operations, unknown, and renamed tools.
+5. Remove the custom pricing pack from runtime assets, CI, dependency updates, hooks, and active discovery.
+6. Keep APEX pricing request/evidence contracts as gate-validation boundaries without owning MCP transport.
+7. Qualify direct OAuth discovery and representative read calls in both supported interactive clients.
 
-**Exit gate:** The candidate is no worse than the current pack on declared metrics, typed arithmetic and meter semantics
-pass, write-tool denial is proven, and no direct exploratory MCP output can satisfy an APEX gate.
+**Exit gate:** Both supported interactive clients discover the allowlisted ARM MCP reads, excluded tools remain
+unavailable to managed agents, typed arithmetic and meter semantics pass, and no MCP call can approve or deploy.
 
 ## Milestone L: Mermaid And Python Diagram Migration
 

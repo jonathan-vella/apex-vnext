@@ -61,7 +61,8 @@
     "documentationCharacterized": true,
     "authenticatedToolsListCaptured": false,
     "outputFixturesCaptured": false,
-    "adapterReady": false,
-    "managedAuthority": false
+    "directClientConfigured": true,
+    "customAdapterRequired": false,
+    "customPricingServerRetired": true
   }
 }

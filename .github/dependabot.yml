@@ -1,7 +1,7 @@
 # Dependabot configuration for automated dependency updates.
 #
 # Scope: dev container features, GitHub Actions, root npm, and the
-# two in-repo Python packages (azure-pricing MCP, apex-recall). Top-level
+# the in-repo apex-recall Python package. Top-level
 # requirements.txt is intentionally out of scope (managed via uv pin in
 # .devcontainer/post-start.sh).
 #
@@ -67,19 +67,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-
-  # ─── Python: azure-pricing MCP server ──────────────────────────────────────
-  - package-ecosystem: "pip"
-    directory: "/tools/mcp-servers/azure-pricing"
-    schedule:
-      interval: "weekly"
-      day: "wednesday"
-    open-pull-requests-limit: 3
-    commit-message:
-      prefix: "chore(pricing-mcp)"
-    labels:
-      - "dependencies"
-      - "azure-pricing-mcp"
 
   # ─── Python: apex-recall CLI ───────────────────────────────────────────────
   - package-ecosystem: "pip"

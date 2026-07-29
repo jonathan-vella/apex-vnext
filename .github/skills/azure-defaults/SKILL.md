@@ -233,7 +233,8 @@ Load these on demand — do NOT read all at once:
 | `references/naming-full-examples.md`        | Generating names for length-constrained resources       |
 | `references/avm-modules.md`                 | Looking up AVM module paths or versions                 |
 | `references/security-baseline-full.md`      | Debugging AVM parameter issues or checking deprecations |
-| `references/pricing-guidance.md`            | Running cost estimates with Azure Pricing MCP           |
+| `references/arm-mcp-pricing-guidance.md`    | Direct ARM MCP cost and pricing evidence                |
+| `references/pricing-guidance.md`            | Historical custom pricing tool reference                |
 | `references/cost-estimate-parent-contract.md` | Parent-side delegation contract for `cost-estimate-subagent` (loaded by 03 + 08) |
 | `references/service-matrices.md`            | Mapping user requirements to Azure service tiers        |
 | `references/waf-criteria.md`                | Scoring WAF pillar assessments                          |

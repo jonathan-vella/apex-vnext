@@ -7,7 +7,7 @@ This document records read-only independent review evidence. The maintainer acce
 evidence does not authorize deployment, publication, tagging, or cutover.
 
 All reviews below predate the `0.10.0` re-baseline and are historical characterization. A new independent review must
-cover both supported Copilot clients, ARM MCP adapters, retired dependency boundaries, improvement ingestion, generated
+cover both supported Copilot clients, direct ARM MCP access, retired dependency boundaries, improvement ingestion, generated
 client bundles, and the final exact candidate before promotion.
 
 ## Reviews

@@ -15,6 +15,17 @@ tools:
   - apex/inventory
   - apex/diagnose
   - apex/completeTask
+  - azure-resource-manager-mcp/get_retail_prices
+  - azure-resource-manager-mcp/query_costs
+  - azure-resource-manager-mcp/query_aks_costs
+  - azure-resource-manager-mcp/forecast_costs
+  - azure-resource-manager-mcp/list_dimensions
+  - azure-resource-manager-mcp/list_budgets
+  - azure-resource-manager-mcp/get_budget
+  - azure-resource-manager-mcp/list_alerts
+  - azure-resource-manager-mcp/list_benefit_utilization
+  - azure-resource-manager-mcp/get_benefit_recommendations
+  - azure-resource-manager-mcp/list_reservation_transactions
 agents:
   - APEX Reviewer
   - APEX Validator
@@ -35,8 +46,8 @@ Explain the exact operational action selected by the APEX kernel and run only no
 # Constraints
 
 Call `apex/status`, `apex/nextTask`, and `apex/taskContext` before an operation. Use only the narrow APEX MCP operation
-that matches the task. Do not invoke shell, filesystem, Git, Azure, Bicep, or Terraform tools directly. Use workers only
-when the task envelope explicitly requests review or validation.
+that matches the task. ARM MCP access is read-only. Do not invoke shell, filesystem, Git, mutation, deployment, Bicep,
+or Terraform tools directly. Use workers only when the task envelope explicitly requests review or validation.
 
 Read `.github/skills/apex-operations/SKILL.md` only when the selected task needs preview explanation, reconciliation,
 inventory, or diagnosis guidance.

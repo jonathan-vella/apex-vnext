@@ -19,16 +19,17 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Replaced the custom Azure Pricing MCP with direct Microsoft Azure Resource Manager MCP access in VS Code and Copilot
+  CLI. Every managed agent receives explicit read-only Cost Management and Pricing tools; custom transport, runtime-pack,
+  CI, hook, Dependabot, and dev-container maintenance paths are retired.
 - Corrected the ARM MCP product boundary: Azure Resource Manager MCP is distinct from Azure MCP Server and exposes
   documented CostManagement/Pricing toolsets at `https://mcp.management.azure.com`. Removed the unrelated Azure MCP
-  characterization from active pricing ownership; authenticated schemas and fixtures remain required before adapter use.
+  characterization from active pricing ownership.
 - Added strict pricing request/evidence contracts and a canonical ARM pricing replacement parity registry covering
   typed arithmetic, meters, commitments, ambiguity, uncertainty, throttling, freshness, and content-free provenance.
-  The current Azure Pricing MCP remains authoritative until later adapter qualification and replacement gates pass.
+  Microsoft ARM MCP is the direct pricing authority; APEX retains workflow, evidence-acceptance, and gate authority.
 - Selected VS Code `1.130.0` and Copilot Chat `0.58.0` exactly from the completed content-free context receipt, with
   validator-enforced version and provenance binding. Paired live client qualification remains open.
-- Constrained Azure Pricing MCP to the supported Python MCP SDK v1 API family after the v2 stable release,
-  preserving fresh-install CI compatibility and adding a dependency-contract regression.
 - Added versioned, content-free normalized Copilot client outcomes, scenario-specific comparison and qualification
   contracts, strict bounded collection, proof-complete evidence closure verification, and fail-closed live release
   binding. Deterministic fixture parity never grants release authority; paired exact-candidate execution remains open.

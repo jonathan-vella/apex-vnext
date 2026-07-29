@@ -52,6 +52,11 @@ test("init installs bundled customizations and runtime config by default", async
         args: ["${workspaceFolder}/node_modules/@apex/cli/dist/cli.js", "mcp", "serve"],
         cwd: "${workspaceFolder}",
       },
+      "azure-resource-manager-mcp": {
+        type: "http",
+        url: "https://mcp.management.azure.com",
+        headers: { "x-mcp-toolset": "CostManagement,Pricing" },
+      },
     },
   });
   await assert.rejects(readFile(join(root, ".github", "mcp.json"), "utf8"), /ENOENT/u);
@@ -73,7 +78,7 @@ test("init installs bundled customizations and runtime config by default", async
   };
   assert.deepEqual(
     registry.packs.map(({ id }) => id),
-    ["azure-pricing", "azure-governance-discovery", "drawio"],
+    ["azure-governance-discovery", "drawio"],
   );
   for (const pack of registry.packs) {
     const source = join(root, ".apex", "runtime", pack.artifact.spec);
@@ -414,21 +419,25 @@ test("doctor leaves unrelated core routes unaffected and service reports require
     false,
   );
   assert.equal(runId.length > 0, true);
-  const pricing = (await service.capabilityStatus("azure-pricing")) as {
+  const governance = (await service.capabilityStatus("azure-governance-discovery")) as {
     state: string;
     reason?: string;
     requiredWorkflows: string[];
     action: string;
   };
-  assert.equal(pricing.state, "not-installed");
-  assert.equal(pricing.reason, undefined);
-  assert.deepEqual(pricing.requiredWorkflows, ["architecture"]);
-  assert.match(pricing.action, /capability install/);
+  assert.equal(governance.state, "not-installed");
+  assert.equal(governance.reason, undefined);
+  assert.deepEqual(governance.requiredWorkflows, [
+    "governance-discovery",
+    "governance-reconciliation",
+    "preview-bicep",
+    "preview-terraform",
+  ]);
+  assert.match(governance.action, /capability install/);
   const listed = (await service.capabilityList()) as Array<{ id: string; state: string }>;
   assert.deepEqual(
     listed.map(({ id, state }) => ({ id, state })),
     [
-      { id: "azure-pricing", state: "not-installed" },
       { id: "azure-governance-discovery", state: "not-installed" },
       { id: "drawio", state: "not-installed" },
     ],

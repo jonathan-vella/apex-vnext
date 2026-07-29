@@ -116,7 +116,11 @@ test("rejects Python validation setup weakening and caller removal", () => {
     ['python-version: "3.14"', 'python-version: "3.13"', "version or cache contract drift"],
     ["cache: pip", "cache: none", "version or cache contract drift"],
     ["set -euo pipefail", "set -e", "dependency bootstrap drift"],
-    ["[admin,dev]", "[dev]", "dependency bootstrap drift"],
+    [
+      "python -m pip install -e tools/apex-recall",
+      "python -m pip install tools/apex-recall",
+      "dependency bootstrap drift",
+    ],
     ["using: composite", "using: node20", "structure or runtime drift"],
     ["      shell: bash", "      continue-on-error: true\n      shell: bash", "dependency bootstrap drift"],
     [

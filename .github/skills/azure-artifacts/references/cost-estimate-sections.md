@@ -365,7 +365,7 @@ Required bullets:
 ## 📊 Pricing Data Accuracy
 
 > **📊 Data Source**: Prices from Azure Retail Prices API via
-> Azure Pricing MCP
+> Azure Resource Manager MCP
 >
 > ✅ **Included**: Retail list prices (PAYG)
 >

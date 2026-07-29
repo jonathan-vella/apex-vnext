@@ -13,6 +13,17 @@ tools:
   - apex/taskContext
   - apex/stageArtifact
   - apex/completeTask
+  - azure-resource-manager-mcp/get_retail_prices
+  - azure-resource-manager-mcp/query_costs
+  - azure-resource-manager-mcp/query_aks_costs
+  - azure-resource-manager-mcp/forecast_costs
+  - azure-resource-manager-mcp/list_dimensions
+  - azure-resource-manager-mcp/list_budgets
+  - azure-resource-manager-mcp/get_budget
+  - azure-resource-manager-mcp/list_alerts
+  - azure-resource-manager-mcp/list_benefit_utilization
+  - azure-resource-manager-mcp/get_benefit_recommendations
+  - azure-resource-manager-mcp/list_reservation_transactions
 agents:
   - APEX Reviewer
   - APEX Validator
@@ -41,8 +52,8 @@ Read `.github/skills/apex-requirements/SKILL.md` when the task needs requirement
 
 ## Boundaries
 
-The kernel owns task state, validation, acceptance, and gate readiness. Write only through APEX MCP. Do not use shell,
-filesystem, Git, Azure, Bicep, or Terraform tools.
+The kernel owns task state, validation, acceptance, and gate readiness. Write only through APEX MCP. ARM MCP access is
+read-only; do not use shell, filesystem, Git, mutation, deployment, Bicep, or Terraform tools.
 
 ## Output
 
