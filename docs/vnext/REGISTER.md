@@ -97,9 +97,9 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Type:** `RISK`
 - **Owner:** Azure capabilities
 - **Impact:** Authentication, tool-name, or response-shape drift could contaminate managed evidence or bypass policy.
-- **Evidence:** Azure Resource Manager MCP is selected for bounded read evidence but has no qualified APEX adapter or
-  pinned toolchain entry.
-- **Related issue:** Pending Milestones I and K issues.
+- **Evidence:** Issue #162 freezes the replacement parity registry and strict pricing request/evidence contracts. Azure
+  Resource Manager MCP still has no qualified APEX adapter or pinned toolchain entry.
+- **Related issue:** [#162](https://github.com/jonathan-vella/apex-vnext/issues/162)
 - **Mitigation:** Use typed read-allowlisted adapters, normalize versioned fixtures, reject unknown tools and shapes,
   and keep native Azure and IaC paths authoritative for mutation.
 - **State:** Open

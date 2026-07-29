@@ -19,6 +19,9 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Added strict pricing request/evidence contracts and a canonical ARM pricing replacement parity registry covering
+  typed arithmetic, meters, commitments, ambiguity, uncertainty, throttling, freshness, and content-free provenance.
+  The current Azure Pricing MCP remains authoritative until later adapter qualification and replacement gates pass.
 - Selected VS Code `1.130.0` and Copilot Chat `0.58.0` exactly from the completed content-free context receipt, with
   validator-enforced version and provenance binding. Paired live client qualification remains open.
 - Constrained Azure Pricing MCP to the supported Python MCP SDK v1 API family after the v2 stable release,

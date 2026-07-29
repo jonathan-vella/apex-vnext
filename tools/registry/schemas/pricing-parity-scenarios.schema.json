@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.apexops.dev/registry/pricing-parity-scenarios-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "currentAuthority", "replacementCandidate", "scenarios"],
+  "properties": {
+    "$schema": { "const": "schemas/pricing-parity-scenarios.schema.json" },
+    "schemaVersion": { "const": "1.0.0" },
+    "currentAuthority": { "const": "azure-pricing-mcp" },
+    "replacementCandidate": { "const": "azure-resource-manager-mcp" },
+    "scenarios": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "capability",
+          "sourceOwners",
+          "expectedDisposition",
+          "requiredSemantics",
+          "arithmeticPredicate",
+          "prohibitedFields"
+        ],
+        "properties": {
+          "id": { "pattern": "^PRICING-[0-9]{3}-[a-z][a-z0-9-]*$", "type": "string" },
+          "capability": { "pattern": "^[a-z][a-z0-9-]*$", "type": "string" },
+          "sourceOwners": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+          },
+          "expectedDisposition": { "enum": ["matched", "ambiguous", "unavailable"] },
+          "requiredSemantics": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "pattern": "^[a-z][a-z0-9-]*$", "type": "string" }
+          },
+          "arithmeticPredicate": { "pattern": "^[a-z][a-z0-9-]*$", "type": "string" },
+          "prohibitedFields": {
+            "type": "array",
+            "minItems": 2,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1, "maxLength": 64 }
+          }
+        }
+      }
+    }
+  }
+}

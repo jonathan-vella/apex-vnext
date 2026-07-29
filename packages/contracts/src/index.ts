@@ -3,6 +3,7 @@ export * from "./common.js";
 export * from "./deployment.js";
 export * from "./evidence.js";
 export * from "./improvement.js";
+export * from "./pricing.js";
 export * from "./runtime.js";
 export * from "./targets.js";
 
@@ -30,6 +31,7 @@ import {
   ImprovementProposalV1Schema,
   ImprovementRecurrenceV1Schema,
 } from "./improvement.js";
+import { PricingEvidenceV1Schema, PricingRequestV1Schema } from "./pricing.js";
 import {
   EventV1Schema,
   InputRequestV1Schema,
@@ -86,6 +88,8 @@ export const contractSchemas = [
   ImprovementProposalV1Schema,
   ImprovementDecisionV1Schema,
   ImprovementPolicyV1Schema,
+  PricingRequestV1Schema,
+  PricingEvidenceV1Schema,
   SkuManifestV1Schema,
   ArchitectureV1Schema,
   CostEstimateV1Schema,
@@ -147,6 +151,8 @@ export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
   "https://schemas.apexops.dev/improvement-proposal-v1.json": metadata(65_536, "confidential"),
   "https://schemas.apexops.dev/improvement-decision-v1.json": metadata(16_384, "confidential"),
   "https://schemas.apexops.dev/improvement-policy-v1.json": metadata(16_384, "public"),
+  "https://schemas.apexops.dev/pricing-request-v1.json": metadata(65_536, "confidential"),
+  "https://schemas.apexops.dev/pricing-evidence-v1.json": metadata(524_288, "restricted"),
   "https://schemas.apexops.dev/sku-manifest-v1.json": metadata(524_288),
   "https://schemas.apexops.dev/architecture-v1.json": metadata(1_048_576),
   "https://schemas.apexops.dev/cost-estimate-v1.json": metadata(1_048_576, "confidential"),

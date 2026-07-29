@@ -1,0 +1,424 @@
+{
+  "$id": "https://schemas.apexops.dev/pricing-request-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "bulkItems": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "meter": {
+            "additionalProperties": false,
+            "properties": {
+              "meterId": {
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._()/-]{0,127}$",
+                "type": "string"
+              },
+              "unitDimension": {
+                "anyOf": [
+                  {
+                    "const": "hour",
+                    "type": "string"
+                  },
+                  {
+                    "const": "day",
+                    "type": "string"
+                  },
+                  {
+                    "const": "month",
+                    "type": "string"
+                  },
+                  {
+                    "const": "second",
+                    "type": "string"
+                  },
+                  {
+                    "const": "gb-month",
+                    "type": "string"
+                  },
+                  {
+                    "const": "gb",
+                    "type": "string"
+                  },
+                  {
+                    "const": "transactions",
+                    "type": "string"
+                  }
+                ]
+              },
+              "unitQuantity": {
+                "exclusiveMinimum": 0,
+                "maximum": 1000000000,
+                "type": "number"
+              }
+            },
+            "required": [
+              "meterId",
+              "unitDimension",
+              "unitQuantity"
+            ],
+            "type": "object"
+          },
+          "specId": {
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._()/-]{0,127}$",
+            "type": "string"
+          },
+          "target": {
+            "additionalProperties": false,
+            "properties": {
+              "currency": {
+                "pattern": "^[A-Z]{3}$",
+                "type": "string"
+              },
+              "regions": {
+                "items": {
+                  "maxLength": 32,
+                  "pattern": "^[a-z][a-z0-9-]{1,31}$",
+                  "type": "string"
+                },
+                "maxItems": 16,
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "serviceName": {
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._()/-]{0,127}$",
+                "type": "string"
+              },
+              "skuName": {
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._()/-]{0,127}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "serviceName",
+              "regions",
+              "currency"
+            ],
+            "type": "object"
+          },
+          "usage": {
+            "additionalProperties": false,
+            "properties": {
+              "dimension": {
+                "anyOf": [
+                  {
+                    "const": "hour",
+                    "type": "string"
+                  },
+                  {
+                    "const": "day",
+                    "type": "string"
+                  },
+                  {
+                    "const": "month",
+                    "type": "string"
+                  },
+                  {
+                    "const": "second",
+                    "type": "string"
+                  },
+                  {
+                    "const": "gb-month",
+                    "type": "string"
+                  },
+                  {
+                    "const": "gb",
+                    "type": "string"
+                  },
+                  {
+                    "const": "transactions",
+                    "type": "string"
+                  }
+                ]
+              },
+              "quantity": {
+                "maximum": 1000000000,
+                "minimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "dimension",
+              "quantity"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "specId",
+          "target",
+          "usage"
+        ],
+        "type": "object"
+      },
+      "maxItems": 256,
+      "minItems": 2,
+      "type": "array"
+    },
+    "commitment": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "anyOf": [
+            {
+              "const": "none",
+              "type": "string"
+            },
+            {
+              "const": "reservation",
+              "type": "string"
+            },
+            {
+              "const": "savings-plan",
+              "type": "string"
+            }
+          ]
+        },
+        "priceBasis": {
+          "anyOf": [
+            {
+              "const": "hourly",
+              "type": "string"
+            },
+            {
+              "const": "total",
+              "type": "string"
+            }
+          ]
+        },
+        "termMonths": {
+          "anyOf": [
+            {
+              "const": 12,
+              "type": "number"
+            },
+            {
+              "const": 36,
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
+    },
+    "meter": {
+      "additionalProperties": false,
+      "properties": {
+        "meterId": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._()/-]{0,127}$",
+          "type": "string"
+        },
+        "unitDimension": {
+          "anyOf": [
+            {
+              "const": "hour",
+              "type": "string"
+            },
+            {
+              "const": "day",
+              "type": "string"
+            },
+            {
+              "const": "month",
+              "type": "string"
+            },
+            {
+              "const": "second",
+              "type": "string"
+            },
+            {
+              "const": "gb-month",
+              "type": "string"
+            },
+            {
+              "const": "gb",
+              "type": "string"
+            },
+            {
+              "const": "transactions",
+              "type": "string"
+            }
+          ]
+        },
+        "unitQuantity": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000000000,
+          "type": "number"
+        }
+      },
+      "required": [
+        "meterId",
+        "unitDimension",
+        "unitQuantity"
+      ],
+      "type": "object"
+    },
+    "projectId": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "requestedAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "requestId": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "runId": {
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+      "type": "string"
+    },
+    "scenarioId": {
+      "anyOf": [
+        {
+          "const": "PRICING-001-retail",
+          "type": "string"
+        },
+        {
+          "const": "PRICING-002-meter-aware",
+          "type": "string"
+        },
+        {
+          "const": "PRICING-003-bulk",
+          "type": "string"
+        },
+        {
+          "const": "PRICING-004-regional",
+          "type": "string"
+        },
+        {
+          "const": "PRICING-005-commitments",
+          "type": "string"
+        },
+        {
+          "const": "PRICING-006-negotiated",
+          "type": "string"
+        },
+        {
+          "const": "PRICING-007-ambiguity",
+          "type": "string"
+        },
+        {
+          "const": "PRICING-008-uncertainty",
+          "type": "string"
+        },
+        {
+          "const": "PRICING-009-throttling",
+          "type": "string"
+        },
+        {
+          "const": "PRICING-010-provenance",
+          "type": "string"
+        }
+      ]
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "target": {
+      "additionalProperties": false,
+      "properties": {
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "regions": {
+          "items": {
+            "maxLength": 32,
+            "pattern": "^[a-z][a-z0-9-]{1,31}$",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "serviceName": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._()/-]{0,127}$",
+          "type": "string"
+        },
+        "skuName": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._()/-]{0,127}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "serviceName",
+        "regions",
+        "currency"
+      ],
+      "type": "object"
+    },
+    "usage": {
+      "additionalProperties": false,
+      "properties": {
+        "dimension": {
+          "anyOf": [
+            {
+              "const": "hour",
+              "type": "string"
+            },
+            {
+              "const": "day",
+              "type": "string"
+            },
+            {
+              "const": "month",
+              "type": "string"
+            },
+            {
+              "const": "second",
+              "type": "string"
+            },
+            {
+              "const": "gb-month",
+              "type": "string"
+            },
+            {
+              "const": "gb",
+              "type": "string"
+            },
+            {
+              "const": "transactions",
+              "type": "string"
+            }
+          ]
+        },
+        "quantity": {
+          "maximum": 1000000000,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "dimension",
+        "quantity"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "runId",
+    "scenarioId",
+    "target",
+    "usage",
+    "requestedAt",
+    "requestId"
+  ],
+  "type": "object"
+}

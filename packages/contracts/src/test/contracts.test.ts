@@ -29,6 +29,8 @@ import {
   LiveQualificationV1Schema,
   LIVE_QUALIFICATION_SCENARIO_IDS,
   PolicyPropertyMapV1Schema,
+  PricingEvidenceV1Schema,
+  PricingRequestV1Schema,
   QualityReportV1Schema,
   QualityMeasurementsV1Schema,
   ArchitectureAvailabilityV1Schema,
@@ -46,6 +48,9 @@ import {
   hasValidCostArithmetic,
   hasValidLogicalResourceReferences,
   hasValidPreviewApprovalBinding,
+  calculatePricingEvidenceId,
+  calculatePricingRequestId,
+  hasValidPricingEvidence,
   schemaById,
   type ApprovalEvidenceV1,
   type CostEstimateV1,
@@ -54,6 +59,8 @@ import {
   type ExecutionPlanAttestationV1,
   type LogicalResourceManifestV1,
   type LiveQualificationV1,
+  type PricingEvidenceV1,
+  type PricingRequestV1,
   type RequirementsV1,
   type RuntimeBundleLockV1,
 } from "../index.js";
@@ -261,6 +268,96 @@ describe("Wave 1 contracts", () => {
     assert.equal(Value.Check(ImprovementPolicyV1Schema, policy), true);
     assert.equal(Value.Check(ImprovementProposalV1Schema, { ...proposal, inert: false }), false);
     assert.equal(Value.Check(ImprovementPolicyV1Schema, { ...policy, automatedIssueCreation: true }), false);
+  });
+});
+
+describe("pricing evidence contracts", () => {
+  const requestContent: Omit<PricingRequestV1, "requestId"> = {
+    schemaVersion: CONTRACT_VERSION,
+    projectId: "pricing-test",
+    runId: "run-1",
+    scenarioId: "PRICING-002-meter-aware",
+    target: {
+      serviceName: "Virtual Machines",
+      skuName: "D2s v5",
+      regions: ["swedencentral"],
+      currency: "USD",
+    },
+    usage: { dimension: "hour", quantity: 730 },
+    meter: { meterId: "compute-hour", unitDimension: "hour", unitQuantity: 1 },
+    commitment: { kind: "none" },
+    requestedAt: timestamp,
+  };
+  const request: PricingRequestV1 = {
+    ...requestContent,
+    requestId: calculatePricingRequestId(requestContent),
+  };
+  const evidenceContent: Omit<PricingEvidenceV1, "evidenceId"> = {
+    schemaVersion: CONTRACT_VERSION,
+    projectId: request.projectId,
+    runId: request.runId,
+    scenarioId: request.scenarioId,
+    requestId: request.requestId,
+    requestHash: request.requestId,
+    provenance: {
+      provider: "azure-resource-manager-mcp",
+      endpointId: "arm-pricing",
+      toolName: "pricing-read",
+      toolVersion: "1.0.0",
+      toolchainHash: hash,
+      toolsListHash: otherHash,
+      rawSourceDigest: "c".repeat(64),
+      rawSourceBytes: 512,
+      contentCapture: false,
+    },
+    collectedAt: expiry,
+    expiresAt: completion,
+    result: {
+      status: "matched",
+      records: [
+        {
+          priceId: "price-1",
+          meterId: "compute-hour",
+          serviceName: "Virtual Machines",
+          skuName: "D2s v5",
+          region: "swedencentral",
+          currency: "USD",
+          priceType: "consumption",
+          unitDimension: "hour",
+          unitQuantity: 1,
+          unitPrice: 0.1,
+          usageQuantity: 730,
+          projectedAmount: 73,
+          commitment: { kind: "none" },
+          uncertainty: { lowerAmount: 73, upperAmount: 73, confidence: "high", reasonCodes: [] },
+        },
+      ],
+      totalAmount: 73,
+      paginationStatus: "complete",
+    },
+    qualifiesGate: false,
+  };
+  const evidence: PricingEvidenceV1 = {
+    ...evidenceContent,
+    evidenceId: calculatePricingEvidenceId(evidenceContent),
+  };
+
+  it("binds strict content-free pricing evidence and arithmetic", () => {
+    assert.equal(Value.Check(PricingRequestV1Schema, request), true);
+    assert.equal(Value.Check(PricingEvidenceV1Schema, evidence), true);
+    assert.equal(hasValidPricingEvidence(request, evidence, expiry), true);
+    assert.equal(hasValidPricingEvidence({ ...request, requestId: hash }, evidence, expiry), false);
+    const badArithmeticContent = {
+      ...evidenceContent,
+      result: { ...evidenceContent.result, totalAmount: 72 },
+    } as Omit<PricingEvidenceV1, "evidenceId">;
+    const badArithmetic = {
+      ...badArithmeticContent,
+      evidenceId: calculatePricingEvidenceId(badArithmeticContent),
+    } as PricingEvidenceV1;
+    assert.equal(hasValidPricingEvidence(request, badArithmetic, expiry), false);
+    assert.equal(Value.Check(PricingEvidenceV1Schema, { ...evidence, rawPayload: {} }), false);
+    assert.equal(Value.Check(PricingEvidenceV1Schema, { ...evidence, qualifiesGate: true }), false);
   });
 });
 

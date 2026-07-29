@@ -20,7 +20,7 @@ No evidence in this dossier authorizes package publication, tag creation, branch
 | Deterministic qualification   | Must repeat after all re-baseline implementation changes.                |
 | VS Code qualification         | Versions selected; must run against the new bundle and exact candidate.  |
 | Client parity qualification   | Deterministic harness complete; paired exact-candidate runs not started. |
-| ARM MCP qualification         | Not run; typed adapter, authentication, and allowlist proof are pending. |
+| ARM MCP qualification         | Contracts frozen; adapter, authentication, and allowlist proof pending.  |
 | MCP and Draw.io retirement    | Not implemented; each replacement gate must pass before removal.         |
 | Improvement measurement       | Not implemented; prior evidence covers observe-and-propose only.         |
 | Package, SBOM, and provenance | Must cover the new generated client projections on the exact candidate.  |

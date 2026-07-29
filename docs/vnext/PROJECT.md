@@ -1,12 +1,12 @@
 ## APEX vNext Checkpoint
 
-- **Updated:** 2026-07-28 UTC
-- **Milestone:** J - supported Copilot client parity
+- **Updated:** 2026-07-29 UTC
+- **Milestone:** K - ARM MCP pricing replacement
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
-- **Active issue:** [#156](https://github.com/jonathan-vella/apex-vnext/issues/156) - exact VS Code selection
-- **Working branch:** `feat/156-pin-vscode-client`
+- **Active issue:** [#162](https://github.com/jonathan-vella/apex-vnext/issues/162) - pricing parity and contracts
+- **Working branch:** `feat/162-pricing-contracts`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -56,6 +56,8 @@ PR #153 closes issue #152. Issue #154 adds deterministic normalized client outco
 proof-complete matrix aggregate that extends the existing live-qualification authority without granting release authority.
 PR #155 closes issue #154. Issue #156 promotes VS Code `1.130.0` and Copilot Chat `0.58.0` from the completed content-free
 context receipt into the exact canonical toolchain selection; paired live execution remains pending.
+PR #158 closes issue #156. Issue #162 freezes normalized pricing replacement semantics and strict request/evidence
+contracts before any ARM MCP adapter or transport is implemented.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
 evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
@@ -78,6 +80,7 @@ not full client-parity qualification. No ARM MCP version has been selected or qu
 | ARM MCP adapters and MCP retirements                                     | Astro and Terraform retired; Azure Pricing and Draw.io gates remain open |
 | Bundle composition mappings, aggregate lock, and client projections      | Implemented; live client qualification remains pending                   |
 | Normalized client outcome contracts, corpus, and deterministic harness   | Implemented; exact-candidate paired live execution remains pending       |
+| Pricing parity registry and strict request/evidence contracts            | Implemented locally; ARM MCP adapter and measured parity remain pending  |
 | Diagram and improvement-measurement changes                              | Pending                                                                  |
 | Final deterministic, client, package, security, and live qualification   | Reopened                                                                 |
 
@@ -91,11 +94,12 @@ not full client-parity qualification. No ARM MCP version has been selected or qu
 
 ## Immediate Sequence
 
-1. Merge issue #156's receipt-bound exact VS Code and Copilot Chat selection.
-2. Run all paired client scenarios and prove equivalent typed outcomes and authority denials.
-3. Complete ARM pricing evidence, diagram routing, bounded improvement measurement, bundle generation, and guidance
+1. Complete issue #162's pricing parity and strict evidence contract slice.
+2. Return to issue #161 when interactive paired client execution and trusted receipt export are available.
+3. Implement and qualify the bounded ARM pricing adapter without retiring the current pricing pack.
+4. Complete diagram routing, bounded improvement measurement, bundle generation, and guidance
    consolidation in roadmap order.
-4. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.
+5. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.
 
 ## Resume Pointer
 

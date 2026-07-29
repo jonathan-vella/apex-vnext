@@ -227,7 +227,8 @@ when a decision has lasting architectural consequences that need alternatives an
   cannot authorize the revised candidate. Publication, tags, support dates, and cutover require a new explicit decision
   after deterministic, security, package, replacement-gate, and both-client qualification passes.
 - **ADR:** Not required; this is a release-governance decision.
-- **Issue/PR:** Pending work-item creation.
+- **Issue/PR:** [#162](https://github.com/jonathan-vella/apex-vnext/issues/162) freezes parity and evidence contracts;
+  adapter implementation and qualification remain pending.
 
 ## DECISION-014: Use A Typed ARM MCP Adapter For Managed Pricing
 

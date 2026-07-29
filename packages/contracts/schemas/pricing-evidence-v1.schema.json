@@ -1,0 +1,628 @@
+{
+  "$id": "https://schemas.apexops.dev/pricing-evidence-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "collectedAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "evidenceId": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "expiresAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "projectId": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "contentCapture": {
+          "const": false,
+          "type": "boolean"
+        },
+        "endpointId": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._()/-]{0,127}$",
+          "type": "string"
+        },
+        "provider": {
+          "const": "azure-resource-manager-mcp",
+          "type": "string"
+        },
+        "rawSourceBytes": {
+          "maximum": 16777216,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "rawSourceDigest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "toolchainHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "toolName": {
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._()/-]{0,127}$",
+          "type": "string"
+        },
+        "toolsListHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "toolVersion": {
+          "maxLength": 32,
+          "pattern": "^[0-9]+(?:\\.[0-9]+){1,3}(?:-[0-9A-Za-z.-]+)?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "endpointId",
+        "toolName",
+        "toolVersion",
+        "toolchainHash",
+        "toolsListHash",
+        "rawSourceDigest",
+        "rawSourceBytes",
+        "contentCapture"
+      ],
+      "type": "object"
+    },
+    "qualifiesGate": {
+      "const": false,
+      "type": "boolean"
+    },
+    "requestHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "requestId": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "result": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "bulk": {
+              "additionalProperties": false,
+              "properties": {
+                "deduplicatedSpecs": {
+                  "maximum": 256,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "failed": {
+                  "maximum": 256,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "partialFailures": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "reasonCode": {
+                        "maxLength": 64,
+                        "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+                        "type": "string"
+                      },
+                      "specId": {
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._()/-]{0,127}$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "specId",
+                      "reasonCode"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 256,
+                  "type": "array"
+                },
+                "successful": {
+                  "maximum": 256,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "deduplicatedSpecs",
+                "successful",
+                "failed",
+                "partialFailures"
+              ],
+              "type": "object"
+            },
+            "continuationCursorHash": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "paginationStatus": {
+              "anyOf": [
+                {
+                  "const": "complete",
+                  "type": "string"
+                },
+                {
+                  "const": "partial",
+                  "type": "string"
+                }
+              ]
+            },
+            "records": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "commitment": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "anyOf": [
+                          {
+                            "const": "none",
+                            "type": "string"
+                          },
+                          {
+                            "const": "reservation",
+                            "type": "string"
+                          },
+                          {
+                            "const": "savings-plan",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "priceBasis": {
+                        "anyOf": [
+                          {
+                            "const": "hourly",
+                            "type": "string"
+                          },
+                          {
+                            "const": "total",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "termMonths": {
+                        "anyOf": [
+                          {
+                            "const": 12,
+                            "type": "number"
+                          },
+                          {
+                            "const": 36,
+                            "type": "number"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  "currency": {
+                    "pattern": "^[A-Z]{3}$",
+                    "type": "string"
+                  },
+                  "meterId": {
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._()/-]{0,127}$",
+                    "type": "string"
+                  },
+                  "priceId": {
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._()/-]{0,127}$",
+                    "type": "string"
+                  },
+                  "priceType": {
+                    "anyOf": [
+                      {
+                        "const": "consumption",
+                        "type": "string"
+                      },
+                      {
+                        "const": "reservation",
+                        "type": "string"
+                      },
+                      {
+                        "const": "savings-plan",
+                        "type": "string"
+                      },
+                      {
+                        "const": "negotiated",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "projectedAmount": {
+                    "maximum": 1000000000000,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "region": {
+                    "maxLength": 32,
+                    "pattern": "^[a-z][a-z0-9-]{1,31}$",
+                    "type": "string"
+                  },
+                  "serviceName": {
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._()/-]{0,127}$",
+                    "type": "string"
+                  },
+                  "skuName": {
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._()/-]{0,127}$",
+                    "type": "string"
+                  },
+                  "specId": {
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._()/-]{0,127}$",
+                    "type": "string"
+                  },
+                  "uncertainty": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "confidence": {
+                        "anyOf": [
+                          {
+                            "const": "low",
+                            "type": "string"
+                          },
+                          {
+                            "const": "medium",
+                            "type": "string"
+                          },
+                          {
+                            "const": "high",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "lowerAmount": {
+                        "maximum": 1000000000000,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "reasonCodes": {
+                        "items": {
+                          "maxLength": 64,
+                          "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+                          "type": "string"
+                        },
+                        "maxItems": 16,
+                        "type": "array",
+                        "uniqueItems": true
+                      },
+                      "upperAmount": {
+                        "maximum": 1000000000000,
+                        "minimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "lowerAmount",
+                      "upperAmount",
+                      "confidence",
+                      "reasonCodes"
+                    ],
+                    "type": "object"
+                  },
+                  "unitDimension": {
+                    "anyOf": [
+                      {
+                        "const": "hour",
+                        "type": "string"
+                      },
+                      {
+                        "const": "day",
+                        "type": "string"
+                      },
+                      {
+                        "const": "month",
+                        "type": "string"
+                      },
+                      {
+                        "const": "second",
+                        "type": "string"
+                      },
+                      {
+                        "const": "gb-month",
+                        "type": "string"
+                      },
+                      {
+                        "const": "gb",
+                        "type": "string"
+                      },
+                      {
+                        "const": "transactions",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "unitPrice": {
+                    "maximum": 1000000000,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "unitQuantity": {
+                    "exclusiveMinimum": 0,
+                    "maximum": 1000000000,
+                    "type": "number"
+                  },
+                  "usageQuantity": {
+                    "maximum": 1000000000,
+                    "minimum": 0,
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "priceId",
+                  "meterId",
+                  "serviceName",
+                  "skuName",
+                  "region",
+                  "currency",
+                  "priceType",
+                  "unitDimension",
+                  "unitQuantity",
+                  "unitPrice",
+                  "usageQuantity",
+                  "projectedAmount",
+                  "commitment",
+                  "uncertainty"
+                ],
+                "type": "object"
+              },
+              "maxItems": 256,
+              "minItems": 1,
+              "type": "array"
+            },
+            "regionalUnavailable": {
+              "items": {
+                "maxLength": 32,
+                "pattern": "^[a-z][a-z0-9-]{1,31}$",
+                "type": "string"
+              },
+              "maxItems": 16,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "status": {
+              "const": "matched",
+              "type": "string"
+            },
+            "totalAmount": {
+              "maximum": 1000000000000,
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "status",
+            "records",
+            "totalAmount",
+            "paginationStatus"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "candidateIds": {
+              "items": {
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._()/-]{0,127}$",
+                "type": "string"
+              },
+              "maxItems": 32,
+              "minItems": 2,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "nextActionCode": {
+              "anyOf": [
+                {
+                  "const": "SELECT_CANDIDATE",
+                  "type": "string"
+                },
+                {
+                  "const": "RETRY_LATER",
+                  "type": "string"
+                },
+                {
+                  "const": "RETRY_WITH_ATTESTED_SOURCE",
+                  "type": "string"
+                },
+                {
+                  "const": "REFRESH_TOOL_BINDING",
+                  "type": "string"
+                },
+                {
+                  "const": "REQUEST_AUTHORIZATION",
+                  "type": "string"
+                }
+              ]
+            },
+            "reasonCode": {
+              "maxLength": 64,
+              "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+              "type": "string"
+            },
+            "status": {
+              "const": "ambiguous",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "reasonCode",
+            "candidateIds",
+            "nextActionCode"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "attemptCount": {
+              "maximum": 16,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "nextActionCode": {
+              "anyOf": [
+                {
+                  "const": "SELECT_CANDIDATE",
+                  "type": "string"
+                },
+                {
+                  "const": "RETRY_LATER",
+                  "type": "string"
+                },
+                {
+                  "const": "RETRY_WITH_ATTESTED_SOURCE",
+                  "type": "string"
+                },
+                {
+                  "const": "REFRESH_TOOL_BINDING",
+                  "type": "string"
+                },
+                {
+                  "const": "REQUEST_AUTHORIZATION",
+                  "type": "string"
+                }
+              ]
+            },
+            "reasonCode": {
+              "anyOf": [
+                {
+                  "const": "NO_MATCH",
+                  "type": "string"
+                },
+                {
+                  "const": "THROTTLED",
+                  "type": "string"
+                },
+                {
+                  "const": "TIMEOUT",
+                  "type": "string"
+                },
+                {
+                  "const": "AUTHORIZATION_DENIED",
+                  "type": "string"
+                },
+                {
+                  "const": "TOOL_DRIFT",
+                  "type": "string"
+                },
+                {
+                  "const": "MALFORMED_SOURCE",
+                  "type": "string"
+                },
+                {
+                  "const": "NEGOTIATED_PRICE_UNAVAILABLE",
+                  "type": "string"
+                }
+              ]
+            },
+            "retryAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "status": {
+              "const": "unavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "reasonCode",
+            "attemptCount",
+            "nextActionCode"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "runId": {
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+      "type": "string"
+    },
+    "scenarioId": {
+      "anyOf": [
+        {
+          "const": "PRICING-001-retail",
+          "type": "string"
+        },
+        {
+          "const": "PRICING-002-meter-aware",
+          "type": "string"
+        },
+        {
+          "const": "PRICING-003-bulk",
+          "type": "string"
+        },
+        {
+          "const": "PRICING-004-regional",
+          "type": "string"
+        },
+        {
+          "const": "PRICING-005-commitments",
+          "type": "string"
+        },
+        {
+          "const": "PRICING-006-negotiated",
+          "type": "string"
+        },
+        {
+          "const": "PRICING-007-ambiguity",
+          "type": "string"
+        },
+        {
+          "const": "PRICING-008-uncertainty",
+          "type": "string"
+        },
+        {
+          "const": "PRICING-009-throttling",
+          "type": "string"
+        },
+        {
+          "const": "PRICING-010-provenance",
+          "type": "string"
+        }
+      ]
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "runId",
+    "scenarioId",
+    "requestId",
+    "requestHash",
+    "evidenceId",
+    "provenance",
+    "collectedAt",
+    "expiresAt",
+    "result",
+    "qualifiesGate"
+  ],
+  "type": "object"
+}
