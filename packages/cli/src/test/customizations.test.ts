@@ -43,7 +43,9 @@ test("init installs bundled customizations and runtime config by default", async
   const root = await tempRoot();
   const service = new ApexService(root);
   await service.init({ projectId: "demo" });
-  assert.match(await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8"), /name: APEX/);
+  const coordinatorAgent = await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8");
+  assert.match(coordinatorAgent, /name: APEX/u);
+  assert.match(coordinatorAgent, /target: vscode/u);
   assert.deepEqual(JSON.parse(await readFile(join(root, ".vscode", "mcp.json"), "utf8")), {
     servers: {
       apex: {
@@ -115,6 +117,7 @@ test("init installs only the selected Copilot CLI projection and records it in t
   await assert.rejects(readFile(join(root, ".vscode", "mcp.json"), "utf8"), /ENOENT/u);
   assert.match(await readFile(join(root, ".github", "mcp.json"), "utf8"), /"recordInput"/u);
   const requirementsAgent = await readFile(join(root, ".github", "agents", "apex-requirements.agent.md"), "utf8");
+  assert.match(requirementsAgent, /target: github-copilot/u);
   assert.match(requirementsAgent, /model: Claude Sonnet 5/u);
   assert.match(requirementsAgent, /- ask_user/u);
   assert.match(requirementsAgent, /- task/u);

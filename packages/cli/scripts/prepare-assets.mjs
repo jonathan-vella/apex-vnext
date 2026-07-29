@@ -11,7 +11,7 @@ const repositoryRoot = resolve(packageRoot, "../..");
 const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
-const CLIENT_ADAPTER_VERSION = "1.0.0";
+const CLIENT_ADAPTER_VERSION = "1.1.0";
 
 function bytewise(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -54,6 +54,7 @@ function serializeAgent(frontmatter, mechanics, body) {
 
 export function renderClientAgentProjection(source, clientId, toolInventory, options = {}) {
   const { frontmatter, body } = parseAgentSource(source);
+  if ("target" in frontmatter) throw new Error("Shared agent source must not declare target");
   if (clientId === "github-copilot-vscode") {
     const mechanics = [
       Array.isArray(frontmatter.tools) && frontmatter.tools.includes("vscode/askQuestions")
@@ -64,7 +65,7 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
         : null,
     ].filter(Boolean);
     return serializeAgent(
-      frontmatter,
+      { ...frontmatter, target: "vscode" },
       mechanics.length === 0 ? "" : `## Client Mechanics\n\n${mechanics.join(" ")}\n\n`,
       body,
     );
@@ -98,6 +99,7 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
   const cliFrontmatter = {
     name: frontmatter.name,
     description: frontmatter.description,
+    target: "github-copilot",
     model,
     "user-invocable": frontmatter["user-invocable"] ?? true,
     "disable-model-invocation": frontmatter["disable-model-invocation"] ?? frontmatter["user-invocable"] === false,
@@ -254,7 +256,12 @@ export function validateClientProjectionDeclarations(customizationManifest) {
         typeof role !== "object" ||
         typeof role.id !== "string" ||
         !safeRelativePath(role.source) ||
-        typeof role.agent !== "string",
+        typeof role.agent !== "string" ||
+        !Array.isArray(role.supportedTargets) ||
+        role.supportedTargets.length !== 2 ||
+        new Set(role.supportedTargets).size !== 2 ||
+        !role.supportedTargets.includes("vscode") ||
+        !role.supportedTargets.includes("github-copilot"),
     ) ||
     roles.length !== new Set(roles.map(({ id }) => id)).size ||
     roles.length !== new Set(roles.map(({ source }) => source)).size ||

@@ -8,7 +8,8 @@ applyTo: "customizations/.github/agents/**/*.agent.md, .github/prompts/**/*.prom
 ## Ownership
 
 - `customizations/.github/agents/` contains the only active APEX custom agents.
-- `customizations/manifest.json` owns roles, models, interaction types, cost tiers, and invocation edges.
+- `customizations/manifest.json` owns roles, supported targets, models, interaction types, cost tiers, and invocation
+  edges.
 - Agent frontmatter is executable configuration and must match the corresponding manifest role.
 - `config/workflow.v1.json` and the kernel own workflow state, routing, gates, and authorization.
 - `.archive/legacy-agents-v0.10/` is historical evidence and must never be added to VS Code discovery settings.
@@ -18,6 +19,8 @@ applyTo: "customizations/.github/agents/**/*.agent.md, .github/prompts/**/*.prom
 Every managed `.agent.md` file must use valid YAML frontmatter with:
 
 - `name`, `description`, `argument-hint`, `model`, `user-invocable`, `tools`, and `agents`.
+- No `target`; shared sources support every manifest-declared client, and the asset renderer adds the explicit target to
+  each selected-client projection.
 - `handoffs` only for direct interactive transitions.
 - `user-invocable: true` for the coordinator and interactive specialists.
 - `user-invocable: false` for hidden workers.
@@ -65,5 +68,5 @@ npm run validate:vnext
 npm run validate:all
 ```
 
-After changing managed agent files, verify a clean consumer install and supported VS Code discovery before making release
-claims.
+After changing managed agent files, verify clean consumer installs and discovery in every supported client before making
+release claims.

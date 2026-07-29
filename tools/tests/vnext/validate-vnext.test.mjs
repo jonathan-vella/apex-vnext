@@ -64,6 +64,20 @@ test("rejects askQuestions on an autonomous subagent", () => {
   assert.ok(hasRule(result, "customization.subagent-questions"));
 });
 
+test("rejects target declarations in shared managed agent sources", () => {
+  const result = mutate((model) => {
+    model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX").frontmatter.target = "vscode";
+  });
+  assert.ok(hasRule(result, "customization.source-target"));
+});
+
+test("rejects incomplete managed role target support", () => {
+  const result = mutate((model) => {
+    model.customization.manifest.roles[0].supportedTargets.pop();
+  });
+  assert.ok(hasRule(result, "customization.schema"));
+});
+
 test("rejects a missing MCP tool", () => {
   const result = mutate((model) => {
     model.mcpTools = model.mcpTools.filter((tool) => tool !== "status");

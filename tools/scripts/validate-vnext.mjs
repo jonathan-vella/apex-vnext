@@ -673,6 +673,13 @@ function validateCustomizations(model, findings) {
       typeof frontmatter["user-invocable"] !== "boolean"
     )
       finding(findings, "customization.frontmatter", `${agent.path} has incomplete frontmatter`, agent.path);
+    if (frontmatter && "target" in frontmatter)
+      finding(
+        findings,
+        "customization.source-target",
+        `${agent.path} must omit target because it is shared by both client projections`,
+        agent.path,
+      );
     if (!role)
       finding(findings, "customization.role-reference", `${name} has no manifest role`, "customizations/manifest.json");
     if (role && (!array(frontmatter.model).includes(role.model) || !(role.costTier in COST_TIERS)))
@@ -721,6 +728,20 @@ function validateCustomizations(model, findings) {
   }
 
   const declaredEdges = array(customization.manifest.invocationEdges);
+  const vscodeRoot = path.join(model.root, "packages", "cli", "assets", "client-projections", "github-copilot-vscode");
+  const vscodeAgents = walk(path.join(vscodeRoot, ".github", "agents"), (file) => file.endsWith(".agent.md"));
+  for (const file of vscodeAgents) {
+    const relativePath = relative(vscodeRoot, file);
+    const frontmatter = yaml.load(readFileSync(file, "utf8").match(/^---\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? "");
+    if (frontmatter?.target !== "vscode") {
+      finding(
+        findings,
+        "customization.vscode-agent-target",
+        `${relativePath} must declare target: vscode`,
+        relativePath,
+      );
+    }
+  }
   const cliRoot = path.join(model.root, "packages", "cli", "assets", "client-projections", "github-copilot-cli");
   const cliAgents = walk(path.join(cliRoot, ".github", "agents"), (file) => file.endsWith(".agent.md"));
   for (const file of cliAgents) {
@@ -731,6 +752,7 @@ function validateCustomizations(model, findings) {
     if (
       !frontmatter ||
       typeof frontmatter !== "object" ||
+      frontmatter.target !== "github-copilot" ||
       Array.isArray(frontmatter.model) ||
       typeof frontmatter.model !== "string" ||
       "handoffs" in frontmatter ||
