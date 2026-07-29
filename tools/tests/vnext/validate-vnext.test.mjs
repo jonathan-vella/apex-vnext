@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   generateManagedFileHashInventory,
   loadRepositoryModel,
+  parseProjectionFrontmatter,
   validateRepositoryModel,
 } from "../../scripts/validate-vnext.mjs";
 
@@ -22,6 +23,21 @@ test("repository model satisfies vNext contracts", () => {
   const result = validateRepositoryModel(baseline);
   assert.deepEqual(result.findings, []);
   assert.ok(Object.values(generateManagedFileHashInventory(baseline)).every((hash) => /^[a-f0-9]{64}$/.test(hash)));
+});
+
+test("projection frontmatter parsing fails closed", () => {
+  assert.deepEqual(parseProjectionFrontmatter("body only"), {
+    frontmatter: null,
+    error: "missing YAML frontmatter",
+  });
+  assert.deepEqual(parseProjectionFrontmatter("---\ntools: [unterminated\n---\n"), {
+    frontmatter: null,
+    error: "malformed YAML frontmatter",
+  });
+  assert.deepEqual(parseProjectionFrontmatter("---\n- invalid\n---\n"), {
+    frontmatter: null,
+    error: "frontmatter must be a YAML object",
+  });
 });
 
 test("rejects CI lint before the vNext build", () => {

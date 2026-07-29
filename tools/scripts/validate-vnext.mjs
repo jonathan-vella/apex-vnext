@@ -161,6 +161,20 @@ export function parseFrontmatter(content) {
   return result;
 }
 
+export function parseProjectionFrontmatter(content) {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/u);
+  if (!match) return { frontmatter: null, error: "missing YAML frontmatter" };
+  try {
+    const frontmatter = yaml.load(match[1]);
+    if (frontmatter === null || typeof frontmatter !== "object" || Array.isArray(frontmatter)) {
+      return { frontmatter: null, error: "frontmatter must be a YAML object" };
+    }
+    return { frontmatter, error: null };
+  } catch {
+    return { frontmatter: null, error: "malformed YAML frontmatter" };
+  }
+}
+
 function parseMcpTools(source) {
   return [...source.matchAll(/registerTool\(\s*["']([^"']+)["']/g)].map((match) => match[1]);
 }
@@ -731,23 +745,33 @@ function validateCustomizations(model, findings) {
   const vscodeRoot = path.join(model.root, "packages", "cli", "assets", "client-projections", "github-copilot-vscode");
   const vscodeAgents = walk(path.join(vscodeRoot, ".github", "agents"), (file) => file.endsWith(".agent.md"));
   for (const file of vscodeAgents) {
-    const relativePath = relative(vscodeRoot, file);
-    const frontmatter = yaml.load(readFileSync(file, "utf8").match(/^---\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? "");
+    const projectionPath = relative(vscodeRoot, file);
+    const repositoryPath = relative(model.root, file);
+    const { frontmatter, error } = parseProjectionFrontmatter(readFileSync(file, "utf8"));
+    if (error) {
+      finding(findings, "customization.vscode-agent-frontmatter", `${repositoryPath}: ${error}`, repositoryPath);
+      continue;
+    }
     if (frontmatter?.target !== "vscode") {
       finding(
         findings,
         "customization.vscode-agent-target",
-        `${relativePath} must declare target: vscode`,
-        relativePath,
+        `${projectionPath} must declare target: vscode`,
+        repositoryPath,
       );
     }
   }
   const cliRoot = path.join(model.root, "packages", "cli", "assets", "client-projections", "github-copilot-cli");
   const cliAgents = walk(path.join(cliRoot, ".github", "agents"), (file) => file.endsWith(".agent.md"));
   for (const file of cliAgents) {
-    const relativePath = relative(cliRoot, file);
-    const frontmatter = yaml.load(readFileSync(file, "utf8").match(/^---\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? "");
-    const role = array(customization.manifest.roles).find(({ source }) => source === relativePath);
+    const projectionPath = relative(cliRoot, file);
+    const repositoryPath = relative(model.root, file);
+    const { frontmatter, error } = parseProjectionFrontmatter(readFileSync(file, "utf8"));
+    if (error) {
+      finding(findings, "customization.cli-agent-frontmatter", `${repositoryPath}: ${error}`, repositoryPath);
+      continue;
+    }
+    const role = array(customization.manifest.roles).find(({ source }) => source === projectionPath);
     const tools = array(frontmatter?.tools);
     if (
       !frontmatter ||
@@ -761,11 +785,16 @@ function validateCustomizations(model, findings) {
       tools.includes("vscode/askQuestions") ||
       role === undefined
     ) {
-      finding(findings, "customization.cli-agent", `${relativePath} is not a valid CLI agent projection`, relativePath);
+      finding(
+        findings,
+        "customization.cli-agent",
+        `${projectionPath} is not a valid CLI agent projection`,
+        repositoryPath,
+      );
       continue;
     }
     const interactive = role.interactionType === "interactive-handoff";
-    const sourceAgent = customization.agents.find(({ path: sourcePath }) => sourcePath === relativePath);
+    const sourceAgent = customization.agents.find(({ path: sourcePath }) => sourcePath === projectionPath);
     const expectedDisableModelInvocation = sourceAgent?.frontmatter?.["disable-model-invocation"] ?? !interactive;
     if (
       frontmatter["user-invocable"] !== interactive ||
@@ -775,8 +804,8 @@ function validateCustomizations(model, findings) {
       finding(
         findings,
         "customization.cli-authority",
-        `${relativePath} disagrees with its manifest interaction boundary`,
-        relativePath,
+        `${projectionPath} disagrees with its manifest interaction boundary`,
+        repositoryPath,
       );
     }
     const delegates = declaredEdges.some(({ from }) => from === role.agent);
@@ -784,8 +813,8 @@ function validateCustomizations(model, findings) {
       finding(
         findings,
         "customization.cli-delegation",
-        `${relativePath} task delegation disagrees with manifest edges`,
-        relativePath,
+        `${projectionPath} task delegation disagrees with manifest edges`,
+        repositoryPath,
       );
     }
   }
