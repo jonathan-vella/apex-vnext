@@ -44,7 +44,7 @@ preview, SVG for scalable / accessible / diff-friendly review.
 | 2    | `02-waf-scores.py/.png/.svg`                                                        |
 | 3    | `03-des-diagram.py/.png/.svg`, `03-des-cost-*.py/.png/.svg`                         |
 | 4    | `04-dependency-diagram.py/.png/.svg`, `04-runtime-diagram.py/.png/.svg`             |
-| 7    | `07-ab-diagram.py/.png/.svg`, `07-ab-cost-*.py/.png/.svg`, compliance outputs      |
+| 7    | `07-ab-diagram.py/.png/.svg`, `07-ab-cost-*.py/.png/.svg`, `07-ab-compliance-gaps.py/.png/.svg` |
 
 Suffix rules: `-des` for design (Step 3), `-ab` for as-built (Step 7).
 
