@@ -212,17 +212,27 @@
       "id": "pricing-evidence",
       "category": "runtime",
       "classification": "rewrite",
-      "canonicalOwner": "packages/contracts/src/evidence.ts",
+      "canonicalOwner": "packages/contracts/src/pricing.ts",
       "sourceRefs": [
-        "packages/contracts/src/evidence.ts",
+        "packages/contracts/src/pricing.ts",
+        "packages/contracts/schemas/pricing-*-v1.schema.json",
         "config/capability-packs.v1.json",
+        "tools/registry/pricing-parity-scenarios.v1.json",
+        "tools/registry/schemas/pricing-parity-scenarios.schema.json",
+        "tools/scripts/validate-pricing-parity.mjs",
+        "tools/tests/validate-pricing-parity.test.mjs",
         "tools/mcp-servers/azure-pricing/src/**/*.py"
       ],
       "consumers": ["architecture workflow", "cost evidence", "Gate 2 review", "release qualification"],
-      "proofCommands": ["npm run test:azure-pricing-mcp", "npm run test:vnext"],
+      "proofCommands": [
+        "npm run validate:pricing-parity",
+        "npm run test:pricing-parity",
+        "npm run test:azure-pricing-mcp",
+        "npm run test:vnext"
+      ],
       "removalGate": "Typed normalized ARM MCP evidence meets pricing parity, reliability, latency, determinism, security, and maintenance gates before the custom pack is archived.",
       "rationale": "Managed pricing trust should belong to versioned APEX evidence contracts, not raw upstream MCP output.",
-      "followUp": "Add pricing request and evidence contracts, a read-allowlisted ARM MCP adapter, and restricted raw-evidence attestation.",
+      "followUp": "Issue #162 freezes pricing request/evidence contracts and replacement parity. Add a read-allowlisted ARM MCP adapter and restricted raw-evidence attestation before measured replacement.",
       "decisionRef": "OWN-013"
     },
     {

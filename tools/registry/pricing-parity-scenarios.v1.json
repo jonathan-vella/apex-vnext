@@ -1,0 +1,105 @@
+{
+  "$schema": "schemas/pricing-parity-scenarios.schema.json",
+  "schemaVersion": "1.0.0",
+  "currentAuthority": "azure-pricing-mcp",
+  "replacementCandidate": "azure-resource-manager-mcp",
+  "scenarios": [
+    {
+      "id": "PRICING-001-retail",
+      "capability": "retail-lookup",
+      "sourceOwners": ["azure_price_search", "PricingService.search_prices"],
+      "expectedDisposition": "matched",
+      "requiredSemantics": ["currency", "meter-id", "pagination-status", "price-id", "price-type"],
+      "arithmeticPredicate": "unit-price-only",
+      "prohibitedFields": ["qualifiesGate", "rawPayload"]
+    },
+    {
+      "id": "PRICING-002-meter-aware",
+      "capability": "meter-aware-projection",
+      "sourceOwners": ["parse_unit_of_measure", "project_monthly_cost", "select_primary_meter"],
+      "expectedDisposition": "matched",
+      "requiredSemantics": ["meter-id", "unit-dimension", "unit-quantity", "usage-quantity"],
+      "arithmeticPredicate": "projected-amount-equals-unit-price-times-usage-over-unit-quantity",
+      "prohibitedFields": ["qualifiesGate", "rawPayload"]
+    },
+    {
+      "id": "PRICING-003-bulk",
+      "capability": "bulk-estimate",
+      "sourceOwners": ["BulkEstimateService.bulk_estimate", "azure_bulk_estimate"],
+      "expectedDisposition": "matched",
+      "requiredSemantics": ["deduplicated-specs", "line-items", "partial-failures", "reconciled-total"],
+      "arithmeticPredicate": "total-equals-line-item-sum",
+      "prohibitedFields": ["qualifiesGate", "rawPayload"]
+    },
+    {
+      "id": "PRICING-004-regional",
+      "capability": "regional-comparison",
+      "sourceOwners": ["PricingService.compare_prices", "PricingService.recommend_regions"],
+      "expectedDisposition": "matched",
+      "requiredSemantics": ["currency", "meter-id", "per-region-unavailability", "price-type", "sku"],
+      "arithmeticPredicate": "comparable-meter-basis",
+      "prohibitedFields": ["qualifiesGate", "rawPayload"]
+    },
+    {
+      "id": "PRICING-005-commitments",
+      "capability": "commitment-pricing",
+      "sourceOwners": ["PricingService.get_ri_pricing", "PricingService.estimate_costs"],
+      "expectedDisposition": "matched",
+      "requiredSemantics": ["commitment-kind", "term-months", "total-versus-hourly", "unit-price"],
+      "arithmeticPredicate": "commitment-term-bound",
+      "prohibitedFields": ["qualifiesGate", "rawPayload"]
+    },
+    {
+      "id": "PRICING-006-negotiated",
+      "capability": "negotiated-pricing",
+      "sourceOwners": ["CostManagement.price-sheet"],
+      "expectedDisposition": "unavailable",
+      "requiredSemantics": ["attested-price-sheet", "negotiated-price-unavailable", "source-digest"],
+      "arithmeticPredicate": "no-default-discount-substitution",
+      "prohibitedFields": ["defaultCustomerDiscount", "qualifiesGate", "rawPayload"]
+    },
+    {
+      "id": "PRICING-007-ambiguity",
+      "capability": "ambiguity",
+      "sourceOwners": ["PricingService.search_prices"],
+      "expectedDisposition": "ambiguous",
+      "requiredSemantics": ["candidate-ids", "next-action-code", "reason-code"],
+      "arithmeticPredicate": "no-first-result-selection",
+      "prohibitedFields": ["qualifiesGate", "rawPayload"]
+    },
+    {
+      "id": "PRICING-008-uncertainty",
+      "capability": "uncertainty",
+      "sourceOwners": ["project_monthly_cost", "test_meter_aware_projection"],
+      "expectedDisposition": "matched",
+      "requiredSemantics": ["confidence", "lower-amount", "reason-codes", "upper-amount"],
+      "arithmeticPredicate": "lower-less-than-or-equal-projected-less-than-or-equal-upper",
+      "prohibitedFields": ["qualifiesGate", "rawPayload", "warningProse"]
+    },
+    {
+      "id": "PRICING-009-throttling",
+      "capability": "throttling",
+      "sourceOwners": ["AzurePricingClient._request_with_retry"],
+      "expectedDisposition": "unavailable",
+      "requiredSemantics": ["attempt-count", "reason-throttled", "retry-at"],
+      "arithmeticPredicate": "no-stale-success-after-retry-exhaustion",
+      "prohibitedFields": ["qualifiesGate", "rawPayload"]
+    },
+    {
+      "id": "PRICING-010-provenance",
+      "capability": "provenance",
+      "sourceOwners": ["ARM-MCP.tools-list", "EvidenceManifestV1"],
+      "expectedDisposition": "matched",
+      "requiredSemantics": [
+        "collection-time",
+        "expiry",
+        "raw-source-digest",
+        "tool-version",
+        "toolchain-hash",
+        "tools-list-hash"
+      ],
+      "arithmeticPredicate": "content-capture-false",
+      "prohibitedFields": ["qualifiesGate", "rawPayload"]
+    }
+  ]
+}

@@ -149,6 +149,16 @@
     "maxBytes": 2097152,
     "sensitivity": "confidential"
   },
+  "https://schemas.apexops.dev/pricing-evidence-v1.json": {
+    "compatibility": "strict-v1",
+    "maxBytes": 524288,
+    "sensitivity": "restricted"
+  },
+  "https://schemas.apexops.dev/pricing-request-v1.json": {
+    "compatibility": "strict-v1",
+    "maxBytes": 65536,
+    "sensitivity": "confidential"
+  },
   "https://schemas.apexops.dev/project-config-v1.json": {
     "compatibility": "strict-v1",
     "maxBytes": 16384,

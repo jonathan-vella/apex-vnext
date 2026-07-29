@@ -194,6 +194,10 @@ lifecycle coverage. Issue #154 adds versioned normalized outcomes, scenario comp
 and fail-closed evidence-manifest binding. npm stays the sole package and installation authority; live client outcome
 parity remains pending.
 
+Issue #162 freezes the `OWN-013` pricing parity registry and strict request/evidence contracts. It binds typed money,
+meter, commitment, ambiguity, uncertainty, throttling, freshness, and content-free provenance semantics. The current
+Azure Pricing MCP remains authoritative until a later ARM adapter passes every measured replacement and denial gate.
+
 ## Removal And Change Gates
 
 Every surface has a specific gate in the machine-readable manifest. The common rule is stricter than "no references":
