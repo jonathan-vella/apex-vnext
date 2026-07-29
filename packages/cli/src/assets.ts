@@ -74,6 +74,12 @@ const PROJECTION_TARGETS: Readonly<Record<BundledClientProjection["id"], string>
 };
 const SHA256 = /^[a-f0-9]{64}$/u;
 
+function projectionTarget(clientId: string | undefined): string {
+  const target = PROJECTION_TARGETS[clientId as BundledClientProjection["id"]];
+  if (target === undefined) throw new Error(`Unsupported bundled client projection: ${clientId ?? "missing"}`);
+  return target;
+}
+
 function portablePath(path: string): string {
   return path.split(sep).join("/");
 }
@@ -394,15 +400,12 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
   for (const file of manifest.files.filter(
     ({ source }) => source.kind === "generated" && source.composition === "client-projections",
   )) {
+    const target = projectionTarget(file.source.clientId);
     const role = file.source.roleId === undefined ? undefined : roles.find(({ id }) => id === file.source.roleId);
     const canonical = sourceMetadata.get(`customizations/${file.source.sourcePath}`);
     if (
       (file.source.roleId !== undefined &&
-        (role === undefined ||
-          role.source !== file.source.sourcePath ||
-          !role.supportedTargets.includes(
-            PROJECTION_TARGETS[file.source.clientId as BundledClientProjection["id"]],
-          ))) ||
+        (role === undefined || role.source !== file.source.sourcePath || !role.supportedTargets.includes(target))) ||
       canonical?.source.kind !== "repository-file" ||
       canonical.sha256 !== file.source.sourceHash
     ) {
@@ -410,6 +413,7 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
     }
   }
   for (const declaration of declarations) {
+    const target = projectionTarget(declaration.id);
     const projection = manifest.projections.find(({ id }) => id === declaration.id);
     if (!Array.isArray(declaration.files) || declaration.files.length !== new Set(declaration.files).size) {
       throw new Error(`Bundled client projection disagrees with its declaration: ${declaration.id}`);
@@ -417,11 +421,7 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
     const expectedTargets = [
       ...sharedFiles,
       ...declaration.files,
-      ...roles
-        .filter(({ supportedTargets }) =>
-          supportedTargets.includes(PROJECTION_TARGETS[declaration.id as BundledClientProjection["id"]]),
-        )
-        .map(({ source }) => source),
+      ...roles.filter(({ supportedTargets }) => supportedTargets.includes(target)).map(({ source }) => source),
     ];
     const expected = expectedTargets.map((path) => `${declaration.generatedRoot}/${path}`).sort();
     if (
