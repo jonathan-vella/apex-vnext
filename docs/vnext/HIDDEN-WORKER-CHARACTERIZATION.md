@@ -94,11 +94,23 @@ Issue #180 must choose among these bounded options:
 The decision must include threat analysis, declared-parent success, undeclared-parent denial, tool/model preservation,
 typed outcome parity, exact client hashes, clean installation, and rollback proof.
 
+## Resolution
+
+ADR-0006 selects the fail-closed option. Autonomous workers are omitted from the Copilot CLI projection until an exact
+supported CLI independently enforces direct-selection hiding and declared-parent invocation. Exact official CLI
+`1.0.75` reproduced the `1.0.73` gap, so re-pinning did not resolve it. Generic tasks were rejected because they lose
+profile-bound model, tool, and role identity; directly selectable workers were rejected because the kernel does not
+authenticate the initiating client-agent profile.
+
+The manifest now owns target support per role. Generation, verification, installation, update, rollback, uninstall,
+and reinstall preserve worker absence for CLI while retaining workers for VS Code.
+
 ## Release Impact
 
-- `CLIENT-002`: unavailable for the current candidate because hidden-worker selection visibility is not equivalent.
-- `CLIENT-005`: blocked because current CLI workers are not task-callable and the callable variant is directly selectable.
+- `CLIENT-002`: CLI discovery must prove omitted workers are absent from files, locks, selection, and task catalogs.
+- `CLIENT-005`: unavailable for CLI while autonomous workers are omitted.
 - ADR-0005 remains Proposed.
+- ADR-0006 records the fail-closed worker boundary.
 - Paired client qualification and final cutover remain blocked.
 
 [vscode-custom-agents]: https://code.visualstudio.com/docs/agent-customization/custom-agents

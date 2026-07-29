@@ -69,7 +69,8 @@ fail-closed source, schema, generator, and projection validation without changin
 Issue #179 characterizes hidden-worker controls. The observed CLI accepted direct selection for every tested variant;
 workers disabled for model invocation were absent from the `task` catalog, while task-callable workers remained directly
 selectable. The CLI binary hash and installed VS Code version did not match the selected evidence inputs, so issue #180
-must resolve the architecture before paired qualification.
+must resolve the architecture before paired qualification. Issue #180 selects the fail-closed ADR-0006 boundary:
+autonomous workers are omitted from the CLI projection until an exact supported client can enforce both controls.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, direct read-only Azure Resource
 Manager MCP access, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement,
@@ -91,7 +92,7 @@ not full client-parity qualification. Direct ARM MCP discovery still requires pa
 | Guidance, Markdown, lint, hook, and workflow ownership                   | Milestone N complete; Milestone O context baseline captured            |
 | ARM MCP access and MCP retirements                                       | Direct access configured; custom pricing retired; Draw.io remains open |
 | Bundle composition mappings, aggregate lock, and client projections      | Target-aware generation implemented; live client proof remains pending |
-| Hidden-worker visibility and delegation                                  | CLI contract gap characterized; resolution required by issue #180      |
+| Hidden-worker visibility and delegation                                  | CLI workers omitted fail-closed under ADR-0006; qualification blocked  |
 | Normalized client outcome contracts, corpus, and deterministic harness   | Implemented; exact-candidate paired live execution remains pending     |
 | Pricing parity contracts and ARM MCP Cost/Pricing documentation          | Direct authority configured; paired live client checks remain pending  |
 | Diagram semantics and improvement-measurement changes                    | Semantics frozen; migration and improvement measurement remain pending |
@@ -111,7 +112,7 @@ not full client-parity qualification. Direct ARM MCP discovery still requires pa
 2. Return to issue #161 when interactive paired client execution and trusted receipt export are available.
 3. Run direct ARM MCP discovery and representative read calls in both supported interactive clients.
 4. Migrate active diagram consumers and qualify Python/Mermaid rendering before any Draw.io retirement.
-5. Resolve issue #180's Copilot CLI hidden-worker contract gap before paired client qualification.
+5. Requalify ADR-0006's omitted-worker boundary on the exact selected clients before paired qualification.
 6. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.
 
 ## Resume Pointer

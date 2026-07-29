@@ -103,7 +103,7 @@
       "source": ".github/agents/apex-codegen.agent.md",
       "agent": "APEX CodeGen",
       "role": "code-generation",
-      "supportedTargets": ["vscode", "github-copilot"],
+      "supportedTargets": ["vscode"],
       "interactionType": "autonomous-subagent",
       "model": "Claude Sonnet 5",
       "costTier": "standard"
@@ -113,7 +113,7 @@
       "source": ".github/agents/apex-reviewer.agent.md",
       "agent": "APEX Reviewer",
       "role": "review",
-      "supportedTargets": ["vscode", "github-copilot"],
+      "supportedTargets": ["vscode"],
       "interactionType": "autonomous-subagent",
       "model": "Claude Sonnet 5",
       "costTier": "standard"
@@ -123,7 +123,7 @@
       "source": ".github/agents/apex-validator.agent.md",
       "agent": "APEX Validator",
       "role": "validation",
-      "supportedTargets": ["vscode", "github-copilot"],
+      "supportedTargets": ["vscode"],
       "interactionType": "autonomous-subagent",
       "model": "Claude Sonnet 5",
       "costTier": "standard"

@@ -58,11 +58,11 @@ scenario. The collector derives content-free semantic receipts from the hash-lin
 each VS Code/CLI pair; and aggregate verification requires the exact comparison and outcome payload closure.
 Fixture evidence proves deterministic behavior only and always records `qualifiesRelease: false`.
 
-Issue #179 characterized hidden-worker controls without changing projections. In the observed Copilot CLI `1.0.73`
-binary, workers unavailable for direct model invocation were absent from the `task` catalog, while task-callable workers
-remained directly selectable. The binary hash did not match the selected artifact and the selected VS Code pair was
-unavailable, so this is non-release evidence. Issue #180 blocks `CLIENT-002` and `CLIENT-005` qualification until it
-selects and proves a supported worker architecture.
+Issue #179 characterized hidden-worker controls without changing projections. The observed Copilot CLI `1.0.73` binary
+and an exact official `1.0.75` release probe exposed the same gap: workers unavailable for model invocation were absent
+from the `task` catalog, while task-callable workers remained directly selectable. ADR-0006 therefore omits autonomous
+workers from the CLI projection. Interactive CLI discovery can satisfy its applicable `CLIENT-002` checks, but
+worker-dependent CLI execution and `CLIENT-005` remain unavailable pending exact-client support and requalification.
 
 Live evidence remains required for every scenario. Production live qualification requires the complete client evidence
 closure, binds it to the exact project and release candidate, and rejects fixture, partial, stale, substituted, duplicate,
@@ -77,7 +77,7 @@ VS Code and Copilot Chat versions.
 | `CLIENT-002` | Repository instructions, target-matched APEX agents, and APEX skills are discovered once with expected visibility. | Inspect workspace discovery, `target: vscode`, and agent/skill pickers. | Use `/env`, `/agent`, and `copilot plugins list --json`; verify `target: github-copilot` in the selected projection. |
 | `CLIENT-003` | Missing input yields the same kernel `needs_input` contract and one typed answer event.                            | Collect through `vscode/askQuestions`.                                  | Collect through interactive `ask_user`; programmatic mode cannot satisfy this scenario.                              |
 | `CLIENT-004` | Only the declared APEX MCP server and exact tool allowlist are available to managed APEX roles.                    | Inspect `.vscode/mcp.json`, startup state, and tool inventory.          | Inspect workspace `.github/mcp.json` or `.mcp.json` with `copilot mcp list --json`; folder trust is required.        |
-| `CLIENT-005` | Interactive specialists route directly; hidden workers stay non-user-invocable and return typed results.           | Exercise handoffs and hidden worker calls.                              | Exercise custom-agent selection and `task` delegation with visibility and tool boundaries.                           |
+| `CLIENT-005` | Interactive specialists route directly; hidden workers stay non-user-invocable and return typed results.           | Exercise handoffs and hidden worker calls.                              | Unavailable while autonomous workers are omitted; fail if a worker is selectable or appears in `task.agent_type`.    |
 | `CLIENT-006` | Gates 1-4, stale-state rejection, and unapproved-operation denials produce the same state and error codes.         | Submit decisions through APEX MCP from the managed client.              | Submit decisions through the same APEX MCP tools with explicit allow and deny rules.                                 |
 | `CLIENT-007` | Restart and resume recover the same journal head without conversation history.                                     | Restart VS Code and resume from repository state.                       | Use `/restart`, then `--resume` or `--continue` against repository state.                                            |
 | `CLIENT-008` | A second client is rejected while a writer lease is active; accepted transfer increments one owner epoch.          | Attempt and then accept the typed transfer from VS Code.                | Attempt and then accept the same typed transfer from Copilot CLI.                                                    |

@@ -51,7 +51,7 @@
           "role": { "type": "string", "minLength": 1 },
           "supportedTargets": {
             "type": "array",
-            "minItems": 2,
+            "minItems": 1,
             "maxItems": 2,
             "uniqueItems": true,
             "items": { "enum": ["vscode", "github-copilot"] }
