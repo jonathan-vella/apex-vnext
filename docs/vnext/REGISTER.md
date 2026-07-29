@@ -97,10 +97,10 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Type:** `RISK`
 - **Owner:** Azure capabilities
 - **Impact:** Authentication, tool-name, or response-shape drift could contaminate managed evidence or bypass policy.
-- **Evidence:** Issue #162 freezes parity and strict evidence contracts. Issue #166 characterizes stable Azure MCP
-  `2.0.5` and read-only `pricing_get`; it has no output schema, fixed host, or Cost Management/Billing/Budget tools.
+- **Evidence:** Issue #162 freezes parity and strict evidence contracts. Issue #169 binds the distinct Azure Resource
+  Manager MCP endpoint and its documented CostManagement/Pricing read and write tool inventory.
 - **Related issue:** [#164](https://github.com/jonathan-vella/apex-vnext/issues/164),
-  [#166](https://github.com/jonathan-vella/apex-vnext/issues/166)
+  [#169](https://github.com/jonathan-vella/apex-vnext/issues/169)
 - **Mitigation:** Use typed read-allowlisted adapters, normalize versioned fixtures, reject unknown tools and shapes,
   and keep native Azure and IaC paths authoritative for mutation.
 - **State:** Open
