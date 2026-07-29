@@ -39,7 +39,7 @@ Specify language after backticks. Never bare fences.
 Use the appropriate diagram skill for each output type:
 
 - **Standalone architecture diagrams** → `python-diagrams` skill (`.py` + `.png` + `.svg`)
-- **WAF/cost/compliance charts** → `python-diagrams` skill (`.py` + `.png`)
+- **WAF/cost/compliance charts** → `python-diagrams` skill (`.py` + `.png` + `.svg`)
 - **Inline markdown diagrams** → `mermaid` skill (fenced code blocks)
 
 > **Audience-specific guidance** — for human-authored documentation in
