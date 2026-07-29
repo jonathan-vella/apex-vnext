@@ -328,6 +328,13 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "test-diagram-semantics",
+      "script": "test:diagram-semantics",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "test-retired-automation",
       "script": "test:retired-automation",
       "profile": "node-test",
@@ -463,6 +470,13 @@
     {
       "id": "validate-arm-mcp-cost-pricing",
       "script": "validate:arm-mcp-cost-pricing",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-diagram-semantics",
+      "script": "validate:diagram-semantics",
       "profile": "node-validation",
       "aliases": [],
       "retirement": { "status": "active", "replacementIds": [] }
@@ -646,6 +660,8 @@
         "test:pricing-parity",
         "validate:arm-mcp-cost-pricing",
         "test:arm-mcp-cost-pricing",
+        "validate:diagram-semantics",
+        "test:diagram-semantics",
         "test:retired-automation",
         "validate:iac-security-baseline",
         "validate:policy-precheck",
@@ -728,6 +744,8 @@
         "test:pricing-parity",
         "validate:arm-mcp-cost-pricing",
         "test:arm-mcp-cost-pricing",
+        "validate:diagram-semantics",
+        "test:diagram-semantics",
         "test:retired-automation",
         "validate:policy-precheck",
         "lint:js:ci",

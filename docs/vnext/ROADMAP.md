@@ -289,9 +289,13 @@ unavailable to managed agents, typed arithmetic and meter semantics pass, and no
 
 **Dependency-complete slices:**
 
-1. Route inline flow, sequence, state, ER, and compact documentation diagrams to Mermaid.
+1. Route inline flow, sequence, state, ER, and compact documentation diagrams to Mermaid. Issue #168 freezes this route;
+   active consumers migrate later.
 2. Route standalone architecture, network, dependency, runtime, as-built, WAF, cost, and compliance outputs to Python.
+   Issue #168 freezes this route; active consumers migrate later.
 3. Generalize existing golden scenarios into format-neutral node, edge, zone, label, legend, and accessibility manifests.
+   Issue #168 implements explicit semantic coverage and reconciles three contradictory legacy fields: G3 routing, G5
+   management-group count, and G6 resource bounds.
 4. Update artifact contracts, templates, prompts, workflow manifests, validators, benchmarks, and Markdown consumers.
 5. Qualify editable source, deterministic rendering, semantic coverage, nonblank output, dimensions, clipping, overlap,
    labels, latency, security, and maintenance at the declared pack threshold.
