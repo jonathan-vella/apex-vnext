@@ -266,8 +266,10 @@ authority to agents.
 **Dependency-complete slices:**
 
 1. Freeze a parity matrix for retail, meter-aware projection, bulk estimates, regional comparison, commitments,
-   negotiated prices, ambiguity, uncertainty, throttling, and provenance.
-2. Add versioned pricing-request and pricing-evidence contracts.
+   negotiated prices, ambiguity, uncertainty, throttling, and provenance. Issue #162 implements this registry and its
+   mutation-tested validator.
+2. Add versioned pricing-request and pricing-evidence contracts. Issue #162 implements strict content-free schemas,
+   request/evidence identity binding, typed arithmetic, expiry, provenance, and non-gate dispositions.
 3. Implement a pinned-host ARM MCP client with exact Pricing and Cost Management read allowlists.
 4. Reject deployment, cancellation, budget creation, unknown, renamed, and write tools before transport.
 5. Add an operator collection and attestation path that keeps restricted raw evidence out of task context.

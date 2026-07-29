@@ -321,6 +321,13 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "test-pricing-parity",
+      "script": "test:pricing-parity",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "test-retired-automation",
       "script": "test:retired-automation",
       "profile": "node-test",
@@ -442,6 +449,13 @@
     {
       "id": "validate-client-outcomes",
       "script": "validate:client-outcomes",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "validate-pricing-parity",
+      "script": "validate:pricing-parity",
       "profile": "node-validation",
       "aliases": [],
       "retirement": { "status": "active", "replacementIds": [] }
@@ -621,6 +635,8 @@
         "test:client-context-samples",
         "validate:client-outcomes",
         "test:client-outcomes",
+        "validate:pricing-parity",
+        "test:pricing-parity",
         "test:retired-automation",
         "validate:iac-security-baseline",
         "validate:policy-precheck",
@@ -699,6 +715,8 @@
         "test:client-context-samples",
         "validate:client-outcomes",
         "test:client-outcomes",
+        "validate:pricing-parity",
+        "test:pricing-parity",
         "test:retired-automation",
         "validate:policy-precheck",
         "lint:js:ci",
