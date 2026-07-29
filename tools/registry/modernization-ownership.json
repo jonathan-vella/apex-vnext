@@ -219,14 +219,21 @@
         "config/capability-packs.v1.json",
         "tools/registry/pricing-parity-scenarios.v1.json",
         "tools/registry/schemas/pricing-parity-scenarios.schema.json",
+        "tools/registry/azure-mcp-pricing-characterization.v1.json",
+        "tools/registry/schemas/azure-mcp-pricing-characterization.schema.json",
+        "tools/registry/evidence/azure-mcp-2.0.5-*.json",
         "tools/scripts/validate-pricing-parity.mjs",
         "tools/tests/validate-pricing-parity.test.mjs",
+        "tools/scripts/validate-azure-mcp-pricing-characterization.mjs",
+        "tools/tests/validate-azure-mcp-pricing-characterization.test.mjs",
         "tools/mcp-servers/azure-pricing/src/**/*.py"
       ],
       "consumers": ["architecture workflow", "cost evidence", "Gate 2 review", "release qualification"],
       "proofCommands": [
         "npm run validate:pricing-parity",
         "npm run test:pricing-parity",
+        "npm run validate:azure-mcp-pricing-characterization",
+        "npm run test:azure-mcp-pricing-characterization",
         "npm run test:azure-pricing-mcp",
         "npm run test:vnext"
       ],
