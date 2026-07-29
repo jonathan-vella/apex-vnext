@@ -8,6 +8,8 @@ import {
   pinSourceRoot,
   readSourceFile,
   renderClientAgentProjection,
+  roleDelegatesOnClient,
+  roleSupportsClient,
   validateBundleDeclarations,
   validateClientProjectionDeclarations,
 } from "../../../packages/cli/scripts/prepare-assets.mjs";
@@ -140,13 +142,53 @@ test("asset generator rejects malformed and duplicate client projection declarat
       manifest.roles.push({ id: "other", source: ".github/agents/other.agent.md", agent: "APEX" });
     },
     (manifest) => {
-      manifest.roles[0].supportedTargets.pop();
+      manifest.roles[0].supportedTargets = [];
+    },
+    (manifest) => {
+      manifest.roles[0].supportedTargets = ["unsupported"];
     },
   ]) {
     const invalid = structuredClone(valid);
     mutate(invalid);
     assert.throws(() => validateClientProjectionDeclarations(invalid), /declarations are invalid/);
   }
+});
+
+test("asset generator accepts a role supported by only one client target", () => {
+  const manifest = {
+    sharedFiles: [".github/copilot-instructions.md"],
+    clientProjections: [
+      {
+        id: "github-copilot-vscode",
+        generatedRoot: "client-projections/github-copilot-vscode",
+        files: [".vscode/mcp.json"],
+      },
+      {
+        id: "github-copilot-cli",
+        generatedRoot: "client-projections/github-copilot-cli",
+        files: [".github/mcp.json"],
+      },
+    ],
+    roles: [
+      {
+        id: "validator",
+        source: ".github/agents/apex-validator.agent.md",
+        agent: "APEX Validator",
+        supportedTargets: ["vscode"],
+      },
+    ],
+  };
+  assert.deepEqual(validateClientProjectionDeclarations(manifest), manifest);
+  assert.equal(roleSupportsClient(manifest.roles[0], "github-copilot-vscode"), true);
+  assert.equal(roleSupportsClient(manifest.roles[0], "github-copilot-cli"), false);
+});
+
+test("delegation is enabled only when a destination is supported by the client", () => {
+  const parent = { agent: "APEX Planner", supportedTargets: ["vscode", "github-copilot"] };
+  const worker = { agent: "APEX CodeGen", supportedTargets: ["vscode"] };
+  const edges = [{ from: parent.agent, to: worker.agent, type: "subagent" }];
+  assert.equal(roleDelegatesOnClient(parent, "github-copilot-vscode", [parent, worker], edges), true);
+  assert.equal(roleDelegatesOnClient(parent, "github-copilot-cli", [parent, worker], edges), false);
 });
 
 test("asset generator renders client-valid Requirements projections from one shared body", () => {

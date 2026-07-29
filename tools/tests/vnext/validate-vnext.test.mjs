@@ -87,9 +87,9 @@ test("rejects target declarations in shared managed agent sources", () => {
   assert.ok(hasRule(result, "customization.source-target"));
 });
 
-test("rejects incomplete managed role target support", () => {
+test("rejects a managed role with no supported target", () => {
   const result = mutate((model) => {
-    model.customization.manifest.roles[0].supportedTargets.pop();
+    model.customization.manifest.roles[0].supportedTargets = [];
   });
   assert.ok(hasRule(result, "customization.schema"));
 });

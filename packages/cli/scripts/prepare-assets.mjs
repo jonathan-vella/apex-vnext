@@ -12,6 +12,10 @@ const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
 const CLIENT_ADAPTER_VERSION = "1.1.0";
+const PROJECTION_TARGETS = new Map([
+  ["github-copilot-vscode", "vscode"],
+  ["github-copilot-cli", "github-copilot"],
+]);
 
 function bytewise(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -258,10 +262,10 @@ export function validateClientProjectionDeclarations(customizationManifest) {
         !safeRelativePath(role.source) ||
         typeof role.agent !== "string" ||
         !Array.isArray(role.supportedTargets) ||
-        role.supportedTargets.length !== 2 ||
-        new Set(role.supportedTargets).size !== 2 ||
-        !role.supportedTargets.includes("vscode") ||
-        !role.supportedTargets.includes("github-copilot"),
+        role.supportedTargets.length === 0 ||
+        role.supportedTargets.length > PROJECTION_TARGETS.size ||
+        new Set(role.supportedTargets).size !== role.supportedTargets.length ||
+        role.supportedTargets.some((target) => ![...PROJECTION_TARGETS.values()].includes(target)),
     ) ||
     roles.length !== new Set(roles.map(({ id }) => id)).size ||
     roles.length !== new Set(roles.map(({ source }) => source)).size ||
@@ -270,6 +274,20 @@ export function validateClientProjectionDeclarations(customizationManifest) {
     throw new Error("Client projection declarations are invalid");
   }
   return { sharedFiles, clientProjections, roles };
+}
+
+export function roleSupportsClient(role, clientId) {
+  const projectionTarget = PROJECTION_TARGETS.get(clientId);
+  if (projectionTarget === undefined) throw new Error(`Unsupported client projection: ${clientId}`);
+  return role.supportedTargets.includes(projectionTarget);
+}
+
+export function roleDelegatesOnClient(role, clientId, roles, invocationEdges) {
+  return invocationEdges.some(
+    ({ from, to }) =>
+      from === role.agent &&
+      roles.some(({ agent, supportedTargets }) => roleSupportsClient({ supportedTargets }, clientId) && agent === to),
+  );
 }
 
 function validateCliToolInventory(value) {
@@ -343,10 +361,11 @@ async function prepareClientProjections(customizationManifest, pinnedCustomizati
       });
     }
     for (const role of roles) {
+      if (!roleSupportsClient(role, projection.id)) continue;
       const sourcePath = join(repositoryRoot, "customizations", role.source);
       const source = (await readSourceFile(pinnedCustomizations.resolvedRoot, sourcePath)).toString("utf8");
       const sourceHash = createHash("sha256").update(source).digest("hex");
-      const delegates = customizationManifest.invocationEdges.some(({ from }) => from === role.agent);
+      const delegates = roleDelegatesOnClient(role, projection.id, roles, customizationManifest.invocationEdges);
       const rendered = Buffer.from(
         renderClientAgentProjection(source, projection.id, toolInventory, { delegates }),
         "utf8",
