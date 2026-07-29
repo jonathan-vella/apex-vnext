@@ -200,6 +200,11 @@ must declare `target: vscode` or `target: github-copilot` and contain only clien
 retired-field rejection, hidden-worker invocation characterization, prompt tool-precedence checks, and paired discovery
 proof without creating agent-local MCP authority or claiming Copilot cloud-agent support.
 
+Issue #177 implements the first target-aware projection slice. Managed roles declare support for the VS Code and GitHub
+Copilot environments, shared source agents intentionally omit `target`, and generated projections emit one explicit
+environment target. Schema, generator, source, generated-output, installation, and mutation checks fail closed on drift;
+hidden-worker invocation semantics remain a separate characterization gate.
+
 Issue #168 freezes the `OWN-014` format-neutral semantic manifest against every existing golden scenario and makes
 Mermaid/Python routing explicit. The contract records bounded reconciliations where legacy aggregate metadata conflicts
 with named prompt semantics. Draw.io remains transitional; active workflow migration and measured rendering parity are

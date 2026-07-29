@@ -113,7 +113,14 @@ test("asset generator rejects malformed and duplicate client projection declarat
         files: [".github/mcp.json"],
       },
     ],
-    roles: [{ id: "coordinator", source: ".github/agents/apex.agent.md", agent: "APEX" }],
+    roles: [
+      {
+        id: "coordinator",
+        source: ".github/agents/apex.agent.md",
+        agent: "APEX",
+        supportedTargets: ["vscode", "github-copilot"],
+      },
+    ],
   };
   assert.deepEqual(validateClientProjectionDeclarations(valid), valid);
   for (const mutate of [
@@ -131,6 +138,9 @@ test("asset generator rejects malformed and duplicate client projection declarat
     },
     (manifest) => {
       manifest.roles.push({ id: "other", source: ".github/agents/other.agent.md", agent: "APEX" });
+    },
+    (manifest) => {
+      manifest.roles[0].supportedTargets.pop();
     },
   ]) {
     const invalid = structuredClone(valid);
@@ -167,17 +177,23 @@ Gather requirements through the kernel.
   const vscode = renderClientAgentProjection(source, "github-copilot-vscode");
   const cli = renderClientAgentProjection(source, "github-copilot-cli");
   assert.match(vscode, /vscode\/askQuestions/u);
+  assert.match(vscode, /target: vscode/u);
   assert.match(vscode, /handoffs:/u);
   assert.match(vscode, /agents:/u);
   assert.match(vscode, /model:\n\s+- Claude Sonnet 5/u);
   assert.match(cli, /\n\s+- ask_user/u);
   assert.match(cli, /\n\s+- task/u);
   assert.match(cli, /model: Claude Sonnet 5/u);
+  assert.match(cli, /target: github-copilot/u);
   assert.match(cli, /disable-model-invocation: false/u);
   assert.doesNotMatch(cli, /vscode\/askQuestions|handoffs:|agents:|argument-hint:/u);
   const marker = "<!-- apex-shared-body -->";
   assert.equal(vscode.slice(vscode.indexOf(marker)), cli.slice(cli.indexOf(marker)));
   assert.notEqual(vscode, cli);
+  assert.throws(
+    () => renderClientAgentProjection(source.replace("name:", "target: vscode\nname:"), "github-copilot-vscode"),
+    /must not declare target/u,
+  );
 });
 
 test("CLI projection keeps hidden workers noninteractive and rejects unpinned APEX operations", () => {
@@ -229,7 +245,14 @@ test("asset generator rejects unsafe projection roots before generation", () => 
         files: [".github/mcp.json"],
       },
     ],
-    roles: [{ id: "coordinator", source: ".github/agents/apex.agent.md", agent: "APEX" }],
+    roles: [
+      {
+        id: "coordinator",
+        source: ".github/agents/apex.agent.md",
+        agent: "APEX",
+        supportedTargets: ["vscode", "github-copilot"],
+      },
+    ],
   };
   for (const root of ["../escaped", "/absolute", "client-projections\\windows", "client-projections/../escape"]) {
     const invalid = structuredClone(base);
