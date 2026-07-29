@@ -51,7 +51,7 @@ Section templates and visual styling:
 
 ## Pricing Sources (Priority Order)
 
-1. Azure Pricing MCP (`azure_price_search`, `azure_cost_estimate`, `azure_bulk_estimate`)
+1. ARM MCP (`get_retail_prices`) with explicit meter matching and agent-side arithmetic
 2. Azure Pricing Calculator (manual validation)
 3. Azure Retail Prices API (programmatic)
 

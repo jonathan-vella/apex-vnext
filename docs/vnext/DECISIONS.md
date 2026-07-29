@@ -230,25 +230,23 @@ when a decision has lasting architectural consequences that need alternatives an
 - **Issue/PR:** [#162](https://github.com/jonathan-vella/apex-vnext/issues/162) freezes parity and evidence contracts;
   adapter implementation and qualification remain pending.
 
-## DECISION-014: Use A Typed ARM MCP Adapter For Managed Pricing
+## DECISION-014: Use Microsoft ARM MCP Directly For Managed Pricing
 
 - **Date:** 2026-07-21
 - **Owner:** Capabilities and architecture
-- **Context:** The custom Azure Pricing MCP duplicates pricing and cost-management capabilities now available from the
-  Azure Resource Manager MCP server, but APEX requires deterministic evidence and strict authority boundaries.
-- **Options:** Keep the custom server; let agents call ARM MCP directly; normalize ARM MCP output through an APEX-owned
-  typed adapter; remove pricing without replacement.
-- **Choice:** Replace managed pricing with an APEX-owned adapter that calls exact read-allowlisted ARM MCP Pricing and
-  Cost Management tools and emits typed, attested evidence. Permit optional direct read-only ARM MCP use for exploration,
-  but do not treat direct output as gate evidence.
-- **Rationale:** The adapter preserves source provenance, scope, freshness, deterministic arithmetic, redaction, and
-  fail-closed tool compatibility while reducing ownership of upstream Azure price and cost retrieval.
-- **Consequences:** Deployment, cancellation, budget creation, unknown, renamed, and write tools are rejected before
-  transport. The current pricing pack remains active until its declared reliability, latency, security, semantic parity,
-  and maintenance gates pass. Broader Resource Graph, deployment-observation, forecast, and price-sheet uses require
-  separate typed read adapters and qualification. ARM MCP never inherits Gate 4 or native IaC authority.
+- **Context:** The custom Azure Pricing MCP duplicates pricing and cost-management capabilities available from the
+  Microsoft-hosted Azure Resource Manager MCP server and creates avoidable transport, dependency, and test ownership.
+- **Options:** Keep the custom server; wrap ARM MCP in an APEX adapter; connect supported agents directly; remove pricing
+  without replacement.
+- **Choice:** Configure ARM MCP directly in VS Code and Copilot CLI and grant every managed agent the documented read-only
+  Cost Management and Pricing tools. Retire the custom Python pricing pack and do not build a replacement adapter.
+- **Rationale:** Microsoft owns endpoint transport, authentication, schemas, and capability evolution. APEX needs to own
+  workflow state, evidence acceptance, and gates, not duplicate an MCP client or upstream pricing implementation.
+- **Consequences:** Agent tool lists exclude deployment, cancellation, resource mutation, budget creation, pricesheet
+  operations, unknown, and renamed tools. Interactive clients perform delegated OAuth. GitHub cloud agents remain out of
+  scope while they lack OAuth-backed remote MCP support. ARM MCP never inherits Gate 4 or native IaC authority.
 - **ADR:** Required before implementation because this changes a release capability and external trust boundary.
-- **Issue/PR:** Pending work-item creation.
+- **Issue/PR:** [#164](https://github.com/jonathan-vella/apex-vnext/issues/164).
 
 ## DECISION-015: Retire Legacy MCP And Draw.io Surfaces Through Explicit Gates
 

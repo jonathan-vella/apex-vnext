@@ -111,12 +111,7 @@ function validatePythonSetupAction(text) {
     "set -euo pipefail",
     "python -m pip install --upgrade pip",
     "python -m pip install -e tools/apex-recall",
-    "python -m pip install -e 'tools/mcp-servers/azure-pricing[dev]'",
-    "python -m pip install pytest",
-    "python -m venv tools/mcp-servers/azure-pricing/.venv",
-    "tools/mcp-servers/azure-pricing/.venv/bin/python -m pip install --upgrade pip",
-    "tools/mcp-servers/azure-pricing/.venv/bin/python -m pip install \\",
-    "-e 'tools/mcp-servers/azure-pricing[admin,dev]'",
+    "python -m pip install pytest ruff",
   ];
   const actualInstall = String(install?.run ?? "")
     .split(/\r?\n/u)

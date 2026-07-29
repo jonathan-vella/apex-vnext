@@ -19,7 +19,7 @@ Fixes #
 - [ ] 🐛 Bug fix
 - [ ] 🔧 Refactoring (no functional changes)
 - [ ] ⚙️ Configuration/workflow change
-- [ ] 💰 MCP server enhancement (azure-pricing-mcp)
+- [ ] ARM MCP client or pricing contract change
 
 ## Token / latency impact (Plan 01 Phase 5)
 

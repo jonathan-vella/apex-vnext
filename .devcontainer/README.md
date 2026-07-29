@@ -34,7 +34,6 @@ with AI agents.
 | 5    | Git config and cache dirs      | `git config`, `mkdir`                                                        |
 | 6    | Python packages                | `uv pip install` — diagrams, matplotlib, pillow, checkov, ruff, pytest       |
 | 7    | PowerShell Az modules          | `Install-Module` — Accounts, Resources, Storage, Network, KeyVault, Websites |
-| 8    | Azure Pricing MCP Server       | Clean `.venv` rebuild + `pip install -e .[admin,dev]` (always, per policy)   |
 | 9.4  | TFLint v0.63.1                | GitHub release with SHA-256 verification                                     |
 | 9.5  | Terraform CLI hardening        | Ensures `TF_PLUGIN_CACHE_DIR` exists; `terraform version` smoke test         |
 | 10   | Python dependency verification | Validates imports against `requirements.txt`                                 |
@@ -51,7 +50,7 @@ graphviz, dos2unix, bats, uv
 
 | Server            | Transport         | Purpose                                          |
 | ----------------- | ----------------- | ------------------------------------------------ |
-| Azure Pricing MCP | stdio             | Real-time SKU pricing for cost estimates         |
+| ARM MCP           | http              | Microsoft-hosted Azure cost and pricing tools     |
 | GitHub MCP        | http              | Copilot-provided GitHub context                  |
 | Draw.io MCP       | stdio (Deno)      | Architecture diagram generation with Azure icons |
 | Azure MCP Server  | VS Code extension | RBAC-aware Azure context for agents              |
@@ -204,22 +203,12 @@ Runs once after container creation. Performs multi-step setup (npm, Python, Powe
 MCP servers, gitleaks, Git config, and tool verification). Output is logged to
 `~/.devcontainer-install.log`.
 
-> **Step 8 policy:** the Azure Pricing MCP venv is **always rebuilt from
-> scratch** in `post-create.sh` (not only on Python-minor drift). This guarantees
-> the venv matches the container's current Python and avoids stale, half-broken
-> pip state carrying over from a persisted workspace. The success message
-> always includes the rebuild reason — e.g. `(rebuilt: clean rebuild
-(post-create policy))` on a healthy container, or `(rebuilt: Python 3.13 →
-3.14 drift)` after a base-image Python bump. `post-start.sh` keeps the
-> conditional-rebuild path so day-to-day starts stay fast.
-
 ### `postStartCommand` — `post-start.sh`
 
 Runs on every container start. Lightweight updates only:
 
 | Tool                 | Method                                                                   |
 | -------------------- | ------------------------------------------------------------------------ |
-| Azure Pricing MCP    | `pip install -e .` in its venv                                           |
 | npm local deps       | Root and site `npm install`                                              |
 | Python packages      | `uv pip install --upgrade` (checkov, ruff, diagrams, matplotlib, pillow) |
 | apex-recall          | `uv pip install --upgrade -e`                                            |

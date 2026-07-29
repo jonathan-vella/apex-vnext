@@ -6,10 +6,10 @@ function validConfig() {
   return {
     servers: {
       github: { type: "http", url: "https://api.githubcopilot.com/mcp/" },
-      "azure-pricing": {
-        type: "stdio",
-        command: "python",
-        args: ["-m", "azure_pricing_mcp"],
+      "azure-resource-manager-mcp": {
+        type: "http",
+        url: "https://mcp.management.azure.com",
+        headers: { "x-mcp-toolset": "CostManagement,Pricing" },
       },
       drawio: {
         type: "stdio",
@@ -69,16 +69,36 @@ test("rejects Terraform MCP by key, executable, source, path, or toolset signatu
   }
 });
 
-test("preserves GitHub, Azure Pricing, and Draw.io requirements", () => {
+test("requires GitHub, Microsoft ARM MCP, and Draw.io", () => {
   const config = validConfig();
-  const azurePricing = structuredClone(config.servers["azure-pricing"]);
+  delete config.servers["azure-resource-manager-mcp"];
   delete config.servers.github;
   config.servers.drawio.command = "node";
   assert.deepEqual(validateMcpConfig(config), [
     "Missing required MCP server: servers.github",
+    "Missing required MCP server: servers.azure-resource-manager-mcp",
     'drawio command must be "deno", got "node"',
   ]);
-  assert.deepEqual(config.servers["azure-pricing"], azurePricing);
+});
+
+test("rejects ARM MCP endpoint or toolset drift and custom pricing reactivation", () => {
+  const wrongEndpoint = validConfig();
+  wrongEndpoint.servers["azure-resource-manager-mcp"].url = "https://example.invalid";
+  assert.deepEqual(validateMcpConfig(wrongEndpoint), [
+    "azure-resource-manager-mcp must use the managed endpoint: https://mcp.management.azure.com",
+  ]);
+
+  const wrongToolset = validConfig();
+  wrongToolset.servers["azure-resource-manager-mcp"].headers["x-mcp-toolset"] = "Pricing";
+  assert.deepEqual(validateMcpConfig(wrongToolset), [
+    "azure-resource-manager-mcp must enable x-mcp-toolset: CostManagement,Pricing",
+  ]);
+
+  const retired = validConfig();
+  retired.servers.legacy = { type: "stdio", command: "python", args: ["-m", "azure_pricing_mcp"] };
+  assert.deepEqual(validateMcpConfig(retired), [
+    "Retired custom Azure Pricing MCP server must not be active: servers.legacy",
+  ]);
 });
 
 test("malformed server maps fail without valid-server assumptions", () => {

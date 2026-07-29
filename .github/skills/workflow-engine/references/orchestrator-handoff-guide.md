@@ -216,5 +216,5 @@ multi-pass rotating lens reviews are opt-in for complex projects; cost-estimate-
 at Steps 2 and 7; the `azure-governance-discovery` skill runs at Step 3.5 (Governance agent).
 
 **Pricing Accuracy Gate (Steps 2 & 7)**: All prices must originate from
-`cost-estimate-subagent` (Codex + Azure Pricing MCP). Never write dollar
+`cost-estimate-subagent` (Codex + direct ARM MCP pricing). Never write dollar
 figures from parametric knowledge.

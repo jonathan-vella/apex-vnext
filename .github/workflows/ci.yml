@@ -96,12 +96,7 @@ jobs:
         uses: ./.github/actions/setup-python-validation
 
       - name: Lint Python (ruff)
-        # ruff ships via the azure-pricing[dev] extra installed above. Mirrors
-        # the pre-commit python-lint hook so format/lint drift cannot land on main.
         run: npm run lint:python
 
       - name: Run apex-recall test suite
         run: npm run test:apex-recall
-
-      - name: Run azure-pricing MCP test suite
-        run: npm run test:azure-pricing-mcp

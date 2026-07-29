@@ -7,6 +7,17 @@ user-invocable: false
 tools:
   - apex/taskContext
   - apex/completeTask
+  - azure-resource-manager-mcp/get_retail_prices
+  - azure-resource-manager-mcp/query_costs
+  - azure-resource-manager-mcp/query_aks_costs
+  - azure-resource-manager-mcp/forecast_costs
+  - azure-resource-manager-mcp/list_dimensions
+  - azure-resource-manager-mcp/list_budgets
+  - azure-resource-manager-mcp/get_budget
+  - azure-resource-manager-mcp/list_alerts
+  - azure-resource-manager-mcp/list_benefit_utilization
+  - azure-resource-manager-mcp/get_benefit_recommendations
+  - azure-resource-manager-mcp/list_reservation_transactions
 agents: []
 ---
 
@@ -22,8 +33,8 @@ Review one artifact against the criteria supplied in the kernel task envelope.
 
 ## Boundaries
 
-Do not ask the user, edit content, broaden the review, or invoke external tools. Do not infer current workflow state or
-accept risk on the user's behalf.
+Do not ask the user, edit content, or broaden the review. ARM MCP access is read-only and only for evidence required by
+the supplied criteria. Do not infer current workflow state or accept risk on the user's behalf.
 
 ## Output
 

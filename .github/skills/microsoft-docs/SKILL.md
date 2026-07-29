@@ -1,6 +1,6 @@
 ---
 name: microsoft-docs
-description: '**ANALYSIS SKILL** — Query official Microsoft documentation to understand concepts, find tutorials, and learn how services work. WHEN: "Microsoft Learn", "Azure docs", "quickstart guide", "limits and quotas", "WAF reference", "architecture pattern docs". DO NOT USE FOR: Azure pricing (use azure-pricing MCP).'
+description: '**ANALYSIS SKILL** — Query official Microsoft documentation to understand concepts, find tutorials, and learn how services work. WHEN: "Microsoft Learn", "Azure docs", "quickstart guide", "limits and quotas", "WAF reference", "architecture pattern docs". DO NOT USE FOR: Azure pricing (use ARM MCP get_retail_prices).'
 compatibility: Works through the Azure MCP `documentation` namespace (`mcp_azure-mcp_documentation`), which proxies the Microsoft Learn MCP backend at `https://learn.microsoft.com/api/mcp`. Can also use the `mslearn` CLI as a fallback.
 license: MIT
 metadata:
@@ -48,7 +48,7 @@ All operations go through the Azure MCP `documentation` router
 - **Search first, fetch second** — always start with `microsoft_docs_search`; only fetch the full page when the search excerpt is insufficient
 - **Be specific** — include version (`.NET 8`, `EF Core 8`), task intent (`quickstart`, `tutorial`, `overview`, `limits`), and platform (`Linux`, `Windows`) where relevant
 - **Live docs over training data** — prefer this skill over model knowledge for accuracy and freshness
-- **Out of scope** — Azure pricing (use Azure Pricing MCP directly)
+- **Out of scope** — Azure pricing (use ARM MCP `get_retail_prices` directly)
 - **Avoid loading entire docs trees** — fetch single pages
 - **CLI fallback** — when MCP server unavailable: `npx @microsoft/learn-cli search "..."`
 

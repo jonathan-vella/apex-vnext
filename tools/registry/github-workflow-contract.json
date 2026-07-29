@@ -23,7 +23,7 @@
   },
   "localActions": {
     ".github/actions/setup-node-repo/action.yml": "56966f1af2a2da0e0c3c51f8f160db41e55ae0bc756f0bb22b17480473d25139",
-    ".github/actions/setup-python-validation/action.yml": "0a3898e5a8a076e3dd480d6d47cb8d0e9cc794cba976a839ab35620616f96273"
+    ".github/actions/setup-python-validation/action.yml": "e458a774a10318bfbaec0f05929cf114a7fcbfdd161eff4a41f3e461ec64a812"
   },
   "workflows": [
     {
@@ -43,7 +43,7 @@
       "triggerDigest": "5c375602c9ef5d8ec711bfa7db1aaaf0484d84e8339627fa7f3bcb8de81edbb6",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "b3bd2f2041bc4b165e508aad8e34a7c2aea5d9a6684fef065c2b768310e97aae",
+      "jobsDigest": "9ee55750e40280687661c9292d8ea9163745cfd5669160d787edf335fd5b1411",
       "jobs": { "ci": "ci", "external-tests": "External Python tests (apex-recall + azure-pricing MCP)" }
     },
     {

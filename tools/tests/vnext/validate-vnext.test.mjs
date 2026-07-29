@@ -79,6 +79,23 @@ test("rejects a PATH-dependent MCP launch", () => {
   assert.ok(hasRule(result, "mcp.launch"));
 });
 
+test("rejects ARM MCP endpoint, toolset, and read allowlist drift", () => {
+  const endpointResult = mutate((model) => {
+    model.customization.vscodeMcp.servers["azure-resource-manager-mcp"].url = "https://example.invalid";
+  });
+  assert.ok(hasRule(endpointResult, "mcp.arm-launch"));
+
+  const toolsetResult = mutate((model) => {
+    model.customization.vscodeMcp.servers["azure-resource-manager-mcp"].headers["x-mcp-toolset"] = "Pricing";
+  });
+  assert.ok(hasRule(toolsetResult, "mcp.arm-launch"));
+
+  const allowlistResult = mutate((model) => {
+    model.customization.cliMcp.mcpServers["azure-resource-manager-mcp"].tools.push("create_budget");
+  });
+  assert.ok(hasRule(allowlistResult, "mcp.cli-arm-launch"));
+});
+
 test("rejects client projection declaration and CLI allowlist drift", () => {
   const projectionResult = mutate((model) => {
     model.customization.manifest.clientProjections.find(({ id }) => id === "github-copilot-vscode").files = [

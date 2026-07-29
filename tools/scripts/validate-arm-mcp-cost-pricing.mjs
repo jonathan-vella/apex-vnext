@@ -9,7 +9,7 @@ import addFormats from "ajv-formats";
 
 const REGISTRY_PATH = "tools/registry/arm-mcp-cost-pricing.v1.json";
 const SCHEMA_PATH = "tools/registry/schemas/arm-mcp-cost-pricing.schema.json";
-const EXPECTED_SHA256 = "f8b8a35169dd00b7beff6fe292eaffb842abe8d21a892b1e8f54aabf140c7785";
+const EXPECTED_SHA256 = "108006651fd445cc995f2aac1341237de04d761610936b5e96d5c2757a1e0659";
 const EXPECTED_COST_READ = [
   "query_costs",
   "query_aks_costs",
@@ -68,10 +68,11 @@ export function validateArmMcpCostPricing(registry, schema) {
       registry.qualification.documentationCharacterized !== true ||
       registry.qualification.authenticatedToolsListCaptured !== false ||
       registry.qualification.outputFixturesCaptured !== false ||
-      registry.qualification.adapterReady !== false ||
-      registry.qualification.managedAuthority !== false
+      registry.qualification.directClientConfigured !== true ||
+      registry.qualification.customAdapterRequired !== false ||
+      registry.qualification.customPricingServerRetired !== true
     ) {
-      errors.push("ARM MCP cost/pricing semantics or authority boundary drifted");
+      errors.push("ARM MCP cost/pricing semantics or direct-client boundary drifted");
     }
     return errors.sort();
   } catch {

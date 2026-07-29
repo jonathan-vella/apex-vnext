@@ -230,13 +230,6 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
-      "id": "test-azure-pricing-mcp",
-      "script": "test:azure-pricing-mcp",
-      "profile": "external-test",
-      "aliases": [],
-      "retirement": { "status": "active", "replacementIds": [] }
-    },
-    {
       "id": "test-classify-model",
       "script": "test:classify-model",
       "profile": "node-test",
@@ -753,8 +746,7 @@
         "lint:terraform-fmt",
         "lint:bicep-fmt",
         "validate:terraform",
-        "test:apex-recall",
-        "test:azure-pricing-mcp"
+        "test:apex-recall"
       ],
       "continueOnError": false,
       "epilogue": null
@@ -798,13 +790,6 @@
       "path": ".github/workflows/ci.yml",
       "name": "Run apex-recall test suite",
       "script": "test:apex-recall"
-    },
-    {
-      "id": "ci-pricing-tests",
-      "kind": "github-actions",
-      "path": ".github/workflows/ci.yml",
-      "name": "Run azure-pricing MCP test suite",
-      "script": "test:azure-pricing-mcp"
     },
     {
       "id": "docs-validation",

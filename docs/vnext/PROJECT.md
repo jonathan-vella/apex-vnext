@@ -5,8 +5,8 @@
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Default and integration branch:** `main`
 - **Characterization base:** `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`
-- **Active issue:** [#169](https://github.com/jonathan-vella/apex-vnext/issues/169) - ARM MCP product boundary
-- **Working branch:** `fix/169-arm-mcp-boundary`
+- **Active issue:** [#164](https://github.com/jonathan-vella/apex-vnext/issues/164) - direct ARM MCP pricing replacement
+- **Working branch:** `feat/164-arm-pricing-adapter`
 - **Release candidate:** None; all `0.10.0` release gates are reopened
 - **Source repository:** `jonathan-vella/apex`
 - **Frozen v1 source head:** `40d0f6147bbaf3e6a809ebd738bb6222509d9bd4`
@@ -59,32 +59,33 @@ context receipt into the exact canonical toolchain selection; paired live execut
 PR #158 closes issue #156. Issue #162 freezes normalized pricing replacement semantics and strict request/evidence
 contracts before any ARM MCP adapter or transport is implemented.
 PR #163 closes issue #162. PR #167 characterized the separate Azure MCP Server under an incorrect ARM MCP assumption.
-Issue #169 removes that unrelated surface from Milestone K and binds the actual ARM MCP endpoint and toolsets.
+Issue #169 removes that unrelated surface from Milestone K and binds the actual ARM MCP endpoint and toolsets. Issue #164
+switches the implementation from a custom adapter to direct supported-client MCP access and retires the Python pack.
 
-The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, typed Azure Resource Manager MCP
-evidence, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement, and an
-npm-generated customization bundle. Astro MCP is retired independently; Azure Pricing, Terraform, and Draw.io MCP
-dependencies retain their separate replacement gates.
+The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, direct read-only Azure Resource
+Manager MCP access, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement,
+and an npm-generated customization bundle. Astro, Terraform, and custom Azure Pricing MCP dependencies are retired;
+Draw.io retains its separate replacement gate.
 
 These are approved requirements, not live-parity claims. Copilot CLI `1.0.73`, VS Code `1.130.0`, and Copilot Chat
 `0.58.0` are selected exactly. The completed context matrix supplies version-selection provenance and a usage baseline,
-not full client-parity qualification. No ARM MCP version has been selected or qualified.
+not full client-parity qualification. Direct ARM MCP discovery still requires paired live client qualification.
 
 ## Evidence State
 
-| Evidence                                                                 | Disposition                                                              |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| PR #88 exact-head receipt for `8b3d9dbbb5beb8d6723c27da56cfd7144cb1cdf8` | Passing regression evidence for the archive change                       |
-| Prior exact candidate `25530c339410e9758ae34538427f24bddfd83e1d`         | Historical characterization for the earlier contract                     |
-| Prior VS Code, package, security, and live Azure results                 | Preserved in [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md)            |
-| VS Code `1.130.0`, Copilot Chat `0.58.0`, and CLI `1.0.73`               | Representative 12-cell context matrix complete                           |
-| Guidance, Markdown, lint, hook, and workflow ownership                   | Milestone N complete; Milestone O context baseline captured              |
-| ARM MCP adapters and MCP retirements                                     | Astro and Terraform retired; Azure Pricing and Draw.io gates remain open |
-| Bundle composition mappings, aggregate lock, and client projections      | Implemented; live client qualification remains pending                   |
-| Normalized client outcome contracts, corpus, and deterministic harness   | Implemented; exact-candidate paired live execution remains pending       |
-| Pricing parity contracts and ARM MCP Cost/Pricing documentation          | Contracts merged; endpoint/tools bound; protocol fixtures still pending  |
-| Diagram and improvement-measurement changes                              | Pending                                                                  |
-| Final deterministic, client, package, security, and live qualification   | Reopened                                                                 |
+| Evidence                                                                 | Disposition                                                            |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| PR #88 exact-head receipt for `8b3d9dbbb5beb8d6723c27da56cfd7144cb1cdf8` | Passing regression evidence for the archive change                     |
+| Prior exact candidate `25530c339410e9758ae34538427f24bddfd83e1d`         | Historical characterization for the earlier contract                   |
+| Prior VS Code, package, security, and live Azure results                 | Preserved in [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md)          |
+| VS Code `1.130.0`, Copilot Chat `0.58.0`, and CLI `1.0.73`               | Representative 12-cell context matrix complete                         |
+| Guidance, Markdown, lint, hook, and workflow ownership                   | Milestone N complete; Milestone O context baseline captured            |
+| ARM MCP access and MCP retirements                                       | Direct access configured; custom pricing retired; Draw.io remains open |
+| Bundle composition mappings, aggregate lock, and client projections      | Implemented; live client qualification remains pending                 |
+| Normalized client outcome contracts, corpus, and deterministic harness   | Implemented; exact-candidate paired live execution remains pending     |
+| Pricing parity contracts and ARM MCP Cost/Pricing documentation          | Direct authority configured; paired live client checks remain pending  |
+| Diagram and improvement-measurement changes                              | Pending                                                                |
+| Final deterministic, client, package, security, and live qualification   | Reopened                                                               |
 
 ## Release Boundaries
 
@@ -96,9 +97,9 @@ not full client-parity qualification. No ARM MCP version has been selected or qu
 
 ## Immediate Sequence
 
-1. Complete issue #169's ARM MCP product-boundary correction.
+1. Complete issue #164's direct ARM MCP configuration and custom pricing retirement.
 2. Return to issue #161 when interactive paired client execution and trusted receipt export are available.
-3. Capture authenticated ARM MCP tools/list and output fixtures for issue #164, then implement the bounded adapter.
+3. Run direct ARM MCP discovery and representative read calls in both supported interactive clients.
 4. Complete diagram routing, bounded improvement measurement, bundle generation, and guidance
    consolidation in roadmap order.
 5. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.

@@ -29,6 +29,26 @@
         "doctor",
         "submitEvidence"
       ]
+    },
+    "azure-resource-manager-mcp": {
+      "type": "http",
+      "url": "https://mcp.management.azure.com",
+      "headers": {
+        "x-mcp-toolset": "CostManagement,Pricing"
+      },
+      "tools": [
+        "get_retail_prices",
+        "query_costs",
+        "query_aks_costs",
+        "forecast_costs",
+        "list_dimensions",
+        "list_budgets",
+        "get_budget",
+        "list_alerts",
+        "list_benefit_utilization",
+        "get_benefit_recommendations",
+        "list_reservation_transactions"
+      ]
     }
   }
 }
