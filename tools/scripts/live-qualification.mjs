@@ -28,6 +28,7 @@ import {
 
 const ROOT = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const COMMAND_OPTIONS = {
+  candidate: new Set(["branch", "output", "package-lock", "release-manifest", "runtime-bundle"]),
   template: new Set([
     "actor",
     "branch",
@@ -57,7 +58,7 @@ const COMMAND_OPTIONS = {
 export function parseLiveQualificationArguments(argv) {
   const command = argv[0];
   const allowed = COMMAND_OPTIONS[command];
-  if (allowed === undefined) throw new Error("Command must be template, validate, or render");
+  if (allowed === undefined) throw new Error("Command must be candidate, template, validate, or render");
   const options = { command };
   for (let index = 1; index < argv.length; index += 2) {
     const argument = argv[index];
@@ -477,8 +478,8 @@ const required = (options, name) => {
   return value;
 };
 
-function gitValue(args) {
-  return execFileSync("git", args, { cwd: ROOT, encoding: "utf8" }).trim();
+function gitValue(args, root = ROOT) {
+  return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 }
 
 export function assertCleanGitStatus(status) {
@@ -543,21 +544,24 @@ export function assertReleaseManifest(manifest, commit, repository) {
   }
 }
 
-async function currentCandidate(options) {
-  const packageLockPath = resolve(options["package-lock"] ?? join(ROOT, "package-lock.json"));
-  const runtimeBundlePath = resolve(options["runtime-bundle"] ?? join(ROOT, "config", "runtime-bundle.v1.json"));
+export async function collectCurrentCandidate(
+  options,
+  { root = ROOT, read = readFile, git = (args) => gitValue(args, root) } = {},
+) {
+  const packageLockPath = resolve(options["package-lock"] ?? join(root, "package-lock.json"));
+  const runtimeBundlePath = resolve(options["runtime-bundle"] ?? join(root, "config", "runtime-bundle.v1.json"));
   const releaseManifestPath = resolve(required(options, "release-manifest"));
-  const packageMetadata = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8"));
+  const packageMetadata = JSON.parse(await read(join(root, "package.json"), "utf8"));
   const repository = packageMetadata.repository.url.replace(/^git\+/, "").replace(/\.git$/, "");
-  const detectedBranch = gitValue(["rev-parse", "--abbrev-ref", "HEAD"]);
+  const detectedBranch = git(["rev-parse", "--abbrev-ref", "HEAD"]);
   const branch = detectedBranch === "HEAD" ? required(options, "branch") : detectedBranch;
   if (options.branch !== undefined && options.branch !== branch)
     throw new Error(`--branch ${options.branch} does not match checked-out branch ${branch}`);
-  const commit = gitValue(["rev-parse", "HEAD"]);
-  const releaseManifestBytes = await readFile(releaseManifestPath);
-  const releaseManifest = JSON.parse(releaseManifestBytes.toString("utf8"));
+  const commit = git(["rev-parse", "HEAD"]);
+  const releaseManifestBytes = await read(releaseManifestPath);
+  const releaseManifest = parseStrictJson(releaseManifestBytes.toString("utf8"));
   const customizationAssetManifest = JSON.parse(
-    await readFile(join(ROOT, "packages", "cli", "assets", "manifest.json"), "utf8"),
+    await read(join(root, "packages", "cli", "assets", "manifest.json"), "utf8"),
   );
   if (!/^[0-9a-f]{64}$/.test(customizationAssetManifest?.lock?.digest ?? "")) {
     throw new Error("Generated customization asset lock is missing or invalid");
@@ -567,9 +571,9 @@ async function currentCandidate(options) {
     repository,
     branch,
     commit,
-    packageLockHash: sha256(await readFile(packageLockPath)),
+    packageLockHash: sha256(await read(packageLockPath)),
     releaseManifestHash: sha256(releaseManifestBytes),
-    runtimeBundleHash: sha256(await readFile(runtimeBundlePath)),
+    runtimeBundleHash: sha256(await read(runtimeBundlePath)),
     customizationBundleHash: customizationAssetManifest.lock.digest,
   };
 }
@@ -618,6 +622,12 @@ async function main() {
     return;
   }
   assertCleanGitStatus(gitValue(["status", "--porcelain"]));
+  if (options.command === "candidate") {
+    const contents = `${JSON.stringify(await collectCurrentCandidate(options), null, 2)}\n`;
+    if (options.output) await writeNewFiles([[resolve(options.output), contents]]);
+    else process.stdout.write(contents);
+    return;
+  }
   const dependencies = await loadDependencies();
   const evidenceManifestPath = resolve(required(options, "evidence-manifest"));
   if (options.command === "template") {
@@ -633,7 +643,7 @@ async function main() {
       scenarioIds: dependencies.scenarioIds,
       projectId: evidenceManifest.projectId,
       runId: evidenceManifest.runId,
-      candidate: await currentCandidate(options),
+      candidate: await collectCurrentCandidate(options),
       evidenceManifestHash: sha256(evidenceManifestBytes),
       createdAt,
       actor: required(options, "actor"),
@@ -655,7 +665,7 @@ async function main() {
   const evidencePayloads = await Promise.all(
     (options["evidence-file"] ?? []).map(async (path) => ({ path, bytes: await readFile(resolve(path)) })),
   );
-  const candidate = await currentCandidate(options);
+  const candidate = await collectCurrentCandidate(options);
   const findings = [
     ...validateLiveQualification(
       qualification.value,

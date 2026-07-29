@@ -24,6 +24,18 @@ npm run pack:vnext
 Create the template only from a clean Git worktree. The command rejects tracked or untracked files because they are not
 represented by the candidate commit.
 
+Before opening either client, generate the exact candidate receipt. This derives repository, branch, commit, package
+lock, release manifest, runtime bundle, and customization bundle bindings without creating scenario evidence:
+
+```bash
+npm run live:vnext -- candidate \
+  --release-manifest dist/vnext-packages/release-manifest.json \
+  --output dist/live-qualification/client-candidate.json
+```
+
+The command refuses to overwrite its output. On detached `HEAD`, pass `--branch` explicitly; on a named branch, a
+different `--branch` value is rejected. The receipt is preparation input only and does not qualify a client scenario.
+
 Candidate repository identity is immutable too. The release manifest must name the same repository as the package
 metadata, allowing equivalent HTTPS and SSH Git URL forms. For this release, the live launcher and workflow accept only
 `jonathan-vella/apex-vnext`; copying the workflow or a release manifest into another repository does not produce valid

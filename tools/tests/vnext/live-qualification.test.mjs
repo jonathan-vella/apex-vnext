@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import {
   LIVE_QUALIFICATION_SCENARIO_IDS,
@@ -10,6 +13,7 @@ import {
 import {
   assertCleanGitStatus,
   assertReleaseManifest,
+  collectCurrentCandidate,
   createEvidenceManifestTemplate,
   createLiveQualificationTemplate,
   parseLiveQualificationArguments,
@@ -82,6 +86,14 @@ function fixture() {
 }
 
 test("parses bounded live qualification commands", () => {
+  assert.deepEqual(
+    parseLiveQualificationArguments(["candidate", "--release-manifest", "release.json", "--output", "candidate.json"]),
+    {
+      command: "candidate",
+      "release-manifest": "release.json",
+      output: "candidate.json",
+    },
+  );
   assert.deepEqual(parseLiveQualificationArguments(["render", "--file", "qualification.json"]), {
     command: "render",
     file: "qualification.json",
@@ -94,6 +106,57 @@ test("parses bounded live qualification commands", () => {
     },
   );
   assert.throws(() => parseLiveQualificationArguments(["validate", "--unknown", "value"]), /Unknown/);
+});
+
+test("collects an exact candidate from bound repository inputs", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "apex-client-candidate-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const commit = "c".repeat(40);
+  const packageLock = Buffer.from('{"lockfileVersion":3}\n');
+  const runtimeBundle = Buffer.from('{"schemaVersion":"1.0.0"}\n');
+  const releaseBytes = Buffer.from(`${JSON.stringify({ ...releaseManifest, sourceCommit: commit })}\n`);
+  const customizationHash = "f".repeat(64);
+  await mkdir(join(root, "config"), { recursive: true });
+  await mkdir(join(root, "packages", "cli", "assets"), { recursive: true });
+  await writeFile(
+    join(root, "package.json"),
+    `${JSON.stringify({ repository: { url: "git+https://github.com/jonathan-vella/apex-vnext.git" } })}\n`,
+  );
+  await writeFile(join(root, "package-lock.json"), packageLock);
+  await writeFile(join(root, "config", "runtime-bundle.v1.json"), runtimeBundle);
+  await writeFile(join(root, "release.json"), releaseBytes);
+  await writeFile(
+    join(root, "packages", "cli", "assets", "manifest.json"),
+    `${JSON.stringify({ lock: { digest: customizationHash } })}\n`,
+  );
+  const git = (args) => (args.includes("--abbrev-ref") ? "main" : commit);
+  const candidate = await collectCurrentCandidate({ "release-manifest": join(root, "release.json") }, { root, git });
+  const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  assert.deepEqual(candidate, {
+    repository: "https://github.com/jonathan-vella/apex-vnext",
+    branch: "main",
+    commit,
+    packageLockHash: digest(packageLock),
+    releaseManifestHash: digest(releaseBytes),
+    runtimeBundleHash: digest(runtimeBundle),
+    customizationBundleHash: customizationHash,
+  });
+  await assert.rejects(
+    collectCurrentCandidate({ branch: "other", "release-manifest": join(root, "release.json") }, { root, git }),
+    /does not match checked-out branch/,
+  );
+  await assert.rejects(
+    collectCurrentCandidate(
+      { "release-manifest": join(root, "release.json") },
+      { root, git: (args) => (args.includes("--abbrev-ref") ? "HEAD" : commit) },
+    ),
+    /--branch is required/,
+  );
+  await writeFile(join(root, "release.json"), '{"version":1,"version":1}\n');
+  await assert.rejects(
+    collectCurrentCandidate({ "release-manifest": join(root, "release.json") }, { root, git }),
+    /DUPLICATE_JSON_KEY/,
+  );
 });
 
 test("requires clean source and a same-candidate release manifest", () => {

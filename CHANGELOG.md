@@ -45,6 +45,8 @@ prior qualification is retained as historical characterization. See
   paired-client qualification remains blocked pending the architecture decision in issue #180.
 - Selected a fail-closed Copilot CLI worker boundary: autonomous workers are generated only for VS Code, unsupported
   role/client pairs are omitted deterministically, and parent delegation tools require a supported destination.
+- Added exact client-qualification candidate receipt generation with clean-worktree, repository, branch, commit,
+  release-manifest, runtime-bundle, package-lock, and customization-bundle binding.
 - Added versioned kernel-owned input requests and typed APEX MCP answer recording bound to the exact journal head and
   writer epoch, with deterministic option validation, replay denial, transfer reissue, and no chat-history dependency.
 - Retired Terraform MCP after migrating active consumers to bounded Registry/native/documentation owners; removed its
