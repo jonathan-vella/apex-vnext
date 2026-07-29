@@ -62,7 +62,8 @@ PR #163 closes issue #162. PR #167 characterized the separate Azure MCP Server u
 Issue #169 removes that unrelated surface from Milestone K and binds the actual ARM MCP endpoint and toolsets. Issue #164
 switches the implementation from a custom adapter to direct supported-client MCP access and retires the Python pack.
 PR #171 closes issue #164. Issue #168 generalizes the existing Draw.io golden expectations into format-neutral semantics
-and freezes Mermaid/Python routing before active consumer migration.
+and freezes Mermaid/Python routing before active consumer migration. Issue #175 plans the managed custom-agent
+frontmatter and projection refresh against the current official `target` and environment-specific field contracts.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, direct read-only Azure Resource
 Manager MCP access, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement,
@@ -103,7 +104,8 @@ not full client-parity qualification. Direct ARM MCP discovery still requires pa
 2. Return to issue #161 when interactive paired client execution and trusted receipt export are available.
 3. Run direct ARM MCP discovery and representative read calls in both supported interactive clients.
 4. Migrate active diagram consumers and qualify Python/Mermaid rendering before any Draw.io retirement.
-5. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.
+5. Implement issue #175's target-aware agent projection and validation contract before paired client qualification.
+6. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.
 
 ## Resume Pointer
 
