@@ -49,6 +49,19 @@ test("known contradictory legacy fields are explicitly reconciled", () => {
   assert.deepEqual(registry.scenarios[5].resources, { minimum: 28, maximum: 32 });
 });
 
+test("required edge labels match exact slash-delimited segments", () => {
+  const drifted = mutate((value) => {
+    const sqlEdge = value.scenarios[0].edges.find((edge) => edge.label === "SQL");
+    sqlEdge.label = "NoSQL";
+  });
+
+  assert.ok(
+    validateDiagramSemantics(drifted, schema).includes(
+      "g1-three-tier-web: required edge label SQL has no semantic edge",
+    ),
+  );
+});
+
 test("legacy zones, edge labels, scope, pages, and resource bounds cannot drift", () => {
   for (const [field, replacement] of [
     ["zones", ["Unknown Zone"]],

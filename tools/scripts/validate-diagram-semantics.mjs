@@ -143,7 +143,7 @@ export function validateDiagramSemantics(registry, schema) {
       }
     }
     for (const label of scenario.edgeLabels) {
-      if (!scenario.edges.some((edge) => edge.label.includes(label))) {
+      if (!scenario.edges.some((edge) => edge.label.split("/").some((part) => part.trim() === label))) {
         errors.push(`${scenario.id}: required edge label ${label} has no semantic edge`);
       }
     }
