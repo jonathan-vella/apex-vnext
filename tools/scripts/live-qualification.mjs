@@ -1679,6 +1679,16 @@ export async function collectTransferEvidence(
   await assertJournalFiles(journalPath);
   const events = await journalFactory(journalPath).replay();
   if (events.length === 0 || events.length > 4096) throw new Error("Transfer journal event count is invalid");
+  if (events.some((event) => event.projectId !== projectId || event.runId !== runId)) {
+    throw new Error("Transfer journal identity does not match the selected project and run");
+  }
+  let previousOwnerEpoch = 0;
+  for (const event of events) {
+    if (!Number.isInteger(event.ownerEpoch) || event.ownerEpoch < 1 || event.ownerEpoch < previousOwnerEpoch) {
+      throw new Error("Transfer journal owner epochs must be positive non-decreasing integers");
+    }
+    previousOwnerEpoch = event.ownerEpoch;
+  }
   const requestedIndex = events.findLastIndex((event) => event.type === "transfer-requested");
   if (requestedIndex < 0) throw new Error("Transfer journal has no recognized request");
   const requested = events[requestedIndex];

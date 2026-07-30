@@ -711,6 +711,53 @@ test("transfer command refuses to overwrite an existing evidence file", async (c
   assert.equal(await readFile(output, "utf8"), "preserve\n");
 });
 
+test("writer transfer evidence rejects mixed identity and owner epoch drift", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "apex-transfer-journal-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const service = new ApexService(root);
+  const initialized = await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+  await service.createWriterTransfer({
+    repository: "owner/repository",
+    branch: "main",
+    commit: "candidate",
+    workflowId: "qualification.yml",
+    sender: "local",
+    recipient: "ci",
+    currentHead: "candidate",
+    ttlMs: 60_000,
+  });
+  const journalPath = join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal");
+  const events = await new EventJournal(journalPath).replay();
+  const request = events.find((event) => event.type === "transfer-requested");
+  assert.ok(request);
+
+  const mixedIdentity = structuredClone(request);
+  mixedIdentity.projectId = "other";
+  const { hash: _mixedHash, ...mixedContent } = mixedIdentity;
+  mixedIdentity.hash = sha256Json(mixedContent);
+  await writeFile(
+    join(journalPath, `${String(mixedIdentity.sequence).padStart(16, "0")}.json`),
+    `${JSON.stringify(mixedIdentity)}\n`,
+  );
+  await assert.rejects(
+    collectTransferEvidence({ workspace: "." }, { root }),
+    /Corrupt journal identity|journal identity does not match/,
+  );
+
+  mixedIdentity.projectId = "demo";
+  mixedIdentity.ownerEpoch = 0;
+  const { hash: _epochHash, ...epochContent } = mixedIdentity;
+  mixedIdentity.hash = sha256Json(epochContent);
+  await writeFile(
+    join(journalPath, `${String(mixedIdentity.sequence).padStart(16, "0")}.json`),
+    `${JSON.stringify(mixedIdentity)}\n`,
+  );
+  await assert.rejects(
+    collectTransferEvidence({ workspace: "." }, { root }),
+    /owner epochs must be positive non-decreasing/,
+  );
+});
+
 test("input command refuses to overwrite an existing evidence file", async (context) => {
   const root = await mkdtemp(join(tmpdir(), "apex-input-output-"));
   context.after(() => rm(root, { recursive: true, force: true }));
