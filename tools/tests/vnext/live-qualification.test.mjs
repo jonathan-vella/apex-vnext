@@ -25,6 +25,7 @@ import {
   collectWorkspacePreparation,
   collectRuntimeEvidence,
   collectRestartEvidence,
+  collectTransferEvidence,
   collectVscodeSurfaceEvidence,
   cleanupWorkspacePreparation,
   createEvidenceManifestTemplate,
@@ -183,6 +184,10 @@ test("parses bounded live qualification commands", () => {
   assert.deepEqual(
     parseLiveQualificationArguments(["restart", "--workspace", "consumer", "--output", "restart.json"]),
     { command: "restart", workspace: "consumer", output: "restart.json" },
+  );
+  assert.deepEqual(
+    parseLiveQualificationArguments(["transfer", "--workspace", "consumer", "--output", "transfer.json"]),
+    { command: "transfer", workspace: "consumer", output: "transfer.json" },
   );
   assert.deepEqual(
     parseLiveQualificationArguments([
@@ -536,6 +541,221 @@ test("restart command refuses to overwrite an existing evidence file", async (co
   assert.equal(result.status, 1);
   assert.match(result.stderr, /EEXIST|file already exists/u);
   assert.equal(await readFile(output, "utf8"), "preserve\n");
+});
+
+test("exports content-free pending and accepted writer transfer evidence", async (context) => {
+  for (const clientId of ["github-copilot-cli", "github-copilot-vscode"]) {
+    const root = await mkdtemp(join(tmpdir(), "apex-transfer-adapter-"));
+    context.after(() => rm(root, { recursive: true, force: true }));
+    const service = new ApexService(root);
+    await service.init({ projectId: "demo", clientId });
+    const created = await service.createWriterTransfer({
+      repository: "owner/repository",
+      branch: "main",
+      commit: "candidate",
+      workflowId: "qualification.yml",
+      sender: "local",
+      recipient: "ci",
+      currentHead: "candidate",
+      ttlMs: 60_000,
+    });
+    const pending = await collectTransferEvidence({ workspace: "." }, { root });
+    assert.equal(pending.status, "pending");
+    assert.equal(pending.client.id, clientId);
+    assert.equal(pending.source.claimHash, created.hash);
+    assert.equal(pending.qualifiesClientParity, false);
+    assert.equal(pending.qualifiesRelease, false);
+    assert.doesNotMatch(JSON.stringify(pending), /owner\/repository|qualification\.yml|"ci"/u);
+
+    await service.acceptWriterTransfer(created.hash, "ci", "candidate");
+    const accepted = await collectTransferEvidence({ workspace: "." }, { root });
+    assert.equal(accepted.status, "accepted");
+    assert.equal(accepted.source.acceptedOwnerEpoch, 2);
+    assert.match(accepted.source.ownershipDigest, /^[0-9a-f]{64}$/u);
+    assert.doesNotMatch(JSON.stringify(accepted), /owner\/repository|qualification\.yml|"ci"/u);
+    const { evidenceId, ...content } = accepted;
+    assert.equal(evidenceId, sha256Json(content));
+  }
+});
+
+test("writer transfer evidence rejects claim, ownership, and projection tampering", async (context) => {
+  const create = async (name) => {
+    const root = await mkdtemp(join(tmpdir(), `apex-transfer-${name}-`));
+    context.after(() => rm(root, { recursive: true, force: true }));
+    const service = new ApexService(root);
+    const initialized = await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+    const created = await service.createWriterTransfer({
+      repository: "owner/repository",
+      branch: "main",
+      commit: "candidate",
+      workflowId: "qualification.yml",
+      sender: "local",
+      recipient: "ci",
+      currentHead: "candidate",
+      ttlMs: 60_000,
+    });
+    return { root, service, initialized, created };
+  };
+
+  const claim = await create("claim");
+  const claimPath = join(
+    claim.root,
+    ".apex",
+    "projects",
+    "demo",
+    "runs",
+    claim.initialized.runId,
+    "transfers",
+    `${claim.created.hash}.json`,
+  );
+  await writeFile(claimPath, (await readFile(claimPath, "utf8")).replace('"recipient":"ci"', '"recipient":"eve"'));
+  await assert.rejects(collectTransferEvidence({ workspace: "." }, { root: claim.root }), /claim is invalid/);
+
+  const ownership = await create("ownership");
+  await ownership.service.acceptWriterTransfer(ownership.created.hash, "ci", "candidate");
+  const ownershipPath = join(
+    ownership.root,
+    ".apex",
+    "projects",
+    "demo",
+    "runs",
+    ownership.initialized.runId,
+    "ownership.json",
+  );
+  await writeFile(ownershipPath, (await readFile(ownershipPath, "utf8")).replace('"ownerId":"ci"', '"ownerId":"eve"'));
+  await assert.rejects(collectTransferEvidence({ workspace: "." }, { root: ownership.root }), /ownership is invalid/);
+
+  const runTamper = await create("run-tamper");
+  await runTamper.service.acceptWriterTransfer(runTamper.created.hash, "ci", "candidate");
+  const runPath = join(runTamper.root, ".apex", "projects", "demo", "runs", runTamper.initialized.runId, "run.json");
+  const run = JSON.parse(await readFile(runPath, "utf8"));
+  run.environment = "tampered";
+  await writeFile(runPath, `${JSON.stringify(run)}\n`);
+  await assert.rejects(
+    collectTransferEvidence({ workspace: "." }, { root: runTamper.root }),
+    /run does not match transfer state/,
+  );
+
+  const drift = await create("drift");
+  await writeFile(join(drift.root, ".github", "mcp.json"), "{}\n");
+  await assert.rejects(collectTransferEvidence({ workspace: "." }, { root: drift.root }), /managed files do not match/);
+
+  const malformedTerminal = await create("malformed-terminal");
+  const malformedJournal = new EventJournal(
+    join(malformedTerminal.root, ".apex", "projects", "demo", "runs", malformedTerminal.initialized.runId, "journal"),
+  );
+  await malformedJournal.append({
+    eventId: "malformed-accepted",
+    projectId: "demo",
+    runId: malformedTerminal.initialized.runId,
+    type: "transfer-accepted",
+    timestamp,
+    ownerEpoch: 2,
+    expectedHead: await malformedJournal.head(),
+    payload: { claimHash: malformedTerminal.created.hash, recipient: "ci" },
+  });
+  await assert.rejects(
+    collectTransferEvidence({ workspace: "." }, { root: malformedTerminal.root }),
+    /Accepted transfer event payload is invalid/,
+  );
+
+  const cancelled = await create("cancelled");
+  const cancelledJournal = new EventJournal(
+    join(cancelled.root, ".apex", "projects", "demo", "runs", cancelled.initialized.runId, "journal"),
+  );
+  await cancelledJournal.append({
+    eventId: "cancelled-transfer",
+    projectId: "demo",
+    runId: cancelled.initialized.runId,
+    type: "transfer-cancelled",
+    timestamp,
+    ownerEpoch: 1,
+    expectedHead: await cancelledJournal.head(),
+    payload: {
+      claimHash: cancelled.created.hash,
+      workflowRunId: 1,
+      failedCandidateCommit: "candidate",
+      reason: "failed-before-import",
+    },
+  });
+  await assert.rejects(
+    collectTransferEvidence({ workspace: "." }, { root: cancelled.root }),
+    /Latest writer transfer was cancelled/,
+  );
+});
+
+test("transfer command refuses to overwrite an existing evidence file", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "apex-transfer-output-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+  await service.createWriterTransfer({
+    repository: "owner/repository",
+    branch: "main",
+    commit: "candidate",
+    workflowId: "qualification.yml",
+    sender: "local",
+    recipient: "ci",
+    currentHead: "candidate",
+    ttlMs: 60_000,
+  });
+  const output = join(root, "existing.json");
+  await writeFile(output, "preserve\n");
+  const result = spawnSync(
+    process.execPath,
+    ["tools/scripts/live-qualification.mjs", "transfer", "--workspace", root, "--output", output],
+    { cwd: process.cwd(), encoding: "utf8", timeout: 30_000 },
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /EEXIST|file already exists/u);
+  assert.equal(await readFile(output, "utf8"), "preserve\n");
+});
+
+test("writer transfer evidence rejects mixed identity and owner epoch drift", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "apex-transfer-journal-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const service = new ApexService(root);
+  const initialized = await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+  await service.createWriterTransfer({
+    repository: "owner/repository",
+    branch: "main",
+    commit: "candidate",
+    workflowId: "qualification.yml",
+    sender: "local",
+    recipient: "ci",
+    currentHead: "candidate",
+    ttlMs: 60_000,
+  });
+  const journalPath = join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal");
+  const events = await new EventJournal(journalPath).replay();
+  const request = events.find((event) => event.type === "transfer-requested");
+  assert.ok(request);
+
+  const mixedIdentity = structuredClone(request);
+  mixedIdentity.projectId = "other";
+  const { hash: _mixedHash, ...mixedContent } = mixedIdentity;
+  mixedIdentity.hash = sha256Json(mixedContent);
+  await writeFile(
+    join(journalPath, `${String(mixedIdentity.sequence).padStart(16, "0")}.json`),
+    `${JSON.stringify(mixedIdentity)}\n`,
+  );
+  await assert.rejects(
+    collectTransferEvidence({ workspace: "." }, { root }),
+    /Corrupt journal identity|journal identity does not match/,
+  );
+
+  mixedIdentity.projectId = "demo";
+  mixedIdentity.ownerEpoch = 0;
+  const { hash: _epochHash, ...epochContent } = mixedIdentity;
+  mixedIdentity.hash = sha256Json(epochContent);
+  await writeFile(
+    join(journalPath, `${String(mixedIdentity.sequence).padStart(16, "0")}.json`),
+    `${JSON.stringify(mixedIdentity)}\n`,
+  );
+  await assert.rejects(
+    collectTransferEvidence({ workspace: "." }, { root }),
+    /owner epochs must be positive non-decreasing/,
+  );
 });
 
 test("input command refuses to overwrite an existing evidence file", async (context) => {
