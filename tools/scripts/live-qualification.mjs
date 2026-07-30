@@ -184,7 +184,12 @@ function defaultCliRunner(binary, args, workspace) {
 async function collectManagedProjection(workspace, expectedClientId, requiredFile, label) {
   const canonicalWorkspace = await realpath(workspace);
   const lockPath = join(workspace, ".apex", "customizations.lock.json");
-  const lockBytes = await readBoundedRegularFile(lockPath, MAX_MANAGED_FILE_BYTES, "Customization lock");
+  let lockBytes;
+  try {
+    lockBytes = await readBoundedRegularFile(lockPath, MAX_MANAGED_FILE_BYTES, `${label} customization lock`);
+  } catch (error) {
+    throw new Error(`${label} customization lock could not be read`, { cause: error });
+  }
   const lock = parseStrictJson(lockBytes.toString("utf8"));
   if (
     lock?.version !== 1 ||
@@ -205,7 +210,12 @@ async function collectManagedProjection(workspace, expectedClientId, requiredFil
     const destination = await managedPath(workspace, canonicalWorkspace, entry.path);
     if (managedDestinations.has(destination)) throw new Error(`${label} managed file destination is duplicated`);
     managedDestinations.add(destination);
-    const bytes = await readBoundedRegularFile(destination, MAX_MANAGED_FILE_BYTES, "Managed customization file");
+    let bytes;
+    try {
+      bytes = await readBoundedRegularFile(destination, MAX_MANAGED_FILE_BYTES, `${label} managed customization file`);
+    } catch (error) {
+      throw new Error(`${label} managed customization file could not be read`, { cause: error });
+    }
     const actualHash = sha256(bytes);
     files.push({
       path: entry.path,
@@ -357,6 +367,8 @@ export async function collectVscodeSurfaceEvidence(
     throw new Error("Selected VS Code toolchain is invalid");
   }
   const host = required(options, "host");
+  if (!isAbsolute(host)) throw new Error("VS Code host must be an absolute path");
+  await readBoundedRegularFile(host, MAX_CLI_BINARY_BYTES, "VS Code host");
   const versionOutput = runVscode(host, ["--version"], workspace);
   if (Buffer.byteLength(versionOutput) > MAX_CLI_OUTPUT_BYTES) throw new Error("VS Code version output is too large");
   const observedVersion = vscodeVersion(versionOutput);

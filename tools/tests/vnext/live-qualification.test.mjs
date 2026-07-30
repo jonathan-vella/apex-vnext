@@ -149,6 +149,7 @@ async function vscodeSurfaceFixture(context, { managedHash } = {}) {
   const managed = Buffer.from('{"servers":{}}\n');
   const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
   await mkdir(join(contractRoot, "config"), { recursive: true });
+  await mkdir(join(root, "bin"), { recursive: true });
   await mkdir(join(workspace, ".apex"), { recursive: true });
   await mkdir(join(workspace, ".vscode"), { recursive: true });
   await writeFile(
@@ -158,6 +159,7 @@ async function vscodeSurfaceFixture(context, { managedHash } = {}) {
     })}\n`,
   );
   await writeFile(join(workspace, ".vscode", "mcp.json"), managed);
+  await writeFile(join(root, "bin", "code"), "code-host");
   await writeFile(
     join(workspace, ".apex", "customizations.lock.json"),
     `${JSON.stringify({
@@ -175,14 +177,14 @@ async function vscodeSurfaceFixture(context, { managedHash } = {}) {
       ],
     })}\n`,
   );
-  return { root, contractRoot, workspace };
+  return { root, contractRoot, workspace, host: join(root, "bin", "code") };
 }
 
 test("exports exact VS Code host, Copilot Chat, and managed projection binding", async (context) => {
   const fixture = await vscodeSurfaceFixture(context);
   const calls = [];
   const exported = await collectVscodeSurfaceEvidence(
-    { workspace: "consumer", host: "/opt/code" },
+    { workspace: "consumer", host: fixture.host },
     {
       root: fixture.root,
       contractRoot: fixture.contractRoot,
@@ -205,7 +207,7 @@ test("exports exact VS Code host, Copilot Chat, and managed projection binding",
 test("VS Code surface binding emits specific unavailable client dispositions", async (context) => {
   const hostMismatchFixture = await vscodeSurfaceFixture(context);
   const hostMismatch = await collectVscodeSurfaceEvidence(
-    { workspace: "consumer", host: "/opt/code" },
+    { workspace: "consumer", host: hostMismatchFixture.host },
     {
       root: hostMismatchFixture.root,
       contractRoot: hostMismatchFixture.contractRoot,
@@ -216,7 +218,7 @@ test("VS Code surface binding emits specific unavailable client dispositions", a
 
   const missingFixture = await vscodeSurfaceFixture(context);
   const missing = await collectVscodeSurfaceEvidence(
-    { workspace: "consumer", host: "/opt/code" },
+    { workspace: "consumer", host: missingFixture.host },
     {
       root: missingFixture.root,
       contractRoot: missingFixture.contractRoot,
@@ -227,7 +229,7 @@ test("VS Code surface binding emits specific unavailable client dispositions", a
 
   const versionFixture = await vscodeSurfaceFixture(context);
   const versionMismatch = await collectVscodeSurfaceEvidence(
-    { workspace: "consumer", host: "/opt/code" },
+    { workspace: "consumer", host: versionFixture.host },
     {
       root: versionFixture.root,
       contractRoot: versionFixture.contractRoot,
@@ -240,7 +242,7 @@ test("VS Code surface binding emits specific unavailable client dispositions", a
 test("VS Code surface binding reports managed drift and rejects duplicate extensions", async (context) => {
   const driftFixture = await vscodeSurfaceFixture(context, { managedHash: "f".repeat(64) });
   const drift = await collectVscodeSurfaceEvidence(
-    { workspace: "consumer", host: "/opt/code" },
+    { workspace: "consumer", host: driftFixture.host },
     {
       root: driftFixture.root,
       contractRoot: driftFixture.contractRoot,
@@ -252,7 +254,7 @@ test("VS Code surface binding reports managed drift and rejects duplicate extens
   const duplicateFixture = await vscodeSurfaceFixture(context);
   await assert.rejects(
     collectVscodeSurfaceEvidence(
-      { workspace: "consumer", host: "/opt/code" },
+      { workspace: "consumer", host: duplicateFixture.host },
       {
         root: duplicateFixture.root,
         contractRoot: duplicateFixture.contractRoot,
@@ -263,6 +265,32 @@ test("VS Code surface binding reports managed drift and rejects duplicate extens
       },
     ),
     /extension inventory is invalid/,
+  );
+
+  await assert.rejects(
+    collectVscodeSurfaceEvidence(
+      { workspace: "consumer", host: "code" },
+      {
+        root: duplicateFixture.root,
+        contractRoot: duplicateFixture.contractRoot,
+        runVscode: () => "1.130.0\ncommit\nx64\n",
+      },
+    ),
+    /host must be an absolute path/,
+  );
+
+  await rm(join(duplicateFixture.workspace, ".apex", "customizations.lock.json"));
+  await assert.rejects(
+    collectVscodeSurfaceEvidence(
+      { workspace: "consumer", host: duplicateFixture.host },
+      {
+        root: duplicateFixture.root,
+        contractRoot: duplicateFixture.contractRoot,
+        runVscode: (_host, args) =>
+          args[0] === "--version" ? "1.130.0\ncommit\nx64\n" : "github.copilot-chat@0.58.0\n",
+      },
+    ),
+    /VS Code customization lock/,
   );
 });
 
