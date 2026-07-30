@@ -89,10 +89,10 @@ npm run live:vnext -- vscode \
 The adapter compares `code --version` and the `github.copilot-chat` entry from
 the bounded extension inventory with the selected toolchain, then verifies the
 VS Code customization lock and every managed file byte. It records only the
-host digest, Copilot Chat extension version, and command-output digests;
-unrelated extension names and lock source paths are not emitted. Host,
-missing-extension, or extension-version mismatches emit distinct `unavailable`
-results.
+selected and observed host versions, host digest, selected and observed Copilot
+Chat versions, and command-output digests. Unrelated extension names and lock
+source paths are not emitted. Host, missing-extension, or extension-version
+mismatches emit distinct `unavailable` results.
 
 This command does not open VS Code, invoke a model, inspect pickers or question
 panels, prove MCP startup, or establish restart/resume behavior. Those remain
