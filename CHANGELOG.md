@@ -63,6 +63,8 @@ prior qualification is retained as historical characterization. See
   post-rename verification; changed or unrelated data is preserved rather than recursively deleted.
 - Added content-free client input journal evidence for real pending and recorded requirements interactions, with exact
   selected-workspace, request supersession, owner epoch, and request-to-answer event binding.
+- Bound fresh CLI and VS Code input journal evidence into guided checkpoints and strict resume while keeping the
+  user-owned client interaction steps pending.
 - Added exact client-qualification candidate receipt generation with clean-worktree, repository, branch, commit,
   release-manifest, runtime-bundle, package-lock, and customization-bundle binding.
 - Added versioned kernel-owned input requests and typed APEX MCP answer recording bound to the exact journal head and

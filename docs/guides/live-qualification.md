@@ -193,12 +193,24 @@ APEX installs exactly one selected client projection per workspace; do not reuse
 paired observations.
 
 The composer does not ingest previously generated adapter JSON. It re-derives
-the candidate, runtime, CLI, VS Code, and lifecycle records, validates adapter
-identities, and binds them with canonical digests and a deterministic checkpoint
-ID. Client failure blocks interaction; unavailable clients block interaction
-until the named environment action is complete. Exact adapters produce explicit
-pending interactive checkpoints. CLIENT-009 is automated and no longer appears
-as an interactive wait.
+the candidate, runtime, CLI, VS Code, input-journal, and lifecycle records,
+validates adapter identities, and binds them with canonical digests and a
+deterministic checkpoint ID. Client failure blocks interaction; unavailable
+clients block interaction until the named environment action is complete. Exact
+adapters produce explicit pending interactive checkpoints. CLIENT-009 is
+automated and no longer appears as an interactive wait.
+
+For the CLI and VS Code input checkpoints, `kernelStatus` reports whether the
+bound journal is still `pending` or has a `recorded` answer event. The checkpoint
+status remains `pending` in both cases because journal evidence does not prove
+that the corresponding client UI interaction occurred. A newly recorded event
+changes the checkpoint ID and makes an older resume checkpoint stale.
+
+The central runtime adapter and the two prepared client workspaces intentionally
+use separate run identities. Each input run is bound through its workspace's
+persisted selection, exact qualification project/client identity, and the same
+customization-lock digest verified by that client's surface adapter. The
+composer must not require the three generated run IDs to be equal.
 
 The checkpoint never accepts assertions, marks scenarios passed, qualifies
 client parity, or qualifies a release. CLI `CLIENT-005` remains an explicit

@@ -620,6 +620,52 @@ function assertLifecycleAdapter(value) {
   }
 }
 
+function assertInputAdapter(value, clientId, projectId) {
+  const { evidenceId, ...content } = value ?? {};
+  const recorded = value?.status === "recorded";
+  const sourceKeys = recorded
+    ? "customizationLockSha256,eventCount,journalHead,managedFiles,recordedEventHash,recordedPayloadHash,requestEventHash,requestPayloadHash"
+    : "customizationLockSha256,eventCount,journalHead,managedFiles,requestEventHash,requestPayloadHash";
+  if (
+    value?.schemaVersion !== "1.0.0" ||
+    value.adapter !== "apex-client-input-journal-v1" ||
+    value?.client?.id !== clientId ||
+    value.projectId !== projectId ||
+    typeof value.runId !== "string" ||
+    !RUN_ID_PATTERN.test(value.runId) ||
+    !["pending", "recorded"].includes(value.status) ||
+    value?.interaction?.needsInput !== "observed" ||
+    value?.interaction?.typedAnswer !== (recorded ? "observed" : "pending") ||
+    value.qualifiesClientParity !== false ||
+    value.qualifiesRelease !== false ||
+    !SHA256_PATTERN.test(evidenceId ?? "") ||
+    evidenceId !== sha256Json(content) ||
+    Object.keys(value).sort().join(",") !==
+      "adapter,client,evidenceId,interaction,projectId,qualifiesClientParity,qualifiesRelease,runId,schemaVersion,source,status" ||
+    Object.keys(value.client ?? {})
+      .sort()
+      .join(",") !== "id" ||
+    Object.keys(value.interaction ?? {})
+      .sort()
+      .join(",") !== "needsInput,typedAnswer" ||
+    Object.keys(value.source ?? {})
+      .sort()
+      .join(",") !== sourceKeys ||
+    !SHA256_PATTERN.test(value.source?.customizationLockSha256 ?? "") ||
+    !Number.isInteger(value.source?.managedFiles) ||
+    value.source.managedFiles < 1 ||
+    value.source.managedFiles > 256 ||
+    !Number.isInteger(value.source?.eventCount) ||
+    value.source.eventCount < 1 ||
+    value.source.eventCount > 4096 ||
+    Object.entries(value.source).some(
+      ([key, item]) => key !== "eventCount" && key !== "managedFiles" && !SHA256_PATTERN.test(item ?? ""),
+    )
+  ) {
+    throw new Error(`Checkpoint adapter apex-client-input-journal-v1 for ${clientId} is invalid`);
+  }
+}
+
 function assertPreviousCheckpoint(previous, current) {
   if (
     previous?.schemaVersion !== "1.0.0" ||
@@ -644,6 +690,7 @@ export async function collectGuidedCheckpoint(
     collectRuntime = (input) => collectRuntimeEvidence(input, { root }),
     collectCli = (input) => collectCliSurfaceEvidence(input, { root }),
     collectVscode = (input) => collectVscodeSurfaceEvidence(input, { root }),
+    collectInput = (input) => collectClientInputEvidence(input, { root }),
     collectLifecycle = (input) => collectLifecycleEvidence(input),
     previousCheckpoint,
   } = {},
@@ -658,20 +705,32 @@ export async function collectGuidedCheckpoint(
     workspace: required(options, "vscode-workspace"),
     host: required(options, "vscode-host"),
   });
+  const cliInput = await collectInput({ workspace: required(options, "cli-workspace") });
+  const vscodeInput = await collectInput({ workspace: required(options, "vscode-workspace") });
   const lifecycle = await collectLifecycle({ root: required(options, "lifecycle-root") });
   assertCheckpointCandidate(candidate);
   assertCheckpointAdapter(runtime, "apex-runtime-journal-v1");
   assertCheckpointAdapter(cli, "copilot-cli-surface-v1", "github-copilot-cli");
   assertCheckpointAdapter(vscode, "vscode-surface-v1", "github-copilot-vscode");
+  assertInputAdapter(cliInput, "github-copilot-cli", "qualification-cli");
+  assertInputAdapter(vscodeInput, "github-copilot-vscode", "qualification-vscode");
   assertLifecycleAdapter(lifecycle);
   assertCheckpointContentFree(runtime);
   assertCheckpointContentFree(cli);
   assertCheckpointContentFree(vscode);
+  assertCheckpointContentFree(cliInput);
+  assertCheckpointContentFree(vscodeInput);
   assertCheckpointContentFree(lifecycle);
   if (runtime.projectId !== options.project || runtime.runId !== options.run) {
     throw new Error("Runtime adapter identity does not match the checkpoint request");
   }
-  const adapters = { runtime, cli, vscode, lifecycle };
+  if (
+    cliInput.source.customizationLockSha256 !== cli?.workspace?.lockSha256 ||
+    vscodeInput.source.customizationLockSha256 !== vscode?.workspace?.lockSha256
+  ) {
+    throw new Error("Input adapter customization lock does not match its client surface adapter");
+  }
+  const adapters = { runtime, cli, vscode, cliInput, vscodeInput, lifecycle };
   const adapterDigests = Object.fromEntries(
     Object.entries(adapters).map(([name, value]) => [name, adapterDigest(value)]),
   );
@@ -705,6 +764,11 @@ export async function collectGuidedCheckpoint(
       ...checkpoint,
       scenarioIds: [...checkpoint.scenarioIds],
       status: automationStatus === "ready" ? "pending" : "blocked",
+      ...(checkpoint.id === "cli-input"
+        ? { kernelStatus: cliInput.status }
+        : checkpoint.id === "vscode-input"
+          ? { kernelStatus: vscodeInput.status }
+          : {}),
     })),
   };
   const current = { ...checkpoint, checkpointId: sha256Json(checkpoint) };
