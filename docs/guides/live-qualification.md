@@ -113,6 +113,12 @@ npm run live:vnext -- checkpoint \
   --output dist/live-qualification/guided-checkpoint.json
 ```
 
+Use separate consumer workspaces because APEX installs exactly one selected
+client projection per workspace. Initialize `../qualification-cli` with
+`--client github-copilot-cli` and `../qualification-vscode` with
+`--client github-copilot-vscode`; do not reuse or switch one workspace between
+the paired observations.
+
 The composer does not ingest previously generated adapter JSON. It re-derives
 the candidate, runtime, CLI, and VS Code records, validates adapter identities,
 and binds them with canonical digests and a deterministic checkpoint ID. Client
