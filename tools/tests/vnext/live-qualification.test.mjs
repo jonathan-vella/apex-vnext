@@ -13,10 +13,12 @@ import {
 import { EventJournal, ObjectStore, sha256Json } from "../../../packages/kernel/dist/index.js";
 import {
   assertCleanGitStatus,
+  assertOutputOutsideLifecycleRoot,
   assertReleaseManifest,
   collectCliSurfaceEvidence,
   collectCurrentCandidate,
   collectGuidedCheckpoint,
+  collectLifecycleEvidence,
   collectRuntimeEvidence,
   collectVscodeSurfaceEvidence,
   createEvidenceManifestTemplate,
@@ -129,6 +131,8 @@ test("parses bounded live qualification commands", () => {
       "cli",
       "--cli-binary",
       "bin/copilot",
+      "--lifecycle-root",
+      "/tmp/lifecycle-run",
       "--vscode-workspace",
       "vscode",
       "--vscode-host",
@@ -145,6 +149,7 @@ test("parses bounded live qualification commands", () => {
       run: "run-1",
       "cli-workspace": "cli",
       "cli-binary": "bin/copilot",
+      "lifecycle-root": "/tmp/lifecycle-run",
       "vscode-workspace": "vscode",
       "vscode-host": "/opt/code",
       output: "checkpoint.json",
@@ -154,6 +159,10 @@ test("parses bounded live qualification commands", () => {
   assert.deepEqual(
     parseLiveQualificationArguments(["runtime", "--project", "demo", "--run", "run-1", "--output", "runtime.json"]),
     { command: "runtime", project: "demo", run: "run-1", output: "runtime.json" },
+  );
+  assert.deepEqual(
+    parseLiveQualificationArguments(["lifecycle", "--root", "/tmp/lifecycle", "--output", "lifecycle.json"]),
+    { command: "lifecycle", root: "/tmp/lifecycle", output: "lifecycle.json" },
   );
   assert.deepEqual(
     parseLiveQualificationArguments([
@@ -177,7 +186,137 @@ test("parses bounded live qualification commands", () => {
   assert.throws(() => parseLiveQualificationArguments(["validate", "--unknown", "value"]), /Unknown/);
 });
 
+function fakeLifecycleService(root, calls, failUpdate = false) {
+  let clientId;
+  const writeLock = async (stage) => {
+    await mkdir(join(root, ".apex"), { recursive: true });
+    await writeFile(
+      join(root, ".apex", "customizations.lock.json"),
+      `${JSON.stringify({
+        version: 1,
+        clientId,
+        files: [{ path: `${stage}.txt`, currentHash: hash }],
+        runtime: [],
+      })}\n`,
+    );
+  };
+  return {
+    async init(input) {
+      clientId = input.clientId;
+      calls.push(`${clientId}:init`);
+      await writeLock("init");
+    },
+    async update() {
+      calls.push(`${clientId}:update`);
+      if (failUpdate) throw new Error("injected lifecycle failure");
+      await writeLock("update");
+    },
+    async rollbackCustomizations() {
+      calls.push(`${clientId}:rollback`);
+      await writeLock("rollback");
+      return { restored: ["managed"], conflicts: [] };
+    },
+    async uninstallCustomizations() {
+      calls.push(`${clientId}:uninstall`);
+      await rm(join(root, ".apex", "customizations.lock.json"));
+      return { removed: ["managed"], conflicts: [] };
+    },
+    async reinstallCustomizations() {
+      calls.push(`${clientId}:reinstall`);
+      await writeLock("reinstall");
+      return { installed: ["managed"], clientId };
+    },
+  };
+}
+
+test("collects both customization lifecycles and cleans isolated workspaces", async (context) => {
+  const parent = await mkdtemp(join(tmpdir(), "apex-lifecycle-parent-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  const root = join(parent, "run");
+  const calls = [];
+  const evidence = await collectLifecycleEvidence(
+    { root },
+    { serviceFactory: (workspace) => fakeLifecycleService(workspace, calls) },
+  );
+  assert.equal(evidence.adapter, "customization-lifecycle-v1");
+  assert.match(evidence.evidenceId, /^[0-9a-f]{64}$/u);
+  assert.equal(evidence.qualifiesClientParity, false);
+  assert.equal(evidence.qualifiesRelease, false);
+  assert.ok(Object.values(evidence.operations).every((status) => status === "pass"));
+  assert.deepEqual(calls, [
+    "github-copilot-cli:init",
+    "github-copilot-cli:update",
+    "github-copilot-cli:rollback",
+    "github-copilot-cli:uninstall",
+    "github-copilot-cli:reinstall",
+    "github-copilot-vscode:init",
+    "github-copilot-vscode:update",
+    "github-copilot-vscode:rollback",
+    "github-copilot-vscode:uninstall",
+    "github-copilot-vscode:reinstall",
+  ]);
+  await assert.rejects(readFile(root), /ENOENT|EISDIR/u);
+});
+
+test("lifecycle refuses existing roots and cleans up after failure", async (context) => {
+  const parent = await mkdtemp(join(tmpdir(), "apex-lifecycle-refusal-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  await assert.rejects(collectLifecycleEvidence({ root: "relative" }), /absolute path/);
+  await assert.rejects(collectLifecycleEvidence({ root: parent }), /must not already exist/);
+  await assert.rejects(
+    collectLifecycleEvidence({ root: join(parent, "inside"), output: join(parent, "inside", "evidence.json") }),
+    /output must be outside/,
+  );
+  const physicalParent = join(parent, "physical");
+  const linkedParent = join(parent, "linked");
+  await mkdir(physicalParent);
+  await symlink(physicalParent, linkedParent);
+  await assert.rejects(
+    collectLifecycleEvidence({ root: join(linkedParent, "run") }),
+    /parent must not resolve through a symlink/,
+  );
+  const normalizedRoot = join(parent, "segment", "..", "normalized");
+  const normalizedEvidence = await collectLifecycleEvidence(
+    { root: normalizedRoot },
+    { serviceFactory: (workspace) => fakeLifecycleService(workspace, []) },
+  );
+  assert.equal(normalizedEvidence.adapter, "customization-lifecycle-v1");
+
+  const root = join(parent, "failed");
+  await assert.rejects(
+    collectLifecycleEvidence({ root }, { serviceFactory: (workspace) => fakeLifecycleService(workspace, [], true) }),
+    /injected lifecycle failure/,
+  );
+  await assert.rejects(readFile(root), /ENOENT|EISDIR/u);
+});
+
+test("checkpoint output must be outside the lifecycle root", () => {
+  assert.throws(
+    () => assertOutputOutsideLifecycleRoot("/tmp/lifecycle", "/tmp/lifecycle/checkpoint.json", "Checkpoint"),
+    /Checkpoint output must be outside the lifecycle root/,
+  );
+  assert.doesNotThrow(() => assertOutputOutsideLifecycleRoot("/tmp/lifecycle", "/tmp/checkpoint.json", "Checkpoint"));
+});
+
 function checkpointAdapters(overrides = {}) {
+  const lifecycle = {
+    schemaVersion: "1.0.0",
+    adapter: "customization-lifecycle-v1",
+    clients: {
+      cli: { clientId: "github-copilot-cli" },
+      vscode: { clientId: "github-copilot-vscode" },
+    },
+    operations: {
+      init: "pass",
+      update: "pass",
+      rollback: "pass",
+      uninstall: "pass",
+      reinstall: "pass",
+      unrelatedFilePreserved: "pass",
+    },
+    qualifiesClientParity: false,
+    qualifiesRelease: false,
+  };
   return {
     runtime: {
       schemaVersion: "1.0.0",
@@ -199,6 +338,7 @@ function checkpointAdapters(overrides = {}) {
       client: { id: "github-copilot-vscode" },
       disposition: { status: "pass" },
     },
+    lifecycle: { ...lifecycle, evidenceId: sha256Json(lifecycle) },
     ...overrides,
   };
 }
@@ -212,6 +352,7 @@ async function guidedCheckpoint(overrides = {}, dependencies = {}) {
       run: "run-1",
       "cli-workspace": "cli",
       "cli-binary": "bin/copilot",
+      "lifecycle-root": "/tmp/lifecycle-run",
       "vscode-workspace": "vscode",
       "vscode-host": "/opt/code",
     },
@@ -220,6 +361,7 @@ async function guidedCheckpoint(overrides = {}, dependencies = {}) {
       collectRuntime: async () => adapters.runtime,
       collectCli: async () => adapters.cli,
       collectVscode: async () => adapters.vscode,
+      collectLifecycle: async () => adapters.lifecycle,
       ...dependencies,
     },
   );
@@ -235,10 +377,11 @@ test("composes source-bound adapters into pending interactive checkpoints", asyn
   assert.equal(checkpoint.status.qualifiesRelease, false);
   assert.match(checkpoint.checkpointId, /^[0-9a-f]{64}$/u);
   assert.equal(repeated.checkpointId, checkpoint.checkpointId);
-  assert.deepEqual(Object.keys(checkpoint.adapterDigests), ["runtime", "cli", "vscode"]);
+  assert.deepEqual(Object.keys(checkpoint.adapterDigests), ["runtime", "cli", "vscode", "lifecycle"]);
   assert.ok(Object.values(checkpoint.adapterDigests).every((value) => /^[0-9a-f]{64}$/u.test(value)));
   assert.ok(checkpoint.interactiveCheckpoints.every(({ status }) => status === "pending"));
   assert.ok(checkpoint.capabilityBlockers.some(({ scenarioIds }) => scenarioIds.includes("CLIENT-005")));
+  assert.ok(checkpoint.interactiveCheckpoints.every(({ scenarioIds }) => !scenarioIds.includes("CLIENT-009")));
   assert.doesNotMatch(JSON.stringify(checkpoint), /assertionState|"assertions"|"pass"\s*:/u);
 });
 
@@ -332,6 +475,18 @@ test("checkpoint rejects mismatched and malformed adapter identities", async () 
     /forbidden field/,
   );
   await assert.rejects(
+    guidedCheckpoint({ lifecycle: { ...checkpointAdapters().lifecycle, evidenceId: "f".repeat(64) } }),
+    /Checkpoint adapter customization-lifecycle-v1 is invalid/,
+  );
+  const incompleteLifecycle = structuredClone(checkpointAdapters().lifecycle);
+  delete incompleteLifecycle.operations.unrelatedFilePreserved;
+  const { evidenceId: _evidenceId, ...incompleteContent } = incompleteLifecycle;
+  incompleteLifecycle.evidenceId = sha256Json(incompleteContent);
+  await assert.rejects(
+    guidedCheckpoint({ lifecycle: incompleteLifecycle }),
+    /Checkpoint adapter customization-lifecycle-v1 is invalid/,
+  );
+  await assert.rejects(
     collectGuidedCheckpoint(
       {
         "release-manifest": "release.json",
@@ -339,6 +494,7 @@ test("checkpoint rejects mismatched and malformed adapter identities", async () 
         run: "run-1",
         "cli-workspace": "cli",
         "cli-binary": "bin/copilot",
+        "lifecycle-root": "/tmp/lifecycle-run",
         "vscode-workspace": "vscode",
         "vscode-host": "/opt/code",
       },
@@ -347,6 +503,7 @@ test("checkpoint rejects mismatched and malformed adapter identities", async () 
         collectRuntime: async () => checkpointAdapters().runtime,
         collectCli: async () => checkpointAdapters().cli,
         collectVscode: async () => checkpointAdapters().vscode,
+        collectLifecycle: async () => checkpointAdapters().lifecycle,
       },
     ),
     /Checkpoint candidate is invalid/,
@@ -359,6 +516,7 @@ test("checkpoint rejects mismatched and malformed adapter identities", async () 
         run: "run-1",
         "cli-workspace": "cli",
         "cli-binary": "bin/copilot",
+        "lifecycle-root": "/tmp/lifecycle-run",
         "vscode-workspace": "vscode",
         "vscode-host": "/opt/code",
       },
@@ -367,6 +525,7 @@ test("checkpoint rejects mismatched and malformed adapter identities", async () 
         collectRuntime: async () => checkpointAdapters().runtime,
         collectCli: async () => checkpointAdapters().cli,
         collectVscode: async () => checkpointAdapters().vscode,
+        collectLifecycle: async () => checkpointAdapters().lifecycle,
       },
     ),
     /Checkpoint candidate is invalid/,

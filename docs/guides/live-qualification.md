@@ -98,6 +98,22 @@ This command does not open VS Code, invoke a model, inspect pickers or question
 panels, prove MCP startup, or establish restart/resume behavior. Those remain
 explicit interactive checkpoints.
 
+Run the managed customization lifecycle in fresh disposable workspaces for both
+client projections:
+
+```bash
+npm run live:vnext -- lifecycle \
+  --root /absolute/path/to/disposable-lifecycle \
+  --output dist/live-qualification/lifecycle-evidence.json
+```
+
+The lifecycle adapter requires a nonexistent absolute root, creates separate CLI
+and VS Code workspaces, and exercises init, update, rollback, uninstall, and
+reinstall. It verifies selected-client locks, unrelated-file preservation, and
+conflict-free rollback/uninstall, then removes the entire disposable root in a
+`finally` path. Output must be outside that root. The evidence is deterministic,
+content-free, and never qualifies parity or release.
+
 After both consumer projections and the APEX run exist, create one durable
 guided checkpoint by re-running every adapter from its authoritative source:
 
@@ -108,6 +124,7 @@ npm run live:vnext -- checkpoint \
   --run candidate-1 \
   --cli-workspace ../qualification-cli \
   --cli-binary /absolute/path/to/copilot \
+  --lifecycle-root /absolute/path/to/disposable-lifecycle \
   --vscode-workspace ../qualification-vscode \
   --vscode-host /absolute/path/to/code \
   --output dist/live-qualification/guided-checkpoint.json
@@ -120,11 +137,12 @@ client projection per workspace. Initialize `../qualification-cli` with
 the paired observations.
 
 The composer does not ingest previously generated adapter JSON. It re-derives
-the candidate, runtime, CLI, and VS Code records, validates adapter identities,
-and binds them with canonical digests and a deterministic checkpoint ID. Client
-failure blocks interaction; unavailable clients block interaction until the
-named environment action is complete. Exact adapters produce explicit pending
-interactive checkpoints.
+the candidate, runtime, CLI, VS Code, and lifecycle records, validates adapter
+identities, and binds them with canonical digests and a deterministic checkpoint
+ID. Client failure blocks interaction; unavailable clients block interaction
+until the named environment action is complete. Exact adapters produce explicit
+pending interactive checkpoints. CLIENT-009 is automated and no longer appears
+as an interactive wait.
 
 The checkpoint never accepts assertions, marks scenarios passed, qualifies
 client parity, or qualifies a release. CLI `CLIENT-005` remains an explicit
@@ -140,6 +158,7 @@ npm run live:vnext -- checkpoint \
   --run candidate-1 \
   --cli-workspace ../qualification-cli \
   --cli-binary /absolute/path/to/copilot \
+  --lifecycle-root /absolute/path/to/disposable-lifecycle \
   --vscode-workspace ../qualification-vscode \
   --vscode-host /absolute/path/to/code \
   --previous dist/live-qualification/guided-checkpoint.json \

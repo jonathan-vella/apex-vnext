@@ -19,6 +19,7 @@ import {
 } from "./_lib/vnext-qualification.mjs";
 import { parseStrictJson } from "./_lib/strict-json.mjs";
 import { hasBoundClientQualification } from "../../packages/contracts/dist/index.js";
+import { ApexService } from "../../packages/cli/dist/index.js";
 import { EventJournal, ObjectStore, sha256Json } from "../../packages/kernel/dist/index.js";
 import { verifyClientOutcomeQualification } from "./compare-client-outcomes.mjs";
 import {
@@ -35,6 +36,7 @@ const COMMAND_OPTIONS = {
     "branch",
     "cli-binary",
     "cli-workspace",
+    "lifecycle-root",
     "output",
     "package-lock",
     "previous",
@@ -46,6 +48,7 @@ const COMMAND_OPTIONS = {
     "vscode-workspace",
   ]),
   cli: new Set(["binary", "output", "workspace"]),
+  lifecycle: new Set(["output", "root"]),
   runtime: new Set(["output", "project", "run"]),
   template: new Set([
     "actor",
@@ -78,7 +81,9 @@ export function parseLiveQualificationArguments(argv) {
   const command = argv[0];
   const allowed = COMMAND_OPTIONS[command];
   if (allowed === undefined)
-    throw new Error("Command must be candidate, checkpoint, cli, runtime, template, validate, vscode, or render");
+    throw new Error(
+      "Command must be candidate, checkpoint, cli, lifecycle, runtime, template, validate, vscode, or render",
+    );
   const options = { command };
   for (let index = 1; index < argv.length; index += 2) {
     const argument = argv[index];
@@ -96,6 +101,109 @@ export function parseLiveQualificationArguments(argv) {
   return options;
 }
 
+async function pathExists(path) {
+  try {
+    await lstat(path);
+    return true;
+  } catch (error) {
+    if (error.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+async function lifecycleClient(root, clientId, projectId, serviceFactory) {
+  await mkdir(root, { recursive: false });
+  const service = serviceFactory(root);
+  await service.init({ projectId, clientId });
+  const lockPath = join(root, ".apex", "customizations.lock.json");
+  const lock = async () => {
+    const bytes = await readBoundedRegularFile(lockPath, MAX_MANAGED_FILE_BYTES, "Lifecycle customization lock");
+    const value = parseStrictJson(bytes.toString("utf8"));
+    if (value?.clientId !== clientId || !Array.isArray(value.files) || value.files.length === 0) {
+      throw new Error("Lifecycle customization lock is invalid");
+    }
+    return { sha256: sha256(bytes), managedFiles: value.files.length };
+  };
+  const initialized = await lock();
+  const sentinelPath = join(root, "unrelated.txt");
+  const sentinel = Buffer.from("preserve\n");
+  await writeFile(sentinelPath, sentinel, { flag: "wx" });
+  await service.update();
+  const updated = await lock();
+  const rollback = await service.rollbackCustomizations();
+  if (rollback.conflicts.length > 0) throw new Error("Lifecycle rollback produced conflicts");
+  const rolledBack = await lock();
+  const uninstall = await service.uninstallCustomizations();
+  if (uninstall.conflicts.length > 0 || (await pathExists(lockPath))) {
+    throw new Error("Lifecycle uninstall did not remove managed state cleanly");
+  }
+  const reinstalledResult = await service.reinstallCustomizations();
+  if (reinstalledResult.clientId !== clientId) throw new Error("Lifecycle reinstall changed the selected client");
+  const reinstalled = await lock();
+  if (!(await readFile(sentinelPath)).equals(sentinel)) throw new Error("Lifecycle changed an unrelated file");
+  return {
+    clientId,
+    initialized,
+    updated,
+    rolledBack,
+    uninstalledFiles: uninstall.removed.length,
+    reinstalled,
+    unrelatedFileSha256: sha256(sentinel),
+  };
+}
+
+export async function collectLifecycleEvidence(
+  options,
+  { serviceFactory = (root) => new ApexService(root), remove = rm } = {},
+) {
+  const inputRoot = required(options, "root");
+  if (!isAbsolute(inputRoot)) throw new Error("Lifecycle root must be an absolute path");
+  const root = resolve(inputRoot);
+  const parent = dirname(root);
+  const canonicalParent = await realpath(parent);
+  if (resolve(canonicalParent, basename(root)) !== root) {
+    throw new Error("Lifecycle root parent must not resolve through a symlink");
+  }
+  assertOutputOutsideLifecycleRoot(root, options.output, "Lifecycle");
+  if (await pathExists(root)) throw new Error("Lifecycle root must not already exist");
+  await mkdir(root, { recursive: false });
+  try {
+    const cli = await lifecycleClient(join(root, "cli"), "github-copilot-cli", "qualification-cli", serviceFactory);
+    const vscode = await lifecycleClient(
+      join(root, "vscode"),
+      "github-copilot-vscode",
+      "qualification-vscode",
+      serviceFactory,
+    );
+    const evidence = {
+      schemaVersion: "1.0.0",
+      adapter: "customization-lifecycle-v1",
+      clients: { cli, vscode },
+      operations: {
+        init: "pass",
+        update: "pass",
+        rollback: "pass",
+        uninstall: "pass",
+        reinstall: "pass",
+        unrelatedFilePreserved: "pass",
+      },
+      qualifiesClientParity: false,
+      qualifiesRelease: false,
+    };
+    return { ...evidence, evidenceId: sha256Json(evidence) };
+  } finally {
+    await remove(root, { recursive: true, force: true });
+  }
+}
+
+export function assertOutputOutsideLifecycleRoot(root, output, label) {
+  if (output === undefined) return;
+  const relation = relative(resolve(root), resolve(output));
+  if (relation === "" || (relation !== ".." && !relation.startsWith(`..${sep}`))) {
+    throw new Error(`${label} output must be outside the lifecycle root`);
+  }
+}
+
 const GUIDED_CHECKPOINTS = [
   { id: "vscode-discovery", client: "github-copilot-vscode", scenarioIds: ["CLIENT-002"] },
   { id: "cli-discovery", client: "github-copilot-cli", scenarioIds: ["CLIENT-002"] },
@@ -106,7 +214,6 @@ const GUIDED_CHECKPOINTS = [
   { id: "vscode-routing", client: "github-copilot-vscode", scenarioIds: ["CLIENT-005"] },
   { id: "restart-resume", client: "paired", scenarioIds: ["CLIENT-007"] },
   { id: "writer-transfer", client: "paired", scenarioIds: ["CLIENT-008"] },
-  { id: "customization-lifecycle", client: "paired", scenarioIds: ["CLIENT-009"] },
   { id: "terminal-workflow", client: "paired", scenarioIds: ["CLIENT-010"] },
 ];
 
@@ -120,6 +227,7 @@ const GUIDED_CAPABILITY_BLOCKERS = [
     nextActionCode: "REQUALIFY_INDEPENDENT_WORKER_CONTROLS",
   },
 ];
+const LIFECYCLE_OPERATIONS = ["init", "update", "rollback", "uninstall", "reinstall", "unrelatedFilePreserved"];
 const CHECKPOINT_FORBIDDEN_FIELD =
   /^(?:assertion|assertions|assertionState|chat(?:log|history)?|content|conversation|instruction|message|prompt|response|raw[-_]?(?:output|text)|transcript)$/iu;
 
@@ -180,6 +288,28 @@ function assertCheckpointCandidate(value) {
   }
 }
 
+function assertLifecycleAdapter(value) {
+  const { evidenceId, ...content } = value ?? {};
+  const operations = value?.operations;
+  if (
+    value?.schemaVersion !== "1.0.0" ||
+    value.adapter !== "customization-lifecycle-v1" ||
+    !SHA256_PATTERN.test(value.evidenceId ?? "") ||
+    value.qualifiesClientParity !== false ||
+    value.qualifiesRelease !== false ||
+    value?.clients?.cli?.clientId !== "github-copilot-cli" ||
+    value?.clients?.vscode?.clientId !== "github-copilot-vscode" ||
+    operations === null ||
+    typeof operations !== "object" ||
+    Array.isArray(operations) ||
+    Object.keys(operations).sort().join(",") !== [...LIFECYCLE_OPERATIONS].sort().join(",") ||
+    LIFECYCLE_OPERATIONS.some((operation) => operations[operation] !== "pass") ||
+    evidenceId !== sha256Json(content)
+  ) {
+    throw new Error("Checkpoint adapter customization-lifecycle-v1 is invalid");
+  }
+}
+
 function assertPreviousCheckpoint(previous, current) {
   if (
     previous?.schemaVersion !== "1.0.0" ||
@@ -204,6 +334,7 @@ export async function collectGuidedCheckpoint(
     collectRuntime = (input) => collectRuntimeEvidence(input, { root }),
     collectCli = (input) => collectCliSurfaceEvidence(input, { root }),
     collectVscode = (input) => collectVscodeSurfaceEvidence(input, { root }),
+    collectLifecycle = (input) => collectLifecycleEvidence(input),
     previousCheckpoint,
   } = {},
 ) {
@@ -217,17 +348,20 @@ export async function collectGuidedCheckpoint(
     workspace: required(options, "vscode-workspace"),
     host: required(options, "vscode-host"),
   });
+  const lifecycle = await collectLifecycle({ root: required(options, "lifecycle-root") });
   assertCheckpointCandidate(candidate);
   assertCheckpointAdapter(runtime, "apex-runtime-journal-v1");
   assertCheckpointAdapter(cli, "copilot-cli-surface-v1", "github-copilot-cli");
   assertCheckpointAdapter(vscode, "vscode-surface-v1", "github-copilot-vscode");
+  assertLifecycleAdapter(lifecycle);
   assertCheckpointContentFree(runtime);
   assertCheckpointContentFree(cli);
   assertCheckpointContentFree(vscode);
+  assertCheckpointContentFree(lifecycle);
   if (runtime.projectId !== options.project || runtime.runId !== options.run) {
     throw new Error("Runtime adapter identity does not match the checkpoint request");
   }
-  const adapters = { runtime, cli, vscode };
+  const adapters = { runtime, cli, vscode, lifecycle };
   const adapterDigests = Object.fromEntries(
     Object.entries(adapters).map(([name, value]) => [name, adapterDigest(value)]),
   );
@@ -1340,6 +1474,12 @@ async function main() {
     else process.stdout.write(contents);
     return;
   }
+  if (options.command === "lifecycle") {
+    const contents = `${JSON.stringify(await collectLifecycleEvidence(options), null, 2)}\n`;
+    if (options.output) await writeNewFiles([[resolve(options.output), contents]]);
+    else process.stdout.write(contents);
+    return;
+  }
   if (options.command === "vscode") {
     const contents = `${JSON.stringify(await collectVscodeSurfaceEvidence(options), null, 2)}\n`;
     if (options.output) await writeNewFiles([[resolve(options.output), contents]]);
@@ -1348,6 +1488,8 @@ async function main() {
   }
   assertCleanGitStatus(gitValue(["status", "--porcelain"]));
   if (options.command === "checkpoint") {
+    const lifecycleRoot = resolve(required(options, "lifecycle-root"));
+    assertOutputOutsideLifecycleRoot(lifecycleRoot, options.output, "Checkpoint");
     const previousCheckpoint =
       options.previous === undefined
         ? undefined

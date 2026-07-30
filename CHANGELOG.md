@@ -55,6 +55,8 @@ prior qualification is retained as historical characterization. See
   expose blocked or pending interactive steps without accepting assertions or qualifying client parity.
 - Added strict checkpoint resume verification that re-runs all source adapters and rejects tampered, stale, or mixed
   candidates while preserving the original checkpoint ID and interaction state.
+- Added deterministic dual-client customization lifecycle evidence for init, update, rollback, uninstall, reinstall,
+  unrelated-file preservation, automatic cleanup, and checkpoint integration for CLIENT-009.
 - Added exact client-qualification candidate receipt generation with clean-worktree, repository, branch, commit,
   release-manifest, runtime-bundle, package-lock, and customization-bundle binding.
 - Added versioned kernel-owned input requests and typed APEX MCP answer recording bound to the exact journal head and
