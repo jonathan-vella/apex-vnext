@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { lstat, mkdir, mkdtemp, readFile, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -10,6 +11,7 @@ import {
   SECRET_VALUE_PATTERN,
   hasValidLiveQualification,
 } from "../../../packages/contracts/dist/index.js";
+import { ApexService } from "../../../packages/cli/dist/index.js";
 import { EventJournal, ObjectStore, sha256Json } from "../../../packages/kernel/dist/index.js";
 import {
   assertCleanGitStatus,
@@ -18,6 +20,7 @@ import {
   collectCliSurfaceEvidence,
   collectCurrentCandidate,
   collectGuidedCheckpoint,
+  collectClientInputEvidence,
   collectLifecycleEvidence,
   collectWorkspacePreparation,
   collectRuntimeEvidence,
@@ -171,6 +174,11 @@ test("parses bounded live qualification commands", () => {
     parseLiveQualificationArguments(["lifecycle", "--root", "/tmp/lifecycle", "--output", "lifecycle.json"]),
     { command: "lifecycle", root: "/tmp/lifecycle", output: "lifecycle.json" },
   );
+  assert.deepEqual(parseLiveQualificationArguments(["input", "--workspace", "consumer", "--output", "input.json"]), {
+    command: "input",
+    workspace: "consumer",
+    output: "input.json",
+  });
   assert.deepEqual(
     parseLiveQualificationArguments([
       "prepare",
@@ -336,6 +344,171 @@ test("prepares exact paired client workspaces and cleans partial failure", async
     /managed files do not match the customization lock/,
   );
   await assert.rejects(lstat(driftedRoot), (error) => error.code === "ENOENT");
+});
+
+test("exports content-free pending and recorded input evidence from a real workspace", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "apex-input-adapter-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+  const pending = await service.nextTask();
+  assert.equal(pending.status, "needs_input");
+  if (pending.status !== "needs_input") return;
+  const before = await collectClientInputEvidence({ workspace: "." }, { root });
+  assert.equal(before.client.id, "github-copilot-cli");
+  assert.equal(before.status, "pending");
+  assert.deepEqual(before.interaction, { needsInput: "observed", typedAnswer: "pending" });
+  assert.equal(before.qualifiesClientParity, false);
+  assert.equal(before.qualifiesRelease, false);
+  assert.match(before.source.customizationLockSha256, /^[0-9a-f]{64}$/u);
+  assert.ok(before.source.managedFiles > 0);
+  assert.doesNotMatch(JSON.stringify(before), /What workload|outcomes and constraints/u);
+
+  await service.recordInput({
+    schemaVersion: "1.0.0",
+    requestId: pending.request.requestId,
+    expectedHead: pending.request.expectedHead,
+    ownerEpoch: pending.request.ownerEpoch,
+    answers: pending.request.questions.map(({ id }) => ({ questionId: id, value: `secret-${id}` })),
+  });
+  const after = await collectClientInputEvidence({ workspace: "." }, { root });
+  assert.equal(after.status, "recorded");
+  assert.deepEqual(after.interaction, { needsInput: "observed", typedAnswer: "observed" });
+  assert.match(after.source.recordedEventHash, /^[0-9a-f]{64}$/u);
+  assert.match(after.source.recordedPayloadHash, /^[0-9a-f]{64}$/u);
+  assert.doesNotMatch(JSON.stringify(after), /secret-workload|secret-requirements/u);
+  const { evidenceId, ...content } = after;
+  assert.equal(evidenceId, sha256Json(content));
+});
+
+test("exports input evidence for the selected VS Code projection", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "apex-vscode-input-adapter-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo", clientId: "github-copilot-vscode" });
+  const pending = await service.nextTask();
+  assert.equal(pending.status, "needs_input");
+  const evidence = await collectClientInputEvidence({ workspace: "." }, { root });
+  assert.equal(evidence.client.id, "github-copilot-vscode");
+  assert.equal(evidence.status, "pending");
+  assert.match(evidence.source.customizationLockSha256, /^[0-9a-f]{64}$/u);
+  assert.ok(evidence.source.managedFiles > 0);
+  assert.equal(evidence.qualifiesClientParity, false);
+  assert.equal(evidence.qualifiesRelease, false);
+});
+
+test("input command refuses to overwrite an existing evidence file", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "apex-input-output-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+  await service.nextTask();
+  const output = join(root, "existing.json");
+  await writeFile(output, "preserve\n");
+  const result = spawnSync(
+    process.execPath,
+    ["tools/scripts/live-qualification.mjs", "input", "--workspace", root, "--output", output],
+    { cwd: process.cwd(), encoding: "utf8", timeout: 30_000 },
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /EEXIST|file already exists/u);
+  assert.equal(await readFile(output, "utf8"), "preserve\n");
+});
+
+test("input evidence rejects malformed, replayed, and drifted source state", async (context) => {
+  const create = async (name) => {
+    const root = await mkdtemp(join(tmpdir(), `apex-input-${name}-`));
+    context.after(() => rm(root, { recursive: true, force: true }));
+    const service = new ApexService(root);
+    await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+    const pending = await service.nextTask();
+    assert.equal(pending.status, "needs_input");
+    if (pending.status !== "needs_input") throw new Error("fixture did not request input");
+    const journalPath = join(root, ".apex", "projects", "demo", "runs", (await service.status()).run.runId, "journal");
+    const journal = new EventJournal(journalPath);
+    return { root, service, pending, journal };
+  };
+
+  const malformed = await create("malformed");
+  await malformed.journal.append({
+    eventId: "malformed-record",
+    projectId: "demo",
+    runId: (await malformed.service.status()).run.runId,
+    type: "requirements.input-recorded",
+    timestamp,
+    ownerEpoch: malformed.pending.request.ownerEpoch,
+    expectedHead: await malformed.journal.head(),
+    payload: { requestId: malformed.pending.request.requestId, answers: [] },
+  });
+  await assert.rejects(
+    collectClientInputEvidence({ workspace: "." }, { root: malformed.root }),
+    /recorded event has invalid payload/,
+  );
+
+  const replayed = await create("replayed");
+  const submission = {
+    schemaVersion: "1.0.0",
+    requestId: replayed.pending.request.requestId,
+    expectedHead: replayed.pending.request.expectedHead,
+    ownerEpoch: replayed.pending.request.ownerEpoch,
+    answers: replayed.pending.request.questions.map(({ id }) => ({ questionId: id, value: id })),
+  };
+  await replayed.service.recordInput(submission);
+  await replayed.journal.append({
+    eventId: "replayed-record",
+    projectId: "demo",
+    runId: (await replayed.service.status()).run.runId,
+    type: "requirements.input-recorded",
+    timestamp,
+    ownerEpoch: replayed.pending.request.ownerEpoch,
+    expectedHead: await replayed.journal.head(),
+    payload: { requestId: submission.requestId, answers: submission.answers },
+  });
+  await assert.rejects(
+    collectClientInputEvidence({ workspace: "." }, { root: replayed.root }),
+    /does not match one request/,
+  );
+
+  const nonCanonical = await create("non-canonical");
+  const runId = (await nonCanonical.service.status()).run.runId;
+  const requestEvent = (await nonCanonical.journal.replay()).find(
+    (event) => event.type === "requirements.input-requested",
+  );
+  assert.ok(requestEvent);
+  requestEvent.payload.questions = [
+    { id: "regions", prompt: "Select regions", options: ["primary", "secondary"], multiSelect: true },
+  ];
+  requestEvent.payloadHash = sha256Json(requestEvent.payload);
+  const { hash: _hash, ...requestContent } = requestEvent;
+  requestEvent.hash = sha256Json(requestContent);
+  await writeFile(
+    join(nonCanonical.journal.directory, `${String(requestEvent.sequence).padStart(16, "0")}.json`),
+    `${JSON.stringify(requestEvent)}\n`,
+  );
+  await nonCanonical.journal.append({
+    eventId: "non-canonical-record",
+    projectId: "demo",
+    runId,
+    type: "requirements.input-recorded",
+    timestamp,
+    ownerEpoch: requestEvent.ownerEpoch,
+    expectedHead: requestEvent.hash,
+    payload: {
+      requestId: requestEvent.payload.requestId,
+      answers: [{ questionId: "regions", value: ["secondary", "primary"] }],
+    },
+  });
+  await assert.rejects(
+    collectClientInputEvidence({ workspace: "." }, { root: nonCanonical.root }),
+    /recorded event has invalid payload/,
+  );
+
+  const drifted = await create("drifted");
+  await writeFile(join(drifted.root, ".github", "mcp.json"), "{}\n");
+  await assert.rejects(
+    collectClientInputEvidence({ workspace: "." }, { root: drifted.root }),
+    /managed files do not match/,
+  );
 });
 
 test("preparation rejects unsafe roots and malformed initialized identity", async (context) => {

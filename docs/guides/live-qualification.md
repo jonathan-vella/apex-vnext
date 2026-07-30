@@ -115,6 +115,25 @@ responses are never included.
 This adapter does not prove agent-picker visibility, `task.agent_type` membership, interactive `ask_user`, restart, or
 model behavior. Those remain explicit later adapters or interactive checkpoints.
 
+After a real client requests or records typed requirements input, export only the resulting kernel journal facts from
+that prepared workspace:
+
+```bash
+npm run live:vnext -- input \
+  --workspace /absolute/path/to/qualification-workspaces/cli \
+  --output dist/live-qualification/cli-input.json
+```
+
+Run the same command against the prepared `vscode/` workspace for the paired observation. The adapter verifies the
+selected client projection, persisted project/run selection, journal chain and identity, owner epochs, request
+supersession, and exact request-to-recorded pairing. It validates question and answer shapes in memory but emits only
+client/project/run identity, customization-lock metadata, event and payload hashes, and `pending` or `recorded`
+interaction states. Prompts, options, question IDs, answer values, and transcripts are never copied.
+
+This evidence proves that the kernel emitted a typed input request and, when recorded, accepted one exact answer set. It
+does not prove that VS Code displayed `vscode/askQuestions` or that Copilot CLI invoked `ask_user`; those client-surface
+actions remain user-owned interactive checkpoints. The adapter never qualifies parity or release.
+
 For a consumer workspace initialized with the VS Code projection, bind the host, Copilot Chat extension, and managed
 files without opening the UI:
 

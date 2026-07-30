@@ -18,7 +18,7 @@ import {
   VNEXT_QUALIFICATION_REPOSITORY_IDENTITY,
 } from "./_lib/vnext-qualification.mjs";
 import { parseStrictJson } from "./_lib/strict-json.mjs";
-import { hasBoundClientQualification } from "../../packages/contracts/dist/index.js";
+import { hasBoundClientQualification, hasValidInputRequestQuestions } from "../../packages/contracts/dist/index.js";
 import { ApexService } from "../../packages/cli/dist/index.js";
 import { EventJournal, ObjectStore, sha256Json } from "../../packages/kernel/dist/index.js";
 import { verifyClientOutcomeQualification } from "./compare-client-outcomes.mjs";
@@ -49,6 +49,7 @@ const COMMAND_OPTIONS = {
     "vscode-workspace",
   ]),
   cli: new Set(["binary", "output", "workspace"]),
+  input: new Set(["output", "workspace"]),
   lifecycle: new Set(["output", "root"]),
   prepare: new Set(["branch", "output", "package-lock", "release-manifest", "root", "runtime-bundle"]),
   runtime: new Set(["output", "project", "run"]),
@@ -84,7 +85,7 @@ export function parseLiveQualificationArguments(argv) {
   const allowed = COMMAND_OPTIONS[command];
   if (allowed === undefined)
     throw new Error(
-      "Command must be candidate, checkpoint, cleanup, cli, lifecycle, prepare, runtime, template, validate, vscode, or render",
+      "Command must be candidate, checkpoint, cleanup, cli, input, lifecycle, prepare, runtime, template, validate, vscode, or render",
     );
   const options = { command };
   for (let index = 1; index < argv.length; index += 2) {
@@ -1056,6 +1057,7 @@ export async function collectVscodeSurfaceEvidence(
 
 const PROJECT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+const INPUT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const RUNTIME_FACT_ID_PATTERN = /^[a-z][a-z0-9.-]{0,63}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const RUNTIME_EVENT_TYPES = new Set([
@@ -1065,6 +1067,215 @@ const RUNTIME_EVENT_TYPES = new Set([
   "deployment.completed",
   "transfer-accepted",
 ]);
+
+function inputRequestPayload(event) {
+  const payload = event.payload;
+  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("Recognized input request event has invalid payload");
+  }
+  const keys = Object.keys(payload).sort().join(",");
+  if (
+    !["questions,requestId", "questions,requestId,supersedesRequestId"].includes(keys) ||
+    !INPUT_ID_PATTERN.test(payload.requestId ?? "") ||
+    (payload.supersedesRequestId !== undefined && !INPUT_ID_PATTERN.test(payload.supersedesRequestId)) ||
+    !Array.isArray(payload.questions) ||
+    payload.questions.length === 0 ||
+    payload.questions.length > 32 ||
+    payload.questions.some(
+      (question) =>
+        question === null ||
+        typeof question !== "object" ||
+        Array.isArray(question) ||
+        !["id,prompt", "id,multiSelect,prompt", "id,multiSelect,options,prompt", "id,options,prompt"].includes(
+          Object.keys(question).sort().join(","),
+        ) ||
+        typeof question.id !== "string" ||
+        question.id.length === 0 ||
+        question.id.length > 128 ||
+        typeof question.prompt !== "string" ||
+        question.prompt.length === 0 ||
+        question.prompt.length > 4096 ||
+        (question.options !== undefined &&
+          (!Array.isArray(question.options) ||
+            question.options.length === 0 ||
+            question.options.length > 128 ||
+            question.options.some(
+              (option) => typeof option !== "string" || option.length === 0 || option.length > 4096,
+            ))) ||
+        (question.multiSelect !== undefined && typeof question.multiSelect !== "boolean"),
+    ) ||
+    !hasValidInputRequestQuestions(payload.questions)
+  ) {
+    throw new Error("Recognized input request event has invalid payload");
+  }
+  return payload;
+}
+
+function inputRecordedPayload(event, request) {
+  const payload = event.payload;
+  if (
+    payload === null ||
+    typeof payload !== "object" ||
+    Array.isArray(payload) ||
+    Object.keys(payload).sort().join(",") !== "answers,requestId" ||
+    payload.requestId !== request.requestId ||
+    !Array.isArray(payload.answers) ||
+    payload.answers.length !== request.questions.length ||
+    payload.answers.length === 0
+  ) {
+    throw new Error("Recognized input recorded event has invalid payload");
+  }
+  const answers = new Map();
+  for (const answer of payload.answers) {
+    if (
+      answer === null ||
+      typeof answer !== "object" ||
+      Array.isArray(answer) ||
+      Object.keys(answer).sort().join(",") !== "questionId,value" ||
+      typeof answer.questionId !== "string" ||
+      answer.questionId.length === 0 ||
+      answer.questionId.length > 128 ||
+      answers.has(answer.questionId) ||
+      (typeof answer.value !== "string" && !Array.isArray(answer.value)) ||
+      (typeof answer.value === "string" && (answer.value.length === 0 || answer.value.length > 4096)) ||
+      (Array.isArray(answer.value) &&
+        (answer.value.length === 0 ||
+          answer.value.length > 128 ||
+          new Set(answer.value).size !== answer.value.length ||
+          answer.value.some((value) => typeof value !== "string" || value.length === 0 || value.length > 4096)))
+    ) {
+      throw new Error("Recognized input recorded event has invalid payload");
+    }
+    answers.set(answer.questionId, answer.value);
+  }
+  for (const question of request.questions) {
+    const value = answers.get(question.id);
+    const selected = Array.isArray(value) ? value : [value];
+    if (
+      value === undefined ||
+      (question.multiSelect === true ? !Array.isArray(value) : typeof value !== "string") ||
+      (question.options !== undefined &&
+        (selected.some((item) => !question.options.includes(item)) ||
+          (Array.isArray(value) &&
+            JSON.stringify(value) !== JSON.stringify(question.options.filter((option) => selected.includes(option))))))
+    ) {
+      throw new Error("Recognized input recorded event has invalid payload");
+    }
+  }
+  return payload;
+}
+
+export async function collectClientInputEvidence(
+  options,
+  { root = ROOT, journalFactory = (path) => new EventJournal(path) } = {},
+) {
+  const workspace = resolve(root, required(options, "workspace"));
+  await assertRuntimeDirectory(workspace, "Input workspace");
+  const lock = parseStrictJson(
+    (
+      await readBoundedRegularFile(
+        join(workspace, ".apex", "customizations.lock.json"),
+        MAX_MANAGED_FILE_BYTES,
+        "Input customization lock",
+      )
+    ).toString("utf8"),
+  );
+  if (!["github-copilot-cli", "github-copilot-vscode"].includes(lock?.clientId)) {
+    throw new Error("Input workspace client selection is invalid");
+  }
+  const requiredFile = lock.clientId === "github-copilot-cli" ? ".github/mcp.json" : ".vscode/mcp.json";
+  const projection = await collectManagedProjection(workspace, lock.clientId, requiredFile, "Input workspace");
+  if (projection.files.some(({ matches }) => !matches)) {
+    throw new Error("Input workspace managed files do not match the customization lock");
+  }
+  const selection = parseStrictJson(
+    (
+      await readBoundedRegularFile(
+        join(workspace, ".apex", "config.json"),
+        MAX_MANAGED_FILE_BYTES,
+        "Input workspace selection",
+      )
+    ).toString("utf8"),
+  );
+  const projectId = runtimeId(selection?.projectId, "Input project ID", PROJECT_ID_PATTERN);
+  const runId = runtimeId(selection?.runId, "Input run ID", RUN_ID_PATTERN);
+  if (Object.keys(selection).sort().join(",") !== "projectId,runId") {
+    throw new Error("Input workspace selection is invalid");
+  }
+  const journalPath = join(workspace, ".apex", "projects", projectId, "runs", runId, "journal");
+  await assertJournalFiles(journalPath);
+  const events = await journalFactory(journalPath).replay();
+  if (events.length === 0 || events.length > 4096) throw new Error("Input journal event count is invalid");
+  if (events.some((event) => event.projectId !== projectId || event.runId !== runId)) {
+    throw new Error("Input journal identity does not match the selected project and run");
+  }
+  const requests = new Map();
+  const records = new Map();
+  let previousOwnerEpoch = 0;
+  let latestRequestId;
+  for (const event of events) {
+    if (!Number.isInteger(event.ownerEpoch) || event.ownerEpoch < 1 || event.ownerEpoch < previousOwnerEpoch) {
+      throw new Error("Input journal owner epochs must be positive non-decreasing integers");
+    }
+    previousOwnerEpoch = event.ownerEpoch;
+    if (event.type === "requirements.input-requested") {
+      const request = inputRequestPayload(event);
+      if (requests.has(request.requestId)) throw new Error("Input request ID is duplicated");
+      if (
+        (requests.size === 0 && request.supersedesRequestId !== undefined) ||
+        (requests.size > 0 && (request.supersedesRequestId !== latestRequestId || records.has(latestRequestId)))
+      ) {
+        throw new Error("Input request supersession is invalid");
+      }
+      requests.set(request.requestId, { event, request });
+      latestRequestId = request.requestId;
+    } else if (event.type === "requirements.input-recorded") {
+      const requestId = event.payload?.requestId;
+      const requested = requests.get(requestId);
+      if (
+        requested === undefined ||
+        requestId !== latestRequestId ||
+        records.has(requestId) ||
+        event.previousHash !== requested.event.hash ||
+        event.ownerEpoch !== requested.event.ownerEpoch
+      ) {
+        throw new Error("Input recorded event does not match one request");
+      }
+      inputRecordedPayload(event, requested.request);
+      records.set(requestId, event);
+    }
+  }
+  const latest = requests.get(latestRequestId);
+  if (latest === undefined) throw new Error("Input journal has no recognized request");
+  const recorded = records.get(latest.request.requestId);
+  const evidence = {
+    schemaVersion: "1.0.0",
+    adapter: "apex-client-input-journal-v1",
+    client: { id: lock.clientId },
+    projectId,
+    runId,
+    source: {
+      customizationLockSha256: projection.lockSha256,
+      managedFiles: projection.files.length,
+      journalHead: events.at(-1).hash,
+      eventCount: events.length,
+      requestEventHash: latest.event.hash,
+      requestPayloadHash: latest.event.payloadHash,
+      ...(recorded === undefined
+        ? {}
+        : { recordedEventHash: recorded.hash, recordedPayloadHash: recorded.payloadHash }),
+    },
+    interaction: {
+      needsInput: "observed",
+      typedAnswer: recorded === undefined ? "pending" : "observed",
+    },
+    status: recorded === undefined ? "pending" : "recorded",
+    qualifiesClientParity: false,
+    qualifiesRelease: false,
+  };
+  assertCheckpointContentFree(evidence);
+  return { ...evidence, evidenceId: sha256Json(evidence) };
+}
 
 async function assertRuntimeDirectory(path, label) {
   const metadata = await lstat(path);
@@ -1785,6 +1996,12 @@ async function main() {
   }
   if (options.command === "lifecycle") {
     const contents = `${JSON.stringify(await collectLifecycleEvidence(options), null, 2)}\n`;
+    if (options.output) await writeNewFiles([[resolve(options.output), contents]]);
+    else process.stdout.write(contents);
+    return;
+  }
+  if (options.command === "input") {
+    const contents = `${JSON.stringify(await collectClientInputEvidence(options), null, 2)}\n`;
     if (options.output) await writeNewFiles([[resolve(options.output), contents]]);
     else process.stdout.write(contents);
     return;
