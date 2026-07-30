@@ -862,6 +862,30 @@ function checkpointAdapters(overrides = {}) {
     qualifiesClientParity: false,
     qualifiesRelease: false,
   };
+  const input = (clientId, projectId, lockHash) => {
+    const content = {
+      schemaVersion: "1.0.0",
+      adapter: "apex-client-input-journal-v1",
+      client: { id: clientId },
+      projectId,
+      runId: `run-${clientId}`,
+      source: {
+        customizationLockSha256: lockHash,
+        managedFiles: 1,
+        journalHead: hash,
+        eventCount: 2,
+        requestEventHash: otherHash,
+        requestPayloadHash: "c".repeat(64),
+      },
+      interaction: { needsInput: "observed", typedAnswer: "pending" },
+      status: "pending",
+      qualifiesClientParity: false,
+      qualifiesRelease: false,
+    };
+    return { ...content, evidenceId: sha256Json(content) };
+  };
+  const cliLockHash = "d".repeat(64);
+  const vscodeLockHash = "e".repeat(64);
   return {
     runtime: {
       schemaVersion: "1.0.0",
@@ -875,17 +899,30 @@ function checkpointAdapters(overrides = {}) {
       schemaVersion: "1.0.0",
       adapter: "copilot-cli-surface-v1",
       client: { id: "github-copilot-cli" },
+      workspace: { lockSha256: cliLockHash },
       disposition: { status: "pass" },
     },
     vscode: {
       schemaVersion: "1.0.0",
       adapter: "vscode-surface-v1",
       client: { id: "github-copilot-vscode" },
+      workspace: { lockSha256: vscodeLockHash },
       disposition: { status: "pass" },
     },
+    cliInput: input("github-copilot-cli", "qualification-cli", cliLockHash),
+    vscodeInput: input("github-copilot-vscode", "qualification-vscode", vscodeLockHash),
     lifecycle: { ...lifecycle, evidenceId: sha256Json(lifecycle) },
     ...overrides,
   };
+}
+
+function recordedInput(value) {
+  const { evidenceId: _evidenceId, ...content } = structuredClone(value);
+  content.source.recordedEventHash = "f".repeat(64);
+  content.source.recordedPayloadHash = "1".repeat(64);
+  content.interaction.typedAnswer = "observed";
+  content.status = "recorded";
+  return { ...content, evidenceId: sha256Json(content) };
 }
 
 async function guidedCheckpoint(overrides = {}, dependencies = {}) {
@@ -906,6 +943,7 @@ async function guidedCheckpoint(overrides = {}, dependencies = {}) {
       collectRuntime: async () => adapters.runtime,
       collectCli: async () => adapters.cli,
       collectVscode: async () => adapters.vscode,
+      collectInput: async ({ workspace }) => (workspace === "cli" ? adapters.cliInput : adapters.vscodeInput),
       collectLifecycle: async () => adapters.lifecycle,
       ...dependencies,
     },
@@ -922,9 +960,28 @@ test("composes source-bound adapters into pending interactive checkpoints", asyn
   assert.equal(checkpoint.status.qualifiesRelease, false);
   assert.match(checkpoint.checkpointId, /^[0-9a-f]{64}$/u);
   assert.equal(repeated.checkpointId, checkpoint.checkpointId);
-  assert.deepEqual(Object.keys(checkpoint.adapterDigests), ["runtime", "cli", "vscode", "lifecycle"]);
+  assert.deepEqual(Object.keys(checkpoint.adapterDigests), [
+    "runtime",
+    "cli",
+    "vscode",
+    "cliInput",
+    "vscodeInput",
+    "lifecycle",
+  ]);
   assert.ok(Object.values(checkpoint.adapterDigests).every((value) => /^[0-9a-f]{64}$/u.test(value)));
   assert.ok(checkpoint.interactiveCheckpoints.every(({ status }) => status === "pending"));
+  assert.notEqual(checkpoint.adapters.runtime.runId, checkpoint.adapters.cliInput.runId);
+  assert.notEqual(checkpoint.adapters.runtime.runId, checkpoint.adapters.vscodeInput.runId);
+  assert.notEqual(checkpoint.adapters.cliInput.runId, checkpoint.adapters.vscodeInput.runId);
+  assert.deepEqual(
+    checkpoint.interactiveCheckpoints
+      .filter(({ id }) => id.endsWith("-input"))
+      .map(({ id, status, kernelStatus }) => ({ id, status, kernelStatus })),
+    [
+      { id: "vscode-input", status: "pending", kernelStatus: "pending" },
+      { id: "cli-input", status: "pending", kernelStatus: "pending" },
+    ],
+  );
   assert.ok(checkpoint.capabilityBlockers.some(({ scenarioIds }) => scenarioIds.includes("CLIENT-005")));
   assert.ok(checkpoint.interactiveCheckpoints.every(({ scenarioIds }) => !scenarioIds.includes("CLIENT-009")));
   assert.doesNotMatch(JSON.stringify(checkpoint), /assertionState|"assertions"|"pass"\s*:/u);
@@ -979,6 +1036,29 @@ test("checkpoint resume accepts exact sources and rejects tampering or stale ada
     /stale or belongs to different sources/,
   );
 
+  const recordedCliInput = recordedInput(checkpointAdapters().cliInput);
+  const recordedCheckpoint = await guidedCheckpoint({ cliInput: recordedCliInput });
+  const cliInputStep = recordedCheckpoint.interactiveCheckpoints.find(({ id }) => id === "cli-input");
+  assert.deepEqual(
+    { status: cliInputStep.status, kernelStatus: cliInputStep.kernelStatus },
+    { status: "pending", kernelStatus: "recorded" },
+  );
+  await assert.rejects(
+    guidedCheckpoint({ cliInput: recordedCliInput }, { previousCheckpoint: previous }),
+    /stale or belongs to different sources/,
+  );
+  const recordedVscodeInput = recordedInput(checkpointAdapters().vscodeInput);
+  const recordedVscodeCheckpoint = await guidedCheckpoint({ vscodeInput: recordedVscodeInput });
+  const vscodeInputStep = recordedVscodeCheckpoint.interactiveCheckpoints.find(({ id }) => id === "vscode-input");
+  assert.deepEqual(
+    { status: vscodeInputStep.status, kernelStatus: vscodeInputStep.kernelStatus },
+    { status: "pending", kernelStatus: "recorded" },
+  );
+  await assert.rejects(
+    guidedCheckpoint({ vscodeInput: recordedVscodeInput }, { previousCheckpoint: previous }),
+    /stale or belongs to different sources/,
+  );
+
   const forbidden = structuredClone(previous);
   forbidden.assertions = { forged: "pass" };
   const { checkpointId: _checkpointId, ...forbiddenContent } = forbidden;
@@ -1023,6 +1103,55 @@ test("checkpoint rejects mismatched and malformed adapter identities", async () 
     guidedCheckpoint({ lifecycle: { ...checkpointAdapters().lifecycle, evidenceId: "f".repeat(64) } }),
     /Checkpoint adapter customization-lifecycle-v1 is invalid/,
   );
+  await assert.rejects(
+    guidedCheckpoint({ cliInput: { ...checkpointAdapters().cliInput, evidenceId: "f".repeat(64) } }),
+    /Checkpoint adapter apex-client-input-journal-v1/,
+  );
+  await assert.rejects(
+    guidedCheckpoint({ vscodeInput: { ...checkpointAdapters().vscodeInput, evidenceId: "f".repeat(64) } }),
+    /Checkpoint adapter apex-client-input-journal-v1/,
+  );
+  const extraInputField = structuredClone(checkpointAdapters().cliInput);
+  extraInputField.extra = "bounded-but-unsupported";
+  const { evidenceId: _extraEvidenceId, ...extraInputContent } = extraInputField;
+  extraInputField.evidenceId = sha256Json(extraInputContent);
+  await assert.rejects(
+    guidedCheckpoint({ cliInput: extraInputField }),
+    /Checkpoint adapter apex-client-input-journal-v1/,
+  );
+  const extraVscodeInputField = structuredClone(checkpointAdapters().vscodeInput);
+  extraVscodeInputField.extra = "bounded-but-unsupported";
+  const { evidenceId: _extraVscodeEvidenceId, ...extraVscodeInputContent } = extraVscodeInputField;
+  extraVscodeInputField.evidenceId = sha256Json(extraVscodeInputContent);
+  await assert.rejects(
+    guidedCheckpoint({ vscodeInput: extraVscodeInputField }),
+    /Checkpoint adapter apex-client-input-journal-v1/,
+  );
+  for (const [name, field, value] of [
+    ["cliInput", "client", { id: "github-copilot-vscode" }],
+    ["cliInput", "projectId", "qualification-vscode"],
+    ["vscodeInput", "client", { id: "github-copilot-cli" }],
+    ["vscodeInput", "projectId", "qualification-cli"],
+  ]) {
+    const mismatchedIdentity = structuredClone(checkpointAdapters()[name]);
+    mismatchedIdentity[field] = value;
+    const { evidenceId: _identityEvidenceId, ...mismatchedIdentityContent } = mismatchedIdentity;
+    mismatchedIdentity.evidenceId = sha256Json(mismatchedIdentityContent);
+    await assert.rejects(
+      guidedCheckpoint({ [name]: mismatchedIdentity }),
+      /Checkpoint adapter apex-client-input-journal-v1/,
+    );
+  }
+  const mismatchedInput = structuredClone(checkpointAdapters().cliInput);
+  mismatchedInput.source.customizationLockSha256 = "f".repeat(64);
+  const { evidenceId: _inputEvidenceId, ...mismatchedInputContent } = mismatchedInput;
+  mismatchedInput.evidenceId = sha256Json(mismatchedInputContent);
+  await assert.rejects(guidedCheckpoint({ cliInput: mismatchedInput }), /customization lock does not match/);
+  const mismatchedVscodeInput = structuredClone(checkpointAdapters().vscodeInput);
+  mismatchedVscodeInput.source.customizationLockSha256 = "f".repeat(64);
+  const { evidenceId: _vscodeInputEvidenceId, ...mismatchedVscodeInputContent } = mismatchedVscodeInput;
+  mismatchedVscodeInput.evidenceId = sha256Json(mismatchedVscodeInputContent);
+  await assert.rejects(guidedCheckpoint({ vscodeInput: mismatchedVscodeInput }), /customization lock does not match/);
   const incompleteLifecycle = structuredClone(checkpointAdapters().lifecycle);
   delete incompleteLifecycle.operations.unrelatedFilePreserved;
   const { evidenceId: _evidenceId, ...incompleteContent } = incompleteLifecycle;
@@ -1048,6 +1177,8 @@ test("checkpoint rejects mismatched and malformed adapter identities", async () 
         collectRuntime: async () => checkpointAdapters().runtime,
         collectCli: async () => checkpointAdapters().cli,
         collectVscode: async () => checkpointAdapters().vscode,
+        collectInput: async ({ workspace }) =>
+          workspace === "cli" ? checkpointAdapters().cliInput : checkpointAdapters().vscodeInput,
         collectLifecycle: async () => checkpointAdapters().lifecycle,
       },
     ),
@@ -1070,6 +1201,8 @@ test("checkpoint rejects mismatched and malformed adapter identities", async () 
         collectRuntime: async () => checkpointAdapters().runtime,
         collectCli: async () => checkpointAdapters().cli,
         collectVscode: async () => checkpointAdapters().vscode,
+        collectInput: async ({ workspace }) =>
+          workspace === "cli" ? checkpointAdapters().cliInput : checkpointAdapters().vscodeInput,
         collectLifecycle: async () => checkpointAdapters().lifecycle,
       },
     ),
