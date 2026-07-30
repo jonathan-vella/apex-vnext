@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { lstat, mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -22,6 +22,7 @@ import {
   collectWorkspacePreparation,
   collectRuntimeEvidence,
   collectVscodeSurfaceEvidence,
+  cleanupWorkspacePreparation,
   createEvidenceManifestTemplate,
   createLiveQualificationTemplate,
   packageRepository,
@@ -103,6 +104,10 @@ test("parses bounded live qualification commands", () => {
       "release-manifest": "release.json",
       output: "candidate.json",
     },
+  );
+  assert.deepEqual(
+    parseLiveQualificationArguments(["cleanup", "--root", "/tmp/qualification", "--preparation", "preparation.json"]),
+    { command: "cleanup", root: "/tmp/qualification", preparation: "preparation.json" },
   );
   assert.deepEqual(parseLiveQualificationArguments(["render", "--file", "qualification.json"]), {
     command: "render",
@@ -273,6 +278,10 @@ function fakePreparationService(root, calls, failClient, driftClient) {
           ],
         })}\n`,
       );
+      await writeFile(
+        join(root, ".apex", "config.json"),
+        `${JSON.stringify({ projectId, runId: `run-${clientId}` })}\n`,
+      );
       if (clientId === driftClient) await writeFile(managedPath, "drift\n");
       return { projectId, runId: `run-${clientId}` };
     },
@@ -396,6 +405,183 @@ test("preparation cleans retained workspaces when receipt persistence fails", as
     /injected receipt failure/,
   );
   await assert.rejects(lstat(root), (error) => error.code === "ENOENT");
+});
+
+test("cleanup removes only an exact receipt-bound prepared root", async (context) => {
+  const parent = await mkdtemp(join(tmpdir(), "apex-preparation-cleanup-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  const root = join(parent, "qualification");
+  const preparation = await collectWorkspacePreparation(
+    { root },
+    {
+      collectCandidate: async () => candidate,
+      serviceFactory: (workspace) => fakePreparationService(workspace, []),
+    },
+  );
+  const preparationPath = join(parent, "preparation.json");
+  await writeFile(preparationPath, `${JSON.stringify(preparation)}\n`);
+  const cleanup = await cleanupWorkspacePreparation({ root, preparation: preparationPath });
+  assert.equal(cleanup.kind, "guided-client-cleanup-v1");
+  assert.equal(cleanup.preparationId, preparation.preparationId);
+  assert.equal(cleanup.removed, true);
+  assert.equal(cleanup.qualifiesClientParity, false);
+  assert.equal(cleanup.qualifiesRelease, false);
+  const { cleanupId, ...cleanupContent } = cleanup;
+  assert.equal(cleanupId, sha256Json(cleanupContent));
+  await assert.rejects(lstat(root), (error) => error.code === "ENOENT");
+});
+
+test("cleanup refuses substituted or changed prepared roots", async (context) => {
+  const parent = await mkdtemp(join(tmpdir(), "apex-preparation-cleanup-refusal-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  const prepare = async (name) => {
+    const root = join(parent, name);
+    const preparation = await collectWorkspacePreparation(
+      { root },
+      {
+        collectCandidate: async () => candidate,
+        serviceFactory: (workspace) => fakePreparationService(workspace, []),
+      },
+    );
+    const preparationPath = join(parent, `${name}.json`);
+    await writeFile(preparationPath, `${JSON.stringify(preparation)}\n`);
+    return { root, preparation, preparationPath };
+  };
+  const tampered = await prepare("tampered");
+  const forged = { ...tampered.preparation, preparationId: "f".repeat(64) };
+  await writeFile(tampered.preparationPath, `${JSON.stringify(forged)}\n`);
+  await assert.rejects(
+    cleanupWorkspacePreparation({ root: tampered.root, preparation: tampered.preparationPath }),
+    /receipt is invalid/,
+  );
+  assert.equal((await lstat(tampered.root)).isDirectory(), true);
+
+  const drifted = await prepare("drifted");
+  await writeFile(join(drifted.root, "vscode", ".vscode", "mcp.json"), "drift\n");
+  await assert.rejects(
+    cleanupWorkspacePreparation({ root: drifted.root, preparation: drifted.preparationPath }),
+    /no longer matches its receipt/,
+  );
+  assert.equal((await lstat(drifted.root)).isDirectory(), true);
+
+  const unexpected = await prepare("unexpected");
+  await writeFile(join(unexpected.root, "unrelated.txt"), "preserve\n");
+  await assert.rejects(
+    cleanupWorkspacePreparation({ root: unexpected.root, preparation: unexpected.preparationPath }),
+    /unexpected entries/,
+  );
+  assert.equal(await readFile(join(unexpected.root, "unrelated.txt"), "utf8"), "preserve\n");
+
+  const nested = await prepare("nested");
+  await writeFile(join(nested.root, "cli", ".github", "unrelated.txt"), "preserve\n");
+  await assert.rejects(
+    cleanupWorkspacePreparation({ root: nested.root, preparation: nested.preparationPath }),
+    /unexpected file/,
+  );
+  assert.equal(await readFile(join(nested.root, "cli", ".github", "unrelated.txt"), "utf8"), "preserve\n");
+
+  const lateMutation = await prepare("late-mutation");
+  await assert.rejects(
+    cleanupWorkspacePreparation(
+      { root: lateMutation.root, preparation: lateMutation.preparationPath },
+      {
+        move: async (source, destination) => {
+          await rename(source, destination);
+          await writeFile(join(destination, "vscode", ".vscode", "late.txt"), "preserve\n");
+        },
+      },
+    ),
+    /renamed data remains/,
+  );
+  const quarantine = join(parent, `.late-mutation.apex-cleanup-${lateMutation.preparation.preparationId.slice(0, 12)}`);
+  assert.equal(await readFile(join(quarantine, "vscode", ".vscode", "late.txt"), "utf8"), "preserve\n");
+});
+
+test("cleanup refuses unsafe paths, marker mismatch, and occupied quarantine", async (context) => {
+  const parent = await mkdtemp(join(tmpdir(), "apex-preparation-cleanup-safety-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  const prepare = async (name) => {
+    const root = join(parent, name);
+    const preparation = await collectWorkspacePreparation(
+      { root },
+      {
+        collectCandidate: async () => candidate,
+        serviceFactory: (workspace) => fakePreparationService(workspace, []),
+      },
+    );
+    const preparationPath = join(parent, `${name}.json`);
+    await writeFile(preparationPath, `${JSON.stringify(preparation)}\n`);
+    return { root, preparation, preparationPath };
+  };
+
+  const contained = await prepare("contained");
+  const containedReceipt = join(contained.root, "preparation.json");
+  await writeFile(containedReceipt, `${JSON.stringify(contained.preparation)}\n`);
+  await assert.rejects(
+    cleanupWorkspacePreparation({ root: contained.root, preparation: containedReceipt }),
+    /outside the disposable root/,
+  );
+  assert.equal((await lstat(contained.root)).isDirectory(), true);
+
+  for (const [name, malformed] of [
+    ["null-receipt", null],
+    ["array-receipt", []],
+  ]) {
+    const value = await prepare(name);
+    await writeFile(value.preparationPath, `${JSON.stringify(malformed)}\n`);
+    await assert.rejects(
+      cleanupWorkspacePreparation({ root: value.root, preparation: value.preparationPath }),
+      /Workspace preparation receipt is invalid/,
+    );
+    assert.equal((await lstat(value.root)).isDirectory(), true);
+  }
+
+  const markerMismatch = await prepare("marker-mismatch");
+  await writeFile(
+    join(markerMismatch.root, ".apex-preparation.json"),
+    `${JSON.stringify({
+      schemaVersion: "1.0.0",
+      kind: "guided-client-preparation-marker-v1",
+      preparationId: "f".repeat(64),
+    })}\n`,
+  );
+  await assert.rejects(
+    cleanupWorkspacePreparation({ root: markerMismatch.root, preparation: markerMismatch.preparationPath }),
+    /marker is invalid/,
+  );
+  assert.equal((await lstat(markerMismatch.root)).isDirectory(), true);
+
+  const occupied = await prepare("occupied");
+  const occupiedQuarantine = join(parent, `.occupied.apex-cleanup-${occupied.preparation.preparationId.slice(0, 12)}`);
+  await mkdir(occupiedQuarantine);
+  await assert.rejects(
+    cleanupWorkspacePreparation({ root: occupied.root, preparation: occupied.preparationPath }),
+    /quarantine path already exists/,
+  );
+  assert.equal((await lstat(occupied.root)).isDirectory(), true);
+
+  const physicalParent = join(parent, "physical");
+  const linkedParent = join(parent, "linked");
+  await mkdir(physicalParent);
+  const symlinkedRoot = join(physicalParent, "qualification");
+  const symlinkedPreparation = await collectWorkspacePreparation(
+    { root: symlinkedRoot },
+    {
+      collectCandidate: async () => candidate,
+      serviceFactory: (workspace) => fakePreparationService(workspace, []),
+    },
+  );
+  const symlinkedPreparationPath = join(parent, "symlinked.json");
+  await writeFile(symlinkedPreparationPath, `${JSON.stringify(symlinkedPreparation)}\n`);
+  await symlink(physicalParent, linkedParent);
+  await assert.rejects(
+    cleanupWorkspacePreparation({
+      root: join(linkedParent, "qualification"),
+      preparation: symlinkedPreparationPath,
+    }),
+    /parent must not resolve through a symlink/,
+  );
+  assert.equal((await lstat(symlinkedRoot)).isDirectory(), true);
 });
 
 test("collects both customization lifecycles and cleans isolated workspaces", async (context) => {
