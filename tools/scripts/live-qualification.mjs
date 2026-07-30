@@ -109,7 +109,40 @@ async function readBoundedRegularFile(path, maxBytes, label) {
   }
 }
 
-async function managedPath(root, value) {
+async function hashBoundedRegularFile(path, maxBytes, label) {
+  const before = await lstat(path, { bigint: true });
+  if (!before.isFile() || before.isSymbolicLink() || before.size > BigInt(maxBytes)) {
+    throw new Error(`${label} must be a bounded regular file`);
+  }
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const opened = await handle.stat({ bigint: true });
+    if (!opened.isFile() || opened.dev !== before.dev || opened.ino !== before.ino || opened.size > BigInt(maxBytes)) {
+      throw new Error(`${label} changed before read`);
+    }
+    const hash = createHash("sha256");
+    let bytesRead = 0;
+    for await (const chunk of handle.createReadStream({ autoClose: false })) {
+      bytesRead += chunk.byteLength;
+      if (bytesRead > maxBytes) throw new Error(`${label} exceeds its byte budget`);
+      hash.update(chunk);
+    }
+    const after = await lstat(path, { bigint: true });
+    if (
+      after.isSymbolicLink() ||
+      after.dev !== opened.dev ||
+      after.ino !== opened.ino ||
+      BigInt(bytesRead) !== opened.size
+    ) {
+      throw new Error(`${label} changed during read`);
+    }
+    return hash.digest("hex");
+  } finally {
+    await handle.close();
+  }
+}
+
+async function managedPath(root, canonicalRoot, value) {
   if (typeof value !== "string" || !MANAGED_PATH_PATTERN.test(value) || isAbsolute(value)) {
     throw new Error("Managed customization path is unsafe");
   }
@@ -118,9 +151,8 @@ async function managedPath(root, value) {
   if (relation === "" || relation === ".." || relation.startsWith(`..${sep}`)) {
     throw new Error("Managed customization path escapes the workspace");
   }
-  const rootPath = await realpath(root);
   const parentPath = await realpath(dirname(path));
-  const parentRelation = relative(rootPath, parentPath);
+  const parentRelation = relative(canonicalRoot, parentPath);
   if (
     parentRelation === ".." ||
     parentRelation.startsWith(`..${sep}`) ||
@@ -153,9 +185,9 @@ export async function collectCliSurfaceEvidence(
 ) {
   const workspace = resolve(root, options.workspace ?? ".");
   await assertRuntimeDirectory(workspace, "CLI workspace");
+  const canonicalWorkspace = await realpath(workspace);
   const binary = resolve(workspace, required(options, "binary"));
-  const binaryBytes = await readBoundedRegularFile(binary, MAX_CLI_BINARY_BYTES, "Copilot CLI binary");
-  const observedBinarySha256 = sha256(binaryBytes);
+  const observedBinarySha256 = await hashBoundedRegularFile(binary, MAX_CLI_BINARY_BYTES, "Copilot CLI binary");
   const inventory = parseStrictJson(
     (
       await readBoundedRegularFile(
@@ -196,7 +228,7 @@ export async function collectCliSurfaceEvidence(
     if (entry === null || typeof entry !== "object" || !SHA256_PATTERN.test(entry.currentHash ?? "")) {
       throw new Error("Copilot CLI managed file entry is invalid");
     }
-    const destination = await managedPath(workspace, entry.path);
+    const destination = await managedPath(workspace, canonicalWorkspace, entry.path);
     if (managedDestinations.has(destination)) throw new Error("Copilot CLI managed file destination is duplicated");
     managedDestinations.add(destination);
     const bytes = await readBoundedRegularFile(destination, MAX_MANAGED_FILE_BYTES, "Managed customization file");

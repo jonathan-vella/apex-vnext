@@ -326,6 +326,29 @@ test("CLI surface export reports managed drift and rejects unsafe lock paths", a
   );
 });
 
+test("CLI surface export fails when exact-client MCP inventory omits APEX", async (context) => {
+  const fixture = await cliSurfaceFixture(context);
+  const calls = [];
+  const exported = await collectCliSurfaceEvidence(
+    { workspace: "consumer", binary: "bin/copilot" },
+    {
+      root: fixture.root,
+      contractRoot: fixture.contractRoot,
+      runCli: (_binary, args) => {
+        calls.push(args);
+        return args[0] === "version" ? "GitHub Copilot CLI 1.0.73\n" : '{"mcpServers":{}}\n';
+      },
+    },
+  );
+  assert.deepEqual(exported.disposition, { status: "fail", reasonCode: "MCP_SERVER_MISSING" });
+  assert.equal(exported.mcp.status, "observed");
+  assert.deepEqual(exported.mcp.servers, []);
+  assert.deepEqual(calls, [
+    ["version", "--no-auto-update"],
+    ["mcp", "list", "--json", "--no-auto-update", "--no-remote"],
+  ]);
+});
+
 async function runtimeFixture(context, runId = "run-1") {
   const root = await mkdtemp(join(tmpdir(), "apex-client-runtime-"));
   context.after(() => rm(root, { recursive: true, force: true }));
