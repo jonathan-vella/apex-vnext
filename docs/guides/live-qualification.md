@@ -41,6 +41,25 @@ metadata, allowing equivalent HTTPS and SSH Git URL forms. For this release, the
 `jonathan-vella/apex-vnext`; copying the workflow or a release manifest into another repository does not produce valid
 qualification evidence.
 
+Prepare fresh, separate consumer workspaces for both selected client projections:
+
+```bash
+npm run live:vnext -- prepare \
+  --release-manifest dist/vnext-packages/release-manifest.json \
+  --root /absolute/path/to/qualification-workspaces \
+  --output dist/live-qualification/workspace-preparation.json
+```
+
+The preparation command requires a clean Git worktree and a nonexistent absolute root. When `--output` is provided, it
+must be outside that root; omit it to emit the receipt to standard output. The command binds the exact candidate,
+initializes `cli/` and `vscode/` with their selected projections, verifies each customization lock and managed file, and
+records the generated project/run identity plus content-free lock metadata. The successful workspaces remain available
+for real client execution. If initialization or receipt emission fails, the command removes the entire preparation root
+so a retry cannot inherit mixed state.
+
+The preparation receipt is self-hashed but does not prove client behavior, qualify parity, or qualify a release. Do not
+move, reuse, or switch either prepared workspace between client observations.
+
 Export runtime facts only after the named APEX run exists:
 
 ```bash
@@ -122,19 +141,17 @@ npm run live:vnext -- checkpoint \
   --release-manifest dist/vnext-packages/release-manifest.json \
   --project release-qualification \
   --run candidate-1 \
-  --cli-workspace ../qualification-cli \
+  --cli-workspace /absolute/path/to/qualification-workspaces/cli \
   --cli-binary /absolute/path/to/copilot \
   --lifecycle-root /absolute/path/to/disposable-lifecycle \
-  --vscode-workspace ../qualification-vscode \
+  --vscode-workspace /absolute/path/to/qualification-workspaces/vscode \
   --vscode-host /absolute/path/to/code \
   --output dist/live-qualification/guided-checkpoint.json
 ```
 
-Use separate consumer workspaces because APEX installs exactly one selected
-client projection per workspace. Initialize `../qualification-cli` with
-`--client github-copilot-cli` and `../qualification-vscode` with
-`--client github-copilot-vscode`; do not reuse or switch one workspace between
-the paired observations.
+Use the `cli/` and `vscode/` directories produced by `prepare`, or independently initialized equivalent workspaces.
+APEX installs exactly one selected client projection per workspace; do not reuse or switch one workspace between the
+paired observations.
 
 The composer does not ingest previously generated adapter JSON. It re-derives
 the candidate, runtime, CLI, VS Code, and lifecycle records, validates adapter
@@ -156,10 +173,10 @@ npm run live:vnext -- checkpoint \
   --release-manifest dist/vnext-packages/release-manifest.json \
   --project release-qualification \
   --run candidate-1 \
-  --cli-workspace ../qualification-cli \
+  --cli-workspace /absolute/path/to/qualification-workspaces/cli \
   --cli-binary /absolute/path/to/copilot \
   --lifecycle-root /absolute/path/to/disposable-lifecycle \
-  --vscode-workspace ../qualification-vscode \
+  --vscode-workspace /absolute/path/to/qualification-workspaces/vscode \
   --vscode-host /absolute/path/to/code \
   --previous dist/live-qualification/guided-checkpoint.json \
   --output dist/live-qualification/guided-checkpoint-verified.json
