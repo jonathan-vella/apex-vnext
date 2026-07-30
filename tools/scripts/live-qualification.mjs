@@ -667,6 +667,44 @@ function assertInputAdapter(value, clientId, projectId) {
   }
 }
 
+function assertRestartAdapter(value, clientId, projectId) {
+  const { evidenceId, ...content } = value ?? {};
+  if (
+    value?.schemaVersion !== "1.0.0" ||
+    value.adapter !== "apex-service-restart-v1" ||
+    value?.client?.id !== clientId ||
+    value.projectId !== projectId ||
+    typeof value.runId !== "string" ||
+    !RUN_ID_PATTERN.test(value.runId) ||
+    value.status !== "observed" ||
+    value.qualifiesClientParity !== false ||
+    value.qualifiesRelease !== false ||
+    !SHA256_PATTERN.test(evidenceId ?? "") ||
+    evidenceId !== sha256Json(content) ||
+    Object.keys(value).sort().join(",") !==
+      "adapter,client,evidenceId,projectId,qualifiesClientParity,qualifiesRelease,runId,schemaVersion,source,status" ||
+    Object.keys(value.client ?? {})
+      .sort()
+      .join(",") !== "id" ||
+    Object.keys(value.source ?? {})
+      .sort()
+      .join(",") !== "customizationLockSha256,eventCount,journalHead,managedFiles,ownerEpoch,stateDigest" ||
+    !SHA256_PATTERN.test(value.source?.customizationLockSha256 ?? "") ||
+    !SHA256_PATTERN.test(value.source?.journalHead ?? "") ||
+    !SHA256_PATTERN.test(value.source?.stateDigest ?? "") ||
+    !Number.isInteger(value.source?.managedFiles) ||
+    value.source.managedFiles < 1 ||
+    value.source.managedFiles > 256 ||
+    !Number.isInteger(value.source?.eventCount) ||
+    value.source.eventCount < 1 ||
+    value.source.eventCount > 4096 ||
+    !Number.isInteger(value.source?.ownerEpoch) ||
+    value.source.ownerEpoch < 1
+  ) {
+    throw new Error(`Checkpoint adapter apex-service-restart-v1 for ${clientId} is invalid`);
+  }
+}
+
 function assertPreviousCheckpoint(previous, current) {
   if (
     previous?.schemaVersion !== "1.0.0" ||
@@ -692,6 +730,7 @@ export async function collectGuidedCheckpoint(
     collectCli = (input) => collectCliSurfaceEvidence(input, { root }),
     collectVscode = (input) => collectVscodeSurfaceEvidence(input, { root }),
     collectInput = (input) => collectClientInputEvidence(input, { root }),
+    collectRestart = (input) => collectRestartEvidence(input, { root }),
     collectLifecycle = (input) => collectLifecycleEvidence(input),
     previousCheckpoint,
   } = {},
@@ -708,6 +747,8 @@ export async function collectGuidedCheckpoint(
   });
   const cliInput = await collectInput({ workspace: required(options, "cli-workspace") });
   const vscodeInput = await collectInput({ workspace: required(options, "vscode-workspace") });
+  const cliRestart = await collectRestart({ workspace: required(options, "cli-workspace") });
+  const vscodeRestart = await collectRestart({ workspace: required(options, "vscode-workspace") });
   const lifecycle = await collectLifecycle({ root: required(options, "lifecycle-root") });
   assertCheckpointCandidate(candidate);
   assertCheckpointAdapter(runtime, "apex-runtime-journal-v1");
@@ -715,12 +756,16 @@ export async function collectGuidedCheckpoint(
   assertCheckpointAdapter(vscode, "vscode-surface-v1", "github-copilot-vscode");
   assertInputAdapter(cliInput, "github-copilot-cli", "qualification-cli");
   assertInputAdapter(vscodeInput, "github-copilot-vscode", "qualification-vscode");
+  assertRestartAdapter(cliRestart, "github-copilot-cli", "qualification-cli");
+  assertRestartAdapter(vscodeRestart, "github-copilot-vscode", "qualification-vscode");
   assertLifecycleAdapter(lifecycle);
   assertCheckpointContentFree(runtime);
   assertCheckpointContentFree(cli);
   assertCheckpointContentFree(vscode);
   assertCheckpointContentFree(cliInput);
   assertCheckpointContentFree(vscodeInput);
+  assertCheckpointContentFree(cliRestart);
+  assertCheckpointContentFree(vscodeRestart);
   assertCheckpointContentFree(lifecycle);
   if (runtime.projectId !== options.project || runtime.runId !== options.run) {
     throw new Error("Runtime adapter identity does not match the checkpoint request");
@@ -731,7 +776,22 @@ export async function collectGuidedCheckpoint(
   ) {
     throw new Error("Input adapter customization lock does not match its client surface adapter");
   }
-  const adapters = { runtime, cli, vscode, cliInput, vscodeInput, lifecycle };
+  if (
+    cliRestart.source.customizationLockSha256 !== cli?.workspace?.lockSha256 ||
+    vscodeRestart.source.customizationLockSha256 !== vscode?.workspace?.lockSha256
+  ) {
+    throw new Error("Restart adapter customization lock does not match its client surface adapter");
+  }
+  const adapters = {
+    runtime,
+    cli,
+    vscode,
+    cliInput,
+    vscodeInput,
+    cliRestart,
+    vscodeRestart,
+    lifecycle,
+  };
   const adapterDigests = Object.fromEntries(
     Object.entries(adapters).map(([name, value]) => [name, adapterDigest(value)]),
   );
@@ -769,7 +829,9 @@ export async function collectGuidedCheckpoint(
         ? { kernelStatus: cliInput.status }
         : checkpoint.id === "vscode-input"
           ? { kernelStatus: vscodeInput.status }
-          : {}),
+          : checkpoint.id === "restart-resume"
+            ? { serviceStatus: "observed" }
+            : {}),
     })),
   };
   const current = { ...checkpoint, checkpointId: sha256Json(checkpoint) };

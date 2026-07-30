@@ -1027,6 +1027,27 @@ function checkpointAdapters(overrides = {}) {
   };
   const cliLockHash = "d".repeat(64);
   const vscodeLockHash = "e".repeat(64);
+  const restart = (clientId, projectId, lockHash) => {
+    const content = {
+      schemaVersion: "1.0.0",
+      adapter: "apex-service-restart-v1",
+      client: { id: clientId },
+      projectId,
+      runId: `run-${clientId}`,
+      source: {
+        customizationLockSha256: lockHash,
+        managedFiles: 1,
+        journalHead: hash,
+        eventCount: 2,
+        ownerEpoch: 1,
+        stateDigest: otherHash,
+      },
+      status: "observed",
+      qualifiesClientParity: false,
+      qualifiesRelease: false,
+    };
+    return { ...content, evidenceId: sha256Json(content) };
+  };
   return {
     runtime: {
       schemaVersion: "1.0.0",
@@ -1052,6 +1073,8 @@ function checkpointAdapters(overrides = {}) {
     },
     cliInput: input("github-copilot-cli", "qualification-cli", cliLockHash),
     vscodeInput: input("github-copilot-vscode", "qualification-vscode", vscodeLockHash),
+    cliRestart: restart("github-copilot-cli", "qualification-cli", cliLockHash),
+    vscodeRestart: restart("github-copilot-vscode", "qualification-vscode", vscodeLockHash),
     lifecycle: { ...lifecycle, evidenceId: sha256Json(lifecycle) },
     ...overrides,
   };
@@ -1063,6 +1086,12 @@ function recordedInput(value) {
   content.source.recordedPayloadHash = "1".repeat(64);
   content.interaction.typedAnswer = "observed";
   content.status = "recorded";
+  return { ...content, evidenceId: sha256Json(content) };
+}
+
+function changedRestart(value) {
+  const { evidenceId: _evidenceId, ...content } = structuredClone(value);
+  content.source.stateDigest = "f".repeat(64);
   return { ...content, evidenceId: sha256Json(content) };
 }
 
@@ -1085,6 +1114,7 @@ async function guidedCheckpoint(overrides = {}, dependencies = {}) {
       collectCli: async () => adapters.cli,
       collectVscode: async () => adapters.vscode,
       collectInput: async ({ workspace }) => (workspace === "cli" ? adapters.cliInput : adapters.vscodeInput),
+      collectRestart: async ({ workspace }) => (workspace === "cli" ? adapters.cliRestart : adapters.vscodeRestart),
       collectLifecycle: async () => adapters.lifecycle,
       ...dependencies,
     },
@@ -1107,10 +1137,17 @@ test("composes source-bound adapters into pending interactive checkpoints", asyn
     "vscode",
     "cliInput",
     "vscodeInput",
+    "cliRestart",
+    "vscodeRestart",
     "lifecycle",
   ]);
   assert.ok(Object.values(checkpoint.adapterDigests).every((value) => /^[0-9a-f]{64}$/u.test(value)));
   assert.ok(checkpoint.interactiveCheckpoints.every(({ status }) => status === "pending"));
+  const restartStep = checkpoint.interactiveCheckpoints.find(({ id }) => id === "restart-resume");
+  assert.deepEqual(
+    { status: restartStep.status, serviceStatus: restartStep.serviceStatus },
+    { status: "pending", serviceStatus: "observed" },
+  );
   assert.notEqual(checkpoint.adapters.runtime.runId, checkpoint.adapters.cliInput.runId);
   assert.notEqual(checkpoint.adapters.runtime.runId, checkpoint.adapters.vscodeInput.runId);
   assert.notEqual(checkpoint.adapters.cliInput.runId, checkpoint.adapters.vscodeInput.runId);
@@ -1199,6 +1236,19 @@ test("checkpoint resume accepts exact sources and rejects tampering or stale ada
     guidedCheckpoint({ vscodeInput: recordedVscodeInput }, { previousCheckpoint: previous }),
     /stale or belongs to different sources/,
   );
+  for (const name of ["cliRestart", "vscodeRestart"]) {
+    const changed = changedRestart(checkpointAdapters()[name]);
+    const changedCheckpoint = await guidedCheckpoint({ [name]: changed });
+    const restartStep = changedCheckpoint.interactiveCheckpoints.find(({ id }) => id === "restart-resume");
+    assert.deepEqual(
+      { status: restartStep.status, serviceStatus: restartStep.serviceStatus },
+      { status: "pending", serviceStatus: "observed" },
+    );
+    await assert.rejects(
+      guidedCheckpoint({ [name]: changed }, { previousCheckpoint: previous }),
+      /stale or belongs to different sources/,
+    );
+  }
 
   const forbidden = structuredClone(previous);
   forbidden.assertions = { forged: "pass" };
@@ -1252,6 +1302,45 @@ test("checkpoint rejects mismatched and malformed adapter identities", async () 
     guidedCheckpoint({ vscodeInput: { ...checkpointAdapters().vscodeInput, evidenceId: "f".repeat(64) } }),
     /Checkpoint adapter apex-client-input-journal-v1/,
   );
+  await assert.rejects(
+    guidedCheckpoint({ cliRestart: { ...checkpointAdapters().cliRestart, evidenceId: "f".repeat(64) } }),
+    /Checkpoint adapter apex-service-restart-v1/,
+  );
+  await assert.rejects(
+    guidedCheckpoint({ vscodeRestart: { ...checkpointAdapters().vscodeRestart, evidenceId: "f".repeat(64) } }),
+    /Checkpoint adapter apex-service-restart-v1/,
+  );
+  const mismatchedRestart = structuredClone(checkpointAdapters().vscodeRestart);
+  mismatchedRestart.source.customizationLockSha256 = "f".repeat(64);
+  const { evidenceId: _restartEvidenceId, ...mismatchedRestartContent } = mismatchedRestart;
+  mismatchedRestart.evidenceId = sha256Json(mismatchedRestartContent);
+  await assert.rejects(
+    guidedCheckpoint({ vscodeRestart: mismatchedRestart }),
+    /Restart adapter customization lock does not match/,
+  );
+  const mismatchedCliRestart = structuredClone(checkpointAdapters().cliRestart);
+  mismatchedCliRestart.source.customizationLockSha256 = "f".repeat(64);
+  const { evidenceId: _cliRestartEvidenceId, ...mismatchedCliRestartContent } = mismatchedCliRestart;
+  mismatchedCliRestart.evidenceId = sha256Json(mismatchedCliRestartContent);
+  await assert.rejects(
+    guidedCheckpoint({ cliRestart: mismatchedCliRestart }),
+    /Restart adapter customization lock does not match/,
+  );
+  for (const [name, field, value] of [
+    ["cliRestart", "client", { id: "github-copilot-vscode" }],
+    ["cliRestart", "projectId", "qualification-vscode"],
+    ["vscodeRestart", "client", { id: "github-copilot-cli" }],
+    ["vscodeRestart", "projectId", "qualification-cli"],
+  ]) {
+    const mismatchedIdentity = structuredClone(checkpointAdapters()[name]);
+    mismatchedIdentity[field] = value;
+    const { evidenceId: _restartIdentityEvidenceId, ...mismatchedIdentityContent } = mismatchedIdentity;
+    mismatchedIdentity.evidenceId = sha256Json(mismatchedIdentityContent);
+    await assert.rejects(
+      guidedCheckpoint({ [name]: mismatchedIdentity }),
+      /Checkpoint adapter apex-service-restart-v1/,
+    );
+  }
   const extraInputField = structuredClone(checkpointAdapters().cliInput);
   extraInputField.extra = "bounded-but-unsupported";
   const { evidenceId: _extraEvidenceId, ...extraInputContent } = extraInputField;
@@ -1320,6 +1409,8 @@ test("checkpoint rejects mismatched and malformed adapter identities", async () 
         collectVscode: async () => checkpointAdapters().vscode,
         collectInput: async ({ workspace }) =>
           workspace === "cli" ? checkpointAdapters().cliInput : checkpointAdapters().vscodeInput,
+        collectRestart: async ({ workspace }) =>
+          workspace === "cli" ? checkpointAdapters().cliRestart : checkpointAdapters().vscodeRestart,
         collectLifecycle: async () => checkpointAdapters().lifecycle,
       },
     ),
@@ -1344,6 +1435,8 @@ test("checkpoint rejects mismatched and malformed adapter identities", async () 
         collectVscode: async () => checkpointAdapters().vscode,
         collectInput: async ({ workspace }) =>
           workspace === "cli" ? checkpointAdapters().cliInput : checkpointAdapters().vscodeInput,
+        collectRestart: async ({ workspace }) =>
+          workspace === "cli" ? checkpointAdapters().cliRestart : checkpointAdapters().vscodeRestart,
         collectLifecycle: async () => checkpointAdapters().lifecycle,
       },
     ),
