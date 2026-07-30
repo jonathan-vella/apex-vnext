@@ -10,7 +10,18 @@ import {
   runQualification,
   runQualificationBenchmark,
   tempWorkspace,
+  type QualificationReport,
 } from "../index.js";
+
+const repeatedReport: QualificationReport = {
+  schemaVersion: "1.0.0",
+  status: "pass",
+  durationMs: 1,
+  tracks: [],
+  checks: [],
+  eventCount: 0,
+  hashes: {},
+};
 
 async function customizationSource(root: string): Promise<string> {
   const source = join(root, "customizations-source");
@@ -154,4 +165,47 @@ test("qualification measurements preserve unavailable evidence and deterministic
 
 test("repeat qualification rejects invalid sample counts", async () => {
   await assert.rejects(() => repeatQualificationReports(0, async () => assert.fail()), /positive integer/);
+  await assert.rejects(
+    () => repeatQualificationReports(1, async () => repeatedReport, 0),
+    /parallelism must be a positive integer/,
+  );
+});
+
+test("repeat qualification bounds parallel work and preserves iteration order", async () => {
+  let active = 0;
+  let maximumActive = 0;
+  const results = await repeatQualificationReports(
+    6,
+    async (iteration) => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      await new Promise((resolvePromise) => setImmediate(resolvePromise));
+      active -= 1;
+      return { ...repeatedReport, hashes: { report: String(iteration) } };
+    },
+    3,
+  );
+  assert.equal(maximumActive, 3);
+  assert.deepEqual(
+    results.map(({ hashes }) => hashes.report),
+    ["0", "1", "2", "3", "4", "5"],
+  );
+});
+
+test("repeat qualification propagates concurrent harness failures", async () => {
+  const started: number[] = [];
+  await assert.rejects(
+    repeatQualificationReports(
+      6,
+      async (iteration) => {
+        started.push(iteration);
+        if (iteration === 1) throw new Error("qualification failed");
+        await new Promise((resolvePromise) => setImmediate(resolvePromise));
+        return repeatedReport;
+      },
+      2,
+    ),
+    /qualification failed/,
+  );
+  assert.deepEqual(started, [0, 1]);
 });

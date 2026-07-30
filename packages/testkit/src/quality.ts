@@ -65,10 +65,20 @@ const SCENARIOS = {
 export async function repeatQualificationReports(
   repetitions: number,
   harness: (iteration: number) => Promise<QualificationReport>,
+  parallelism = 1,
 ): Promise<readonly QualificationReport[]> {
   if (!Number.isInteger(repetitions) || repetitions < 1) throw new RangeError("repetitions must be a positive integer");
-  const reports: QualificationReport[] = [];
-  for (let iteration = 0; iteration < repetitions; iteration += 1) reports.push(await harness(iteration));
+  if (!Number.isInteger(parallelism) || parallelism < 1) throw new RangeError("parallelism must be a positive integer");
+  const reports = new Array<QualificationReport>(repetitions);
+  let nextIteration = 0;
+  const worker = async (): Promise<void> => {
+    while (nextIteration < repetitions) {
+      const iteration = nextIteration;
+      nextIteration += 1;
+      reports[iteration] = await harness(iteration);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(parallelism, repetitions) }, () => worker()));
   return reports;
 }
 
