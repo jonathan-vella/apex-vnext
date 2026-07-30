@@ -47,6 +47,8 @@ prior qualification is retained as historical characterization. See
   role/client pairs are omitted deterministically, and parent delegation tools require a supported destination.
 - Added bounded runtime evidence export for guided client qualification, deriving source-bound facts from verified APEX
   journals and immutable approval objects without creating client assertions or qualified outcomes.
+- Added exact Copilot CLI surface binding for guided qualification, with binary/version checks, managed-projection drift
+  detection, bounded MCP server-name inventory, and explicit unavailable results for non-selected binaries.
 - Added exact client-qualification candidate receipt generation with clean-worktree, repository, branch, commit,
   release-manifest, runtime-bundle, package-lock, and customization-bundle binding.
 - Added versioned kernel-owned input requests and typed APEX MCP answer recording bound to the exact journal head and

@@ -14,6 +14,7 @@ import { EventJournal, ObjectStore } from "../../../packages/kernel/dist/index.j
 import {
   assertCleanGitStatus,
   assertReleaseManifest,
+  collectCliSurfaceEvidence,
   collectCurrentCandidate,
   collectRuntimeEvidence,
   createEvidenceManifestTemplate,
@@ -102,6 +103,18 @@ test("parses bounded live qualification commands", () => {
     file: "qualification.json",
   });
   assert.deepEqual(
+    parseLiveQualificationArguments([
+      "cli",
+      "--workspace",
+      "consumer",
+      "--binary",
+      "bin/copilot",
+      "--output",
+      "cli.json",
+    ]),
+    { command: "cli", workspace: "consumer", binary: "bin/copilot", output: "cli.json" },
+  );
+  assert.deepEqual(
     parseLiveQualificationArguments(["runtime", "--project", "demo", "--run", "run-1", "--output", "runtime.json"]),
     { command: "runtime", project: "demo", run: "run-1", output: "runtime.json" },
   );
@@ -113,6 +126,169 @@ test("parses bounded live qualification commands", () => {
     },
   );
   assert.throws(() => parseLiveQualificationArguments(["validate", "--unknown", "value"]), /Unknown/);
+});
+
+async function cliSurfaceFixture(context, { selectedHash, managedHash } = {}) {
+  const root = await mkdtemp(join(tmpdir(), "apex-client-cli-surface-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const contractRoot = join(root, "contract");
+  const workspace = join(root, "consumer");
+  const binary = Buffer.from("copilot-binary");
+  const managed = Buffer.from('{"mcpServers":{}}\n');
+  const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  await mkdir(join(contractRoot, "tools", "registry"), { recursive: true });
+  await mkdir(join(workspace, "bin"), { recursive: true });
+  await mkdir(join(workspace, ".apex"), { recursive: true });
+  await mkdir(join(workspace, ".github"), { recursive: true });
+  await writeFile(join(workspace, "bin", "copilot"), binary);
+  await writeFile(join(workspace, ".github", "mcp.json"), managed);
+  await writeFile(
+    join(contractRoot, "tools", "registry", "copilot-cli-agent-tools.json"),
+    `${JSON.stringify({
+      schemaVersion: "1.0.0",
+      client: "github-copilot-cli",
+      clientVersion: "1.0.73",
+      clientBinarySha256: selectedHash ?? digest(binary),
+      workspaceServer: "apex",
+    })}\n`,
+  );
+  await writeFile(
+    join(workspace, ".apex", "customizations.lock.json"),
+    `${JSON.stringify({
+      version: 1,
+      source: "/private/source/path",
+      clientId: "github-copilot-cli",
+      runtime: [],
+      files: [
+        {
+          path: ".github/mcp.json",
+          sourceHash: digest(managed),
+          baseHash: digest(managed),
+          currentHash: managedHash ?? digest(managed),
+        },
+      ],
+    })}\n`,
+  );
+  return { root, contractRoot, workspace, binaryHash: digest(binary), managedHash: digest(managed) };
+}
+
+test("exports exact CLI binding, managed files, and bounded MCP server names", async (context) => {
+  const fixture = await cliSurfaceFixture(context);
+  const calls = [];
+  const exported = await collectCliSurfaceEvidence(
+    { workspace: "consumer", binary: "bin/copilot" },
+    {
+      root: fixture.root,
+      contractRoot: fixture.contractRoot,
+      runCli: (_binary, args) => {
+        calls.push(args);
+        return args[0] === "version" ? "GitHub Copilot CLI 1.0.73\n" : '{"mcpServers":{"apex":{"status":"ok"}}}\n';
+      },
+    },
+  );
+  assert.equal(exported.disposition.status, "pass");
+  assert.equal(exported.client.observedBinarySha256, fixture.binaryHash);
+  assert.deepEqual(exported.mcp.servers, ["apex"]);
+  assert.equal(exported.workspace.files[0].matches, true);
+  assert.deepEqual(calls, [
+    ["version", "--no-auto-update"],
+    ["mcp", "list", "--json", "--no-auto-update", "--no-remote"],
+  ]);
+  assert.doesNotMatch(JSON.stringify(exported), /private\/source\/path|status.*ok/u);
+});
+
+test("CLI binding mismatch is unavailable and does not inspect MCP", async (context) => {
+  const fixture = await cliSurfaceFixture(context, { selectedHash: "f".repeat(64) });
+  const calls = [];
+  const exported = await collectCliSurfaceEvidence(
+    { workspace: "consumer", binary: "bin/copilot" },
+    {
+      root: fixture.root,
+      contractRoot: fixture.contractRoot,
+      runCli: (_binary, args) => {
+        calls.push(args);
+        return "GitHub Copilot CLI 1.0.73\n";
+      },
+    },
+  );
+  assert.equal(exported.disposition.status, "unavailable");
+  assert.equal(exported.disposition.reasonCode, "CLIENT_BINARY_MISMATCH");
+  assert.deepEqual(calls, [["version", "--no-auto-update"]]);
+  assert.equal(exported.mcp.status, "not-run");
+});
+
+test("CLI surface export reports managed drift and rejects unsafe lock paths", async (context) => {
+  const drift = await cliSurfaceFixture(context, { managedHash: "e".repeat(64) });
+  const driftCalls = [];
+  const exported = await collectCliSurfaceEvidence(
+    { workspace: "consumer", binary: "bin/copilot" },
+    {
+      root: drift.root,
+      contractRoot: drift.contractRoot,
+      runCli: (_binary, args) => {
+        driftCalls.push(args);
+        return "GitHub Copilot CLI 1.0.73\n";
+      },
+    },
+  );
+  assert.deepEqual(exported.disposition, { status: "fail", reasonCode: "MANAGED_FILE_DRIFT" });
+  assert.deepEqual(driftCalls, [["version", "--no-auto-update"]]);
+  assert.equal(exported.mcp.status, "not-run");
+
+  const unsafe = await cliSurfaceFixture(context);
+  const lockPath = join(unsafe.workspace, ".apex", "customizations.lock.json");
+  const lock = JSON.parse(await readFile(lockPath, "utf8"));
+  lock.files.push({ ...lock.files[0], path: "../outside.json" });
+  await writeFile(lockPath, JSON.stringify(lock));
+  await assert.rejects(
+    collectCliSurfaceEvidence(
+      { workspace: "consumer", binary: "bin/copilot" },
+      {
+        root: unsafe.root,
+        contractRoot: unsafe.contractRoot,
+        runCli: () => "GitHub Copilot CLI 1.0.73\n",
+      },
+    ),
+    /unsafe|escapes/,
+  );
+
+  const linked = await cliSurfaceFixture(context);
+  const outsideDirectory = join(linked.root, "outside-managed");
+  await mkdir(outsideDirectory);
+  await writeFile(join(outsideDirectory, "mcp.json"), '{"mcpServers":{}}\n');
+  await rm(join(linked.workspace, ".github"), { recursive: true });
+  await symlink(outsideDirectory, join(linked.workspace, ".github"));
+  await assert.rejects(
+    collectCliSurfaceEvidence(
+      { workspace: "consumer", binary: "bin/copilot" },
+      {
+        root: linked.root,
+        contractRoot: linked.contractRoot,
+        runCli: () => "GitHub Copilot CLI 1.0.73\n",
+      },
+    ),
+    /parent escapes/,
+  );
+
+  const oversized = await cliSurfaceFixture(context);
+  const oversizedLockPath = join(oversized.workspace, ".apex", "customizations.lock.json");
+  const oversizedLock = JSON.parse(await readFile(oversizedLockPath, "utf8"));
+  oversizedLock.files = Array.from({ length: 257 }, (_, index) => ({
+    ...oversizedLock.files[0],
+    path: index === 0 ? ".github/mcp.json" : `.github/agents/agent-${index}.md`,
+  }));
+  await writeFile(oversizedLockPath, JSON.stringify(oversizedLock));
+  await assert.rejects(
+    collectCliSurfaceEvidence(
+      { workspace: "consumer", binary: "bin/copilot" },
+      {
+        root: oversized.root,
+        contractRoot: oversized.contractRoot,
+        runCli: () => "GitHub Copilot CLI 1.0.73\n",
+      },
+    ),
+    /customization lock is invalid/,
+  );
 });
 
 async function runtimeFixture(context, runId = "run-1") {

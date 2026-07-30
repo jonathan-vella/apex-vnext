@@ -8,8 +8,9 @@
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { constants } from "node:fs";
+import { lstat, mkdir, open, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import {
@@ -30,6 +31,7 @@ import {
 const ROOT = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const COMMAND_OPTIONS = {
   candidate: new Set(["branch", "output", "package-lock", "release-manifest", "runtime-bundle"]),
+  cli: new Set(["binary", "output", "workspace"]),
   runtime: new Set(["output", "project", "run"]),
   template: new Set([
     "actor",
@@ -60,7 +62,7 @@ const COMMAND_OPTIONS = {
 export function parseLiveQualificationArguments(argv) {
   const command = argv[0];
   const allowed = COMMAND_OPTIONS[command];
-  if (allowed === undefined) throw new Error("Command must be candidate, runtime, template, validate, or render");
+  if (allowed === undefined) throw new Error("Command must be candidate, cli, runtime, template, validate, or render");
   const options = { command };
   for (let index = 1; index < argv.length; index += 2) {
     const argument = argv[index];
@@ -76,6 +78,190 @@ export function parseLiveQualificationArguments(argv) {
     }
   }
   return options;
+}
+
+const MAX_CLI_BINARY_BYTES = 256 * 1024 * 1024;
+const MAX_CLI_OUTPUT_BYTES = 1024 * 1024;
+const MAX_MANAGED_FILE_BYTES = 2 * 1024 * 1024;
+const MANAGED_PATH_PATTERN = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]+$/;
+const MCP_SERVER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+
+async function readBoundedRegularFile(path, maxBytes, label) {
+  const before = await lstat(path, { bigint: true });
+  if (!before.isFile() || before.isSymbolicLink() || before.size > BigInt(maxBytes)) {
+    throw new Error(`${label} must be a bounded regular file`);
+  }
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const opened = await handle.stat({ bigint: true });
+    if (!opened.isFile() || opened.dev !== before.dev || opened.ino !== before.ino || opened.size > BigInt(maxBytes)) {
+      throw new Error(`${label} changed before read`);
+    }
+    const bytes = await handle.readFile();
+    if (bytes.byteLength > maxBytes) throw new Error(`${label} exceeds its byte budget`);
+    const after = await lstat(path, { bigint: true });
+    if (after.isSymbolicLink() || after.dev !== opened.dev || after.ino !== opened.ino) {
+      throw new Error(`${label} changed during read`);
+    }
+    return bytes;
+  } finally {
+    await handle.close();
+  }
+}
+
+async function managedPath(root, value) {
+  if (typeof value !== "string" || !MANAGED_PATH_PATTERN.test(value) || isAbsolute(value)) {
+    throw new Error("Managed customization path is unsafe");
+  }
+  const path = resolve(root, value);
+  const relation = relative(root, path);
+  if (relation === "" || relation === ".." || relation.startsWith(`..${sep}`)) {
+    throw new Error("Managed customization path escapes the workspace");
+  }
+  const rootPath = await realpath(root);
+  const parentPath = await realpath(dirname(path));
+  const parentRelation = relative(rootPath, parentPath);
+  if (
+    parentRelation === ".." ||
+    parentRelation.startsWith(`..${sep}`) ||
+    resolve(parentPath, basename(path)) !== path
+  ) {
+    throw new Error("Managed customization parent escapes the workspace");
+  }
+  return path;
+}
+
+function cliVersion(output) {
+  const match = /^GitHub Copilot CLI ([0-9]+(?:\.[0-9]+){1,3}(?:-[0-9A-Za-z.-]+)?)/m.exec(output);
+  if (match === null) throw new Error("Copilot CLI version output is invalid");
+  return match[1];
+}
+
+function defaultCliRunner(binary, args, workspace) {
+  return execFileSync(binary, args, {
+    cwd: workspace,
+    encoding: "utf8",
+    timeout: 30_000,
+    maxBuffer: MAX_CLI_OUTPUT_BYTES,
+    env: { ...process.env, NO_COLOR: "1" },
+  });
+}
+
+export async function collectCliSurfaceEvidence(
+  options,
+  { root = ROOT, contractRoot = ROOT, runCli = defaultCliRunner } = {},
+) {
+  const workspace = resolve(root, options.workspace ?? ".");
+  await assertRuntimeDirectory(workspace, "CLI workspace");
+  const binary = resolve(workspace, required(options, "binary"));
+  const binaryBytes = await readBoundedRegularFile(binary, MAX_CLI_BINARY_BYTES, "Copilot CLI binary");
+  const observedBinarySha256 = sha256(binaryBytes);
+  const inventory = parseStrictJson(
+    (
+      await readBoundedRegularFile(
+        join(contractRoot, "tools", "registry", "copilot-cli-agent-tools.json"),
+        MAX_CLI_OUTPUT_BYTES,
+        "Copilot CLI inventory",
+      )
+    ).toString("utf8"),
+  );
+  if (
+    inventory?.client !== "github-copilot-cli" ||
+    typeof inventory.clientVersion !== "string" ||
+    !SHA256_PATTERN.test(inventory.clientBinarySha256 ?? "") ||
+    typeof inventory.workspaceServer !== "string"
+  ) {
+    throw new Error("Copilot CLI inventory is invalid");
+  }
+  const versionOutput = runCli(binary, ["version", "--no-auto-update"], workspace);
+  if (Buffer.byteLength(versionOutput) > MAX_CLI_OUTPUT_BYTES)
+    throw new Error("Copilot CLI version output is too large");
+  const observedVersion = cliVersion(versionOutput);
+  const lockPath = join(workspace, ".apex", "customizations.lock.json");
+  const lockBytes = await readBoundedRegularFile(lockPath, MAX_MANAGED_FILE_BYTES, "Customization lock");
+  const lock = parseStrictJson(lockBytes.toString("utf8"));
+  if (
+    lock?.version !== 1 ||
+    lock.clientId !== "github-copilot-cli" ||
+    !Array.isArray(lock.files) ||
+    lock.files.length === 0 ||
+    lock.files.length > 256 ||
+    !lock.files.some((entry) => entry?.path === ".github/mcp.json")
+  ) {
+    throw new Error("Copilot CLI customization lock is invalid");
+  }
+  const files = [];
+  for (const entry of lock.files) {
+    if (
+      entry === null ||
+      typeof entry !== "object" ||
+      !SHA256_PATTERN.test(entry.currentHash ?? "") ||
+      files.some(({ path }) => path === entry.path)
+    ) {
+      throw new Error("Copilot CLI managed file entry is invalid");
+    }
+    const bytes = await readBoundedRegularFile(
+      await managedPath(workspace, entry.path),
+      MAX_MANAGED_FILE_BYTES,
+      "Managed customization file",
+    );
+    const actualHash = sha256(bytes);
+    files.push({
+      path: entry.path,
+      expectedHash: entry.currentHash,
+      actualHash,
+      matches: actualHash === entry.currentHash,
+    });
+  }
+  files.sort(({ path: left }, { path: right }) => left.localeCompare(right));
+  const exactClient =
+    observedVersion === inventory.clientVersion && observedBinarySha256 === inventory.clientBinarySha256;
+  const drift = files.some(({ matches }) => !matches);
+  let mcp = { status: "not-run", servers: [], sourceDigest: null };
+  if (exactClient && !drift) {
+    const output = runCli(binary, ["mcp", "list", "--json", "--no-auto-update", "--no-remote"], workspace);
+    if (Buffer.byteLength(output) > MAX_CLI_OUTPUT_BYTES) throw new Error("Copilot CLI MCP output is too large");
+    const value = parseStrictJson(output);
+    if (value?.mcpServers === null || typeof value?.mcpServers !== "object" || Array.isArray(value.mcpServers)) {
+      throw new Error("Copilot CLI MCP inventory is invalid");
+    }
+    const servers = Object.keys(value.mcpServers).sort();
+    if (servers.some((server) => !MCP_SERVER_PATTERN.test(server)))
+      throw new Error("Copilot CLI MCP server name is invalid");
+    mcp = { status: "observed", servers, sourceDigest: sha256(Buffer.from(output)) };
+  }
+  const missingMcp = exactClient && !mcp.servers.includes(inventory.workspaceServer);
+  const disposition = !exactClient
+    ? {
+        status: "unavailable",
+        reasonCode: "CLIENT_BINARY_MISMATCH",
+        ownerCode: "CLIENT_ENVIRONMENT",
+        nextActionCode: "INSTALL_SELECTED_CLI",
+      }
+    : drift
+      ? { status: "fail", reasonCode: "MANAGED_FILE_DRIFT" }
+      : missingMcp
+        ? { status: "fail", reasonCode: "MCP_SERVER_MISSING" }
+        : { status: "pass" };
+  return {
+    schemaVersion: "1.0.0",
+    adapter: "copilot-cli-surface-v1",
+    client: {
+      id: "github-copilot-cli",
+      selectedVersion: inventory.clientVersion,
+      observedVersion,
+      selectedBinarySha256: inventory.clientBinarySha256,
+      observedBinarySha256,
+      versionOutputSha256: sha256(Buffer.from(versionOutput)),
+    },
+    workspace: {
+      clientId: lock.clientId,
+      lockSha256: sha256(lockBytes),
+      files,
+    },
+    mcp,
+    disposition,
+  };
 }
 
 const PROJECT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -799,6 +985,12 @@ async function main() {
     const rendered = renderLiveQualification(qualification);
     if (options.output) await writeRendered(resolve(options.output), rendered);
     else process.stdout.write(rendered);
+    return;
+  }
+  if (options.command === "cli") {
+    const contents = `${JSON.stringify(await collectCliSurfaceEvidence(options), null, 2)}\n`;
+    if (options.output) await writeNewFiles([[resolve(options.output), contents]]);
+    else process.stdout.write(contents);
     return;
   }
   assertCleanGitStatus(gitValue(["status", "--porcelain"]));
