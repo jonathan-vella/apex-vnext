@@ -830,10 +830,7 @@ export async function collectGuidedCheckpoint(
         : checkpoint.id === "vscode-input"
           ? { kernelStatus: vscodeInput.status }
           : checkpoint.id === "restart-resume"
-            ? {
-                serviceStatus:
-                  cliRestart.status === "observed" && vscodeRestart.status === "observed" ? "observed" : "pending",
-              }
+            ? { serviceStatus: "observed" }
             : {}),
     })),
   };
