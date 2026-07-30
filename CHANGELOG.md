@@ -67,6 +67,8 @@ prior qualification is retained as historical characterization. See
   user-owned client interaction steps pending.
 - Added content-free restart evidence that compares persisted run state across distinct APEX service instances for both
   selected client workspaces without claiming client-process or UI-session restart.
+- Bound fresh paired restart evidence into guided checkpoints and strict resume while retaining the user-owned client
+  restart interaction as pending.
 - Added exact client-qualification candidate receipt generation with clean-worktree, repository, branch, commit,
   release-manifest, runtime-bundle, package-lock, and customization-bundle binding.
 - Added versioned kernel-owned input requests and typed APEX MCP answer recording bound to the exact journal head and

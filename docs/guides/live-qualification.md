@@ -230,6 +230,12 @@ persisted selection, exact qualification project/client identity, and the same
 customization-lock digest verified by that client's surface adapter. The
 composer must not require the three generated run IDs to be equal.
 
+The paired `restart-resume` checkpoint includes `serviceStatus: observed` only
+when both prepared workspaces pass fresh APEX service reconstruction evidence.
+Its interaction `status` remains `pending`: service reconstruction does not prove
+that VS Code or Copilot CLI restarted or restored a UI session. Any changed
+restart state digest changes the checkpoint ID and invalidates an older resume.
+
 The checkpoint never accepts assertions, marks scenarios passed, qualifies
 client parity, or qualifies a release. CLI `CLIENT-005` remains an explicit
 capability blocker under ADR-0006 even when all automated adapters pass.
