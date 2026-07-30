@@ -41,6 +41,23 @@ metadata, allowing equivalent HTTPS and SSH Git URL forms. For this release, the
 `jonathan-vella/apex-vnext`; copying the workflow or a release manifest into another repository does not produce valid
 qualification evidence.
 
+Export runtime facts only after the named APEX run exists:
+
+```bash
+npm run live:vnext -- runtime \
+  --project release-qualification \
+  --run candidate-1 \
+  --output dist/live-qualification/runtime-evidence.json
+```
+
+The runtime adapter verifies the journal chain, embedded project/run identity, owner epochs, regular-file paths, and
+content-addressed approval objects. It emits only source-bound task, gate, artifact, accepted-evidence, deployment, and
+writer-transfer facts. Unknown payload fields are not copied, and the command refuses to overwrite its output.
+
+This output is adapter evidence, not a client outcome or collector receipt. It cannot prove picker visibility, agent or
+skill discovery, MCP inventory, interactive questions, restart behavior, denial responses, or other client-surface
+facts. Exact-client adapters and interactive checkpoints must supply those records before scenario composition.
+
 When the public npm registry is unavailable locally, use an approved registry proxy as a process-scoped override:
 
 ```bash
