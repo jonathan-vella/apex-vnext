@@ -198,6 +198,7 @@ test("exports exact VS Code host, Copilot Chat, and managed projection binding",
   );
   assert.deepEqual(exported.disposition, { status: "pass" });
   assert.equal(exported.client.observedVersion, "1.130.0");
+  assert.match(exported.client.observedHostSha256, /^[0-9a-f]{64}$/u);
   assert.equal(exported.client.observedExtensionVersion, "0.58.0");
   assert.equal(exported.workspace.files[0].matches, true);
   assert.deepEqual(calls, [["--version"], ["--list-extensions", "--show-versions"]]);
@@ -291,6 +292,26 @@ test("VS Code surface binding reports managed drift and rejects duplicate extens
       },
     ),
     /VS Code customization lock/,
+  );
+
+  const malformedFixture = await vscodeSurfaceFixture(context);
+  const malformedLockPath = join(malformedFixture.workspace, ".apex", "customizations.lock.json");
+  const malformedLock = JSON.parse(await readFile(malformedLockPath, "utf8"));
+  const malformedEntry = { ...malformedLock.files[0] };
+  delete malformedEntry.path;
+  malformedLock.files.push(malformedEntry);
+  await writeFile(malformedLockPath, JSON.stringify(malformedLock));
+  await assert.rejects(
+    collectVscodeSurfaceEvidence(
+      { workspace: "consumer", host: malformedFixture.host },
+      {
+        root: malformedFixture.root,
+        contractRoot: malformedFixture.contractRoot,
+        runVscode: (_host, args) =>
+          args[0] === "--version" ? "1.130.0\ncommit\nx64\n" : "github.copilot-chat@0.58.0\n",
+      },
+    ),
+    /VS Code managed file entry is invalid/,
   );
 });
 

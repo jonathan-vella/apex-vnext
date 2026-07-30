@@ -204,7 +204,12 @@ async function collectManagedProjection(workspace, expectedClientId, requiredFil
   const files = [];
   const managedDestinations = new Set();
   for (const entry of lock.files) {
-    if (entry === null || typeof entry !== "object" || !SHA256_PATTERN.test(entry.currentHash ?? "")) {
+    if (
+      entry === null ||
+      typeof entry !== "object" ||
+      typeof entry.path !== "string" ||
+      !SHA256_PATTERN.test(entry.currentHash ?? "")
+    ) {
       throw new Error(`${label} managed file entry is invalid`);
     }
     const destination = await managedPath(workspace, canonicalWorkspace, entry.path);
@@ -368,7 +373,7 @@ export async function collectVscodeSurfaceEvidence(
   }
   const host = required(options, "host");
   if (!isAbsolute(host)) throw new Error("VS Code host must be an absolute path");
-  await readBoundedRegularFile(host, MAX_CLI_BINARY_BYTES, "VS Code host");
+  const observedHostSha256 = await hashBoundedRegularFile(host, MAX_CLI_BINARY_BYTES, "VS Code host");
   const versionOutput = runVscode(host, ["--version"], workspace);
   if (Buffer.byteLength(versionOutput) > MAX_CLI_OUTPUT_BYTES) throw new Error("VS Code version output is too large");
   const observedVersion = vscodeVersion(versionOutput);
@@ -409,6 +414,7 @@ export async function collectVscodeSurfaceEvidence(
       id: "github-copilot-vscode",
       selectedVersion,
       observedVersion,
+      observedHostSha256,
       selectedExtensionVersion,
       observedExtensionVersion,
       versionOutputSha256: sha256(Buffer.from(versionOutput)),
