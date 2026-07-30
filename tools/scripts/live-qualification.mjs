@@ -49,6 +49,7 @@ const COMMAND_OPTIONS = {
   ]),
   cli: new Set(["binary", "output", "workspace"]),
   lifecycle: new Set(["output", "root"]),
+  prepare: new Set(["branch", "output", "package-lock", "release-manifest", "root", "runtime-bundle"]),
   runtime: new Set(["output", "project", "run"]),
   template: new Set([
     "actor",
@@ -82,7 +83,7 @@ export function parseLiveQualificationArguments(argv) {
   const allowed = COMMAND_OPTIONS[command];
   if (allowed === undefined)
     throw new Error(
-      "Command must be candidate, checkpoint, cli, lifecycle, runtime, template, validate, vscode, or render",
+      "Command must be candidate, checkpoint, cli, lifecycle, prepare, runtime, template, validate, vscode, or render",
     );
   const options = { command };
   for (let index = 1; index < argv.length; index += 2) {
@@ -152,6 +153,92 @@ async function lifecycleClient(root, clientId, projectId, serviceFactory) {
   };
 }
 
+async function prepareClient(root, clientId, projectId, serviceFactory) {
+  await mkdir(root, { recursive: false });
+  const initialized = await serviceFactory(root).init({ projectId, clientId });
+  if (
+    initialized?.projectId !== projectId ||
+    typeof initialized?.runId !== "string" ||
+    !RUN_ID_PATTERN.test(initialized.runId)
+  ) {
+    throw new Error("Prepared workspace identity is invalid");
+  }
+  const requiredFile = clientId === "github-copilot-cli" ? ".github/mcp.json" : ".vscode/mcp.json";
+  const projection = await collectManagedProjection(root, clientId, requiredFile, "Prepared workspace");
+  return {
+    clientId,
+    projectId: initialized.projectId,
+    runId: initialized.runId,
+    customizationLockSha256: projection.lockSha256,
+    managedFiles: projection.files.length,
+  };
+}
+
+export async function collectWorkspacePreparation(
+  options,
+  {
+    collectCandidate = (input) => collectCurrentCandidate(input),
+    serviceFactory = (root) => new ApexService(root),
+    remove = rm,
+  } = {},
+) {
+  const inputRoot = required(options, "root");
+  if (!isAbsolute(inputRoot)) throw new Error("Preparation root must be an absolute path");
+  const root = resolve(inputRoot);
+  const canonicalParent = await realpath(dirname(root));
+  if (resolve(canonicalParent, basename(root)) !== root) {
+    throw new Error("Preparation root parent must not resolve through a symlink");
+  }
+  assertOutputOutsideDisposableRoot(root, options.output, "Preparation");
+  if (await pathExists(root)) throw new Error("Preparation root must not already exist");
+  const candidate = await collectCandidate(options);
+  assertCheckpointCandidate(candidate);
+  await mkdir(root, { recursive: false });
+  try {
+    const cli = await prepareClient(join(root, "cli"), "github-copilot-cli", "qualification-cli", serviceFactory);
+    const vscode = await prepareClient(
+      join(root, "vscode"),
+      "github-copilot-vscode",
+      "qualification-vscode",
+      serviceFactory,
+    );
+    const preparation = {
+      schemaVersion: "1.0.0",
+      kind: "guided-client-preparation-v1",
+      candidate,
+      workspaces: { cli, vscode },
+      qualifiesClientParity: false,
+      qualifiesRelease: false,
+    };
+    assertCheckpointContentFree(preparation);
+    return { ...preparation, preparationId: sha256Json(preparation) };
+  } catch (error) {
+    await remove(root, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+export async function writeWorkspacePreparation(
+  options,
+  {
+    collect = (input) => collectWorkspacePreparation(input),
+    write = writeNewFiles,
+    emit = (contents) => process.stdout.write(contents),
+    remove = rm,
+  } = {},
+) {
+  const preparation = await collect(options);
+  const contents = `${JSON.stringify(preparation, null, 2)}\n`;
+  try {
+    if (options.output) await write([[resolve(options.output), contents]]);
+    else emit(contents);
+    return preparation;
+  } catch (error) {
+    await remove(resolve(required(options, "root")), { recursive: true, force: true });
+    throw error;
+  }
+}
+
 export async function collectLifecycleEvidence(
   options,
   { serviceFactory = (root) => new ApexService(root), remove = rm } = {},
@@ -164,7 +251,7 @@ export async function collectLifecycleEvidence(
   if (resolve(canonicalParent, basename(root)) !== root) {
     throw new Error("Lifecycle root parent must not resolve through a symlink");
   }
-  assertOutputOutsideLifecycleRoot(root, options.output, "Lifecycle");
+  assertOutputOutsideDisposableRoot(root, options.output, "Lifecycle");
   if (await pathExists(root)) throw new Error("Lifecycle root must not already exist");
   await mkdir(root, { recursive: false });
   try {
@@ -196,11 +283,11 @@ export async function collectLifecycleEvidence(
   }
 }
 
-export function assertOutputOutsideLifecycleRoot(root, output, label) {
+export function assertOutputOutsideDisposableRoot(root, output, label) {
   if (output === undefined) return;
   const relation = relative(resolve(root), resolve(output));
   if (relation === "" || (relation !== ".." && !relation.startsWith(`..${sep}`))) {
-    throw new Error(`${label} output must be outside the lifecycle root`);
+    throw new Error(`${label} output must be outside the disposable root`);
   }
 }
 
@@ -1487,9 +1574,13 @@ async function main() {
     return;
   }
   assertCleanGitStatus(gitValue(["status", "--porcelain"]));
+  if (options.command === "prepare") {
+    await writeWorkspacePreparation(options);
+    return;
+  }
   if (options.command === "checkpoint") {
     const lifecycleRoot = resolve(required(options, "lifecycle-root"));
-    assertOutputOutsideLifecycleRoot(lifecycleRoot, options.output, "Checkpoint");
+    assertOutputOutsideDisposableRoot(lifecycleRoot, options.output, "Checkpoint");
     const previousCheckpoint =
       options.previous === undefined
         ? undefined

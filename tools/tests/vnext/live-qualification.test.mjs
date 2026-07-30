@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -13,12 +13,13 @@ import {
 import { EventJournal, ObjectStore, sha256Json } from "../../../packages/kernel/dist/index.js";
 import {
   assertCleanGitStatus,
-  assertOutputOutsideLifecycleRoot,
+  assertOutputOutsideDisposableRoot,
   assertReleaseManifest,
   collectCliSurfaceEvidence,
   collectCurrentCandidate,
   collectGuidedCheckpoint,
   collectLifecycleEvidence,
+  collectWorkspacePreparation,
   collectRuntimeEvidence,
   collectVscodeSurfaceEvidence,
   createEvidenceManifestTemplate,
@@ -28,6 +29,7 @@ import {
   renderLiveQualification,
   validateEvidencePayloads,
   validateLiveQualification,
+  writeWorkspacePreparation,
 } from "../../scripts/live-qualification.mjs";
 
 const hash = "a".repeat(64);
@@ -166,6 +168,23 @@ test("parses bounded live qualification commands", () => {
   );
   assert.deepEqual(
     parseLiveQualificationArguments([
+      "prepare",
+      "--root",
+      "/tmp/qualification",
+      "--release-manifest",
+      "release.json",
+      "--output",
+      "preparation.json",
+    ]),
+    {
+      command: "prepare",
+      root: "/tmp/qualification",
+      "release-manifest": "release.json",
+      output: "preparation.json",
+    },
+  );
+  assert.deepEqual(
+    parseLiveQualificationArguments([
       "vscode",
       "--workspace",
       "consumer",
@@ -228,6 +247,142 @@ function fakeLifecycleService(root, calls, failUpdate = false) {
     },
   };
 }
+
+function fakePreparationService(root, calls, failClient) {
+  return {
+    async init({ projectId, clientId }) {
+      calls.push(clientId);
+      if (clientId === failClient) throw new Error("injected preparation failure");
+      const managedRelativePath = clientId === "github-copilot-cli" ? ".github/mcp.json" : ".vscode/mcp.json";
+      const managedPath =
+        clientId === "github-copilot-cli" ? join(root, ".github", "mcp.json") : join(root, ".vscode", "mcp.json");
+      const managedBytes = Buffer.from("{}\n");
+      await mkdir(join(root, ".apex"), { recursive: true });
+      await mkdir(clientId === "github-copilot-cli" ? join(root, ".github") : join(root, ".vscode"));
+      await writeFile(managedPath, managedBytes);
+      await writeFile(
+        join(root, ".apex", "customizations.lock.json"),
+        `${JSON.stringify({
+          version: 1,
+          clientId,
+          files: [
+            {
+              path: managedRelativePath,
+              currentHash: createHash("sha256").update(managedBytes).digest("hex"),
+            },
+          ],
+        })}\n`,
+      );
+      return { projectId, runId: `run-${clientId}` };
+    },
+  };
+}
+
+test("prepares exact paired client workspaces and cleans partial failure", async (context) => {
+  const parent = await mkdtemp(join(tmpdir(), "apex-preparation-parent-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  const root = join(parent, "qualification");
+  const calls = [];
+  const preparation = await collectWorkspacePreparation(
+    { root },
+    {
+      collectCandidate: async () => candidate,
+      serviceFactory: (workspace) => fakePreparationService(workspace, calls),
+    },
+  );
+  assert.equal(preparation.kind, "guided-client-preparation-v1");
+  assert.equal(preparation.candidate.commit, candidate.commit);
+  assert.match(preparation.preparationId, /^[0-9a-f]{64}$/u);
+  assert.equal(preparation.qualifiesClientParity, false);
+  assert.equal(preparation.qualifiesRelease, false);
+  const { preparationId, ...preparationContent } = preparation;
+  assert.equal(preparationId, sha256Json(preparationContent));
+  assert.deepEqual(calls, ["github-copilot-cli", "github-copilot-vscode"]);
+  assert.equal(preparation.workspaces.cli.clientId, "github-copilot-cli");
+  assert.equal(preparation.workspaces.vscode.clientId, "github-copilot-vscode");
+
+  const failedRoot = join(parent, "failed");
+  await assert.rejects(
+    collectWorkspacePreparation(
+      { root: failedRoot },
+      {
+        collectCandidate: async () => candidate,
+        serviceFactory: (workspace) => fakePreparationService(workspace, [], "github-copilot-vscode"),
+      },
+    ),
+    /injected preparation failure/,
+  );
+  await assert.rejects(lstat(failedRoot), (error) => error.code === "ENOENT");
+});
+
+test("preparation rejects unsafe roots and malformed initialized identity", async (context) => {
+  const parent = await mkdtemp(join(tmpdir(), "apex-preparation-refusal-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  await assert.rejects(collectWorkspacePreparation({ root: "relative" }), /absolute path/);
+  await assert.rejects(
+    collectWorkspacePreparation({ root: parent }, { collectCandidate: async () => candidate }),
+    /must not already exist/,
+  );
+  await assert.rejects(
+    collectWorkspacePreparation(
+      { root: join(parent, "inside"), output: join(parent, "inside", "preparation.json") },
+      { collectCandidate: async () => candidate },
+    ),
+    /output must be outside the disposable root/,
+  );
+  const physicalParent = join(parent, "physical");
+  const linkedParent = join(parent, "linked");
+  await mkdir(physicalParent);
+  await symlink(physicalParent, linkedParent);
+  await assert.rejects(
+    collectWorkspacePreparation({ root: join(linkedParent, "run") }, { collectCandidate: async () => candidate }),
+    /parent must not resolve through a symlink/,
+  );
+  const malformedRoot = join(parent, "malformed");
+  await assert.rejects(
+    collectWorkspacePreparation(
+      { root: malformedRoot },
+      {
+        collectCandidate: async () => candidate,
+        serviceFactory: (workspace) => ({
+          async init({ clientId, projectId }) {
+            await mkdir(join(workspace, ".apex"), { recursive: true });
+            await writeFile(
+              join(workspace, ".apex", "customizations.lock.json"),
+              `${JSON.stringify({ clientId, files: [{ path: "managed.txt" }] })}\n`,
+            );
+            return { projectId, runId: 123 };
+          },
+        }),
+      },
+    ),
+    /Prepared workspace identity is invalid/,
+  );
+  await assert.rejects(lstat(malformedRoot), (error) => error.code === "ENOENT");
+});
+
+test("preparation cleans retained workspaces when receipt persistence fails", async (context) => {
+  const parent = await mkdtemp(join(tmpdir(), "apex-preparation-write-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  const root = join(parent, "qualification");
+  await assert.rejects(
+    writeWorkspacePreparation(
+      { root, output: join(parent, "preparation.json") },
+      {
+        collect: (options) =>
+          collectWorkspacePreparation(options, {
+            collectCandidate: async () => candidate,
+            serviceFactory: (workspace) => fakePreparationService(workspace, []),
+          }),
+        write: async () => {
+          throw new Error("injected receipt failure");
+        },
+      },
+    ),
+    /injected receipt failure/,
+  );
+  await assert.rejects(lstat(root), (error) => error.code === "ENOENT");
+});
 
 test("collects both customization lifecycles and cleans isolated workspaces", async (context) => {
   const parent = await mkdtemp(join(tmpdir(), "apex-lifecycle-parent-"));
@@ -292,10 +447,10 @@ test("lifecycle refuses existing roots and cleans up after failure", async (cont
 
 test("checkpoint output must be outside the lifecycle root", () => {
   assert.throws(
-    () => assertOutputOutsideLifecycleRoot("/tmp/lifecycle", "/tmp/lifecycle/checkpoint.json", "Checkpoint"),
-    /Checkpoint output must be outside the lifecycle root/,
+    () => assertOutputOutsideDisposableRoot("/tmp/lifecycle", "/tmp/lifecycle/checkpoint.json", "Checkpoint"),
+    /Checkpoint output must be outside the disposable root/,
   );
-  assert.doesNotThrow(() => assertOutputOutsideLifecycleRoot("/tmp/lifecycle", "/tmp/checkpoint.json", "Checkpoint"));
+  assert.doesNotThrow(() => assertOutputOutsideDisposableRoot("/tmp/lifecycle", "/tmp/checkpoint.json", "Checkpoint"));
 });
 
 function checkpointAdapters(overrides = {}) {
