@@ -215,6 +215,24 @@ test("CLI binding mismatch is unavailable and does not inspect MCP", async (cont
   assert.equal(exported.disposition.reasonCode, "CLIENT_BINARY_MISMATCH");
   assert.deepEqual(calls, [["version", "--no-auto-update"]]);
   assert.equal(exported.mcp.status, "not-run");
+
+  const versionFixture = await cliSurfaceFixture(context);
+  const versionCalls = [];
+  const versionMismatch = await collectCliSurfaceEvidence(
+    { workspace: "consumer", binary: "bin/copilot" },
+    {
+      root: versionFixture.root,
+      contractRoot: versionFixture.contractRoot,
+      runCli: (_binary, args) => {
+        versionCalls.push(args);
+        return "GitHub Copilot CLI 1.0.74\n";
+      },
+    },
+  );
+  assert.equal(versionMismatch.disposition.status, "unavailable");
+  assert.equal(versionMismatch.disposition.reasonCode, "CLIENT_VERSION_MISMATCH");
+  assert.deepEqual(versionCalls, [["version", "--no-auto-update"]]);
+  assert.equal(versionMismatch.mcp.status, "not-run");
 });
 
 test("CLI surface export reports managed drift and rejects unsafe lock paths", async (context) => {

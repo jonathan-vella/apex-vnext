@@ -209,8 +209,9 @@ export async function collectCliSurfaceEvidence(
     });
   }
   files.sort(({ path: left }, { path: right }) => left.localeCompare(right));
-  const exactClient =
-    observedVersion === inventory.clientVersion && observedBinarySha256 === inventory.clientBinarySha256;
+  const versionMatches = observedVersion === inventory.clientVersion;
+  const binaryMatches = observedBinarySha256 === inventory.clientBinarySha256;
+  const exactClient = versionMatches && binaryMatches;
   const drift = files.some(({ matches }) => !matches);
   let mcp = { status: "not-run", servers: [], sourceDigest: null };
   if (exactClient && !drift) {
@@ -229,7 +230,7 @@ export async function collectCliSurfaceEvidence(
   const disposition = !exactClient
     ? {
         status: "unavailable",
-        reasonCode: "CLIENT_BINARY_MISMATCH",
+        reasonCode: versionMatches ? "CLIENT_BINARY_MISMATCH" : "CLIENT_VERSION_MISMATCH",
         ownerCode: "CLIENT_ENVIRONMENT",
         nextActionCode: "INSTALL_SELECTED_CLI",
       }
