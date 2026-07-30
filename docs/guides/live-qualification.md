@@ -58,6 +58,24 @@ This output is adapter evidence, not a client outcome or collector receipt. It c
 skill discovery, MCP inventory, interactive questions, restart behavior, denial responses, or other client-surface
 facts. Exact-client adapters and interactive checkpoints must supply those records before scenario composition.
 
+For a consumer workspace initialized with the Copilot CLI projection, bind the executable and installed managed files:
+
+```bash
+npm run live:vnext -- cli \
+  --workspace ../qualification-consumer \
+  --binary /absolute/path/to/copilot \
+  --output dist/live-qualification/cli-surface.json
+```
+
+The adapter hashes the executable, compares its version and binary digest with the selected CLI inventory, verifies the
+CLI customization lock and every managed file byte, and records only MCP server names plus a digest of the bounded JSON
+inventory. A version or binary mismatch emits `unavailable` and does not run MCP inspection. Managed-file drift emits
+`fail` and also prevents MCP inspection. Raw command output, MCP configuration values, lock source paths, prompts, and
+responses are never included.
+
+This adapter does not prove agent-picker visibility, `task.agent_type` membership, interactive `ask_user`, restart, or
+model behavior. Those remain explicit later adapters or interactive checkpoints.
+
 When the public npm registry is unavailable locally, use an approved registry proxy as a process-scoped override:
 
 ```bash
