@@ -60,6 +60,26 @@ so a retry cannot inherit mixed state.
 The preparation receipt is self-hashed but does not prove client behavior, qualify parity, or qualify a release. Do not
 move, reuse, or switch either prepared workspace between client observations.
 
+After qualification evidence has been collected, remove the paired workspaces through the bound cleanup command:
+
+```bash
+npm run live:vnext -- cleanup \
+  --root /absolute/path/to/qualification-workspaces \
+  --preparation dist/live-qualification/workspace-preparation.json
+```
+
+Cleanup is not a generic recursive-delete command. It requires the exact self-hashed preparation receipt and the marker
+written inside its root. Before deletion it verifies the root has only the marker plus the `cli/` and `vscode/`
+workspaces, both selections retain their prepared project/run identities, and every managed projection file still
+matches the recorded lock. Outside the reserved `.apex/` runtime namespace, the workspace tree may contain only those
+managed files and their parent directories. Substituted receipts, symlinked paths, changed selections, drift, and
+unrelated files or directories at any depth all block cleanup without deleting the root.
+
+The command atomically renames the verified root to a same-parent quarantine, verifies the same inode and complete
+workspace state again, and only then removes it. A late mutation leaves the quarantine intact; a removal failure
+preserves any remaining quarantine data. The command reports that path for manual recovery. Successful cleanup emits a
+self-hashed, content-free receipt to standard output; it never qualifies client parity or release.
+
 Export runtime facts only after the named APEX run exists:
 
 ```bash

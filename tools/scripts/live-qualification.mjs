@@ -9,7 +9,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -32,6 +32,7 @@ import {
 const ROOT = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const COMMAND_OPTIONS = {
   candidate: new Set(["branch", "output", "package-lock", "release-manifest", "runtime-bundle"]),
+  cleanup: new Set(["preparation", "root"]),
   checkpoint: new Set([
     "branch",
     "cli-binary",
@@ -83,7 +84,7 @@ export function parseLiveQualificationArguments(argv) {
   const allowed = COMMAND_OPTIONS[command];
   if (allowed === undefined)
     throw new Error(
-      "Command must be candidate, checkpoint, cli, lifecycle, prepare, runtime, template, validate, vscode, or render",
+      "Command must be candidate, checkpoint, cleanup, cli, lifecycle, prepare, runtime, template, validate, vscode, or render",
     );
   const options = { command };
   for (let index = 1; index < argv.length; index += 2) {
@@ -214,7 +215,18 @@ export async function collectWorkspacePreparation(
       qualifiesRelease: false,
     };
     assertCheckpointContentFree(preparation);
-    return { ...preparation, preparationId: sha256Json(preparation) };
+    const result = { ...preparation, preparationId: sha256Json(preparation) };
+    const marker = {
+      schemaVersion: "1.0.0",
+      kind: "guided-client-preparation-marker-v1",
+      preparationId: result.preparationId,
+    };
+    await writeFile(join(root, ".apex-preparation.json"), `${JSON.stringify(marker)}\n`, {
+      encoding: "utf8",
+      flag: "wx",
+      mode: 0o600,
+    });
+    return result;
   } catch (error) {
     await remove(root, { recursive: true, force: true });
     throw error;
@@ -240,6 +252,213 @@ export async function writeWorkspacePreparation(
     await remove(resolve(required(options, "root")), { recursive: true, force: true });
     throw error;
   }
+}
+
+function assertWorkspacePreparation(preparation) {
+  if (preparation === null || typeof preparation !== "object" || Array.isArray(preparation)) {
+    throw new Error("Workspace preparation receipt is invalid");
+  }
+  const { preparationId, ...content } = preparation;
+  try {
+    assertCheckpointCandidate(preparation.candidate);
+    assertCheckpointContentFree(preparation);
+  } catch {
+    throw new Error("Workspace preparation receipt is invalid");
+  }
+  const expectedWorkspaces = {
+    cli: { clientId: "github-copilot-cli", projectId: "qualification-cli" },
+    vscode: { clientId: "github-copilot-vscode", projectId: "qualification-vscode" },
+  };
+  if (
+    preparation?.schemaVersion !== "1.0.0" ||
+    preparation.kind !== "guided-client-preparation-v1" ||
+    preparation.qualifiesClientParity !== false ||
+    preparation.qualifiesRelease !== false ||
+    !SHA256_PATTERN.test(preparationId ?? "") ||
+    preparationId !== sha256Json(content) ||
+    Object.keys(preparation).sort().join(",") !==
+      "candidate,kind,preparationId,qualifiesClientParity,qualifiesRelease,schemaVersion,workspaces" ||
+    Object.keys(preparation.candidate ?? {})
+      .sort()
+      .join(",") !==
+      "branch,commit,customizationBundleHash,packageLockHash,releaseManifestHash,repository,runtimeBundleHash" ||
+    Object.keys(preparation.workspaces ?? {})
+      .sort()
+      .join(",") !== "cli,vscode"
+  ) {
+    throw new Error("Workspace preparation receipt is invalid");
+  }
+  for (const [name, expected] of Object.entries(expectedWorkspaces)) {
+    const workspace = preparation.workspaces[name];
+    if (
+      Object.keys(workspace ?? {})
+        .sort()
+        .join(",") !== "clientId,customizationLockSha256,managedFiles,projectId,runId" ||
+      workspace.clientId !== expected.clientId ||
+      workspace.projectId !== expected.projectId ||
+      typeof workspace.runId !== "string" ||
+      !RUN_ID_PATTERN.test(workspace.runId) ||
+      !SHA256_PATTERN.test(workspace.customizationLockSha256 ?? "") ||
+      !Number.isInteger(workspace.managedFiles) ||
+      workspace.managedFiles < 1 ||
+      workspace.managedFiles > 256
+    ) {
+      throw new Error("Workspace preparation receipt is invalid");
+    }
+  }
+}
+
+async function verifyPreparedWorkspace(root, expected) {
+  await assertRuntimeDirectory(root, "Prepared cleanup workspace");
+  const requiredFile = expected.clientId === "github-copilot-cli" ? ".github/mcp.json" : ".vscode/mcp.json";
+  const projection = await collectManagedProjection(
+    root,
+    expected.clientId,
+    requiredFile,
+    "Prepared cleanup workspace",
+  );
+  const selection = parseStrictJson(
+    (
+      await readBoundedRegularFile(
+        join(root, ".apex", "config.json"),
+        MAX_MANAGED_FILE_BYTES,
+        "Prepared workspace selection",
+      )
+    ).toString("utf8"),
+  );
+  if (
+    projection.lockSha256 !== expected.customizationLockSha256 ||
+    projection.files.length !== expected.managedFiles ||
+    projection.files.some(({ matches }) => !matches) ||
+    Object.keys(selection ?? {})
+      .sort()
+      .join(",") !== "projectId,runId" ||
+    selection.projectId !== expected.projectId ||
+    selection.runId !== expected.runId
+  ) {
+    throw new Error("Prepared workspace no longer matches its receipt");
+  }
+  await assertPreparedWorkspaceInventory(
+    root,
+    projection.files.map(({ path }) => path),
+  );
+}
+
+async function assertPreparedWorkspaceInventory(root, managedFiles) {
+  const expectedFiles = new Set(managedFiles);
+  const expectedDirectories = new Set();
+  for (const file of managedFiles) {
+    const segments = file.split("/");
+    for (let index = 1; index < segments.length; index += 1) {
+      expectedDirectories.add(segments.slice(0, index).join("/"));
+    }
+  }
+  const observedFiles = new Set();
+  let entryCount = 0;
+  const walk = async (relativeDirectory = "") => {
+    const directory = relativeDirectory === "" ? root : join(root, relativeDirectory);
+    if (relativeDirectory !== "") await assertRuntimeDirectory(directory, "Prepared workspace directory");
+    const names = await readdir(directory);
+    for (const name of names) {
+      entryCount += 1;
+      if (entryCount > 4096) throw new Error("Prepared workspace inventory is too large");
+      const relativePath = relativeDirectory === "" ? name : `${relativeDirectory}/${name}`;
+      if (relativePath === ".apex") {
+        await assertRuntimeDirectory(join(root, relativePath), "Prepared workspace runtime directory");
+        continue;
+      }
+      const metadata = await lstat(join(root, relativePath));
+      if (metadata.isSymbolicLink()) throw new Error("Prepared workspace contains an unexpected symbolic link");
+      if (metadata.isDirectory()) {
+        if (!expectedDirectories.has(relativePath)) {
+          throw new Error("Prepared workspace contains an unexpected directory");
+        }
+        await walk(relativePath);
+      } else if (metadata.isFile()) {
+        if (!expectedFiles.has(relativePath)) throw new Error("Prepared workspace contains an unexpected file");
+        observedFiles.add(relativePath);
+      } else {
+        throw new Error("Prepared workspace contains an unexpected filesystem entry");
+      }
+    }
+  };
+  await walk();
+  if (observedFiles.size !== expectedFiles.size || [...expectedFiles].some((file) => !observedFiles.has(file))) {
+    throw new Error("Prepared workspace inventory does not match its customization lock");
+  }
+}
+
+async function verifyPreparationRoot(root, preparation) {
+  await assertRuntimeDirectory(root, "Cleanup root");
+  const names = (await readdir(root)).sort();
+  if (names.join(",") !== ".apex-preparation.json,cli,vscode") {
+    throw new Error("Cleanup root contains unexpected entries");
+  }
+  const marker = parseStrictJson(
+    (
+      await readBoundedRegularFile(
+        join(root, ".apex-preparation.json"),
+        MAX_MANAGED_FILE_BYTES,
+        "Workspace preparation marker",
+      )
+    ).toString("utf8"),
+  );
+  if (
+    Object.keys(marker ?? {})
+      .sort()
+      .join(",") !== "kind,preparationId,schemaVersion" ||
+    marker.schemaVersion !== "1.0.0" ||
+    marker.kind !== "guided-client-preparation-marker-v1" ||
+    marker.preparationId !== preparation.preparationId
+  ) {
+    throw new Error("Workspace preparation marker is invalid");
+  }
+  await verifyPreparedWorkspace(join(root, "cli"), preparation.workspaces.cli);
+  await verifyPreparedWorkspace(join(root, "vscode"), preparation.workspaces.vscode);
+}
+
+export async function cleanupWorkspacePreparation(options, { move = rename, remove = rm } = {}) {
+  const inputRoot = required(options, "root");
+  if (!isAbsolute(inputRoot)) throw new Error("Cleanup root must be an absolute path");
+  const root = resolve(inputRoot);
+  const parent = dirname(root);
+  const canonicalParent = await realpath(parent);
+  if (resolve(canonicalParent, basename(root)) !== root) {
+    throw new Error("Cleanup root parent must not resolve through a symlink");
+  }
+  const preparationPath = resolve(required(options, "preparation"));
+  assertOutputOutsideDisposableRoot(root, preparationPath, "Cleanup receipt");
+  const preparation = parseStrictJson(
+    (await readBoundedRegularFile(preparationPath, MAX_MANAGED_FILE_BYTES, "Workspace preparation receipt")).toString(
+      "utf8",
+    ),
+  );
+  assertWorkspacePreparation(preparation);
+  await verifyPreparationRoot(root, preparation);
+  const before = await lstat(root, { bigint: true });
+  if (!before.isDirectory() || before.isSymbolicLink()) throw new Error("Cleanup root changed before removal");
+  const quarantine = join(parent, `.${basename(root)}.apex-cleanup-${preparation.preparationId.slice(0, 12)}`);
+  if (await pathExists(quarantine)) throw new Error("Cleanup quarantine path already exists");
+  await move(root, quarantine);
+  try {
+    const moved = await lstat(quarantine, { bigint: true });
+    if (!moved.isDirectory() || moved.isSymbolicLink() || moved.dev !== before.dev || moved.ino !== before.ino) {
+      throw new Error("Cleanup root changed during atomic rename");
+    }
+    await verifyPreparationRoot(quarantine, preparation);
+    await remove(quarantine, { recursive: true, force: false });
+  } catch (error) {
+    throw new Error(`Cleanup stopped; renamed data remains at ${quarantine}`, { cause: error });
+  }
+  const cleanup = {
+    schemaVersion: "1.0.0",
+    kind: "guided-client-cleanup-v1",
+    preparationId: preparation.preparationId,
+    removed: true,
+    qualifiesClientParity: false,
+    qualifiesRelease: false,
+  };
+  return { ...cleanup, cleanupId: sha256Json(cleanup) };
 }
 
 export async function collectLifecycleEvidence(
@@ -1568,6 +1787,10 @@ async function main() {
     const contents = `${JSON.stringify(await collectLifecycleEvidence(options), null, 2)}\n`;
     if (options.output) await writeNewFiles([[resolve(options.output), contents]]);
     else process.stdout.write(contents);
+    return;
+  }
+  if (options.command === "cleanup") {
+    process.stdout.write(`${JSON.stringify(await cleanupWorkspacePreparation(options), null, 2)}\n`);
     return;
   }
   if (options.command === "vscode") {
