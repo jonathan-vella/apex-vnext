@@ -8,7 +8,7 @@
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -18,6 +18,7 @@ import {
 } from "./_lib/vnext-qualification.mjs";
 import { parseStrictJson } from "./_lib/strict-json.mjs";
 import { hasBoundClientQualification } from "../../packages/contracts/dist/index.js";
+import { EventJournal, ObjectStore } from "../../packages/kernel/dist/index.js";
 import { verifyClientOutcomeQualification } from "./compare-client-outcomes.mjs";
 import {
   CLIENT_OUTCOME_SCENARIO_CORPUS,
@@ -29,6 +30,7 @@ import {
 const ROOT = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const COMMAND_OPTIONS = {
   candidate: new Set(["branch", "output", "package-lock", "release-manifest", "runtime-bundle"]),
+  runtime: new Set(["output", "project", "run"]),
   template: new Set([
     "actor",
     "branch",
@@ -58,7 +60,7 @@ const COMMAND_OPTIONS = {
 export function parseLiveQualificationArguments(argv) {
   const command = argv[0];
   const allowed = COMMAND_OPTIONS[command];
-  if (allowed === undefined) throw new Error("Command must be candidate, template, validate, or render");
+  if (allowed === undefined) throw new Error("Command must be candidate, runtime, template, validate, or render");
   const options = { command };
   for (let index = 1; index < argv.length; index += 2) {
     const argument = argv[index];
@@ -74,6 +76,153 @@ export function parseLiveQualificationArguments(argv) {
     }
   }
   return options;
+}
+
+const RUNTIME_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+const RUNTIME_FACT_ID_PATTERN = /^[a-z][a-z0-9.-]{0,63}$/;
+const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+
+async function assertRuntimeDirectory(path, label) {
+  const metadata = await lstat(path);
+  if (!metadata.isDirectory() || metadata.isSymbolicLink() || (await realpath(path)) !== resolve(path)) {
+    throw new Error(`${label} must be a real directory`);
+  }
+}
+
+async function assertJournalFiles(journalPath) {
+  await assertRuntimeDirectory(journalPath, "Runtime journal");
+  const names = await readdir(journalPath);
+  if (names.length === 0 || names.length > 4096 || names.some((name) => !/^\d{16}\.json$/.test(name))) {
+    throw new Error("Runtime journal file set is invalid");
+  }
+  for (const name of names) {
+    const metadata = await lstat(join(journalPath, name));
+    if (!metadata.isFile() || metadata.isSymbolicLink())
+      throw new Error("Runtime journal entries must be regular files");
+  }
+}
+
+function runtimeId(value, label) {
+  if (typeof value !== "string" || !RUNTIME_ID_PATTERN.test(value)) throw new Error(`${label} is invalid`);
+  return value;
+}
+
+function runtimeFactId(value, label) {
+  if (typeof value !== "string" || !RUNTIME_FACT_ID_PATTERN.test(value)) throw new Error(`${label} is invalid`);
+  return value;
+}
+
+function runtimeHash(value, label) {
+  if (typeof value !== "string" || !SHA256_PATTERN.test(value)) throw new Error(`${label} is invalid`);
+  return value;
+}
+
+async function runtimeFacts(event, objects, firstOwnerEpoch) {
+  const payload = event.payload;
+  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return [];
+  const facts = [];
+  if (event.type === "task.completed") {
+    facts.push({ type: "task", node: runtimeFactId(payload.nodeId, "Task node"), taskState: "completed" });
+    const artifactHashes = payload.artifactHashes;
+    if (artifactHashes !== undefined) {
+      if (artifactHashes === null || typeof artifactHashes !== "object" || Array.isArray(artifactHashes)) {
+        throw new Error("Task artifact hashes are invalid");
+      }
+      for (const [artifact, artifactHash] of Object.entries(artifactHashes).sort(([left], [right]) =>
+        left.localeCompare(right),
+      )) {
+        facts.push({
+          type: "artifact",
+          artifact: runtimeFactId(artifact, "Artifact kind"),
+          artifactHash: runtimeHash(artifactHash, "Artifact hash"),
+        });
+      }
+    }
+  } else if (event.type === "gate.decided") {
+    if (!Number.isInteger(payload.gate) || payload.gate < 1 || payload.gate > 4) {
+      throw new Error("Gate number is invalid");
+    }
+    const approvalHash = runtimeHash(payload.approvalHash, "Approval hash");
+    const approval = await objects.getJson(approvalHash);
+    if (
+      approval?.projectId !== event.projectId ||
+      approval?.runId !== event.runId ||
+      approval?.gate !== payload.gate ||
+      approval?.writerEpoch !== event.ownerEpoch ||
+      !["approved", "rejected"].includes(approval?.decision)
+    ) {
+      throw new Error("Gate approval object does not match its journal event");
+    }
+    facts.push({
+      type: "gate",
+      gate: payload.gate,
+      gateState: approval.decision === "approved" ? "approved" : "denied",
+    });
+  } else if (event.type === "evidence.accepted" && payload.status === "accepted" && payload.hash !== undefined) {
+    facts.push({
+      type: "evidence",
+      evidence: runtimeFactId(payload.kind, "Evidence kind"),
+      evidenceHash: runtimeHash(payload.hash, "Evidence hash"),
+    });
+  } else if (event.type === "deployment.completed") {
+    for (const [artifact, field] of [
+      ["operation-record", "operationHash"],
+      ["resource-inventory", "inventoryHash"],
+    ]) {
+      if (payload[field] !== undefined) {
+        facts.push({ type: "artifact", artifact, artifactHash: runtimeHash(payload[field], `${artifact} hash`) });
+      }
+    }
+  } else if (event.type === "transfer-accepted") {
+    facts.push({ type: "transfer", transferResult: "succeeded", ownerEpochDelta: event.ownerEpoch - firstOwnerEpoch });
+  }
+  return facts;
+}
+
+export async function collectRuntimeEvidence(
+  options,
+  { root = ROOT, journalFactory = (path) => new EventJournal(path), objectStore = new ObjectStore(root) } = {},
+) {
+  const projectId = runtimeId(required(options, "project"), "Project ID");
+  const runId = runtimeId(required(options, "run"), "Run ID");
+  const runPath = join(root, ".apex", "projects", projectId, "runs", runId);
+  await assertRuntimeDirectory(runPath, "Runtime run");
+  const journalPath = join(runPath, "journal");
+  await assertJournalFiles(journalPath);
+  const events = await journalFactory(journalPath).replay();
+  if (events.length === 0 || events.length > 4096) throw new Error("Runtime journal event count is invalid");
+  if (events.some((event) => event.projectId !== projectId || event.runId !== runId)) {
+    throw new Error("Runtime journal identity does not match the requested project and run");
+  }
+  const firstOwnerEpoch = events[0].ownerEpoch;
+  const records = [];
+  for (const event of events) {
+    for (const fact of await runtimeFacts(event, objectStore, firstOwnerEpoch)) {
+      records.push({
+        source: {
+          eventHash: event.hash,
+          sequence: event.sequence,
+          eventType: event.type,
+          payloadHash: event.payloadHash,
+          ownerEpoch: event.ownerEpoch,
+        },
+        fact,
+      });
+    }
+  }
+  return {
+    schemaVersion: "1.0.0",
+    adapter: "apex-runtime-journal-v1",
+    projectId,
+    runId,
+    source: {
+      journalHead: events.at(-1).hash,
+      eventCount: events.length,
+      firstOwnerEpoch,
+      lastOwnerEpoch: events.at(-1).ownerEpoch,
+    },
+    records,
+  };
 }
 
 export function createEvidenceManifestTemplate({ projectId, runId, createdAt }) {
@@ -641,6 +790,12 @@ async function main() {
   assertCleanGitStatus(gitValue(["status", "--porcelain"]));
   if (options.command === "candidate") {
     const contents = `${JSON.stringify(await collectCurrentCandidate(options), null, 2)}\n`;
+    if (options.output) await writeNewFiles([[resolve(options.output), contents]]);
+    else process.stdout.write(contents);
+    return;
+  }
+  if (options.command === "runtime") {
+    const contents = `${JSON.stringify(await collectRuntimeEvidence(options), null, 2)}\n`;
     if (options.output) await writeNewFiles([[resolve(options.output), contents]]);
     else process.stdout.write(contents);
     return;

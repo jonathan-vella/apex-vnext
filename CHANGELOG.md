@@ -45,6 +45,8 @@ prior qualification is retained as historical characterization. See
   paired-client qualification remains blocked pending the architecture decision in issue #180.
 - Selected a fail-closed Copilot CLI worker boundary: autonomous workers are generated only for VS Code, unsupported
   role/client pairs are omitted deterministically, and parent delegation tools require a supported destination.
+- Added bounded runtime evidence export for guided client qualification, deriving source-bound facts from verified APEX
+  journals and immutable approval objects without creating client assertions or qualified outcomes.
 - Added exact client-qualification candidate receipt generation with clean-worktree, repository, branch, commit,
   release-manifest, runtime-bundle, package-lock, and customization-bundle binding.
 - Added versioned kernel-owned input requests and typed APEX MCP answer recording bound to the exact journal head and
