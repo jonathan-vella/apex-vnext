@@ -134,6 +134,24 @@ This evidence proves that the kernel emitted a typed input request and, when rec
 does not prove that VS Code displayed `vscode/askQuestions` or that Copilot CLI invoked `ask_user`; those client-surface
 actions remain user-owned interactive checkpoints. The adapter never qualifies parity or release.
 
+Verify that persisted APEX state survives service reconstruction in either prepared workspace:
+
+```bash
+npm run live:vnext -- restart \
+  --workspace /absolute/path/to/qualification-workspaces/cli \
+  --output dist/live-qualification/cli-restart.json
+```
+
+Run the same command against the prepared `vscode/` workspace. The adapter verifies the selected projection and managed
+files, creates two distinct `ApexService` instances over the same workspace, and requires their bounded status
+projections to match exactly. The journal head and event count are pinned directly before and after both reads, so any
+status-side mutation blocks evidence. It emits only client/project/run identity, lock metadata, journal head and event
+count, owner epoch, and a digest of task/blocker state. Task names and blocker text are hashed rather than copied.
+
+This evidence proves repository-backed APEX service reconstruction. It does not restart VS Code or Copilot CLI, prove
+that either client restored its UI session, or complete the `restart-resume` interactive checkpoint. Those client actions
+remain user-owned. The adapter never qualifies parity or release.
+
 For a consumer workspace initialized with the VS Code projection, bind the host, Copilot Chat extension, and managed
 files without opening the UI:
 

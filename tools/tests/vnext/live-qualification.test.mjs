@@ -24,6 +24,7 @@ import {
   collectLifecycleEvidence,
   collectWorkspacePreparation,
   collectRuntimeEvidence,
+  collectRestartEvidence,
   collectVscodeSurfaceEvidence,
   cleanupWorkspacePreparation,
   createEvidenceManifestTemplate,
@@ -179,6 +180,10 @@ test("parses bounded live qualification commands", () => {
     workspace: "consumer",
     output: "input.json",
   });
+  assert.deepEqual(
+    parseLiveQualificationArguments(["restart", "--workspace", "consumer", "--output", "restart.json"]),
+    { command: "restart", workspace: "consumer", output: "restart.json" },
+  );
   assert.deepEqual(
     parseLiveQualificationArguments([
       "prepare",
@@ -395,6 +400,137 @@ test("exports input evidence for the selected VS Code projection", async (contex
   assert.ok(evidence.source.managedFiles > 0);
   assert.equal(evidence.qualifiesClientParity, false);
   assert.equal(evidence.qualifiesRelease, false);
+});
+
+test("exports content-free restart evidence from distinct service instances", async (context) => {
+  for (const clientId of ["github-copilot-cli", "github-copilot-vscode"]) {
+    const root = await mkdtemp(join(tmpdir(), "apex-restart-adapter-"));
+    context.after(() => rm(root, { recursive: true, force: true }));
+    const service = new ApexService(root);
+    const initialized = await service.init({ projectId: "demo", clientId });
+    await service.nextTask();
+    const instances = [];
+    const evidence = await collectRestartEvidence(
+      { workspace: "." },
+      {
+        root,
+        serviceFactory: (workspace) => {
+          const instance = new ApexService(workspace);
+          instances.push(instance);
+          return instance;
+        },
+      },
+    );
+    assert.equal(instances.length, 2);
+    assert.notEqual(instances[0], instances[1]);
+    assert.equal(evidence.client.id, clientId);
+    assert.equal(evidence.projectId, "demo");
+    assert.equal(evidence.runId, initialized.runId);
+    assert.equal(evidence.status, "observed");
+    assert.match(evidence.source.stateDigest, /^[0-9a-f]{64}$/u);
+    assert.equal(evidence.qualifiesClientParity, false);
+    assert.equal(evidence.qualifiesRelease, false);
+    assert.doesNotMatch(JSON.stringify(evidence), /What workload|outcomes and constraints/u);
+    const { evidenceId, ...content } = evidence;
+    assert.equal(evidenceId, sha256Json(content));
+  }
+});
+
+test("restart evidence rejects state changes and managed projection drift", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "apex-restart-refusal-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const service = new ApexService(root);
+  const initialized = await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+  await service.nextTask();
+  let calls = 0;
+  await assert.rejects(
+    collectRestartEvidence(
+      { workspace: "." },
+      {
+        root,
+        serviceFactory: () => ({
+          async status() {
+            calls += 1;
+            const status = await new ApexService(root).status();
+            return calls === 1 ? status : { ...status, events: status.events + 1 };
+          },
+        }),
+      },
+    ),
+    /Restart changed persisted workspace state/,
+  );
+  await writeFile(join(root, ".github", "mcp.json"), "{}\n");
+  await assert.rejects(collectRestartEvidence({ workspace: "." }, { root }), /managed files do not match/);
+  assert.match(initialized.runId, /^[A-Za-z0-9_-]+$/u);
+});
+
+test("restart evidence rejects journal mutation and malformed status", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "apex-restart-mutation-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+  await service.nextTask();
+  const status = await service.status();
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", status.run.runId, "journal"));
+  let calls = 0;
+  await assert.rejects(
+    collectRestartEvidence(
+      { workspace: "." },
+      {
+        root,
+        serviceFactory: () => ({
+          async status() {
+            calls += 1;
+            if (calls === 1) {
+              await journal.append({
+                eventId: "restart-mutation",
+                projectId: "demo",
+                runId: status.run.runId,
+                type: "unrecognized.restart-mutation",
+                timestamp,
+                ownerEpoch: status.run.ownerEpoch,
+                expectedHead: await journal.head(),
+                payload: {},
+              });
+            }
+            return new ApexService(root).status();
+          },
+        }),
+      },
+    ),
+    /Restart changed persisted workspace state/,
+  );
+
+  for (const malformed of [
+    { ...status, head: null },
+    { ...status, events: 0 },
+    { ...status, task: "" },
+    { ...status, blockers: [123] },
+    { ...status, run: { ...status.run, projectId: "../bad" } },
+  ]) {
+    await assert.rejects(
+      collectRestartEvidence({ workspace: "." }, { root, serviceFactory: () => ({ status: async () => malformed }) }),
+      /Restart status is invalid|Restart changed persisted workspace state/,
+    );
+  }
+});
+
+test("restart command refuses to overwrite an existing evidence file", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "apex-restart-output-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+  await service.nextTask();
+  const output = join(root, "existing.json");
+  await writeFile(output, "preserve\n");
+  const result = spawnSync(
+    process.execPath,
+    ["tools/scripts/live-qualification.mjs", "restart", "--workspace", root, "--output", output],
+    { cwd: process.cwd(), encoding: "utf8", timeout: 30_000 },
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /EEXIST|file already exists/u);
+  assert.equal(await readFile(output, "utf8"), "preserve\n");
 });
 
 test("input command refuses to overwrite an existing evidence file", async (context) => {
