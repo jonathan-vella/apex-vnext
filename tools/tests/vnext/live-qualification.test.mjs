@@ -115,11 +115,10 @@ test("parses bounded live qualification commands", () => {
   assert.throws(() => parseLiveQualificationArguments(["validate", "--unknown", "value"]), /Unknown/);
 });
 
-async function runtimeFixture(context) {
+async function runtimeFixture(context, runId = "run-1") {
   const root = await mkdtemp(join(tmpdir(), "apex-client-runtime-"));
   context.after(() => rm(root, { recursive: true, force: true }));
   const projectId = "demo";
-  const runId = "run-1";
   const journalPath = join(root, ".apex", "projects", projectId, "runs", runId, "journal");
   await mkdir(journalPath, { recursive: true });
   const journal = new EventJournal(journalPath);
@@ -185,6 +184,14 @@ test("exports source-bound runtime facts without copying unrecognized content", 
   assert.doesNotMatch(JSON.stringify(exported), /must-not-escape/u);
 });
 
+test("accepts canonical maximum-length run IDs", async (context) => {
+  const runId = `run_${"a".repeat(124)}`;
+  assert.equal(runId.length, 128);
+  const fixture = await runtimeFixture(context, runId);
+  const exported = await collectRuntimeEvidence({ project: fixture.projectId, run: runId }, { root: fixture.root });
+  assert.equal(exported.runId, runId);
+});
+
 test("runtime export rejects traversal, journal tampering, and symlinked entries", async (context) => {
   const traversal = await runtimeFixture(context);
   await assert.rejects(
@@ -208,7 +215,12 @@ test("runtime export rejects traversal, journal tampering, and symlinked entries
   await symlink(outside, linkedEvent);
   await assert.rejects(
     collectRuntimeEvidence({ project: linked.projectId, run: linked.runId }, { root: linked.root }),
-    /regular files/,
+    /unsafe file/,
+  );
+
+  await assert.rejects(
+    collectRuntimeEvidence({ project: "demo.with-dot", run: linked.runId }, { root: linked.root }),
+    /Project ID is invalid/,
   );
 
   const mismatched = await runtimeFixture(context);

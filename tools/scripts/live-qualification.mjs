@@ -78,7 +78,8 @@ export function parseLiveQualificationArguments(argv) {
   return options;
 }
 
-const RUNTIME_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+const PROJECT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const RUNTIME_FACT_ID_PATTERN = /^[a-z][a-z0-9.-]{0,63}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 
@@ -95,15 +96,10 @@ async function assertJournalFiles(journalPath) {
   if (names.length === 0 || names.length > 4096 || names.some((name) => !/^\d{16}\.json$/.test(name))) {
     throw new Error("Runtime journal file set is invalid");
   }
-  for (const name of names) {
-    const metadata = await lstat(join(journalPath, name));
-    if (!metadata.isFile() || metadata.isSymbolicLink())
-      throw new Error("Runtime journal entries must be regular files");
-  }
 }
 
-function runtimeId(value, label) {
-  if (typeof value !== "string" || !RUNTIME_ID_PATTERN.test(value)) throw new Error(`${label} is invalid`);
+function runtimeId(value, label, pattern) {
+  if (typeof value !== "string" || !pattern.test(value)) throw new Error(`${label} is invalid`);
   return value;
 }
 
@@ -183,8 +179,8 @@ export async function collectRuntimeEvidence(
   options,
   { root = ROOT, journalFactory = (path) => new EventJournal(path), objectStore = new ObjectStore(root) } = {},
 ) {
-  const projectId = runtimeId(required(options, "project"), "Project ID");
-  const runId = runtimeId(required(options, "run"), "Run ID");
+  const projectId = runtimeId(required(options, "project"), "Project ID", PROJECT_ID_PATTERN);
+  const runId = runtimeId(required(options, "run"), "Run ID", RUN_ID_PATTERN);
   const runPath = join(root, ".apex", "projects", projectId, "runs", runId);
   await assertRuntimeDirectory(runPath, "Runtime run");
   const journalPath = join(runPath, "journal");
