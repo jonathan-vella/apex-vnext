@@ -140,10 +140,10 @@ npm run live:vnext -- checkpoint \
   --release-manifest dist/vnext-packages/release-manifest.json \
   --project release-qualification \
   --run candidate-1 \
-  --cli-workspace ../qualification-cli \
+  --cli-workspace /absolute/path/to/qualification-workspaces/cli \
   --cli-binary /absolute/path/to/copilot \
   --lifecycle-root /absolute/path/to/disposable-lifecycle \
-  --vscode-workspace ../qualification-vscode \
+  --vscode-workspace /absolute/path/to/qualification-workspaces/vscode \
   --vscode-host /absolute/path/to/code \
   --output dist/live-qualification/guided-checkpoint.json
 ```
@@ -172,10 +172,10 @@ npm run live:vnext -- checkpoint \
   --release-manifest dist/vnext-packages/release-manifest.json \
   --project release-qualification \
   --run candidate-1 \
-  --cli-workspace ../qualification-cli \
+  --cli-workspace /absolute/path/to/qualification-workspaces/cli \
   --cli-binary /absolute/path/to/copilot \
   --lifecycle-root /absolute/path/to/disposable-lifecycle \
-  --vscode-workspace ../qualification-vscode \
+  --vscode-workspace /absolute/path/to/qualification-workspaces/vscode \
   --vscode-host /absolute/path/to/code \
   --previous dist/live-qualification/guided-checkpoint.json \
   --output dist/live-qualification/guided-checkpoint-verified.json
