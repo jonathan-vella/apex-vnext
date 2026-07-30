@@ -442,6 +442,11 @@ test("restart evidence rejects state changes and managed projection drift", asyn
   const service = new ApexService(root);
   const initialized = await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
   await service.nextTask();
+  const singleton = new ApexService(root);
+  await assert.rejects(
+    collectRestartEvidence({ workspace: "." }, { root, serviceFactory: () => singleton }),
+    /requires distinct service instances/,
+  );
   let calls = 0;
   await assert.rejects(
     collectRestartEvidence(

@@ -1426,8 +1426,11 @@ export async function collectRestartEvidence(
   const pinnedBefore = await journal.replay();
   if (pinnedBefore.length === 0 || pinnedBefore.length > 4096)
     throw new Error("Restart journal event count is invalid");
-  const before = restartStatusProjection(await serviceFactory(workspace).status());
-  const after = restartStatusProjection(await serviceFactory(workspace).status());
+  const firstService = serviceFactory(workspace);
+  const secondService = serviceFactory(workspace);
+  if (firstService === secondService) throw new Error("Restart requires distinct service instances");
+  const before = restartStatusProjection(await firstService.status());
+  const after = restartStatusProjection(await secondService.status());
   const pinnedAfter = await journal.replay();
   if (
     sha256Json(before) !== sha256Json(after) ||
