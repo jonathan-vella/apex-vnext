@@ -165,6 +165,9 @@ async function prepareClient(root, clientId, projectId, serviceFactory) {
   }
   const requiredFile = clientId === "github-copilot-cli" ? ".github/mcp.json" : ".vscode/mcp.json";
   const projection = await collectManagedProjection(root, clientId, requiredFile, "Prepared workspace");
+  if (projection.files.some(({ matches }) => !matches)) {
+    throw new Error("Prepared workspace managed files do not match the customization lock");
+  }
   return {
     clientId,
     projectId: initialized.projectId,

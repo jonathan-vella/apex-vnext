@@ -248,7 +248,7 @@ function fakeLifecycleService(root, calls, failUpdate = false) {
   };
 }
 
-function fakePreparationService(root, calls, failClient) {
+function fakePreparationService(root, calls, failClient, driftClient) {
   return {
     async init({ projectId, clientId }) {
       calls.push(clientId);
@@ -273,6 +273,7 @@ function fakePreparationService(root, calls, failClient) {
           ],
         })}\n`,
       );
+      if (clientId === driftClient) await writeFile(managedPath, "drift\n");
       return { projectId, runId: `run-${clientId}` };
     },
   };
@@ -313,6 +314,19 @@ test("prepares exact paired client workspaces and cleans partial failure", async
     /injected preparation failure/,
   );
   await assert.rejects(lstat(failedRoot), (error) => error.code === "ENOENT");
+
+  const driftedRoot = join(parent, "drifted");
+  await assert.rejects(
+    collectWorkspacePreparation(
+      { root: driftedRoot },
+      {
+        collectCandidate: async () => candidate,
+        serviceFactory: (workspace) => fakePreparationService(workspace, [], undefined, "github-copilot-vscode"),
+      },
+    ),
+    /managed files do not match the customization lock/,
+  );
+  await assert.rejects(lstat(driftedRoot), (error) => error.code === "ENOENT");
 });
 
 test("preparation rejects unsafe roots and malformed initialized identity", async (context) => {
