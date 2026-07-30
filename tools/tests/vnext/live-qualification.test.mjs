@@ -16,6 +16,7 @@ import {
   assertReleaseManifest,
   collectCliSurfaceEvidence,
   collectCurrentCandidate,
+  collectGuidedCheckpoint,
   collectRuntimeEvidence,
   collectVscodeSurfaceEvidence,
   createEvidenceManifestTemplate,
@@ -116,6 +117,38 @@ test("parses bounded live qualification commands", () => {
     { command: "cli", workspace: "consumer", binary: "bin/copilot", output: "cli.json" },
   );
   assert.deepEqual(
+    parseLiveQualificationArguments([
+      "checkpoint",
+      "--release-manifest",
+      "release.json",
+      "--project",
+      "demo",
+      "--run",
+      "run-1",
+      "--cli-workspace",
+      "cli",
+      "--cli-binary",
+      "bin/copilot",
+      "--vscode-workspace",
+      "vscode",
+      "--vscode-host",
+      "/opt/code",
+      "--output",
+      "checkpoint.json",
+    ]),
+    {
+      command: "checkpoint",
+      "release-manifest": "release.json",
+      project: "demo",
+      run: "run-1",
+      "cli-workspace": "cli",
+      "cli-binary": "bin/copilot",
+      "vscode-workspace": "vscode",
+      "vscode-host": "/opt/code",
+      output: "checkpoint.json",
+    },
+  );
+  assert.deepEqual(
     parseLiveQualificationArguments(["runtime", "--project", "demo", "--run", "run-1", "--output", "runtime.json"]),
     { command: "runtime", project: "demo", run: "run-1", output: "runtime.json" },
   );
@@ -139,6 +172,167 @@ test("parses bounded live qualification commands", () => {
     },
   );
   assert.throws(() => parseLiveQualificationArguments(["validate", "--unknown", "value"]), /Unknown/);
+});
+
+function checkpointAdapters(overrides = {}) {
+  return {
+    runtime: {
+      schemaVersion: "1.0.0",
+      adapter: "apex-runtime-journal-v1",
+      projectId: "demo",
+      runId: "run-1",
+      source: { journalHead: hash, eventCount: 1, firstOwnerEpoch: 1, lastOwnerEpoch: 1 },
+      records: [],
+    },
+    cli: {
+      schemaVersion: "1.0.0",
+      adapter: "copilot-cli-surface-v1",
+      client: { id: "github-copilot-cli" },
+      disposition: { status: "pass" },
+    },
+    vscode: {
+      schemaVersion: "1.0.0",
+      adapter: "vscode-surface-v1",
+      client: { id: "github-copilot-vscode" },
+      disposition: { status: "pass" },
+    },
+    ...overrides,
+  };
+}
+
+async function guidedCheckpoint(overrides = {}) {
+  const adapters = checkpointAdapters(overrides);
+  return collectGuidedCheckpoint(
+    {
+      "release-manifest": "release.json",
+      project: "demo",
+      run: "run-1",
+      "cli-workspace": "cli",
+      "cli-binary": "bin/copilot",
+      "vscode-workspace": "vscode",
+      "vscode-host": "/opt/code",
+    },
+    {
+      collectCandidate: async () => candidate,
+      collectRuntime: async () => adapters.runtime,
+      collectCli: async () => adapters.cli,
+      collectVscode: async () => adapters.vscode,
+    },
+  );
+}
+
+test("composes source-bound adapters into pending interactive checkpoints", async () => {
+  const checkpoint = await guidedCheckpoint();
+  const repeated = await guidedCheckpoint();
+  assert.equal(checkpoint.kind, "guided-client-checkpoint-v1");
+  assert.equal(checkpoint.status.automation, "ready");
+  assert.equal(checkpoint.status.interaction, "waiting");
+  assert.equal(checkpoint.status.qualifiesClientParity, false);
+  assert.equal(checkpoint.status.qualifiesRelease, false);
+  assert.match(checkpoint.checkpointId, /^[0-9a-f]{64}$/u);
+  assert.equal(repeated.checkpointId, checkpoint.checkpointId);
+  assert.deepEqual(Object.keys(checkpoint.adapterDigests), ["runtime", "cli", "vscode"]);
+  assert.ok(Object.values(checkpoint.adapterDigests).every((value) => /^[0-9a-f]{64}$/u.test(value)));
+  assert.ok(checkpoint.interactiveCheckpoints.every(({ status }) => status === "pending"));
+  assert.ok(checkpoint.capabilityBlockers.some(({ scenarioIds }) => scenarioIds.includes("CLIENT-005")));
+  assert.doesNotMatch(JSON.stringify(checkpoint), /assertionState|"assertions"|"pass"\s*:/u);
+});
+
+test("checkpoint status derives from adapters without converting blockers to assertions", async () => {
+  const unavailable = await guidedCheckpoint({
+    cli: {
+      ...checkpointAdapters().cli,
+      disposition: {
+        status: "unavailable",
+        reasonCode: "CLIENT_BINARY_MISMATCH",
+        ownerCode: "CLIENT_ENVIRONMENT",
+        nextActionCode: "INSTALL_SELECTED_CLI",
+      },
+    },
+  });
+  assert.equal(unavailable.status.automation, "unavailable");
+  assert.ok(unavailable.interactiveCheckpoints.every(({ status }) => status === "blocked"));
+
+  const blocked = await guidedCheckpoint({
+    vscode: { ...checkpointAdapters().vscode, disposition: { status: "fail", reasonCode: "MANAGED_FILE_DRIFT" } },
+  });
+  assert.equal(blocked.status.automation, "blocked");
+  assert.equal(blocked.interactiveCheckpoints[0].status, "blocked");
+});
+
+test("checkpoint rejects mismatched and malformed adapter identities", async () => {
+  const missingRuntimeIdentity = { ...checkpointAdapters().runtime };
+  delete missingRuntimeIdentity.projectId;
+  await assert.rejects(
+    guidedCheckpoint({ runtime: missingRuntimeIdentity }),
+    /Checkpoint adapter apex-runtime-journal-v1 is invalid/,
+  );
+  await assert.rejects(
+    guidedCheckpoint({ runtime: { ...checkpointAdapters().runtime, runId: "run.with-dot" } }),
+    /Checkpoint adapter apex-runtime-journal-v1 is invalid/,
+  );
+  await assert.rejects(
+    guidedCheckpoint({ runtime: { ...checkpointAdapters().runtime, runId: "other" } }),
+    /identity does not match/,
+  );
+  await assert.rejects(
+    guidedCheckpoint({ cli: { ...checkpointAdapters().cli, adapter: "forged" } }),
+    /Checkpoint adapter copilot-cli-surface-v1 is invalid/,
+  );
+  await assert.rejects(
+    guidedCheckpoint({ vscode: { ...checkpointAdapters().vscode, disposition: { status: "passed" } } }),
+    /Checkpoint adapter vscode-surface-v1 is invalid/,
+  );
+  const cliWithoutDisposition = { ...checkpointAdapters().cli };
+  delete cliWithoutDisposition.disposition;
+  await assert.rejects(
+    guidedCheckpoint({ cli: cliWithoutDisposition }),
+    /Checkpoint adapter copilot-cli-surface-v1 is invalid/,
+  );
+  await assert.rejects(
+    guidedCheckpoint({ runtime: { ...checkpointAdapters().runtime, assertions: { forged: "pass" } } }),
+    /forbidden field/,
+  );
+  await assert.rejects(
+    collectGuidedCheckpoint(
+      {
+        "release-manifest": "release.json",
+        project: "demo",
+        run: "run-1",
+        "cli-workspace": "cli",
+        "cli-binary": "bin/copilot",
+        "vscode-workspace": "vscode",
+        "vscode-host": "/opt/code",
+      },
+      {
+        collectCandidate: async () => ({ ...candidate, commit: "forged" }),
+        collectRuntime: async () => checkpointAdapters().runtime,
+        collectCli: async () => checkpointAdapters().cli,
+        collectVscode: async () => checkpointAdapters().vscode,
+      },
+    ),
+    /Checkpoint candidate is invalid/,
+  );
+  await assert.rejects(
+    collectGuidedCheckpoint(
+      {
+        "release-manifest": "release.json",
+        project: "demo",
+        run: "run-1",
+        "cli-workspace": "cli",
+        "cli-binary": "bin/copilot",
+        "vscode-workspace": "vscode",
+        "vscode-host": "/opt/code",
+      },
+      {
+        collectCandidate: async () => ({ ...candidate, repository: "", branch: "" }),
+        collectRuntime: async () => checkpointAdapters().runtime,
+        collectCli: async () => checkpointAdapters().cli,
+        collectVscode: async () => checkpointAdapters().vscode,
+      },
+    ),
+    /Checkpoint candidate is invalid/,
+  );
 });
 
 async function vscodeSurfaceFixture(context, { managedHash } = {}) {
