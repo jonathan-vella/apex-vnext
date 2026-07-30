@@ -544,15 +544,32 @@ export function assertReleaseManifest(manifest, commit, repository) {
   }
 }
 
+function candidateInputPath(root, value, fallback) {
+  return resolve(root, value ?? fallback);
+}
+
+export function packageRepository(packageMetadata) {
+  const repository = packageMetadata?.repository;
+  const value = typeof repository === "string" ? repository : repository?.url;
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error("Package metadata must declare a repository URL");
+  }
+  return value.replace(/^git\+/, "").replace(/\.git$/, "");
+}
+
 export async function collectCurrentCandidate(
   options,
   { root = ROOT, read = readFile, git = (args) => gitValue(args, root) } = {},
 ) {
-  const packageLockPath = resolve(options["package-lock"] ?? join(root, "package-lock.json"));
-  const runtimeBundlePath = resolve(options["runtime-bundle"] ?? join(root, "config", "runtime-bundle.v1.json"));
-  const releaseManifestPath = resolve(required(options, "release-manifest"));
+  const packageLockPath = candidateInputPath(root, options["package-lock"], "package-lock.json");
+  const runtimeBundlePath = candidateInputPath(
+    root,
+    options["runtime-bundle"],
+    join("config", "runtime-bundle.v1.json"),
+  );
+  const releaseManifestPath = candidateInputPath(root, required(options, "release-manifest"));
   const packageMetadata = JSON.parse(await read(join(root, "package.json"), "utf8"));
-  const repository = packageMetadata.repository.url.replace(/^git\+/, "").replace(/\.git$/, "");
+  const repository = packageRepository(packageMetadata);
   const detectedBranch = git(["rev-parse", "--abbrev-ref", "HEAD"]);
   const branch = detectedBranch === "HEAD" ? required(options, "branch") : detectedBranch;
   if (options.branch !== undefined && options.branch !== branch)
