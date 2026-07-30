@@ -56,13 +56,15 @@ const COMMAND_OPTIONS = {
     "release-manifest",
     "runtime-bundle",
   ]),
+  vscode: new Set(["host", "output", "workspace"]),
   render: new Set(["file", "output"]),
 };
 
 export function parseLiveQualificationArguments(argv) {
   const command = argv[0];
   const allowed = COMMAND_OPTIONS[command];
-  if (allowed === undefined) throw new Error("Command must be candidate, cli, runtime, template, validate, or render");
+  if (allowed === undefined)
+    throw new Error("Command must be candidate, cli, runtime, template, validate, vscode, or render");
   const options = { command };
   for (let index = 1; index < argv.length; index += 2) {
     const argument = argv[index];
@@ -179,13 +181,64 @@ function defaultCliRunner(binary, args, workspace) {
   });
 }
 
+async function collectManagedProjection(workspace, expectedClientId, requiredFile, label) {
+  const canonicalWorkspace = await realpath(workspace);
+  const lockPath = join(workspace, ".apex", "customizations.lock.json");
+  let lockBytes;
+  try {
+    lockBytes = await readBoundedRegularFile(lockPath, MAX_MANAGED_FILE_BYTES, `${label} customization lock`);
+  } catch (error) {
+    throw new Error(`${label} customization lock could not be read`, { cause: error });
+  }
+  const lock = parseStrictJson(lockBytes.toString("utf8"));
+  if (
+    lock?.version !== 1 ||
+    lock.clientId !== expectedClientId ||
+    !Array.isArray(lock.files) ||
+    lock.files.length === 0 ||
+    lock.files.length > 256 ||
+    !lock.files.some((entry) => entry?.path === requiredFile)
+  ) {
+    throw new Error(`${label} customization lock is invalid`);
+  }
+  const files = [];
+  const managedDestinations = new Set();
+  for (const entry of lock.files) {
+    if (
+      entry === null ||
+      typeof entry !== "object" ||
+      typeof entry.path !== "string" ||
+      !SHA256_PATTERN.test(entry.currentHash ?? "")
+    ) {
+      throw new Error(`${label} managed file entry is invalid`);
+    }
+    const destination = await managedPath(workspace, canonicalWorkspace, entry.path);
+    if (managedDestinations.has(destination)) throw new Error(`${label} managed file destination is duplicated`);
+    managedDestinations.add(destination);
+    let bytes;
+    try {
+      bytes = await readBoundedRegularFile(destination, MAX_MANAGED_FILE_BYTES, `${label} managed customization file`);
+    } catch (error) {
+      throw new Error(`${label} managed customization file could not be read`, { cause: error });
+    }
+    const actualHash = sha256(bytes);
+    files.push({
+      path: entry.path,
+      expectedHash: entry.currentHash,
+      actualHash,
+      matches: actualHash === entry.currentHash,
+    });
+  }
+  files.sort(({ path: left }, { path: right }) => left.localeCompare(right));
+  return { clientId: lock.clientId, lockSha256: sha256(lockBytes), files };
+}
+
 export async function collectCliSurfaceEvidence(
   options,
   { root = ROOT, contractRoot = ROOT, runCli = defaultCliRunner } = {},
 ) {
   const workspace = resolve(root, options.workspace ?? ".");
   await assertRuntimeDirectory(workspace, "CLI workspace");
-  const canonicalWorkspace = await realpath(workspace);
   const binary = resolve(workspace, required(options, "binary"));
   const observedBinarySha256 = await hashBoundedRegularFile(binary, MAX_CLI_BINARY_BYTES, "Copilot CLI binary");
   const inventory = parseStrictJson(
@@ -209,38 +262,8 @@ export async function collectCliSurfaceEvidence(
   if (Buffer.byteLength(versionOutput) > MAX_CLI_OUTPUT_BYTES)
     throw new Error("Copilot CLI version output is too large");
   const observedVersion = cliVersion(versionOutput);
-  const lockPath = join(workspace, ".apex", "customizations.lock.json");
-  const lockBytes = await readBoundedRegularFile(lockPath, MAX_MANAGED_FILE_BYTES, "Customization lock");
-  const lock = parseStrictJson(lockBytes.toString("utf8"));
-  if (
-    lock?.version !== 1 ||
-    lock.clientId !== "github-copilot-cli" ||
-    !Array.isArray(lock.files) ||
-    lock.files.length === 0 ||
-    lock.files.length > 256 ||
-    !lock.files.some((entry) => entry?.path === ".github/mcp.json")
-  ) {
-    throw new Error("Copilot CLI customization lock is invalid");
-  }
-  const files = [];
-  const managedDestinations = new Set();
-  for (const entry of lock.files) {
-    if (entry === null || typeof entry !== "object" || !SHA256_PATTERN.test(entry.currentHash ?? "")) {
-      throw new Error("Copilot CLI managed file entry is invalid");
-    }
-    const destination = await managedPath(workspace, canonicalWorkspace, entry.path);
-    if (managedDestinations.has(destination)) throw new Error("Copilot CLI managed file destination is duplicated");
-    managedDestinations.add(destination);
-    const bytes = await readBoundedRegularFile(destination, MAX_MANAGED_FILE_BYTES, "Managed customization file");
-    const actualHash = sha256(bytes);
-    files.push({
-      path: entry.path,
-      expectedHash: entry.currentHash,
-      actualHash,
-      matches: actualHash === entry.currentHash,
-    });
-  }
-  files.sort(({ path: left }, { path: right }) => left.localeCompare(right));
+  const projection = await collectManagedProjection(workspace, "github-copilot-cli", ".github/mcp.json", "Copilot CLI");
+  const { files } = projection;
   const versionMatches = observedVersion === inventory.clientVersion;
   const binaryMatches = observedBinarySha256 === inventory.clientBinarySha256;
   const exactClient = versionMatches && binaryMatches;
@@ -283,11 +306,121 @@ export async function collectCliSurfaceEvidence(
       versionOutputSha256: sha256(Buffer.from(versionOutput)),
     },
     workspace: {
-      clientId: lock.clientId,
-      lockSha256: sha256(lockBytes),
+      clientId: projection.clientId,
+      lockSha256: projection.lockSha256,
       files,
     },
     mcp,
+    disposition,
+  };
+}
+
+const VERSION_PATTERN = /^[0-9]+(?:\.[0-9]+){1,3}(?:-[0-9A-Za-z.-]+)?$/;
+const EXTENSION_ID_PATTERN = /^[a-z0-9][a-z0-9.-]{0,127}$/;
+
+function defaultVscodeRunner(host, args, workspace) {
+  return execFileSync(host, args, {
+    cwd: workspace,
+    encoding: "utf8",
+    timeout: 30_000,
+    maxBuffer: MAX_CLI_OUTPUT_BYTES,
+    env: { ...process.env, NO_COLOR: "1" },
+  });
+}
+
+function vscodeVersion(output) {
+  const version = output.split(/\r?\n/u)[0]?.trim();
+  if (version === undefined || !VERSION_PATTERN.test(version)) throw new Error("VS Code version output is invalid");
+  return version;
+}
+
+function vscodeExtensions(output) {
+  if (Buffer.byteLength(output) > MAX_CLI_OUTPUT_BYTES) throw new Error("VS Code extension output is too large");
+  const extensions = new Map();
+  for (const line of output.split(/\r?\n/u).filter((value) => value.length > 0)) {
+    if (/^Extensions installed on [^\r\n]{1,160}:$/u.test(line)) continue;
+    const separator = line.lastIndexOf("@");
+    const id = line.slice(0, separator).toLowerCase();
+    const version = line.slice(separator + 1);
+    if (separator < 1 || !EXTENSION_ID_PATTERN.test(id) || !VERSION_PATTERN.test(version) || extensions.has(id)) {
+      throw new Error("VS Code extension inventory is invalid");
+    }
+    extensions.set(id, version);
+    if (extensions.size > 2048) throw new Error("VS Code extension inventory is too large");
+  }
+  return extensions;
+}
+
+export async function collectVscodeSurfaceEvidence(
+  options,
+  { root = ROOT, contractRoot = ROOT, runVscode = defaultVscodeRunner } = {},
+) {
+  const workspace = resolve(root, options.workspace ?? ".");
+  await assertRuntimeDirectory(workspace, "VS Code workspace");
+  const toolchain = parseStrictJson(
+    (
+      await readBoundedRegularFile(
+        join(contractRoot, "config", "toolchain.v1.json"),
+        MAX_CLI_OUTPUT_BYTES,
+        "Toolchain configuration",
+      )
+    ).toString("utf8"),
+  );
+  const selectedVersion = toolchain?.core?.vscode?.selectedExactVersion;
+  const selectedExtensionVersion = toolchain?.core?.vscode?.selectedExactCopilotChatVersion;
+  if (!VERSION_PATTERN.test(selectedVersion ?? "") || !VERSION_PATTERN.test(selectedExtensionVersion ?? "")) {
+    throw new Error("Selected VS Code toolchain is invalid");
+  }
+  const host = required(options, "host");
+  if (!isAbsolute(host)) throw new Error("VS Code host must be an absolute path");
+  const observedHostSha256 = await hashBoundedRegularFile(host, MAX_CLI_BINARY_BYTES, "VS Code host");
+  const versionOutput = runVscode(host, ["--version"], workspace);
+  if (Buffer.byteLength(versionOutput) > MAX_CLI_OUTPUT_BYTES) throw new Error("VS Code version output is too large");
+  const observedVersion = vscodeVersion(versionOutput);
+  const extensionOutput = runVscode(host, ["--list-extensions", "--show-versions"], workspace);
+  const extensions = vscodeExtensions(extensionOutput);
+  const observedExtensionVersion = extensions.get("github.copilot-chat") ?? null;
+  const projection = await collectManagedProjection(workspace, "github-copilot-vscode", ".vscode/mcp.json", "VS Code");
+  const drift = projection.files.some(({ matches }) => !matches);
+  const disposition =
+    observedVersion !== selectedVersion
+      ? {
+          status: "unavailable",
+          reasonCode: "HOST_VERSION_MISMATCH",
+          ownerCode: "CLIENT_ENVIRONMENT",
+          nextActionCode: "INSTALL_SELECTED_VSCODE",
+        }
+      : observedExtensionVersion === null
+        ? {
+            status: "unavailable",
+            reasonCode: "COPILOT_CHAT_EXTENSION_MISSING",
+            ownerCode: "CLIENT_ENVIRONMENT",
+            nextActionCode: "INSTALL_SELECTED_COPILOT_CHAT",
+          }
+        : observedExtensionVersion !== selectedExtensionVersion
+          ? {
+              status: "unavailable",
+              reasonCode: "COPILOT_CHAT_VERSION_MISMATCH",
+              ownerCode: "CLIENT_ENVIRONMENT",
+              nextActionCode: "INSTALL_SELECTED_COPILOT_CHAT",
+            }
+          : drift
+            ? { status: "fail", reasonCode: "MANAGED_FILE_DRIFT" }
+            : { status: "pass" };
+  return {
+    schemaVersion: "1.0.0",
+    adapter: "vscode-surface-v1",
+    client: {
+      id: "github-copilot-vscode",
+      selectedVersion,
+      observedVersion,
+      observedHostSha256,
+      selectedExtensionVersion,
+      observedExtensionVersion,
+      versionOutputSha256: sha256(Buffer.from(versionOutput)),
+      extensionInventorySha256: sha256(Buffer.from(extensionOutput)),
+    },
+    workspace: projection,
     disposition,
   };
 }
@@ -1017,6 +1150,12 @@ async function main() {
   }
   if (options.command === "cli") {
     const contents = `${JSON.stringify(await collectCliSurfaceEvidence(options), null, 2)}\n`;
+    if (options.output) await writeNewFiles([[resolve(options.output), contents]]);
+    else process.stdout.write(contents);
+    return;
+  }
+  if (options.command === "vscode") {
+    const contents = `${JSON.stringify(await collectVscodeSurfaceEvidence(options), null, 2)}\n`;
     if (options.output) await writeNewFiles([[resolve(options.output), contents]]);
     else process.stdout.write(contents);
     return;
