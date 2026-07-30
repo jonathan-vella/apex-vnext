@@ -17,6 +17,7 @@ import {
   collectCliSurfaceEvidence,
   collectCurrentCandidate,
   collectRuntimeEvidence,
+  collectVscodeSurfaceEvidence,
   createEvidenceManifestTemplate,
   createLiveQualificationTemplate,
   packageRepository,
@@ -119,6 +120,18 @@ test("parses bounded live qualification commands", () => {
     { command: "runtime", project: "demo", run: "run-1", output: "runtime.json" },
   );
   assert.deepEqual(
+    parseLiveQualificationArguments([
+      "vscode",
+      "--workspace",
+      "consumer",
+      "--host",
+      "/opt/code",
+      "--output",
+      "vscode.json",
+    ]),
+    { command: "vscode", workspace: "consumer", host: "/opt/code", output: "vscode.json" },
+  );
+  assert.deepEqual(
     parseLiveQualificationArguments(["validate", "--evidence-file", "first.json", "--evidence-file", "second.json"]),
     {
       command: "validate",
@@ -126,6 +139,131 @@ test("parses bounded live qualification commands", () => {
     },
   );
   assert.throws(() => parseLiveQualificationArguments(["validate", "--unknown", "value"]), /Unknown/);
+});
+
+async function vscodeSurfaceFixture(context, { managedHash } = {}) {
+  const root = await mkdtemp(join(tmpdir(), "apex-client-vscode-surface-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const contractRoot = join(root, "contract");
+  const workspace = join(root, "consumer");
+  const managed = Buffer.from('{"servers":{}}\n');
+  const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  await mkdir(join(contractRoot, "config"), { recursive: true });
+  await mkdir(join(workspace, ".apex"), { recursive: true });
+  await mkdir(join(workspace, ".vscode"), { recursive: true });
+  await writeFile(
+    join(contractRoot, "config", "toolchain.v1.json"),
+    `${JSON.stringify({
+      core: { vscode: { selectedExactVersion: "1.130.0", selectedExactCopilotChatVersion: "0.58.0" } },
+    })}\n`,
+  );
+  await writeFile(join(workspace, ".vscode", "mcp.json"), managed);
+  await writeFile(
+    join(workspace, ".apex", "customizations.lock.json"),
+    `${JSON.stringify({
+      version: 1,
+      source: "/private/source/path",
+      clientId: "github-copilot-vscode",
+      runtime: [],
+      files: [
+        {
+          path: ".vscode/mcp.json",
+          sourceHash: digest(managed),
+          baseHash: digest(managed),
+          currentHash: managedHash ?? digest(managed),
+        },
+      ],
+    })}\n`,
+  );
+  return { root, contractRoot, workspace };
+}
+
+test("exports exact VS Code host, Copilot Chat, and managed projection binding", async (context) => {
+  const fixture = await vscodeSurfaceFixture(context);
+  const calls = [];
+  const exported = await collectVscodeSurfaceEvidence(
+    { workspace: "consumer", host: "/opt/code" },
+    {
+      root: fixture.root,
+      contractRoot: fixture.contractRoot,
+      runVscode: (_host, args) => {
+        calls.push(args);
+        return args[0] === "--version"
+          ? "1.130.0\ncommit\nx64\n"
+          : "Extensions installed on Dev Container: Test:\ngithub.copilot-chat@0.58.0\nexample.unrelated@2.0.0\n";
+      },
+    },
+  );
+  assert.deepEqual(exported.disposition, { status: "pass" });
+  assert.equal(exported.client.observedVersion, "1.130.0");
+  assert.equal(exported.client.observedExtensionVersion, "0.58.0");
+  assert.equal(exported.workspace.files[0].matches, true);
+  assert.deepEqual(calls, [["--version"], ["--list-extensions", "--show-versions"]]);
+  assert.doesNotMatch(JSON.stringify(exported), /example\.unrelated|private\/source\/path/u);
+});
+
+test("VS Code surface binding emits specific unavailable client dispositions", async (context) => {
+  const hostMismatchFixture = await vscodeSurfaceFixture(context);
+  const hostMismatch = await collectVscodeSurfaceEvidence(
+    { workspace: "consumer", host: "/opt/code" },
+    {
+      root: hostMismatchFixture.root,
+      contractRoot: hostMismatchFixture.contractRoot,
+      runVscode: (_host, args) => (args[0] === "--version" ? "1.131.0\ncommit\nx64\n" : "github.copilot-chat@0.58.0\n"),
+    },
+  );
+  assert.equal(hostMismatch.disposition.reasonCode, "HOST_VERSION_MISMATCH");
+
+  const missingFixture = await vscodeSurfaceFixture(context);
+  const missing = await collectVscodeSurfaceEvidence(
+    { workspace: "consumer", host: "/opt/code" },
+    {
+      root: missingFixture.root,
+      contractRoot: missingFixture.contractRoot,
+      runVscode: (_host, args) => (args[0] === "--version" ? "1.130.0\ncommit\nx64\n" : "example.other@1.0.0\n"),
+    },
+  );
+  assert.equal(missing.disposition.reasonCode, "COPILOT_CHAT_EXTENSION_MISSING");
+
+  const versionFixture = await vscodeSurfaceFixture(context);
+  const versionMismatch = await collectVscodeSurfaceEvidence(
+    { workspace: "consumer", host: "/opt/code" },
+    {
+      root: versionFixture.root,
+      contractRoot: versionFixture.contractRoot,
+      runVscode: (_host, args) => (args[0] === "--version" ? "1.130.0\ncommit\nx64\n" : "github.copilot-chat@0.59.0\n"),
+    },
+  );
+  assert.equal(versionMismatch.disposition.reasonCode, "COPILOT_CHAT_VERSION_MISMATCH");
+});
+
+test("VS Code surface binding reports managed drift and rejects duplicate extensions", async (context) => {
+  const driftFixture = await vscodeSurfaceFixture(context, { managedHash: "f".repeat(64) });
+  const drift = await collectVscodeSurfaceEvidence(
+    { workspace: "consumer", host: "/opt/code" },
+    {
+      root: driftFixture.root,
+      contractRoot: driftFixture.contractRoot,
+      runVscode: (_host, args) => (args[0] === "--version" ? "1.130.0\ncommit\nx64\n" : "github.copilot-chat@0.58.0\n"),
+    },
+  );
+  assert.deepEqual(drift.disposition, { status: "fail", reasonCode: "MANAGED_FILE_DRIFT" });
+
+  const duplicateFixture = await vscodeSurfaceFixture(context);
+  await assert.rejects(
+    collectVscodeSurfaceEvidence(
+      { workspace: "consumer", host: "/opt/code" },
+      {
+        root: duplicateFixture.root,
+        contractRoot: duplicateFixture.contractRoot,
+        runVscode: (_host, args) =>
+          args[0] === "--version"
+            ? "1.130.0\ncommit\nx64\n"
+            : "github.copilot-chat@0.58.0\nGITHUB.COPILOT-CHAT@0.58.0\n",
+      },
+    ),
+    /extension inventory is invalid/,
+  );
 });
 
 async function cliSurfaceFixture(context, { selectedHash, managedHash } = {}) {

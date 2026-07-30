@@ -76,6 +76,24 @@ responses are never included.
 This adapter does not prove agent-picker visibility, `task.agent_type` membership, interactive `ask_user`, restart, or
 model behavior. Those remain explicit later adapters or interactive checkpoints.
 
+For a consumer workspace initialized with the VS Code projection, bind the host, Copilot Chat extension, and managed
+files without opening the UI:
+
+```bash
+npm run live:vnext -- vscode \
+  --workspace ../qualification-consumer \
+  --host /absolute/path/to/code \
+  --output dist/live-qualification/vscode-surface.json
+```
+
+The adapter compares `code --version` and the `github.copilot-chat` entry from the bounded extension inventory with the
+selected toolchain, then verifies the VS Code customization lock and every managed file byte. It records only the
+Copilot Chat extension version plus digests of the complete command outputs; unrelated extension names and lock source
+paths are not emitted. Host, missing-extension, or extension-version mismatches emit distinct `unavailable` results.
+
+This command does not open VS Code, invoke a model, inspect pickers or question panels, prove MCP startup, or establish
+restart/resume behavior. Those remain explicit interactive checkpoints.
+
 When the public npm registry is unavailable locally, use an approved registry proxy as a process-scoped override:
 
 ```bash
