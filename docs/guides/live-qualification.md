@@ -98,6 +98,32 @@ This command does not open VS Code, invoke a model, inspect pickers or question
 panels, prove MCP startup, or establish restart/resume behavior. Those remain
 explicit interactive checkpoints.
 
+After both consumer projections and the APEX run exist, create one durable
+guided checkpoint by re-running every adapter from its authoritative source:
+
+```bash
+npm run live:vnext -- checkpoint \
+  --release-manifest dist/vnext-packages/release-manifest.json \
+  --project release-qualification \
+  --run candidate-1 \
+  --cli-workspace ../qualification-cli \
+  --cli-binary /absolute/path/to/copilot \
+  --vscode-workspace ../qualification-vscode \
+  --vscode-host /absolute/path/to/code \
+  --output dist/live-qualification/guided-checkpoint.json
+```
+
+The composer does not ingest previously generated adapter JSON. It re-derives
+the candidate, runtime, CLI, and VS Code records, validates adapter identities,
+and binds them with canonical digests and a deterministic checkpoint ID. Client
+failure blocks interaction; unavailable clients block interaction until the
+named environment action is complete. Exact adapters produce explicit pending
+interactive checkpoints.
+
+The checkpoint never accepts assertions, marks scenarios passed, qualifies
+client parity, or qualifies a release. CLI `CLIENT-005` remains an explicit
+capability blocker under ADR-0006 even when all automated adapters pass.
+
 When the public npm registry is unavailable locally, use an approved registry proxy as a process-scoped override:
 
 ```bash

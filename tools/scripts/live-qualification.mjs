@@ -19,7 +19,7 @@ import {
 } from "./_lib/vnext-qualification.mjs";
 import { parseStrictJson } from "./_lib/strict-json.mjs";
 import { hasBoundClientQualification } from "../../packages/contracts/dist/index.js";
-import { EventJournal, ObjectStore } from "../../packages/kernel/dist/index.js";
+import { EventJournal, ObjectStore, sha256Json } from "../../packages/kernel/dist/index.js";
 import { verifyClientOutcomeQualification } from "./compare-client-outcomes.mjs";
 import {
   CLIENT_OUTCOME_SCENARIO_CORPUS,
@@ -31,6 +31,19 @@ import {
 const ROOT = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const COMMAND_OPTIONS = {
   candidate: new Set(["branch", "output", "package-lock", "release-manifest", "runtime-bundle"]),
+  checkpoint: new Set([
+    "branch",
+    "cli-binary",
+    "cli-workspace",
+    "output",
+    "package-lock",
+    "project",
+    "release-manifest",
+    "run",
+    "runtime-bundle",
+    "vscode-host",
+    "vscode-workspace",
+  ]),
   cli: new Set(["binary", "output", "workspace"]),
   runtime: new Set(["output", "project", "run"]),
   template: new Set([
@@ -64,7 +77,7 @@ export function parseLiveQualificationArguments(argv) {
   const command = argv[0];
   const allowed = COMMAND_OPTIONS[command];
   if (allowed === undefined)
-    throw new Error("Command must be candidate, cli, runtime, template, validate, vscode, or render");
+    throw new Error("Command must be candidate, checkpoint, cli, runtime, template, validate, vscode, or render");
   const options = { command };
   for (let index = 1; index < argv.length; index += 2) {
     const argument = argv[index];
@@ -80,6 +93,147 @@ export function parseLiveQualificationArguments(argv) {
     }
   }
   return options;
+}
+
+const GUIDED_CHECKPOINTS = [
+  { id: "vscode-discovery", client: "github-copilot-vscode", scenarioIds: ["CLIENT-002"] },
+  { id: "cli-discovery", client: "github-copilot-cli", scenarioIds: ["CLIENT-002"] },
+  { id: "vscode-input", client: "github-copilot-vscode", scenarioIds: ["CLIENT-003"] },
+  { id: "cli-input", client: "github-copilot-cli", scenarioIds: ["CLIENT-003"] },
+  { id: "vscode-mcp-startup", client: "github-copilot-vscode", scenarioIds: ["CLIENT-004"] },
+  { id: "client-tool-denials", client: "paired", scenarioIds: ["CLIENT-004", "CLIENT-006"] },
+  { id: "vscode-routing", client: "github-copilot-vscode", scenarioIds: ["CLIENT-005"] },
+  { id: "restart-resume", client: "paired", scenarioIds: ["CLIENT-007"] },
+  { id: "writer-transfer", client: "paired", scenarioIds: ["CLIENT-008"] },
+  { id: "customization-lifecycle", client: "paired", scenarioIds: ["CLIENT-009"] },
+  { id: "terminal-workflow", client: "paired", scenarioIds: ["CLIENT-010"] },
+];
+
+const GUIDED_CAPABILITY_BLOCKERS = [
+  {
+    id: "cli-hidden-worker-unavailable",
+    client: "github-copilot-cli",
+    scenarioIds: ["CLIENT-005"],
+    reasonCode: "CLI_AUTONOMOUS_WORKERS_OMITTED",
+    ownerCode: "UPSTREAM_CLIENT",
+    nextActionCode: "REQUALIFY_INDEPENDENT_WORKER_CONTROLS",
+  },
+];
+const CHECKPOINT_FORBIDDEN_FIELD =
+  /^(?:assertion|assertions|assertionState|chat(?:log|history)?|content|conversation|instruction|message|prompt|response|raw[-_]?(?:output|text)|transcript)$/iu;
+
+function adapterDigest(value) {
+  return sha256Json(value);
+}
+
+function assertCheckpointContentFree(value) {
+  if (Array.isArray(value)) {
+    for (const item of value) assertCheckpointContentFree(item);
+    return;
+  }
+  if (value !== null && typeof value === "object") {
+    for (const [key, child] of Object.entries(value)) {
+      if (CHECKPOINT_FORBIDDEN_FIELD.test(key)) throw new Error("Checkpoint adapter contains a forbidden field");
+      assertCheckpointContentFree(child);
+    }
+  }
+}
+
+function assertCheckpointAdapter(value, adapter, clientId) {
+  if (
+    value?.schemaVersion !== "1.0.0" ||
+    value.adapter !== adapter ||
+    (clientId !== undefined && value?.client?.id !== clientId) ||
+    (value.disposition !== undefined && !["pass", "fail", "unavailable"].includes(value.disposition.status))
+  ) {
+    throw new Error(`Checkpoint adapter ${adapter} is invalid`);
+  }
+}
+
+function assertCheckpointCandidate(value) {
+  const hashes = [
+    value?.packageLockHash,
+    value?.releaseManifestHash,
+    value?.runtimeBundleHash,
+    value?.customizationBundleHash,
+  ];
+  if (
+    typeof value?.repository !== "string" ||
+    typeof value?.branch !== "string" ||
+    !/^[0-9a-f]{40}$/u.test(value?.commit ?? "") ||
+    hashes.some((hash) => !SHA256_PATTERN.test(hash ?? ""))
+  ) {
+    throw new Error("Checkpoint candidate is invalid");
+  }
+}
+
+export async function collectGuidedCheckpoint(
+  options,
+  {
+    root = ROOT,
+    collectCandidate = (input) => collectCurrentCandidate(input, { root }),
+    collectRuntime = (input) => collectRuntimeEvidence(input, { root }),
+    collectCli = (input) => collectCliSurfaceEvidence(input, { root }),
+    collectVscode = (input) => collectVscodeSurfaceEvidence(input, { root }),
+  } = {},
+) {
+  const candidate = await collectCandidate(options);
+  const runtime = await collectRuntime({ project: required(options, "project"), run: required(options, "run") });
+  const cli = await collectCli({
+    workspace: required(options, "cli-workspace"),
+    binary: required(options, "cli-binary"),
+  });
+  const vscode = await collectVscode({
+    workspace: required(options, "vscode-workspace"),
+    host: required(options, "vscode-host"),
+  });
+  assertCheckpointCandidate(candidate);
+  assertCheckpointAdapter(runtime, "apex-runtime-journal-v1");
+  assertCheckpointAdapter(cli, "copilot-cli-surface-v1", "github-copilot-cli");
+  assertCheckpointAdapter(vscode, "vscode-surface-v1", "github-copilot-vscode");
+  assertCheckpointContentFree(runtime);
+  assertCheckpointContentFree(cli);
+  assertCheckpointContentFree(vscode);
+  if (runtime.projectId !== options.project || runtime.runId !== options.run) {
+    throw new Error("Runtime adapter identity does not match the checkpoint request");
+  }
+  const adapters = { runtime, cli, vscode };
+  const adapterDigests = Object.fromEntries(
+    Object.entries(adapters).map(([name, value]) => [name, adapterDigest(value)]),
+  );
+  const clientDispositions = [cli.disposition, vscode.disposition];
+  const automationStatus = clientDispositions.some(({ status }) => status === "fail")
+    ? "blocked"
+    : clientDispositions.some(({ status }) => status === "unavailable")
+      ? "unavailable"
+      : "ready";
+  const checkpoint = {
+    schemaVersion: "1.0.0",
+    kind: "guided-client-checkpoint-v1",
+    scenarioCorpusHash: CLIENT_OUTCOME_SCENARIO_CORPUS_HASH,
+    toolchainHash: CLIENT_OUTCOME_TOOLCHAIN_HASH,
+    candidate,
+    projectId: runtime.projectId,
+    runId: runtime.runId,
+    adapters,
+    adapterDigests,
+    status: {
+      automation: automationStatus,
+      interaction: "waiting",
+      qualifiesClientParity: false,
+      qualifiesRelease: false,
+    },
+    capabilityBlockers: GUIDED_CAPABILITY_BLOCKERS.map((blocker) => ({
+      ...blocker,
+      scenarioIds: [...blocker.scenarioIds],
+    })),
+    interactiveCheckpoints: GUIDED_CHECKPOINTS.map((checkpoint) => ({
+      ...checkpoint,
+      scenarioIds: [...checkpoint.scenarioIds],
+      status: automationStatus === "ready" ? "pending" : "blocked",
+    })),
+  };
+  return { ...checkpoint, checkpointId: sha256Json(checkpoint) };
 }
 
 const MAX_CLI_BINARY_BYTES = 256 * 1024 * 1024;
@@ -1161,6 +1315,12 @@ async function main() {
     return;
   }
   assertCleanGitStatus(gitValue(["status", "--porcelain"]));
+  if (options.command === "checkpoint") {
+    const contents = `${JSON.stringify(await collectGuidedCheckpoint(options), null, 2)}\n`;
+    if (options.output) await writeNewFiles([[resolve(options.output), contents]]);
+    else process.stdout.write(contents);
+    return;
+  }
   if (options.command === "candidate") {
     const contents = `${JSON.stringify(await collectCurrentCandidate(options), null, 2)}\n`;
     if (options.output) await writeNewFiles([[resolve(options.output), contents]]);
