@@ -52,6 +52,7 @@ const COMMAND_OPTIONS = {
   input: new Set(["output", "workspace"]),
   lifecycle: new Set(["output", "root"]),
   prepare: new Set(["branch", "output", "package-lock", "release-manifest", "root", "runtime-bundle"]),
+  restart: new Set(["output", "workspace"]),
   runtime: new Set(["output", "project", "run"]),
   template: new Set([
     "actor",
@@ -85,7 +86,7 @@ export function parseLiveQualificationArguments(argv) {
   const allowed = COMMAND_OPTIONS[command];
   if (allowed === undefined)
     throw new Error(
-      "Command must be candidate, checkpoint, cleanup, cli, input, lifecycle, prepare, runtime, template, validate, vscode, or render",
+      "Command must be candidate, checkpoint, cleanup, cli, input, lifecycle, prepare, restart, runtime, template, validate, vscode, or render",
     );
   const options = { command };
   for (let index = 1; index < argv.length; index += 2) {
@@ -1343,6 +1344,127 @@ export async function collectClientInputEvidence(
   return { ...evidence, evidenceId: sha256Json(evidence) };
 }
 
+function restartStatusProjection(status) {
+  if (
+    status === null ||
+    typeof status !== "object" ||
+    status.run === null ||
+    typeof status.run !== "object" ||
+    typeof status.run.projectId !== "string" ||
+    !PROJECT_ID_PATTERN.test(status.run.projectId) ||
+    typeof status.run.runId !== "string" ||
+    !RUN_ID_PATTERN.test(status.run.runId) ||
+    !Number.isInteger(status.run.ownerEpoch) ||
+    status.run.ownerEpoch < 1 ||
+    !SHA256_PATTERN.test(status.head ?? "") ||
+    !Number.isInteger(status.events) ||
+    status.events < 1 ||
+    status.events > 4096 ||
+    (status.task !== null &&
+      (typeof status.task !== "string" || status.task.length === 0 || status.task.length > 128)) ||
+    !Array.isArray(status.blockers) ||
+    status.blockers.length > 128 ||
+    status.blockers.some((blocker) => typeof blocker !== "string" || blocker.length === 0 || blocker.length > 4096)
+  ) {
+    throw new Error("Restart status is invalid");
+  }
+  return {
+    projectId: status.run.projectId,
+    runId: status.run.runId,
+    ownerEpoch: status.run.ownerEpoch,
+    journalHead: status.head,
+    eventCount: status.events,
+    taskDigest: sha256Json(status.task),
+    blockersDigest: sha256Json(status.blockers),
+  };
+}
+
+export async function collectRestartEvidence(
+  options,
+  {
+    root = ROOT,
+    serviceFactory = (workspace) => new ApexService(workspace),
+    journalFactory = (path) => new EventJournal(path),
+  } = {},
+) {
+  const workspace = resolve(root, required(options, "workspace"));
+  await assertRuntimeDirectory(workspace, "Restart workspace");
+  const lock = parseStrictJson(
+    (
+      await readBoundedRegularFile(
+        join(workspace, ".apex", "customizations.lock.json"),
+        MAX_MANAGED_FILE_BYTES,
+        "Restart customization lock",
+      )
+    ).toString("utf8"),
+  );
+  if (!["github-copilot-cli", "github-copilot-vscode"].includes(lock?.clientId)) {
+    throw new Error("Restart workspace client selection is invalid");
+  }
+  const requiredFile = lock.clientId === "github-copilot-cli" ? ".github/mcp.json" : ".vscode/mcp.json";
+  const projection = await collectManagedProjection(workspace, lock.clientId, requiredFile, "Restart workspace");
+  if (projection.files.some(({ matches }) => !matches)) {
+    throw new Error("Restart workspace managed files do not match the customization lock");
+  }
+  const selection = parseStrictJson(
+    (
+      await readBoundedRegularFile(
+        join(workspace, ".apex", "config.json"),
+        MAX_MANAGED_FILE_BYTES,
+        "Restart workspace selection",
+      )
+    ).toString("utf8"),
+  );
+  const projectId = runtimeId(selection?.projectId, "Restart project ID", PROJECT_ID_PATTERN);
+  const runId = runtimeId(selection?.runId, "Restart run ID", RUN_ID_PATTERN);
+  if (Object.keys(selection).sort().join(",") !== "projectId,runId") {
+    throw new Error("Restart workspace selection is invalid");
+  }
+  const journalPath = join(workspace, ".apex", "projects", projectId, "runs", runId, "journal");
+  await assertJournalFiles(journalPath);
+  const journal = journalFactory(journalPath);
+  const pinnedBefore = await journal.replay();
+  if (pinnedBefore.length === 0 || pinnedBefore.length > 4096)
+    throw new Error("Restart journal event count is invalid");
+  const firstService = serviceFactory(workspace);
+  const secondService = serviceFactory(workspace);
+  if (firstService === secondService) throw new Error("Restart requires distinct service instances");
+  const before = restartStatusProjection(await firstService.status());
+  const after = restartStatusProjection(await secondService.status());
+  const pinnedAfter = await journal.replay();
+  if (
+    sha256Json(before) !== sha256Json(after) ||
+    before.projectId !== projectId ||
+    before.runId !== runId ||
+    pinnedBefore.length !== pinnedAfter.length ||
+    pinnedBefore.at(-1)?.hash !== pinnedAfter.at(-1)?.hash ||
+    after.eventCount !== pinnedAfter.length ||
+    after.journalHead !== pinnedAfter.at(-1)?.hash
+  ) {
+    throw new Error("Restart changed persisted workspace state");
+  }
+  const evidence = {
+    schemaVersion: "1.0.0",
+    adapter: "apex-service-restart-v1",
+    client: { id: lock.clientId },
+    projectId: after.projectId,
+    runId: after.runId,
+    source: {
+      customizationLockSha256: projection.lockSha256,
+      managedFiles: projection.files.length,
+      journalHead: after.journalHead,
+      eventCount: after.eventCount,
+      ownerEpoch: after.ownerEpoch,
+      stateDigest: sha256Json(after),
+    },
+    status: "observed",
+    qualifiesClientParity: false,
+    qualifiesRelease: false,
+  };
+  assertCheckpointContentFree(evidence);
+  return { ...evidence, evidenceId: sha256Json(evidence) };
+}
+
 async function assertRuntimeDirectory(path, label) {
   const metadata = await lstat(path);
   if (!metadata.isDirectory() || metadata.isSymbolicLink() || (await realpath(path)) !== resolve(path)) {
@@ -2068,6 +2190,12 @@ async function main() {
   }
   if (options.command === "input") {
     const contents = `${JSON.stringify(await collectClientInputEvidence(options), null, 2)}\n`;
+    if (options.output) await writeNewFiles([[resolve(options.output), contents]]);
+    else process.stdout.write(contents);
+    return;
+  }
+  if (options.command === "restart") {
+    const contents = `${JSON.stringify(await collectRestartEvidence(options), null, 2)}\n`;
     if (options.output) await writeNewFiles([[resolve(options.output), contents]]);
     else process.stdout.write(contents);
     return;
