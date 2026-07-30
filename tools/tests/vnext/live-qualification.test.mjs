@@ -10,7 +10,7 @@ import {
   SECRET_VALUE_PATTERN,
   hasValidLiveQualification,
 } from "../../../packages/contracts/dist/index.js";
-import { EventJournal, ObjectStore } from "../../../packages/kernel/dist/index.js";
+import { EventJournal, ObjectStore, sha256Json } from "../../../packages/kernel/dist/index.js";
 import {
   assertCleanGitStatus,
   assertReleaseManifest,
@@ -135,6 +135,8 @@ test("parses bounded live qualification commands", () => {
       "/opt/code",
       "--output",
       "checkpoint.json",
+      "--previous",
+      "previous.json",
     ]),
     {
       command: "checkpoint",
@@ -146,6 +148,7 @@ test("parses bounded live qualification commands", () => {
       "vscode-workspace": "vscode",
       "vscode-host": "/opt/code",
       output: "checkpoint.json",
+      previous: "previous.json",
     },
   );
   assert.deepEqual(
@@ -200,7 +203,7 @@ function checkpointAdapters(overrides = {}) {
   };
 }
 
-async function guidedCheckpoint(overrides = {}) {
+async function guidedCheckpoint(overrides = {}, dependencies = {}) {
   const adapters = checkpointAdapters(overrides);
   return collectGuidedCheckpoint(
     {
@@ -217,6 +220,7 @@ async function guidedCheckpoint(overrides = {}) {
       collectRuntime: async () => adapters.runtime,
       collectCli: async () => adapters.cli,
       collectVscode: async () => adapters.vscode,
+      ...dependencies,
     },
   );
 }
@@ -258,6 +262,40 @@ test("checkpoint status derives from adapters without converting blockers to ass
   });
   assert.equal(blocked.status.automation, "blocked");
   assert.equal(blocked.interactiveCheckpoints[0].status, "blocked");
+});
+
+test("checkpoint resume accepts exact sources and rejects tampering or stale adapters", async () => {
+  const previous = await guidedCheckpoint();
+  const resumed = await guidedCheckpoint({}, { previousCheckpoint: previous });
+  assert.deepEqual(resumed, previous);
+
+  const tampered = structuredClone(previous);
+  tampered.status.interaction = "complete";
+  await assert.rejects(guidedCheckpoint({}, { previousCheckpoint: tampered }), /self-hash is invalid/);
+
+  await assert.rejects(
+    guidedCheckpoint(
+      {
+        cli: {
+          ...checkpointAdapters().cli,
+          disposition: {
+            status: "unavailable",
+            reasonCode: "CLIENT_BINARY_MISMATCH",
+            ownerCode: "CLIENT_ENVIRONMENT",
+            nextActionCode: "INSTALL_SELECTED_CLI",
+          },
+        },
+      },
+      { previousCheckpoint: previous },
+    ),
+    /stale or belongs to different sources/,
+  );
+
+  const forbidden = structuredClone(previous);
+  forbidden.assertions = { forged: "pass" };
+  const { checkpointId: _checkpointId, ...forbiddenContent } = forbidden;
+  forbidden.checkpointId = sha256Json(forbiddenContent);
+  await assert.rejects(guidedCheckpoint({}, { previousCheckpoint: forbidden }), /forbidden field/);
 });
 
 test("checkpoint rejects mismatched and malformed adapter identities", async () => {

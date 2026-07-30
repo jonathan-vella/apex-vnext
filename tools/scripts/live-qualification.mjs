@@ -37,6 +37,7 @@ const COMMAND_OPTIONS = {
     "cli-workspace",
     "output",
     "package-lock",
+    "previous",
     "project",
     "release-manifest",
     "run",
@@ -179,6 +180,22 @@ function assertCheckpointCandidate(value) {
   }
 }
 
+function assertPreviousCheckpoint(previous, current) {
+  if (
+    previous?.schemaVersion !== "1.0.0" ||
+    previous.kind !== "guided-client-checkpoint-v1" ||
+    !SHA256_PATTERN.test(previous.checkpointId ?? "")
+  ) {
+    throw new Error("Previous guided checkpoint is invalid");
+  }
+  assertCheckpointContentFree(previous);
+  const { checkpointId, ...content } = previous;
+  if (checkpointId !== sha256Json(content)) throw new Error("Previous guided checkpoint self-hash is invalid");
+  if (checkpointId !== current.checkpointId) {
+    throw new Error("Previous guided checkpoint is stale or belongs to different sources");
+  }
+}
+
 export async function collectGuidedCheckpoint(
   options,
   {
@@ -187,6 +204,7 @@ export async function collectGuidedCheckpoint(
     collectRuntime = (input) => collectRuntimeEvidence(input, { root }),
     collectCli = (input) => collectCliSurfaceEvidence(input, { root }),
     collectVscode = (input) => collectVscodeSurfaceEvidence(input, { root }),
+    previousCheckpoint,
   } = {},
 ) {
   const candidate = await collectCandidate(options);
@@ -245,7 +263,9 @@ export async function collectGuidedCheckpoint(
       status: automationStatus === "ready" ? "pending" : "blocked",
     })),
   };
-  return { ...checkpoint, checkpointId: sha256Json(checkpoint) };
+  const current = { ...checkpoint, checkpointId: sha256Json(checkpoint) };
+  if (previousCheckpoint !== undefined) assertPreviousCheckpoint(previousCheckpoint, current);
+  return current;
 }
 
 const MAX_CLI_BINARY_BYTES = 256 * 1024 * 1024;
@@ -1328,7 +1348,15 @@ async function main() {
   }
   assertCleanGitStatus(gitValue(["status", "--porcelain"]));
   if (options.command === "checkpoint") {
-    const contents = `${JSON.stringify(await collectGuidedCheckpoint(options), null, 2)}\n`;
+    const previousCheckpoint =
+      options.previous === undefined
+        ? undefined
+        : parseStrictJson(
+            (
+              await readBoundedRegularFile(resolve(options.previous), MAX_MANAGED_FILE_BYTES, "Previous checkpoint")
+            ).toString("utf8"),
+          );
+    const contents = `${JSON.stringify(await collectGuidedCheckpoint(options, { previousCheckpoint }), null, 2)}\n`;
     if (options.output) await writeNewFiles([[resolve(options.output), contents]]);
     else process.stdout.write(contents);
     return;

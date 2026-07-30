@@ -130,6 +130,29 @@ The checkpoint never accepts assertions, marks scenarios passed, qualifies
 client parity, or qualifies a release. CLI `CLIENT-005` remains an explicit
 capability blocker under ADR-0006 even when all automated adapters pass.
 
+To resume preparation later, verify the durable checkpoint while re-running all
+sources:
+
+```bash
+npm run live:vnext -- checkpoint \
+  --release-manifest dist/vnext-packages/release-manifest.json \
+  --project release-qualification \
+  --run candidate-1 \
+  --cli-workspace ../qualification-cli \
+  --cli-binary /absolute/path/to/copilot \
+  --vscode-workspace ../qualification-vscode \
+  --vscode-host /absolute/path/to/code \
+  --previous dist/live-qualification/guided-checkpoint.json \
+  --output dist/live-qualification/guided-checkpoint-verified.json
+```
+
+Resume verifies the prior self-hash and requires its candidate, corpus,
+toolchain, project/run, adapter outputs, and canonical adapter digests to match
+freshly collected sources exactly. Tampered, stale, or mixed checkpoints are
+rejected. Resume does not advance interactive status; an exact resume emits the
+same checkpoint ID. Omit `--output` to inspect the verified checkpoint on
+standard output without overwriting the prior file.
+
 When the public npm registry is unavailable locally, use an approved registry proxy as a process-scoped override:
 
 ```bash

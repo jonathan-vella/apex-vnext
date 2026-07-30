@@ -53,6 +53,8 @@ prior qualification is retained as historical characterization. See
   drift detection, bounded extension inventory parsing, and no UI or model invocation.
 - Added deterministic guided qualification checkpoints that re-run source adapters, bind canonical adapter digests, and
   expose blocked or pending interactive steps without accepting assertions or qualifying client parity.
+- Added strict checkpoint resume verification that re-runs all source adapters and rejects tampered, stale, or mixed
+  candidates while preserving the original checkpoint ID and interaction state.
 - Added exact client-qualification candidate receipt generation with clean-worktree, repository, branch, commit,
   release-manifest, runtime-bundle, package-lock, and customization-bundle binding.
 - Added versioned kernel-owned input requests and typed APEX MCP answer recording bound to the exact journal head and
