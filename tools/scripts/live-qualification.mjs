@@ -144,7 +144,8 @@ function assertCheckpointAdapter(value, adapter, clientId) {
     value?.schemaVersion !== "1.0.0" ||
     value.adapter !== adapter ||
     (clientId !== undefined && value?.client?.id !== clientId) ||
-    (value.disposition !== undefined && !["pass", "fail", "unavailable"].includes(value.disposition.status))
+    (clientId !== undefined && !["pass", "fail", "unavailable"].includes(value?.disposition?.status)) ||
+    (clientId === undefined && value.disposition !== undefined)
   ) {
     throw new Error(`Checkpoint adapter ${adapter} is invalid`);
   }
@@ -159,7 +160,11 @@ function assertCheckpointCandidate(value) {
   ];
   if (
     typeof value?.repository !== "string" ||
+    value.repository.length === 0 ||
+    value.repository.length > 256 ||
     typeof value?.branch !== "string" ||
+    value.branch.length === 0 ||
+    value.branch.length > 128 ||
     !/^[0-9a-f]{40}$/u.test(value?.commit ?? "") ||
     hashes.some((hash) => !SHA256_PATTERN.test(hash ?? ""))
   ) {

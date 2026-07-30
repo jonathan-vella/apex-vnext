@@ -273,6 +273,12 @@ test("checkpoint rejects mismatched and malformed adapter identities", async () 
     guidedCheckpoint({ vscode: { ...checkpointAdapters().vscode, disposition: { status: "passed" } } }),
     /Checkpoint adapter vscode-surface-v1 is invalid/,
   );
+  const cliWithoutDisposition = { ...checkpointAdapters().cli };
+  delete cliWithoutDisposition.disposition;
+  await assert.rejects(
+    guidedCheckpoint({ cli: cliWithoutDisposition }),
+    /Checkpoint adapter copilot-cli-surface-v1 is invalid/,
+  );
   await assert.rejects(
     guidedCheckpoint({ runtime: { ...checkpointAdapters().runtime, assertions: { forged: "pass" } } }),
     /forbidden field/,
@@ -290,6 +296,26 @@ test("checkpoint rejects mismatched and malformed adapter identities", async () 
       },
       {
         collectCandidate: async () => ({ ...candidate, commit: "forged" }),
+        collectRuntime: async () => checkpointAdapters().runtime,
+        collectCli: async () => checkpointAdapters().cli,
+        collectVscode: async () => checkpointAdapters().vscode,
+      },
+    ),
+    /Checkpoint candidate is invalid/,
+  );
+  await assert.rejects(
+    collectGuidedCheckpoint(
+      {
+        "release-manifest": "release.json",
+        project: "demo",
+        run: "run-1",
+        "cli-workspace": "cli",
+        "cli-binary": "bin/copilot",
+        "vscode-workspace": "vscode",
+        "vscode-host": "/opt/code",
+      },
+      {
+        collectCandidate: async () => ({ ...candidate, repository: "", branch: "" }),
         collectRuntime: async () => checkpointAdapters().runtime,
         collectCli: async () => checkpointAdapters().cli,
         collectVscode: async () => checkpointAdapters().vscode,
