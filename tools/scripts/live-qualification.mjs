@@ -191,20 +191,15 @@ export async function collectCliSurfaceEvidence(
     throw new Error("Copilot CLI customization lock is invalid");
   }
   const files = [];
+  const managedDestinations = new Set();
   for (const entry of lock.files) {
-    if (
-      entry === null ||
-      typeof entry !== "object" ||
-      !SHA256_PATTERN.test(entry.currentHash ?? "") ||
-      files.some(({ path }) => path === entry.path)
-    ) {
+    if (entry === null || typeof entry !== "object" || !SHA256_PATTERN.test(entry.currentHash ?? "")) {
       throw new Error("Copilot CLI managed file entry is invalid");
     }
-    const bytes = await readBoundedRegularFile(
-      await managedPath(workspace, entry.path),
-      MAX_MANAGED_FILE_BYTES,
-      "Managed customization file",
-    );
+    const destination = await managedPath(workspace, entry.path);
+    if (managedDestinations.has(destination)) throw new Error("Copilot CLI managed file destination is duplicated");
+    managedDestinations.add(destination);
+    const bytes = await readBoundedRegularFile(destination, MAX_MANAGED_FILE_BYTES, "Managed customization file");
     const actualHash = sha256(bytes);
     files.push({
       path: entry.path,

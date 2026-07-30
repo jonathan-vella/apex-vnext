@@ -289,6 +289,23 @@ test("CLI surface export reports managed drift and rejects unsafe lock paths", a
     ),
     /customization lock is invalid/,
   );
+
+  const duplicate = await cliSurfaceFixture(context);
+  const duplicateLockPath = join(duplicate.workspace, ".apex", "customizations.lock.json");
+  const duplicateLock = JSON.parse(await readFile(duplicateLockPath, "utf8"));
+  duplicateLock.files.push({ ...duplicateLock.files[0], path: "./.github/mcp.json" });
+  await writeFile(duplicateLockPath, JSON.stringify(duplicateLock));
+  await assert.rejects(
+    collectCliSurfaceEvidence(
+      { workspace: "consumer", binary: "bin/copilot" },
+      {
+        root: duplicate.root,
+        contractRoot: duplicate.contractRoot,
+        runCli: () => "GitHub Copilot CLI 1.0.73\n",
+      },
+    ),
+    /destination is duplicated/,
+  );
 });
 
 async function runtimeFixture(context, runId = "run-1") {
