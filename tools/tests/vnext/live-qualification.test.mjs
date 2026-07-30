@@ -459,7 +459,7 @@ test("lifecycle refuses existing roots and cleans up after failure", async (cont
   await assert.rejects(readFile(root), /ENOENT|EISDIR/u);
 });
 
-test("checkpoint output must be outside the lifecycle root", () => {
+test("checkpoint output must be outside the disposable root", () => {
   assert.throws(
     () => assertOutputOutsideDisposableRoot("/tmp/lifecycle", "/tmp/lifecycle/checkpoint.json", "Checkpoint"),
     /Checkpoint output must be outside the disposable root/,

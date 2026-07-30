@@ -50,11 +50,12 @@ npm run live:vnext -- prepare \
   --output dist/live-qualification/workspace-preparation.json
 ```
 
-The preparation command requires a nonexistent absolute root and an output path outside that root. It binds the exact
-candidate, initializes `cli/` and `vscode/` with their selected projections, verifies each customization lock, and
+The preparation command requires a clean Git worktree and a nonexistent absolute root. When `--output` is provided, it
+must be outside that root; omit it to emit the receipt to standard output. The command binds the exact candidate,
+initializes `cli/` and `vscode/` with their selected projections, verifies each customization lock and managed file, and
 records the generated project/run identity plus content-free lock metadata. The successful workspaces remain available
-for real client execution. If either initialization fails, the command removes the entire preparation root so a retry
-cannot inherit mixed state.
+for real client execution. If initialization or receipt emission fails, the command removes the entire preparation root
+so a retry cannot inherit mixed state.
 
 The preparation receipt is self-hashed but does not prove client behavior, qualify parity, or qualify a release. Do not
 move, reuse, or switch either prepared workspace between client observations.
