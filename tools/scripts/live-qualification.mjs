@@ -82,6 +82,13 @@ const PROJECT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const RUNTIME_FACT_ID_PATTERN = /^[a-z][a-z0-9.-]{0,63}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+const RUNTIME_EVENT_TYPES = new Set([
+  "task.completed",
+  "gate.decided",
+  "evidence.accepted",
+  "deployment.completed",
+  "transfer-accepted",
+]);
 
 async function assertRuntimeDirectory(path, label) {
   const metadata = await lstat(path);
@@ -115,7 +122,11 @@ function runtimeHash(value, label) {
 
 async function runtimeFacts(event, objects, firstOwnerEpoch) {
   const payload = event.payload;
-  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return [];
+  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
+    if (RUNTIME_EVENT_TYPES.has(event.type))
+      throw new Error(`Recognized runtime event ${event.type} has invalid payload`);
+    return [];
+  }
   const facts = [];
   if (event.type === "task.completed") {
     facts.push({ type: "task", node: runtimeFactId(payload.nodeId, "Task node"), taskState: "completed" });
@@ -189,6 +200,13 @@ export async function collectRuntimeEvidence(
   if (events.length === 0 || events.length > 4096) throw new Error("Runtime journal event count is invalid");
   if (events.some((event) => event.projectId !== projectId || event.runId !== runId)) {
     throw new Error("Runtime journal identity does not match the requested project and run");
+  }
+  let previousOwnerEpoch = 0;
+  for (const event of events) {
+    if (!Number.isInteger(event.ownerEpoch) || event.ownerEpoch < 1 || event.ownerEpoch < previousOwnerEpoch) {
+      throw new Error("Runtime journal owner epochs must be positive non-decreasing integers");
+    }
+    previousOwnerEpoch = event.ownerEpoch;
   }
   const firstOwnerEpoch = events[0].ownerEpoch;
   const records = [];

@@ -251,6 +251,36 @@ test("runtime export rejects traversal, journal tampering, and symlinked entries
   );
 });
 
+test("runtime export rejects malformed recognized events and invalid owner epochs", async (context) => {
+  const malformed = await runtimeFixture(context);
+  const malformedJournal = new EventJournal(malformed.journalPath);
+  await malformedJournal.append({
+    eventId: "event-malformed-recognized",
+    projectId: malformed.projectId,
+    runId: malformed.runId,
+    type: "task.completed",
+    timestamp: "2026-07-30T00:01:00.000Z",
+    ownerEpoch: 2,
+    expectedHead: await malformedJournal.head(),
+    payload: "invalid",
+  });
+  await assert.rejects(
+    collectRuntimeEvidence({ project: malformed.projectId, run: malformed.runId }, { root: malformed.root }),
+    /recognized runtime event task\.completed has invalid payload/i,
+  );
+
+  const invalidEpoch = await runtimeFixture(context);
+  const events = await new EventJournal(invalidEpoch.journalPath).replay();
+  const invalidEvents = events.map((event, index) => (index === 0 ? { ...event, ownerEpoch: "one" } : event));
+  await assert.rejects(
+    collectRuntimeEvidence(
+      { project: invalidEpoch.projectId, run: invalidEpoch.runId },
+      { root: invalidEpoch.root, journalFactory: () => ({ replay: async () => invalidEvents }) },
+    ),
+    /owner epochs/,
+  );
+});
+
 test("collects an exact candidate from bound repository inputs", async (context) => {
   const root = await mkdtemp(join(tmpdir(), "apex-client-candidate-"));
   context.after(() => rm(root, { recursive: true, force: true }));
