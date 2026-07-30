@@ -69,6 +69,8 @@ prior qualification is retained as historical characterization. See
   selected client workspaces without claiming client-process or UI-session restart.
 - Bound fresh paired restart evidence into guided checkpoints and strict resume while retaining the user-owned client
   restart interaction as pending.
+- Added content-free writer-transfer evidence for pending and accepted kernel state, with immutable claim, run
+  transaction, ownership, and owner-epoch verification and no cross-client interaction claim.
 - Added exact client-qualification candidate receipt generation with clean-worktree, repository, branch, commit,
   release-manifest, runtime-bundle, package-lock, and customization-bundle binding.
 - Added versioned kernel-owned input requests and typed APEX MCP answer recording bound to the exact journal head and

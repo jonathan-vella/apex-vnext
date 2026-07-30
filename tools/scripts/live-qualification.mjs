@@ -53,6 +53,7 @@ const COMMAND_OPTIONS = {
   lifecycle: new Set(["output", "root"]),
   prepare: new Set(["branch", "output", "package-lock", "release-manifest", "root", "runtime-bundle"]),
   restart: new Set(["output", "workspace"]),
+  transfer: new Set(["output", "workspace"]),
   runtime: new Set(["output", "project", "run"]),
   template: new Set([
     "actor",
@@ -86,7 +87,7 @@ export function parseLiveQualificationArguments(argv) {
   const allowed = COMMAND_OPTIONS[command];
   if (allowed === undefined)
     throw new Error(
-      "Command must be candidate, checkpoint, cleanup, cli, input, lifecycle, prepare, restart, runtime, template, validate, vscode, or render",
+      "Command must be candidate, checkpoint, cleanup, cli, input, lifecycle, prepare, restart, runtime, template, transfer, validate, vscode, or render",
     );
   const options = { command };
   for (let index = 1; index < argv.length; index += 2) {
@@ -1527,6 +1528,263 @@ export async function collectRestartEvidence(
   return { ...evidence, evidenceId: sha256Json(evidence) };
 }
 
+function transferEventPayload(event, label, accepted = false) {
+  const payload = event.payload;
+  if (
+    payload === null ||
+    typeof payload !== "object" ||
+    Array.isArray(payload) ||
+    Object.keys(payload).sort().join(",") !== (accepted ? "claimHash,recipient,transaction" : "claimHash,recipient") ||
+    typeof payload.claimHash !== "string" ||
+    !SHA256_PATTERN.test(payload.claimHash) ||
+    typeof payload.recipient !== "string" ||
+    payload.recipient.length === 0 ||
+    payload.recipient.length > 256 ||
+    (accepted &&
+      (payload.transaction === null ||
+        typeof payload.transaction !== "object" ||
+        Array.isArray(payload.transaction) ||
+        Object.keys(payload.transaction).sort().join(",") !== "after,afterHash" ||
+        payload.transaction.after === null ||
+        typeof payload.transaction.after !== "object" ||
+        Array.isArray(payload.transaction.after) ||
+        !SHA256_PATTERN.test(payload.transaction.afterHash ?? "") ||
+        sha256Json(payload.transaction.after) !== payload.transaction.afterHash))
+  ) {
+    throw new Error(`${label} transfer event payload is invalid`);
+  }
+  return payload;
+}
+
+function cancelledTransferPayload(event) {
+  const payload = event.payload;
+  if (
+    payload === null ||
+    typeof payload !== "object" ||
+    Array.isArray(payload) ||
+    Object.keys(payload).sort().join(",") !== "claimHash,failedCandidateCommit,reason,workflowRunId" ||
+    typeof payload.claimHash !== "string" ||
+    !SHA256_PATTERN.test(payload.claimHash) ||
+    typeof payload.failedCandidateCommit !== "string" ||
+    payload.failedCandidateCommit.length === 0 ||
+    payload.failedCandidateCommit.length > 256 ||
+    payload.reason !== "failed-before-import" ||
+    !Number.isInteger(payload.workflowRunId) ||
+    payload.workflowRunId < 1
+  ) {
+    throw new Error("Cancelled transfer event payload is invalid");
+  }
+  return payload;
+}
+
+function assertTransferClaim(claim, claimHash, projectId, runId, request, requestOwnerEpoch) {
+  const keys = Object.keys(claim ?? {})
+    .sort()
+    .join(",");
+  if (
+    claim === null ||
+    typeof claim !== "object" ||
+    Array.isArray(claim) ||
+    ![
+      "branch,commit,expiresAt,nextEpoch,projectId,recipient,repository,runId,sender,workflowId",
+      "approvalEnvironment,branch,commit,expiresAt,nextEpoch,projectId,recipient,repository,runId,sender,workflowId",
+    ].includes(keys) ||
+    sha256Json(claim) !== claimHash ||
+    claim.projectId !== projectId ||
+    claim.runId !== runId ||
+    claim.recipient !== request.recipient ||
+    !Number.isInteger(claim.nextEpoch) ||
+    claim.nextEpoch !== requestOwnerEpoch + 1 ||
+    !Number.isFinite(Date.parse(claim.expiresAt)) ||
+    [claim.repository, claim.branch, claim.commit, claim.workflowId, claim.sender, claim.recipient].some(
+      (value) => typeof value !== "string" || value.length === 0 || value.length > 256,
+    ) ||
+    (claim.approvalEnvironment !== undefined &&
+      (typeof claim.approvalEnvironment !== "string" ||
+        claim.approvalEnvironment.length === 0 ||
+        claim.approvalEnvironment.length > 256))
+  ) {
+    throw new Error("Writer transfer claim is invalid");
+  }
+}
+
+function assertTransferOwnership(ownership, claim, claimHash, accepted) {
+  const keys = Object.keys(ownership ?? {})
+    .sort()
+    .join(",");
+  if (
+    ownership === null ||
+    typeof ownership !== "object" ||
+    Array.isArray(ownership) ||
+    ![
+      "acceptedAt,branch,claimHash,commit,ownerEpoch,ownerId,previousOwnerEpoch,previousOwnerId,repository,workflowId",
+      "acceptedAt,approvalEnvironment,branch,claimHash,commit,ownerEpoch,ownerId,previousOwnerEpoch,previousOwnerId,repository,workflowId",
+    ].includes(keys) ||
+    ownership.claimHash !== claimHash ||
+    ownership.ownerId !== claim.recipient ||
+    ownership.ownerEpoch !== claim.nextEpoch ||
+    ownership.previousOwnerId !== claim.sender ||
+    ownership.previousOwnerEpoch !== claim.nextEpoch - 1 ||
+    ownership.repository !== claim.repository ||
+    ownership.branch !== claim.branch ||
+    ownership.commit !== claim.commit ||
+    ownership.workflowId !== claim.workflowId ||
+    ownership.approvalEnvironment !== claim.approvalEnvironment ||
+    ownership.acceptedAt !== accepted.timestamp ||
+    !Number.isFinite(Date.parse(ownership.acceptedAt))
+  ) {
+    throw new Error("Writer transfer ownership is invalid");
+  }
+}
+
+export async function collectTransferEvidence(
+  options,
+  { root = ROOT, journalFactory = (path) => new EventJournal(path) } = {},
+) {
+  const workspace = resolve(root, required(options, "workspace"));
+  await assertRuntimeDirectory(workspace, "Transfer workspace");
+  const lock = parseStrictJson(
+    (
+      await readBoundedRegularFile(
+        join(workspace, ".apex", "customizations.lock.json"),
+        MAX_MANAGED_FILE_BYTES,
+        "Transfer customization lock",
+      )
+    ).toString("utf8"),
+  );
+  if (!["github-copilot-cli", "github-copilot-vscode"].includes(lock?.clientId)) {
+    throw new Error("Transfer workspace client selection is invalid");
+  }
+  const requiredFile = lock.clientId === "github-copilot-cli" ? ".github/mcp.json" : ".vscode/mcp.json";
+  const projection = await collectManagedProjection(workspace, lock.clientId, requiredFile, "Transfer workspace");
+  if (projection.files.some(({ matches }) => !matches)) {
+    throw new Error("Transfer workspace managed files do not match the customization lock");
+  }
+  const selection = parseStrictJson(
+    (
+      await readBoundedRegularFile(
+        join(workspace, ".apex", "config.json"),
+        MAX_MANAGED_FILE_BYTES,
+        "Transfer workspace selection",
+      )
+    ).toString("utf8"),
+  );
+  const projectId = runtimeId(selection?.projectId, "Transfer project ID", PROJECT_ID_PATTERN);
+  const runId = runtimeId(selection?.runId, "Transfer run ID", RUN_ID_PATTERN);
+  if (Object.keys(selection).sort().join(",") !== "projectId,runId") {
+    throw new Error("Transfer workspace selection is invalid");
+  }
+  const runPath = join(workspace, ".apex", "projects", projectId, "runs", runId);
+  const journalPath = join(runPath, "journal");
+  await assertJournalFiles(journalPath);
+  const events = await journalFactory(journalPath).replay();
+  if (events.length === 0 || events.length > 4096) throw new Error("Transfer journal event count is invalid");
+  const requestedIndex = events.findLastIndex((event) => event.type === "transfer-requested");
+  if (requestedIndex < 0) throw new Error("Transfer journal has no recognized request");
+  const requested = events[requestedIndex];
+  const request = transferEventPayload(requested, "Requested");
+  const terminals = [];
+  for (const event of events.slice(requestedIndex + 1)) {
+    if (event.type === "transfer-accepted") {
+      const payload = transferEventPayload(event, "Accepted", true);
+      if (payload.claimHash !== request.claimHash)
+        throw new Error("Transfer terminal event claim does not match request");
+      terminals.push(event);
+    } else if (event.type === "transfer-cancelled") {
+      const payload = cancelledTransferPayload(event);
+      if (payload.claimHash !== request.claimHash)
+        throw new Error("Transfer terminal event claim does not match request");
+      terminals.push(event);
+    }
+  }
+  if (terminals.length > 1) throw new Error("Writer transfer has multiple terminal events");
+  const terminal = terminals[0];
+  if (terminal?.type === "transfer-cancelled") throw new Error("Latest writer transfer was cancelled");
+  const claim = parseStrictJson(
+    (
+      await readBoundedRegularFile(
+        join(runPath, "transfers", `${request.claimHash}.json`),
+        MAX_MANAGED_FILE_BYTES,
+        "Writer transfer claim",
+      )
+    ).toString("utf8"),
+  );
+  assertTransferClaim(claim, request.claimHash, projectId, runId, request, requested.ownerEpoch);
+  let ownership;
+  let acceptedRunHash;
+  if (terminal !== undefined) {
+    const accepted = transferEventPayload(terminal, "Accepted", true);
+    if (
+      accepted.claimHash !== request.claimHash ||
+      accepted.recipient !== request.recipient ||
+      terminal.ownerEpoch !== claim.nextEpoch ||
+      accepted.transaction.after.projectId !== projectId ||
+      accepted.transaction.after.runId !== runId ||
+      accepted.transaction.after.ownerEpoch !== claim.nextEpoch ||
+      !Number.isFinite(Date.parse(terminal.timestamp)) ||
+      Date.parse(terminal.timestamp) > Date.parse(claim.expiresAt)
+    ) {
+      throw new Error("Accepted transfer does not match its request");
+    }
+    acceptedRunHash = accepted.transaction.afterHash;
+    ownership = parseStrictJson(
+      (
+        await readBoundedRegularFile(
+          join(runPath, "ownership.json"),
+          MAX_MANAGED_FILE_BYTES,
+          "Writer transfer ownership",
+        )
+      ).toString("utf8"),
+    );
+    assertTransferOwnership(ownership, claim, request.claimHash, terminal);
+  }
+  const run = parseStrictJson(
+    (await readBoundedRegularFile(join(runPath, "run.json"), MAX_MANAGED_FILE_BYTES, "Writer transfer run")).toString(
+      "utf8",
+    ),
+  );
+  const status = terminal === undefined ? "pending" : "accepted";
+  const expectedEpoch = terminal === undefined ? requested.ownerEpoch : claim.nextEpoch;
+  if (
+    run?.projectId !== projectId ||
+    run?.runId !== runId ||
+    run?.ownerEpoch !== expectedEpoch ||
+    (acceptedRunHash !== undefined && sha256Json(run) !== acceptedRunHash)
+  ) {
+    throw new Error("Writer transfer run does not match transfer state");
+  }
+  const evidence = {
+    schemaVersion: "1.0.0",
+    adapter: "apex-writer-transfer-v1",
+    client: { id: lock.clientId },
+    projectId,
+    runId,
+    source: {
+      customizationLockSha256: projection.lockSha256,
+      managedFiles: projection.files.length,
+      journalHead: events.at(-1).hash,
+      eventCount: events.length,
+      claimHash: request.claimHash,
+      requestEventHash: requested.hash,
+      requestPayloadHash: requested.payloadHash,
+      requestOwnerEpoch: requested.ownerEpoch,
+      ...(terminal === undefined
+        ? {}
+        : {
+            acceptedEventHash: terminal.hash,
+            acceptedPayloadHash: terminal.payloadHash,
+            acceptedOwnerEpoch: terminal.ownerEpoch,
+            ownershipDigest: sha256Json(ownership),
+          }),
+    },
+    status,
+    qualifiesClientParity: false,
+    qualifiesRelease: false,
+  };
+  assertCheckpointContentFree(evidence);
+  return { ...evidence, evidenceId: sha256Json(evidence) };
+}
+
 async function assertRuntimeDirectory(path, label) {
   const metadata = await lstat(path);
   if (!metadata.isDirectory() || metadata.isSymbolicLink() || (await realpath(path)) !== resolve(path)) {
@@ -2258,6 +2516,12 @@ async function main() {
   }
   if (options.command === "restart") {
     const contents = `${JSON.stringify(await collectRestartEvidence(options), null, 2)}\n`;
+    if (options.output) await writeNewFiles([[resolve(options.output), contents]]);
+    else process.stdout.write(contents);
+    return;
+  }
+  if (options.command === "transfer") {
+    const contents = `${JSON.stringify(await collectTransferEvidence(options), null, 2)}\n`;
     if (options.output) await writeNewFiles([[resolve(options.output), contents]]);
     else process.stdout.write(contents);
     return;

@@ -152,6 +152,23 @@ This evidence proves repository-backed APEX service reconstruction. It does not 
 that either client restored its UI session, or complete the `restart-resume` interactive checkpoint. Those client actions
 remain user-owned. The adapter never qualifies parity or release.
 
+Export source-bound writer-transfer state from a prepared workspace after a real transfer request or acceptance:
+
+```bash
+npm run live:vnext -- transfer \
+  --workspace /absolute/path/to/qualification-workspaces/cli \
+  --output dist/live-qualification/cli-transfer.json
+```
+
+The adapter verifies the selected projection, persisted run, journal chain, latest transfer request, immutable claim,
+accepted run transaction, ownership record, and exact owner-epoch transition. It emits only client/project/run identity,
+lock metadata, event and payload hashes, claim hash, owner epochs, status, and an ownership digest. Repository, branch,
+commit, workflow, sender, recipient, and approval-environment values are validated in memory but never copied.
+
+This evidence reports `pending` or `accepted` kernel transfer state. It does not perform a transfer, prove which Copilot
+client initiated or accepted it, or prove stale-writer denial because rejected attempts are not journaled. Those
+cross-client actions remain user-owned interactive checkpoints. The adapter never qualifies parity or release.
+
 For a consumer workspace initialized with the VS Code projection, bind the host, Copilot Chat extension, and managed
 files without opening the UI:
 
