@@ -140,12 +140,19 @@ function assertCheckpointContentFree(value) {
 }
 
 function assertCheckpointAdapter(value, adapter, clientId) {
+  const runtimeIdentityInvalid =
+    clientId === undefined &&
+    (typeof value?.projectId !== "string" ||
+      !PROJECT_ID_PATTERN.test(value.projectId) ||
+      typeof value?.runId !== "string" ||
+      !RUN_ID_PATTERN.test(value.runId));
   if (
     value?.schemaVersion !== "1.0.0" ||
     value.adapter !== adapter ||
     (clientId !== undefined && value?.client?.id !== clientId) ||
     (clientId !== undefined && !["pass", "fail", "unavailable"].includes(value?.disposition?.status)) ||
-    (clientId === undefined && value.disposition !== undefined)
+    (clientId === undefined && value.disposition !== undefined) ||
+    runtimeIdentityInvalid
   ) {
     throw new Error(`Checkpoint adapter ${adapter} is invalid`);
   }

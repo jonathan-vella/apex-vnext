@@ -261,6 +261,16 @@ test("checkpoint status derives from adapters without converting blockers to ass
 });
 
 test("checkpoint rejects mismatched and malformed adapter identities", async () => {
+  const missingRuntimeIdentity = { ...checkpointAdapters().runtime };
+  delete missingRuntimeIdentity.projectId;
+  await assert.rejects(
+    guidedCheckpoint({ runtime: missingRuntimeIdentity }),
+    /Checkpoint adapter apex-runtime-journal-v1 is invalid/,
+  );
+  await assert.rejects(
+    guidedCheckpoint({ runtime: { ...checkpointAdapters().runtime, runId: "run.with-dot" } }),
+    /Checkpoint adapter apex-runtime-journal-v1 is invalid/,
+  );
   await assert.rejects(
     guidedCheckpoint({ runtime: { ...checkpointAdapters().runtime, runId: "other" } }),
     /identity does not match/,
