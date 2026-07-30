@@ -57,6 +57,8 @@ prior qualification is retained as historical characterization. See
   candidates while preserving the original checkpoint ID and interaction state.
 - Added deterministic dual-client customization lifecycle evidence for init, update, rollback, uninstall, reinstall,
   unrelated-file preservation, automatic cleanup, and checkpoint integration for CLIENT-009.
+- Added fail-closed paired client workspace preparation with exact candidate binding, selected projection lock
+  verification, durable run identities, and cleanup after partial initialization failure.
 - Added exact client-qualification candidate receipt generation with clean-worktree, repository, branch, commit,
   release-manifest, runtime-bundle, package-lock, and customization-bundle binding.
 - Added versioned kernel-owned input requests and typed APEX MCP answer recording bound to the exact journal head and
