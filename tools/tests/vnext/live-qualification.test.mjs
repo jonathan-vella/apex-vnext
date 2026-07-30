@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -10,10 +10,12 @@ import {
   SECRET_VALUE_PATTERN,
   hasValidLiveQualification,
 } from "../../../packages/contracts/dist/index.js";
+import { EventJournal, ObjectStore } from "../../../packages/kernel/dist/index.js";
 import {
   assertCleanGitStatus,
   assertReleaseManifest,
   collectCurrentCandidate,
+  collectRuntimeEvidence,
   createEvidenceManifestTemplate,
   createLiveQualificationTemplate,
   packageRepository,
@@ -100,6 +102,10 @@ test("parses bounded live qualification commands", () => {
     file: "qualification.json",
   });
   assert.deepEqual(
+    parseLiveQualificationArguments(["runtime", "--project", "demo", "--run", "run-1", "--output", "runtime.json"]),
+    { command: "runtime", project: "demo", run: "run-1", output: "runtime.json" },
+  );
+  assert.deepEqual(
     parseLiveQualificationArguments(["validate", "--evidence-file", "first.json", "--evidence-file", "second.json"]),
     {
       command: "validate",
@@ -107,6 +113,172 @@ test("parses bounded live qualification commands", () => {
     },
   );
   assert.throws(() => parseLiveQualificationArguments(["validate", "--unknown", "value"]), /Unknown/);
+});
+
+async function runtimeFixture(context, runId = "run-1") {
+  const root = await mkdtemp(join(tmpdir(), "apex-client-runtime-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const projectId = "demo";
+  const journalPath = join(root, ".apex", "projects", projectId, "runs", runId, "journal");
+  await mkdir(journalPath, { recursive: true });
+  const journal = new EventJournal(journalPath);
+  const objects = new ObjectStore(root);
+  const append = async (type, payload, ownerEpoch = 1) =>
+    journal.append({
+      eventId: `event-${type}-${ownerEpoch}-${(await journal.replay()).length + 1}`,
+      projectId,
+      runId,
+      type,
+      timestamp: "2026-07-30T00:00:00.000Z",
+      ownerEpoch,
+      expectedHead: await journal.head(),
+      payload,
+    });
+  const artifactHash = "a".repeat(64);
+  const evidenceHash = "b".repeat(64);
+  const operationHash = "c".repeat(64);
+  const inventoryHash = "d".repeat(64);
+  await append("task.completed", {
+    taskId: "task-1",
+    nodeId: "quality",
+    artifactHashes: { "quality-report": artifactHash },
+    prompt: "must-not-escape",
+  });
+  const approvalHash = await objects.putJson({
+    projectId,
+    runId,
+    gate: 1,
+    decision: "approved",
+    writerEpoch: 1,
+  });
+  await append("gate.decided", { gate: 1, approvalHash });
+  await append("evidence.accepted", { kind: "validation-evidence", status: "accepted", hash: evidenceHash });
+  await append("deployment.completed", { operationHash, inventoryHash });
+  await append("transfer-accepted", { claimHash: "e".repeat(64), recipient: "ci" }, 2);
+  return { root, projectId, runId, journalPath, artifactHash, evidenceHash, operationHash, inventoryHash };
+}
+
+test("exports source-bound runtime facts without copying unrecognized content", async (context) => {
+  const fixture = await runtimeFixture(context);
+  const exported = await collectRuntimeEvidence(
+    { project: fixture.projectId, run: fixture.runId },
+    { root: fixture.root },
+  );
+  assert.equal(exported.adapter, "apex-runtime-journal-v1");
+  assert.equal(exported.source.eventCount, 5);
+  assert.equal(exported.source.firstOwnerEpoch, 1);
+  assert.equal(exported.source.lastOwnerEpoch, 2);
+  assert.deepEqual(
+    exported.records.map(({ fact }) => fact),
+    [
+      { type: "task", node: "quality", taskState: "completed" },
+      { type: "artifact", artifact: "quality-report", artifactHash: fixture.artifactHash },
+      { type: "gate", gate: 1, gateState: "approved" },
+      { type: "evidence", evidence: "validation-evidence", evidenceHash: fixture.evidenceHash },
+      { type: "artifact", artifact: "operation-record", artifactHash: fixture.operationHash },
+      { type: "artifact", artifact: "resource-inventory", artifactHash: fixture.inventoryHash },
+      { type: "transfer", transferResult: "succeeded", ownerEpochDelta: 1 },
+    ],
+  );
+  assert.ok(exported.records.every(({ source }) => /^[0-9a-f]{64}$/.test(source.eventHash)));
+  assert.doesNotMatch(JSON.stringify(exported), /must-not-escape/u);
+});
+
+test("accepts canonical maximum-length run IDs", async (context) => {
+  const runId = `run_${"a".repeat(124)}`;
+  assert.equal(runId.length, 128);
+  const fixture = await runtimeFixture(context, runId);
+  const exported = await collectRuntimeEvidence({ project: fixture.projectId, run: runId }, { root: fixture.root });
+  assert.equal(exported.runId, runId);
+});
+
+test("runtime export rejects traversal, journal tampering, and symlinked entries", async (context) => {
+  const traversal = await runtimeFixture(context);
+  await assert.rejects(
+    collectRuntimeEvidence({ project: "../demo", run: traversal.runId }, { root: traversal.root }),
+    /Project ID is invalid/,
+  );
+
+  const tampered = await runtimeFixture(context);
+  const firstEvent = join(tampered.journalPath, "0000000000000001.json");
+  await writeFile(firstEvent, `${(await readFile(firstEvent, "utf8")).replace("quality", "tampered")}\n`);
+  await assert.rejects(
+    collectRuntimeEvidence({ project: tampered.projectId, run: tampered.runId }, { root: tampered.root }),
+    /Corrupt journal payload|Corrupt journal hash/,
+  );
+
+  const linked = await runtimeFixture(context);
+  const linkedEvent = join(linked.journalPath, "0000000000000001.json");
+  const outside = join(linked.root, "outside.json");
+  await writeFile(outside, await readFile(linkedEvent));
+  await unlink(linkedEvent);
+  await symlink(outside, linkedEvent);
+  await assert.rejects(
+    collectRuntimeEvidence({ project: linked.projectId, run: linked.runId }, { root: linked.root }),
+    /unsafe file/,
+  );
+
+  await assert.rejects(
+    collectRuntimeEvidence({ project: "demo.with-dot", run: linked.runId }, { root: linked.root }),
+    /Project ID is invalid/,
+  );
+
+  const mismatched = await runtimeFixture(context);
+  const mismatchedJournalPath = join(
+    mismatched.root,
+    ".apex",
+    "projects",
+    "requested",
+    "runs",
+    mismatched.runId,
+    "journal",
+  );
+  await mkdir(mismatchedJournalPath, { recursive: true });
+  const mismatchedJournal = new EventJournal(mismatchedJournalPath);
+  await mismatchedJournal.append({
+    eventId: "event-mismatched",
+    projectId: "embedded",
+    runId: mismatched.runId,
+    type: "task.completed",
+    timestamp: "2026-07-30T00:00:00.000Z",
+    ownerEpoch: 1,
+    expectedHead: null,
+    payload: { taskId: "task-1", nodeId: "quality", artifactHashes: {} },
+  });
+  await assert.rejects(
+    collectRuntimeEvidence({ project: "requested", run: mismatched.runId }, { root: mismatched.root }),
+    /identity does not match/,
+  );
+});
+
+test("runtime export rejects malformed recognized events and invalid owner epochs", async (context) => {
+  const malformed = await runtimeFixture(context);
+  const malformedJournal = new EventJournal(malformed.journalPath);
+  await malformedJournal.append({
+    eventId: "event-malformed-recognized",
+    projectId: malformed.projectId,
+    runId: malformed.runId,
+    type: "task.completed",
+    timestamp: "2026-07-30T00:01:00.000Z",
+    ownerEpoch: 2,
+    expectedHead: await malformedJournal.head(),
+    payload: "invalid",
+  });
+  await assert.rejects(
+    collectRuntimeEvidence({ project: malformed.projectId, run: malformed.runId }, { root: malformed.root }),
+    /recognized runtime event task\.completed has invalid payload/i,
+  );
+
+  const invalidEpoch = await runtimeFixture(context);
+  const events = await new EventJournal(invalidEpoch.journalPath).replay();
+  const invalidEvents = events.map((event, index) => (index === 0 ? { ...event, ownerEpoch: "one" } : event));
+  await assert.rejects(
+    collectRuntimeEvidence(
+      { project: invalidEpoch.projectId, run: invalidEpoch.runId },
+      { root: invalidEpoch.root, journalFactory: () => ({ replay: async () => invalidEvents }) },
+    ),
+    /owner epochs/,
+  );
 });
 
 test("collects an exact candidate from bound repository inputs", async (context) => {
