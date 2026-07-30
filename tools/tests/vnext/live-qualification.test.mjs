@@ -445,6 +445,23 @@ test("input evidence rejects malformed, replayed, and drifted source state", asy
     /recorded event has invalid payload/,
   );
 
+  const numericRequest = await create("numeric-request");
+  const numericEvents = await numericRequest.journal.replay();
+  const numericEvent = numericEvents.find((event) => event.type === "requirements.input-requested");
+  assert.ok(numericEvent);
+  numericEvent.payload.requestId = 123;
+  numericEvent.payloadHash = sha256Json(numericEvent.payload);
+  const { hash: _numericHash, ...numericContent } = numericEvent;
+  numericEvent.hash = sha256Json(numericContent);
+  await writeFile(
+    join(numericRequest.journal.directory, `${String(numericEvent.sequence).padStart(16, "0")}.json`),
+    `${JSON.stringify(numericEvent)}\n`,
+  );
+  await assert.rejects(
+    collectClientInputEvidence({ workspace: "." }, { root: numericRequest.root }),
+    /request event has invalid payload/,
+  );
+
   const replayed = await create("replayed");
   const submission = {
     schemaVersion: "1.0.0",

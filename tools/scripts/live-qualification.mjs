@@ -1076,8 +1076,10 @@ function inputRequestPayload(event) {
   const keys = Object.keys(payload).sort().join(",");
   if (
     !["questions,requestId", "questions,requestId,supersedesRequestId"].includes(keys) ||
-    !INPUT_ID_PATTERN.test(payload.requestId ?? "") ||
-    (payload.supersedesRequestId !== undefined && !INPUT_ID_PATTERN.test(payload.supersedesRequestId)) ||
+    typeof payload.requestId !== "string" ||
+    !INPUT_ID_PATTERN.test(payload.requestId) ||
+    (payload.supersedesRequestId !== undefined &&
+      (typeof payload.supersedesRequestId !== "string" || !INPUT_ID_PATTERN.test(payload.supersedesRequestId))) ||
     !Array.isArray(payload.questions) ||
     payload.questions.length === 0 ||
     payload.questions.length > 32 ||
