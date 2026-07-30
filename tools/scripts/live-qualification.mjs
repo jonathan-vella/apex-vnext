@@ -156,20 +156,15 @@ export async function collectLifecycleEvidence(
   options,
   { serviceFactory = (root) => new ApexService(root), remove = rm } = {},
 ) {
-  const root = required(options, "root");
-  if (!isAbsolute(root)) throw new Error("Lifecycle root must be an absolute path");
+  const inputRoot = required(options, "root");
+  if (!isAbsolute(inputRoot)) throw new Error("Lifecycle root must be an absolute path");
+  const root = resolve(inputRoot);
   const parent = dirname(root);
   const canonicalParent = await realpath(parent);
   if (resolve(canonicalParent, basename(root)) !== root) {
     throw new Error("Lifecycle root parent must not resolve through a symlink");
   }
-  if (options.output !== undefined) {
-    const output = resolve(options.output);
-    const relation = relative(root, output);
-    if (relation === "" || (relation !== ".." && !relation.startsWith(`..${sep}`))) {
-      throw new Error("Lifecycle output must be outside the disposable root");
-    }
-  }
+  assertOutputOutsideLifecycleRoot(root, options.output, "Lifecycle");
   if (await pathExists(root)) throw new Error("Lifecycle root must not already exist");
   await mkdir(root, { recursive: false });
   try {
@@ -201,6 +196,14 @@ export async function collectLifecycleEvidence(
   }
 }
 
+export function assertOutputOutsideLifecycleRoot(root, output, label) {
+  if (output === undefined) return;
+  const relation = relative(resolve(root), resolve(output));
+  if (relation === "" || (relation !== ".." && !relation.startsWith(`..${sep}`))) {
+    throw new Error(`${label} output must be outside the lifecycle root`);
+  }
+}
+
 const GUIDED_CHECKPOINTS = [
   { id: "vscode-discovery", client: "github-copilot-vscode", scenarioIds: ["CLIENT-002"] },
   { id: "cli-discovery", client: "github-copilot-cli", scenarioIds: ["CLIENT-002"] },
@@ -224,6 +227,7 @@ const GUIDED_CAPABILITY_BLOCKERS = [
     nextActionCode: "REQUALIFY_INDEPENDENT_WORKER_CONTROLS",
   },
 ];
+const LIFECYCLE_OPERATIONS = ["init", "update", "rollback", "uninstall", "reinstall", "unrelatedFilePreserved"];
 const CHECKPOINT_FORBIDDEN_FIELD =
   /^(?:assertion|assertions|assertionState|chat(?:log|history)?|content|conversation|instruction|message|prompt|response|raw[-_]?(?:output|text)|transcript)$/iu;
 
@@ -286,6 +290,7 @@ function assertCheckpointCandidate(value) {
 
 function assertLifecycleAdapter(value) {
   const { evidenceId, ...content } = value ?? {};
+  const operations = value?.operations;
   if (
     value?.schemaVersion !== "1.0.0" ||
     value.adapter !== "customization-lifecycle-v1" ||
@@ -294,7 +299,11 @@ function assertLifecycleAdapter(value) {
     value.qualifiesRelease !== false ||
     value?.clients?.cli?.clientId !== "github-copilot-cli" ||
     value?.clients?.vscode?.clientId !== "github-copilot-vscode" ||
-    Object.values(value?.operations ?? {}).some((status) => status !== "pass") ||
+    operations === null ||
+    typeof operations !== "object" ||
+    Array.isArray(operations) ||
+    Object.keys(operations).sort().join(",") !== [...LIFECYCLE_OPERATIONS].sort().join(",") ||
+    LIFECYCLE_OPERATIONS.some((operation) => operations[operation] !== "pass") ||
     evidenceId !== sha256Json(content)
   ) {
     throw new Error("Checkpoint adapter customization-lifecycle-v1 is invalid");
@@ -1479,6 +1488,8 @@ async function main() {
   }
   assertCleanGitStatus(gitValue(["status", "--porcelain"]));
   if (options.command === "checkpoint") {
+    const lifecycleRoot = resolve(required(options, "lifecycle-root"));
+    assertOutputOutsideLifecycleRoot(lifecycleRoot, options.output, "Checkpoint");
     const previousCheckpoint =
       options.previous === undefined
         ? undefined

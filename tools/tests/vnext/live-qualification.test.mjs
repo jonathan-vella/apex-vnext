@@ -13,6 +13,7 @@ import {
 import { EventJournal, ObjectStore, sha256Json } from "../../../packages/kernel/dist/index.js";
 import {
   assertCleanGitStatus,
+  assertOutputOutsideLifecycleRoot,
   assertReleaseManifest,
   collectCliSurfaceEvidence,
   collectCurrentCandidate,
@@ -274,6 +275,12 @@ test("lifecycle refuses existing roots and cleans up after failure", async (cont
     collectLifecycleEvidence({ root: join(linkedParent, "run") }),
     /parent must not resolve through a symlink/,
   );
+  const normalizedRoot = join(parent, "segment", "..", "normalized");
+  const normalizedEvidence = await collectLifecycleEvidence(
+    { root: normalizedRoot },
+    { serviceFactory: (workspace) => fakeLifecycleService(workspace, []) },
+  );
+  assert.equal(normalizedEvidence.adapter, "customization-lifecycle-v1");
 
   const root = join(parent, "failed");
   await assert.rejects(
@@ -281,6 +288,14 @@ test("lifecycle refuses existing roots and cleans up after failure", async (cont
     /injected lifecycle failure/,
   );
   await assert.rejects(readFile(root), /ENOENT|EISDIR/u);
+});
+
+test("checkpoint output must be outside the lifecycle root", () => {
+  assert.throws(
+    () => assertOutputOutsideLifecycleRoot("/tmp/lifecycle", "/tmp/lifecycle/checkpoint.json", "Checkpoint"),
+    /Checkpoint output must be outside the lifecycle root/,
+  );
+  assert.doesNotThrow(() => assertOutputOutsideLifecycleRoot("/tmp/lifecycle", "/tmp/checkpoint.json", "Checkpoint"));
 });
 
 function checkpointAdapters(overrides = {}) {
@@ -291,7 +306,14 @@ function checkpointAdapters(overrides = {}) {
       cli: { clientId: "github-copilot-cli" },
       vscode: { clientId: "github-copilot-vscode" },
     },
-    operations: { init: "pass", update: "pass", rollback: "pass", uninstall: "pass", reinstall: "pass" },
+    operations: {
+      init: "pass",
+      update: "pass",
+      rollback: "pass",
+      uninstall: "pass",
+      reinstall: "pass",
+      unrelatedFilePreserved: "pass",
+    },
     qualifiesClientParity: false,
     qualifiesRelease: false,
   };
@@ -454,6 +476,14 @@ test("checkpoint rejects mismatched and malformed adapter identities", async () 
   );
   await assert.rejects(
     guidedCheckpoint({ lifecycle: { ...checkpointAdapters().lifecycle, evidenceId: "f".repeat(64) } }),
+    /Checkpoint adapter customization-lifecycle-v1 is invalid/,
+  );
+  const incompleteLifecycle = structuredClone(checkpointAdapters().lifecycle);
+  delete incompleteLifecycle.operations.unrelatedFilePreserved;
+  const { evidenceId: _evidenceId, ...incompleteContent } = incompleteLifecycle;
+  incompleteLifecycle.evidenceId = sha256Json(incompleteContent);
+  await assert.rejects(
+    guidedCheckpoint({ lifecycle: incompleteLifecycle }),
     /Checkpoint adapter customization-lifecycle-v1 is invalid/,
   );
   await assert.rejects(
