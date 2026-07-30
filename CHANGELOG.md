@@ -59,6 +59,8 @@ prior qualification is retained as historical characterization. See
   unrelated-file preservation, automatic cleanup, and checkpoint integration for CLIENT-009.
 - Added fail-closed paired client workspace preparation with exact candidate binding, selected projection lock
   verification, durable run identities, and cleanup after partial initialization failure.
+- Added receipt-authorized cleanup for prepared client workspaces with exact marker, selection, projection, inode, and
+  post-rename verification; changed or unrelated data is preserved rather than recursively deleted.
 - Added exact client-qualification candidate receipt generation with clean-worktree, repository, branch, commit,
   release-manifest, runtime-bundle, package-lock, and customization-bundle binding.
 - Added versioned kernel-owned input requests and typed APEX MCP answer recording bound to the exact journal head and
