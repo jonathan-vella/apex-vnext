@@ -71,11 +71,17 @@ export async function repeatQualificationReports(
   if (!Number.isInteger(parallelism) || parallelism < 1) throw new RangeError("parallelism must be a positive integer");
   const reports = new Array<QualificationReport>(repetitions);
   let nextIteration = 0;
+  let stopped = false;
   const worker = async (): Promise<void> => {
-    while (nextIteration < repetitions) {
+    while (!stopped && nextIteration < repetitions) {
       const iteration = nextIteration;
       nextIteration += 1;
-      reports[iteration] = await harness(iteration);
+      try {
+        reports[iteration] = await harness(iteration);
+      } catch (error) {
+        stopped = true;
+        throw error;
+      }
     }
   };
   await Promise.all(Array.from({ length: Math.min(parallelism, repetitions) }, () => worker()));

@@ -207,5 +207,6 @@ test("repeat qualification propagates concurrent harness failures", async () => 
     ),
     /qualification failed/,
   );
+  await new Promise((resolvePromise) => setImmediate(resolvePromise));
   assert.deepEqual(started, [0, 1]);
 });
