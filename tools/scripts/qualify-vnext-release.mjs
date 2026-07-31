@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Run and compact all non-cloud release qualification for one immutable candidate. */
+/** Run and compact release-unique scorecard evidence for one immutable candidate. */
 
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -92,13 +92,14 @@ export async function runReleaseQualification(options, dependencies = {}) {
   await mkdir(logs, { recursive: true });
   const commands = [
     { command: "npm", args: ["run", "prepare:vnext-assets"], log: "prepare-assets.log" },
-    { command: "npm", args: ["run", "validate:all"], log: "validate-all.log" },
-    { command: "npm", args: ["run", "qualify:vnext"], log: "qualify.log" },
+    { command: "npm", args: ["run", "build:vnext"], log: "build.log" },
     {
       command: "node",
       args: [
         "tools/scripts/qualify-vnext.mjs",
         "--release",
+        "--parallelism",
+        "4",
         "--collected-at",
         options.collectedAt,
         "--output",

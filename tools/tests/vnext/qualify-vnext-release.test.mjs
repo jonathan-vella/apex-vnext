@@ -48,13 +48,12 @@ test("release qualification runs in order, compacts evidence, and denies promoti
 
   assert.deepEqual(
     commands.map(([command, ...args]) => `${command} ${args.slice(0, 2).join(" ")}`),
-    [
-      "npm run prepare:vnext-assets",
-      "npm run validate:all",
-      "npm run qualify:vnext",
-      "node tools/scripts/qualify-vnext.mjs --release",
-    ],
+    ["npm run prepare:vnext-assets", "npm run build:vnext", "node tools/scripts/qualify-vnext.mjs --release"],
   );
+  assert.ok(
+    result.commands.every((command) => !command.includes("validate:all") && !command.includes("qualify:vnext")),
+  );
+  assert.ok(result.commands.some((command) => command.includes("--release --parallelism 4")));
   assert.equal(result.status, "pass");
   assert.ok(Object.values(result.authorization).every((authorized) => authorized === false));
   await assert.rejects(readFile(join(output, "scorecard", "workspace", "large.tmp")), /ENOENT/);

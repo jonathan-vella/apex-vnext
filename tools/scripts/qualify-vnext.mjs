@@ -14,12 +14,14 @@ import process from "node:process";
 const ROOT = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const DEFAULT_REPETITIONS = 10;
 const RELEASE_REPETITIONS = 30;
+const RELEASE_PARALLELISM = 4;
 const FAULT_SAMPLES = 100;
 
 export function parseQualificationArguments(argv) {
   const options = {
     release: false,
     repetitions: undefined,
+    parallelism: undefined,
     collectedAt: undefined,
     indicators: undefined,
     output: join(ROOT, "dist", "vnext-qualification"),
@@ -28,6 +30,7 @@ export function parseQualificationArguments(argv) {
     const argument = argv[index];
     if (argument === "--release") options.release = true;
     else if (argument === "--repetitions") options.repetitions = Number(argv[++index]);
+    else if (argument === "--parallelism") options.parallelism = Number(argv[++index]);
     else if (argument === "--collected-at") options.collectedAt = argv[++index];
     else if (argument === "--indicators") options.indicators = resolve(argv[++index]);
     else if (argument === "--output") options.output = resolve(argv[++index]);
@@ -35,10 +38,14 @@ export function parseQualificationArguments(argv) {
   }
   const minimum = options.release ? RELEASE_REPETITIONS : 1;
   options.repetitions ??= options.release ? RELEASE_REPETITIONS : DEFAULT_REPETITIONS;
+  options.parallelism ??= options.release ? RELEASE_PARALLELISM : 1;
   if (!Number.isInteger(options.repetitions) || options.repetitions < minimum)
     throw new Error(
       `Repetitions must be an integer of at least ${minimum}${options.release ? " in release mode" : ""}`,
     );
+  if (!Number.isInteger(options.parallelism) || options.parallelism < 1 || options.parallelism > options.repetitions) {
+    throw new Error("Parallelism must be an integer between 1 and repetitions");
+  }
   if (options.collectedAt !== undefined && Number.isNaN(Date.parse(options.collectedAt)))
     throw new Error("--collected-at must be an ISO date-time");
   return options;
@@ -59,11 +66,14 @@ export async function runVnextQualification(options, dependencies) {
   const workspace = join(output, "workspace");
   await rm(output, { recursive: true, force: true });
   await mkdir(output, { recursive: true });
-  const reports = await dependencies.repeatQualificationReports(options.repetitions, async (iteration) =>
-    dependencies.runQualification({
-      workspaceRoot: join(workspace, `run-${String(iteration).padStart(3, "0")}`),
-      customizationsSource: dependencies.customizationsSource,
-    }),
+  const reports = await dependencies.repeatQualificationReports(
+    options.repetitions,
+    async (iteration) =>
+      dependencies.runQualification({
+        workspaceRoot: join(workspace, `run-${String(iteration).padStart(3, "0")}`),
+        customizationsSource: dependencies.customizationsSource,
+      }),
+    options.parallelism,
   );
   const benchmark = dependencies.runQualificationBenchmark(100, dependencies.budgets);
   const indicators = options.indicators === undefined ? {} : JSON.parse(await readFile(options.indicators, "utf8"));

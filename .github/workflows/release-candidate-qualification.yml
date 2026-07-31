@@ -1,4 +1,4 @@
-# Runs complete non-cloud release qualification for every release-relevant candidate revision.
+# Runs release-unique scorecard qualification after required CI owns validators, tests, and packaging.
 # The workflow emits evidence only; it cannot merge, deploy, publish, tag, or authorize cutover.
 name: Release Candidate Qualification
 
@@ -55,15 +55,6 @@ jobs:
 
       - name: Setup Node repository
         uses: ./.github/actions/setup-node-repo
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v4
-        with:
-          terraform_version: 1.15.8
-          terraform_wrapper: false
-
-      - name: Setup Python validation
-        uses: ./.github/actions/setup-python-validation
 
       - name: Bind stable collection time
         id: candidate

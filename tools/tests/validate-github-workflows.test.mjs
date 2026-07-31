@@ -143,7 +143,7 @@ test("rejects Python validation setup weakening and caller removal", () => {
     assert.ok(errors.some((error) => error.startsWith(`${actionPath}: `) && error.includes(expected)));
   }
 
-  for (const path of [".github/workflows/ci.yml", ".github/workflows/release-candidate-qualification.yml"]) {
+  for (const path of [".github/workflows/ci.yml"]) {
     const texts = mutate(
       path,
       "      - name: Setup Python validation\n        uses: ./.github/actions/setup-python-validation\n",
@@ -270,13 +270,13 @@ test("release authority and evidence invariants survive contract rebaselining", 
   );
   assert.ok(validate(actionTexts, rebaseline(path, actionTexts)).some((error) => error.includes("unapproved action")));
 
-  const removedActionTexts = mutate(
+  const extraTerraformSetup = mutate(
     path,
-    "      - name: Setup Terraform\n        uses: hashicorp/setup-terraform@v4\n        with:\n          terraform_version: 1.15.8\n          terraform_wrapper: false\n\n",
-    "",
+    "      - name: Setup Node repository",
+    "      - name: Obsolete Terraform setup\n        uses: hashicorp/setup-terraform@v4\n      - name: Setup Node repository",
   );
   assert.ok(
-    validate(removedActionTexts, rebaseline(path, removedActionTexts)).some((error) =>
+    validate(extraTerraformSetup, rebaseline(path, extraTerraformSetup)).some((error) =>
       error.includes("unapproved action"),
     ),
   );

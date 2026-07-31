@@ -19,6 +19,10 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Removed duplicate validator, test, packaging, Terraform, and Python setup from pull-request release qualification.
+  Required CI remains authoritative for those checks; exact-head qualification now runs only the release scorecard and
+  compact evidence bundle.
+
 - Replaced the custom Azure Pricing MCP with direct Microsoft Azure Resource Manager MCP access in VS Code and Copilot
   CLI. Every managed agent receives explicit read-only Cost Management and Pricing tools; custom transport, runtime-pack,
   CI, hook, Dependabot, and dev-container maintenance paths are retired.
