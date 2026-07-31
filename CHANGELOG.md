@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Removed unreferenced archived skill copies from `.archive/_archived_skills`; Git history remains the provenance source,
+  while contract-bound legacy agent and retired automation archives remain tracked.
 - Removed the retired custom Azure Pricing MCP source, tests, package metadata, and dependency-update surface after
   direct Microsoft ARM MCP access and pricing parity validators became authoritative.
 - Replaced exact live VS Code, Copilot Chat, and GitHub Copilot CLI pins with a rolling latest-stable policy. Live
