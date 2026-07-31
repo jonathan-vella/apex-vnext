@@ -230,11 +230,12 @@ and accepted before managed-agent behavior can influence qualification results.
 1. A deterministic Node.js controller owns queue selection, Git state, command execution, policy enforcement,
    checkpoints, and stop decisions. The model never controls the outer loop.
 2. A human creates a run authorization bound to the base commit, issue, allowed paths, protected paths, command allowlist,
-   network policy, file and line budgets, iteration and credit limits, expiry, and permitted local-commit behavior.
+   network policy, file and line budgets, iteration and wall-clock limits, expiry, and permitted local-commit behavior.
 3. The controller requires a clean dedicated worktree and branch, builds the complete inventory, captures baselines, and
    derives a dependency-ordered queue. It never edits the user's primary worktree.
-4. Each queue item starts a fresh non-interactive Copilot CLI task with JSONL output, no `ask_user`, no remote control,
-   no built-in MCP servers, no GitHub mutation tools, bounded credits, and only the paths and tools required by that item.
+4. Each queue item starts a fresh non-interactive Copilot CLI task with JSONL output, an isolated Copilot home and neutral
+   working directory, no `ask_user`, no remote control, no built-in MCP servers, no GitHub mutation tools, and only the
+   paths and tools required by that item.
 5. After each task, the controller rejects scope escape, protected-file changes, generated-source inversion, unexpected
    binaries, excessive churn, secrets, and a dirty state not attributable to the current item.
 6. The controller runs only focused format, compile, lint, unit, mutation, or behavior checks selected from the ownership
