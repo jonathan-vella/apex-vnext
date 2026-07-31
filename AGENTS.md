@@ -71,6 +71,10 @@ relevant validations before committing.
 
 ## Agent Workflow
 
+This section governs APEX workload execution. Repository engineering and maintenance prompts do not use this workflow,
+`apex-recall`, agent-output artifacts, or challenger gates unless their current bounded item explicitly evaluates those
+surfaces.
+
 | Step | Phase        | Output                                                   | Review                                                    |
 | ---- | ------------ | -------------------------------------------------------- | --------------------------------------------------------- |
 | 1    | Requirements | `01-requirements.md` + `sku-manifest.{json,md}` (rev 1)  | 1× comprehensive (mandatory)                              |

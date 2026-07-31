@@ -6,10 +6,17 @@
 ## Azure Defaults (canonical)
 
 This section is the canonical declaration of Azure infrastructure defaults.
-Every skill, agent, and prompt must reference this section — never restate
+Every Azure infrastructure skill, agent, and prompt must reference this section — never restate
 the values inline. The IaC-flavoured mirror with CAF naming, AVM modules,
 and reference index lives in
 [`.github/skills/azure-defaults/SKILL.md`](skills/azure-defaults/SKILL.md).
+
+## Repository Maintenance Mode
+
+When a prompt explicitly declares repository maintenance, its approved branch, scope, testing, validation, archive,
+and stop boundaries govern that run. Do not route maintenance through `apex-recall`, the workload workflow, Azure
+defaults, artifact generation, or managed APEX roles unless the current bounded item directly evaluates that surface.
+Path-scoped instructions and repository safety rules still apply.
 
 ### Default Regions
 
