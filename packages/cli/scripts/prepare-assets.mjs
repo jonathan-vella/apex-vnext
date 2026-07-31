@@ -294,8 +294,8 @@ function validateCliToolInventory(value) {
   if (
     value?.schemaVersion !== "1.0.0" ||
     value.client !== "github-copilot-cli" ||
-    value.clientVersion !== "1.0.73" ||
-    !/^[a-f0-9]{64}$/u.test(value.clientBinarySha256 ?? "") ||
+    value.characterizationVersion !== "1.0.73" ||
+    !/^[a-f0-9]{64}$/u.test(value.characterizationBinarySha256 ?? "") ||
     value.workspaceServer !== "apex" ||
     value.interactiveTools?.askUser !== "ask_user" ||
     value.interactiveTools?.delegate !== "task" ||

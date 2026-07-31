@@ -100,6 +100,7 @@ export function validateClientOutcomeScenarios(corpus, toolchain, receipt, recei
   }
   const vscode = toolchain?.core?.vscode;
   const cli = toolchain?.core?.copilotCli;
+  const livePolicy = toolchain?.clientQualificationPolicy;
   const expectedVscodeVersion = vscode?.selectedExactVersion;
   const expectedExtensionVersion = vscode?.selectedExactCopilotChatVersion;
   if (
@@ -109,6 +110,17 @@ export function validateClientOutcomeScenarios(corpus, toolchain, receipt, recei
     corpus.fixtureClients?.cliArtifactHash !== cli?.releaseArtifact?.sha256
   ) {
     errors.push("fixtureClients must match canonical toolchain fixture and pinned values");
+  }
+  if (
+    livePolicy?.mode !== "rolling-observed" ||
+    livePolicy.preference !== "latest-stable-supported" ||
+    livePolicy.versionBinding !== "observed-per-candidate" ||
+    livePolicy.extensionVersionBinding !== "observed-per-candidate" ||
+    livePolicy.binaryBinding !== "sha256-per-candidate" ||
+    livePolicy.historicalFixtures !== "immutable" ||
+    livePolicy.autoUpdateBetweenCandidates !== true
+  ) {
+    errors.push("live client qualification policy must require rolling observed candidate bindings");
   }
   const receiptVscode = receipt?.clients?.find(({ id }) => id === "github-copilot-vscode");
   const receiptCli = receipt?.clients?.find(({ id }) => id === "github-copilot-cli");
@@ -125,7 +137,7 @@ export function validateClientOutcomeScenarios(corpus, toolchain, receipt, recei
     receiptVscode?.extensionVersion !== expectedExtensionVersion ||
     receiptCli?.version !== cli?.selectedExactVersion
   ) {
-    errors.push("selected VS Code versions must match the complete bound context receipt");
+    errors.push("historical client fixtures must match the complete bound context receipt");
   }
   return errors;
 }

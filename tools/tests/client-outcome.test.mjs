@@ -158,7 +158,11 @@ function input(scenarioId, clientId, overrides = {}) {
       contentCapture: false,
     },
   };
-  return merge(base, overrides);
+  const result = merge(base, overrides);
+  if (result.evidenceKind === "live" && result.client.binarySha256 === undefined) {
+    result.client.binarySha256 = clientId === "github-copilot-cli" ? hash("8") : hash("9");
+  }
+  return result;
 }
 
 function pair(scenarioId, cliOverrides = {}, vscodeOverrides = {}) {
@@ -202,7 +206,7 @@ test("the corpus defines exact scenario-specific proof and valid equality paths"
   }
 });
 
-test("exact VS Code selection is bound to the complete context receipt", () => {
+test("historical client fixtures remain bound to the complete context receipt", () => {
   assert.equal(canonicalContextReceiptDigest(contextReceipt), contextReceiptHash);
   assert.throws(() => canonicalContextReceiptDigest({ value: undefined }), /CONTEXT_RECEIPT_NON_JSON_VALUE/);
   assert.throws(() => canonicalContextReceiptDigest({ value: Number.NaN }), /CONTEXT_RECEIPT_NON_JSON_VALUE/);
@@ -226,9 +230,17 @@ test("exact VS Code selection is bound to the complete context receipt", () => {
         toolchain,
         contextReceipt,
         contextReceiptHash,
-      ).includes("selected VS Code versions must match the complete bound context receipt"),
+      ).includes("historical client fixtures must match the complete bound context receipt"),
     );
   }
+  assert.ok(
+    validateClientOutcomeScenarios(
+      CLIENT_OUTCOME_SCENARIO_CORPUS,
+      merge(canonicalToolchain, { clientQualificationPolicy: { autoUpdateBetweenCandidates: false } }),
+      contextReceipt,
+      contextReceiptHash,
+    ).includes("live client qualification policy must require rolling observed candidate bindings"),
+  );
 });
 
 test("all fixture comparisons pass but no per-scenario comparison qualifies", () => {
@@ -361,7 +373,7 @@ test("scenario proof requires pass disposition and matching execution state", ()
   );
 });
 
-test("exact fixture and selected live versions are required", () => {
+test("exact fixtures remain pinned while live versions bind observed stable clients", () => {
   assert.throws(
     () => collectClientOutcome(input("CLIENT-001", "github-copilot-cli", { client: { version: "1.0.72" } })),
     /FIXTURE_CLIENT_VERSION_MISMATCH/,
@@ -378,16 +390,18 @@ test("exact fixture and selected live versions are required", () => {
     collectClientOutcome(input("CLIENT-001", "github-copilot-vscode", { evidenceKind: "live" })).evidenceKind,
     "live",
   );
-  assert.throws(
-    () =>
-      collectClientOutcome(
-        input("CLIENT-001", "github-copilot-vscode", {
-          evidenceKind: "live",
-          client: { extensionVersion: "0.57.0" },
-        }),
-      ),
-    /LIVE_CLIENT_VERSION_MISMATCH/,
+  assert.equal(
+    collectClientOutcome(
+      input("CLIENT-001", "github-copilot-vscode", {
+        evidenceKind: "live",
+        client: { version: "1.131.0", extensionVersion: "0.59.0" },
+      }),
+    ).client.version,
+    "1.131.0",
   );
+  const missingExtension = input("CLIENT-001", "github-copilot-vscode", { evidenceKind: "live" });
+  delete missingExtension.client.extensionVersion;
+  assert.throws(() => collectClientOutcome(missingExtension), /LIVE_CLIENT_VERSION_BINDING_INVALID/);
 });
 
 test("duplicate gate numbers are rejected even when gate objects differ", () => {
@@ -438,6 +452,15 @@ test("comparison verification rejects forged IDs and status", () => {
   const wrongVersion = merge(outcomes[1], { client: { version: "9.9.9" } });
   wrongVersion.outcomeId = calculateOutcomeId(wrongVersion);
   assert.throws(() => compareClientOutcomes(outcomes[0], wrongVersion), /FIXTURE_CLIENT_VERSION_MISMATCH/);
+  const liveOutcomes = pair(
+    "CLIENT-010",
+    { evidenceKind: "live", client: { version: "1.0.75" } },
+    { evidenceKind: "live", client: { version: "1.131.0", extensionVersion: "0.59.0" } },
+  );
+  const missingDigest = structuredClone(liveOutcomes[0]);
+  delete missingDigest.client.binarySha256;
+  missingDigest.outcomeId = calculateOutcomeId(missingDigest);
+  assert.throws(() => compareClientOutcomes(missingDigest, liveOutcomes[1]), /LIVE_CLIENT_BINDING_INVALID/);
 });
 
 test("content, token aliases, token values, and prose disposition fields are rejected", () => {
@@ -511,15 +534,19 @@ test("complete verified fixture aggregate proves parity but never release author
   assert.throws(() => verifyClientOutcomeQualification(forgedId, triplets, context), /QUALIFICATION_ID_INVALID/);
 });
 
-test("selected live versions compare and aggregate without release authority", () => {
+test("one observed live version set compares and aggregates without release authority", () => {
   const triplets = CLIENT_OUTCOME_SCENARIO_CORPUS.scenarios.map(({ id }) =>
-    triplet(id, { evidenceKind: "live" }, { evidenceKind: "live" }),
+    triplet(
+      id,
+      { evidenceKind: "live", client: { version: "1.0.75" } },
+      { evidenceKind: "live", client: { version: "1.131.0", extensionVersion: "0.59.0" } },
+    ),
   );
   for (const { comparison } of triplets) {
     assert.equal(comparison.evidenceKind, "live");
-    assert.equal(comparison.binding.clients.vscodeVersion, "1.130.0");
-    assert.equal(comparison.binding.clients.vscodeExtensionVersion, "0.58.0");
-    assert.equal(comparison.binding.clients.cliVersion, "1.0.73");
+    assert.equal(comparison.binding.clients.vscodeVersion, "1.131.0");
+    assert.equal(comparison.binding.clients.vscodeExtensionVersion, "0.59.0");
+    assert.equal(comparison.binding.clients.cliVersion, "1.0.75");
     assert.equal(comparison.status, "pass");
     assert.equal(comparison.qualifiesRelease, false);
   }
@@ -529,16 +556,23 @@ test("selected live versions compare and aggregate without release authority", (
   assert.equal(qualification.qualifiesClientParity, true);
   assert.equal(qualification.qualifiesRelease, false);
   assert.equal(verifyClientOutcomeQualification(qualification, triplets), true);
-  assert.throws(
-    () =>
-      collectClientOutcome(
-        input("CLIENT-001", "github-copilot-cli", {
-          evidenceKind: "live",
-          client: { version: "1.0.72" },
-        }),
-      ),
-    /LIVE_CLIENT_VERSION_MISMATCH/,
+  const mixed = structuredClone(triplets);
+  mixed[0] = triplet(
+    mixed[0].comparison.scenarioId,
+    { evidenceKind: "live", client: { version: "1.0.76" } },
+    { evidenceKind: "live", client: { version: "1.131.0", extensionVersion: "0.59.0" } },
   );
+  assert.throws(() => qualifyClientOutcomes(mixed), /QUALIFICATION_BINDING_MISMATCH/);
+  const mixedBinary = structuredClone(triplets);
+  mixedBinary[0] = triplet(
+    mixedBinary[0].comparison.scenarioId,
+    { evidenceKind: "live", client: { version: "1.0.75", binarySha256: hash("7") } },
+    {
+      evidenceKind: "live",
+      client: { version: "1.131.0", extensionVersion: "0.59.0", binarySha256: hash("9") },
+    },
+  );
+  assert.throws(() => qualifyClientOutcomes(mixedBinary), /QUALIFICATION_BINDING_MISMATCH/);
 });
 
 test("client closure composer generates deterministic live comparisons and qualification atomically", async () => {

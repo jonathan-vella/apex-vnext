@@ -250,18 +250,26 @@ function normalizeObservations(observations) {
 
 function assertClientVersionBinding(input) {
   const fixture = CLIENT_OUTCOME_SCENARIO_CORPUS.fixtureClients;
-  const vscode = CLIENT_OUTCOME_TOOLCHAIN.core.vscode;
   const cli = CLIENT_OUTCOME_TOOLCHAIN.core.copilotCli;
   if (input.evidenceKind === "live") {
-    if (vscode.selectedExactVersion === null || vscode.selectedExactCopilotChatVersion == null) {
-      throw new TypeError("LIVE_TOOLCHAIN_UNAVAILABLE");
+    const policy = CLIENT_OUTCOME_TOOLCHAIN.clientQualificationPolicy;
+    if (
+      policy?.mode !== "rolling-observed" ||
+      policy.preference !== "latest-stable-supported" ||
+      policy.versionBinding !== "observed-per-candidate" ||
+      policy.extensionVersionBinding !== "observed-per-candidate" ||
+      policy.binaryBinding !== "sha256-per-candidate" ||
+      policy.historicalFixtures !== "immutable" ||
+      policy.autoUpdateBetweenCandidates !== true
+    ) {
+      throw new TypeError("LIVE_CLIENT_POLICY_INVALID");
     }
-    const expectedVersion =
-      input.client.id === "github-copilot-vscode" ? vscode.selectedExactVersion : cli.selectedExactVersion;
-    const expectedExtension =
-      input.client.id === "github-copilot-vscode" ? vscode.selectedExactCopilotChatVersion : undefined;
-    if (input.client.version !== expectedVersion || input.client.extensionVersion !== expectedExtension) {
-      throw new TypeError("LIVE_CLIENT_VERSION_MISMATCH");
+    if (
+      (input.client.id === "github-copilot-vscode" && input.client.extensionVersion === undefined) ||
+      (input.client.id === "github-copilot-cli" && input.client.extensionVersion !== undefined) ||
+      !/^[0-9a-f]{64}$/u.test(input.client.binarySha256 ?? "")
+    ) {
+      throw new TypeError("LIVE_CLIENT_VERSION_BINDING_INVALID");
     }
   } else if (
     (input.client.id === "github-copilot-vscode" &&
