@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Replaced exact live VS Code, Copilot Chat, and GitHub Copilot CLI pins with a rolling latest-stable policy. Live
+  outcomes bind observed versions and executable hashes per candidate; historical context fixtures remain immutable.
 - Removed duplicate validator, test, packaging, Terraform, and Python setup from pull-request release qualification.
   Required CI remains authoritative for those checks; exact-head qualification now runs only the release scorecard and
   compact evidence bundle.

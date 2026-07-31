@@ -919,6 +919,22 @@ const MAX_MANAGED_FILE_BYTES = 2 * 1024 * 1024;
 const MANAGED_PATH_PATTERN = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]+$/;
 const MCP_SERVER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
+function rollingClientPolicy(toolchain, label) {
+  const policy = toolchain?.clientQualificationPolicy;
+  if (
+    policy?.mode !== "rolling-observed" ||
+    policy.preference !== "latest-stable-supported" ||
+    policy.versionBinding !== "observed-per-candidate" ||
+    policy.extensionVersionBinding !== "observed-per-candidate" ||
+    policy.binaryBinding !== "sha256-per-candidate" ||
+    policy.historicalFixtures !== "immutable" ||
+    policy.autoUpdateBetweenCandidates !== true
+  ) {
+    throw new Error(`${label} qualification policy is invalid`);
+  }
+  return policy;
+}
+
 async function readBoundedRegularFile(path, maxBytes, label) {
   const before = await lstat(path, { bigint: true });
   if (!before.isFile() || before.isSymbolicLink() || before.size > BigInt(maxBytes)) {
@@ -1081,10 +1097,20 @@ export async function collectCliSurfaceEvidence(
       )
     ).toString("utf8"),
   );
+  const toolchain = parseStrictJson(
+    (
+      await readBoundedRegularFile(
+        join(contractRoot, "config", "toolchain.v1.json"),
+        MAX_CLI_OUTPUT_BYTES,
+        "Toolchain configuration",
+      )
+    ).toString("utf8"),
+  );
+  const policy = rollingClientPolicy(toolchain, "Copilot CLI");
   if (
     inventory?.client !== "github-copilot-cli" ||
-    typeof inventory.clientVersion !== "string" ||
-    !SHA256_PATTERN.test(inventory.clientBinarySha256 ?? "") ||
+    typeof inventory.characterizationVersion !== "string" ||
+    !SHA256_PATTERN.test(inventory.characterizationBinarySha256 ?? "") ||
     typeof inventory.workspaceServer !== "string"
   ) {
     throw new Error("Copilot CLI inventory is invalid");
@@ -1095,12 +1121,9 @@ export async function collectCliSurfaceEvidence(
   const observedVersion = cliVersion(versionOutput);
   const projection = await collectManagedProjection(workspace, "github-copilot-cli", ".github/mcp.json", "Copilot CLI");
   const { files } = projection;
-  const versionMatches = observedVersion === inventory.clientVersion;
-  const binaryMatches = observedBinarySha256 === inventory.clientBinarySha256;
-  const exactClient = versionMatches && binaryMatches;
   const drift = files.some(({ matches }) => !matches);
   let mcp = { status: "not-run", servers: [], sourceDigest: null };
-  if (exactClient && !drift) {
+  if (!drift) {
     const output = runCli(binary, ["mcp", "list", "--json", "--no-auto-update", "--no-remote"], workspace);
     if (Buffer.byteLength(output) > MAX_CLI_OUTPUT_BYTES) throw new Error("Copilot CLI MCP output is too large");
     const value = parseStrictJson(output);
@@ -1112,27 +1135,20 @@ export async function collectCliSurfaceEvidence(
       throw new Error("Copilot CLI MCP server name is invalid");
     mcp = { status: "observed", servers, sourceDigest: sha256(Buffer.from(output)) };
   }
-  const missingMcp = exactClient && !mcp.servers.includes(inventory.workspaceServer);
-  const disposition = !exactClient
-    ? {
-        status: "unavailable",
-        reasonCode: versionMatches ? "CLIENT_BINARY_MISMATCH" : "CLIENT_VERSION_MISMATCH",
-        ownerCode: "CLIENT_ENVIRONMENT",
-        nextActionCode: "INSTALL_SELECTED_CLI",
-      }
-    : drift
-      ? { status: "fail", reasonCode: "MANAGED_FILE_DRIFT" }
-      : missingMcp
-        ? { status: "fail", reasonCode: "MCP_SERVER_MISSING" }
-        : { status: "pass" };
+  const missingMcp = !mcp.servers.includes(inventory.workspaceServer);
+  const disposition = drift
+    ? { status: "fail", reasonCode: "MANAGED_FILE_DRIFT" }
+    : missingMcp
+      ? { status: "fail", reasonCode: "MCP_SERVER_MISSING" }
+      : { status: "pass" };
   return {
     schemaVersion: "1.0.0",
     adapter: "copilot-cli-surface-v1",
     client: {
       id: "github-copilot-cli",
-      selectedVersion: inventory.clientVersion,
+      versionPolicy: policy.mode,
+      versionPreference: policy.preference,
       observedVersion,
-      selectedBinarySha256: inventory.clientBinarySha256,
       observedBinarySha256,
       versionOutputSha256: sha256(Buffer.from(versionOutput)),
     },
@@ -1197,11 +1213,7 @@ export async function collectVscodeSurfaceEvidence(
       )
     ).toString("utf8"),
   );
-  const selectedVersion = toolchain?.core?.vscode?.selectedExactVersion;
-  const selectedExtensionVersion = toolchain?.core?.vscode?.selectedExactCopilotChatVersion;
-  if (!VERSION_PATTERN.test(selectedVersion ?? "") || !VERSION_PATTERN.test(selectedExtensionVersion ?? "")) {
-    throw new Error("Selected VS Code toolchain is invalid");
-  }
+  const policy = rollingClientPolicy(toolchain, "VS Code");
   const host = required(options, "host");
   if (!isAbsolute(host)) throw new Error("VS Code host must be an absolute path");
   const observedHostSha256 = await hashBoundedRegularFile(host, MAX_CLI_BINARY_BYTES, "VS Code host");
@@ -1214,39 +1226,25 @@ export async function collectVscodeSurfaceEvidence(
   const projection = await collectManagedProjection(workspace, "github-copilot-vscode", ".vscode/mcp.json", "VS Code");
   const drift = projection.files.some(({ matches }) => !matches);
   const disposition =
-    observedVersion !== selectedVersion
+    observedExtensionVersion === null
       ? {
           status: "unavailable",
-          reasonCode: "HOST_VERSION_MISMATCH",
+          reasonCode: "COPILOT_CHAT_EXTENSION_MISSING",
           ownerCode: "CLIENT_ENVIRONMENT",
-          nextActionCode: "INSTALL_SELECTED_VSCODE",
+          nextActionCode: "INSTALL_LATEST_COPILOT_CHAT",
         }
-      : observedExtensionVersion === null
-        ? {
-            status: "unavailable",
-            reasonCode: "COPILOT_CHAT_EXTENSION_MISSING",
-            ownerCode: "CLIENT_ENVIRONMENT",
-            nextActionCode: "INSTALL_SELECTED_COPILOT_CHAT",
-          }
-        : observedExtensionVersion !== selectedExtensionVersion
-          ? {
-              status: "unavailable",
-              reasonCode: "COPILOT_CHAT_VERSION_MISMATCH",
-              ownerCode: "CLIENT_ENVIRONMENT",
-              nextActionCode: "INSTALL_SELECTED_COPILOT_CHAT",
-            }
-          : drift
-            ? { status: "fail", reasonCode: "MANAGED_FILE_DRIFT" }
-            : { status: "pass" };
+      : drift
+        ? { status: "fail", reasonCode: "MANAGED_FILE_DRIFT" }
+        : { status: "pass" };
   return {
     schemaVersion: "1.0.0",
     adapter: "vscode-surface-v1",
     client: {
       id: "github-copilot-vscode",
-      selectedVersion,
+      versionPolicy: policy.mode,
+      versionPreference: policy.preference,
       observedVersion,
       observedHostSha256,
-      selectedExtensionVersion,
       observedExtensionVersion,
       versionOutputSha256: sha256(Buffer.from(versionOutput)),
       extensionInventorySha256: sha256(Buffer.from(extensionOutput)),

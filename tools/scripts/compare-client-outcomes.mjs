@@ -88,7 +88,7 @@ function comparisonStatus(blockers, mismatches) {
 }
 
 function comparisonBinding(vscode, cli) {
-  return {
+  const binding = {
     candidateId: sha256Json(vscode.candidate),
     toolchainHash: vscode.candidate.toolchainHash,
     clients: {
@@ -97,6 +97,11 @@ function comparisonBinding(vscode, cli) {
       cliVersion: cli.client.version,
     },
   };
+  if (vscode.evidenceKind === "live" && cli.evidenceKind === "live") {
+    binding.clients.vscodeHostSha256 = vscode.client.binarySha256;
+    binding.clients.cliBinarySha256 = cli.client.binarySha256;
+  }
+  return binding;
 }
 
 function assertOutcomeBinding(outcome) {
@@ -107,20 +112,21 @@ function assertOutcomeBinding(outcome) {
     throw new TypeError("OUTCOME_TOOLCHAIN_BINDING_INVALID");
   }
   const fixture = CLIENT_OUTCOME_SCENARIO_CORPUS.fixtureClients;
-  const vscode = CLIENT_OUTCOME_TOOLCHAIN.core.vscode;
-  const cli = CLIENT_OUTCOME_TOOLCHAIN.core.copilotCli;
   if (outcome.evidenceKind === "live") {
-    if (vscode.selectedExactVersion === null || vscode.selectedExactCopilotChatVersion === null) {
-      throw new TypeError("LIVE_TOOLCHAIN_UNAVAILABLE");
-    }
+    const policy = CLIENT_OUTCOME_TOOLCHAIN.clientQualificationPolicy;
     if (
-      (outcome.client.id === "github-copilot-vscode" &&
-        (outcome.client.version !== vscode.selectedExactVersion ||
-          outcome.client.extensionVersion !== vscode.selectedExactCopilotChatVersion)) ||
-      (outcome.client.id === "github-copilot-cli" &&
-        (outcome.client.version !== cli.selectedExactVersion || outcome.client.extensionVersion !== undefined))
+      policy?.mode !== "rolling-observed" ||
+      policy.preference !== "latest-stable-supported" ||
+      policy.versionBinding !== "observed-per-candidate" ||
+      policy.extensionVersionBinding !== "observed-per-candidate" ||
+      policy.binaryBinding !== "sha256-per-candidate" ||
+      policy.historicalFixtures !== "immutable" ||
+      policy.autoUpdateBetweenCandidates !== true ||
+      !/^[0-9a-f]{64}$/u.test(outcome.client.binarySha256 ?? "") ||
+      (outcome.client.id === "github-copilot-vscode" && outcome.client.extensionVersion === undefined) ||
+      (outcome.client.id === "github-copilot-cli" && outcome.client.extensionVersion !== undefined)
     ) {
-      throw new TypeError("LIVE_CLIENT_VERSION_MISMATCH");
+      throw new TypeError("LIVE_CLIENT_BINDING_INVALID");
     }
   } else if (
     (outcome.client.id === "github-copilot-vscode" &&
@@ -199,8 +205,6 @@ export function calculateQualificationId(qualification) {
 }
 
 function qualificationPolicy(context) {
-  const vscode = CLIENT_OUTCOME_TOOLCHAIN.core.vscode;
-  const cli = CLIENT_OUTCOME_TOOLCHAIN.core.copilotCli;
   if (context !== undefined) {
     const fixture = CLIENT_OUTCOME_SCENARIO_CORPUS.fixtureClients;
     const expected = {
@@ -218,19 +222,15 @@ function qualificationPolicy(context) {
       throw new TypeError("FIXTURE_QUALIFICATION_CONTEXT_INVALID");
     return { evidenceKind: "fixture", ...expected };
   }
-  if (vscode.selectedExactVersion === null || vscode.selectedExactCopilotChatVersion === null) {
-    throw new TypeError("LIVE_TOOLCHAIN_UNAVAILABLE");
+  const policy = CLIENT_OUTCOME_TOOLCHAIN.clientQualificationPolicy;
+  if (policy?.mode !== "rolling-observed" || policy.preference !== "latest-stable-supported") {
+    throw new TypeError("LIVE_CLIENT_POLICY_INVALID");
   }
   return {
     evidenceKind: "live",
     scenarioIds: CLIENT_OUTCOME_SCENARIO_IDS,
     scenarioCorpusHash: CLIENT_OUTCOME_SCENARIO_CORPUS_HASH,
     toolchainHash: CLIENT_OUTCOME_TOOLCHAIN_HASH,
-    clients: {
-      vscodeVersion: vscode.selectedExactVersion,
-      vscodeExtensionVersion: vscode.selectedExactCopilotChatVersion,
-      cliVersion: cli.selectedExactVersion,
-    },
   };
 }
 
@@ -270,7 +270,7 @@ export function qualifyClientOutcomes(triplets, context) {
   if (
     evidenceKind !== policy.evidenceKind ||
     binding.toolchainHash !== policy.toolchainHash ||
-    canonicalJson(binding.clients) !== canonicalJson(policy.clients) ||
+    (policy.clients !== undefined && canonicalJson(binding.clients) !== canonicalJson(policy.clients)) ||
     ordered.some(({ outcomes }) =>
       outcomes.some(({ candidate }) => candidate.scenarioCorpusHash !== policy.scenarioCorpusHash),
     ) ||

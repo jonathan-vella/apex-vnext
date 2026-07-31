@@ -1,8 +1,8 @@
 {
   "schemaVersion": "1.0.0",
   "client": "github-copilot-cli",
-  "clientVersion": "1.0.73",
-  "clientBinarySha256": "d47d8fe63b4a4bd6f0f7cd1ed4074ffff9f4b90c78df61f8513e99e098490c33",
+  "characterizationVersion": "1.0.73",
+  "characterizationBinarySha256": "d47d8fe63b4a4bd6f0f7cd1ed4074ffff9f4b90c78df61f8513e99e098490c33",
   "observedAt": "2026-07-28",
   "workspaceServer": "apex",
   "interactiveTools": {

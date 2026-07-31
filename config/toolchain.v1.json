@@ -104,6 +104,15 @@
     "vscode": "1.130.0",
     "copilotCli": "1.0.73"
   },
+  "clientQualificationPolicy": {
+    "mode": "rolling-observed",
+    "preference": "latest-stable-supported",
+    "versionBinding": "observed-per-candidate",
+    "extensionVersionBinding": "observed-per-candidate",
+    "binaryBinding": "sha256-per-candidate",
+    "historicalFixtures": "immutable",
+    "autoUpdateBetweenCandidates": true
+  },
   "optionalCapabilityPackRuntimes": {
     "python": {
       "requiredForCore": false,

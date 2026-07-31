@@ -72,6 +72,7 @@ const CONFIG_SHAPES = {
     "supportPolicy",
     "core",
     "compatibilitySet",
+    "clientQualificationPolicy",
     "optionalCapabilityPackRuntimes",
     "approvedExceptions",
   ],
