@@ -69,6 +69,14 @@ test("requirements task remains blocked until pending input is recorded", async 
   assert.equal(requested.status, "needs_input");
   const stillWaiting = await service.nextTask();
   assert.equal(stillWaiting.status, "needs_input");
+  await assert.rejects(
+    service.taskContext("requirements"),
+    (error: unknown) => error instanceof ApexError && error.code === "APEX_NOT_FOUND",
+  );
+  await assert.rejects(
+    service.taskContext("../requirements"),
+    (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
+  );
 });
 
 test("typed input recording rejects premature, stale, malformed, duplicate, and replayed answers", async () => {

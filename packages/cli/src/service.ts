@@ -3430,9 +3430,19 @@ export class ApexService {
   }
 
   private async readTask(run: RunConfigV1, taskId: string): Promise<TaskEnvelopeV1> {
-    return JSON.parse(
-      await readFile(join(this.projects.runDirectory(run.projectId, run.runId), "tasks", `${taskId}.json`), "utf8"),
-    ) as TaskEnvelopeV1;
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u.test(taskId)) {
+      throw new ApexError("APEX_VALIDATION", "Task ID is invalid", EXIT_CODES.validation);
+    }
+    try {
+      return JSON.parse(
+        await readFile(join(this.projects.runDirectory(run.projectId, run.runId), "tasks", `${taskId}.json`), "utf8"),
+      ) as TaskEnvelopeV1;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        throw new ApexError("APEX_NOT_FOUND", "Task was not found", EXIT_CODES.notFound);
+      }
+      throw error;
+    }
   }
 
   private async refreshTaskHead(run: RunConfigV1, task: TaskEnvelopeV1): Promise<void> {

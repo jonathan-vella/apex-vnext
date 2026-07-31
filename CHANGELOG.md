@@ -22,6 +22,8 @@ prior qualification is retained as historical characterization. See
 - Fixed Requirements input and authoring so blank or inferred sentinel answers are rejected, kernel questions identify
   the decision areas to cover, and MCP task context returns recorded answers plus stageable output templates without
   requiring filesystem access.
+- Fixed Requirements task sequencing so agents handle `needs_input` before requesting task context and use only the
+  exact task ID returned by a subsequent `nextTask` result.
 - Removed unreferenced archived skill copies from `.archive/_archived_skills`; Git history remains the provenance source,
   while contract-bound legacy agent and retired automation archives remain tracked.
 - Removed the retired custom Azure Pricing MCP source, tests, package metadata, and dependency-update surface after
