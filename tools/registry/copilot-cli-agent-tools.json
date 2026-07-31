@@ -1,10 +1,33 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "client": "github-copilot-cli",
-  "characterizationVersion": "1.0.73",
-  "characterizationBinarySha256": "d47d8fe63b4a4bd6f0f7cd1ed4074ffff9f4b90c78df61f8513e99e098490c33",
-  "observedAt": "2026-07-28",
+  "characterizationVersion": "1.0.77",
+  "characterizationBinarySha256": "08892391ed7f6bd71ea0d19695a87e871caff72d37986d2313f9bb2d7f5ba91f",
+  "characterizationPayloadSha256": "1d099399d0e0a453b1fb9ed2ae759120c9c864512a4dfb717771bcac583081f8",
+  "observedAt": "2026-07-31",
   "workspaceServer": "apex",
+  "nativeTools": {
+    "maintenanceAllowlist": ["bash", "view", "glob", "rg", "apply_patch"],
+    "maintenanceDenylist": [
+      "ask_user",
+      "task",
+      "skill",
+      "web_fetch",
+      "fetch_copilot_cli_documentation",
+      "session_store_sql",
+      "sql",
+      "list_agents",
+      "read_agent",
+      "write_agent",
+      "list_bash",
+      "read_bash",
+      "stop_bash"
+    ],
+    "permissionPatterns": {
+      "commands": "shell(<authorized-command-prefix>:*)",
+      "writes": "write(<authorized-absolute-path>)"
+    }
+  },
   "interactiveTools": {
     "askUser": "ask_user",
     "delegate": "task"
@@ -59,6 +82,7 @@
     "submitEvidence"
   ],
   "evidence": {
+    "nativeToolProbe": "isolated CLI 1.0.77 run with MCP, remote control, custom instructions, and ask_user disabled; bash, view, glob, rg, and apply_patch were recognized while edit and grep were rejected as unknown",
     "collection": "trusted disposable workspace; built-in MCP disabled; full workspace allowlist; --available-tools and --allow-tool set to every apex/<operation>; no tool invocation",
     "probeSha256": "3d3d3e985aa2599584303c16098d12d4efd9f7fbd07876b42a59baabd6f0cb22",
     "mcpList": "workspace .github/mcp.json loaded with exact operation allowlist",

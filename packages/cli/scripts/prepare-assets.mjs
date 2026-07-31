@@ -291,12 +291,33 @@ export function roleDelegatesOnClient(role, clientId, roles, invocationEdges) {
 }
 
 function validateCliToolInventory(value) {
+  const maintenanceAllowlist = ["bash", "view", "glob", "rg", "apply_patch"];
+  const maintenanceDenylist = [
+    "ask_user",
+    "task",
+    "skill",
+    "web_fetch",
+    "fetch_copilot_cli_documentation",
+    "session_store_sql",
+    "sql",
+    "list_agents",
+    "read_agent",
+    "write_agent",
+    "list_bash",
+    "read_bash",
+    "stop_bash",
+  ];
   if (
-    value?.schemaVersion !== "1.0.0" ||
+    value?.schemaVersion !== "1.1.0" ||
     value.client !== "github-copilot-cli" ||
-    value.characterizationVersion !== "1.0.73" ||
+    value.characterizationVersion !== "1.0.77" ||
     !/^[a-f0-9]{64}$/u.test(value.characterizationBinarySha256 ?? "") ||
+    !/^[a-f0-9]{64}$/u.test(value.characterizationPayloadSha256 ?? "") ||
     value.workspaceServer !== "apex" ||
+    JSON.stringify(value.nativeTools?.maintenanceAllowlist) !== JSON.stringify(maintenanceAllowlist) ||
+    JSON.stringify(value.nativeTools?.maintenanceDenylist) !== JSON.stringify(maintenanceDenylist) ||
+    value.nativeTools?.permissionPatterns?.commands !== "shell(<authorized-command-prefix>:*)" ||
+    value.nativeTools?.permissionPatterns?.writes !== "write(<authorized-absolute-path>)" ||
     value.interactiveTools?.askUser !== "ask_user" ||
     value.interactiveTools?.delegate !== "task" ||
     value.mcpSelectorFormat !== "{server}/{operation}" ||
