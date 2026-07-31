@@ -10,6 +10,9 @@ The current characterization base is `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`.
 GitHub Copilot CLI parity, direct Azure Resource Manager MCP access, MCP and Draw.io retirement, bounded improvement
 measurement, and npm-generated client projections. These additions reopen every affected release gate.
 
+Maintainer decision update (2026-07-31): the measured Draw.io parity gate is explicitly bypassed for retirement.
+Python standalone diagrams and Mermaid inline diagrams are accepted as sufficient replacement coverage.
+
 No evidence in this dossier authorizes package publication, tag creation, branch changes, or production cutover.
 
 ## Reopened Qualification Gates
@@ -21,7 +24,7 @@ No evidence in this dossier authorizes package publication, tag creation, branch
 | VS Code qualification         | Versions selected; must run against the new bundle and exact candidate.  |
 | Client parity qualification   | Deterministic harness complete; paired exact-candidate runs not started. |
 | ARM MCP qualification         | Direct clients configured; paired live OAuth discovery remains pending.  |
-| MCP and Draw.io retirement    | Consumers migrated; rendering parity remains before removal.             |
+| MCP and Draw.io retirement    | Retired from active discovery, setup, workflows, and validators.         |
 | Improvement measurement       | Not implemented; prior evidence covers observe-and-propose only.         |
 | Package, SBOM, and provenance | Must cover the new generated client projections on the exact candidate.  |
 | Guidance and automation       | Characterized on `b27d173`; later N/O parity gates remain incomplete.    |
@@ -194,7 +197,7 @@ The dispositions below apply only to the product contract bound to
 1. Complete Milestone H characterization and bind ownership records to the current `main` base.
 2. Preserve the four-surface guidance and automation characterization, then prove each later consolidation against its
    captured behavior, diagnostics, security, context/timing, rollback, and hosted-check gates.
-3. Complete paired live ARM MCP checks and prove the Draw.io replacement before removing its old surface.
+3. Complete paired live ARM MCP checks on exact selected clients.
 4. Qualify equivalent typed outcomes and authority denials in supported VS Code and Copilot CLI versions.
 5. Qualify ARM MCP OAuth discovery, direct read allowlists, excluded-tool behavior, and failure handling.
 6. Prove Mermaid and Python diagram routing, bounded improvement measurement, and deterministic bundle generation.

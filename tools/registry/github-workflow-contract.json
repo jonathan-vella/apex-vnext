@@ -16,13 +16,12 @@
     "actions/setup-python": ["v6"],
     "actions/upload-artifact": ["v4", "v7"],
     "azure/login": ["v3"],
-    "denoland/setup-deno": ["v2"],
     "devcontainers/ci": ["v0.3"],
     "hashicorp/setup-terraform": ["v4"],
     "peter-evans/create-pull-request": ["v8"]
   },
   "localActions": {
-    ".github/actions/setup-node-repo/action.yml": "56966f1af2a2da0e0c3c51f8f160db41e55ae0bc756f0bb22b17480473d25139",
+    ".github/actions/setup-node-repo/action.yml": "3bcfc010a947e1f53b2cdd17872025ce6bfb32804a9450290c652ed1f1e38445",
     ".github/actions/setup-python-validation/action.yml": "e458a774a10318bfbaec0f05929cf114a7fcbfdd161eff4a41f3e461ec64a812"
   },
   "workflows": [
@@ -144,13 +143,11 @@
       "triggerDigest": "e1a2eeace4ec779df21a7a24202de6cb681e873d0678ae11869c10ff1db45f92",
       "permissionsDigest": "0686420875052835389cb6e71bf20b413979858f142d3c2eb5c3efd881b5b4c9",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "c5a1664dba10d0211acc2c6488f37595e1e12ca36b7d9adee7fc2f7565621988",
+      "jobsDigest": "8eeca00ad5b5b1afce672e5da79a19b2d3afdeb83d3cc5691ce9d43b8aa44253",
       "jobs": {
         "refresh-avm-module-index": "Refresh AVM Module Index",
         "track-deprecations": "Track Azure Deprecations",
         "docs-freshness": "Quarterly Audit (glob, orphans, freshness)",
-        "drawio-mcp-tests": "Drawio MCP Tests (Deno)",
-        "drawio-icon-converter-tests": "Drawio Icon Converter Tests (Python)",
         "link-check": "Check docs links"
       }
     }

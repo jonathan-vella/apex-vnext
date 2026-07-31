@@ -10,21 +10,10 @@
     "routing": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["inline", "standalone", "transitional"],
+      "required": ["inline", "standalone"],
       "properties": {
         "inline": { "$ref": "#/$defs/route" },
-        "standalone": { "$ref": "#/$defs/route" },
-        "transitional": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["owner", "newOutputAllowed", "historicalReadable", "formats"],
-          "properties": {
-            "owner": { "const": "drawio" },
-            "newOutputAllowed": { "const": false },
-            "historicalReadable": { "const": true },
-            "formats": { "const": ["drawio"] }
-          }
-        }
+        "standalone": { "$ref": "#/$defs/route" }
       }
     },
     "activeConsumers": {
@@ -41,11 +30,11 @@
     "authority": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["activeConsumersMigrated", "migrationReady", "drawioRemovalAllowed"],
+      "required": ["activeConsumersMigrated", "migrationReady", "maintainerParityOverride"],
       "properties": {
         "activeConsumersMigrated": { "const": true },
-        "migrationReady": { "const": false },
-        "drawioRemovalAllowed": { "const": false }
+        "migrationReady": { "const": true },
+        "maintainerParityOverride": { "const": true }
       }
     }
   },
@@ -74,7 +63,7 @@
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
         },
-        "allowTransitionalReferences": { "const": true }
+        "allowTransitionalReferences": { "type": "boolean" }
       }
     },
     "route": {
@@ -93,7 +82,6 @@
       "required": [
         "id",
         "title",
-        "sourceExpectation",
         "outputClass",
         "diagramType",
         "scope",
@@ -111,7 +99,6 @@
       "properties": {
         "id": { "type": "string", "pattern": "^g[1-9][0-9]*-[a-z0-9-]+$" },
         "title": { "type": "string", "minLength": 1 },
-        "sourceExpectation": { "type": "string", "pattern": "^tools/tests/drawio-golden/[a-z0-9-]+/expected\\.json$" },
         "outputClass": { "enum": ["architecture", "network", "runtime"] },
         "diagramType": {
           "enum": ["logical", "network", "runtime-flow", "deployment", "logical+network", "decomposed"]

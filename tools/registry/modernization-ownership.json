@@ -205,7 +205,7 @@
       ],
       "removalGate": "Each retired server has a passing replacement gate, zero active discovery or package references, and an explicit negative assertion.",
       "rationale": "MCP ownership is currently distributed across client config, packs, setup, tests, and documentation.",
-      "followUp": "Issues #140, #145, and #147 complete Terraform replacement, consumer migration, and retirement. Azure Pricing and Draw.io retain independent gates.",
+      "followUp": "Issues #140, #145, and #147 complete Terraform replacement, consumer migration, and retirement. Custom pricing and Draw.io are also retired with negative reintroduction guards.",
       "decisionRef": "OWN-012"
     },
     {
@@ -474,13 +474,11 @@
     {
       "id": "diagram-routing",
       "category": "generation",
-      "classification": "rewrite",
+      "classification": "keep",
       "canonicalOwner": ".github/skills/mermaid/ and .github/skills/python-diagrams/",
       "sourceRefs": [
         ".github/skills/mermaid/SKILL.md",
         ".github/skills/python-diagrams/SKILL.md",
-        ".github/skills/drawio/SKILL.md",
-        "tools/tests/drawio-golden/**/expected.json",
         "tools/registry/diagram-semantics.v1.json",
         "tools/registry/schemas/diagram-semantics.schema.json",
         "tools/scripts/validate-diagram-semantics.mjs",
@@ -496,12 +494,11 @@
         "npm run validate:diagram-semantics",
         "npm run test:diagram-semantics",
         "npm run validate:artifacts",
-        "npm run validate:workflow-graph",
-        "npm run lint:drawio"
+        "npm run validate:workflow-graph"
       ],
-      "removalGate": "Format-neutral scenarios prove editable Mermaid or Python source, semantic and visual quality, deterministic rendering, and historical Draw.io readability.",
-      "rationale": "New inline and standalone diagrams need explicit format owners before the Draw.io toolchain can retire.",
-      "followUp": "Issues #168 and #173 freeze semantics and migrate active consumers. Qualify rendering, then archive Draw.io only after measured parity.",
+      "removalGate": "Draw.io toolchain is retired from active workflows; Mermaid and Python ownership remains validated by format-neutral semantic checks.",
+      "rationale": "Inline and standalone diagram outputs are now owned by Mermaid and Python only.",
+      "followUp": "Maintainer-approved measured-parity bypass is recorded in release docs; preserve historical evidence only.",
       "decisionRef": "OWN-014"
     },
     {
@@ -804,7 +801,7 @@
       "decision": "Route new inline diagrams to Mermaid and standalone diagrams to editable Python sources.",
       "rationale": "The two formats cover documentation and inspectable architecture outputs without retaining Draw.io generation.",
       "owner": "Diagram modernization",
-      "gate": "Format-neutral semantic and visual qualification passes before Draw.io generation is archived."
+      "gate": "Maintainer-approved parity bypass is recorded; format-neutral semantic validation remains required."
     },
     {
       "id": "OWN-015",

@@ -218,41 +218,24 @@ Runs **before** Phase 0. Read `decisions.design_scope`. If set, skip
 silently. If absent, raise a single `vscode_askQuestions` with three
 options:
 
-- **Diagrams only** — produce `03-des-diagram.{drawio|py}` (+ `.png`);
+- **Diagrams only** — produce `03-des-diagram.py` (+ `.png` + `.svg`);
   skip ADR generation.
 - **ADRs only** — produce `03-des-adr-NNNN-{slug}.md` for each
-  non-trivial decision; skip Phase 0 and diagram generation entirely.
+  non-trivial decision; skip diagram generation entirely.
 - **Both (diagrams + ADRs)** — full Step 3 output.
 
 Record `apex-recall decide --key design_scope --value <diagrams|adrs|both> --step 3 --json`.
 
 Routing rules after the gate:
 
-- `design_scope == "adrs"` → skip Phase 0 and Section 1 (Diagram
-  generation); run Section 2 (ADRs) only.
-- `design_scope == "diagrams"` → run Phase 0 + Section 1; skip
+- `design_scope == "adrs"` → skip Section 1 (Diagram generation);
+  run Section 2 (ADRs) only.
+- `design_scope == "diagrams"` → run Section 1; skip
   Section 2 (ADRs).
-- `design_scope == "both"` → run Phase 0 + Section 1 + Section 2.
+- `design_scope == "both"` → run Section 1 + Section 2.
 
-## Design (Step 3) — Phase 0: Diagram tool choice (one-time gate)
-
-Skipped when `decisions.design_scope == "adrs"`. Otherwise read
-`decisions.diagram_tool`. If set, skip silently. If absent, raise a
-single `vscode_askQuestions` with two options:
-
-- **Draw.io** (Azure-brand icons, higher visual quality) — recommended;
-  every existing artifact in `agent-output/*/` uses Draw.io.
-- **Python diagrams** (faster, lower fidelity, generic icons).
-
-Record `apex-recall decide --key diagram_tool --value <drawio|python> --step 3 --json`.
-
-## Design (Step 3) — Drawio contract guards
-
-- **Timing budget**: a typical 12-resource diagram completes in ≤ 3 min.
-  If exceeded, abort, run `clear-diagram`, rebuild from clean base.
-- **`import-diagram` input contract**: the `xml` field accepts XML
-  **content as a string**, NOT a file path. Pass `read_file(<path>)`
-  content. Same warning in `drawio/SKILL.md`.
+Design diagrams are generated with `python-diagrams` for standalone
+artifacts and Mermaid for inline documentation.
 
 ## Governance (Step 3.5) — Phase 2.7: Inline Resolution Gate
 

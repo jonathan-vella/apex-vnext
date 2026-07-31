@@ -100,8 +100,6 @@
         "mutantdino.resourcemonitor",
         "HashiCorp.terraform",
         "ms-azuretools.vscode-azureterraform",
-        "hediet.vscode-drawio",
-        "denoland.vscode-deno",
         "ms-vscode.vscode-node-azure-pack"
       ],
       "settings": {
@@ -165,11 +163,7 @@
         "markdownlint.config": {
           "extends": "${workspaceFolder}/.markdownlint-cli2.jsonc"
         },
-        "markdownlint.run": "onSave",
-        "deno.enable": false,
-        "deno.enablePaths": ["tools/mcp-servers/drawio"],
-        "deno.lint": true,
-        "deno.unstable": []
+        "markdownlint.run": "onSave"
       }
     }
   },

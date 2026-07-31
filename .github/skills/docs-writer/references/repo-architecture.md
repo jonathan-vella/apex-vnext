@@ -25,8 +25,7 @@ apex/  (APEX)
 ├── infra/bicep/             # Bicep module library
 ├── tools/
 │   ├── apex-recall/        # Progressive session recall CLI
-│   ├── mcp-servers/
-│   │   └── drawio/         # Transitional Draw.io MCP server
+│   ├── mcp-servers/        # MCP server implementations
 │   ├── registry/           # Agent registry + count manifest
 │   ├── schemas/            # JSON schemas
 │   └── scripts/            # Validation and maintenance scripts
@@ -45,7 +44,7 @@ See `tools/registry/count-manifest.json` for canonical counts.
 | Orchestrator      | `01-orchestrator.agent.md`       | MAI-Code-1-Flash          | All  | Orchestration                   |
 | Requirements      | `02-requirements.agent.md`       | Claude Sonnet 5           | 1    | `01-requirements.md`            |
 | Architect         | `03-architect.agent.md`          | Opus 4.7 (High reasoning) | 2    | `02-architecture-assessment.md` |
-| Design            | `04-design.agent.md`             | Sonnet 5                  | 3    | `03-des-*.{drawio,py,png,md}`   |
+| Design            | `04-design.agent.md`             | Sonnet 5                  | 3    | `03-des-*.{py,png,svg,md}`      |
 | Governance        | `04g-governance.agent.md`        | GPT-5.5                   | 3.5  | `04-governance-constraints.md`  |
 | IaC Plan          | `05-iac-planner.agent.md`        | Opus 4.7 (High reasoning) | 4    | `04-implementation-plan.md`     |
 | Bicep Code        | `06b-bicep-codegen.agent.md`     | GPT-5.5                   | 5b   | Bicep in `infra/bicep/`         |
@@ -181,7 +180,7 @@ Step 1          Step 2            Step 3         Step 4
 Requirements → Architecture →  Design       → Planning
 (01-*.md)     (02-*.md)       (03-des-*)     (04-*.md)
                                   │
-                                  ├─ Diagrams (03-des-diagram.drawio)
+                                  ├─ Diagrams (03-des-diagram.py + .png/.svg)
                                   ├─ ADRs (03-des-adr-*.md)
                                   └─ Cost Estimate (03-des-cost-estimate.md)
 
@@ -229,7 +228,6 @@ These skills are explicitly referenced in agent body text via mandatory
 | ------------------- | ---------------------------------------------------------- |
 | `azure-defaults`    | all primary agents                                         |
 | `azure-artifacts`   | requirements, architect, iac-planner, deploy, orchestrator |
-| `drawio`            | design, architect, as-built agents                         |
 | `python-diagrams`   | architect, as-built agents                                 |
 | `azure-adr`         | design agent                                               |
 | `github-operations` | orchestrator, iac-planner agents                           |

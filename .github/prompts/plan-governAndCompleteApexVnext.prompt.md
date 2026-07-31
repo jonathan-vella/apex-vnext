@@ -100,7 +100,7 @@ or self-modification loop.
     across validate/test/pack, preserve the clean-install test, retain stable required-check names, and measure runtime
     before/after. Keep network freshness separate from deterministic CI.
 15. Exercise capability-pack install/status/verify/update/rollback/uninstall in a clean consumer and document absent-pack
-    behavior. Validate pricing, governance, and Draw.io startup from embedded, exact-locked assets without making optional
+    behavior. Validate pricing and governance startup from embedded, exact-locked assets without making optional
     packs core prerequisites.
 16. Prepare executable evidence templates and scripts for live qualification, then perform or hand off the user-owned
     runs: fresh supported VS Code discovery, MCP startup, direct handoffs, `askQuestions`, hidden worker tiers,

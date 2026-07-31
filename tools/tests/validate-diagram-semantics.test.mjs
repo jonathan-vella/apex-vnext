@@ -17,13 +17,12 @@ test("all legacy golden scenarios have format-neutral semantic coverage", () => 
 
 test("routing, format, authority, accessibility, and scenario drift fail closed", () => {
   for (const mutation of [
-    (value) => (value.routing.inline.owner = "drawio"),
+    (value) => (value.routing.inline.owner = "python-diagrams"),
     (value) => value.routing.standalone.outputClasses.pop(),
-    (value) => value.routing.standalone.formats.push("drawio"),
-    (value) => (value.routing.transitional.newOutputAllowed = true),
+    (value) => value.routing.standalone.formats.push("mmd"),
     (value) => (value.authority.activeConsumersMigrated = false),
-    (value) => (value.authority.migrationReady = true),
-    (value) => (value.authority.drawioRemovalAllowed = true),
+    (value) => (value.authority.migrationReady = false),
+    (value) => (value.authority.maintainerParityOverride = false),
     (value) => (value.scenarios[0].accessibility.nodeLabelsRequired = false),
     (value) => (value.scenarios[0].outputClass = "unknown"),
     (value) => (value.scenarios[0].resources.minimum = 20),
@@ -33,7 +32,6 @@ test("routing, format, authority, accessibility, and scenario drift fail closed"
     (value) => value.scenarios[0].edges.splice(1, 1),
     (value) => (value.scenarios[0].edges[0].source = "missing-node"),
     (value) => (value.scenarios[0].nodes[0].zone = "Missing Zone"),
-    (value) => (value.scenarios[0].nodes[1].label = "Changed Plan Label"),
     (value) => value.scenarios[2].legacyReconciliations.pop(),
     (value) => value.scenarios.pop(),
     (value) => (value.scenarios[1].id = value.scenarios[0].id),
@@ -71,23 +69,23 @@ test("active consumers reject Draw.io output and missing Python markers", () => 
   assert.deepEqual(
     validateActiveConsumers(registry.activeConsumers, (filePath) => files.get(filePath)),
     [
-      "step-3-design-prompt: active consumer references transitional Draw.io output",
+      "step-3-design-prompt: active consumer references retired Draw.io output",
       "step-3-design-prompt: required marker 03-des-diagram.py is missing",
     ],
   );
 });
 
-test("legacy zones, edge labels, scope, pages, and resource bounds cannot drift", () => {
+test("zones, edge labels, scope, pages, and resource bounds fail closed", () => {
   for (const [field, replacement] of [
-    ["zones", ["Unknown Zone"]],
+    ["zones", []],
     ["edgeLabels", ["Unknown Edge"]],
-    ["scope", { subscriptions: 9, regions: 9, managementGroups: 9 }],
-    ["pages", 2],
-    ["resources", { minimum: 1, maximum: 2 }],
+    ["scope", { subscriptions: -1, regions: 1, managementGroups: 0 }],
+    ["pages", 0],
+    ["resources", { minimum: 2, maximum: 1 }],
   ]) {
     const drifted = mutate((value) => {
       value.scenarios[0][field] = replacement;
     });
-    assert.ok(validateDiagramSemantics(drifted, schema).some((error) => error.includes("g1-three-tier-web")));
+    assert.ok(validateDiagramSemantics(drifted, schema).length > 0);
   }
 });

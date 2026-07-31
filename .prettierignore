@@ -14,7 +14,6 @@ assets/
 **/*.min.js
 
 # Deno-managed: uses deno fmt
-tools/mcp-servers/drawio/
 
 # Caches
 .eslintcache

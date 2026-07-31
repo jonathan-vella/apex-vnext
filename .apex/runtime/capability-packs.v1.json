@@ -10,34 +10,6 @@
   },
   "packs": [
     {
-      "id": "azure-pricing",
-      "availability": "optional",
-      "implementation": "python",
-      "source": "tools/mcp-servers/azure-pricing",
-      "lazyInstall": true,
-      "requiredWorkflows": ["architecture"],
-      "lockOwnership": {
-        "manifest": "config/capability-packs.v1.json",
-        "runtimeVersion": "pack-lock",
-        "directDependencies": "pack-lock",
-        "transitiveDependencies": "pack-lock",
-        "resolvedArtifactDigest": "runtime-bundle-build"
-      },
-      "absentBehavior": {
-        "affectedWorkflow": "blocked-capability-unavailable",
-        "unaffectedWorkflows": "continue",
-        "projectStatus": "available"
-      },
-      "replacementCriteria": {
-        "minimumMeasuredRuns": 100,
-        "candidateFailureRateMustBeNoGreaterThanCurrent": true,
-        "candidateP95LatencyMustBeNoGreaterThanCurrent": true,
-        "securityFindingsMustNotIncrease": true,
-        "maintenanceBurdenReductionEvidenceRequired": true,
-        "owner": "capabilities"
-      }
-    },
-    {
       "id": "azure-governance-discovery",
       "availability": "optional-required-by-workflow",
       "implementation": "python",
@@ -65,35 +37,6 @@
         "securityFindingsMustNotIncrease": true,
         "maintenanceBurdenReductionEvidenceRequired": true,
         "owner": "governance"
-      }
-    },
-    {
-      "id": "drawio",
-      "availability": "optional",
-      "implementation": "deno",
-      "source": "tools/mcp-servers/drawio",
-      "lazyInstall": true,
-      "requiredWorkflows": [],
-      "lockOwnership": {
-        "manifest": "config/capability-packs.v1.json",
-        "runtimeVersion": "pack-lock",
-        "directDependencies": "pack-lock",
-        "transitiveDependencies": "pack-lock",
-        "resolvedArtifactDigest": "runtime-bundle-build"
-      },
-      "absentBehavior": {
-        "affectedWorkflow": "skip-optional-diagram-output",
-        "unaffectedWorkflows": "continue",
-        "projectStatus": "available"
-      },
-      "replacementCriteria": {
-        "minimumMeasuredRuns": 50,
-        "candidateRenderSuccessRateMustBeNoLessThanCurrent": true,
-        "candidateP95LatencyMustBeNoGreaterThanCurrent": true,
-        "outputCompatibilityEvidenceRequired": true,
-        "securityFindingsMustNotIncrease": true,
-        "maintenanceBurdenReductionEvidenceRequired": true,
-        "owner": "documentation-tooling"
       }
     }
   ]

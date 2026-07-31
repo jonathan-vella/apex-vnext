@@ -104,47 +104,10 @@ else
     step_warn "k6 skipped: unsupported architecture $ARCH (supported: amd64, arm64)"
 fi
 
-# ─── Step 4: Deno upgrade ─────────────────────────────────────────────────────
-# The devcontainer feature caches the image layer, so "version: latest" may
-# lag behind. Explicitly upgrade to ensure we always have the latest release.
-# Falls back to curl installer if `deno upgrade` fails (e.g. corrupt binary,
-# GitHub API rate limit during feature install).
-
-step_start "🦕" "Upgrading Deno to latest..."
-if command -v deno &>/dev/null; then
-    DENO_OUT=$(sudo deno upgrade 2>&1) ; DENO_RC=$?
-    echo "$DENO_OUT" | tail -1
-    if [[ $DENO_RC -eq 0 ]]; then
-        step_done "deno $(deno --version 2>/dev/null | head -n1 | awk '{print $2}')"
-    else
-        # Fallback: install from official script if upgrade fails
-        DENO_OUT=$(curl -fsSL https://deno.land/install.sh | sudo env DENO_INSTALL=/usr/local sh 2>&1) ; DENO_RC=$?
-        echo "$DENO_OUT" | tail -1
-        if [[ $DENO_RC -eq 0 ]]; then
-            step_done "deno $(deno --version 2>/dev/null | head -n1 | awk '{print $2}') (fresh install)"
-        else
-            step_warn "Deno upgrade and fresh install both failed — using feature-installed version"
-        fi
-    fi
-    # Pre-cache drawio MCP server dependencies to eliminate first-start latency.
-    # Use `deno cache <entrypoint>` (canonical) so all transitive imports
-    # (JSR, npm, https) are pulled into $DENO_DIR. `deno install` (no args)
-    # only manages package.json-style deps and does NOT traverse JSR imports
-    # like @std/dotenv, which causes --cached-only startups to fail.
-    DRAWIO_DIR="${PWD}/tools/mcp-servers/drawio"
-    if [ -f "$DRAWIO_DIR/deno.json" ]; then
-        (cd "$DRAWIO_DIR" && deno cache --frozen src/index.ts) >/dev/null 2>&1 \
-            && printf "        ✅ drawio-mcp-server deps cached\n" \
-            || printf "        ⚠️  drawio dep cache skipped\n"
-    fi
-else
-    step_warn "Deno not found — rebuild container"
-fi
-
 # ─── Step 5: Directories & Git ───────────────────────────────────────────────
 
 step_start "🔐" "Configuring Git & directories..."
-sudo mkdir -p "${HOME}/.cache" "${HOME}/.cache/deno" "${HOME}/.config/gh" \
+sudo mkdir -p "${HOME}/.cache" "${HOME}/.config/gh" \
               "${HOME}/.local/share/powershell/PSReadLine"
 sudo chown -R vscode:vscode "${HOME}/.cache" 2>/dev/null || true
 sudo chown -R vscode:vscode "${HOME}/.config/gh" 2>/dev/null || true
@@ -376,12 +339,6 @@ default_github = {
     "url": "https://api.githubcopilot.com/mcp/",
 }
 
-default_drawio = {
-    "type": "stdio",
-    "command": "deno",
-    "args": ["run", "-P", "--no-check", "--cached-only", "${workspaceFolder}/tools/mcp-servers/drawio/src/index.ts"],
-}
-
 data = {"servers": {}}
 
 if config_path.exists():
@@ -396,9 +353,9 @@ if config_path.exists():
 
 servers = data.setdefault("servers", {})
 servers.pop("azure-pricing", None)
+servers.pop("drawio", None)
 servers.setdefault("azure-resource-manager-mcp", default_arm_mcp)
 servers.setdefault("github", default_github)
-servers.setdefault("drawio", default_drawio)
 # Azure MCP is provided by the ms-azuretools.vscode-azure-mcp-server extension
 # (declared in devcontainer.json customizations.vscode.extensions) — no
 # npx-launched stdio server is registered here to avoid a duplicate server.
