@@ -155,7 +155,7 @@
   ],
   "skill_allowlist": [],
   "context_hashes": {
-    ".github/prompts/apex-autonomous-pre-agent-loop.prompt.md": "8f56e10cd5863ee7c43990ddab9dd135569011ac21bc82de2f4f3158eee3846b",
+    ".github/prompts/apex-autonomous-pre-agent-loop.prompt.md": "f84f041b019a6aa43dc41fec9d85747b4bceaf76f91a21650379c02c6d941fd8",
     "AGENTS.md": "dad114b9f59e597437be286a41857d1f94d9666abc99fb118ffc6a7dbb465b9a",
     ".github/copilot-instructions.md": "aff580ed99b7c007caa4b5ce6b6c0670dbc2ccea619177d7d0cb84b0157c5e63",
     ".vscode/settings.json": "30cbdf32b28aecf68c31d14ba750c488647057e7efce3fbd31af432cfa0e66f0",

@@ -2,7 +2,7 @@
 name: "apex-autonomous-pre-agent-loop"
 description: "Automate APEX on a dedicated branch, push checkpoints, and stop before agent testing and validation."
 agent: agent
-model: "GPT-5.6 Sol"
+model: "GPT-5.6 Terra"
 argument-hint: "Optional: an existing authorization manifest path, its dedicated branch, or an authorized issue subset. Never widens the manifest."
 tools: [execute/runInTerminal, read, search, edit]
 ---
