@@ -292,6 +292,44 @@ rejected. Resume does not advance interactive status; an exact resume emits the
 same checkpoint ID. Omit `--output` to inspect the verified checkpoint on
 standard output without overwriting the prior file.
 
+After the authoritative collector has produced one live outcome for each client
+and scenario, create a strict path manifest relative to its own directory:
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "outcomes": [
+    {
+      "scenarioId": "CLIENT-001",
+      "clientId": "github-copilot-vscode",
+      "outcomePath": "outcomes/CLIENT-001-vscode.json"
+    }
+  ]
+}
+```
+
+The real manifest must contain exactly one VS Code and one Copilot CLI outcome
+for every scenario. Compose the comparison and aggregate closure into a new
+directory:
+
+```bash
+npm run compose:vnext-client-closure -- \
+  dist/live-qualification/client-closure \
+  dist/live-qualification/client-outcomes.json
+```
+
+The composer accepts only path-contained, collector-generated live outcomes. It
+rejects incomplete, duplicate, fixture-mixed, unavailable, failed, mismatched,
+or preexisting output before publishing. It generates canonical outcome copies,
+one comparison per scenario, the verified parity qualification, and a self-hashed
+`closure.json` index. The output remains parity-only:
+`qualifiesClientParity` is true and `qualifiesRelease` is false.
+
+This closure is not yet an evidence manifest. Final binding must also supply and
+validate every immutable runtime journal, attestation, artifact, and evidence
+payload referenced by the outcomes. Do not add the client qualification to live
+release evidence until `validate` accepts that complete payload closure.
+
 When the public npm registry is unavailable locally, use an approved registry proxy as a process-scoped override:
 
 ```bash
