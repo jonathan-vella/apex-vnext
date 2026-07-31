@@ -32,7 +32,9 @@ const ROOT = path.resolve(new URL("../..", import.meta.url).pathname);
 const SCAN_GLOBS = [
   // Agent + prompt + instruction files
   { dir: ".github/agents", suffix: ".md" },
+  { dir: "customizations/.github/agents", suffix: ".md" },
   { dir: ".github/instructions", suffix: ".md" },
+  { dir: ".github/prompts", suffix: ".md" },
   { dir: "tools/apex-prompts", suffix: ".md" },
 ];
 // For skills, only the canonical SKILL files (not nested references/).

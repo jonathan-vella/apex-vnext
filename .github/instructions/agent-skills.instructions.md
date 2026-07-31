@@ -129,13 +129,86 @@ References to `references/` or `templates/` subpaths inside the same skill
 are picked up via fallback containment checks but are not the preferred
 wiring form. Use the canonical `SKILL.md` pattern for explicit wiring.
 
+## Anthropic Skill Authoring Best Practices
+
+Source: [Skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).
+Apply these whenever a `SKILL.md` or a bundled file is created or modified. The frontmatter mechanics above win on
+format; these rules govern content.
+
+### Conciseness and degrees of freedom
+
+- Assume the model is already capable. Add only context it does not have, and delete any paragraph that does not
+  justify its token cost.
+- Match specificity to task fragility:
+  - **High freedom** (prose guidance) when several approaches are valid and context decides.
+  - **Medium freedom** (parameterised pseudocode or a configurable script) when a preferred pattern exists.
+  - **Low freedom** (one exact command, no variation) when the operation is fragile or order-dependent. Say
+    "Do not modify the command" explicitly.
+- Give one default approach plus an escape hatch. Never list interchangeable libraries or tools as equal options.
+
+### Naming and description
+
+- Prefer gerund names (`processing-pdfs`, `analyzing-spreadsheets`). Noun-phrase and action forms are acceptable;
+  keep one pattern across the collection.
+- Never use vague names (`helper`, `utils`, `tools`), overly generic names (`documents`, `data`), reserved words
+  (`anthropic`, `claude`), or XML tags in `name` or `description`.
+- Write descriptions in third person. Never "I can help you…" or "You can use this to…".
+
+### Progressive disclosure
+
+- Treat `SKILL.md` as a table of contents, not the manual. Push detail into bundled files.
+- Pick one pattern: high-level guide with links, domain-split `references/` files, or conditional links to advanced
+  material.
+- Keep every reference **one level deep from `SKILL.md`**. Nested links cause partial reads and lost information.
+- Give any reference file over 100 lines a `## Contents` list at the top.
+- Name files by content (`form-validation-rules.md`, not `doc2.md`) and organise directories by domain.
+
+### Workflows, feedback loops, and content hygiene
+
+- Express multi-step work as numbered steps with a copyable progress checklist.
+- Include a validator loop for quality-critical work: run the check, fix the reported errors, re-run, and only proceed
+  once it passes.
+- Use a conditional-workflow branch at decision points, and move large branches into separate files.
+- Provide output templates marked either exact ("ALWAYS use this template") or advisory ("sensible default").
+- Show concrete input/output example pairs when output style matters. Examples beat abstract description.
+- Exclude time-sensitive statements. Put superseded guidance in a collapsed "Old patterns" section instead.
+- Use one term per concept throughout the skill.
+
+### Bundled scripts
+
+- Scripts must solve the problem, not defer it. Handle missing files and permission errors with a usable fallback.
+- Justify every constant in a comment. No unexplained magic numbers.
+- Prefer a committed utility script over model-generated code; it is more reliable and consumes no context.
+- State intent explicitly: "Run `x.py` to …" (execute) versus "See `x.py` for the algorithm" (read as reference).
+- For batch or destructive work use plan → validate → execute: write a structured plan file, validate it with a
+  script, then apply. Validation errors must name the offending value and list the valid alternatives.
+- List required packages with their install command. Never assume a package or CLI is present.
+- Use forward slashes in every path.
+- Reference MCP tools fully qualified as `ServerName:tool_name`.
+
+### Evaluation
+
+- Build evaluations before writing extensive content: identify the gap without the skill, create at least three
+  scenarios, measure a baseline, write the minimum instructions that pass, then iterate.
+- Test across every model tier the skill will run on. Content tuned for a strong model can under-specify for a fast one.
+- Watch real usage. Unexpected read order, an ignored reference file, or a repeatedly re-read file all signal a
+  structure problem: promote repeatedly-read content into `SKILL.md` and delete content that is never read.
+
 ## Validation Checklist
 
 - [ ] Valid frontmatter with `name` and `description`
 - [ ] `name` is lowercase with hyphens, ≤64 characters, matches directory name
-- [ ] `description` states WHAT, WHEN, and KEYWORDS
+- [ ] `description` states WHAT, WHEN, and KEYWORDS, in third person, with no XML tags
 - [ ] Body ≤500 lines; large content in `references/`
-- [ ] Scripts include help docs and error handling
+- [ ] Every reference link is one level deep from `SKILL.md`
+- [ ] Reference files over 100 lines open with a `## Contents` list
+- [ ] One default approach per task, not a menu of equivalents
+- [ ] No time-sensitive statements outside an "Old patterns" section
+- [ ] Consistent terminology; concrete examples rather than abstract description
+- [ ] Workflows have numbered steps and a validator feedback loop where quality matters
+- [ ] Scripts include help docs and error handling, solve rather than defer, and justify every constant
+- [ ] Execute-versus-read intent is explicit for every bundled script
+- [ ] All paths use forward slashes; MCP tools are fully qualified
 - [ ] No hardcoded credentials
 
 ## Managed Task File Re-Read Budget (HARD LIMIT)
@@ -171,4 +244,5 @@ phrase forbidding redundant reads ("do not re-read predecessor artifacts",
 
 - [Agent Skills Specification](https://agentskills.io/)
 - [VS Code Agent Skills Docs](https://code.visualstudio.com/docs/copilot/customization/agent-skills)
+- [Anthropic skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)
 - [Reference skills repository](https://github.com/anthropics/skills)
