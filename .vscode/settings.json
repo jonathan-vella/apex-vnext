@@ -11,6 +11,9 @@
   "chat.agentSkillsLocations": {
     ".github/skills": true,
     "customizations/.github/skills": true,
+    ".agents/skills": false,
+    ".claude/skills": false,
+    "~/.agents/skills": false,
     "~/.copilot/skills": false,
     "~/.claude/skills": false
   },
