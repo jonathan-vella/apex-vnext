@@ -97,6 +97,14 @@
       ],
       "notes": "Lightweight, cost-optimized model for utility prompts and CLI-only workflows. Suitable for straightforward git operations, file staging, and deterministic CLI parsing. Not for complex orchestration or reasoning-heavy tasks."
     },
+    "GPT-5.6 Sol": {
+      "vendor": "OpenAI",
+      "tier": "frontier",
+      "released": "2026-07",
+      "deprecated": false,
+      "use_for": ["repository-maintenance"],
+      "notes": "Authorized 2026-07 for the pre-agent automation loop prompt. Shares the GPT-5.5 outcome-first prompting contract (Role / Goal / Success criteria / Constraints / Output / Stop rules, decision rules over absolutes, no Anthropic XML blocks), so `classifyModel()` assigns it the enforced `gpt-5.6` family and the `gpt55-*` rules in the vendor-prompting registry apply unchanged."
+    },
     "GPT-5.5": {
       "vendor": "OpenAI",
       "tier": "balanced",
