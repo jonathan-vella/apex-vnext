@@ -1198,6 +1198,36 @@ function vscodeExtensions(output) {
   return extensions;
 }
 
+async function builtinCopilotChat(host, hostVersion) {
+  const remoteCliDirectory = dirname(host);
+  if (basename(host) !== "code" || basename(remoteCliDirectory) !== "remote-cli") return null;
+  const binDirectory = dirname(remoteCliDirectory);
+  if (basename(binDirectory) !== "bin") return null;
+  const installRoot = dirname(binDirectory);
+  const manifestPath = join(installRoot, "extensions", "copilot", "package.json");
+  let bytes;
+  try {
+    const expectedManifestPath = join(await realpath(installRoot), "extensions", "copilot", "package.json");
+    if ((await realpath(manifestPath)) !== expectedManifestPath) {
+      throw new Error("Built-in Copilot Chat manifest path is not canonical");
+    }
+    bytes = await readBoundedRegularFile(manifestPath, MAX_CLI_OUTPUT_BYTES, "Built-in Copilot Chat manifest");
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+  const manifest = parseStrictJson(bytes.toString("utf8"));
+  if (
+    manifest?.publisher !== "GitHub" ||
+    manifest.name !== "copilot-chat" ||
+    !VERSION_PATTERN.test(manifest.version ?? "") ||
+    manifest.engines?.vscode !== `^${hostVersion}`
+  ) {
+    throw new Error("Built-in Copilot Chat manifest is invalid");
+  }
+  return { version: manifest.version, digest: sha256(bytes) };
+}
+
 export async function collectVscodeSurfaceEvidence(
   options,
   { root = ROOT, contractRoot = ROOT, runVscode = defaultVscodeRunner } = {},
@@ -1222,7 +1252,10 @@ export async function collectVscodeSurfaceEvidence(
   const observedVersion = vscodeVersion(versionOutput);
   const extensionOutput = runVscode(host, ["--list-extensions", "--show-versions"], workspace);
   const extensions = vscodeExtensions(extensionOutput);
-  const observedExtensionVersion = extensions.get("github.copilot-chat") ?? null;
+  const listedExtensionVersion = extensions.get("github.copilot-chat") ?? null;
+  const builtInExtension = listedExtensionVersion === null ? await builtinCopilotChat(host, observedVersion) : null;
+  const observedExtensionVersion = listedExtensionVersion ?? builtInExtension?.version ?? null;
+  const extensionInventorySha256 = builtInExtension?.digest ?? sha256(Buffer.from(extensionOutput));
   const projection = await collectManagedProjection(workspace, "github-copilot-vscode", ".vscode/mcp.json", "VS Code");
   const drift = projection.files.some(({ matches }) => !matches);
   const disposition =
@@ -1247,7 +1280,7 @@ export async function collectVscodeSurfaceEvidence(
       observedHostSha256,
       observedExtensionVersion,
       versionOutputSha256: sha256(Buffer.from(versionOutput)),
-      extensionInventorySha256: sha256(Buffer.from(extensionOutput)),
+      extensionInventorySha256,
     },
     workspace: projection,
     disposition,
