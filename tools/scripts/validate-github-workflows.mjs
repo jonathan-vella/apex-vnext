@@ -13,12 +13,11 @@ const WORKFLOW_DIRECTORY = ".github/workflows";
 
 export const EXPECTED_REQUIRED_CONTEXTS = [
   "ci",
-  "External Python tests (apex-recall + azure-pricing MCP)",
+  "External Python tests (apex-recall)",
   "Analyze (actions)",
   "Analyze (javascript-typescript)",
   "Analyze (python)",
 ];
-const EXTERNAL_PYTHON_CONTEXT = "External Python tests (apex-recall)";
 
 function canonicalJson(value) {
   if (value === null || typeof value === "boolean" || typeof value === "number" || typeof value === "string") {
@@ -328,14 +327,7 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
   }
 
   const ci = values.get("ci");
-  if (
-    ci?.jobs?.ci?.name !== "ci" ||
-    ci?.jobs?.["external-tests"]?.name !== EXTERNAL_PYTHON_CONTEXT ||
-    ci?.jobs?.["external-tests-legacy"]?.name !== EXPECTED_REQUIRED_CONTEXTS[1] ||
-    ci?.jobs?.["external-tests-legacy"]?.needs !== "external-tests" ||
-    ci?.jobs?.["external-tests-legacy"]?.if !== "${{ always() }}" ||
-    ci?.jobs?.["external-tests-legacy"]?.steps?.[0]?.env?.EXTERNAL_TESTS_RESULT !== "${{ needs.external-tests.result }}"
-  ) {
+  if (ci?.jobs?.ci?.name !== "ci" || ci?.jobs?.["external-tests"]?.name !== EXPECTED_REQUIRED_CONTEXTS[1]) {
     errors.push("ci workflow must preserve separate required Node and external Python checks");
   }
 
