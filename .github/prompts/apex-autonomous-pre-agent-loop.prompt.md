@@ -214,9 +214,11 @@ Preflight runs in two stages because the adapter cannot be exercised before it e
    plugin, custom, organization, or unknown skill is discovered. Compare built-in names and content hashes with
    `launcher.builtin_skills`; stop on additions, removals, hash drift, or an unavailable skill file. Built-in inventory
    metadata is part of the pinned CLI and does not itself mean a skill was loaded into a task.
-6. Hash and parse `launcher.tool_registry.path`. Require its schema version, characterization version, launcher hash,
-   native maintenance allowlist, and denylist to match `launcher.tool_registry` and the pinned CLI. Stop on drift,
-   unknown selectors, or a missing native read, search, edit, or command capability.
+6. Hash `launcher.tool_registry.path` and require it to match `launcher.tool_registry.sha256`, then parse the registry.
+   Require its schema and characterization versions to match the corresponding `launcher.tool_registry` fields, and
+   require its `characterizationBinarySha256` to match the launcher binary. Validate the registry's native maintenance
+   allowlist and denylist against the pinned CLI. Stop on drift, unknown selectors, or a missing native read, search,
+   edit, or command capability.
 7. Confirm the `tool-guardian` PreToolUse hook is enabled in `chat.hookFilesLocations`. Because the neutral working
    directory intentionally prevents repository discovery, create the isolated home's `settings.json` with only an
    inline `PreToolUse` hook whose command is
