@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Removed the retired custom Azure Pricing MCP source, tests, package metadata, and dependency-update surface after
+  direct Microsoft ARM MCP access and pricing parity validators became authoritative.
 - Replaced exact live VS Code, Copilot Chat, and GitHub Copilot CLI pins with a rolling latest-stable policy. Live
   outcomes bind observed versions and executable hashes per candidate; historical context fixtures remain immutable.
 - Removed duplicate validator, test, packaging, Terraform, and Python setup from pull-request release qualification.
