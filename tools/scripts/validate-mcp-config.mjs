@@ -12,6 +12,7 @@ const repoRoot = resolve(__dirname, "../..");
 const mcpConfigPath = resolve(repoRoot, ".vscode/mcp.json");
 const RETIRED_ASTRO_HOST = "mcp.docs.astro.build";
 const RETIRED_TERRAFORM_EXECUTABLE = "terraform-mcp-server";
+const RETIRED_DRAWIO_EXECUTABLE = "deno";
 const ARM_MCP_ENDPOINT = "https://mcp.management.azure.com";
 const ARM_MCP_TOOLSET = "CostManagement,Pricing";
 
@@ -40,6 +41,23 @@ function retiredTerraformMarker(name, server) {
   return null;
 }
 
+function retiredDrawioMarker(name, server) {
+  const normalizedName = name.toLowerCase();
+  if (normalizedName === "drawio" || normalizedName === "draw.io") return "legacy server key";
+  const command = typeof server?.command === "string" ? server.command.replaceAll("\\", "/").toLowerCase() : "";
+  const executable = command
+    .split("/")
+    .at(-1)
+    ?.replace(/\.exe$/u, "");
+  if (executable === RETIRED_DRAWIO_EXECUTABLE) {
+    const args = Array.isArray(server?.args) ? server.args.map((value) => String(value).toLowerCase()) : [];
+    if (args.some((value) => value.includes("mcp-servers/drawio"))) return "server executable";
+  }
+  const serialized = JSON.stringify(server).toLowerCase().replaceAll("\\", "/");
+  if (serialized.includes("mcp-servers/drawio") || serialized.includes("drawio-mcp-server")) return "upstream source";
+  return null;
+}
+
 export function validateMcpConfig(mcpConfig) {
   const errors = [];
   const servers = mcpConfig?.servers;
@@ -57,14 +75,6 @@ export function validateMcpConfig(mcpConfig) {
     errors.push(`azure-resource-manager-mcp must enable x-mcp-toolset: ${ARM_MCP_TOOLSET}`);
   }
 
-  const drawio = servers.drawio;
-  if (!drawio) errors.push("Missing required MCP server: servers.drawio");
-  else if (drawio.type !== "stdio") errors.push(`drawio server must use type: "stdio", got "${drawio.type}"`);
-  else if (drawio.command !== "deno") errors.push(`drawio command must be "deno", got "${drawio.command}"`);
-  else if (!Array.isArray(drawio.args) || !drawio.args.some((argument) => argument.includes("mcp-servers/drawio"))) {
-    errors.push("drawio args must include the drawio MCP server path (tools/mcp-servers/drawio)");
-  }
-
   for (const [name, server] of Object.entries(servers)) {
     const serialized = JSON.stringify(server).toLowerCase().replaceAll("\\", "/");
     if (name.toLowerCase() === "azure-pricing" || serialized.includes("azure_pricing_mcp")) {
@@ -76,6 +86,10 @@ export function validateMcpConfig(mcpConfig) {
     const terraformMarker = retiredTerraformMarker(name, server);
     if (terraformMarker !== null) {
       errors.push(`Retired Terraform MCP server must not be active: servers.${name} (${terraformMarker})`);
+    }
+    const drawioMarker = retiredDrawioMarker(name, server);
+    if (drawioMarker !== null) {
+      errors.push(`Retired Draw.io MCP server must not be active: servers.${name} (${drawioMarker})`);
     }
   }
   return errors;
@@ -115,16 +129,16 @@ function main() {
     r.ok("Retired custom Azure Pricing MCP server is absent from active discovery");
   }
   r.tick();
-  if (hasServerMap && !errors.some((error) => error.startsWith("drawio ") || error.includes("servers.drawio"))) {
-    r.ok("MCP config includes valid drawio server (Deno stdio)");
-  }
-  r.tick();
   if (hasServerMap && !errors.some((error) => error.startsWith("Retired Astro MCP"))) {
     r.ok("Retired Astro MCP server is absent from active discovery");
   }
   r.tick();
   if (hasServerMap && !errors.some((error) => error.startsWith("Retired Terraform MCP"))) {
     r.ok("Retired Terraform MCP server is absent from active discovery");
+  }
+  r.tick();
+  if (hasServerMap && !errors.some((error) => error.startsWith("Retired Draw.io MCP"))) {
+    r.ok("Retired Draw.io MCP server is absent from active discovery");
   }
 
   r.summary();

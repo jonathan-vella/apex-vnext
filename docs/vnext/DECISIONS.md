@@ -267,6 +267,11 @@ when a decision has lasting architectural consequences that need alternatives an
 - **ADR:** Required for the diagram artifact-contract migration; not required for the isolated Astro removal.
 - **Issue/PR:** Pending work-item creation.
 
+**Maintainer update (2026-07-31):** Existing Python and Mermaid output quality is accepted as sufficient. The measured
+diagram parity gate is explicitly bypassed, and Draw.io MCP, skill, assets, setup, workflows, and validators are removed
+from active source. Frozen phase-0 evidence and Git history remain the historical readability and provenance boundary;
+the former golden fixtures and regression tests are intentionally removed with the toolchain.
+
 ## DECISION-016: Keep Npm As The Sole Distribution Authority
 
 - **Date:** 2026-07-21

@@ -28,7 +28,7 @@
 #   - governance-policy-baseline.yml — pwsh + azure/login, no Node
 #   - docs.yml — validates repository-native Markdown documentation
 #   - branch-enforcement.yml — neither job needs Node
-#   - weekly-maintenance.yml drawio-* jobs — Deno/Python only
+#   - validate-devcontainer-base.yml — disabled reference workflow
 
 name: Setup Node Repo
 description: Node.js setup + npm ci (shared workflow prelude — caller must check out repo first)

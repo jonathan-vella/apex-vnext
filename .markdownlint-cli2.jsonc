@@ -149,9 +149,6 @@
 
     // Archived content
 
-    // Vendored MCP server (external fork — not hand-authored)
-    "tools/mcp-servers/drawio/**",
-
     // Upstream vendored files (not hand-authored)
 
     // pytest cache (auto-generated, not hand-authored)

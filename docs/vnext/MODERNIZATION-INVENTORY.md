@@ -57,8 +57,8 @@ baselines before the related ownership entries move.
 | `improvement-outcome-ingestion` | rewrite     | improvement policy and contracts | `OWN-015` |
 | `client-bundle-generation`      | rewrite     | CLI asset preparation            | `OWN-016` |
 
-These rows identify migration targets only. Current VS Code projections, MCP servers, pricing pack, Draw.io paths,
-manual improvement submission, and single-client bundle remain active until their individual replacement gates pass.
+These rows identify migration targets only. Client projections, managed MCP access, and bundle generation remain active;
+custom pricing and Draw.io toolchains are retired, while manual improvement submission remains pending modernization.
 
 ## Automation And Generation
 
@@ -208,8 +208,9 @@ hidden-worker invocation semantics remain a separate characterization gate.
 Issue #168 freezes the `OWN-014` format-neutral semantic manifest against every existing golden scenario and makes
 Mermaid/Python routing explicit. The contract records bounded reconciliations where legacy aggregate metadata conflicts
 with named prompt semantics. Issue #173 migrates active workflow, template, validator, benchmark, and documentation
-consumers to Python source plus PNG/SVG outputs. Draw.io remains transitional; measured rendering parity is required
-before removal.
+consumers to Python source plus PNG/SVG outputs. The original transition required measured rendering parity before
+removal. On 2026-07-31, the maintainer accepted existing Python/Mermaid quality and explicitly bypassed that measurement
+gate; the Draw.io toolchain is retired while frozen phase-0 evidence remains unchanged.
 
 Issue #162 freezes the `OWN-013` pricing parity registry and strict request/evidence contracts. It binds typed money,
 meter, commitment, ambiguity, uncertainty, throttling, freshness, and content-free provenance semantics. Issue #169

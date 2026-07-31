@@ -11,11 +11,6 @@ function validConfig() {
         url: "https://mcp.management.azure.com",
         headers: { "x-mcp-toolset": "CostManagement,Pricing" },
       },
-      drawio: {
-        type: "stdio",
-        command: "deno",
-        args: ["run", "tools/mcp-servers/drawio/src/index.ts"],
-      },
     },
   };
 }
@@ -69,15 +64,41 @@ test("rejects Terraform MCP by key, executable, source, path, or toolset signatu
   }
 });
 
-test("requires GitHub, Microsoft ARM MCP, and Draw.io", () => {
+test("requires GitHub and Microsoft ARM MCP", () => {
   const config = validConfig();
   delete config.servers["azure-resource-manager-mcp"];
   delete config.servers.github;
-  config.servers.drawio.command = "node";
   assert.deepEqual(validateMcpConfig(config), [
     "Missing required MCP server: servers.github",
     "Missing required MCP server: servers.azure-resource-manager-mcp",
-    'drawio command must be "deno", got "node"',
+  ]);
+});
+
+test("rejects Draw.io server by key, executable signature, or embedded source path", () => {
+  const byKey = validConfig();
+  byKey.servers.drawio = { type: "stdio", command: "node", args: ["index.js"] };
+  assert.deepEqual(validateMcpConfig(byKey), [
+    "Retired Draw.io MCP server must not be active: servers.drawio (legacy server key)",
+  ]);
+
+  const byExecutable = validConfig();
+  byExecutable.servers.diagrams = {
+    type: "stdio",
+    command: "deno",
+    args: ["run", "tools/mcp-servers/drawio/src/index.ts"],
+  };
+  assert.deepEqual(validateMcpConfig(byExecutable), [
+    "Retired Draw.io MCP server must not be active: servers.diagrams (server executable)",
+  ]);
+
+  const bySource = validConfig();
+  bySource.servers.diagrams = {
+    type: "stdio",
+    command: "node",
+    args: ["/tmp/drawio-mcp-server.js"],
+  };
+  assert.deepEqual(validateMcpConfig(bySource), [
+    "Retired Draw.io MCP server must not be active: servers.diagrams (upstream source)",
   ]);
 });
 

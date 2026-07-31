@@ -57,21 +57,6 @@ diagramming capabilities for architecture documentation.
 
 <div align="right"><a href="#top"><b>⬆️ Back to Top</b></a></div>
 
-## Draw.io MCP Server Contributors
-
-The [Draw.io MCP Server](tools/mcp-servers/drawio/) provides Azure architecture diagram generation
-with 700+ built-in Azure icons, batch operations, and transactional workflow support.
-
-### Original Author
-
-- **Simon Kurtz** ([@simonkurtz-MSFT](https://github.com/simonkurtz-MSFT)) - Created the Draw.io MCP Server
-
-### Source Repository
-
-- [drawio-mcp-server](https://github.com/simonkurtz-MSFT/drawio-mcp-server) - Original MCP server implementation
-
-<div align="right"><a href="#top"><b>⬆️ Back to Top</b></a></div>
-
 ## How to Contribute
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to get involved.

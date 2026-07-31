@@ -37,7 +37,6 @@ Updated by the doc-gardening workflow and referenced by `QUALITY_SCORE.md`.
 | 17  | Skills         | SKILL.md lint errors (MD013/MD040)           | 2026-03-23 | Shifted to demo content  |
 | 19  | CI/CD          | lint:md 115 errors (demo/test/site)          | 2026-03-25 | Excluded from scope      |
 | 20  | CI/CD          | Fabric ref 2 blank-line errors               | 2026-03-27 | Migration cleanup        |
-| 21  | CI/CD          | drawio-mcp-server 314 lint errors            | 2026-04-03 | Local suppression config |
 | 18  | Agents         | 2 prompt model mismatches                    | 2026-04-12 | Prompts updated          |
 | 22  | Agents         | e2e-orchestrator 430 lines (>400)            | 2026-04-12 | Limit raised to 500      |
 | 24  | Documentation  | Explorer graph stale (2026-04-22)            | 2026-04-24 | Regenerated              |

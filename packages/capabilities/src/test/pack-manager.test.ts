@@ -81,7 +81,7 @@ test("source-only bundled packs are actionable unavailable and do not affect cor
     schemaVersion: "1.0.0",
     packs: [
       { id: "azure-pricing", implementation: "python", source: "tools/pricing", requiredWorkflows: ["architecture"] },
-      { id: "drawio", implementation: "deno", source: "tools/drawio", requiredWorkflows: [] },
+      { id: "deno-example", implementation: "deno", source: "tools/deno-example", requiredWorkflows: [] },
     ],
   });
   const statuses = await packs.list();
@@ -148,22 +148,22 @@ test("dependency-free governance installs without pip after script verification"
 
 test("Deno lock is verified and cache runs only with the explicit flag", async () => {
   const workspace = await root();
-  const source = join(workspace, "manifest", "drawio");
+  const source = join(workspace, "manifest", "deno-example");
   await mkdir(source, { recursive: true });
-  await writeFile(join(source, "index.ts"), "console.log('drawio');\n");
+  await writeFile(join(source, "index.ts"), "console.log('deno-example');\n");
   await writeFile(join(source, "deno.lock"), "{}\n");
   const lockDigest = await fileDigest(join(source, "deno.lock"));
   const { manager: packs, runner } = await manager(workspace, {
     schemaVersion: "1.0.0",
     packs: [
       {
-        id: "drawio",
+        id: "deno-example",
         version: "1.0.0",
         runtime: "deno",
-        artifact: { type: "local-directory", spec: "drawio", digest: await treeDigest(source) },
+        artifact: { type: "local-directory", spec: "deno-example", digest: await treeDigest(source) },
         lock: {
           installer: "deno",
-          path: "drawio/deno.lock",
+          path: "deno-example/deno.lock",
           digest: lockDigest,
           directDigest: lockDigest,
           transitiveDigest: lockDigest,
@@ -173,10 +173,10 @@ test("Deno lock is verified and cache runs only with the explicit flag", async (
       },
     ],
   });
-  assert.equal((await packs.install("drawio")).state, "installed");
+  assert.equal((await packs.install("deno-example")).state, "installed");
   assert.equal(runner.requests.length, 0);
-  await rm(join(workspace, ".apex", "capability-packs", "drawio"), { recursive: true });
-  assert.equal((await packs.install("drawio", { cacheDeno: true })).state, "installed");
+  await rm(join(workspace, ".apex", "capability-packs", "deno-example"), { recursive: true });
+  assert.equal((await packs.install("deno-example", { cacheDeno: true })).state, "installed");
   assert.deepEqual(runner.requests[0]?.args, [
     "cache",
     "--frozen",
@@ -310,7 +310,7 @@ test("uninstall preserves other packs and fails before removal when the registry
   const manifestRoot = join(workspace, "manifest");
   const manifestPath = join(manifestRoot, "capability-packs.v1.json");
   const definitions = [];
-  for (const id of ["governance", "drawio"]) {
+  for (const id of ["governance", "deno-example"]) {
     const source = join(manifestRoot, id);
     await mkdir(source, { recursive: true });
     const script = `${id}.py`;
@@ -329,7 +329,7 @@ test("uninstall preserves other packs and fails before removal when the registry
   const registry: CapabilityPackRegistryV1 = { schemaVersion: "1.0.0", packs: definitions };
   const { manager: packs } = await manager(workspace, registry);
   assert.equal((await packs.install("governance")).state, "installed");
-  assert.equal((await packs.install("drawio")).state, "installed");
+  assert.equal((await packs.install("deno-example")).state, "installed");
 
   await rm(manifestPath);
   await assert.rejects(packs.uninstall("governance"), /ENOENT/);
@@ -337,10 +337,10 @@ test("uninstall preserves other packs and fails before removal when the registry
   await writeFile(manifestPath, JSON.stringify(registry));
 
   assert.equal((await packs.uninstall("governance")).state, "not-installed");
-  assert.equal((await packs.verify("drawio")).state, "installed");
+  assert.equal((await packs.verify("deno-example")).state, "installed");
   assert.equal(
-    await readFile(join(workspace, ".apex", "capability-packs", "drawio", "drawio.py"), "utf8"),
-    "print('drawio')\n",
+    await readFile(join(workspace, ".apex", "capability-packs", "deno-example", "deno-example.py"), "utf8"),
+    "print('deno-example')\n",
   );
 });
 

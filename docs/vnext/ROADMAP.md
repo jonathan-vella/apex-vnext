@@ -300,10 +300,11 @@ unavailable to managed agents, typed arithmetic and meter semantics pass, and no
    Issue #173 migrates these active surfaces and adds fail-closed consumer drift validation.
 5. Qualify editable source, deterministic rendering, semantic coverage, nonblank output, dimensions, clipping, overlap,
    labels, latency, security, and maintenance at the declared pack threshold.
-6. Archive and remove Draw.io MCP, skill, assets, tests, and setup only after every replacement criterion passes.
+6. Remove Draw.io MCP, skill, assets, tests, and setup from active surfaces. Preserve frozen phase-0 evidence and Git
+   history; dedicated golden fixtures retire with the toolchain.
 
-**Exit gate:** No new workflow emits `.drawio`; Python replacements pass the measured gate; historical Draw.io artifacts
-remain readable and need no conversion.
+**Exit gate:** No active workflow emits `.drawio`; Python/Mermaid routing passes semantic validation; historical Draw.io
+artifacts remain readable and need no conversion.
 
 ## Milestone M: Bounded Improvement Operationalization
 
@@ -362,7 +363,7 @@ diagnostics, artifacts, coverage, and exact-head behavior remain stable; CI, hoo
    instructions, detailed procedures in skills, executable role data in agent frontmatter/manifest, and consumer
    behavior in managed guidance.
 2. Reconcile Markdown guidance for human docs, prompts/agents, generated artifacts, templates, and historical evidence;
-   route new diagrams to Mermaid/Python without invalidating historical Draw.io readability.
+   route new diagrams to Mermaid/Python while keeping historical Draw.io artifacts readable.
 3. Rewrite `.github/copilot-instructions.md` around supported clients, cloud-agent exclusion, kernel and Gate 4 authority,
    MCP distinctions, source/generated boundaries, validation ownership, and release controls.
 4. Rewrite root `AGENTS.md` for common setup, build, validation, and client qualification; keep scoped `AGENTS.md` files

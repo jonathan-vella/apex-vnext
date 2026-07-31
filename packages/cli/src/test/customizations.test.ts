@@ -81,7 +81,7 @@ test("init installs bundled customizations and runtime config by default", async
   };
   assert.deepEqual(
     registry.packs.map(({ id }) => id),
-    ["azure-governance-discovery", "drawio"],
+    ["azure-governance-discovery"],
   );
   for (const pack of registry.packs) {
     const source = join(root, ".apex", "runtime", pack.artifact.spec);
@@ -446,9 +446,6 @@ test("doctor leaves unrelated core routes unaffected and service reports require
   const listed = (await service.capabilityList()) as Array<{ id: string; state: string }>;
   assert.deepEqual(
     listed.map(({ id, state }) => ({ id, state })),
-    [
-      { id: "azure-governance-discovery", state: "not-installed" },
-      { id: "drawio", state: "not-installed" },
-    ],
+    [{ id: "azure-governance-discovery", state: "not-installed" }],
   );
 });
