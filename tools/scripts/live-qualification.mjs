@@ -1203,10 +1203,12 @@ async function builtinCopilotChat(host, hostVersion) {
   if (basename(host) !== "code" || basename(remoteCliDirectory) !== "remote-cli") return null;
   const binDirectory = dirname(remoteCliDirectory);
   if (basename(binDirectory) !== "bin") return null;
-  const manifestPath = join(dirname(binDirectory), "extensions", "copilot", "package.json");
+  const installRoot = dirname(binDirectory);
+  const manifestPath = join(installRoot, "extensions", "copilot", "package.json");
   let bytes;
   try {
-    if ((await realpath(manifestPath)) !== manifestPath) {
+    const expectedManifestPath = join(await realpath(installRoot), "extensions", "copilot", "package.json");
+    if ((await realpath(manifestPath)) !== expectedManifestPath) {
       throw new Error("Built-in Copilot Chat manifest path is not canonical");
     }
     bytes = await readBoundedRegularFile(manifestPath, MAX_CLI_OUTPUT_BYTES, "Built-in Copilot Chat manifest");

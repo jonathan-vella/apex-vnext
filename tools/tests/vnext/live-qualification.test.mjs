@@ -1879,6 +1879,18 @@ test("binds host-bundled Copilot Chat when remote inventory omits built-in exten
   assert.equal(exported.client.observedExtensionVersion, "0.59.0");
   assert.equal(exported.client.extensionInventorySha256, createHash("sha256").update(manifest).digest("hex"));
 
+  const alias = join(fixture.root, "alias");
+  await symlink(fixture.root, alias);
+  const aliased = await collectVscodeSurfaceEvidence(
+    { workspace: "consumer", host: join(alias, "bin", "remote-cli", "code") },
+    {
+      root: fixture.root,
+      contractRoot: fixture.contractRoot,
+      runVscode: (_host, args) => (args[0] === "--version" ? "1.131.0\ncommit\nx64\n" : "example.other@1.0.0\n"),
+    },
+  );
+  assert.deepEqual(aliased.disposition, { status: "pass" });
+
   await writeFile(
     join(fixture.root, "extensions", "copilot", "package.json"),
     `${JSON.stringify({ name: "copilot-chat", publisher: "Other", version: "0.59.0" })}\n`,
