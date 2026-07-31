@@ -82,6 +82,8 @@ prior qualification is retained as historical characterization. See
   user-owned transfer and stale-writer interactions pending.
 - Added an atomic live client-closure composer that generates canonical paired comparisons and a verified parity-only
   aggregate from the complete set of collector outcomes without claiming runtime-payload or release closure.
+- Fixed client-closure payload serialization so the emitted qualification uses the exact canonical bytes required by
+  evidence-manifest client qualification binding.
 - Added exact client-qualification candidate receipt generation with clean-worktree, repository, branch, commit,
   release-manifest, runtime-bundle, package-lock, and customization-bundle binding.
 - Added versioned kernel-owned input requests and typed APEX MCP answer recording bound to the exact journal head and
