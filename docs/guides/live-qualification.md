@@ -11,6 +11,12 @@ The command creates and validates evidence files; it does not invoke VS Code, ap
 > The current record schema reflects the implemented VS Code-era ceremony. It remains useful for characterization, but a
 > final `0.10.0` record must also cover Copilot CLI parity and every re-baselined dependency boundary.
 
+Live qualification prefers the latest stable supported VS Code, Copilot Chat, and GitHub Copilot CLI available in the
+execution environment; the runner records but does not independently prove upstream latest status. Do not downgrade
+clients to historical characterization versions. Each candidate binds the
+observed client versions, executable digests, managed projections, and capability inventories; every scenario in one
+aggregate must use the same observed version set. Historical context receipts and fixture versions remain immutable.
+
 ## Prepare the Candidate
 
 Install dependencies and produce the release package set from the exact commit under test:

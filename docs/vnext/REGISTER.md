@@ -84,8 +84,9 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Type:** `RISK`
 - **Owner:** Client experience
 - **Impact:** VS Code and Copilot CLI could produce different workflow outcomes or expose different authority.
-- **Evidence:** Copilot CLI `1.0.73`, VS Code `1.130.0`, and Copilot Chat `0.58.0` are selected exactly. The deterministic
-  corpus, proof-complete aggregate, and fail-closed binding are implemented, but live paired execution has not run.
+- **Evidence:** Historical exact-version context evidence is preserved. Live qualification now binds one observed
+  latest-stable client set per candidate. The deterministic corpus, proof-complete aggregate, and fail-closed binding
+  are implemented, but live paired execution has not run.
 - **Related issue:** [#91](https://github.com/jonathan-vella/apex-vnext/issues/91)
 - **Mitigation:** Generate thin projections from one bundle contract and compare normalized typed outcomes,
   authorization denials, restart/resume behavior, and evidence hashes rather than UI mechanics.
@@ -243,11 +244,11 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Type:** `ISSUE`
 - **Owner:** Release qualification
 - **Impact:** Final promotion remains blocked until VS Code and Copilot CLI pass the expanded contract.
-- **Evidence:** Earlier live Azure and package results remain historical. Copilot CLI `1.0.73` and the normalized matrix
-  are recorded, but no parity result exists and the CLI is not globally installed in the current container.
+- **Evidence:** Earlier live Azure, package, and exact-version context results remain historical. A normalized matrix is
+  recorded, but no rolling-client parity result exists for the current candidate.
 - **Related issue:** [#91](https://github.com/jonathan-vella/apex-vnext/issues/91)
-- **Mitigation:** Select real supported client versions, run the shared workflow and denial corpus, and bind outcomes to
-  the new exact candidate and generated bundle hashes.
+- **Mitigation:** Use the latest stable supported clients, run the shared workflow and denial corpus, and bind their
+  observed versions and outcomes to the new exact candidate and generated bundle hashes.
 - **State:** Open
 - **Closure proof:** Versioned VS Code and Copilot CLI evidence with scenario outcomes and evidence hashes.
 

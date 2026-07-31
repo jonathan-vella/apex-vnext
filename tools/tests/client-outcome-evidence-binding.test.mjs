@@ -117,6 +117,7 @@ function liveOutcomeFixture(scenarioId, clientId) {
     client: {
       id: clientId,
       version: clientId === "github-copilot-cli" ? cli.selectedExactVersion : vscode.selectedExactVersion,
+      binarySha256: clientId === "github-copilot-cli" ? hash("8") : hash("9"),
       ...(clientId === "github-copilot-vscode" ? { extensionVersion: vscode.selectedExactCopilotChatVersion } : {}),
       os: "linux",
       architecture: "x64",

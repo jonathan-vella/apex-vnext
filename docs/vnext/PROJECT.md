@@ -80,9 +80,10 @@ Manager MCP access, native Terraform lifecycle authority, Mermaid and Python dia
 and an npm-generated customization bundle. Astro, Terraform, and custom Azure Pricing MCP dependencies are retired;
 Draw.io retains its separate replacement gate.
 
-These are approved requirements, not live-parity claims. Copilot CLI `1.0.73`, VS Code `1.130.0`, and Copilot Chat
-`0.58.0` are selected exactly. The completed context matrix supplies version-selection provenance and a usage baseline,
-not full client-parity qualification. Direct ARM MCP discovery still requires paired live client qualification.
+These are approved requirements, not live-parity claims. Live qualification uses the latest stable supported clients
+and binds the observed version set to each candidate. The completed exact-version context matrix remains historical
+usage evidence, not a live version pin or full client-parity qualification. Direct ARM MCP discovery still requires
+paired live client qualification.
 
 ## Evidence State
 
@@ -91,7 +92,7 @@ not full client-parity qualification. Direct ARM MCP discovery still requires pa
 | PR #88 exact-head receipt for `8b3d9dbbb5beb8d6723c27da56cfd7144cb1cdf8` | Passing regression evidence for the archive change                      |
 | Prior exact candidate `25530c339410e9758ae34538427f24bddfd83e1d`         | Historical characterization for the earlier contract                    |
 | Prior VS Code, package, security, and live Azure results                 | Preserved in [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md)           |
-| VS Code `1.130.0`, Copilot Chat `0.58.0`, and CLI `1.0.73`               | Representative 12-cell context matrix complete                          |
+| Historical exact-version VS Code, Copilot Chat, and CLI context matrix   | Representative context baseline complete                                |
 | Guidance, Markdown, lint, hook, and workflow ownership                   | Milestone N complete; Milestone O context baseline captured             |
 | ARM MCP access and MCP retirements                                       | Direct access configured; custom pricing retired; Draw.io remains open  |
 | Bundle composition mappings, aggregate lock, and client projections      | Target-aware generation implemented; live client proof remains pending  |
