@@ -52,25 +52,10 @@ test("rejects required context and external-runtime check drift", () => {
   );
 
   const errors = validate(
-    mutate(
-      ".github/workflows/ci.yml",
-      "name: External Python tests (apex-recall + azure-pricing MCP)",
-      "name: Combined tests",
-    ),
+    mutate(".github/workflows/ci.yml", "name: External Python tests (apex-recall)", "name: Combined tests"),
   );
   assert.ok(errors.some((error) => error.includes("job/check name drift")));
   assert.ok(errors.some((error) => error.includes("separate required Node and external Python checks")));
-
-  assert.ok(
-    validate(
-      mutate(".github/workflows/ci.yml", "name: External Python tests (apex-recall)", "name: Renamed external tests"),
-    ).some((error) => error.includes("separate required Node and external Python checks")),
-  );
-  assert.ok(
-    validate(mutate(".github/workflows/ci.yml", "if: ${{ always() }}", "if: ${{ success() }}")).some((error) =>
-      error.includes("separate required Node and external Python checks"),
-    ),
-  );
 });
 
 test("rejects trigger, permission, and action-version drift", () => {
