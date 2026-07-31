@@ -59,11 +59,13 @@ const agentPaths = findFiles(AGENTS_DIR, ".agent.md").map((filePath) =>
   toRepoPath(filePath).replace(/^\.archive\/legacy-agents-v0\.10\//, ""),
 );
 const schemaNames = findFiles(SCHEMAS_DIR, ".schema.json").map((filePath) => path.basename(filePath));
-const mcpPaths = fs
-  .readdirSync(MCP_DIR, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
-  .map((entry) => `tools/mcp-servers/${entry.name}/`)
-  .sort();
+const mcpPaths = fs.existsSync(MCP_DIR)
+  ? fs
+      .readdirSync(MCP_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
+      .map((entry) => `tools/mcp-servers/${entry.name}/`)
+      .sort()
+  : [];
 const workflow = JSON.parse(fs.readFileSync(WORKFLOW_PATH, "utf8"));
 const workflowNodeIds = Object.keys(workflow.nodes).sort();
 const recallHelp = execFileSync("python3", ["-m", "apex_recall", "--help"], {

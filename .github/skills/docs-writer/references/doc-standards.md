@@ -101,7 +101,7 @@ These agents were removed and converted to skills. Never reference them:
 
 | Removed Agent      | Replacement Skill                   |
 | ------------------ | ----------------------------------- |
-| `diagram.agent.md` | `drawio` or `python-diagrams` skill |
+| `diagram.agent.md` | `python-diagrams` or `mermaid` skill |
 | `adr.agent.md`     | `azure-adr` skill                   |
 | `docs.agent.md`    | `azure-artifacts` skill             |
 

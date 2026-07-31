@@ -54,8 +54,8 @@ This prompt is test-only and non-interactive:
 - It routes each workflow step through the real workflow agent.
 - It calls challenger, validator, and specialized subagents directly between
   step agent invocations (flat delegation model).
-- It requires the real Draw.io, pricing, governance, and dry-run deployment
-  paths instead of substituting inline benchmark-only artifacts.
+- It requires the real pricing, governance, Python/Mermaid diagram routing,
+  and dry-run deployment paths instead of substituting inline benchmark-only artifacts.
 
 This runs the full 7-step pipeline autonomously:
 

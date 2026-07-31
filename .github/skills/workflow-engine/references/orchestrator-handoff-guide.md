@@ -102,8 +102,8 @@ Use the same sidecar-aware / legacy fallback rule documented under Gate 1.
 ```text
 📝 IMPLEMENTATION PLAN COMPLETE
 Artifact: agent-output/{project}/04-implementation-plan.md
-Dependency Diagram: agent-output/{project}/04-dependency-diagram.drawio
-Runtime Diagram: agent-output/{project}/04-runtime-diagram.drawio
+Dependency Diagram: agent-output/{project}/04-dependency-diagram.py (+ .png/.svg)
+Runtime Diagram: agent-output/{project}/04-runtime-diagram.py (+ .png/.svg)
 Deployment: {Phased (N phases) | Single}
 ✅ Next: IaC Implementation (Step 5)
 💡 SESSION BREAK RECOMMENDED: Start a fresh chat for IaC code generation.

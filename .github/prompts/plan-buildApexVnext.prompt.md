@@ -363,7 +363,7 @@ Verification:
 5. Add AVM Bicep and Terraform metadata resolvers, exact module/provider/API pinning, and a documented native-resource
    fallback when no suitable AVM exists.
 6. Add Bicep, deployment-stack, Terraform/backend/plan, Azure CLI, policy, Resource Graph, ARM GET, Git, filesystem,
-   hashing, pricing-pack, and optional Draw.io-pack adapters. Use VS Code MCP sandboxing where supported as defense in
+   hashing, pricing-pack, and optional capability-pack adapters. Use VS Code MCP sandboxing where supported as defense in
    depth, but keep kernel authorization authoritative and preserve equivalent behavior where sandboxing is unavailable.
 7. Build one in-process validator registry with shared compiled schemas and handwritten TypeScript business/security
    validators. Cache pure validation and rendering by content, dependency, configuration, and toolchain hashes; invalidate
@@ -641,7 +641,6 @@ Verification:
 - `/workspaces/apex/.github/skills/` — curate domain knowledge only; remove state mutation and workflow routing.
 - Custom Azure Pricing MCP — treat Git history and frozen phase-0 evidence as characterization input; use direct
   Microsoft ARM MCP access in supported clients.
-- `/workspaces/apex/tools/mcp-servers/drawio/` — retain as an optional lazy capability pack outside the critical path.
 - `/workspaces/apex/.devcontainer/` and `/workspaces/apex/.github/workflows/` — toolchain, CI, provenance, and
   branch-maintenance inventory.
 - `/workspaces/apex/tests/` and `/workspaces/apex/tools/tests/` — characterization failures, scenarios, and fixtures to

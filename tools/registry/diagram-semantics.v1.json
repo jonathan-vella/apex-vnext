@@ -11,12 +11,6 @@
       "owner": "python-diagrams",
       "outputClasses": ["architecture", "network", "dependency", "runtime", "as-built", "waf", "cost", "compliance"],
       "formats": ["py", "png", "svg"]
-    },
-    "transitional": {
-      "owner": "drawio",
-      "newOutputAllowed": false,
-      "historicalReadable": true,
-      "formats": ["drawio"]
     }
   },
   "activeConsumers": [
@@ -107,13 +101,6 @@
       "requiredMarkers": ["07-ab-diagram.py", "07-ab-diagram.png"]
     },
     {
-      "id": "drawio-maintenance-skill",
-      "path": ".github/skills/drawio/SKILL.md",
-      "outputClass": "routing",
-      "requiredMarkers": ["disable-model-invocation: true", "historical readability", "python-diagrams", "mermaid"],
-      "allowTransitionalReferences": true
-    },
-    {
       "id": "e2e-step-validator",
       "path": "tools/scripts/validate-e2e-step.mjs",
       "outputClass": "validation",
@@ -130,8 +117,7 @@
         "04-runtime-diagram.py",
         "04-runtime-diagram.png",
         "04-runtime-diagram.svg"
-      ],
-      "allowTransitionalReferences": true
+      ]
     },
     {
       "id": "e2e-workflow-prompt",
@@ -144,7 +130,6 @@
     {
       "id": "g1-three-tier-web",
       "title": "Three-Tier Web App (small)",
-      "sourceExpectation": "tools/tests/drawio-golden/g1-three-tier-web/expected.json",
       "outputClass": "architecture",
       "diagramType": "logical",
       "scope": { "subscriptions": 1, "regions": 1, "managementGroups": 0 },
@@ -177,7 +162,6 @@
     {
       "id": "g2-hub-spoke-landing-zone",
       "title": "Hub-Spoke Landing Zone (medium)",
-      "sourceExpectation": "tools/tests/drawio-golden/g2-hub-spoke-landing-zone/expected.json",
       "outputClass": "network",
       "diagramType": "network",
       "scope": { "subscriptions": 3, "regions": 1, "managementGroups": 0 },
@@ -234,7 +218,6 @@
     {
       "id": "g3-event-driven-microservices",
       "title": "Event-Driven Microservices (medium)",
-      "sourceExpectation": "tools/tests/drawio-golden/g3-event-driven-microservices/expected.json",
       "outputClass": "runtime",
       "diagramType": "runtime-flow",
       "scope": { "subscriptions": 1, "regions": 1, "managementGroups": 0 },
@@ -286,7 +269,6 @@
     {
       "id": "g4-ml-training-pipeline",
       "title": "ML Training Pipeline (medium)",
-      "sourceExpectation": "tools/tests/drawio-golden/g4-ml-training-pipeline/expected.json",
       "outputClass": "architecture",
       "diagramType": "deployment",
       "scope": { "subscriptions": 1, "regions": 1, "managementGroups": 0 },
@@ -335,7 +317,6 @@
     {
       "id": "g5-enterprise-landing-zone",
       "title": "Enterprise Landing Zone (large)",
-      "sourceExpectation": "tools/tests/drawio-golden/g5-enterprise-landing-zone/expected.json",
       "outputClass": "architecture",
       "diagramType": "logical+network",
       "scope": { "subscriptions": 5, "regions": 1, "managementGroups": 6 },
@@ -444,7 +425,6 @@
     {
       "id": "g6-hyperscale-platform",
       "title": "Hyperscale Platform (extra-large)",
-      "sourceExpectation": "tools/tests/drawio-golden/g6-hyperscale-platform/expected.json",
       "outputClass": "architecture",
       "diagramType": "decomposed",
       "scope": { "subscriptions": 6, "regions": 2, "managementGroups": 0 },
@@ -518,7 +498,6 @@
     {
       "id": "g7-multi-region-active-active",
       "title": "Multi-Region Active-Active (medium)",
-      "sourceExpectation": "tools/tests/drawio-golden/g7-multi-region-active-active/expected.json",
       "outputClass": "architecture",
       "diagramType": "logical",
       "scope": { "subscriptions": 1, "regions": 2, "managementGroups": 0 },
@@ -557,5 +536,5 @@
       "legacyReconciliations": []
     }
   ],
-  "authority": { "activeConsumersMigrated": true, "migrationReady": false, "drawioRemovalAllowed": false }
+  "authority": { "activeConsumersMigrated": true, "migrationReady": true, "maintainerParityOverride": true }
 }

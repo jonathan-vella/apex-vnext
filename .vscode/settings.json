@@ -52,18 +52,6 @@
     {
       "fileMatch": ["agent-output/*/08-iteration-log.json", "agent-output/_bench/*/*/08-iteration-log.json"],
       "url": "./tools/schemas/iteration-log.schema.json"
-    },
-    {
-      "fileMatch": ["tools/tests/drawio-golden/*/expected.json"],
-      "url": "./tools/schemas/drawio-golden-scenario.schema.json"
-    },
-    {
-      "fileMatch": ["tools/tests/drawio-baseline/_baseline-runs.json"],
-      "url": "./tools/schemas/drawio-baseline-runs.schema.json"
-    },
-    {
-      "fileMatch": ["tools/tests/drawio-baseline/regen-baseline.json"],
-      "url": "./tools/schemas/drawio-regen-baseline.schema.json"
     }
   ],
   "editor.formatOnSave": true,
@@ -96,10 +84,6 @@
   },
   "python.terminal.useEnvFile": true,
   "azureTerraform.checkTerraformCmd": false,
-  "deno.enable": false,
-  "deno.enablePaths": ["tools/mcp-servers/drawio"],
-  "deno.lint": true,
-  "deno.unstable": [],
   "chat.mcp.serverSampling": {
     "apex/.vscode/mcp.json: azure-mcp": {
       "allowedDuringChat": true
