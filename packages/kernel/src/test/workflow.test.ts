@@ -129,6 +129,20 @@ test("kernel validates freeform, single-select, and multi-select answers", () =>
       ]),
     /shape does not match/u,
   );
+  for (const value of ["", "   ", "none", "N/A", ["logs", " "]]) {
+    assert.throws(
+      () =>
+        validateInputAnswers(
+          [{ id: "answer", prompt: "Answer?", ...(Array.isArray(value) ? { multiSelect: true } : {}) }],
+          [{ questionId: "answer", value }],
+        ),
+      /explicitly provided or deferred/u,
+    );
+  }
+  assert.deepEqual(
+    validateInputAnswers([{ id: "answer", prompt: "Answer?" }], [{ questionId: "answer", value: "unknown" }]),
+    [{ questionId: "answer", value: "unknown" }],
+  );
 });
 
 test("validator registry caches pure results by content and never caches freshness or authorization", () => {
