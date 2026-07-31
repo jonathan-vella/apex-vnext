@@ -7,7 +7,7 @@
   "expires_at": "2026-08-03T23:59:59Z",
   "base_commit": "origin/main",
   "issues": [222, 220, 219],
-  "worktree": "/workspaces/.worktrees/apex-pre-agent-optimization",
+  "worktree": "/home/vscode/.worktrees/apex-pre-agent-optimization",
   "branch": "chore/pre-agent-optimization",
   "upstream": "origin/chore/pre-agent-optimization",
   "allowed_paths": [
@@ -124,7 +124,13 @@
         "name": "customize-cloud-agent",
         "sha256": "6acee791cd48a31eb881431c0f1394d3c79d33d62f0d58b2d9b699e4a275ea93"
       }
-    ]
+    ],
+    "tool_registry": {
+      "path": "tools/registry/copilot-cli-agent-tools.json",
+      "schema_version": "1.1.0",
+      "characterization_version": "1.0.77",
+      "sha256": "5f1fec548262accd1360a77f60aabe2194ec9abfacadf3c9075c81e003ec92cf"
+    }
   },
   "budgets": {
     "files_per_slice": 10,
@@ -149,7 +155,7 @@
   ],
   "skill_allowlist": [],
   "context_hashes": {
-    ".github/prompts/apex-autonomous-pre-agent-loop.prompt.md": "06549ccbce70c2902f28ca4a4c678963326576b4ffd22012b252a675a76db032",
+    ".github/prompts/apex-autonomous-pre-agent-loop.prompt.md": "ed3de64ed6d2e7f51720a5d4a3299beb1482c582b266735ae2881876a75ae528",
     "AGENTS.md": "dad114b9f59e597437be286a41857d1f94d9666abc99fb118ffc6a7dbb465b9a",
     ".github/copilot-instructions.md": "aff580ed99b7c007caa4b5ce6b6c0670dbc2ccea619177d7d0cb84b0157c5e63",
     ".vscode/settings.json": "30cbdf32b28aecf68c31d14ba750c488647057e7efce3fbd31af432cfa0e66f0",

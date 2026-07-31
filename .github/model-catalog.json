@@ -1,7 +1,7 @@
 {
   "$schema": "../tools/schemas/model-catalog.schema.json",
   "description": "Authorized Copilot Chat model labels for APEX agents. Two-part design: `models` is hand-maintained metadata that authorizes which labels may appear in agent frontmatter; `assignments` is auto-generated from frontmatter (the canonical source) so the catalog can never drift from the agents themselves. The agent registry mirrors frontmatter via validate-models.mjs --only=consistency; the catalog enforces the label allow-list and assignment integrity via validate-models.mjs --only=catalog.",
-  "last_updated": "2026-06-08",
+  "last_updated": "2026-07-31",
   "models": {
     "Claude Opus 4.8": {
       "vendor": "Anthropic",
@@ -104,6 +104,14 @@
       "deprecated": false,
       "use_for": ["repository-maintenance"],
       "notes": "Authorized 2026-07 for the pre-agent automation loop prompt. Shares the GPT-5.5 outcome-first prompting contract (Role / Goal / Success criteria / Constraints / Output / Stop rules, decision rules over absolutes, no Anthropic XML blocks), so `classifyModel()` assigns it the enforced `gpt-5.6` family and the `gpt55-*` rules in the vendor-prompting registry apply unchanged."
+    },
+    "GPT-5.6 Terra": {
+      "vendor": "OpenAI",
+      "tier": "frontier",
+      "released": "2026-07",
+      "deprecated": false,
+      "use_for": ["repository-maintenance"],
+      "notes": "Authorized 2026-07 for the pre-agent automation loop prompt. Shares the GPT-5.5 outcome-first prompting contract, so `classifyModel()` assigns it the enforced `gpt-5.6` family and the `gpt55-*` rules apply unchanged."
     },
     "GPT-5.5": {
       "vendor": "OpenAI",
