@@ -345,7 +345,7 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
     errors.push("release qualification permissions must remain exactly contents read with no job override");
   }
   const releaseActions = workflowActions({ jobs: { qualify: releaseJob } });
-  const allowedReleaseActions = ["actions/checkout@v6", "actions/upload-artifact@v4"];
+  const allowedReleaseActions = ["actions/checkout@v7", "actions/upload-artifact@v7"];
   const localReleaseActions = releaseSteps
     .filter((step) => step !== null && typeof step === "object" && String(step.uses ?? "").startsWith("./"))
     .map((step) => step.uses);
@@ -361,7 +361,7 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
   const checkout = checkouts.find((step) => step.name === "Checkout exact candidate");
   if (
     checkouts.length !== 1 ||
-    checkout?.uses !== "actions/checkout@v6" ||
+    checkout?.uses !== "actions/checkout@v7" ||
     checkout.with?.ref !== "${{ github.event.pull_request.head.sha || github.sha }}" ||
     checkout.with?.["persist-credentials"] !== false
   ) {
@@ -387,7 +387,7 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
     .filter(Boolean);
   if (
     uploads.length !== 1 ||
-    upload?.uses !== "actions/upload-artifact@v4" ||
+    upload?.uses !== "actions/upload-artifact@v7" ||
     upload.if !== "always()" ||
     upload.with?.name !== "release-qualification-${{ steps.candidate.outputs.candidate_sha }}" ||
     upload.with?.["if-no-files-found"] !== "error" ||

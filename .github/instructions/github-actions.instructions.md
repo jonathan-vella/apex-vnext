@@ -38,9 +38,9 @@ For general GitHub Actions best practices, rely on
 
 | Action                            | Version |
 | --------------------------------- | ------- |
-| `actions/checkout`                | `@v6`   |
+| `actions/checkout`                | `@v7`   |
 | `actions/setup-node`              | `@v6`   |
-| `actions/upload-artifact`         | `@v4`   |
+| `actions/upload-artifact`         | `@v7`   |
 | `actions/download-artifact`       | `@v4`   |
 | `actions/cache`                   | `@v4`   |
 | `actions/github-script`           | `@v8`   |
@@ -96,10 +96,10 @@ Workflows run these project validators:
 
 | Anti-Pattern                    | Solution                                                  |
 | ------------------------------- | --------------------------------------------------------- |
-| Pinning to `@main` or `@latest` | Use `@v6` major version tags                              |
+| Pinning to `@main` or `@latest` | Use current major version tags                           |
 | `npm install` in CI             | Use `npm ci` for deterministic installs                   |
 | Missing `permissions` block     | Always declare least-privilege permissions                |
 | Broad triggers (no path filter) | Scope with `paths:` to relevant files                     |
 | Duplicate validation logic      | Reuse existing validator scripts                          |
-| `actions/upload-artifact@v3`    | Use `@v4` (v3 is deprecated)                              |
+| `actions/upload-artifact@v3`    | Use `@v7` (v3 is deprecated)                              |
 | `node-version: "20"` or older   | Use `node-version: "24"` — Node.js 20 is EOL (April 2026) |
