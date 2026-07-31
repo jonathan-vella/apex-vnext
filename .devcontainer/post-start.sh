@@ -14,25 +14,11 @@ if [ -d .github/hooks ]; then
     printf "    hook script perms     ✅ fixed\n"
 fi
 
-# ─── Deno ─────────────────────────────────────────────────────────────────────
-# Deno is upgraded automatically on container rebuild via the devcontainer
-# feature (version: latest). No in-container upgrade needed.
-if command -v deno &>/dev/null; then
-    printf "    deno                  ✅ %s\n" "$(deno --version 2>/dev/null | head -n1)"
-else
-    printf "    deno                  ⚠️  not installed — rebuild container\n"
-fi
-
 # ─── npm local dependencies ──────────────────────────────────────────────────
 printf "    npm local deps        "
 npm install --loglevel=error 2>&1 | tail -1 \
     && printf "✅ ok\n" \
     || printf "⚠️  npm install failed (continuing)\n"
-
-printf "    site npm deps         "
-npm --prefix site install --loglevel=error 2>&1 | tail -1 \
-    && printf "✅ ok\n" \
-    || printf "⚠️  site npm install failed (continuing)\n"
 
 # ─── Azure Developer CLI (azd) version + auth check ─────────────────────────
 # The devcontainer feature only runs at image-build time, so a cached rebuild

@@ -15,9 +15,7 @@
     "redhat.vscode-yaml",
     "esbenp.prettier-vscode",
     "HashiCorp.terraform",
-    "ms-azuretools.vscode-azureterraform",
-    "denoland.vscode-deno",
-    "hediet.vscode-drawio"
+    "ms-azuretools.vscode-azureterraform"
   ],
   "unwantedRecommendations": [
     "ms-azuretools.vscode-azure-github-copilot",

@@ -493,11 +493,6 @@ async function prepareCapabilityPacks(inventory) {
       root: join(repositoryRoot, ".github", "skills", "azure-governance-discovery"),
       entries: [join("scripts", "discover.py"), join("scripts", "render_governance.py")],
     },
-    {
-      id: "drawio",
-      root: join(repositoryRoot, "tools", "mcp-servers", "drawio"),
-      entries: ["deno.json", "deno.lock", "src", join("assets", "azure-public-service-icons")],
-    },
   ];
   for (const source of sources) {
     const pinnedRoot = await pinSourceRoot(source.root);
@@ -509,9 +504,6 @@ async function prepareCapabilityPacks(inventory) {
 
   const emptyDigest = createHash("sha256").update("").digest("hex");
   const governanceSource = join(packsRoot, "azure-governance-discovery", "source");
-  const drawioSource = join(packsRoot, "drawio", "source");
-  const drawioConfig = JSON.parse(await readFile(join(drawioSource, "deno.json"), "utf8"));
-  const denoDigest = await fileDigest(join(drawioSource, "deno.lock"));
   const governanceScriptDigest = await fileDigest(join(governanceSource, "scripts", "discover.py"));
   const metadata = (id) => {
     const definition = definitions.get(id);
@@ -543,25 +535,6 @@ async function prepareCapabilityPacks(inventory) {
         script: "scripts/discover.py",
         scriptDigest: governanceScriptDigest,
         capabilities: ["governance-discovery"],
-      },
-      {
-        ...metadata("drawio"),
-        version: typeof drawioConfig.version === "string" ? drawioConfig.version : "1.0.0",
-        runtime: "deno",
-        artifact: {
-          type: "local-directory",
-          spec: "capability-packs/drawio/source",
-          digest: await treeDigest(drawioSource),
-        },
-        lock: {
-          installer: "deno",
-          path: "capability-packs/drawio/source/deno.lock",
-          digest: denoDigest,
-          directDigest: denoDigest,
-          transitiveDigest: denoDigest,
-        },
-        executable: { command: "deno", args: ["run", "--frozen", "-P", "src/index.ts", "--transport", "stdio"] },
-        capabilities: ["drawio"],
       },
     ],
   };
@@ -663,12 +636,6 @@ async function prepareAssets() {
         mode: "copy-entries",
         sourceRoot: ".github/skills/azure-governance-discovery",
         generatedRoot: "capability-packs/azure-governance-discovery/source",
-      },
-      {
-        id: "drawio",
-        mode: "copy-entries",
-        sourceRoot: "tools/mcp-servers/drawio",
-        generatedRoot: "capability-packs/drawio/source",
       },
       { id: "capability-pack-registry", mode: "compose-json", generatedPath: "capability-packs/registry.v1.json" },
     ],

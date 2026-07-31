@@ -8,7 +8,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 
 const REGISTRY_PATH = "tools/registry/diagram-semantics.v1.json";
 const SCHEMA_PATH = "tools/registry/schemas/diagram-semantics.schema.json";
-const EXPECTED_SHA256 = "4583eaa567c42fe59285160243ba182c519750c88214d5d57d9d1576d42b0760";
+const EXPECTED_SHA256 = "22f9fc82072be4f670696e0f5096efc9780f0f7672942a570bd0933500471730";
 const EXPECTED_IDS = [
   "g1-three-tier-web",
   "g2-hub-spoke-landing-zone",
@@ -29,7 +29,6 @@ const EXPECTED_ROUTING = {
     outputClasses: ["architecture", "network", "dependency", "runtime", "as-built", "waf", "cost", "compliance"],
     formats: ["py", "png", "svg"],
   },
-  transitional: { owner: "drawio", newOutputAllowed: false, historicalReadable: true, formats: ["drawio"] },
 };
 const EXPECTED_RECONCILIATIONS = {
   "g3-event-driven-microservices": [
@@ -58,13 +57,6 @@ const EXPECTED_RECONCILIATIONS = {
   ],
 };
 
-function reconciledValue(scenario, field, legacyValue) {
-  const reconciliation = scenario.legacyReconciliations.find((item) => item.field === field);
-  if (reconciliation === undefined) return legacyValue;
-  if (JSON.stringify(reconciliation.legacy) !== JSON.stringify(legacyValue)) return Symbol("invalid-reconciliation");
-  return reconciliation.resolved;
-}
-
 function canonicalValue(value) {
   if (Array.isArray(value)) return value.map(canonicalValue);
   if (value !== null && typeof value === "object") {
@@ -90,8 +82,8 @@ export function validateActiveConsumers(consumers, readText = (filePath) => read
       errors.push(`${consumer.id}: active consumer is missing or unreadable`);
       continue;
     }
-    if (!consumer.allowTransitionalReferences && /\.drawio\b|draw\.io/i.test(content)) {
-      errors.push(`${consumer.id}: active consumer references transitional Draw.io output`);
+    if (/\.drawio\b|draw\.io/i.test(content)) {
+      errors.push(`${consumer.id}: active consumer references retired Draw.io output`);
     }
     for (const marker of consumer.requiredMarkers) {
       if (!content.includes(marker)) errors.push(`${consumer.id}: required marker ${marker} is missing`);
@@ -118,36 +110,6 @@ export function validateDiagramSemantics(registry, schema) {
     errors.push("format-neutral scenario coverage drifted");
   }
   for (const scenario of registry.scenarios) {
-    let source;
-    try {
-      source = JSON.parse(readFileSync(scenario.sourceExpectation, "utf8"));
-    } catch {
-      errors.push(`${scenario.id}: source expectation is missing or invalid`);
-      continue;
-    }
-    const expected = {
-      id: source.id,
-      title: source.title,
-      diagramType: reconciledValue(scenario, "diagramType", source.diagram_type),
-      scope: {
-        subscriptions: source.scope.subscriptions,
-        regions: source.scope.regions,
-        managementGroups: reconciledValue(scenario, "scope.managementGroups", source.scope.management_groups),
-      },
-      resources: reconciledValue(scenario, "resources", {
-        minimum: source.min_resources,
-        maximum: source.max_resources,
-      }),
-      zones: source.expected_zones,
-      edgeLabels: source.expected_edge_labels,
-      legendRequired: source.expected_legend_required,
-      pages: source.expected_pages ?? 1,
-    };
-    for (const [field, value] of Object.entries(expected)) {
-      if (JSON.stringify(scenario[field]) !== JSON.stringify(value)) {
-        errors.push(`${scenario.id}: ${field} differs from the legacy semantic source`);
-      }
-    }
     if (scenario.resources.minimum > scenario.resources.maximum) errors.push(`${scenario.id}: resource bounds invert`);
     const expectedReconciliations = EXPECTED_RECONCILIATIONS[scenario.id] ?? [];
     if (JSON.stringify(scenario.legacyReconciliations) !== JSON.stringify(expectedReconciliations)) {

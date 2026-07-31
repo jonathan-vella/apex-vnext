@@ -42,7 +42,7 @@ See `customizations/manifest.json` for managed agent roles, models, interaction 
 
 Do NOT reference these removed agents/skills:
 
-- `diagram.agent.md` → Use `drawio` or `python-diagrams` skill
+- `diagram.agent.md` → Use `python-diagrams` or `mermaid` skill
 - `adr.agent.md` → Use `azure-adr` skill
 - `docs.agent.md` → Use `azure-artifacts` skill or `as-built` agent
 - `azure-workload-docs` skill → Use `azure-artifacts` skill

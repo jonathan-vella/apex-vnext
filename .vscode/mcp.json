@@ -10,20 +10,6 @@
       "headers": {
         "x-mcp-toolset": "CostManagement,Pricing"
       }
-    },
-    "drawio": {
-      "type": "stdio",
-      "command": "deno",
-      "args": [
-        "run",
-        "-P",
-        "--no-check",
-        "--frozen",
-        "${workspaceFolder}/tools/mcp-servers/drawio/src/index.ts"
-      ],
-      "env": {
-        "DENO_DIR": "${userHome}/.cache/deno"
-      }
     }
   }
 }

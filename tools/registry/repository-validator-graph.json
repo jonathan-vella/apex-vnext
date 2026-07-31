@@ -97,13 +97,6 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
-      "id": "lint-drawio",
-      "script": "lint:drawio",
-      "profile": "node-lint",
-      "aliases": [],
-      "retirement": { "status": "active", "replacementIds": [] }
-    },
-    {
       "id": "lint-glob-audit",
       "script": "lint:glob-audit",
       "profile": "node-lint",
@@ -669,7 +662,6 @@
         "validate:sku-iac-coverage",
         "validate:banned-phrases",
         "validate:vscode",
-        "lint:drawio",
         "validate:terminology",
         "validate:model-consistency",
         "validate:deprecated-models",
@@ -716,7 +708,6 @@
         "lint:glob-audit",
         "lint:orphaned-content",
         "validate:vscode",
-        "lint:drawio",
         "validate:model-consistency",
         "validate:deprecated-models",
         "validate:model-catalog",

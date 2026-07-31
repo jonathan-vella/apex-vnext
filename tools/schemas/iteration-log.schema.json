@@ -69,11 +69,11 @@
           "items": {
             "type": "string"
           },
-          "description": "Filenames produced by this iteration (e.g., '03-des-diagram.drawio')."
+          "description": "Filenames produced by this iteration (e.g., '03-des-diagram.py')."
         },
         "artifact_retries": {
           "type": "object",
-          "description": "Per-artifact retry counts. Keys are artifact filenames produced in this iteration; values are integers >= 0 counting how many times the artifact was regenerated before acceptance. Consumed by tools/scripts/benchmark-e2e.mjs scoreRegenerationRate() and aggregated for the regen-rate baseline (T-012). Added by T-011 (Draw.io Diagram Quality Uplift plan).",
+          "description": "Per-artifact retry counts. Keys are artifact filenames produced in this iteration; values are integers >= 0 counting how many times the artifact was regenerated before acceptance. Consumed by tools/scripts/benchmark-e2e.mjs scoreRegenerationRate().",
           "additionalProperties": {
             "type": "integer",
             "minimum": 0

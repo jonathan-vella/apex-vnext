@@ -20,17 +20,16 @@ with AI agents.
 | Node.js                   | LTS     | Validation scripts, npm tooling   |
 | GitHub CLI                | latest  | Repository operations             |
 | Terraform                 | latest  | Signed HashiCorp APT repository    |
-| Deno                      | latest  | Draw.io MCP server runtime        |
+| Deno                      | latest  | Optional capability-pack runtime   |
 | Azure Developer CLI (azd) | latest  | Standardized Azure deployments    |
 
 ### Tools Installed by `post-create.sh`
 
 | Step | Tool                           | Method                                                                       |
 | ---- | ------------------------------ | ---------------------------------------------------------------------------- |
-| 1    | npm dependencies               | Root `npm install` + locked site `npm ci`                                    |
+| 1    | npm dependencies               | Root `npm install`                                                           |
 | 2    | markdownlint-cli2              | `npm install -g`                                                             |
 | 3    | k6 load testing                | deb repo (amd64) or GitHub release (arm64)                                   |
-| 4    | Deno upgrade                   | `deno upgrade` (ensures latest beyond cached feature layer)                  |
 | 5    | Git config and cache dirs      | `git config`, `mkdir`                                                        |
 | 6    | Python packages                | `uv pip install` — diagrams, matplotlib, pillow, checkov, ruff, pytest       |
 | 7    | PowerShell Az modules          | `Install-Module` — Accounts, Resources, Storage, Network, KeyVault, Websites |
@@ -52,7 +51,6 @@ graphviz, dos2unix, bats, uv
 | ----------------- | ----------------- | ------------------------------------------------ |
 | ARM MCP           | http              | Microsoft-hosted Azure cost and pricing tools     |
 | GitHub MCP        | http              | Copilot-provided GitHub context                  |
-| Draw.io MCP       | stdio (Deno)      | Architecture diagram generation with Azure icons |
 | Azure MCP Server  | VS Code extension | RBAC-aware Azure context for agents              |
 
 ### VS Code Extensions
@@ -65,7 +63,7 @@ graphviz, dos2unix, bats, uv
 - **Kubernetes** — AKS tools, Container Tools
 - **GitHub** — Actions, Pull Requests
 - **Terraform** — HashiCorp + Azure Terraform
-- **Other** — Draw.io, Rainbow CSV, YAML, Resource Monitor, Deno
+- **Other** — Rainbow CSV, YAML, Resource Monitor
 
 ## Quick Start
 
@@ -177,7 +175,6 @@ gh auth status
 | `PYTHONUNBUFFERED`        | `1`                           | Unbuffered Python output                                 |
 | `UV_CACHE_DIR`            | `~/.cache/uv`                 | uv package cache                                         |
 | `TF_PLUGIN_CACHE_DIR`     | `~/.terraform.d/plugin-cache` | Terraform provider cache                                 |
-| `DENO_DIR`                | `~/.cache/deno`               | Deno module cache                                        |
 
 ### Azure CLI Extension Auto-Install
 
@@ -209,7 +206,7 @@ Runs on every container start. Lightweight updates only:
 
 | Tool                 | Method                                                                   |
 | -------------------- | ------------------------------------------------------------------------ |
-| npm local deps       | Root and site `npm install`                                              |
+| npm local deps       | Root `npm install`                                                       |
 | Python packages      | `uv pip install --upgrade` (checkov, ruff, diagrams, matplotlib, pillow) |
 | apex-recall          | `uv pip install --upgrade -e`                                            |
 | azd auth             | Status check (warns if not authenticated)                                |

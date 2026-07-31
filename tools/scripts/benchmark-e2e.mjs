@@ -16,7 +16,7 @@
  *   - Cost accuracy
  *   - Session state integrity
  *   - Timing performance
- *   - Regeneration rate (Draw.io diagrams; reported, weight 0 until baseline lands per T-012)
+ *   - Regeneration rate (format-neutral diagram artifacts; reported, weight 0)
  *
  * Usage:
  *   node tools/scripts/benchmark-e2e.mjs [project]
@@ -453,12 +453,6 @@ function scoreTimingPerformance() {
   };
 }
 
-// Path to the Draw.io regen-rate baseline. Captured by T-012 before any
-// uplift code change lands; the post-change reduction target is >=40%.
-// Path matches the rubric's `regen_rate.baseline_path` and the golden-
-// scenario fixture pack location (tools/tests/drawio-golden/).
-const REGEN_BASELINE_PATH = path.join("tools", "tests", "drawio-baseline", "regen-baseline.json");
-
 function scoreRegenerationRate() {
   const iterLog = readJson(path.join(OUTPUT_DIR, "08-iteration-log.json"));
   if (!iterLog || !Array.isArray(iterLog.entries) || iterLog.entries.length === 0) {
@@ -469,18 +463,19 @@ function scoreRegenerationRate() {
     };
   }
 
-  // Aggregate retry + friction counts across all entries, scoped to *.drawio
-  // artifacts. Schema fields: entries[].artifact_retries (object) and
-  // optional entries[].artifact_friction (object), keyed by filename.
+  // Aggregate retry + friction counts across all entries for active
+  // diagram artifacts. Schema fields: entries[].artifact_retries (object)
+  // and optional entries[].artifact_friction (object), keyed by filename.
+  const isDiagramArtifact = (filename) => /-diagram\.(py|png|svg|mmd)$/u.test(filename);
   let totalRetries = 0;
   let totalFriction = 0;
-  const drawioArtifacts = new Set();
+  const diagramArtifacts = new Set();
   for (const entry of iterLog.entries) {
     const retries = entry?.artifact_retries;
     if (retries && typeof retries === "object") {
       for (const [filename, count] of Object.entries(retries)) {
-        if (!filename.endsWith(".drawio")) continue;
-        drawioArtifacts.add(filename);
+        if (!isDiagramArtifact(filename)) continue;
+        diagramArtifacts.add(filename);
         const n = Number(count);
         if (Number.isFinite(n) && n >= 0) totalRetries += n;
       }
@@ -488,82 +483,39 @@ function scoreRegenerationRate() {
     const friction = entry?.artifact_friction;
     if (friction && typeof friction === "object") {
       for (const [filename, count] of Object.entries(friction)) {
-        if (!filename.endsWith(".drawio")) continue;
-        drawioArtifacts.add(filename);
+        if (!isDiagramArtifact(filename)) continue;
+        diagramArtifacts.add(filename);
         const n = Number(count);
         if (Number.isFinite(n) && n >= 0) totalFriction += n;
       }
     }
   }
 
-  if (drawioArtifacts.size === 0) {
+  if (diagramArtifacts.size === 0) {
     return {
       score: null,
-      details: "No .drawio artifacts recorded with artifact_retries; dimension not applicable to this run",
-      drawio_artifacts: 0,
+      details: "No diagram artifacts recorded with artifact_retries; dimension not applicable to this run",
+      diagram_artifacts: 0,
       total_retries: 0,
       total_friction: 0,
       grade: "N/A",
     };
   }
 
-  const currentRetryMean = totalRetries / drawioArtifacts.size;
-  const currentFrictionMean = totalFriction / drawioArtifacts.size;
+  const currentRetryMean = totalRetries / diagramArtifacts.size;
+  const currentFrictionMean = totalFriction / diagramArtifacts.size;
   const currentCostMean = currentRetryMean + currentFrictionMean;
 
-  // Compare against captured baseline (T-012). When absent, report the raw
-  // current means and skip scoring rather than failing the run.
-  const baseline = readJson(REGEN_BASELINE_PATH);
-  if (!baseline || typeof baseline.mean_retries_per_drawio !== "number") {
-    return {
-      score: null,
-      details: `No regen-rate baseline at ${REGEN_BASELINE_PATH} (captured by T-012); reporting raw current means only`,
-      drawio_artifacts: drawioArtifacts.size,
-      total_retries: totalRetries,
-      total_friction: totalFriction,
-      current_mean_retries_per_drawio: Number(currentRetryMean.toFixed(3)),
-      current_mean_friction_per_drawio: Number(currentFrictionMean.toFixed(3)),
-      current_mean_cost_per_drawio: Number(currentCostMean.toFixed(3)),
-      baseline_available: false,
-      grade: "N/A",
-    };
-  }
-
-  // Composite cost = retries + friction. Falls back to retries-only when
-  // baseline lacks the friction field (older baselines).
-  const baselineRetryMean = baseline.mean_retries_per_drawio;
-  const baselineFrictionMean =
-    typeof baseline.mean_friction_per_drawio === "number" ? baseline.mean_friction_per_drawio : 0;
-  const baselineCostMean =
-    typeof baseline.mean_cost_per_drawio === "number"
-      ? baseline.mean_cost_per_drawio
-      : baselineRetryMean + baselineFrictionMean;
-
-  // Score formula (plan §Validation Strategy): 100 * max(0, 1 - current/baseline),
-  // capped at 100. Uses the composite cost metric so it remains meaningful
-  // when strict retries are 0 but friction is non-zero. When baseline cost
-  // is 0 we cannot compute reduction; treat as perfect.
-  let score;
-  if (baselineCostMean <= 0) {
-    score = currentCostMean <= 0 ? 100 : 0;
-  } else {
-    const ratio = currentCostMean / baselineCostMean;
-    score = Math.round(Math.max(0, Math.min(1, 1 - ratio)) * 100);
-  }
+  const score = Math.max(0, 100 - Math.round(currentCostMean * 25));
 
   return {
     score,
-    drawio_artifacts: drawioArtifacts.size,
+    diagram_artifacts: diagramArtifacts.size,
     total_retries: totalRetries,
     total_friction: totalFriction,
-    current_mean_retries_per_drawio: Number(currentRetryMean.toFixed(3)),
-    current_mean_friction_per_drawio: Number(currentFrictionMean.toFixed(3)),
-    current_mean_cost_per_drawio: Number(currentCostMean.toFixed(3)),
-    baseline_mean_retries_per_drawio: baselineRetryMean,
-    baseline_mean_friction_per_drawio: baselineFrictionMean,
-    baseline_mean_cost_per_drawio: baselineCostMean,
-    baseline_commit_sha: baseline.commit_sha || baseline.captured_on_commit || null,
-    target_reduction_pct: baseline.target_reduction_pct || 40,
+    current_mean_retries_per_diagram: Number(currentRetryMean.toFixed(3)),
+    current_mean_friction_per_diagram: Number(currentFrictionMean.toFixed(3)),
+    current_mean_cost_per_diagram: Number(currentCostMean.toFixed(3)),
     grade: gradeScore(score),
   };
 }
@@ -743,10 +695,9 @@ const scores = {
   regeneration_rate: scoreRegenerationRate(),
 };
 
-// Compute weighted composite. Dimensions whose score is null (e.g., regen
-// rate before T-012 baseline lands, or runs with no .drawio artifacts) are
+// Compute weighted composite. Dimensions whose score is null are
 // skipped — their weight is 0 today, but this guard keeps composite stable
-// when T-033 rebalances.
+// when this dimension weight is increased in the future.
 let compositeScore = 0;
 for (const [dim, weight] of Object.entries(WEIGHTS)) {
   const s = scores[dim].score;
