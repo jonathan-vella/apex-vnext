@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -32,6 +32,7 @@ import {
 import { parseStrictJson } from "../scripts/_lib/strict-json.mjs";
 import { validateClientRuntimeEvidence, validateEvidencePayloads } from "../scripts/live-qualification.mjs";
 import { resolveInputPath } from "../scripts/qualify-client-outcomes.mjs";
+import { composeClientOutcomeClosure } from "../scripts/compose-client-outcome-closure.mjs";
 import {
   canonicalContextReceiptDigest,
   validateClientOutcomeScenarios,
@@ -538,6 +539,95 @@ test("selected live versions compare and aggregate without release authority", (
       ),
     /LIVE_CLIENT_VERSION_MISMATCH/,
   );
+});
+
+test("client closure composer generates deterministic live comparisons and qualification atomically", async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "apex-client-closure-"));
+  try {
+    const outcomes = [];
+    for (const { id } of CLIENT_OUTCOME_SCENARIO_CORPUS.scenarios) {
+      for (const outcome of triplet(id, { evidenceKind: "live" }, { evidenceKind: "live" }).outcomes) {
+        const client = outcome.client.id === "github-copilot-vscode" ? "vscode" : "cli";
+        const outcomePath = `${id}-${client}.json`;
+        writeFileSync(path.join(directory, outcomePath), canonicalJson(outcome));
+        outcomes.push({ scenarioId: id, clientId: outcome.client.id, outcomePath });
+      }
+    }
+    const manifestPath = path.join(directory, "manifest.json");
+    writeFileSync(manifestPath, canonicalJson({ schemaVersion: "1.0.0", outcomes }));
+    const firstOutput = path.join(directory, "first");
+    const secondOutput = path.join(directory, "second");
+    const first = await composeClientOutcomeClosure({ manifest: manifestPath, output: firstOutput });
+    const second = await composeClientOutcomeClosure({ manifest: manifestPath, output: secondOutput });
+    assert.deepEqual(first, second);
+    assert.equal(first.outcomes.length, 20);
+    assert.equal(first.comparisons.length, 10);
+    assert.equal(first.qualifiesClientParity, true);
+    assert.equal(first.qualifiesRelease, false);
+    assert.equal(
+      first.closureId,
+      sha256Json(Object.fromEntries(Object.entries(first).filter(([key]) => key !== "closureId"))),
+    );
+    assert.equal(statSync(firstOutput).mode & 0o777, 0o700);
+    assert.equal(statSync(path.join(firstOutput, "closure.json")).mode & 0o777, 0o600);
+    assert.equal(JSON.parse(readFileSync(path.join(firstOutput, "client-qualification.json"), "utf8")).status, "pass");
+    await assert.rejects(
+      composeClientOutcomeClosure({ manifest: manifestPath, output: firstOutput }),
+      /CLOSURE_OUTPUT_INVALID/,
+    );
+
+    const incompleteManifest = path.join(directory, "incomplete.json");
+    writeFileSync(incompleteManifest, canonicalJson({ schemaVersion: "1.0.0", outcomes: outcomes.slice(1) }));
+    const incompleteOutput = path.join(directory, "incomplete");
+    await assert.rejects(
+      composeClientOutcomeClosure({ manifest: incompleteManifest, output: incompleteOutput }),
+      /CLOSURE_MANIFEST_INVALID/,
+    );
+    assert.throws(() => statSync(incompleteOutput));
+
+    const duplicateManifest = path.join(directory, "duplicate-path.json");
+    const duplicateOutcomes = structuredClone(outcomes);
+    duplicateOutcomes[1].outcomePath = duplicateOutcomes[0].outcomePath;
+    writeFileSync(duplicateManifest, canonicalJson({ schemaVersion: "1.0.0", outcomes: duplicateOutcomes }));
+    await assert.rejects(
+      composeClientOutcomeClosure({ manifest: duplicateManifest, output: path.join(directory, "duplicate-output") }),
+      /CLOSURE_MANIFEST_PATH_DUPLICATE/,
+    );
+
+    const cliOutput = path.join(directory, "cli-incomplete");
+    const cliResult = spawnSync(
+      process.execPath,
+      ["tools/scripts/compose-client-outcome-closure.mjs", cliOutput, incompleteManifest],
+      { cwd: process.cwd(), encoding: "utf8" },
+    );
+    assert.equal(cliResult.status, 2);
+    assert.match(cliResult.stderr, /CLIENT_OUTCOME_CLOSURE_FAILED:CLOSURE_MANIFEST_INVALID/);
+    assert.equal(cliResult.stderr.includes(directory), false);
+    assert.throws(() => statSync(cliOutput));
+
+    const outputParent = path.join(directory, "output-parent");
+    const linkedParent = path.join(directory, "linked-parent");
+    mkdirSync(outputParent);
+    symlinkSync(outputParent, linkedParent, "dir");
+    await assert.rejects(
+      composeClientOutcomeClosure({ manifest: manifestPath, output: path.join(linkedParent, "closure") }),
+      /CLOSURE_OUTPUT_INVALID/,
+    );
+
+    const mixedPath = path.join(directory, outcomes[0].outcomePath);
+    const fixtureOutcome = triplet(outcomes[0].scenarioId).outcomes.find(
+      ({ client }) => client.id === outcomes[0].clientId,
+    );
+    writeFileSync(mixedPath, canonicalJson(fixtureOutcome));
+    const mixedOutput = path.join(directory, "mixed");
+    await assert.rejects(
+      composeClientOutcomeClosure({ manifest: manifestPath, output: mixedOutput }),
+      /CLOSURE_OUTCOME_BINDING_INVALID/,
+    );
+    assert.throws(() => statSync(mixedOutput));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("client parity integrates into evidence manifest without becoming release authority", () => {
