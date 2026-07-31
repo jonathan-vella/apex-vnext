@@ -484,18 +484,24 @@
         "tools/registry/diagram-semantics.v1.json",
         "tools/registry/schemas/diagram-semantics.schema.json",
         "tools/scripts/validate-diagram-semantics.mjs",
-        "tools/tests/validate-diagram-semantics.test.mjs"
+        "tools/tests/validate-diagram-semantics.test.mjs",
+        "tools/apex-prompts/workflow-prompts/04-design.prompt.md",
+        "tools/apex-prompts/workflow-prompts/05-iac-planner.prompt.md",
+        "tools/apex-prompts/workflow-prompts/08-as-built.prompt.md",
+        ".github/skills/workflow-engine/templates/workflow-graph.json"
       ],
       "consumers": ["design workflow", "IaC planning", "as-built output", "documentation"],
       "proofCommands": [
         "npm run validate:skills",
         "npm run validate:diagram-semantics",
         "npm run test:diagram-semantics",
+        "npm run validate:artifacts",
+        "npm run validate:workflow-graph",
         "npm run lint:drawio"
       ],
       "removalGate": "Format-neutral scenarios prove editable Mermaid or Python source, semantic and visual quality, deterministic rendering, and historical Draw.io readability.",
       "rationale": "New inline and standalone diagrams need explicit format owners before the Draw.io toolchain can retire.",
-      "followUp": "Issue #168 freezes format-neutral semantics and routing. Migrate active consumers, qualify rendering, then archive Draw.io only after measured parity.",
+      "followUp": "Issues #168 and #173 freeze semantics and migrate active consumers. Qualify rendering, then archive Draw.io only after measured parity.",
       "decisionRef": "OWN-014"
     },
     {

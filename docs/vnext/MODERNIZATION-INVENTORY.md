@@ -207,8 +207,9 @@ hidden-worker invocation semantics remain a separate characterization gate.
 
 Issue #168 freezes the `OWN-014` format-neutral semantic manifest against every existing golden scenario and makes
 Mermaid/Python routing explicit. The contract records bounded reconciliations where legacy aggregate metadata conflicts
-with named prompt semantics. Draw.io remains transitional; active workflow migration and measured rendering parity are
-required before removal.
+with named prompt semantics. Issue #173 migrates active workflow, template, validator, benchmark, and documentation
+consumers to Python source plus PNG/SVG outputs. Draw.io remains transitional; measured rendering parity is required
+before removal.
 
 Issue #162 freezes the `OWN-013` pricing parity registry and strict request/evidence contracts. It binds typed money,
 meter, commitment, ambiguity, uncertainty, throttling, freshness, and content-free provenance semantics. Issue #169

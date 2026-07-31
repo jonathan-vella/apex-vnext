@@ -21,7 +21,7 @@ No evidence in this dossier authorizes package publication, tag creation, branch
 | VS Code qualification         | Versions selected; must run against the new bundle and exact candidate.  |
 | Client parity qualification   | Deterministic harness complete; paired exact-candidate runs not started. |
 | ARM MCP qualification         | Direct clients configured; paired live OAuth discovery remains pending.  |
-| MCP and Draw.io retirement    | Diagram semantics frozen; migration/parity gates remain before removal.  |
+| MCP and Draw.io retirement    | Consumers migrated; rendering parity remains before removal.             |
 | Improvement measurement       | Not implemented; prior evidence covers observe-and-propose only.         |
 | Package, SBOM, and provenance | Must cover the new generated client projections on the exact candidate.  |
 | Guidance and automation       | Characterized on `b27d173`; later N/O parity gates remain incomplete.    |

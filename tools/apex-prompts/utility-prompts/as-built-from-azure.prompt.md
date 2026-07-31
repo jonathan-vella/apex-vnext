@@ -20,16 +20,17 @@ argument-hint: "Provide subscription name/ID, resource group(s), and workload na
 
 # As-Built Documentation from Existing Azure Deployment
 
-Generate comprehensive as-built documentation (all 7 Step-7 documents + Draw.io diagram)
-for an existing Azure workload where **no prior artifacts exist** (no IaC, no requirements docs,
-no architecture assessments). The agent discovers everything from the live Azure environment
-and user-provided context.
+Generate comprehensive as-built documentation, including all seven Step 7
+documents and an editable Python architecture diagram, for an existing Azure
+workload where **no prior artifacts exist**. The agent discovers everything
+from the live Azure environment and user-provided context.
 
 # Goal
 
 Reconstruct a complete `agent-output/{project}/` workspace from a live Azure
 subscription + resource group(s), then hand off to the `08-As-Built` agent
-to produce the full Step-7 documentation suite plus a Draw.io diagram.
+to produce the full Step 7 documentation suite plus Python source and rendered
+architecture outputs.
 
 # Success criteria
 
@@ -39,8 +40,8 @@ to produce the full Step-7 documentation suite plus a Draw.io diagram.
   in-scope resource group.
 - Phase 5 wrote pseudo-artifacts mimicking Steps 1–6 outputs into
   `agent-output/{project}/`.
-- Phase 6 invoked `08-As-Built` and the seven `07-*.md` documents plus the
-  Draw.io architecture diagram exist.
+- Phase 6 invoked `08-As-Built`; the seven `07-*.md` documents and
+  `07-ab-diagram.py`, `07-ab-diagram.png`, and `07-ab-diagram.svg` exist.
 - Project `README.md` updated with the as-built handoff entry.
 
 # Constraints
@@ -60,8 +61,9 @@ to produce the full Step-7 documentation suite plus a Draw.io diagram.
   resumption)
 - `agent-output/{project}/01-requirements.md` through `06-deployment-summary.md`
   as pseudo-artifacts derived from discovery
-- `agent-output/{project}/07-*.md` (seven documents) and the Draw.io diagram
-  via the `08-As-Built` handoff
+- `agent-output/{project}/07-*.md` (seven documents) plus
+  `07-ab-diagram.py`, `07-ab-diagram.png`, and `07-ab-diagram.svg` via the
+  `08-As-Built` handoff
 - Updated project `README.md`
 
 # Stop rules
@@ -86,7 +88,8 @@ to produce the full Step-7 documentation suite plus a Draw.io diagram.
 - User has Azure CLI authenticated (`az account show` succeeds)
 - User has Reader access (minimum) to the target subscription and resource group(s)
 - No prior `agent-output/{project}/` artifacts exist — this prompt creates them from scratch
-- All 7 as-built documents + Draw.io diagram will be generated
+- All 7 as-built documents plus an editable Python as-built diagram and
+  rendered PNG/SVG outputs will be generated
 
 ---
 
@@ -408,7 +411,8 @@ After all pseudo-artifacts are saved, delegate to the `08-As-Built` agent:
 > exist — use Azure CLI queries for resource details. The workload runs in
 > subscription `{subscription}`, resource group(s) `{resource-groups}`.
 > Read all prior artifacts and generate all 7 documentation files plus
-> the Draw.io as-built diagram.
+> `07-ab-diagram.py`, `07-ab-diagram.png`, and `07-ab-diagram.svg` using the
+> `python-diagrams` skill.
 
 The `08-As-Built` agent will produce:
 
@@ -419,7 +423,9 @@ The `08-As-Built` agent will produce:
 - `07-backup-dr-plan.md`
 - `07-operations-runbook.md`
 - `07-documentation-index.md`
-- `07-ab-diagram.drawio`
+- `07-ab-diagram.py`
+- `07-ab-diagram.png`
+- `07-ab-diagram.svg`
 
 ---
 
@@ -437,7 +443,9 @@ All files saved to `agent-output/{project}/`:
 | `06-deployment-summary.md`      | This prompt | Live resource state snapshot               |
 | `README.md`                     | This prompt | Project dashboard                          |
 | `07-*.md` (7 files)             | 08-As-Built | Full documentation suite                   |
-| `07-ab-diagram.drawio`          | 08-As-Built | Architecture diagram                       |
+| `07-ab-diagram.py`              | 08-As-Built | Editable architecture diagram source       |
+| `07-ab-diagram.png`             | 08-As-Built | Architecture diagram preview               |
+| `07-ab-diagram.svg`             | 08-As-Built | Scalable architecture diagram              |
 
 ## Quality Assurance
 

@@ -28,6 +28,8 @@ template structure exactly:
 
 The project `README.md` is updated with final progress and artifact links.
 Session state has Step 7 `status = "complete"`.
+The as-built architecture is emitted as editable Python source plus rendered
+PNG and SVG siblings.
 
 # Constraints
 
@@ -39,6 +41,8 @@ Session state has Step 7 `status = "complete"`.
   `05-implementation-reference.md`.
 - Read `.github/skills/azure-artifacts/references/07-docs-template.md` for
   the H2 template structure.
+- Read `.github/skills/python-diagrams/SKILL.md` for the standalone as-built
+  architecture diagram.
 - Query deployed resource state via `az resource list` for the project
   resource group; use planned values as fallback only when resources are
   not yet deployed.
@@ -48,6 +52,9 @@ Session state has Step 7 `status = "complete"`.
 # Output
 
 - `agent-output/{project}/07-*.md` (7 files listed above)
+- `agent-output/{project}/07-ab-diagram.py`
+- `agent-output/{project}/07-ab-diagram.png`
+- `agent-output/{project}/07-ab-diagram.svg`
 - Updated project `README.md`
 - Updated `agent-output/{project}/00-session-state.json`
 
