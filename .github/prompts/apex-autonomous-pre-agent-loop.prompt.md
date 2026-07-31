@@ -2,7 +2,7 @@
 name: "apex-autonomous-pre-agent-loop"
 description: "Automate APEX on a dedicated branch, push checkpoints, and stop before agent testing and validation."
 agent: agent
-model: "Claude Opus 4.7"
+model: "GPT-5.6 Sol"
 argument-hint: "Optional: dedicated branch, authorization manifest, or issue. Defaults to the pre-agent workstream."
 tools: [execute/runInTerminal, read, search, edit, todo]
 ---
