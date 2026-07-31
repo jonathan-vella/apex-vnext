@@ -4,7 +4,7 @@ description: "Automate APEX on a dedicated branch, push checkpoints, and stop be
 agent: agent
 model: "GPT-5.6 Sol"
 argument-hint: "Optional: an existing authorization manifest path, its dedicated branch, or an authorized issue subset. Never widens the manifest."
-tools: [execute/runInTerminal, read, search, edit, todo]
+tools: [execute/runInTerminal, read, search, edit]
 ---
 
 # Automate APEX Before Agent Testing
@@ -128,24 +128,15 @@ The manifest must bind:
 | `worktree`, `branch`, `upstream`                     | Isolated worktree, dedicated branch, and its matching `origin` upstream                                                                                                       |
 | `allowed_paths[]`, `protected_paths[]`               | Path policy applied to every launched task                                                                                                                                    |
 | `allowed_commands[]`, `denied_commands[]`, `network` | Command allowlist, deny overrides, and network policy. Allowlist entries are prefixes, so `denied_commands` must exclude any aggregate a prefix would reach. Deny always wins |
-| `launcher`                                           | Absolute `copilot` binary path, pinned version and model, isolated home and working directory, and allowed built-in skill inventory                                           |
+| `launcher`                                           | Absolute `copilot` binary path, pinned version and model, isolated home and working directory, allowed built-in skill inventory, and hash-bound native tool registry          |
 | `budgets`                                            | File, line, iteration, queue-item, and wall-clock ceilings                                                                                                                    |
 | `expires_at`, `stop_conditions[]`                    | Expiry and any additional stop triggers                                                                                                                                       |
 | `checkpoint_policy`                                  | Commit and push frequency                                                                                                                                                     |
 | `context_hashes`                                     | Hashes of this prompt, `AGENTS.md`, `.github/copilot-instructions.md`, applicable instructions, VS Code discovery settings, and the discovered skill metadata inventory       |
 | `skill_allowlist`                                    | Per-item skill IDs; the default is empty                                                                                                                                      |
 
-When a budget field is absent, apply the conservative default below and record the substitution in the checkpoint.
-Never raise a ceiling the manifest set explicitly.
-
-| Budget          | Default                          |
-| --------------- | -------------------------------- |
-| Files per slice | 10 changed files                 |
-| Lines per slice | 400 changed lines                |
-| Repair attempts | 1 per failed focused check       |
-| Queue items     | 15 accepted items per invocation |
-| Wall clock      | 4 hours per invocation           |
-| Expiry          | 72 hours from manifest creation  |
+All budget and expiry fields are required by the authorization schema. Treat any absent field as an invalid manifest
+and stop; never synthesize, raise, or reinterpret a ceiling inside the loop.
 
 Count a pure rename by its content change, not by the delete-plus-add the diff shows, so archiving one directory does
 not trip the line ceiling.
@@ -171,8 +162,8 @@ deployment, release, destructive cloud operations, final validation, or managed-
 8. Create or resume the dedicated authorized branch from the verified base in the manifest's isolated worktree.
 9. Publish the dedicated branch to `origin` with upstream tracking after its first checkpoint commit.
 10. Refuse to continue when the selected branch is `main`, has a different upstream, or contains unrelated work.
-11. Create a VS Code todo for bootstrap, the issue #222 safety proof, each dependency-ready queue item, and completion.
-    Keep its status synchronized with durable `queue.json`; after compaction or resume, rebuild the todo from that file.
+11. Create `queue.json` entries for bootstrap, the issue #222 safety proof, each dependency-ready queue item, and
+    completion. Treat that file as the only authoritative task state across compaction and resume.
 12. Complete the **environment preflight** below. Defer the adapter preflight until the controller exists.
 13. Inspect issue #222 and existing controller code before implementing anything.
 14. Implement the smallest controller slice needed to prove one safety property at a time.
@@ -223,7 +214,10 @@ Preflight runs in two stages because the adapter cannot be exercised before it e
    plugin, custom, organization, or unknown skill is discovered. Compare built-in names and content hashes with
    `launcher.builtin_skills`; stop on additions, removals, hash drift, or an unavailable skill file. Built-in inventory
    metadata is part of the pinned CLI and does not itself mean a skill was loaded into a task.
-6. Confirm the `tool-guardian` PreToolUse hook is enabled in `chat.hookFilesLocations`. Because the neutral working
+6. Hash and parse `launcher.tool_registry.path`. Require its schema version, characterization version, launcher hash,
+   native maintenance allowlist, and denylist to match `launcher.tool_registry` and the pinned CLI. Stop on drift,
+   unknown selectors, or a missing native read, search, edit, or command capability.
+7. Confirm the `tool-guardian` PreToolUse hook is enabled in `chat.hookFilesLocations`. Because the neutral working
    directory intentionally prevents repository discovery, create the isolated home's `settings.json` with only an
    inline `PreToolUse` hook whose command is
    `bash <authorized-worktree>/.github/hooks/tool-guardian/guard-tool.sh`; do not copy or modify protected hook files.
@@ -231,7 +225,7 @@ Preflight runs in two stages because the adapter cannot be exercised before it e
    `APEX_LOOP_GUARD=true` for every launched task, then run a CLI fixture that proves the inline hook refuses a denied
    sample command. Never set `SKIP_TOOL_GUARD`, never lower `GUARD_MODE`, and treat `.github/hooks/**` as a protected
    path.
-7. Record the MCP servers declared in `.vscode/mcp.json` in the run evidence and disable MCP for every launched task.
+8. Record the MCP servers declared in `.vscode/mcp.json` in the run evidence and disable MCP for every launched task.
    The GitHub MCP server is a mutation vector and must never be reachable from an unattended item.
 
 **Adapter preflight** (after the controller's safety proof, before the first launched item):
@@ -245,8 +239,10 @@ Preflight runs in two stages because the adapter cannot be exercised before it e
 
 Per launch:
 
-- Launch from the authorized isolated home and neutral working directory. Pass only that item's allowed paths, tool
-  allowlist derived from `tools/registry/copilot-cli-agent-tools.json`, command allowlist, and skill allowlist.
+- Launch from the authorized isolated home and neutral working directory. Intersect the item's tool allowlist with
+  `nativeTools.maintenanceAllowlist` from the hash-bound registry and pass the exact result through `--available-tools`.
+  Exclude every `nativeTools.maintenanceDenylist` selector, generate `--allow-tool` entries only for the item's command
+  prefixes and absolute writable paths, and pass only that item's allowed paths and skill allowlist.
 - Never pass `--allow-all`, `--yolo`, an unrestricted path, or an unrestricted tool set.
 - Carry no chat history between items.
 - Treat task output as a proposal. Accept it only after mechanical diff, path, secret, churn, and focused-check
