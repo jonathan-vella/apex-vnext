@@ -119,6 +119,10 @@ function runFrontmatterValidation() {
       continue;
     }
 
+    if ("target" in frontmatter) {
+      r.error(relativePath, "Shared managed agent source must omit 'target'; client projections add it");
+    }
+
     const requiredFields = isSubagent ? SUBAGENT_REQUIRED : MAIN_AGENT_REQUIRED;
 
     for (const field of requiredFields) {

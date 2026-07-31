@@ -43,7 +43,10 @@ test("init installs bundled customizations and runtime config by default", async
   const root = await tempRoot();
   const service = new ApexService(root);
   await service.init({ projectId: "demo" });
-  assert.match(await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8"), /name: APEX/);
+  const coordinatorAgent = await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8");
+  assert.match(coordinatorAgent, /name: APEX/u);
+  assert.match(coordinatorAgent, /target: vscode/u);
+  assert.match(await readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"), /target: vscode/u);
   assert.deepEqual(JSON.parse(await readFile(join(root, ".vscode", "mcp.json"), "utf8")), {
     servers: {
       apex: {
@@ -115,10 +118,14 @@ test("init installs only the selected Copilot CLI projection and records it in t
   await assert.rejects(readFile(join(root, ".vscode", "mcp.json"), "utf8"), /ENOENT/u);
   assert.match(await readFile(join(root, ".github", "mcp.json"), "utf8"), /"recordInput"/u);
   const requirementsAgent = await readFile(join(root, ".github", "agents", "apex-requirements.agent.md"), "utf8");
+  assert.match(requirementsAgent, /target: github-copilot/u);
   assert.match(requirementsAgent, /model: Claude Sonnet 5/u);
   assert.match(requirementsAgent, /- ask_user/u);
   assert.match(requirementsAgent, /- task/u);
   assert.doesNotMatch(requirementsAgent, /vscode\/askQuestions|handoffs:|agents:/u);
+  for (const worker of ["apex-codegen.agent.md", "apex-reviewer.agent.md", "apex-validator.agent.md"]) {
+    await assert.rejects(readFile(join(root, ".github", "agents", worker), "utf8"), /ENOENT/u);
+  }
   const lock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
     clientId?: string;
     files: Array<{ path: string }>;
@@ -126,6 +133,7 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.equal(lock.clientId, "github-copilot-cli");
   assert.ok(lock.files.some(({ path }) => path === ".github/mcp.json"));
   assert.ok(!lock.files.some(({ path }) => path === ".vscode/mcp.json"));
+  assert.ok(!lock.files.some(({ path }) => /apex-(?:codegen|reviewer|validator)\.agent\.md$/u.test(path)));
   await writeFile(join(root, "unrelated.txt"), "preserve\n");
   await service.update();
   const updatedLock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
@@ -143,6 +151,7 @@ test("init installs only the selected Copilot CLI projection and records it in t
   const reinstalled = await service.reinstallCustomizations();
   assert.equal(reinstalled.clientId, "github-copilot-cli");
   assert.match(await readFile(join(root, ".github", "mcp.json"), "utf8"), /"recordInput"/u);
+  await assert.rejects(readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"), /ENOENT/u);
 });
 
 test("legacy locks default to VS Code and custom sources require explicit updates", async () => {

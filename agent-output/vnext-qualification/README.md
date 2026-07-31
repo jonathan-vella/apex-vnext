@@ -81,6 +81,7 @@ fallback only.
 | [03-des-adr-0003-use-bounded-entra-only-handoff-session.md](./03-des-adr-0003-use-bounded-entra-only-handoff-session.md) | Bounded Entra-only handoff endpoint session | Accepted | 2026-07-17 |
 | [03-des-adr-0004-use-bounded-observe-and-propose-improvement.md](./03-des-adr-0004-use-bounded-observe-and-propose-improvement.md) | Bounded improvement authority and clean-room decision | Accepted | 2026-07-17 |
 | [03-des-adr-0005-use-selected-client-agent-projections.md](./03-des-adr-0005-use-selected-client-agent-projections.md) | Selected client-valid agent projection decision | Proposed | 2026-07-28 |
+| [03-des-adr-0006-omit-cli-autonomous-workers.md](./03-des-adr-0006-omit-cli-autonomous-workers.md) | Fail-closed Copilot CLI autonomous worker boundary | Proposed | 2026-07-29 |
 | [04-governance-constraints.json](./04-governance-constraints.json) | Live `apex-shared` Azure Policy constraints | Complete | 2026-07-20 |
 | [04-governance-constraints.md](./04-governance-constraints.md) | Human-readable `apex-shared` governance record | Complete | 2026-07-20 |
 | [sku-manifest.json](./sku-manifest.json) | Canonical Standard LRS dual-track SKU decision | Locked | 2026-07-15 |

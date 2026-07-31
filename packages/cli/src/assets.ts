@@ -68,7 +68,17 @@ export interface BundledAssets {
 
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
+const PROJECTION_TARGETS: Readonly<Record<BundledClientProjection["id"], string>> = {
+  "github-copilot-cli": "github-copilot",
+  "github-copilot-vscode": "vscode",
+};
 const SHA256 = /^[a-f0-9]{64}$/u;
+
+function projectionTarget(clientId: string | undefined): string {
+  const target = PROJECTION_TARGETS[clientId as BundledClientProjection["id"]];
+  if (target === undefined) throw new Error(`Unsupported bundled client projection: ${clientId ?? "missing"}`);
+  return target;
+}
 
 function portablePath(path: string): string {
   return path.split(sep).join("/");
@@ -316,7 +326,7 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
         const expectedPrefix = `${mapping.generatedRoot}/${file.source.clientId}/`;
         if (
           !["github-copilot-cli", "github-copilot-vscode"].includes(file.source.clientId ?? "") ||
-          file.source.adapterVersion !== "1.0.0" ||
+          file.source.adapterVersion !== "1.1.0" ||
           !safeRelativePath(file.source.target ?? "") ||
           !file.path.startsWith(expectedPrefix) ||
           file.path !== `${expectedPrefix}${file.source.target}` ||
@@ -365,7 +375,12 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
   ) as Record<string, unknown>;
   verifyBundleDeclarations(manifest, customizationManifest, runtimeBundle);
   const sharedFiles = customizationManifest.sharedFiles as string[];
-  const roles = customizationManifest.roles as Array<{ id: string; source: string; agent: string }>;
+  const roles = customizationManifest.roles as Array<{
+    id: string;
+    source: string;
+    agent: string;
+    supportedTargets: string[];
+  }>;
   const declarations = customizationManifest.clientProjections as Array<{
     id: string;
     generatedRoot: string;
@@ -385,10 +400,12 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
   for (const file of manifest.files.filter(
     ({ source }) => source.kind === "generated" && source.composition === "client-projections",
   )) {
+    const target = projectionTarget(file.source.clientId);
     const role = file.source.roleId === undefined ? undefined : roles.find(({ id }) => id === file.source.roleId);
     const canonical = sourceMetadata.get(`customizations/${file.source.sourcePath}`);
     if (
-      (file.source.roleId !== undefined && (role === undefined || role.source !== file.source.sourcePath)) ||
+      (file.source.roleId !== undefined &&
+        (role === undefined || role.source !== file.source.sourcePath || !role.supportedTargets.includes(target))) ||
       canonical?.source.kind !== "repository-file" ||
       canonical.sha256 !== file.source.sourceHash
     ) {
@@ -396,6 +413,7 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
     }
   }
   for (const declaration of declarations) {
+    const target = projectionTarget(declaration.id);
     const projection = manifest.projections.find(({ id }) => id === declaration.id);
     if (!Array.isArray(declaration.files) || declaration.files.length !== new Set(declaration.files).size) {
       throw new Error(`Bundled client projection disagrees with its declaration: ${declaration.id}`);
@@ -403,7 +421,7 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
     const expectedTargets = [
       ...sharedFiles,
       ...declaration.files,
-      ...(customizationManifest.roles as Array<{ source: string }>).map(({ source }) => source),
+      ...roles.filter(({ supportedTargets }) => supportedTargets.includes(target)).map(({ source }) => source),
     ];
     const expected = expectedTargets.map((path) => `${declaration.generatedRoot}/${path}`).sort();
     if (

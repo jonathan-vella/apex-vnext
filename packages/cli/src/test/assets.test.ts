@@ -51,7 +51,14 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
           files: [".github/mcp.json"],
         },
       ],
-      roles: [{ id: "coordinator", source: ".github/agents/apex.agent.md", agent: "APEX" }],
+      roles: [
+        {
+          id: "coordinator",
+          source: ".github/agents/apex.agent.md",
+          agent: "APEX",
+          supportedTargets: ["vscode", "github-copilot"],
+        },
+      ],
     })}\n`,
   );
   const runtimeBytes = Buffer.from(
@@ -194,7 +201,7 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
           composition: "client-projections",
           clientId: client,
           target,
-          adapterVersion: "1.0.0",
+          adapterVersion: "1.1.0",
           sourcePath: target,
           sourceHash: sha256Bytes(content),
           ...(agent
@@ -323,6 +330,16 @@ test("rejects client projection digest and declaration drift after aggregate reb
   digestDrift.lock.digest = bundleLockDigest(digestDrift);
   await assert.rejects(verifyBundledAssetManifest(root, digestDrift), /Invalid bundled client projection/);
 
+  const adapterDrift = structuredClone(manifest);
+  adapterDrift.files.find(
+    ({ source }) => source.kind === "generated" && source.composition === "client-projections",
+  )!.source.adapterVersion = "1.0.0";
+  adapterDrift.lock.digest = bundleLockDigest(adapterDrift);
+  await assert.rejects(
+    verifyBundledAssetManifest(root, adapterDrift),
+    /Invalid generated client projection provenance/,
+  );
+
   const declarationDrift = structuredClone(manifest);
   const declarationPath = join(root, "customizations", "manifest.json");
   const declaration = JSON.parse(
@@ -344,6 +361,53 @@ test("rejects client projection digest and declaration drift after aggregate reb
   entry.bytes = incomplete.byteLength;
   declarationDrift.lock.digest = bundleLockDigest(declarationDrift);
   await assert.rejects(verifyBundledAssetManifest(root, declarationDrift), /declarations are missing/);
+});
+
+test("rejects a generated role in an unsupported client projection", async (context) => {
+  const { root, manifest } = await fixture();
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const changedManifest = structuredClone(manifest);
+  const declarationPath = join(root, "customizations", "manifest.json");
+  const declaration = JSON.parse(
+    await import("node:fs/promises").then(({ readFile }) => readFile(declarationPath, "utf8")),
+  );
+  declaration.roles[0].supportedTargets = ["vscode"];
+  const changed = Buffer.from(`${JSON.stringify(declaration)}\n`);
+  await writeFile(declarationPath, changed);
+  const entry = changedManifest.files.find(({ path }) => path === "customizations/manifest.json")!;
+  entry.sha256 = sha256Bytes(changed);
+  entry.bytes = changed.byteLength;
+  changedManifest.lock.digest = bundleLockDigest(changedManifest);
+  await assert.rejects(verifyBundledAssetManifest(root, changedManifest), /source binding mismatch/);
+});
+
+test("rejects unknown client projection IDs before target-dependent binding", async (context) => {
+  const { root, manifest } = await fixture();
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const changedManifest = structuredClone(manifest);
+  const generated = changedManifest.files.find(
+    ({ source }) => source.kind === "generated" && source.roleId === "coordinator",
+  )!;
+  generated.source.clientId = "unknown-client";
+  changedManifest.lock.digest = bundleLockDigest(changedManifest);
+  await assert.rejects(
+    verifyBundledAssetManifest(root, changedManifest),
+    /Invalid generated client projection provenance/,
+  );
+  generated.source.clientId = "github-copilot-cli";
+
+  const declarationPath = join(root, "customizations", "manifest.json");
+  const declaration = JSON.parse(
+    await import("node:fs/promises").then(({ readFile }) => readFile(declarationPath, "utf8")),
+  );
+  declaration.clientProjections[0].id = "unknown-client";
+  const changed = Buffer.from(`${JSON.stringify(declaration)}\n`);
+  await writeFile(declarationPath, changed);
+  const entry = changedManifest.files.find(({ path }) => path === "customizations/manifest.json")!;
+  entry.sha256 = sha256Bytes(changed);
+  entry.bytes = changed.byteLength;
+  changedManifest.lock.digest = bundleLockDigest(changedManifest);
+  await assert.rejects(verifyBundledAssetManifest(root, changedManifest), /Unsupported bundled client projection/);
 });
 
 test("rejects symlinks and false source mapping provenance", async (context) => {

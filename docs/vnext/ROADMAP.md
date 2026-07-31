@@ -371,9 +371,17 @@ diagnostics, artifacts, coverage, and exact-head behavior remain stable; CI, hoo
    provenance only after their implementation owners stabilize.
 6. Regenerate packaged assets only from canonical sources and validate effective instruction/skill discovery, context
    budgets, and semantic rule presence in both clients.
+7. Implement issue #175's managed custom-agent contract refresh: keep shared source roles cross-client, emit explicit
+   `target` values in selected-client projections, reject retired or unsupported fields, characterize hidden-worker
+   invocation, and prove prompt/tool, discovery, and delegation boundaries in both supported clients.
+
+Issue #179 found that observed Copilot CLI `1.0.73` behavior cannot make a custom-agent worker both non-selectable and
+explicitly `task`-callable. Issue #180 must resolve that contract gap before Milestone O or paired qualification can
+complete. ADR-0006 resolves the implementation boundary by omitting autonomous workers from the CLI projection;
+worker-dependent CLI scenarios remain unavailable until an exact supported client proves independent controls.
 
 **Exit gate:** Active guidance contains no obsolete MCP, Draw.io, VS Code-only, APM-adoption, or per-IaC SBOM claim;
-generated assets match canonical sources; both clients discover the intended instructions without conflict.
+generated assets match canonical sources; both clients discover the intended instructions and agents without conflict.
 
 ## Milestone P: Final Qualification And Cutover Decision
 

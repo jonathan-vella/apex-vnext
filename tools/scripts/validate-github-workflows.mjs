@@ -344,14 +344,13 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
     errors.push("release qualification permissions must remain exactly contents read with no job override");
   }
   const releaseActions = workflowActions({ jobs: { qualify: releaseJob } });
-  const allowedReleaseActions = ["actions/checkout@v6", "hashicorp/setup-terraform@v4", "actions/upload-artifact@v4"];
+  const allowedReleaseActions = ["actions/checkout@v6", "actions/upload-artifact@v4"];
   const localReleaseActions = releaseSteps
     .filter((step) => step !== null && typeof step === "object" && String(step.uses ?? "").startsWith("./"))
     .map((step) => step.uses);
   if (
     JSON.stringify(releaseActions) !== JSON.stringify(allowedReleaseActions) ||
-    JSON.stringify(localReleaseActions) !==
-      JSON.stringify(["./.github/actions/setup-node-repo", "./.github/actions/setup-python-validation"])
+    JSON.stringify(localReleaseActions) !== JSON.stringify(["./.github/actions/setup-node-repo"])
   ) {
     errors.push("release qualification contains an unapproved action");
   }

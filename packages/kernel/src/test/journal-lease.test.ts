@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -79,6 +79,31 @@ test("event journal detects corruption", async () => {
   event.payload = { value: 99 };
   await writeFile(path, JSON.stringify(event));
   await assert.rejects(journal.replay(), /Corrupt journal payload/);
+});
+
+test("event journal rejects symlinked and oversized event files", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "apex-journal-safe-read-"));
+  const journal = new EventJournal(directory);
+  await journal.append({
+    eventId: "event-1",
+    projectId,
+    runId,
+    type: "started",
+    timestamp: "2026-01-01T00:00:00.000Z",
+    ownerEpoch: 1,
+    expectedHead: null,
+    payload: { value: 1 },
+  });
+  const eventPath = join(directory, "0000000000000001.json");
+  const outside = join(directory, "outside.json");
+  await writeFile(outside, await readFile(eventPath));
+  await unlink(eventPath);
+  await symlink(outside, eventPath);
+  await assert.rejects(journal.replay(), /unsafe file/);
+
+  await unlink(eventPath);
+  await writeFile(eventPath, Buffer.alloc(1024 * 1024 + 1, "x"));
+  await assert.rejects(journal.replay(), /unsafe file/);
 });
 
 test("lease expiry permits reacquisition with a new epoch", async () => {

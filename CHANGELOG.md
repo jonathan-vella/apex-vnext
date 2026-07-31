@@ -19,6 +19,10 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Removed duplicate validator, test, packaging, Terraform, and Python setup from pull-request release qualification.
+  Required CI remains authoritative for those checks; exact-head qualification now runs only the release scorecard and
+  compact evidence bundle.
+
 - Replaced the custom Azure Pricing MCP with direct Microsoft Azure Resource Manager MCP access in VS Code and Copilot
   CLI. Every managed agent receives explicit read-only Cost Management and Pricing tools; custom transport, runtime-pack,
   CI, hook, Dependabot, and dev-container maintenance paths are retired.
@@ -41,6 +45,41 @@ prior qualification is retained as historical characterization. See
   binding. Deterministic fixture parity never grants release authority; paired exact-candidate execution remains open.
 - Added schema-backed, deterministic VS Code and Copilot CLI agent projections with pinned tool selectors, source-bound
   provenance, explicit selected-client installation, and transactional update, rollback, uninstall, and reinstall.
+- Added manifest-owned managed-agent target support and explicit `target: vscode` / `target: github-copilot` projection
+  rendering with fail-closed source, schema, generator, installation, and drift validation.
+- Characterized hidden-worker visibility and delegation without changing projection flags. The observed Copilot CLI
+  exposes no tested combination that is both unavailable for direct selection and explicitly `task`-callable; exact
+  paired-client qualification remains blocked pending the architecture decision in issue #180.
+- Selected a fail-closed Copilot CLI worker boundary: autonomous workers are generated only for VS Code, unsupported
+  role/client pairs are omitted deterministically, and parent delegation tools require a supported destination.
+- Added bounded runtime evidence export for guided client qualification, deriving source-bound facts from verified APEX
+  journals and immutable approval objects without creating client assertions or qualified outcomes.
+- Added exact Copilot CLI surface binding for guided qualification, with binary/version checks, managed-projection drift
+  detection, bounded MCP server-name inventory, and explicit unavailable results for non-selected binaries.
+- Added exact VS Code surface binding for guided qualification, with host/Copilot Chat version checks, managed-projection
+  drift detection, bounded extension inventory parsing, and no UI or model invocation.
+- Added deterministic guided qualification checkpoints that re-run source adapters, bind canonical adapter digests, and
+  expose blocked or pending interactive steps without accepting assertions or qualifying client parity.
+- Added strict checkpoint resume verification that re-runs all source adapters and rejects tampered, stale, or mixed
+  candidates while preserving the original checkpoint ID and interaction state.
+- Added deterministic dual-client customization lifecycle evidence for init, update, rollback, uninstall, reinstall,
+  unrelated-file preservation, automatic cleanup, and checkpoint integration for CLIENT-009.
+- Added fail-closed paired client workspace preparation with exact candidate binding, selected projection lock
+  verification, durable run identities, and cleanup after partial initialization failure.
+- Added receipt-authorized cleanup for prepared client workspaces with exact marker, selection, projection, inode, and
+  post-rename verification; changed or unrelated data is preserved rather than recursively deleted.
+- Added content-free client input journal evidence for real pending and recorded requirements interactions, with exact
+  selected-workspace, request supersession, owner epoch, and request-to-answer event binding.
+- Bound fresh CLI and VS Code input journal evidence into guided checkpoints and strict resume while keeping the
+  user-owned client interaction steps pending.
+- Added content-free restart evidence that compares persisted run state across distinct APEX service instances for both
+  selected client workspaces without claiming client-process or UI-session restart.
+- Bound fresh paired restart evidence into guided checkpoints and strict resume while retaining the user-owned client
+  restart interaction as pending.
+- Added content-free writer-transfer evidence for pending and accepted kernel state, with immutable claim, run
+  transaction, ownership, and owner-epoch verification and no cross-client interaction claim.
+- Added exact client-qualification candidate receipt generation with clean-worktree, repository, branch, commit,
+  release-manifest, runtime-bundle, package-lock, and customization-bundle binding.
 - Added versioned kernel-owned input requests and typed APEX MCP answer recording bound to the exact journal head and
   writer epoch, with deterministic option validation, replay denial, transfer reissue, and no chat-history dependency.
 - Retired Terraform MCP after migrating active consumers to bounded Registry/native/documentation owners; removed its

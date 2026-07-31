@@ -11,7 +11,11 @@ const repositoryRoot = resolve(packageRoot, "../..");
 const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
-const CLIENT_ADAPTER_VERSION = "1.0.0";
+const CLIENT_ADAPTER_VERSION = "1.1.0";
+const PROJECTION_TARGETS = new Map([
+  ["github-copilot-vscode", "vscode"],
+  ["github-copilot-cli", "github-copilot"],
+]);
 
 function bytewise(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -54,6 +58,7 @@ function serializeAgent(frontmatter, mechanics, body) {
 
 export function renderClientAgentProjection(source, clientId, toolInventory, options = {}) {
   const { frontmatter, body } = parseAgentSource(source);
+  if ("target" in frontmatter) throw new Error("Shared agent source must not declare target");
   if (clientId === "github-copilot-vscode") {
     const mechanics = [
       Array.isArray(frontmatter.tools) && frontmatter.tools.includes("vscode/askQuestions")
@@ -64,7 +69,7 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
         : null,
     ].filter(Boolean);
     return serializeAgent(
-      frontmatter,
+      { ...frontmatter, target: "vscode" },
       mechanics.length === 0 ? "" : `## Client Mechanics\n\n${mechanics.join(" ")}\n\n`,
       body,
     );
@@ -98,6 +103,7 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
   const cliFrontmatter = {
     name: frontmatter.name,
     description: frontmatter.description,
+    target: "github-copilot",
     model,
     "user-invocable": frontmatter["user-invocable"] ?? true,
     "disable-model-invocation": frontmatter["disable-model-invocation"] ?? frontmatter["user-invocable"] === false,
@@ -254,7 +260,12 @@ export function validateClientProjectionDeclarations(customizationManifest) {
         typeof role !== "object" ||
         typeof role.id !== "string" ||
         !safeRelativePath(role.source) ||
-        typeof role.agent !== "string",
+        typeof role.agent !== "string" ||
+        !Array.isArray(role.supportedTargets) ||
+        role.supportedTargets.length === 0 ||
+        role.supportedTargets.length > PROJECTION_TARGETS.size ||
+        new Set(role.supportedTargets).size !== role.supportedTargets.length ||
+        role.supportedTargets.some((target) => ![...PROJECTION_TARGETS.values()].includes(target)),
     ) ||
     roles.length !== new Set(roles.map(({ id }) => id)).size ||
     roles.length !== new Set(roles.map(({ source }) => source)).size ||
@@ -263,6 +274,20 @@ export function validateClientProjectionDeclarations(customizationManifest) {
     throw new Error("Client projection declarations are invalid");
   }
   return { sharedFiles, clientProjections, roles };
+}
+
+export function roleSupportsClient(role, clientId) {
+  const projectionTarget = PROJECTION_TARGETS.get(clientId);
+  if (projectionTarget === undefined) throw new Error(`Unsupported client projection: ${clientId}`);
+  return role.supportedTargets.includes(projectionTarget);
+}
+
+export function roleDelegatesOnClient(role, clientId, roles, invocationEdges) {
+  return invocationEdges.some(
+    ({ from, to }) =>
+      from === role.agent &&
+      roles.some(({ agent, supportedTargets }) => roleSupportsClient({ supportedTargets }, clientId) && agent === to),
+  );
 }
 
 function validateCliToolInventory(value) {
@@ -336,10 +361,11 @@ async function prepareClientProjections(customizationManifest, pinnedCustomizati
       });
     }
     for (const role of roles) {
+      if (!roleSupportsClient(role, projection.id)) continue;
       const sourcePath = join(repositoryRoot, "customizations", role.source);
       const source = (await readSourceFile(pinnedCustomizations.resolvedRoot, sourcePath)).toString("utf8");
       const sourceHash = createHash("sha256").update(source).digest("hex");
-      const delegates = customizationManifest.invocationEdges.some(({ from }) => from === role.agent);
+      const delegates = roleDelegatesOnClient(role, projection.id, roles, customizationManifest.invocationEdges);
       const rendered = Buffer.from(
         renderClientAgentProjection(source, projection.id, toolInventory, { delegates }),
         "utf8",

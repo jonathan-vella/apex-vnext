@@ -17,8 +17,12 @@ const report = {
 
 test("qualifier applies practical CI and required release repetitions", () => {
   assert.equal(parseQualificationArguments([]).repetitions, 10);
+  assert.equal(parseQualificationArguments([]).parallelism, 1);
   assert.equal(parseQualificationArguments(["--release"]).repetitions, 30);
+  assert.equal(parseQualificationArguments(["--release"]).parallelism, 4);
   assert.throws(() => parseQualificationArguments(["--release", "--repetitions", "29"]), /at least 30/);
+  assert.throws(() => parseQualificationArguments(["--parallelism", "0"]), /Parallelism/);
+  assert.throws(() => parseQualificationArguments(["--repetitions", "2", "--parallelism", "3"]), /Parallelism/);
 });
 
 test("qualifier writes deterministic artifacts and blocks unavailable measurements", async () => {
