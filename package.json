@@ -22,6 +22,7 @@
     "qualify:vnext": "npm run validate:vnext && npm run test:vnext && npm run test:vnext-validator && npm run test:vnext-pack",
     "qualify:vnext-release": "node tools/scripts/qualify-vnext-release.mjs",
     "live:vnext": "npm run build --workspace @apex/contracts && node tools/scripts/live-qualification.mjs",
+    "compose:vnext-client-closure": "npm run build:vnext && node tools/scripts/compose-client-outcome-closure.mjs",
     "prepare:vnext-live": "npm run prepare:vnext-assets && npm run build:vnext && node tools/scripts/vnext-live-prepare.mjs",
     "lint:md": "markdownlint-cli2",
     "lint:md:fix": "markdownlint-cli2 --fix",
