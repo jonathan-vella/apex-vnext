@@ -100,6 +100,8 @@ paired live client qualification.
 | Normalized client outcome contracts, corpus, and deterministic harness   | Implemented; exact-candidate paired live execution remains pending      |
 | Pricing parity contracts and ARM MCP Cost/Pricing documentation          | Direct authority configured; paired live client checks remain pending   |
 | Diagram semantics and improvement-measurement changes                    | Consumers migrated; rendering qualification and improvement remain open |
+| Skill and instruction capability parity                                  | Issue #219 owns migration, replacement proof, and optimization          |
+| Pre-agent repository optimization                                        | Issues #220/#222 own the bounded loop and completion receipt            |
 | Final deterministic, client, package, security, and live qualification   | Reopened                                                                |
 
 ## Release Boundaries
@@ -112,10 +114,14 @@ paired live client qualification.
 
 ## Immediate Sequence
 
-1. Return to issue #161 when interactive paired client execution and trusted receipt export are available.
-2. Run direct ARM MCP discovery and representative read calls in both supported interactive clients.
-3. Requalify ADR-0006's omitted-worker boundary on the exact selected clients before paired qualification.
-4. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.
+1. Implement issue #222's bounded local optimization controller selected by DECISION-020.
+2. Complete issue #220's inventory, autonomous remediation slices, and candidate-bound completion receipt.
+3. Complete issue #219's skill and instruction migration matrix, replacement slices, and measurements within that gate.
+4. Freeze the completion tree and run terminal full validation followed by managed-agent qualification.
+5. Return to issue #161 during terminal verification for paired-client execution and trusted receipt export.
+6. Run direct ARM MCP discovery and representative read calls in both supported interactive clients.
+7. Requalify ADR-0006's omitted-worker boundary on the exact selected clients before paired qualification.
+8. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.
 
 ## Resume Pointer
 

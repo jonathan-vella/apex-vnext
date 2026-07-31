@@ -3439,7 +3439,7 @@ export class ApexService {
       ) as TaskEnvelopeV1;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        throw new ApexError("APEX_NOT_FOUND", "Task was not found", EXIT_CODES.notFound);
+        throw new ApexError("APEX_NOT_FOUND", "Task was not found", EXIT_CODES.notFound, undefined, { cause: error });
       }
       throw error;
     }

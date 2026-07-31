@@ -170,6 +170,53 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Closure proof:** Issue #93 provides complete maps and gates; later Milestone N/O slices pass their characterized
   parity and removal tests on the exact candidate.
 
+### RISK-014: Skill Simplification Could Remove Domain Capability
+
+- **Type:** `RISK`
+- **Owner:** Client experience and capability owners
+- **Impact:** Concise role skills could preserve workflow routing while losing Azure architecture, WAF, ADR, pricing,
+  security, governance, IaC pattern, validation, deployment, or diagnostic behavior required by real workloads.
+- **Evidence:** The managed bundle contains role-oriented skills, while the active v1 domain catalog remains
+  repository-local and lacks a complete source-to-replacement qualification matrix.
+- **Related issue:** [#219](https://github.com/jonathan-vella/apex-vnext/issues/219)
+- **Mitigation:** Map every active skill and instruction to a managed guidance, contract, validator, capability, or
+  approved retirement owner. Require semantic scenarios and both-client evidence before optimization or removal.
+- **State:** Open
+- **Closure proof:** A candidate-bound migration matrix shows qualified replacement or approved retirement for every
+  source, with retained domain scenarios passing after measured context optimization in both supported clients.
+
+### RISK-015: Agent Testing Could Mask Repository Defects
+
+- **Type:** `RISK`
+- **Owner:** Quality engineering and repository maintainers
+- **Impact:** Agent scenarios could produce plausible outcomes while duplicate commands, contradictory guidance, stale
+  package boundaries, inefficient workflows, or unowned root files remain and contaminate qualification evidence.
+- **Evidence:** Existing modernization work characterizes selected automation and guidance surfaces, but no single
+  candidate-bound gate inventories every requested path and blocks agent testing on unresolved findings.
+- **Related issue:** [#220](https://github.com/jonathan-vella/apex-vnext/issues/220)
+- **Mitigation:** Complete the repository-wide optimization inventory and independently revertible remediation slices;
+  allow implementation tests but block managed-agent and paired-client scenario execution until a signed gate receipt.
+- **State:** Open
+- **Closure proof:** The candidate-bound gate receipt covers every scoped path, full validation passes, accepted deferrals
+  are explicit, and subsequent agent qualification uses the same reviewed tree.
+
+### RISK-016: Autonomous Optimization Could Escape Its Authorized Scope
+
+- **Type:** `RISK`
+- **Owner:** Repository maintainers and quality engineering
+- **Impact:** An unattended coding task could alter protected files, amplify a mistaken assumption, expose credentials,
+  consume unbounded credits, or create repository and GitHub state that is difficult to review or reverse.
+- **Evidence:** Copilot CLI supports non-interactive execution and broad permission flags, while the repository has no
+  deterministic outer controller or candidate-bound run-authorization contract.
+- **Related issues:** [#222](https://github.com/jonathan-vella/apex-vnext/issues/222), parent gate
+  [#220](https://github.com/jonathan-vella/apex-vnext/issues/220)
+- **Mitigation:** Use a clean dedicated worktree, fresh bounded tasks, explicit path and command policy, disabled remote
+  and GitHub mutation tools, diff and secret checks, local-only commits, focused checks, budgets, hash-linked state, and
+  fail-closed stop conditions. Never use unrestricted permission flags.
+- **State:** Open
+- **Closure proof:** Mutation and fault tests prove scope escape, protected-file edits, command escalation, dirty-state
+  confusion, secret introduction, repeated failures, and exhausted budgets stop without push, merge, release, or deploy.
+
 ### ASSUMPTION-001: Both Copilot Clients Can Project One Workflow Contract
 
 - **Type:** `ASSUMPTION`
