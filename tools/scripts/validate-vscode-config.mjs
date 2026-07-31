@@ -124,6 +124,17 @@ function validateDevcontainer() {
     if (!skillPaths["customizations/.github/skills"]) {
       errors.push("❌ customizations/.github/skills not in chat.agentSkillsLocations");
     }
+    for (const disabledPath of [
+      ".agents/skills",
+      ".claude/skills",
+      "~/.agents/skills",
+      "~/.copilot/skills",
+      "~/.claude/skills",
+    ]) {
+      if (skillPaths[disabledPath] !== false) {
+        errors.push(`❌ ${disabledPath} must be disabled in chat.agentSkillsLocations`);
+      }
+    }
 
     checkRequiredExtensionsInList("devcontainer.json", extensions);
 
