@@ -85,11 +85,25 @@
     "launcher": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["binary", "version", "model", "mcp"],
+      "required": ["binary", "version", "model", "mcp", "copilot_home", "working_directory", "builtin_skills"],
       "properties": {
         "binary": { "type": "string", "minLength": 1 },
         "version": { "type": "string", "minLength": 1 },
         "model": { "type": "string", "minLength": 1 },
+        "copilot_home": { "type": "string", "pattern": "^/" },
+        "working_directory": { "type": "string", "pattern": "^/" },
+        "builtin_skills": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "sha256"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          }
+        },
         "mcp": {
           "const": "disabled",
           "description": "Issue #222 forbids MCP servers inside launched tasks."
@@ -99,21 +113,13 @@
     "budgets": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "files_per_slice",
-        "lines_per_slice",
-        "repair_attempts",
-        "queue_items",
-        "wall_clock_minutes",
-        "credits"
-      ],
+      "required": ["files_per_slice", "lines_per_slice", "repair_attempts", "queue_items", "wall_clock_minutes"],
       "properties": {
         "files_per_slice": { "type": "integer", "minimum": 1, "maximum": 50 },
         "lines_per_slice": { "type": "integer", "minimum": 1, "maximum": 2000 },
         "repair_attempts": { "type": "integer", "minimum": 0, "maximum": 1 },
         "queue_items": { "type": "integer", "minimum": 1, "maximum": 100 },
-        "wall_clock_minutes": { "type": "integer", "minimum": 1, "maximum": 1440 },
-        "credits": { "type": "integer", "minimum": 1, "maximum": 1000 }
+        "wall_clock_minutes": { "type": "integer", "minimum": 1, "maximum": 1440 }
       }
     },
     "checkpoint_policy": {
