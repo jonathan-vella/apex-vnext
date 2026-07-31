@@ -83,7 +83,7 @@ function readOutcomePairs(manifestPath) {
 }
 
 function payload(path, kind, value) {
-  const bytes = Buffer.from(`${canonicalJson(value)}\n`, "utf8");
+  const bytes = Buffer.from(canonicalJson(value), "utf8");
   return {
     path,
     kind,
