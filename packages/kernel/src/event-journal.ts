@@ -1,6 +1,7 @@
 import type { EventV1, ProjectId, RunId } from "@apex/contracts";
 import { CONTRACT_VERSION } from "@apex/contracts";
-import { readFile, readdir } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, open, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { canonicalJsonBytes, sha256Json, type JsonValue } from "./canonical.js";
 import { atomicWriteBytes } from "./files.js";
@@ -17,6 +18,35 @@ export interface AppendEventInput {
 }
 
 type EventWithoutHash = Omit<EventV1, "hash">;
+const MAX_EVENT_BYTES = 1024 * 1024;
+
+async function readEventFile(path: string): Promise<string> {
+  const before = await lstat(path, { bigint: true });
+  if (!before.isFile() || before.isSymbolicLink() || before.size > BigInt(MAX_EVENT_BYTES)) {
+    throw new Error("Journal event must be a bounded regular file");
+  }
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const opened = await handle.stat({ bigint: true });
+    if (
+      !opened.isFile() ||
+      opened.dev !== before.dev ||
+      opened.ino !== before.ino ||
+      opened.size > BigInt(MAX_EVENT_BYTES)
+    ) {
+      throw new Error("Journal event changed before read");
+    }
+    const bytes = await handle.readFile();
+    if (bytes.byteLength > MAX_EVENT_BYTES) throw new Error("Journal event exceeds its byte budget");
+    const after = await lstat(path, { bigint: true });
+    if (after.isSymbolicLink() || after.dev !== opened.dev || after.ino !== opened.ino) {
+      throw new Error("Journal event changed during read");
+    }
+    return bytes.toString("utf8");
+  } finally {
+    await handle.close();
+  }
+}
 
 export class EventJournal {
   readonly directory: string;
@@ -85,9 +115,15 @@ export class EventJournal {
     let previousHash: string | null = null;
     let identity: Pick<EventV1, "projectId" | "runId"> | undefined;
     for (const [index, name] of names.entries()) {
+      let contents: string;
+      try {
+        contents = await readEventFile(join(this.directory, name));
+      } catch (error) {
+        throw new Error(`Corrupt journal event ${name}: unsafe file`, { cause: error });
+      }
       let event: EventV1;
       try {
-        event = JSON.parse(await readFile(join(this.directory, name), "utf8")) as EventV1;
+        event = JSON.parse(contents) as EventV1;
       } catch (error) {
         throw new Error(`Corrupt journal event ${name}: invalid JSON`, { cause: error });
       }

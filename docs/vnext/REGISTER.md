@@ -174,10 +174,15 @@ Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, a
 - **Owner:** Client experience
 - **Impact:** Failure would require a product-contract or projection redesign before release.
 - **Evidence:** Generated client-specific projections preserve different handoff, delegation, and input mechanics. The
-  deterministic two-client fixture matrix produces equivalent typed outcomes, but live client proof is still absent.
-- **Related issue:** [#91](https://github.com/jonathan-vella/apex-vnext/issues/91)
+  deterministic two-client fixture matrix produces equivalent typed outcomes, but
+  [hidden-worker characterization](HIDDEN-WORKER-CHARACTERIZATION.md) found no observed CLI field combination that is
+  both non-selectable and `task`-callable.
+- **Related issues:** [#91](https://github.com/jonathan-vella/apex-vnext/issues/91),
+  [#179](https://github.com/jonathan-vella/apex-vnext/issues/179),
+  [#180](https://github.com/jonathan-vella/apex-vnext/issues/180)
 - **Mitigation:** Characterize real supported clients, preserve client-specific interaction mechanics, and compare their
-  normalized outcomes using one scenario corpus.
+  normalized outcomes using one scenario corpus. Omit unsupported CLI workers under ADR-0006 and keep dependent
+  scenarios unavailable until exact-client controls pass.
 - **State:** Open
 - **Closure proof:** Versioned two-client qualification evidence on the exact candidate head.
 

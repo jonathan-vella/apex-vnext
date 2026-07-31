@@ -42,13 +42,20 @@
       "uniqueItems": true,
       "items": {
         "type": "object",
-        "required": ["id", "source", "agent", "role", "interactionType", "model", "costTier"],
+        "required": ["id", "source", "agent", "role", "supportedTargets", "interactionType", "model", "costTier"],
         "additionalProperties": false,
         "properties": {
           "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
           "source": { "type": "string", "pattern": "^\\.github/agents/[a-z0-9-]+\\.agent\\.md$" },
           "agent": { "type": "string", "minLength": 1 },
           "role": { "type": "string", "minLength": 1 },
+          "supportedTargets": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "uniqueItems": true,
+            "items": { "enum": ["vscode", "github-copilot"] }
+          },
           "interactionType": { "enum": ["interactive-handoff", "autonomous-subagent"] },
           "model": { "type": "string", "minLength": 1 },
           "costTier": { "enum": ["fast", "standard", "premium"] }

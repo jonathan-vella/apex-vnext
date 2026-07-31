@@ -64,7 +64,16 @@ switches the implementation from a custom adapter to direct supported-client MCP
 PR #171 closes issue #164. Issue #168 generalizes the existing Draw.io golden expectations into format-neutral semantics
 and freezes Mermaid/Python routing before active consumer migration.
 PR #172 closes issue #168. Issue #173 migrates active Step 3, Step 4, and Step 7 emitters, templates, validators, and
-benchmarks to Python source plus PNG/SVG outputs while retaining Draw.io for historical readability.
+benchmarks to Python source plus PNG/SVG outputs while retaining Draw.io for historical readability. Issue #175 plans
+the managed custom-agent
+frontmatter and projection refresh against the current official `target` and environment-specific field contracts.
+Issue #177 implements the first bounded slice: manifest-owned supported targets, explicit generated targets, and
+fail-closed source, schema, generator, and projection validation without changing visibility or delegation semantics.
+Issue #179 characterizes hidden-worker controls. The observed CLI accepted direct selection for every tested variant;
+workers disabled for model invocation were absent from the `task` catalog, while task-callable workers remained directly
+selectable. The CLI binary hash and installed VS Code version did not match the selected evidence inputs, so issue #180
+must resolve the architecture before paired qualification. Issue #180 selects the fail-closed ADR-0006 boundary:
+autonomous workers are omitted from the CLI projection until an exact supported client can enforce both controls.
 
 The product contract now targets GitHub Copilot in VS Code and GitHub Copilot CLI, direct read-only Azure Resource
 Manager MCP access, native Terraform lifecycle authority, Mermaid and Python diagrams, bounded improvement measurement,
@@ -85,7 +94,8 @@ not full client-parity qualification. Direct ARM MCP discovery still requires pa
 | VS Code `1.130.0`, Copilot Chat `0.58.0`, and CLI `1.0.73`               | Representative 12-cell context matrix complete                          |
 | Guidance, Markdown, lint, hook, and workflow ownership                   | Milestone N complete; Milestone O context baseline captured             |
 | ARM MCP access and MCP retirements                                       | Direct access configured; custom pricing retired; Draw.io remains open  |
-| Bundle composition mappings, aggregate lock, and client projections      | Implemented; live client qualification remains pending                  |
+| Bundle composition mappings, aggregate lock, and client projections      | Target-aware generation implemented; live client proof remains pending  |
+| Hidden-worker visibility and delegation                                  | CLI workers omitted fail-closed under ADR-0006; qualification blocked   |
 | Normalized client outcome contracts, corpus, and deterministic harness   | Implemented; exact-candidate paired live execution remains pending      |
 | Pricing parity contracts and ARM MCP Cost/Pricing documentation          | Direct authority configured; paired live client checks remain pending   |
 | Diagram semantics and improvement-measurement changes                    | Consumers migrated; rendering qualification and improvement remain open |
@@ -101,10 +111,10 @@ not full client-parity qualification. Direct ARM MCP discovery still requires pa
 
 ## Immediate Sequence
 
-1. Complete issue #173's active diagram consumer migration.
+1. Qualify Python/Mermaid rendering before any Draw.io retirement.
 2. Return to issue #161 when interactive paired client execution and trusted receipt export are available.
 3. Run direct ARM MCP discovery and representative read calls in both supported interactive clients.
-4. Qualify Python/Mermaid rendering before any Draw.io retirement.
+4. Requalify ADR-0006's omitted-worker boundary on the exact selected clients before paired qualification.
 5. Select a new exact candidate only after those milestones pass, then rerun every affected release gate.
 
 ## Resume Pointer

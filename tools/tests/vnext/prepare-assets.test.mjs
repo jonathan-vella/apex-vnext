@@ -8,6 +8,8 @@ import {
   pinSourceRoot,
   readSourceFile,
   renderClientAgentProjection,
+  roleDelegatesOnClient,
+  roleSupportsClient,
   validateBundleDeclarations,
   validateClientProjectionDeclarations,
 } from "../../../packages/cli/scripts/prepare-assets.mjs";
@@ -113,7 +115,14 @@ test("asset generator rejects malformed and duplicate client projection declarat
         files: [".github/mcp.json"],
       },
     ],
-    roles: [{ id: "coordinator", source: ".github/agents/apex.agent.md", agent: "APEX" }],
+    roles: [
+      {
+        id: "coordinator",
+        source: ".github/agents/apex.agent.md",
+        agent: "APEX",
+        supportedTargets: ["vscode", "github-copilot"],
+      },
+    ],
   };
   assert.deepEqual(validateClientProjectionDeclarations(valid), valid);
   for (const mutate of [
@@ -132,11 +141,54 @@ test("asset generator rejects malformed and duplicate client projection declarat
     (manifest) => {
       manifest.roles.push({ id: "other", source: ".github/agents/other.agent.md", agent: "APEX" });
     },
+    (manifest) => {
+      manifest.roles[0].supportedTargets = [];
+    },
+    (manifest) => {
+      manifest.roles[0].supportedTargets = ["unsupported"];
+    },
   ]) {
     const invalid = structuredClone(valid);
     mutate(invalid);
     assert.throws(() => validateClientProjectionDeclarations(invalid), /declarations are invalid/);
   }
+});
+
+test("asset generator accepts a role supported by only one client target", () => {
+  const manifest = {
+    sharedFiles: [".github/copilot-instructions.md"],
+    clientProjections: [
+      {
+        id: "github-copilot-vscode",
+        generatedRoot: "client-projections/github-copilot-vscode",
+        files: [".vscode/mcp.json"],
+      },
+      {
+        id: "github-copilot-cli",
+        generatedRoot: "client-projections/github-copilot-cli",
+        files: [".github/mcp.json"],
+      },
+    ],
+    roles: [
+      {
+        id: "validator",
+        source: ".github/agents/apex-validator.agent.md",
+        agent: "APEX Validator",
+        supportedTargets: ["vscode"],
+      },
+    ],
+  };
+  assert.deepEqual(validateClientProjectionDeclarations(manifest), manifest);
+  assert.equal(roleSupportsClient(manifest.roles[0], "github-copilot-vscode"), true);
+  assert.equal(roleSupportsClient(manifest.roles[0], "github-copilot-cli"), false);
+});
+
+test("delegation is enabled only when a destination is supported by the client", () => {
+  const parent = { agent: "APEX Planner", supportedTargets: ["vscode", "github-copilot"] };
+  const worker = { agent: "APEX CodeGen", supportedTargets: ["vscode"] };
+  const edges = [{ from: parent.agent, to: worker.agent, type: "subagent" }];
+  assert.equal(roleDelegatesOnClient(parent, "github-copilot-vscode", [parent, worker], edges), true);
+  assert.equal(roleDelegatesOnClient(parent, "github-copilot-cli", [parent, worker], edges), false);
 });
 
 test("asset generator renders client-valid Requirements projections from one shared body", () => {
@@ -167,17 +219,23 @@ Gather requirements through the kernel.
   const vscode = renderClientAgentProjection(source, "github-copilot-vscode");
   const cli = renderClientAgentProjection(source, "github-copilot-cli");
   assert.match(vscode, /vscode\/askQuestions/u);
+  assert.match(vscode, /target: vscode/u);
   assert.match(vscode, /handoffs:/u);
   assert.match(vscode, /agents:/u);
   assert.match(vscode, /model:\n\s+- Claude Sonnet 5/u);
   assert.match(cli, /\n\s+- ask_user/u);
   assert.match(cli, /\n\s+- task/u);
   assert.match(cli, /model: Claude Sonnet 5/u);
+  assert.match(cli, /target: github-copilot/u);
   assert.match(cli, /disable-model-invocation: false/u);
   assert.doesNotMatch(cli, /vscode\/askQuestions|handoffs:|agents:|argument-hint:/u);
   const marker = "<!-- apex-shared-body -->";
   assert.equal(vscode.slice(vscode.indexOf(marker)), cli.slice(cli.indexOf(marker)));
   assert.notEqual(vscode, cli);
+  assert.throws(
+    () => renderClientAgentProjection(source.replace("name:", "target: vscode\nname:"), "github-copilot-vscode"),
+    /must not declare target/u,
+  );
 });
 
 test("CLI projection keeps hidden workers noninteractive and rejects unpinned APEX operations", () => {
@@ -229,7 +287,14 @@ test("asset generator rejects unsafe projection roots before generation", () => 
         files: [".github/mcp.json"],
       },
     ],
-    roles: [{ id: "coordinator", source: ".github/agents/apex.agent.md", agent: "APEX" }],
+    roles: [
+      {
+        id: "coordinator",
+        source: ".github/agents/apex.agent.md",
+        agent: "APEX",
+        supportedTargets: ["vscode", "github-copilot"],
+      },
+    ],
   };
   for (const root of ["../escaped", "/absolute", "client-projections\\windows", "client-projections/../escape"]) {
     const invalid = structuredClone(base);
