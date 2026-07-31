@@ -1,28 +1,23 @@
 ## Supported Client Qualification Contract
 
 This document defines the client-neutral acceptance contract for GitHub Copilot in VS Code and GitHub Copilot CLI.
-It selects exact client versions and defines qualification evidence. It does not claim either client has passed against
-the re-baselined `0.10.0` implementation.
+It selects a rolling stable client policy and defines qualification evidence. It does not claim either client has passed
+against the re-baselined `0.10.0` implementation.
 
-## Version Selection
+## Version Policy
 
-| Property            | Selected value                                                                           |
-| ------------------- | ---------------------------------------------------------------------------------------- |
-| Copilot CLI release | `1.0.73`                                                                                 |
-| Release source      | [GitHub Copilot CLI v1.0.73](https://github.com/github/copilot-cli/releases/tag/v1.0.73) |
-| Linux x64 artifact  | `copilot-linux-x64.tar.gz`                                                               |
-| Artifact SHA-256    | `8f9bb5f7e364c267265d1e24ac2aea69ed559ddb956719c6db12a353de6c5970`                       |
-| Verification        | Published digest matched; `copilot version` reported `GitHub Copilot CLI 1.0.73`         |
-| npm observation     | `@github/copilot` tag `latest` resolved to `1.0.71-1` on 2026-07-21                      |
-| VS Code release     | `1.130.0`                                                                                |
-| Copilot Chat        | `0.58.0`                                                                                 |
-| Selection evidence  | Content-free completed context matrix receipt, canonical SHA-256 `197cbc48...013f42a`    |
+| Client              | Live qualification policy                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------ |
+| GitHub Copilot CLI  | Latest stable supported release; bind observed version and binary SHA-256 to the candidate |
+| VS Code             | Latest stable supported release; bind observed host version and SHA-256 to the candidate   |
+| Copilot Chat        | Latest stable host-installed release; bind the observed extension version to the candidate |
+| Aggregate invariant | Every scenario uses one consistent observed VS Code, Copilot Chat, and CLI version set     |
+| Historical evidence | Exact context matrix and characterization versions remain immutable                        |
 
-The GitHub release is selected because it was the newest non-draft, non-prerelease release observed at the cutoff and
-its platform artifact was independently digest-checked and executed. The npm channel lag is recorded rather than hidden.
-Final qualification must disable automatic updates and prove the exact selected binary before starting a scenario.
-The VS Code pair is selected from the completed version-bound context matrix and the current stable host observation.
-Selection removes a configuration blocker; it is not live scenario evidence.
+Do not downgrade clients to historical characterization versions. Automatic stable updates are allowed between
+candidates. A candidate remains immutable: every live outcome records observed versions, and the aggregate rejects
+mixed version sets. Version presence alone is not proof; managed projection, capability inventory, executable digest,
+runtime evidence, and scenario semantics must still pass.
 
 ## Support Boundary
 
@@ -62,18 +57,18 @@ Issue #179 characterized hidden-worker controls without changing projections. Th
 and an exact official `1.0.75` release probe exposed the same gap: workers unavailable for model invocation were absent
 from the `task` catalog, while task-callable workers remained directly selectable. ADR-0006 therefore omits autonomous
 workers from the CLI projection. Interactive CLI discovery can satisfy its applicable `CLIENT-002` checks, but
-worker-dependent CLI execution and `CLIENT-005` remain unavailable pending exact-client support and requalification.
+worker-dependent CLI execution and `CLIENT-005` remain unavailable pending supported-client controls and requalification.
 
 Live evidence remains required for every scenario. Production live qualification requires the complete client evidence
 closure, binds it to the exact project and release candidate, and rejects fixture, partial, stale, substituted, duplicate,
-or unreferenced evidence. Collection remains blocked until canonical toolchain configuration selects exact supported
-VS Code and Copilot Chat versions.
+or unreferenced evidence. Collection binds the observed latest-stable clients to the candidate and blocks mixed version
+sets, missing capabilities, or malformed version evidence.
 
 ## Scenario Matrix
 
 | ID           | Required outcome                                                                                                   | VS Code mechanism                                                       | Copilot CLI mechanism                                                                                                |
 | ------------ | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `CLIENT-001` | Exact client and bundle versions are bound before work starts.                                                     | Record VS Code and Copilot Chat versions plus managed-file hashes.      | Run `copilot version` with auto-update disabled and record managed-file hashes.                                      |
+| `CLIENT-001` | Observed client versions and exact bundle hashes are bound before work starts.                                     | Record VS Code and Copilot Chat versions plus managed-file hashes.      | Run `copilot version` and record the binary and managed-file hashes.                                                 |
 | `CLIENT-002` | Repository instructions, target-matched APEX agents, and APEX skills are discovered once with expected visibility. | Inspect workspace discovery, `target: vscode`, and agent/skill pickers. | Use `/env`, `/agent`, and `copilot plugins list --json`; verify `target: github-copilot` in the selected projection. |
 | `CLIENT-003` | Missing input yields the same kernel `needs_input` contract and one typed answer event.                            | Collect through `vscode/askQuestions`.                                  | Collect through interactive `ask_user`; programmatic mode cannot satisfy this scenario.                              |
 | `CLIENT-004` | Only the declared APEX MCP server and exact tool allowlist are available to managed APEX roles.                    | Inspect `.vscode/mcp.json`, startup state, and tool inventory.          | Inspect workspace `.github/mcp.json` or `.mcp.json` with `copilot mcp list --json`; folder trust is required.        |
@@ -91,7 +86,8 @@ Client-projection implementation begins only after the
 workflow owners. The review does not block this qualification contract or version selection.
 
 1. Run each client from a clean consumer workspace against the same exact candidate and generated bundle.
-2. Record supported stable client versions before the first model interaction; an automatic update invalidates the run.
+2. Record the observed stable client versions before the first model interaction. An update during a candidate run
+   invalidates that run; stable updates between candidates are allowed.
 3. Use interactive mode for `CLIENT-003`. Programmatic mode is allowed only for scenarios that cannot request input.
 4. Use explicit tool availability and permission rules. `--allow-all`, `--yolo`, remote sessions, and `/delegate` are
    prohibited.
@@ -118,12 +114,12 @@ collection, comparison, aggregation, strict parsing, confidentiality, and author
 
 ## Completion Gate
 
-Issue [#91](https://github.com/jonathan-vella/apex-vnext/issues/91) completes the Milestone H contract when:
+Historical issue [#91](https://github.com/jonathan-vella/apex-vnext/issues/91) completed the Milestone H baseline when:
 
 - Copilot CLI `1.0.73` is pinned in the canonical toolchain and generated package asset;
 - this matrix is linked from project controls and the testing guide;
 - project-control, JSON, package-asset, Markdown, and link validation pass;
-- the register distinguishes selected-version evidence from still-unavailable client execution.
+- the register distinguished selected-version evidence from then-unavailable client execution.
 
 Milestone J remains open until both clients execute every blocking scenario on one exact candidate and all normalized
 outcomes pass.

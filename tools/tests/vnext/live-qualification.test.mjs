@@ -42,6 +42,15 @@ const hash = "a".repeat(64);
 const otherHash = "b".repeat(64);
 const timestamp = "2026-07-15T08:00:00.000Z";
 const scenarioIds = [...LIVE_QUALIFICATION_SCENARIO_IDS];
+const rollingClientPolicy = {
+  mode: "rolling-observed",
+  preference: "latest-stable-supported",
+  versionBinding: "observed-per-candidate",
+  extensionVersionBinding: "observed-per-candidate",
+  binaryBinding: "sha256-per-candidate",
+  historicalFixtures: "immutable",
+  autoUpdateBetweenCandidates: true,
+};
 const candidate = {
   repository: "https://github.com/jonathan-vella/apex-vnext",
   branch: "main",
@@ -1780,7 +1789,7 @@ test("checkpoint rejects mismatched and malformed adapter identities", async () 
   );
 });
 
-async function vscodeSurfaceFixture(context, { managedHash } = {}) {
+async function vscodeSurfaceFixture(context, { managedHash, policy = rollingClientPolicy } = {}) {
   const root = await mkdtemp(join(tmpdir(), "apex-client-vscode-surface-"));
   context.after(() => rm(root, { recursive: true, force: true }));
   const contractRoot = join(root, "contract");
@@ -1794,7 +1803,7 @@ async function vscodeSurfaceFixture(context, { managedHash } = {}) {
   await writeFile(
     join(contractRoot, "config", "toolchain.v1.json"),
     `${JSON.stringify({
-      core: { vscode: { selectedExactVersion: "1.130.0", selectedExactCopilotChatVersion: "0.58.0" } },
+      clientQualificationPolicy: policy,
     })}\n`,
   );
   await writeFile(join(workspace, ".vscode", "mcp.json"), managed);
@@ -1819,7 +1828,7 @@ async function vscodeSurfaceFixture(context, { managedHash } = {}) {
   return { root, contractRoot, workspace, host: join(root, "bin", "code") };
 }
 
-test("exports exact VS Code host, Copilot Chat, and managed projection binding", async (context) => {
+test("exports observed rolling VS Code host, Copilot Chat, and managed projection binding", async (context) => {
   const fixture = await vscodeSurfaceFixture(context);
   const calls = [];
   const exported = await collectVscodeSurfaceEvidence(
@@ -1830,32 +1839,23 @@ test("exports exact VS Code host, Copilot Chat, and managed projection binding",
       runVscode: (_host, args) => {
         calls.push(args);
         return args[0] === "--version"
-          ? "1.130.0\ncommit\nx64\n"
-          : "Extensions installed on Dev Container: Test:\ngithub.copilot-chat@0.58.0\nexample.unrelated@2.0.0\n";
+          ? "1.131.0\ncommit\nx64\n"
+          : "Extensions installed on Dev Container: Test:\ngithub.copilot-chat@0.59.0\nexample.unrelated@2.0.0\n";
       },
     },
   );
   assert.deepEqual(exported.disposition, { status: "pass" });
-  assert.equal(exported.client.observedVersion, "1.130.0");
+  assert.equal(exported.client.versionPolicy, "rolling-observed");
+  assert.equal(exported.client.versionPreference, "latest-stable-supported");
+  assert.equal(exported.client.observedVersion, "1.131.0");
   assert.match(exported.client.observedHostSha256, /^[0-9a-f]{64}$/u);
-  assert.equal(exported.client.observedExtensionVersion, "0.58.0");
+  assert.equal(exported.client.observedExtensionVersion, "0.59.0");
   assert.equal(exported.workspace.files[0].matches, true);
   assert.deepEqual(calls, [["--version"], ["--list-extensions", "--show-versions"]]);
   assert.doesNotMatch(JSON.stringify(exported), /example\.unrelated|private\/source\/path/u);
 });
 
-test("VS Code surface binding emits specific unavailable client dispositions", async (context) => {
-  const hostMismatchFixture = await vscodeSurfaceFixture(context);
-  const hostMismatch = await collectVscodeSurfaceEvidence(
-    { workspace: "consumer", host: hostMismatchFixture.host },
-    {
-      root: hostMismatchFixture.root,
-      contractRoot: hostMismatchFixture.contractRoot,
-      runVscode: (_host, args) => (args[0] === "--version" ? "1.131.0\ncommit\nx64\n" : "github.copilot-chat@0.58.0\n"),
-    },
-  );
-  assert.equal(hostMismatch.disposition.reasonCode, "HOST_VERSION_MISMATCH");
-
+test("VS Code surface binding requires the rolling Copilot Chat capability", async (context) => {
   const missingFixture = await vscodeSurfaceFixture(context);
   const missing = await collectVscodeSurfaceEvidence(
     { workspace: "consumer", host: missingFixture.host },
@@ -1867,16 +1867,21 @@ test("VS Code surface binding emits specific unavailable client dispositions", a
   );
   assert.equal(missing.disposition.reasonCode, "COPILOT_CHAT_EXTENSION_MISSING");
 
-  const versionFixture = await vscodeSurfaceFixture(context);
-  const versionMismatch = await collectVscodeSurfaceEvidence(
-    { workspace: "consumer", host: versionFixture.host },
-    {
-      root: versionFixture.root,
-      contractRoot: versionFixture.contractRoot,
-      runVscode: (_host, args) => (args[0] === "--version" ? "1.130.0\ncommit\nx64\n" : "github.copilot-chat@0.59.0\n"),
-    },
+  const invalidPolicy = await vscodeSurfaceFixture(context, {
+    policy: { ...rollingClientPolicy, autoUpdateBetweenCandidates: false },
+  });
+  await assert.rejects(
+    collectVscodeSurfaceEvidence(
+      { workspace: "consumer", host: invalidPolicy.host },
+      {
+        root: invalidPolicy.root,
+        contractRoot: invalidPolicy.contractRoot,
+        runVscode: (_host, args) =>
+          args[0] === "--version" ? "1.131.0\ncommit\nx64\n" : "github.copilot-chat@0.59.0\n",
+      },
+    ),
+    /qualification policy is invalid/,
   );
-  assert.equal(versionMismatch.disposition.reasonCode, "COPILOT_CHAT_VERSION_MISMATCH");
 });
 
 test("VS Code surface binding reports managed drift and rejects duplicate extensions", async (context) => {
@@ -1954,7 +1959,7 @@ test("VS Code surface binding reports managed drift and rejects duplicate extens
   );
 });
 
-async function cliSurfaceFixture(context, { selectedHash, managedHash } = {}) {
+async function cliSurfaceFixture(context, { characterizationHash, managedHash, policy = rollingClientPolicy } = {}) {
   const root = await mkdtemp(join(tmpdir(), "apex-client-cli-surface-"));
   context.after(() => rm(root, { recursive: true, force: true }));
   const contractRoot = join(root, "contract");
@@ -1963,6 +1968,7 @@ async function cliSurfaceFixture(context, { selectedHash, managedHash } = {}) {
   const managed = Buffer.from('{"mcpServers":{}}\n');
   const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
   await mkdir(join(contractRoot, "tools", "registry"), { recursive: true });
+  await mkdir(join(contractRoot, "config"), { recursive: true });
   await mkdir(join(workspace, "bin"), { recursive: true });
   await mkdir(join(workspace, ".apex"), { recursive: true });
   await mkdir(join(workspace, ".github"), { recursive: true });
@@ -1973,10 +1979,14 @@ async function cliSurfaceFixture(context, { selectedHash, managedHash } = {}) {
     `${JSON.stringify({
       schemaVersion: "1.0.0",
       client: "github-copilot-cli",
-      clientVersion: "1.0.73",
-      clientBinarySha256: selectedHash ?? digest(binary),
+      characterizationVersion: "1.0.73",
+      characterizationBinarySha256: characterizationHash ?? digest(binary),
       workspaceServer: "apex",
     })}\n`,
+  );
+  await writeFile(
+    join(contractRoot, "config", "toolchain.v1.json"),
+    `${JSON.stringify({ clientQualificationPolicy: policy })}\n`,
   );
   await writeFile(
     join(workspace, ".apex", "customizations.lock.json"),
@@ -1998,7 +2008,7 @@ async function cliSurfaceFixture(context, { selectedHash, managedHash } = {}) {
   return { root, contractRoot, workspace, binaryHash: digest(binary), managedHash: digest(managed) };
 }
 
-test("exports exact CLI binding, managed files, and bounded MCP server names", async (context) => {
+test("exports observed rolling CLI binding, managed files, and bounded MCP server names", async (context) => {
   const fixture = await cliSurfaceFixture(context);
   const calls = [];
   const exported = await collectCliSurfaceEvidence(
@@ -2008,11 +2018,14 @@ test("exports exact CLI binding, managed files, and bounded MCP server names", a
       contractRoot: fixture.contractRoot,
       runCli: (_binary, args) => {
         calls.push(args);
-        return args[0] === "version" ? "GitHub Copilot CLI 1.0.73\n" : '{"mcpServers":{"apex":{"status":"ok"}}}\n';
+        return args[0] === "version" ? "GitHub Copilot CLI 1.0.75\n" : '{"mcpServers":{"apex":{"status":"ok"}}}\n';
       },
     },
   );
   assert.equal(exported.disposition.status, "pass");
+  assert.equal(exported.client.versionPolicy, "rolling-observed");
+  assert.equal(exported.client.versionPreference, "latest-stable-supported");
+  assert.equal(exported.client.observedVersion, "1.0.75");
   assert.equal(exported.client.observedBinarySha256, fixture.binaryHash);
   assert.deepEqual(exported.mcp.servers, ["apex"]);
   assert.equal(exported.workspace.files[0].matches, true);
@@ -2023,8 +2036,8 @@ test("exports exact CLI binding, managed files, and bounded MCP server names", a
   assert.doesNotMatch(JSON.stringify(exported), /private\/source\/path|status.*ok/u);
 });
 
-test("CLI binding mismatch is unavailable and does not inspect MCP", async (context) => {
-  const fixture = await cliSurfaceFixture(context, { selectedHash: "f".repeat(64) });
+test("rolling CLI versions and binary hashes remain source-bound without historical pin rejection", async (context) => {
+  const fixture = await cliSurfaceFixture(context, { characterizationHash: "f".repeat(64) });
   const calls = [];
   const exported = await collectCliSurfaceEvidence(
     { workspace: "consumer", binary: "bin/copilot" },
@@ -2033,14 +2046,16 @@ test("CLI binding mismatch is unavailable and does not inspect MCP", async (cont
       contractRoot: fixture.contractRoot,
       runCli: (_binary, args) => {
         calls.push(args);
-        return "GitHub Copilot CLI 1.0.73\n";
+        return args[0] === "version" ? "GitHub Copilot CLI 1.0.75\n" : '{"mcpServers":{"apex":{}}}\n';
       },
     },
   );
-  assert.equal(exported.disposition.status, "unavailable");
-  assert.equal(exported.disposition.reasonCode, "CLIENT_BINARY_MISMATCH");
-  assert.deepEqual(calls, [["version", "--no-auto-update"]]);
-  assert.equal(exported.mcp.status, "not-run");
+  assert.equal(exported.disposition.status, "pass");
+  assert.deepEqual(calls, [
+    ["version", "--no-auto-update"],
+    ["mcp", "list", "--json", "--no-auto-update", "--no-remote"],
+  ]);
+  assert.equal(exported.mcp.status, "observed");
 
   const versionFixture = await cliSurfaceFixture(context);
   const versionCalls = [];
@@ -2051,14 +2066,31 @@ test("CLI binding mismatch is unavailable and does not inspect MCP", async (cont
       contractRoot: versionFixture.contractRoot,
       runCli: (_binary, args) => {
         versionCalls.push(args);
-        return "GitHub Copilot CLI 1.0.74\n";
+        return args[0] === "version" ? "GitHub Copilot CLI 1.0.76\n" : '{"mcpServers":{"apex":{}}}\n';
       },
     },
   );
-  assert.equal(versionMismatch.disposition.status, "unavailable");
-  assert.equal(versionMismatch.disposition.reasonCode, "CLIENT_VERSION_MISMATCH");
-  assert.deepEqual(versionCalls, [["version", "--no-auto-update"]]);
-  assert.equal(versionMismatch.mcp.status, "not-run");
+  assert.equal(versionMismatch.disposition.status, "pass");
+  assert.deepEqual(versionCalls, [
+    ["version", "--no-auto-update"],
+    ["mcp", "list", "--json", "--no-auto-update", "--no-remote"],
+  ]);
+  assert.equal(versionMismatch.mcp.status, "observed");
+
+  const invalidPolicy = await cliSurfaceFixture(context, {
+    policy: { ...rollingClientPolicy, binaryBinding: "historical-pin" },
+  });
+  await assert.rejects(
+    collectCliSurfaceEvidence(
+      { workspace: "consumer", binary: "bin/copilot" },
+      {
+        root: invalidPolicy.root,
+        contractRoot: invalidPolicy.contractRoot,
+        runCli: () => "GitHub Copilot CLI 1.0.75\n",
+      },
+    ),
+    /qualification policy is invalid/,
+  );
 });
 
 test("CLI surface export reports managed drift and rejects unsafe lock paths", async (context) => {
