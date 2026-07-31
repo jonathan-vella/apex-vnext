@@ -114,6 +114,15 @@ test("typed input recording rejects premature, stale, malformed, duplicate, and 
     service.recordInput({ ...valid, answers: [valid.answers[0]!, valid.answers[0]!] }),
     (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
   );
+  for (const value of ["", "none", "N/A"]) {
+    await assert.rejects(
+      service.recordInput({
+        ...valid,
+        answers: [valid.answers[0]!, { questionId: "requirements", value }],
+      }),
+      (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
+    );
+  }
   const recorded = await service.recordInput(valid);
   assert.deepEqual(recorded, { recorded: true, requestId: pending.request.requestId });
   await assert.rejects(
@@ -126,6 +135,71 @@ test("typed input recording rejects premature, stale, malformed, duplicate, and 
   const inputEvents = events.filter((event) => event.type === "requirements.input-recorded");
   assert.equal(inputEvents.length, 1);
   assert.deepEqual((inputEvents[0]?.payload as { answers?: unknown }).answers, valid.answers);
+});
+
+test("requirements task context includes recorded input and stageable output templates", async () => {
+  const service = new ApexService(await tempRoot());
+  await service.init({ projectId: "demo" });
+  await service.recordRequirementsInput({ workload: "ecommerce", requirements: "99.9% availability; PCI DSS" });
+  const issued = await service.nextTask();
+  assert.equal(issued.status, "task");
+  if (issued.status !== "task") return;
+  const context = await service.taskContext(issued.task.taskId);
+  assert.deepEqual(context.recordedInput, {
+    workload: "ecommerce",
+    requirements: "99.9% availability; PCI DSS",
+  });
+  assert.equal(context.inputs.length, 0);
+  assert.deepEqual(context.outputTemplates.requirements, {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    workload: "ecommerce",
+    environment: "dev",
+    requirements: [
+      {
+        id: "REQ-001",
+        statement: "99.9% availability; PCI DSS",
+        priority: "must",
+        status: "confirmed",
+        source: "recorded-input:requirements",
+      },
+    ],
+    assumptions: [],
+    unknowns: [],
+  });
+  await service.stageArtifact(issued.task.taskId, {
+    kind: "requirements",
+    value: context.outputTemplates.requirements,
+  });
+  await service.stageArtifact(issued.task.taskId, {
+    kind: "sku-manifest",
+    value: context.outputTemplates["sku-manifest"],
+  });
+});
+
+test("requirements template preserves explicit unresolved status", async () => {
+  for (const [requirements, status] of [
+    ["deferred: product owner", "deferred"],
+    ["unknown", "unknown"],
+  ] as const) {
+    const service = new ApexService(await tempRoot());
+    await service.init({ projectId: `demo-${status}` });
+    await service.recordRequirementsInput({ workload: "ecommerce", requirements });
+    const issued = await service.nextTask();
+    assert.equal(issued.status, "task");
+    if (issued.status !== "task") continue;
+    const context = await service.taskContext(issued.task.taskId);
+    const template = context.outputTemplates.requirements as {
+      requirements: Array<{ statement: string; status: string }>;
+    };
+    assert.deepEqual(template.requirements[0], {
+      id: "REQ-001",
+      statement: requirements,
+      priority: "must",
+      status,
+      source: "recorded-input:requirements",
+    });
+  }
 });
 
 test("pending input is reissued after writer transfer", async () => {

@@ -752,8 +752,12 @@ export class ApexService {
       );
       if (requested === undefined) {
         const questions = [
-          { id: "workload", prompt: "What workload should this project deliver?" },
-          { id: "requirements", prompt: "What outcomes and constraints are required?" },
+          { id: "workload", prompt: "Briefly describe the workload and its users." },
+          {
+            id: "requirements",
+            prompt:
+              "List required outcomes and constraints for environment, availability, security/compliance, budget, recovery, operations, and IaC preference. Use 'deferred: <owner>' for undecided items.",
+          },
         ];
         if (!hasValidInputRequestQuestions(questions)) {
           throw new ApexError("APEX_INTERNAL", "Kernel input questions are invalid", EXIT_CODES.internal);
@@ -879,16 +883,33 @@ export class ApexService {
     });
   }
 
-  async taskContext(
-    taskId: string,
-  ): Promise<{ task: TaskEnvelopeV1; inputs: unknown[]; outputRoot: string; status: string; blockers: string[] }> {
+  async taskContext(taskId: string): Promise<{
+    task: TaskEnvelopeV1;
+    inputs: unknown[];
+    recordedInput: Record<string, string | string[]> | null;
+    outputTemplates: Partial<Record<ArtifactKind, unknown>>;
+    outputRoot: string;
+    status: string;
+    blockers: string[];
+  }> {
     const run = await this.currentRun();
     const task = await this.readTask(run, taskId);
     const events = await this.journal(run).replay();
     const route = await this.route(run, events);
+    const outputTemplates: Partial<Record<ArtifactKind, unknown>> = {};
+    if (task.taskType === "requirements") {
+      for (const kind of task.allowedOutputKinds) {
+        if (!SUPPORTED_ARTIFACT_KINDS.includes(kind as ArtifactKind)) {
+          throw new ApexError("APEX_INTERNAL", `Unsupported task output kind: ${kind}`, EXIT_CODES.internal);
+        }
+        outputTemplates[kind as ArtifactKind] = this.outputTemplate(kind as ArtifactKind, run, events);
+      }
+    }
     return {
       task,
       inputs: await Promise.all(task.inputRefs.map((hash) => this.objects.getJson(hash))),
+      recordedInput: task.taskType === "requirements" ? this.recordedRequirementsInput(events) : null,
+      outputTemplates,
       outputRoot: join(this.root, ".apex", "work", run.runId, taskId),
       status: this.completedNodeIds(events).has(task.taskType) ? "completed" : "active",
       blockers: route.blockers,
@@ -2510,6 +2531,79 @@ export class ApexService {
       return [];
     });
     return [...new Set(hashes)];
+  }
+
+  private recordedRequirementsInput(
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+  ): Record<string, string | string[]> | null {
+    const recorded = [...events].reverse().find((event) => event.type === "requirements.input-recorded");
+    const answers = (recorded?.payload as { answers?: unknown } | undefined)?.answers;
+    if (!Array.isArray(answers)) return null;
+    const result: Record<string, string | string[]> = {};
+    for (const answer of answers) {
+      const value = answer as { questionId?: unknown; value?: unknown };
+      if (
+        typeof value.questionId !== "string" ||
+        (typeof value.value !== "string" &&
+          (!Array.isArray(value.value) || value.value.some((item) => typeof item !== "string")))
+      ) {
+        throw new ApexError("APEX_INTERNAL", "Recorded requirements input is invalid", EXIT_CODES.internal);
+      }
+      result[value.questionId] = value.value as string | string[];
+    }
+    return result;
+  }
+
+  private outputTemplate(
+    kind: ArtifactKind,
+    run: RunConfigV1,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+  ): unknown {
+    if (kind === "requirements") {
+      const input = this.recordedRequirementsInput(events);
+      const recordedRequirement = input?.requirements;
+      const requirementStatement =
+        typeof recordedRequirement === "string" ? recordedRequirement : "deferred: requirements owner";
+      const requirementStatus = /^deferred:/iu.test(requirementStatement.trim())
+        ? "deferred"
+        : /^unknown$/iu.test(requirementStatement.trim())
+          ? "unknown"
+          : "confirmed";
+      return {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: run.projectId,
+        workload: input?.workload ?? "",
+        environment: run.environment,
+        requirements: [
+          {
+            id: "REQ-001",
+            statement: requirementStatement,
+            priority: "must",
+            status: requirementStatus,
+            source: "recorded-input:requirements",
+          },
+        ],
+        assumptions: [],
+        unknowns: [],
+      };
+    }
+    if (kind === "sku-manifest") {
+      return {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: run.projectId,
+        environments: [run.environment],
+        services: [],
+        revisions: [
+          {
+            number: 1,
+            createdAt: run.createdAt,
+            sourceHash: events.at(-1)?.hash ?? ZERO_HASH,
+            reason: "Initial requirements capture",
+          },
+        ],
+      };
+    }
+    return { schemaId: ARTIFACTS[kind][1].$id };
   }
 
   private completedNodeIds(events: Awaited<ReturnType<EventJournal["replay"]>>): Set<string> {

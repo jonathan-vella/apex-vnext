@@ -61,8 +61,11 @@ export function validateInputAnswers(questions: QuestionV1[], submitted: InputAn
     if (question.multiSelect === true ? !Array.isArray(value) : typeof value !== "string") {
       throw new Error(`Answer shape does not match question: ${question.id}`);
     }
+    const selected = Array.isArray(value) ? value : [value];
+    if (selected.some((item) => item.trim().length === 0 || /^(?:none|n\/a)$/iu.test(item.trim()))) {
+      throw new Error(`Answer must be explicitly provided or deferred: ${question.id}`);
+    }
     if (question.options !== undefined) {
-      const selected = Array.isArray(value) ? value : [value];
       if (selected.some((item) => !question.options!.includes(item))) {
         throw new Error(`Answer is not a declared option: ${question.id}`);
       }
