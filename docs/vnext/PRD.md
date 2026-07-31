@@ -11,6 +11,7 @@ interfaces; the kernel owns workflow, state, authorization, validation, evidence
 - Support Bicep and Terraform through one track-neutral workflow and equivalent logical outcomes.
 - Ship a clean-installable npm runtime plus managed Copilot customizations with safe update and rollback.
 - Provide equivalent governed workflow outcomes in GitHub Copilot for VS Code and GitHub Copilot CLI.
+- Preserve required Azure and IaC domain knowledge while optimizing managed skill and instruction context.
 - Bind every approval and external operation to exact inputs, state, target, commit, evidence, and expiry.
 - Measure release quality from deterministic events and retain unavailable evidence without inventing claims.
 
@@ -133,6 +134,17 @@ boundaries. VS Code may use direct handoffs and `vscode/askQuestions`; Copilot C
 `ask_user`. Both paths must resolve the kernel-owned `needs_input` contract and record typed answers without relying on
 chat history. Model availability, grants, agents, skills, managed files, and MCP inventory must be qualified per client.
 
+### REQ-GUIDANCE-001: Skill And Instruction Capability Parity
+
+The release must migrate the approved domain behavior of active v1 skills and instructions into managed vNext skills,
+scoped instructions, executable capabilities, contracts, or explicit retirements. Every source must have a target owner,
+consumer map, disposition, replacement proof, rollback or removal gate, and supported-client qualification scenario.
+Concise role skills may route work, but must not silently replace Azure architecture, WAF, ADR, pricing, security,
+governance, IaC pattern, validation, deployment, or diagnostic knowledge with generic model reasoning. Deterministic
+authority belongs in the kernel and capability code; non-deterministic domain guidance must remain discoverable on
+demand. Context optimization must use measured progressive disclosure, shared references, and duplicate removal only
+after semantic and scenario parity passes in both supported clients.
+
 ### REQ-DETERMINISM-001: Deterministic Packaging And Validation
 
 Equivalent inputs must produce byte-stable contracts, rendered artifacts, generated IaC, package tarballs, release
@@ -148,6 +160,24 @@ configuration. Every rule and duplicate cluster must have a current owner, consu
 security boundary, proposed disposition, proof test, and rollback or removal gate. Consolidation must reduce editable
 owners or measured duplication without flattening audience-specific guidance, weakening language-native validation,
 changing required checks, or introducing a generic task/workflow framework.
+
+### REQ-OPTIMIZATION-001: Pre-Agent Repository Optimization
+
+Before managed-agent scenario testing, model comparison, paired-client execution, or live qualification begins, APEX
+must complete a candidate-bound review of npm scripts, every instruction and skill, workspace and package manifests,
+lock and build configuration, GitHub Actions and runtime workflows, and every file at the repository root. The review
+must map owners and consumers; detect errors, gaps, contradictions, dead paths, duplicate authority, and stale content;
+and assess performance, consolidation, shared implementation, maintainability, and retirement opportunities. Proposed
+reductions in lines of code or file count must preserve behavior, diagnostics, security boundaries, provenance, and
+rollback. Each disposition must be implemented or explicitly deferred with an owner, rationale, expiry, and release
+impact. Characterization and unit tests may run during this work, but managed-agent and client scenario testing remains
+blocked until the optimization gate records a completion receipt. A local repository-maintenance controller may execute
+the approved work autonomously outside the APEX runtime when a human supplies a candidate-bound authorization manifest
+with allowed paths, commands, budgets, stop conditions, and expiry. The controller must use fresh bounded tasks, verify
+every diff mechanically, run focused slice checks, and checkpoint each accepted change. It cannot use improvement
+proposals as mutation authority or push, create or merge pull requests, create issues, publish, deploy, or alter the
+terminal verification rules. Full repository validation and managed-agent testing remain a final human-started stage on
+the immutable completion tree.
 
 ### REQ-DOCS-001: Documentation And Lifecycle
 
@@ -182,7 +212,8 @@ and triage outcomes; a noisy automatic adapter remains disabled without weakenin
   color-only meaning.
 - **Privacy:** Telemetry is separate, optional, exportable, and deletable; raw chat history is never scraped or replayed.
 - **Maintainability:** Repository guidance and automation have one canonical owner per concern; generated views and
-  compatibility aliases are validated derivatives rather than parallel editable sources.
+  compatibility aliases are validated derivatives rather than parallel editable sources. Managed skills and
+  instructions use progressive disclosure without removing required domain capability.
 
 ## Exclusions
 
@@ -192,7 +223,9 @@ and triage outcomes; a noisy automatic adapter remains disabled without weakenin
   runtimes.
 - Preview VS Code plugin behavior as a first-release dependency.
 - APM as a package manager or a second runtime distribution authority.
-- Autonomous issue creation, repository edits, pull requests, approvals, releases, or deployments from improvement data.
+- Autonomous issue creation, repository edits, pull requests, approvals, releases, or deployments from improvement data
+  or the APEX runtime. The separately authorized local pre-agent maintenance controller is limited by
+  `REQ-OPTIMIZATION-001`.
 - Transcript scraping or direct promotion of observations into instructions, agents, skills, or code.
 - Azure Resource Manager MCP deployment, cancellation, or budget-write tools in managed APEX workflows.
 - Generic unscoped Bicep destroy or post-approval Terraform plan regeneration.

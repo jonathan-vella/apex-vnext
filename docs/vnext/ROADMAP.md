@@ -15,13 +15,14 @@ Project controls
   -> bounded improvement proof of concept
   -> candidate re-baseline and replacement characterization
   -> independent legacy MCP retirement
-  -> VS Code and Copilot CLI governed workflow parity
   -> ARM MCP pricing replacement
   -> Mermaid and Python diagram migration
   -> bounded improvement operationalization
   -> bundle, validator, hook, and workflow simplification
-  -> active guidance rewrite
-  -> complete exact-head and both-client qualification
+   -> skill and instruction migration, optimization, and active guidance rewrite
+   -> VS Code and Copilot CLI governed workflow implementation mechanics
+   -> pre-agent repository optimization gate
+   -> terminal full validation and managed-agent qualification
   -> maintainer cutover decision
 ```
 
@@ -182,6 +183,85 @@ context. Automated issue creation requires a later explicit decision.
 
 **Historical traceability:** Governance completion plan Phase 5.
 
+## Pre-Agent Testing Repository Optimization Gate
+
+**Outcome:** The complete repository implementation and guidance surface is reviewed, simplified where proven safe,
+and accepted before managed-agent behavior can influence qualification results.
+
+**Requirements:** `REQ-DETERMINISM-001`, `REQ-GUIDANCE-001`, `REQ-MAINTAINABILITY-001`,
+`REQ-OPTIMIZATION-001`, `REQ-QUALITY-001`, `REQ-SECURITY-001`.
+
+**Scope:**
+
+| Surface       | Required review                                                                                                                          |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| npm scripts   | Root and workspace command graph, aliases, duplicate wrappers, startup and CI cost, failure propagation, and unused commands.            |
+| Instructions  | Repository and managed sources, `applyTo` intersections, precedence, contradictions, duplication, context cost, and retirement.          |
+| Skills        | Repository and managed catalogs, consumers, capability parity, routing, progressive disclosure, duplication, gaps, and retirement.       |
+| Package files | Every workspace manifest, lockfile, export map, dependency boundary, build configuration, generated projection, and published-file list. |
+| Workflows     | GitHub Actions, local hooks, runtime workflow manifests, shared actions, permissions, triggers, caches, duplication, and obsolete paths. |
+| Root files    | Every regular and hidden configuration file at repository root, with owner, consumers, purpose, overlap, freshness, and disposition.     |
+
+**Review dimensions:**
+
+- Correctness: find errors, unreachable paths, stale assumptions, missing consumers, inconsistent diagnostics, and
+  unsafe defaults.
+- Coherence: find gaps, contradictions, conflicting authority, duplicated facts, and source/generated drift.
+- Performance: measure command startup, build and validation duration, hook and CI critical paths, package size,
+  loaded context, cache behavior, and unnecessary work.
+- Simplification: consolidate shared behavior, reduce editable owners and duplication, improve boundaries, and reduce lines
+  only when tests prove equivalent behavior and clearer ownership.
+- Retirement: remove or archive unused files, commands, dependencies, guidance, and workflows only after consumer search,
+  negative reintroduction tests, provenance capture, and rollback planning.
+
+**Required evidence:**
+
+1. Produce a machine-readable path inventory covering every scoped file with owner, consumers, classification,
+   findings, disposition, proof, and release impact.
+2. Capture pre-change baselines for behavior, diagnostics, timing, package composition, context, and relevant security
+   boundaries.
+3. Apply changes as independently revertible slices and record accepted deferrals with owner, rationale, expiry, and
+   release impact.
+4. Re-run focused deterministic checks after each slice; reserve full repository validation for terminal verification.
+5. Generate a completion receipt that binds the reviewed tree hash, unresolved findings, measurements, and verdict.
+
+**Autonomous execution design:**
+
+1. A deterministic Node.js controller owns queue selection, Git state, command execution, policy enforcement,
+   checkpoints, and stop decisions. The model never controls the outer loop.
+2. A human creates a run authorization bound to the base commit, issue, allowed paths, protected paths, command allowlist,
+   network policy, file and line budgets, iteration and credit limits, expiry, and permitted local-commit behavior.
+3. The controller requires a clean dedicated worktree and branch, builds the complete inventory, captures baselines, and
+   derives a dependency-ordered queue. It never edits the user's primary worktree.
+4. Each queue item starts a fresh non-interactive Copilot CLI task with JSONL output, no `ask_user`, no remote control,
+   no built-in MCP servers, no GitHub mutation tools, bounded credits, and only the paths and tools required by that item.
+5. After each task, the controller rejects scope escape, protected-file changes, generated-source inversion, unexpected
+   binaries, excessive churn, secrets, and a dirty state not attributable to the current item.
+6. The controller runs only focused format, compile, lint, unit, mutation, or behavior checks selected from the ownership
+   graph. A failed check permits one bounded repair task, then stops for human input.
+7. Accepted slices receive a local commit, measurement delta, inventory update, finding disposition, and hash-linked
+   checkpoint. The next task receives state artifacts, not prior chat history.
+8. The loop stops on ambiguity, missing ownership, conflicting sources of truth, critical or high security findings,
+   repeated failure, budget exhaustion, expired authorization, no ready work, or completion.
+9. The controller cannot push, create or merge pull requests, create issues, approve, release, publish, deploy, run
+   managed-agent scenarios, or execute the full validation suite.
+10. Completion emits an immutable handoff containing the exact tree hash, local commits, findings, deferrals,
+    measurements, focused-check results, and commands required by terminal verification.
+
+**Blocking rule:** Characterization, focused unit, integration, and mutation checks needed by a remediation slice may
+run. No full repository validation, managed-agent scenario test, model comparison, paired-client agent execution, or live
+agent qualification may begin inside the autonomous loop. Milestone J implementation mechanics may proceed, but its
+agent-testing slice remains blocked until the completion receipt is accepted for terminal verification.
+
+Issue [#220](https://github.com/jonathan-vella/apex-vnext/issues/220) owns the repository-wide gate. Issue
+[#219](https://github.com/jonathan-vella/apex-vnext/issues/219) supplies its required skill and instruction migration
+workstream. Issue [#222](https://github.com/jonathan-vella/apex-vnext/issues/222) owns the bounded local controller and
+must pass its safety proof before autonomous remediation begins.
+
+**Exit gate:** Every scoped path has a disposition; no critical or high unresolved correctness, security, contradiction,
+or ownership finding remains; accepted deferrals are explicit; performance regressions are within approved tolerances;
+focused slice checks pass; and the candidate-bound completion receipt is ready for terminal verification.
+
 ## Milestone H: Candidate Re-Baseline And Characterization
 
 **Outcome:** The approved `0.10.0` scope has current decisions, requirements, owners, baselines, and removal gates before
@@ -234,7 +314,11 @@ pass; Terraform state, saved-plan, apply, destroy, and Gate 4 behavior is unchan
 **Outcome:** GitHub Copilot in VS Code and GitHub Copilot CLI drive the same kernel-governed APEX workflow.
 
 **Requirements:** `REQ-DIST-001`, `REQ-STATE-001`, `REQ-CONTRACT-001`, `REQ-WORKFLOW-001`,
-`REQ-CUSTOMIZATION-001`, `REQ-APPROVAL-001`, `REQ-SECURITY-001`, `REQ-DOCS-001`.
+`REQ-CUSTOMIZATION-001`, `REQ-APPROVAL-001`, `REQ-OPTIMIZATION-001`, `REQ-SECURITY-001`, `REQ-DOCS-001`.
+
+**Entry gate:** Managed-agent and paired-client scenario execution cannot begin until the
+[Pre-Agent Testing Repository Optimization Gate](#pre-agent-testing-repository-optimization-gate) passes on the same
+candidate tree. Implementation and deterministic non-agent tests may proceed before that receipt.
 
 **Dependency-complete slices:**
 
@@ -350,12 +434,13 @@ dynamic two-client context and cache samples remain explicitly assigned to Miles
 **Exit gate:** Canonical owners and duplicate definitions decrease; required checks, permissions, triggers, pins,
 diagnostics, artifacts, coverage, and exact-head behavior remain stable; CI, hook, and context baselines do not regress.
 
-## Milestone O: Active Guidance Rewrite
+## Milestone O: Skill And Instruction Migration And Active Guidance Rewrite
 
-**Outcome:** Repository and managed guidance describe the implemented two-client system and point to canonical owners.
+**Outcome:** Repository and managed guidance preserve required domain capability, describe the implemented two-client
+system, minimize measured context, and point to canonical owners.
 
 **Requirements:** `REQ-CUSTOMIZATION-001`, `REQ-CAPABILITY-001`, `REQ-DETERMINISM-001`,
-`REQ-MAINTAINABILITY-001`, `REQ-DOCS-001`.
+`REQ-GUIDANCE-001`, `REQ-MAINTAINABILITY-001`, `REQ-DOCS-001`.
 
 **Dependency-complete slices:**
 
@@ -375,6 +460,20 @@ diagnostics, artifacts, coverage, and exact-head behavior remain stable; CI, hoo
 7. Implement issue #175's managed custom-agent contract refresh: keep shared source roles cross-client, emit explicit
    `target` values in selected-client projections, reject retired or unsupported fields, characterize hidden-worker
    invocation, and prove prompt/tool, discovery, and delegation boundaries in both supported clients.
+8. Inventory every active v1 skill and instruction with its consumers, domain behaviors, target owner, disposition,
+   replacement proof, rollback or removal gate, and both-client scenario coverage.
+9. Preserve domain knowledge through focused managed skills, scoped instructions, on-demand references, typed evidence,
+   or executable capability owners. Keep role skills as routers rather than pretending concise workflow prose replaces
+   Azure, WAF, ADR, IaC pattern, validation, deployment, and diagnostic expertise.
+10. Strengthen schemas and validators where required behavior must be deterministic; do not leave safety, traceability,
+    or approval-critical rules solely in model guidance.
+11. Optimize migrated guidance only after parity passes by removing duplicate authority, sharing references, tightening
+    discovery descriptions, and measuring loaded context and cache behavior in both supported clients.
+12. Add positive scenarios for every retained capability cluster and negative discovery tests for every retired source;
+    block release when a source has neither qualified replacement evidence nor an approved retirement decision.
+
+Issue [#219](https://github.com/jonathan-vella/apex-vnext/issues/219) owns the skill and instruction migration,
+replacement proof, and measured optimization workstream.
 
 Issue #179 found that observed Copilot CLI `1.0.73` behavior cannot make a custom-agent worker both non-selectable and
 explicitly `task`-callable. Issue #180 must resolve that contract gap before Milestone O or paired qualification can
@@ -382,7 +481,30 @@ complete. ADR-0006 resolves the implementation boundary by omitting autonomous w
 worker-dependent CLI scenarios remain unavailable until an exact supported client proves independent controls.
 
 **Exit gate:** Active guidance contains no obsolete MCP, Draw.io, VS Code-only, APM-adoption, or per-IaC SBOM claim;
-generated assets match canonical sources; both clients discover the intended instructions and agents without conflict.
+every active v1 skill and instruction has a proven replacement or approved retirement; retained domain scenarios pass in
+both clients; measured optimization does not reduce semantic coverage; generated assets match canonical sources; both
+clients discover the intended instructions, skills, and agents without conflict.
+
+## Terminal Agent Testing And Validation
+
+**Outcome:** The immutable optimization completion tree receives all deferred full validation and managed-agent
+qualification as the final technical activity before the maintainer cutover decision.
+
+**Entry gate:** The issue #220 completion receipt is accepted, all autonomous-loop processes are stopped, and the exact
+tree hash is frozen. No uncommitted or generated drift is present.
+
+**Order:**
+
+1. Review the autonomous-loop commits, measurements, findings, and accepted deferrals without changing the tree.
+2. Run the full repository, security, package, provenance, and clean-install validation suite on the frozen tree.
+3. Run managed-agent scenarios, model comparisons, paired-client execution, live qualification, and cross-device
+   evidence collection on that same tree.
+4. Bind all results to the tree hash and produce the final qualification verdict.
+5. Treat any file, dependency, configuration, or generated-output change as invalidating the terminal results; return
+   the delta through the bounded optimization loop and restart this terminal stage.
+
+**Exit gate:** Full deterministic validation and managed-agent qualification pass on one unchanged tree, or release is
+blocked with findings returned to the repository optimization queue.
 
 ## Milestone P: Final Qualification And Cutover Decision
 
