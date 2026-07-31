@@ -84,6 +84,10 @@ prior qualification is retained as historical characterization. See
   aggregate from the complete set of collector outcomes without claiming runtime-payload or release closure.
 - Fixed client-closure payload serialization so the emitted qualification uses the exact canonical bytes required by
   evidence-manifest client qualification binding.
+- Added atomic client evidence binding that combines a verified parity closure with exact candidate-bound immutable
+  runtime payloads only after the existing live evidence validator accepts the complete manifest.
+- Fixed runtime source-payload verification to restore the independently bound journal head before replay, allowing the
+  canonical head-free source projection to satisfy complete live evidence closure.
 - Added exact client-qualification candidate receipt generation with clean-worktree, repository, branch, commit,
   release-manifest, runtime-bundle, package-lock, and customization-bundle binding.
 - Added versioned kernel-owned input requests and typed APEX MCP answer recording bound to the exact journal head and
