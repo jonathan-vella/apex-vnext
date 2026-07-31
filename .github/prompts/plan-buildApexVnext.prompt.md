@@ -639,8 +639,8 @@ Verification:
 - `/workspaces/apex/.github/agents/` — role, interaction, model, diagnostics, and operational behavior inventory; rewrite
   as managed workspace agents with direct interactive handoffs and bounded autonomous workers.
 - `/workspaces/apex/.github/skills/` — curate domain knowledge only; remove state mutation and workflow routing.
-- `/workspaces/apex/tools/mcp-servers/azure-pricing/` — preserve only as characterization input; replace active use with
-  direct Microsoft ARM MCP access in supported clients.
+- Custom Azure Pricing MCP — treat Git history and frozen phase-0 evidence as characterization input; use direct
+  Microsoft ARM MCP access in supported clients.
 - `/workspaces/apex/tools/mcp-servers/drawio/` — retain as an optional lazy capability pack outside the critical path.
 - `/workspaces/apex/.devcontainer/` and `/workspaces/apex/.github/workflows/` — toolchain, CI, provenance, and
   branch-maintenance inventory.
