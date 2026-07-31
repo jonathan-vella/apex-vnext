@@ -337,6 +337,24 @@ test("prepares exact paired client workspaces and cleans partial failure", async
   assert.deepEqual(calls, ["github-copilot-cli", "github-copilot-vscode"]);
   assert.equal(preparation.workspaces.cli.clientId, "github-copilot-cli");
   assert.equal(preparation.workspaces.vscode.clientId, "github-copilot-vscode");
+  const installedCli = join(root, "cli", ".apex", "runtime-packages", "node_modules", "@apex", "cli", "dist");
+  await mkdir(installedCli, { recursive: true });
+  await writeFile(join(installedCli, "cli.js"), "console.log(JSON.stringify(process.argv.slice(2)));\n");
+  const launcher = spawnSync(
+    process.execPath,
+    [join(root, "cli", "node_modules", "@apex", "cli", "dist", "cli.js"), "mcp", "serve"],
+    { cwd: join(root, "cli"), encoding: "utf8" },
+  );
+  assert.equal(launcher.status, 0, launcher.stderr);
+  assert.deepEqual(JSON.parse(launcher.stdout), ["mcp", "serve"]);
+  await writeFile(join(installedCli, "cli.js"), 'process.kill(process.pid, "SIGTERM");\n');
+  const terminatedLauncher = spawnSync(
+    process.execPath,
+    [join(root, "cli", "node_modules", "@apex", "cli", "dist", "cli.js")],
+    { cwd: join(root, "cli"), encoding: "utf8" },
+  );
+  assert.equal(terminatedLauncher.signal, null);
+  assert.equal(terminatedLauncher.status, 143);
 
   const failedRoot = join(parent, "failed");
   await assert.rejects(
