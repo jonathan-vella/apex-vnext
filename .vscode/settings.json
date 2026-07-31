@@ -31,7 +31,7 @@
   "json.schemas": [
     {
       "fileMatch": ["docs/vnext/pre-agent-loop/authorization.json"],
-      "url": "./tools/schemas/pre-agent-loop-authorization.schema.json"
+      "url": "./docs/vnext/pre-agent-loop/authorization.schema.json"
     },
     {
       "fileMatch": [".github/data/governance-policy-baseline.fixture.json"],

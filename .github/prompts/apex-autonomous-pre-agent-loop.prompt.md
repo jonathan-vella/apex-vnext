@@ -98,7 +98,7 @@ passes and only with the per-item context and tools declared by its authorizatio
 ## Authorization
 
 A human-authored run authorization is mandatory. It lives at `docs/vnext/pre-agent-loop/authorization.json` and
-validates against the schema delivered by issue #222 at `tools/schemas/pre-agent-loop-authorization.schema.json`.
+validates against the schema delivered by issue #222 at `docs/vnext/pre-agent-loop/authorization.schema.json`.
 Never author, widen, renew, or reinterpret the manifest from inside this loop. Stop and report the exact missing or
 stale fields when it is absent, unparsable, expired, unbound to the verified base commit, or when its recorded context
 hashes no longer match the workspace.

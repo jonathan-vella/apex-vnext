@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/jonathan-vella/apex-vnext/schemas/pre-agent-loop-authorization.schema.json",
   "title": "Pre-Agent Loop Run Authorization",
-  "description": "Human-authored authorization for one bounded unattended repository-maintenance run. Implements DECISION-020 and issue #222. The loop reads this file and never writes it.",
+  "description": "Human-authored authorization for one bounded unattended repository-maintenance run. Implements DECISION-020 and issue #222. The loop reads this file and never writes it. Kept beside its manifest rather than under tools/schemas/ because it is vNext engineering tooling, not a v1 runtime surface tracked by the Phase 0A compatibility matrix.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -29,6 +29,7 @@
     "context_hashes"
   ],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "const": 1 },
     "authorization_id": {
       "type": "string",

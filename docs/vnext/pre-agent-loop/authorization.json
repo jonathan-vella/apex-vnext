@@ -1,5 +1,5 @@
 {
-  "$schema": "../../../tools/schemas/pre-agent-loop-authorization.schema.json",
+  "$schema": "./authorization.schema.json",
   "version": 1,
   "authorization_id": "pre-agent-opt-2026-07-31",
   "authored_by": "jonathan-vella",
@@ -39,7 +39,7 @@
     "package-lock.json",
     "docs/vnext/phase-0a/**",
     "docs/vnext/pre-agent-loop/authorization.json",
-    "tools/schemas/pre-agent-loop-authorization.schema.json"
+    "docs/vnext/pre-agent-loop/authorization.schema.json"
   ],
   "allowed_commands": [
     "git status",
@@ -142,10 +142,10 @@
   ],
   "skill_allowlist": [],
   "context_hashes": {
-    ".github/prompts/apex-autonomous-pre-agent-loop.prompt.md": "a401aeb539cdf1784a1723c7269830dafb3fa7a37af76a99ef9e53223227fea0",
+    ".github/prompts/apex-autonomous-pre-agent-loop.prompt.md": "eb3de1891f5a4340c5b95ba1939150a4ca4df7cbbde4f46d9b182fbb93df162b",
     "AGENTS.md": "dad114b9f59e597437be286a41857d1f94d9666abc99fb118ffc6a7dbb465b9a",
     ".github/copilot-instructions.md": "aff580ed99b7c007caa4b5ce6b6c0670dbc2ccea619177d7d0cb84b0157c5e63",
-    ".vscode/settings.json": "14800586348c0f6c5e41bfbaf7b0c5490dd9550e1e543aac667e9eac2c7d8738",
+    ".vscode/settings.json": "30cbdf32b28aecf68c31d14ba750c488647057e7efce3fbd31af432cfa0e66f0",
     ".github/instructions/agent-skills.instructions.md": "d6e88a7c5ad63db5c5352e304f3c1c1ffa8e8941fa034870d53008b722632c18",
     ".github/instructions/agent-authoring.instructions.md": "f2253cd8f22c6f9eba35f2c7dc44575a1b91f07807b23c8e5379aa9590411e0e",
     ".github/instructions/instructions.instructions.md": "a354e64fb2d294815fee33eb24809076efb0226e0d7b47d3a82e6f003648e19c",
