@@ -228,12 +228,13 @@ APEX installs exactly one selected client projection per workspace; do not reuse
 paired observations.
 
 The composer does not ingest previously generated adapter JSON. It re-derives
-the candidate, runtime, CLI, VS Code, input-journal, and lifecycle records,
-validates adapter identities, and binds them with canonical digests and a
-deterministic checkpoint ID. Client failure blocks interaction; unavailable
-clients block interaction until the named environment action is complete. Exact
-adapters produce explicit pending interactive checkpoints. CLIENT-009 is
-automated and no longer appears as an interactive wait.
+the candidate, runtime, CLI, VS Code, input-journal, restart, writer-transfer,
+and lifecycle records, validates adapter identities, and binds them with
+canonical digests and a deterministic checkpoint ID. Client failure blocks
+interaction; unavailable clients block interaction until the named environment
+action is complete. Exact adapters produce explicit pending interactive
+checkpoints. CLIENT-009 is automated and no longer appears as an interactive
+wait.
 
 For the CLI and VS Code input checkpoints, `kernelStatus` reports whether the
 bound journal is still `pending` or has a `recorded` answer event. The checkpoint
@@ -252,6 +253,16 @@ when both prepared workspaces pass fresh APEX service reconstruction evidence.
 Its interaction `status` remains `pending`: service reconstruction does not prove
 that VS Code or Copilot CLI restarted or restored a UI session. Any changed
 restart state digest changes the checkpoint ID and invalidates an older resume.
+
+The paired `writer-transfer` checkpoint includes `transferStatus: accepted` only
+when both prepared client runs contain fresh, accepted transfer evidence. Each
+adapter must share the exact run identity and customization lock of that client's
+input, restart, and surface adapters, and its accepted owner epoch must increment
+the request epoch by one. A pending transfer in either workspace keeps the paired
+status pending. The interaction `status` also remains `pending`: kernel transfer
+state does not prove which client initiated or accepted the transfer, or that the
+stale writer was rejected. Any changed transfer state changes the checkpoint ID
+and invalidates an older resume.
 
 The checkpoint never accepts assertions, marks scenarios passed, qualifies
 client parity, or qualifies a release. CLI `CLIENT-005` remains an explicit
