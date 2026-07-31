@@ -23,8 +23,8 @@ repository:
   `~/.claude/rules`.
 - `chat.agentFilesLocations` disables `~/.copilot/agents` and
   `~/.claude/agents`.
-- `chat.agentSkillsLocations` disables `~/.copilot/skills` and
-  `~/.claude/skills`.
+- `chat.agentSkillsLocations` disables workspace and user-profile `.agents` and
+  `.claude` skill roots plus `~/.copilot/skills`.
 - `chat.useClaudeMdFile` is set to `false` because this repository uses
   `AGENTS.md`.
 
