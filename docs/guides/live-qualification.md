@@ -330,6 +330,39 @@ validate every immutable runtime journal, attestation, artifact, and evidence
 payload referenced by the outcomes. Do not add the client qualification to live
 release evidence until `validate` accepts that complete payload closure.
 
+To bind that complete payload set, create a path-contained binding manifest:
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "candidatePath": "client-candidate.json",
+  "evidenceManifestPath": "evidence-manifest.json",
+  "evidencePayloadPaths": ["runtime/journal-source.json"],
+  "clientClosurePath": "client-closure/closure.json"
+}
+```
+
+The base evidence manifest must not already contain client outcomes,
+comparisons, or a client qualification. List every payload declared by that base
+manifest. Bind into a new private directory:
+
+```bash
+npm run bind:vnext-client-evidence -- \
+  dist/live-qualification/bound-client-evidence \
+  dist/live-qualification/evidence-binding.json
+```
+
+The binder verifies the candidate shape, base manifest schema, closure self-hash,
+canonical qualification bytes, every declared hash and size, full comparison and
+outcome closure, exact project/candidate binding, and all independently supplied
+runtime payloads. It publishes only after `validateEvidencePayloads` returns no
+findings. The output contains the combined `evidence-manifest.json`, immutable
+payloads named by SHA-256, and a self-hashed `binding.json` index.
+
+Binding proves complete client-parity evidence but still sets
+`qualifiesRelease: false`. Release qualification, deployment, publication, tags,
+and cutover remain separate maintainer-authorized operations.
+
 When the public npm registry is unavailable locally, use an approved registry proxy as a process-scoped override:
 
 ```bash

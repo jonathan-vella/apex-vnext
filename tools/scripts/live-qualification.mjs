@@ -2377,7 +2377,10 @@ export function validateClientRuntimeEvidence(outcomes, entriesByHash, payloadBy
           throw new TypeError("SOURCE_PAYLOAD_MISSING");
         }
       }
-      verifyClientOutcomeRuntimeReceipt(outcome, source);
+      verifyClientOutcomeRuntimeReceipt(outcome, {
+        ...source,
+        head: outcome.execution.rawJournalHead,
+      });
     } catch {
       findings.push(`${prefix}: journal source evidence is invalid`);
     }
