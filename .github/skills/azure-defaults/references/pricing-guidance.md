@@ -463,5 +463,5 @@ If you find a new MCP-vs-API discrepancy, add a row to the
 `## Known MCP bugs` table above with the symptom, the canonical filter
 that works against the Retail Prices API, and a brief root-cause
 hypothesis. Link to a GitHub issue in
-`tools/mcp-servers/azure-pricing` so the underlying bug can be tracked
-and eventually closed.
+this repository so the underlying ARM MCP or Retail Prices API discrepancy can
+be tracked and eventually closed.

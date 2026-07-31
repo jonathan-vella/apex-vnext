@@ -26,8 +26,7 @@ apex/  (APEX)
 ├── tools/
 │   ├── apex-recall/        # Progressive session recall CLI
 │   ├── mcp-servers/
-│   │   ├── azure-pricing/  # Azure Pricing MCP server
-│   │   └── drawio/         # Draw.io MCP server
+│   │   └── drawio/         # Transitional Draw.io MCP server
 │   ├── registry/           # Agent registry + count manifest
 │   ├── schemas/            # JSON schemas
 │   └── scripts/            # Validation and maintenance scripts
