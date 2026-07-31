@@ -1,14 +1,8 @@
 {
   "$schema": "schemas/github-workflow-contract.schema.json",
   "schemaVersion": "1.0.0",
-  "expectedRequiredContexts": [
-    "ci",
-    "External Python tests (apex-recall)",
-    "Analyze (actions)",
-    "Analyze (javascript-typescript)",
-    "Analyze (python)"
-  ],
-  "managedContexts": ["Analyze (actions)", "Analyze (javascript-typescript)", "Analyze (python)"],
+  "expectedRequiredContexts": ["ci", "External Python tests (apex-recall)", "CodeQL"],
+  "managedContexts": ["CodeQL"],
   "actionVersions": {
     "actions/checkout": ["v7"],
     "actions/download-artifact": ["v8"],
