@@ -18,6 +18,7 @@ export const EXPECTED_REQUIRED_CONTEXTS = [
   "Analyze (javascript-typescript)",
   "Analyze (python)",
 ];
+const EXTERNAL_PYTHON_CONTEXT = "External Python tests (apex-recall)";
 
 function canonicalJson(value) {
   if (value === null || typeof value === "boolean" || typeof value === "number" || typeof value === "string") {
@@ -327,7 +328,7 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
   }
 
   const ci = values.get("ci");
-  if (ci?.jobs?.ci?.name !== "ci" || ci?.jobs?.["external-tests"]?.name !== EXPECTED_REQUIRED_CONTEXTS[1]) {
+  if (ci?.jobs?.ci?.name !== "ci" || ci?.jobs?.["external-tests"]?.name !== EXTERNAL_PYTHON_CONTEXT) {
     errors.push("ci workflow must preserve separate required Node and external Python checks");
   }
 
