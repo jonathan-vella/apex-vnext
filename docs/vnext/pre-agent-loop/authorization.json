@@ -141,7 +141,7 @@
     ".github/instructions/code-quality.instructions.md": "5223713c1f411117df41bc6ddfed98ebac33c77bf098a5feaf752a8453e0cba1",
     ".github/instructions/no-hardcoded-counts.instructions.md": "e8370c5108842341f559a91797574d3e9f24ebd50c8362cb8c3341e6ebb40641",
     ".github/instructions/context-optimization.instructions.md": "549a67d43feb89999908f201a6897cbf2771128ab172fa652550e4b3b1680d3e",
-    ".github/hooks/tool-guardian/guard-tool.sh": "31c62c79eeb51e73c3097312b523777678e4d7fcb9561aab3baf8107fa81448d",
+    ".github/hooks/tool-guardian/guard-tool.sh": "a6794985444ac1562f6d12c4a7e123673ced38f1d0bc97172630ee17779c7fd9",
     "skill-metadata-inventory": "ebd49577420fd9bea897020a6f1a8a226e9b37c6445ba8446bef84d6b64ad6dd"
   },
   "notes": "Hashes were computed at authoring time. Re-run tools/scripts/pre-agent-loop-hashes.mjs and update context_hashes after any change to a listed file, including the pending tool-guardian loop-boundary patch. skill-metadata-inventory is the SHA-256 of the concatenated first six lines of every discoverable SKILL.md under .github/skills and customizations/.github/skills. model 'auto' lets the Copilot CLI select; pin an explicit id to make runs reproducible."
