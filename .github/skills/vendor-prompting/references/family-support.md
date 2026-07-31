@@ -25,8 +25,7 @@ Family status determines per-rule severity overrides.
 | `claude-opus`   | enforced      | All Claude rules at default severity               | `Claude Opus 4.8`   |
 | `claude-sonnet` | enforced      | All Claude rules at default severity               | `Claude Sonnet 5`   |
 | `claude-haiku`  | warn-only     | XML structuring + few-shot rules; rest downgraded  | `Claude Haiku 4.5`  |
-| `claude`        | warn-only     | Generic Claude — flag at warn for explicit version | `Claude`            |
-| `gpt-5.5`       | enforced      | All GPT-5.5 rules at default severity              | `GPT-5.5`           |
+| `claude`        | warn-only     | Generic Claude — flag at warn for explicit version | `Claude`            || `gpt-5.6`       | enforced      | GPT-5.5 rules apply (shared OpenAI cohort)           | `GPT-5.6 Sol`       || `gpt-5.5`       | enforced      | All GPT-5.5 rules at default severity              | `GPT-5.5`           |
 | `gpt-5.4`       | enforced      | GPT-5.5 rules apply (shared OpenAI cohort)         | `GPT-5.4`           |
 | `gpt-codex`     | reviewer-only | Decision-log only; no automated enforcement        | `GPT-5.3-Codex`     |
 | `gpt-4o`        | reviewer-only | Legacy; no new enforcement                         | `GPT-4o`            |
