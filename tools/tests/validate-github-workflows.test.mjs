@@ -185,7 +185,7 @@ test("rejects release exact-head, credential, artifact, and authority drift", ()
       mutate(
         path,
         "      - name: Setup Node repository",
-        "      - name: Extra checkout\n        uses: actions/checkout@v6\n        with:\n          ref: main\n      - name: Setup Node repository",
+        "      - name: Extra checkout\n        uses: actions/checkout@v7\n        with:\n          ref: main\n      - name: Setup Node repository",
       ),
     ).some((error) => error.includes("exact candidate")),
   );
@@ -194,7 +194,7 @@ test("rejects release exact-head, credential, artifact, and authority drift", ()
       mutate(
         path,
         "      - name: Upload compact qualification evidence",
-        "      - name: Extra upload\n        uses: actions/upload-artifact@v4\n        with:\n          name: extra\n          path: package-lock.json\n      - name: Upload compact qualification evidence",
+        "      - name: Extra upload\n        uses: actions/upload-artifact@v7\n        with:\n          name: extra\n          path: package-lock.json\n      - name: Upload compact qualification evidence",
       ),
     ).some((error) => error.includes("artifact version or retention drift")),
   );

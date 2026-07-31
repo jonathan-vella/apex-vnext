@@ -90,7 +90,7 @@ export function validateWorkflowText(text) {
   fail(jobs.apply?.needs === "validate_dispatch", "apply must need validate_dispatch");
   fail(jobs.apply?.if === undefined, "apply must not bypass dispatch validation");
   for (const name of ["validate_dispatch", ...PROTECTED]) {
-    const checkoutSteps = steps(jobs[name]).filter((step) => step.uses === "actions/checkout@v6");
+    const checkoutSteps = steps(jobs[name]).filter((step) => step.uses === "actions/checkout@v7");
     fail(
       checkoutSteps.length === 1 &&
         checkoutSteps[0].with?.ref === "${{ inputs.candidate_sha }}" &&
@@ -112,7 +112,7 @@ export function validateWorkflowText(text) {
     "exact lowercase SHA or preview hash guard missing",
   );
   fail(validation.includes("[0-9a-f]{8}-[0-9a-f]{4}-4"), "handoff UUID guard missing");
-  fail(uses(jobs.validate_dispatch).includes("actions/checkout@v6"), "validation checkout must use v6");
+  fail(uses(jobs.validate_dispatch).includes("actions/checkout@v7"), "validation checkout must use v7");
   fail(!text.includes("APEX_PLAN_TRANSPORT_KEY"), "manual transport key is forbidden");
 
   for (const name of PROTECTED) {
@@ -132,7 +132,7 @@ export function validateWorkflowText(text) {
       `${name} isolated APEX runtime missing`,
     );
     fail(job?.["timeout-minutes"] > 0, `${name} timeout missing`);
-    fail(actions.includes("actions/checkout@v6"), `${name} exact checkout action missing`);
+    fail(actions.includes("actions/checkout@v7"), `${name} exact checkout action missing`);
     fail(actions.includes("./.github/actions/setup-node-repo"), `${name} setup action missing`);
     fail(actions.includes("azure/login@v3"), `${name} Azure login version invalid`);
     fail(actions.includes("hashicorp/setup-terraform@v4"), `${name} Terraform setup version invalid`);
@@ -320,7 +320,7 @@ export function validateWorkflowText(text) {
   );
   const returnFallback = applySteps.find((step) => step.name === "Upload bound return fallback");
   fail(
-    returnFallback?.uses === "actions/upload-artifact@v4" &&
+    returnFallback?.uses === "actions/upload-artifact@v7" &&
       returnFallback.with?.path === "apex-live/return-authority.json" &&
       returnFallback.with?.["retention-days"] === 1 &&
       returnFallback.with?.["compression-level"] === 0 &&
@@ -330,7 +330,7 @@ export function validateWorkflowText(text) {
   );
   const evidence = applySteps.find((step) => step.name === "Upload apply evidence");
   fail(
-    evidence?.uses === "actions/upload-artifact@v4" &&
+    evidence?.uses === "actions/upload-artifact@v7" &&
       evidence.with?.path === "apex-live/evidence/" &&
       evidence.with?.["retention-days"] === 1 &&
       evidence.with?.["compression-level"] === 0 &&
@@ -339,7 +339,7 @@ export function validateWorkflowText(text) {
     "apply evidence artifact invalid",
   );
   fail(
-    uses(jobs.apply).filter((action) => action === "actions/upload-artifact@v4").length >= 2,
+    uses(jobs.apply).filter((action) => action === "actions/upload-artifact@v7").length >= 2,
     "apply artifacts invalid",
   );
 
@@ -354,7 +354,7 @@ export function validateWorkflowText(text) {
   ];
   for (const pattern of forbidden) fail(!pattern.test(combined), `forbidden direct mutation found: ${pattern}`);
   const artifactPaths = steps(jobs.apply)
-    .filter((step) => step.uses === "actions/upload-artifact@v4")
+    .filter((step) => step.uses === "actions/upload-artifact@v7")
     .map((step) => String(step.with?.path ?? ""))
     .join("\n");
   fail(
