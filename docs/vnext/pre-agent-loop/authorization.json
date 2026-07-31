@@ -157,7 +157,7 @@
     ".github/instructions/code-quality.instructions.md": "5223713c1f411117df41bc6ddfed98ebac33c77bf098a5feaf752a8453e0cba1",
     ".github/instructions/no-hardcoded-counts.instructions.md": "e8370c5108842341f559a91797574d3e9f24ebd50c8362cb8c3341e6ebb40641",
     ".github/instructions/context-optimization.instructions.md": "549a67d43feb89999908f201a6897cbf2771128ab172fa652550e4b3b1680d3e",
-    ".github/hooks/tool-guardian/guard-tool.sh": "a6794985444ac1562f6d12c4a7e123673ced38f1d0bc97172630ee17779c7fd9",
+    ".github/hooks/tool-guardian/guard-tool.sh": "8b7069d20fcd65906794a80e434953f335f0ad89ef134dff1443a56b14dc92d8",
     "skill-metadata-inventory": "6b3f9bf444488525336821baf17951bb035a9dc95e7c9b42e86dd8349d0f24c3"
   },
   "notes": "Hashes were computed at authoring time. Re-run tools/scripts/pre-agent-loop-hashes.mjs and update context_hashes after any change to a listed file. skill-metadata-inventory is the SHA-256 of each discoverable SKILL.md path plus its YAML frontmatter block, across .github/skills and customizations/.github/skills. allowed_commands entries are prefixes, so denied_commands exists to exclude aggregates such as npm run validate:all that a prefix would otherwise reach; deny always wins. model 'auto' lets the Copilot CLI select; pin an explicit id to make runs reproducible."

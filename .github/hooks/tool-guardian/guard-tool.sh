@@ -191,8 +191,8 @@ PATTERNS=(
 # ---------------------------------------------------------------------------
 if [[ "${APEX_LOOP_GUARD:-}" == "true" ]]; then
   PATTERNS+=(
-    "loop_boundary:::critical:::git push[^&|;]*[[:space:]:](main|master)([^a-zA-Z0-9._/-]|$):::Push only to the dedicated branch named by the run authorization"
-    "loop_boundary:::critical:::git push[[:space:]]+(--force|-f)([^a-zA-Z0-9._/-]|$):::Force-push is never authorized for an unattended run"
+        "loop_boundary:::critical:::git push[^&|;]*[[:space:]:/](main|master)([^a-zA-Z0-9._/-]|$):::Push only to the dedicated branch named by the run authorization"
+    "loop_boundary:::critical:::git push[^&|;]*[[:space:]](--force|-[a-zA-Z]*f):::Force-push is never authorized for an unattended run"
     "loop_boundary:::critical:::git merge:::Merging is reserved for the human reviewer after the loop stops"
     "loop_boundary:::critical:::gh pr (create|merge|close|review|ready):::Pull-request mutation is outside the run authorization"
     "loop_boundary:::critical:::gh issue (create|edit|close|comment|reopen):::Issue mutation is outside the run authorization; report the handoff instead"
