@@ -116,6 +116,55 @@ async function pathExists(path) {
   }
 }
 
+const QUALIFICATION_RUNTIME_LAUNCHER_PATH = "node_modules/@apex/cli/dist/cli.js";
+const QUALIFICATION_RUNTIME_LAUNCHER =
+  'const { spawn } = require("node:child_process");\n' +
+  'const { join } = require("node:path");\n' +
+  'const child = spawn(process.execPath, [join(__dirname, "../../../../.apex/runtime-packages/node_modules/@apex/cli/dist/cli.js"), ...process.argv.slice(2)], { stdio: "inherit" });\n' +
+  'for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal));\n' +
+  'child.once("error", (error) => { console.error(error.message); process.exit(1); });\n' +
+  'child.once("exit", (code, signal) => process.exit(code ?? { SIGINT: 130, SIGTERM: 143 }[signal] ?? 1));\n';
+const APPROVED_NPM_REGISTRY = "https://packagefeedproxy.microsoft.io/npm/";
+
+async function installQualifiedRuntime(workspace, options, root = ROOT) {
+  const releaseManifestPath = candidateInputPath(root, required(options, "release-manifest"));
+  const manifest = parseStrictJson(
+    (await readBoundedRegularFile(releaseManifestPath, MAX_MANAGED_FILE_BYTES, "Release manifest")).toString("utf8"),
+  );
+  if (!Array.isArray(manifest?.packages) || manifest.packages.length === 0) {
+    throw new Error("Qualified runtime package inventory is invalid");
+  }
+  const tarballs = [];
+  for (const entry of manifest.packages) {
+    if (
+      typeof entry?.file !== "string" ||
+      basename(entry.file) !== entry.file ||
+      !entry.file.endsWith(".tgz") ||
+      !SHA256_PATTERN.test(entry.sha256 ?? "") ||
+      !Number.isInteger(entry.bytes) ||
+      entry.bytes < 1
+    ) {
+      throw new Error("Qualified runtime package inventory is invalid");
+    }
+    const tarball = join(dirname(releaseManifestPath), entry.file);
+    const bytes = await readBoundedRegularFile(tarball, MAX_CLI_BINARY_BYTES, "Qualified runtime package");
+    if (bytes.byteLength !== entry.bytes || sha256(bytes) !== entry.sha256) {
+      throw new Error("Qualified runtime package does not match the release manifest");
+    }
+    tarballs.push(tarball);
+  }
+  const runtimeRoot = join(workspace, ".apex", "runtime-packages");
+  await mkdir(runtimeRoot, { recursive: true });
+  await writeFile(join(runtimeRoot, "package.json"), '{"private":true}\n', { flag: "wx" });
+  execFileSync("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund", ...tarballs], {
+    cwd: runtimeRoot,
+    encoding: "utf8",
+    timeout: 120_000,
+    maxBuffer: MAX_CLI_OUTPUT_BYTES,
+    env: { ...process.env, npm_config_registry: APPROVED_NPM_REGISTRY },
+  });
+}
+
 async function lifecycleClient(root, clientId, projectId, serviceFactory) {
   await mkdir(root, { recursive: false });
   const service = serviceFactory(root);
@@ -157,9 +206,13 @@ async function lifecycleClient(root, clientId, projectId, serviceFactory) {
   };
 }
 
-async function prepareClient(root, clientId, projectId, serviceFactory) {
+async function prepareClient(root, clientId, projectId, serviceFactory, installRuntime, options) {
   await mkdir(root, { recursive: false });
   const initialized = await serviceFactory(root).init({ projectId, clientId });
+  await installRuntime(root, options);
+  const launcher = join(root, QUALIFICATION_RUNTIME_LAUNCHER_PATH);
+  await mkdir(dirname(launcher), { recursive: true });
+  await writeFile(launcher, QUALIFICATION_RUNTIME_LAUNCHER, { flag: "wx", mode: 0o700 });
   if (
     initialized?.projectId !== projectId ||
     typeof initialized?.runId !== "string" ||
@@ -186,6 +239,7 @@ export async function collectWorkspacePreparation(
   {
     collectCandidate = (input) => collectCurrentCandidate(input),
     serviceFactory = (root) => new ApexService(root),
+    installRuntime = options["release-manifest"] === undefined ? async () => {} : installQualifiedRuntime,
     remove = rm,
   } = {},
 ) {
@@ -202,12 +256,21 @@ export async function collectWorkspacePreparation(
   assertCheckpointCandidate(candidate);
   await mkdir(root, { recursive: false });
   try {
-    const cli = await prepareClient(join(root, "cli"), "github-copilot-cli", "qualification-cli", serviceFactory);
+    const cli = await prepareClient(
+      join(root, "cli"),
+      "github-copilot-cli",
+      "qualification-cli",
+      serviceFactory,
+      installRuntime,
+      options,
+    );
     const vscode = await prepareClient(
       join(root, "vscode"),
       "github-copilot-vscode",
       "qualification-vscode",
       serviceFactory,
+      installRuntime,
+      options,
     );
     const preparation = {
       schemaVersion: "1.0.0",
@@ -341,10 +404,18 @@ async function verifyPreparedWorkspace(root, expected) {
   ) {
     throw new Error("Prepared workspace no longer matches its receipt");
   }
-  await assertPreparedWorkspaceInventory(
-    root,
-    projection.files.map(({ path }) => path),
+  const launcher = await readBoundedRegularFile(
+    join(root, QUALIFICATION_RUNTIME_LAUNCHER_PATH),
+    MAX_MANAGED_FILE_BYTES,
+    "Prepared runtime launcher",
   );
+  if (launcher.toString("utf8") !== QUALIFICATION_RUNTIME_LAUNCHER) {
+    throw new Error("Prepared runtime launcher does not match its contract");
+  }
+  await assertPreparedWorkspaceInventory(root, [
+    ...projection.files.map(({ path }) => path),
+    QUALIFICATION_RUNTIME_LAUNCHER_PATH,
+  ]);
 }
 
 async function assertPreparedWorkspaceInventory(root, managedFiles) {
