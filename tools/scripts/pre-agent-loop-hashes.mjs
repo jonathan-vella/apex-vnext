@@ -11,6 +11,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { globSync, readFileSync, writeFileSync } from "node:fs";
 import process from "node:process";
 
@@ -50,6 +51,13 @@ function main() {
   if (write) {
     manifest.context_hashes = computed;
     writeFileSync(MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
+    // JSON.stringify expands short arrays that Prettier keeps inline, which would
+    // fail the repository format check on the next commit.
+    try {
+      execFileSync("npx", ["prettier", "--write", "--log-level", "warn", MANIFEST], { stdio: "inherit" });
+    } catch {
+      console.warn(`⚠️  Prettier unavailable — run 'npx prettier --write ${MANIFEST}' before committing`);
+    }
     console.log(`✅ Rewrote ${drifted.length} context hash(es) in ${MANIFEST}`);
     return;
   }

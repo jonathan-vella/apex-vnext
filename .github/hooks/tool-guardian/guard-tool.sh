@@ -9,6 +9,7 @@
 #   SKIP_TOOL_GUARD      - "true" to disable entirely (default: unset)
 #   TOOL_GUARD_LOG_DIR   - Directory for guard logs (default: logs/copilot/tool-guardian)
 #   TOOL_GUARD_ALLOWLIST - Comma-separated patterns to skip (default: unset)
+#   APEX_LOOP_GUARD      - "true" to add unattended-loop boundaries (default: unset)
 
 set -euo pipefail
 
@@ -121,7 +122,7 @@ case "$TOOL_NAME" in
 esac
 
 # ---------------------------------------------------------------------------
-# Threat patterns (6 categories, ~20 patterns)
+# Threat patterns
 #
 # Each entry: "CATEGORY:::SEVERITY:::REGEX:::SUGGESTION"
 # Uses ::: as delimiter to avoid conflicts with regex pipe characters
@@ -179,6 +180,26 @@ PATTERNS=(
   # Bypass safety
   "bypass_safety:::high:::--no-verify:::Do not bypass git hooks or verification checks"
 )
+
+# ---------------------------------------------------------------------------
+# Unattended-loop boundaries (opt-in).
+#
+# These deny operations that are routine in an interactive session but sit
+# outside the authorization of an unattended automation run. The controller
+# exports APEX_LOOP_GUARD=true for its own runs, so a normal chat session keeps
+# full access to `gh`, merges, and branch operations.
+# ---------------------------------------------------------------------------
+if [[ "${APEX_LOOP_GUARD:-}" == "true" ]]; then
+  PATTERNS+=(
+    "loop_boundary:::critical:::git push[^&|;]*[[:space:]:](main|master)([[:space:]]|$):::Push only to the dedicated branch named by the run authorization"
+    "loop_boundary:::critical:::git push[[:space:]]+(--force|-f)([[:space:]]|$):::Force-push is never authorized for an unattended run"
+    "loop_boundary:::critical:::git merge:::Merging is reserved for the human reviewer after the loop stops"
+    "loop_boundary:::critical:::gh pr (create|merge|close|review|ready):::Pull-request mutation is outside the run authorization"
+    "loop_boundary:::critical:::gh issue (create|edit|close|comment|reopen):::Issue mutation is outside the run authorization; report the handoff instead"
+    "loop_boundary:::critical:::gh release (create|edit|delete):::Release operations are reserved for the human release stage"
+    "loop_boundary:::high:::npm run validate:all:::Full validation is reserved for the human validation stage"
+  )
+fi
 
 # ---------------------------------------------------------------------------
 # Fast path: a single combined-alternation grep decides whether ANY pattern

@@ -110,7 +110,7 @@ The manifest must bind:
 
 | Field                                  | Purpose                                                                                                                                                                 |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `base_commit`, `issues[]`              | Authorized issue set and verified base. `base_commit` may be the literal `origin/main`, which bootstrap resolves once and freezes into the first checkpoint              |
+| `base_commit`, `issues[]`              | Authorized issue set and verified base. `base_commit` may be the literal `origin/main`, which bootstrap resolves once and freezes into the first checkpoint             |
 | `worktree`, `branch`, `upstream`       | Isolated worktree, dedicated branch, and its matching `origin` upstream                                                                                                 |
 | `allowed_paths[]`, `protected_paths[]` | Path policy applied to every launched task                                                                                                                              |
 | `allowed_commands[]`, `network`        | Command allowlist and network policy                                                                                                                                    |
@@ -133,6 +133,9 @@ Never raise a ceiling the manifest set explicitly.
 | Wall clock      | 4 hours per invocation                            |
 | Credits         | 150 launched-task premium requests per invocation |
 | Expiry          | 72 hours from manifest creation                   |
+
+Count a pure rename by its content change, not by the delete-plus-add the diff shows, so archiving one directory does
+not trip the line ceiling.
 
 Authorization covers conventional commits and fast-forward pushes to the dedicated branch on `origin`. It never covers
 pushing to `main` or another branch, force-push, pull-request or issue mutation, merge, approval, publication,
