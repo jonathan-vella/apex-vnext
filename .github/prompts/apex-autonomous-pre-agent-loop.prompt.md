@@ -2,34 +2,17 @@
 name: "apex-autonomous-pre-agent-loop"
 description: "Automate APEX on a dedicated branch, push checkpoints, and stop before agent testing and validation."
 agent: agent
-model: "Claude Opus 5"
+model: "GPT-5.5"
 argument-hint: "Optional: an existing authorization manifest path, its dedicated branch, or an authorized issue subset. Never widens the manifest."
 tools: [execute/runInTerminal, read, search, edit, todo]
 ---
 
 # Automate APEX Before Agent Testing
 
-<investigate_before_answering>
-Treat the current repository, GitHub issues, and merged project controls as authoritative. Verify the branch, exact
-heads, worktrees, dirty files, open pull requests, issue state, and existing controller artifacts before changing
-anything. Read only the files needed for the current bounded item. Prefer executable evidence over prose claims.
-</investigate_before_answering>
+Role: You supervise a deterministic local controller that performs bounded repository maintenance on one authorized
+branch, and you stop the run before any project validation or managed-agent testing.
 
-<context_awareness>
-This loop outlives one context window. Durable state lives in `docs/vnext/pre-agent-loop/`, in Git history, and on the
-dedicated remote branch, never in this conversation. Re-read the authorization, queue, and latest checkpoint after any
-compaction, restart, or resume instead of trusting recalled state. When remaining context can no longer hold one full
-slice plus its focused check, write a checkpoint, push it, and stop with an exact resume pointer.
-</context_awareness>
-
-<output_contract>
-Run or resume the authorized pre-agent automation loop. Complete as many dependency-ready bounded items as policy and
-budget permit. Leave hash-linked checkpoints, focused-check evidence, commits, measurements, and an exact resume
-pointer under `docs/vnext/pre-agent-loop/`. Commit and push every recoverable checkpoint to the dedicated branch. On
-completion, emit the issue #220 handoff and stop before validation or any managed-agent testing.
-</output_contract>
-
-## Mission
+# Goal
 
 Automate the repository work required by issues #222, #220, and #219 in dependency order:
 
@@ -42,6 +25,37 @@ Automate the repository work required by issues #222, #220, and #219 in dependen
 Do not replace the controller with one long unrestricted autopilot editing session. VS Code autopilot supervises the
 bootstrap, recovery, and evidence review; the deterministic controller owns queue selection, policy, Git state,
 commands, checkpoints, and stop decisions once its safety proof passes.
+
+# Success criteria
+
+A run is finished, rather than merely stopped, when all of the following hold:
+
+- Every scoped path carries an owner, classification, disposition, and proof in `inventory.json`.
+- Every accepted slice has a focused-check result, a measurement delta, a conventional commit, and a pushed checkpoint
+  whose remote SHA matches local.
+- Each retirement has consumer-migration proof, provenance, rollback steps, and a negative reintroduction check.
+- No protected path changed, no aggregate validation ran outside the audited-script carve-out, and no managed-agent
+  scenario ran.
+- The completion handoff exists, is bound to the final pushed tree hash, and names the commands reserved for the user.
+
+When budget, expiry, or context runs out first, the run is resumable rather than finished: leave a checkpoint, a pushed
+commit, and an exact resume pointer.
+
+# Constraints
+
+## Evidence and retrieval budget
+
+Treat the current repository, GitHub issues, and merged project controls as authoritative. Chat history, memory, and
+recalled state are not authorities. Verify branch, exact heads, worktrees, dirty files, open pull requests, issue
+state, and existing controller artifacts before changing anything, and prefer executable evidence over prose claims.
+
+Read only what the current bounded item needs. Start from the item's declared paths; read further only when a required
+fact, owner, consumer, date, or identifier is still missing. Re-reading to improve phrasing or collect nonessential
+context spends budget without changing a disposition.
+
+This loop outlives one context window. Durable state lives in `docs/vnext/pre-agent-loop/`, in Git history, and on the
+dedicated remote branch. After any compaction, restart, or resume, re-read the authorization, queue, and latest
+checkpoint rather than trusting recalled state.
 
 ## Binding Authorities
 
@@ -140,6 +154,8 @@ not trip the line ceiling.
 Authorization covers conventional commits and fast-forward pushes to the dedicated branch on `origin`. It never covers
 pushing to `main` or another branch, force-push, pull-request or issue mutation, merge, approval, publication,
 deployment, release, destructive cloud operations, final validation, or managed-agent testing.
+
+# Method
 
 ## Bootstrap
 
@@ -321,6 +337,8 @@ For each dependency-ready item:
 Continue without asking for confirmation while the next item is unambiguous, authorized, within budget, and all focused
 checks pass. Stop instead of guessing when ownership, intent, safety, or compatibility is unclear.
 
+# Boundaries
+
 ## Reserved Testing And Validation
 
 The user owns final testing and validation after all autonomous work is complete. Do not run any of the following inside
@@ -359,6 +377,12 @@ stop and report the unexpected command instead of bypassing it.
 - Never discard, reset, overwrite, or clean changes not created by this run.
 - Before and after each push, verify the current branch, upstream, local SHA, remote SHA, and absence of unexpected files.
 
+# Output
+
+Run or resume the authorized loop, completing as many dependency-ready items as policy and budget permit. Every run
+leaves hash-linked checkpoints, focused-check evidence, commits, and measurements under `docs/vnext/pre-agent-loop/`,
+with each recoverable checkpoint pushed to the dedicated branch.
+
 ## Completion Handoff
 
 When every scoped path has a disposition and no ready remediation remains, write the issue #220 completion handoff to
@@ -376,7 +400,21 @@ Commit and push the completion handoff, verify that local and remote SHAs match,
 branch and file for the user to post to issue #220; never comment on or edit the issue from this loop. Any later
 mutation invalidates the handoff and must re-enter this loop.
 
-## Stop Rules
+## Final Response
+
+Report only:
+
+- Run state: completed, stopped, blocked, or resumable.
+- Authorization, worktree, branch, upstream, base, local SHA, and confirmed remote SHA.
+- Queue items and pushed commits completed during this invocation.
+- Focused checks and measurement deltas.
+- Findings, deferrals, blockers, and remaining budget.
+- Checkpoint and completion-handoff paths.
+- The exact next resume action or terminal-stage handoff.
+
+Do not claim that the project is validated or that its agents pass testing.
+
+# Stop rules
 
 Stop immediately and checkpoint when:
 
@@ -400,17 +438,3 @@ Stop immediately and checkpoint when:
 - A checkpoint push fails or the remote SHA cannot be confirmed.
 - Remaining context cannot hold one full slice plus its focused check.
 - The completion handoff is written and the tree is frozen.
-
-## Final Response
-
-Report only:
-
-- Run state: completed, stopped, blocked, or resumable.
-- Authorization, worktree, branch, upstream, base, local SHA, and confirmed remote SHA.
-- Queue items and pushed commits completed during this invocation.
-- Focused checks and measurement deltas.
-- Findings, deferrals, blockers, and remaining budget.
-- Checkpoint and completion-handoff paths.
-- The exact next resume action or terminal-stage handoff.
-
-Do not claim that the project is validated or that its agents pass testing.
