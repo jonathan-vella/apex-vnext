@@ -10,18 +10,18 @@
   ],
   "managedContexts": ["Analyze (actions)", "Analyze (javascript-typescript)", "Analyze (python)"],
   "actionVersions": {
-    "actions/checkout": ["v6", "v7"],
+    "actions/checkout": ["v7"],
     "actions/download-artifact": ["v8"],
     "actions/github-script": ["v9"],
     "actions/setup-python": ["v6"],
-    "actions/upload-artifact": ["v4", "v7"],
+    "actions/upload-artifact": ["v7"],
     "azure/login": ["v3"],
     "devcontainers/ci": ["v0.3"],
     "hashicorp/setup-terraform": ["v4"],
     "peter-evans/create-pull-request": ["v8"]
   },
   "localActions": {
-    ".github/actions/setup-node-repo/action.yml": "3bcfc010a947e1f53b2cdd17872025ce6bfb32804a9450290c652ed1f1e38445",
+    ".github/actions/setup-node-repo/action.yml": "16d513b787574744c65350192978410b636bcbd1e2734688c7ba48fd8eb7ca97",
     ".github/actions/setup-python-validation/action.yml": "e458a774a10318bfbaec0f05929cf114a7fcbfdd161eff4a41f3e461ec64a812"
   },
   "workflows": [
@@ -95,7 +95,7 @@
       "triggerDigest": "267a76bf9976b37b8267e70d277289467c5e081a07130713e09f99650755fac5",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "bdd6cdc37cac967d7dda65b5fff59194bf1863652b0568584fa8e665c5192351",
+      "jobsDigest": "ef151f8720accb255a4fa5992b91062461084e75733aa11951976fa9f1159ffa",
       "jobs": { "qualify": "Exact-head release qualification" }
     },
     {
@@ -133,7 +133,7 @@
       "triggerDigest": "e3ded6e02ec4d49557432b3b0d6fba9b1e37aa8136ebb240386c6d72546b4ec9",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "ac5c13ccbc116722f751295746c3c0d50eb7a8c994519ad66f4c2ed00f8ecc81",
-      "jobsDigest": "b16ee385f64d867ebb17a551a570e0c13e85f34e476dfec3a3af7f044a6f9d2e",
+      "jobsDigest": "e967c3cc5bbac5969a5346436a7609e56d5eb41f53a419d3b7b49952089f9489",
       "jobs": {
         "validate_dispatch": "Validate exact dispatch",
         "apply": "Import local Gate 4 approval and deploy exact preview"

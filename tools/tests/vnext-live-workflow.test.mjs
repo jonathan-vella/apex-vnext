@@ -326,7 +326,7 @@ rejectsMutation(
 );
 rejectsMutation(
   "wrong upload action version fails",
-  (text) => text.replace("actions/upload-artifact@v4", "actions/upload-artifact@v3"),
+  (text) => text.replace("actions/upload-artifact@v7", "actions/upload-artifact@v6"),
   "apply artifacts invalid",
 );
 rejectsMutation(
@@ -346,8 +346,8 @@ rejectsMutation(
 );
 rejectsMutation(
   "wrong checkout action version fails",
-  (text) => text.replace("actions/checkout@v6", "actions/checkout@v5"),
-  "checkout must use v6",
+  (text) => text.replace("actions/checkout@v7", "actions/checkout@v6"),
+  "checkout must use v7",
 );
 rejectsMutation(
   "wrong checkout ref fails",
