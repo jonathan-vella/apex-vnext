@@ -11,7 +11,7 @@ Validated by `scripts/validate-branch-naming.sh` and `scripts/validate-branch-sc
 
 | Prefix          | Allowed File Paths                                      |
 | --------------- | ------------------------------------------------------- |
-| `docs/`         | `site/`, `README.md`, `CONTRIBUTING.md`, `CHANGELOG.md` |
+| `docs/`         | `docs/`, `README.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `GLOSSARY.md` |
 | `agents/`       | `customizations/.github/agents/`, `customizations/manifest.json` |
 | `skills/`       | `.github/skills/`                                       |
 | `infra/`        | `infra/`                                                |
