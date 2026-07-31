@@ -53,7 +53,9 @@ const EXPECTED_ARTIFACTS = {
   "02-waf-scores.svg": { required: false, step: 2 },
   // Step 3 — Design
   "03-des-cost-estimate.md": { required: false, step: 3 },
-  "03-des-diagram.drawio": { required: false, step: 3 },
+  "03-des-diagram.py": { required: false, step: 3 },
+  "03-des-diagram.png": { required: false, step: 3 },
+  "03-des-diagram.svg": { required: false, step: 3 },
   "03-des-cost-distribution.py": { required: false, step: 3 },
   "03-des-cost-distribution.png": { required: false, step: 3 },
   "03-des-cost-distribution.svg": { required: false, step: 3 },
@@ -67,8 +69,6 @@ const EXPECTED_ARTIFACTS = {
   // Step 4 — IaC Plan
   "04-implementation-plan.md": { required: true, step: 4 },
   "04-preflight-check.md": { required: false, step: 4 },
-  "04-dependency-diagram.drawio": { required: false, step: 4 },
-  "04-runtime-diagram.drawio": { required: false, step: 4 },
   "04-dependency-diagram.py": { required: false, step: 4 },
   "04-dependency-diagram.png": { required: false, step: 4 },
   "04-dependency-diagram.svg": { required: false, step: 4 },
@@ -88,7 +88,9 @@ const EXPECTED_ARTIFACTS = {
   "07-compliance-matrix.md": { required: false, step: 7 },
   "07-ab-cost-estimate.md": { required: false, step: 7 },
   // Step 7 — As-Built diagrams & charts
-  "07-ab-diagram.drawio": { required: false, step: 7 },
+  "07-ab-diagram.py": { required: false, step: 7 },
+  "07-ab-diagram.png": { required: false, step: 7 },
+  "07-ab-diagram.svg": { required: false, step: 7 },
   "07-ab-cost-distribution.py": { required: false, step: 7 },
   "07-ab-cost-distribution.png": { required: false, step: 7 },
   "07-ab-cost-distribution.svg": { required: false, step: 7 },
@@ -163,32 +165,29 @@ function scoreArtifactCompleteness() {
   let total = 0;
   const missing = [];
 
-  const alternativeGroups = [
+  const artifactGroups = [
     {
       required: true,
       names: [
-        "04-dependency-diagram.drawio",
-        "04-runtime-diagram.drawio",
         "04-dependency-diagram.py",
+        "04-dependency-diagram.png",
+        "04-dependency-diagram.svg",
         "04-runtime-diagram.py",
+        "04-runtime-diagram.png",
+        "04-runtime-diagram.svg",
       ],
-      satisfied: () => {
-        const hasDrawio =
-          fileExists(path.join(OUTPUT_DIR, "04-dependency-diagram.drawio")) &&
-          fileExists(path.join(OUTPUT_DIR, "04-runtime-diagram.drawio"));
-        const hasPython =
-          fileExists(path.join(OUTPUT_DIR, "04-dependency-diagram.py")) &&
-          fileExists(path.join(OUTPUT_DIR, "04-runtime-diagram.py"));
-        return hasDrawio || hasPython;
-      },
+      satisfied: () =>
+        ["04-dependency-diagram", "04-runtime-diagram"].every((stem) =>
+          ["py", "png", "svg"].every((extension) => fileExists(path.join(OUTPUT_DIR, `${stem}.${extension}`))),
+        ),
       label: "step-4-diagrams",
     },
   ];
 
-  const handledAlternatives = new Set(alternativeGroups.flatMap((group) => group.names));
+  const handledArtifacts = new Set(artifactGroups.flatMap((group) => group.names));
 
   for (const [name, spec] of Object.entries(EXPECTED_ARTIFACTS)) {
-    if (handledAlternatives.has(name)) {
+    if (handledArtifacts.has(name)) {
       continue;
     }
 
@@ -209,7 +208,7 @@ function scoreArtifactCompleteness() {
     }
   }
 
-  for (const group of alternativeGroups) {
+  for (const group of artifactGroups) {
     total++;
     if (group.satisfied()) {
       found++;

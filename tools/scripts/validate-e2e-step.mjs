@@ -163,18 +163,18 @@ function preValidateStep(step) {
     if (matches.length < spec.minFiles) {
       findings.push(`Expected ≥${spec.minFiles} files matching ${spec.pattern}, found ${matches.length}`);
     }
+    for (const file of ["07-ab-diagram.py", "07-ab-diagram.png", "07-ab-diagram.svg"]) {
+      if (!fileExists(path.join(OUTPUT_DIR, file))) findings.push(`Missing as-built diagram artifact: ${file}`);
+    }
   } else if (step === 3) {
     const adrMatches = globFiles(OUTPUT_DIR, "03-des-*.md");
-    const hasDrawio = fileExists(path.join(OUTPUT_DIR, "03-des-diagram.drawio"));
-    const hasLegacyPython = globFiles(OUTPUT_DIR, "03-des-*.py").length > 0;
+    const diagramFiles = ["03-des-diagram.py", "03-des-diagram.png", "03-des-diagram.svg"];
 
     if (adrMatches.length === 0) {
       findings.push(`No files matching 03-des-*.md in ${OUTPUT_DIR}`);
     }
-    if (!hasDrawio && !hasLegacyPython) {
-      findings.push(
-        `Missing design diagram artifact: expected 03-des-diagram.drawio or legacy 03-des-*.py in ${OUTPUT_DIR}`,
-      );
+    for (const file of diagramFiles) {
+      if (!fileExists(path.join(OUTPUT_DIR, file))) findings.push(`Missing design diagram artifact: ${file}`);
     }
   } else if (step === 4) {
     const planPath = path.join(OUTPUT_DIR, spec.file);
@@ -187,15 +187,11 @@ function preValidateStep(step) {
       }
     }
 
-    const hasDrawio =
-      fileExists(path.join(OUTPUT_DIR, "04-dependency-diagram.drawio")) &&
-      fileExists(path.join(OUTPUT_DIR, "04-runtime-diagram.drawio"));
-    const hasLegacyPython =
-      fileExists(path.join(OUTPUT_DIR, "04-dependency-diagram.py")) &&
-      fileExists(path.join(OUTPUT_DIR, "04-runtime-diagram.py"));
-
-    if (!hasDrawio && !hasLegacyPython) {
-      findings.push("Missing Step 4 diagrams: expected Draw.io or legacy Python diagram source files");
+    for (const stem of ["04-dependency-diagram", "04-runtime-diagram"]) {
+      for (const extension of ["py", "png", "svg"]) {
+        const file = `${stem}.${extension}`;
+        if (!fileExists(path.join(OUTPUT_DIR, file))) findings.push(`Missing Step 4 diagram artifact: ${file}`);
+      }
     }
   } else if (spec.files) {
     // Multiple specific files (e.g., Step 3, 3.5)

@@ -290,13 +290,14 @@ unavailable to managed agents, typed arithmetic and meter semantics pass, and no
 **Dependency-complete slices:**
 
 1. Route inline flow, sequence, state, ER, and compact documentation diagrams to Mermaid. Issue #168 freezes this route;
-   active consumers migrate later.
+   issue #173 migrates active consumers.
 2. Route standalone architecture, network, dependency, runtime, as-built, WAF, cost, and compliance outputs to Python.
-   Issue #168 freezes this route; active consumers migrate later.
+   Issue #168 freezes this route; issue #173 migrates active consumers.
 3. Generalize existing golden scenarios into format-neutral node, edge, zone, label, legend, and accessibility manifests.
    Issue #168 implements explicit semantic coverage and reconciles three contradictory legacy fields: G3 routing, G5
    management-group count, and G6 resource bounds.
 4. Update artifact contracts, templates, prompts, workflow manifests, validators, benchmarks, and Markdown consumers.
+   Issue #173 migrates these active surfaces and adds fail-closed consumer drift validation.
 5. Qualify editable source, deterministic rendering, semantic coverage, nonblank output, dimensions, clipping, overlap,
    labels, latency, security, and maintenance at the declared pack threshold.
 6. Archive and remove Draw.io MCP, skill, assets, tests, and setup only after every replacement criterion passes.

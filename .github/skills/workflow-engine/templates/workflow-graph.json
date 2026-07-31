@@ -58,7 +58,7 @@
       "name": "Design (optional)",
       "agent": "04-Design",
       "requires": ["gate-2"],
-      "produces": ["03-des-diagram.drawio", "03-des-adr-*.md"],
+      "produces": ["03-des-diagram.py", "03-des-diagram.png", "03-des-diagram.svg", "03-des-adr-*.md"],
       "gate": null,
       "optional": true,
       "challenger": {
@@ -295,7 +295,10 @@
         "07-compliance-matrix.md",
         "07-backup-dr-plan.md",
         "07-resource-inventory.md",
-        "07-documentation-index.md"
+        "07-documentation-index.md",
+        "07-ab-diagram.py",
+        "07-ab-diagram.png",
+        "07-ab-diagram.svg"
       ],
       "mutates": ["sku-manifest.json", "sku-manifest.md"],
       "gate": null,

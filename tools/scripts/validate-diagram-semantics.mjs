@@ -8,7 +8,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 
 const REGISTRY_PATH = "tools/registry/diagram-semantics.v1.json";
 const SCHEMA_PATH = "tools/registry/schemas/diagram-semantics.schema.json";
-const EXPECTED_SHA256 = "d5050ddd3d06a8a7503a6a9e4d79e28203ce0925c80c01b9bc20829f939af8eb";
+const EXPECTED_SHA256 = "4583eaa567c42fe59285160243ba182c519750c88214d5d57d9d1576d42b0760";
 const EXPECTED_IDS = [
   "g1-three-tier-web",
   "g2-hub-spoke-landing-zone",
@@ -77,6 +77,30 @@ function canonicalValue(value) {
   return value;
 }
 
+export function validateActiveConsumers(consumers, readText = (filePath) => readFileSync(filePath, "utf8")) {
+  const errors = [];
+  const ids = consumers.map(({ id }) => id);
+  if (new Set(ids).size !== ids.length) errors.push("active diagram consumer IDs are not unique");
+
+  for (const consumer of consumers) {
+    let content;
+    try {
+      content = readText(consumer.path);
+    } catch {
+      errors.push(`${consumer.id}: active consumer is missing or unreadable`);
+      continue;
+    }
+    if (!consumer.allowTransitionalReferences && /\.drawio\b|draw\.io/i.test(content)) {
+      errors.push(`${consumer.id}: active consumer references transitional Draw.io output`);
+    }
+    for (const marker of consumer.requiredMarkers) {
+      if (!content.includes(marker)) errors.push(`${consumer.id}: required marker ${marker} is missing`);
+    }
+  }
+
+  return errors.sort();
+}
+
 export function validateDiagramSemantics(registry, schema) {
   const errors = [];
   const ajv = new Ajv2020({ allErrors: true, strict: true });
@@ -88,6 +112,7 @@ export function validateDiagramSemantics(registry, schema) {
     .digest("hex");
   if (digest !== EXPECTED_SHA256) errors.push("canonical diagram semantic manifest drifted");
   if (JSON.stringify(registry.routing) !== JSON.stringify(EXPECTED_ROUTING)) errors.push("diagram routing drifted");
+  errors.push(...validateActiveConsumers(registry.activeConsumers));
   const ids = registry.scenarios.map(({ id }) => id);
   if (JSON.stringify(ids) !== JSON.stringify(EXPECTED_IDS) || new Set(ids).size !== ids.length) {
     errors.push("format-neutral scenario coverage drifted");
