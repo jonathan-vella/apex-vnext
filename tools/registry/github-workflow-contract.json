@@ -42,8 +42,12 @@
       "triggerDigest": "5c375602c9ef5d8ec711bfa7db1aaaf0484d84e8339627fa7f3bcb8de81edbb6",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "9ee55750e40280687661c9292d8ea9163745cfd5669160d787edf335fd5b1411",
-      "jobs": { "ci": "ci", "external-tests": "External Python tests (apex-recall + azure-pricing MCP)" }
+      "jobsDigest": "4986b450915ca9d43a136bee8b2fdb44a7ce9f0217c6ec745cf32b094b113c97",
+      "jobs": {
+        "ci": "ci",
+        "external-tests": "External Python tests (apex-recall)",
+        "external-tests-legacy": "External Python tests (apex-recall + azure-pricing MCP)"
+      }
     },
     {
       "id": "docs",
