@@ -61,6 +61,8 @@ test("MCP registers only narrow tools and calls the service", async () => {
     "taskContext",
     "validateTask",
   ]);
+  assert.match(tools.tools.find(({ name }) => name === "nextTask")?.description ?? "", /needs_input/u);
+  assert.match(tools.tools.find(({ name }) => name === "taskContext")?.description ?? "", /exact task\.taskId/u);
   const response = await client.callTool({ name: "status", arguments: {} });
   assert.equal(response.isError, undefined);
   assert.equal((response.structuredContent as { run: { projectId: string } }).run.projectId, "demo");

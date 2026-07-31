@@ -52,11 +52,21 @@ export function createMcpServer(service: ApexService): McpServer {
     { description: "Read one capability pack status", inputSchema: { pack: z.string() } },
     async ({ pack }) => result(await service.capabilityStatus(pack)),
   );
-  server.registerTool("nextTask", { description: "Get the next constrained workflow task" }, async () =>
-    result(await service.nextTask()),
+  server.registerTool(
+    "nextTask",
+    {
+      description:
+        "Get the next workflow result. Handle needs_input before requesting context; only status=task returns a task.taskId.",
+    },
+    async () => result(await service.nextTask()),
   );
-  server.registerTool("taskContext", { inputSchema: { taskId: z.string() } }, async ({ taskId }) =>
-    result(await service.taskContext(taskId)),
+  server.registerTool(
+    "taskContext",
+    {
+      description: "Read context only for the exact task.taskId returned by nextTask with status=task.",
+      inputSchema: { taskId: z.string() },
+    },
+    async ({ taskId }) => result(await service.taskContext(taskId)),
   );
   server.registerTool(
     "recordInput",

@@ -176,6 +176,8 @@ The dispositions below apply only to the product contract bound to
 | `REQ-CAPABILITY-001`    | Automated pass          | Fault collectors and transactional pack lifecycle; capability owners              |
 | `REQ-SECURITY-001`      | Accepted pass           | Exact-main equivalent review, audits, SBOM, and provenance; security              |
 | `REQ-CUSTOMIZATION-001` | Manual pending          | Static bundle checks pass; supported VS Code behavior remains; VS Code experience |
+| `REQ-GUIDANCE-001`      | Not assessed            | Historical candidate predates skill and instruction migration requirement         |
+| `REQ-OPTIMIZATION-001`  | Not assessed            | Historical candidate predates the pre-agent repository optimization gate          |
 | `REQ-DETERMINISM-001`   | Automated pass          | Double-pack, checksums, CI, and release qualification; release engineering        |
 | `REQ-DOCS-001`          | Automated pass          | Lifecycle documentation, compatibility matrix, and docs validation; docs          |
 | `REQ-IMPROVE-001`       | Automated pass          | Bounded observation, proposal, authority, retention, and injection tests; quality |

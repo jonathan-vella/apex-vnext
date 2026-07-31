@@ -349,3 +349,26 @@ the former golden fixtures and regression tests are intentionally removed with t
   registry is introduced.
 - **ADR:** Not required unless a later slice changes a hosted trust boundary or public command contract.
 - **Issue/PR:** [#93](https://github.com/jonathan-vella/apex-vnext/issues/93).
+
+## DECISION-020: Use A Bounded Local Controller For Pre-Agent Optimization
+
+- **Date:** 2026-07-31
+- **Owner:** Repository maintainers and quality engineering
+- **Context:** Issue #220 requires broad inventory, remediation, measurement, and retirement work before terminal agent
+  testing. Manual phase gates prevent unattended progress, while DECISION-004 correctly denies the APEX runtime and
+  improvement proposals repository-mutation authority.
+- **Options:** Keep all remediation manual; use one long unrestricted autopilot session; grant APEX self-modification;
+  use a deterministic local controller that launches fresh bounded coding tasks.
+- **Choice:** Build a local Node.js controller outside the APEX runtime. A human authorizes one candidate-bound run; the
+  controller selects dependency-ready work, launches a fresh constrained Copilot CLI task per item, verifies diffs,
+  runs focused checks, records local commits and measurements, and stops before full validation or agent testing.
+- **Rationale:** Fresh tasks and a deterministic outer loop bound context, permissions, cost, and failure propagation.
+  Dedicated worktrees, path and command policy, mechanical diff checks, and hash-linked checkpoints make unattended
+  progress resumable without turning model output into authority.
+- **Consequences:** The controller cannot consume inert improvement proposals as authorization, modify its own active
+  policy, use unrestricted tool permissions, write through MCP, mutate GitHub, push, merge, approve, publish, deploy, or
+  run terminal verification. Any ambiguity, scope escape, protected-file change, repeated check failure, security
+  finding, or exhausted budget stops the run. DECISION-004 and DECISION-017 remain unchanged for the product runtime.
+- **ADR:** Required before implementation because this introduces a new repository-mutation and automation boundary.
+- **Issue/PR:** [#222](https://github.com/jonathan-vella/apex-vnext/issues/222); issue
+  [#220](https://github.com/jonathan-vella/apex-vnext/issues/220) owns the parent optimization gate.
