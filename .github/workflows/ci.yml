@@ -100,14 +100,3 @@ jobs:
 
       - name: Run apex-recall test suite
         run: npm run test:apex-recall
-
-  external-tests-legacy:
-    name: External Python tests (apex-recall + azure-pricing MCP)
-    needs: external-tests
-    if: ${{ always() }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Preserve legacy required context during migration
-        env:
-          EXTERNAL_TESTS_RESULT: ${{ needs.external-tests.result }}
-        run: test "$EXTERNAL_TESTS_RESULT" = "success"
