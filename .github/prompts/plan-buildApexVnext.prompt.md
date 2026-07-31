@@ -646,7 +646,8 @@ Verification:
   branch-maintenance inventory.
 - `/workspaces/apex/tests/` and `/workspaces/apex/tools/tests/` — characterization failures, scenarios, and fixtures to
   preserve or replace deliberately.
-- `/workspaces/apex/site/` — keep v1 accurate during development and add minimum versioned vNext content before cutover.
+- Astro documentation site — maintain it in its separate repository; produce a documentation handoff instead of
+   creating or updating `site/` in this workspace.
 
 **Global verification**
 
