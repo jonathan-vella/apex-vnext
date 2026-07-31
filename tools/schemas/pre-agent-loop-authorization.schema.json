@@ -1,6 +1,6 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/jonathan-vella/apex-vnext/tools/schemas/pre-agent-loop-authorization.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jonathan-vella/apex-vnext/schemas/pre-agent-loop-authorization.schema.json",
   "title": "Pre-Agent Loop Run Authorization",
   "description": "Human-authored authorization for one bounded unattended repository-maintenance run. Implements DECISION-020 and issue #222. The loop reads this file and never writes it.",
   "type": "object",
@@ -19,6 +19,7 @@
     "allowed_paths",
     "protected_paths",
     "allowed_commands",
+    "denied_commands",
     "network",
     "launcher",
     "budgets",
@@ -60,7 +61,17 @@
     "upstream": { "type": "string", "pattern": "^origin/" },
     "allowed_paths": { "type": "array", "minItems": 1, "items": { "type": "string" } },
     "protected_paths": { "type": "array", "minItems": 1, "items": { "type": "string" } },
-    "allowed_commands": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "allowed_commands": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "Command prefixes the controller may run. A prefix match is sufficient, so denied_commands must exclude any aggregate the prefix would otherwise reach."
+    },
+    "denied_commands": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Command prefixes that are refused even when allowed_commands matches. Deny always wins."
+    },
     "network": {
       "type": "object",
       "additionalProperties": false,
@@ -122,7 +133,7 @@
     },
     "context_hashes": {
       "type": "object",
-      "description": "SHA-256 of each context input, keyed by repository-relative path. Bootstrap stops on any mismatch.",
+      "description": "SHA-256 of each context input. Keys are repository-relative paths, or a derived key such as 'skill-metadata-inventory' whose value is computed by tools/scripts/pre-agent-loop-hashes.mjs. Bootstrap stops on any mismatch.",
       "minProperties": 1,
       "additionalProperties": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
     },

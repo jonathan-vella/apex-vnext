@@ -93,6 +93,22 @@
     "find",
     "wc"
   ],
+  "denied_commands": [
+    "npm run validate:all",
+    "npm test",
+    "gh pr",
+    "gh issue create",
+    "gh issue edit",
+    "gh issue comment",
+    "gh issue close",
+    "gh release",
+    "git merge",
+    "git push --force",
+    "git push -f",
+    "git rebase",
+    "git reset --hard",
+    "git clean"
+  ],
   "network": {
     "policy": "deny"
   },
@@ -126,7 +142,7 @@
   ],
   "skill_allowlist": [],
   "context_hashes": {
-    ".github/prompts/apex-autonomous-pre-agent-loop.prompt.md": "cbe7eec7f5fa66ba100faed7224e46b3a7d059ea709b9fcd2c6ef418f91cb085",
+    ".github/prompts/apex-autonomous-pre-agent-loop.prompt.md": "a401aeb539cdf1784a1723c7269830dafb3fa7a37af76a99ef9e53223227fea0",
     "AGENTS.md": "dad114b9f59e597437be286a41857d1f94d9666abc99fb118ffc6a7dbb465b9a",
     ".github/copilot-instructions.md": "aff580ed99b7c007caa4b5ce6b6c0670dbc2ccea619177d7d0cb84b0157c5e63",
     ".vscode/settings.json": "14800586348c0f6c5e41bfbaf7b0c5490dd9550e1e543aac667e9eac2c7d8738",
@@ -142,7 +158,7 @@
     ".github/instructions/no-hardcoded-counts.instructions.md": "e8370c5108842341f559a91797574d3e9f24ebd50c8362cb8c3341e6ebb40641",
     ".github/instructions/context-optimization.instructions.md": "549a67d43feb89999908f201a6897cbf2771128ab172fa652550e4b3b1680d3e",
     ".github/hooks/tool-guardian/guard-tool.sh": "a6794985444ac1562f6d12c4a7e123673ced38f1d0bc97172630ee17779c7fd9",
-    "skill-metadata-inventory": "ebd49577420fd9bea897020a6f1a8a226e9b37c6445ba8446bef84d6b64ad6dd"
+    "skill-metadata-inventory": "6b3f9bf444488525336821baf17951bb035a9dc95e7c9b42e86dd8349d0f24c3"
   },
-  "notes": "Hashes were computed at authoring time. Re-run tools/scripts/pre-agent-loop-hashes.mjs and update context_hashes after any change to a listed file, including the pending tool-guardian loop-boundary patch. skill-metadata-inventory is the SHA-256 of the concatenated first six lines of every discoverable SKILL.md under .github/skills and customizations/.github/skills. model 'auto' lets the Copilot CLI select; pin an explicit id to make runs reproducible."
+  "notes": "Hashes were computed at authoring time. Re-run tools/scripts/pre-agent-loop-hashes.mjs and update context_hashes after any change to a listed file. skill-metadata-inventory is the SHA-256 of each discoverable SKILL.md path plus its YAML frontmatter block, across .github/skills and customizations/.github/skills. allowed_commands entries are prefixes, so denied_commands exists to exclude aggregates such as npm run validate:all that a prefix would otherwise reach; deny always wins. model 'auto' lets the Copilot CLI select; pin an explicit id to make runs reproducible."
 }

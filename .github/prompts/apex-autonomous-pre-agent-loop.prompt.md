@@ -108,18 +108,18 @@ never widens one.
 
 The manifest must bind:
 
-| Field                                  | Purpose                                                                                                                                                                 |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `base_commit`, `issues[]`              | Authorized issue set and verified base. `base_commit` may be the literal `origin/main`, which bootstrap resolves once and freezes into the first checkpoint             |
-| `worktree`, `branch`, `upstream`       | Isolated worktree, dedicated branch, and its matching `origin` upstream                                                                                                 |
-| `allowed_paths[]`, `protected_paths[]` | Path policy applied to every launched task                                                                                                                              |
-| `allowed_commands[]`, `network`        | Command allowlist and network policy                                                                                                                                    |
-| `launcher`                             | Absolute `copilot` binary path, pinned version, and model id                                                                                                            |
-| `budgets`                              | File, line, iteration, wall-clock, and credit ceilings                                                                                                                  |
-| `expires_at`, `stop_conditions[]`      | Expiry and any additional stop triggers                                                                                                                                 |
-| `checkpoint_policy`                    | Commit and push frequency                                                                                                                                               |
-| `context_hashes`                       | Hashes of this prompt, `AGENTS.md`, `.github/copilot-instructions.md`, applicable instructions, VS Code discovery settings, and the discovered skill metadata inventory |
-| `skill_allowlist`                      | Per-item skill IDs; the default is empty                                                                                                                                |
+| Field                                                | Purpose                                                                                                                                                                       |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `base_commit`, `issues[]`                            | Authorized issue set and verified base. `base_commit` may be the literal `origin/main`, which bootstrap resolves once and freezes into the first checkpoint                   |
+| `worktree`, `branch`, `upstream`                     | Isolated worktree, dedicated branch, and its matching `origin` upstream                                                                                                       |
+| `allowed_paths[]`, `protected_paths[]`               | Path policy applied to every launched task                                                                                                                                    |
+| `allowed_commands[]`, `denied_commands[]`, `network` | Command allowlist, deny overrides, and network policy. Allowlist entries are prefixes, so `denied_commands` must exclude any aggregate a prefix would reach. Deny always wins |
+| `launcher`                                           | Absolute `copilot` binary path, pinned version, and model id                                                                                                                  |
+| `budgets`                                            | File, line, iteration, wall-clock, and credit ceilings                                                                                                                        |
+| `expires_at`, `stop_conditions[]`                    | Expiry and any additional stop triggers                                                                                                                                       |
+| `checkpoint_policy`                                  | Commit and push frequency                                                                                                                                                     |
+| `context_hashes`                                     | Hashes of this prompt, `AGENTS.md`, `.github/copilot-instructions.md`, applicable instructions, VS Code discovery settings, and the discovered skill metadata inventory       |
+| `skill_allowlist`                                    | Per-item skill IDs; the default is empty                                                                                                                                      |
 
 When a budget field is absent, apply the conservative default below and record the substitution in the checkpoint.
 Never raise a ceiling the manifest set explicitly.
