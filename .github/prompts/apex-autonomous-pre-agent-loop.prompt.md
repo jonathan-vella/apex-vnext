@@ -92,7 +92,7 @@ The approved authorization must bind:
 - Expiry and stop conditions.
 - The dedicated remote branch and checkpoint frequency.
 - Hashes for this prompt, `AGENTS.md`, `.github/copilot-instructions.md`, applicable instructions, VS Code discovery
-    settings, and the discovered skill metadata inventory.
+  settings, and the discovered skill metadata inventory.
 - A per-item skill allowlist. The default is empty.
 
 Authorization includes conventional commits and pushes to the dedicated branch on `origin`. It never includes pushing
@@ -104,7 +104,7 @@ release, destructive cloud operations, final validation, or managed-agent testin
 1. Verify that local `main` equals `origin/main`; fetch without rewriting local work. Do not commit on `main`.
 2. Inventory every worktree and preserve all changes not created by this run.
 3. Capture the effective instruction, skill, agent, prompt, hook, and extension customization inventory from VS Code
-    diagnostics or deterministic workspace settings. Stop on an unknown user or extension contribution.
+   diagnostics or deterministic workspace settings. Stop on an unknown user or extension contribution.
 4. Hash the effective context inputs and bind them into the authorization before mutation.
 5. Create or resume the dedicated authorized branch from the verified `origin/main` base in an isolated worktree.
 6. Publish the dedicated branch to `origin` with upstream tracking after its first checkpoint commit.
@@ -112,7 +112,7 @@ release, destructive cloud operations, final validation, or managed-agent testin
 8. Inspect issue #222 and existing controller code before implementing anything.
 9. Implement the smallest controller slice needed to prove one safety property at a time.
 10. Run focused controller checks for authorization binding, path protection, command allowlisting, budgets, expiry,
-   checkpoint integrity, diff rejection, and every stop condition.
+    checkpoint integrity, diff rejection, and every stop condition.
 11. Do not start issue #220 remediation until the issue #222 safety proof passes.
 
 If VS Code cannot edit the dedicated worktree, stop after creating it and report the exact path and resume command. Do
@@ -128,14 +128,14 @@ The controller must:
 4. Restrict each item to its allowed paths, tools, command budget, and acceptance checks.
 5. Start each item with no skills. Load only skill IDs named by that item's allowlist and record their content hashes.
 6. Reject context-input drift, an undeclared skill or instruction, protected-file changes, scope escape, unexpected
-    binaries, generated-source inversion, excessive churn,
+   binaries, generated-source inversion, excessive churn,
    secrets, and unattributed dirty state.
 7. Run focused format, compile, lint, unit, mutation, or behavior checks for the changed slice only.
 8. Permit one bounded repair attempt when a focused check fails, then stop with evidence.
 9. Record accepted slices as local commits with measurement deltas and hash-linked checkpoints.
 10. Push every checkpoint commit to the dedicated upstream branch before selecting another queue item.
 11. Stop on ambiguity, missing ownership, contradictory sources, security findings, repeated failure, exhausted budget,
-   expired authorization, no ready work, or completion.
+    expired authorization, no ready work, or completion.
 12. Emit an immutable completion handoff bound to the final pushed tree hash.
 
 ## Repository Review Queue
@@ -171,15 +171,15 @@ For each retirement:
 1. Prove all active consumers are removed or migrated and the replacement or approved omission is documented.
 2. Record the removal gate and focused negative reintroduction check before moving the source.
 3. Move retained historical material under `.archive/retired-vnext/<surface>/` while preserving useful relative
-    structure. Never modify frozen `docs/vnext/phase-0a/**` evidence.
+   structure. Never modify frozen `docs/vnext/phase-0a/**` evidence.
 4. Add or update archive metadata with the original path, source commit and content hash, retirement date, rationale,
-    replacement owner, related issue or decision, active-reference exclusions, and exact rollback steps.
+   replacement owner, related issue or decision, active-reference exclusions, and exact rollback steps.
 5. Remove the retired surface from active discovery, package contents, build graphs, workflows, hooks, documentation,
-    generators, and validation inputs where applicable.
+   generators, and validation inputs where applicable.
 6. Prefer archival over deletion when content has historical, provenance, rollback, or audit value. Delete only generated
-    or reproducible debris with no audit value and record that disposition in the inventory.
+   or reproducible debris with no audit value and record that disposition in the inventory.
 7. Commit and push the archive move together with its consumer migration and focused proof. Do not archive first and
-    leave active consumers broken in a later commit.
+   leave active consumers broken in a later commit.
 
 Archived content is historical evidence. Do not allow `.archive/**` to become an active runtime, package, discovery, or
 configuration source.
@@ -231,7 +231,7 @@ stop and report the unexpected command instead of bypassing it.
 - Keep all autonomous mutations in the dedicated worktree and authorized branch.
 - Commit regularly and push every commit only to the dedicated branch's matching upstream on `origin`.
 - Never commit directly to `main`, push to `main`, merge into `main`, rebase or force-push published history, or change
-    branch protection.
+  branch protection.
 - Do not create or edit issues, create or edit pull requests, merge, approve, tag, publish, or release.
 - Do not deploy or invoke mutating cloud commands.
 - Do not bypass hooks, checks, branch protection, or security controls.
@@ -260,16 +260,16 @@ Stop immediately and checkpoint when:
 
 - Authorization is absent, expired, exhausted, or does not cover the next action.
 - The effective prompt, instruction, skill, agent, hook, extension, or discovery-setting inventory differs from the
-    authorization snapshot.
+  authorization snapshot.
 - The worktree is dirty from another source or the verified base changed.
 - The current branch is `main`, the upstream is not the matching dedicated `origin` branch, or a push would target any
-    other ref.
+  other ref.
 - A task changes a protected or unauthorized path.
 - A critical or high security concern appears.
 - Sources of truth conflict or ownership is missing.
 - The focused check still fails after one repair attempt.
 - A merge, pull-request or issue mutation, validation, agent test, deployment, publication, release, or destructive
-    action would be next.
+  action would be next.
 - A checkpoint push fails or the remote SHA cannot be confirmed.
 - The completion handoff is written and the tree is frozen.
 
