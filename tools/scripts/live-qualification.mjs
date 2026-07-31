@@ -706,6 +706,51 @@ function assertRestartAdapter(value, clientId, projectId) {
   }
 }
 
+function assertTransferAdapter(value, clientId, projectId) {
+  const { evidenceId, ...content } = value ?? {};
+  const accepted = value?.status === "accepted";
+  const sourceKeys = accepted
+    ? "acceptedEventHash,acceptedOwnerEpoch,acceptedPayloadHash,claimHash,customizationLockSha256,eventCount,journalHead,managedFiles,ownershipDigest,requestEventHash,requestOwnerEpoch,requestPayloadHash"
+    : "claimHash,customizationLockSha256,eventCount,journalHead,managedFiles,requestEventHash,requestOwnerEpoch,requestPayloadHash";
+  if (
+    value?.schemaVersion !== "1.0.0" ||
+    value.adapter !== "apex-writer-transfer-v1" ||
+    value?.client?.id !== clientId ||
+    value.projectId !== projectId ||
+    typeof value.runId !== "string" ||
+    !RUN_ID_PATTERN.test(value.runId) ||
+    !["pending", "accepted"].includes(value.status) ||
+    value.qualifiesClientParity !== false ||
+    value.qualifiesRelease !== false ||
+    !SHA256_PATTERN.test(evidenceId ?? "") ||
+    evidenceId !== sha256Json(content) ||
+    Object.keys(value).sort().join(",") !==
+      "adapter,client,evidenceId,projectId,qualifiesClientParity,qualifiesRelease,runId,schemaVersion,source,status" ||
+    Object.keys(value.client ?? {})
+      .sort()
+      .join(",") !== "id" ||
+    Object.keys(value.source ?? {})
+      .sort()
+      .join(",") !== sourceKeys ||
+    !Number.isInteger(value.source?.managedFiles) ||
+    value.source.managedFiles < 1 ||
+    value.source.managedFiles > 256 ||
+    !Number.isInteger(value.source?.eventCount) ||
+    value.source.eventCount < 1 ||
+    value.source.eventCount > 4096 ||
+    !Number.isInteger(value.source?.requestOwnerEpoch) ||
+    value.source.requestOwnerEpoch < 1 ||
+    (accepted && value.source.acceptedOwnerEpoch !== value.source.requestOwnerEpoch + 1) ||
+    Object.entries(value.source).some(
+      ([key, item]) =>
+        !["eventCount", "managedFiles", "requestOwnerEpoch", "acceptedOwnerEpoch"].includes(key) &&
+        !SHA256_PATTERN.test(item ?? ""),
+    )
+  ) {
+    throw new Error(`Checkpoint adapter apex-writer-transfer-v1 for ${clientId} is invalid`);
+  }
+}
+
 function assertPreviousCheckpoint(previous, current) {
   if (
     previous?.schemaVersion !== "1.0.0" ||
@@ -732,6 +777,7 @@ export async function collectGuidedCheckpoint(
     collectVscode = (input) => collectVscodeSurfaceEvidence(input, { root }),
     collectInput = (input) => collectClientInputEvidence(input, { root }),
     collectRestart = (input) => collectRestartEvidence(input, { root }),
+    collectTransfer = (input) => collectTransferEvidence(input, { root }),
     collectLifecycle = (input) => collectLifecycleEvidence(input),
     previousCheckpoint,
   } = {},
@@ -750,6 +796,8 @@ export async function collectGuidedCheckpoint(
   const vscodeInput = await collectInput({ workspace: required(options, "vscode-workspace") });
   const cliRestart = await collectRestart({ workspace: required(options, "cli-workspace") });
   const vscodeRestart = await collectRestart({ workspace: required(options, "vscode-workspace") });
+  const cliTransfer = await collectTransfer({ workspace: required(options, "cli-workspace") });
+  const vscodeTransfer = await collectTransfer({ workspace: required(options, "vscode-workspace") });
   const lifecycle = await collectLifecycle({ root: required(options, "lifecycle-root") });
   assertCheckpointCandidate(candidate);
   assertCheckpointAdapter(runtime, "apex-runtime-journal-v1");
@@ -759,6 +807,8 @@ export async function collectGuidedCheckpoint(
   assertInputAdapter(vscodeInput, "github-copilot-vscode", "qualification-vscode");
   assertRestartAdapter(cliRestart, "github-copilot-cli", "qualification-cli");
   assertRestartAdapter(vscodeRestart, "github-copilot-vscode", "qualification-vscode");
+  assertTransferAdapter(cliTransfer, "github-copilot-cli", "qualification-cli");
+  assertTransferAdapter(vscodeTransfer, "github-copilot-vscode", "qualification-vscode");
   assertLifecycleAdapter(lifecycle);
   assertCheckpointContentFree(runtime);
   assertCheckpointContentFree(cli);
@@ -767,6 +817,8 @@ export async function collectGuidedCheckpoint(
   assertCheckpointContentFree(vscodeInput);
   assertCheckpointContentFree(cliRestart);
   assertCheckpointContentFree(vscodeRestart);
+  assertCheckpointContentFree(cliTransfer);
+  assertCheckpointContentFree(vscodeTransfer);
   assertCheckpointContentFree(lifecycle);
   if (runtime.projectId !== options.project || runtime.runId !== options.run) {
     throw new Error("Runtime adapter identity does not match the checkpoint request");
@@ -783,6 +835,20 @@ export async function collectGuidedCheckpoint(
   ) {
     throw new Error("Restart adapter customization lock does not match its client surface adapter");
   }
+  if (
+    cliTransfer.source.customizationLockSha256 !== cli?.workspace?.lockSha256 ||
+    vscodeTransfer.source.customizationLockSha256 !== vscode?.workspace?.lockSha256
+  ) {
+    throw new Error("Transfer adapter customization lock does not match its client surface adapter");
+  }
+  if (
+    cliTransfer.runId !== cliInput.runId ||
+    cliTransfer.runId !== cliRestart.runId ||
+    vscodeTransfer.runId !== vscodeInput.runId ||
+    vscodeTransfer.runId !== vscodeRestart.runId
+  ) {
+    throw new Error("Transfer adapter run identity does not match its client workspace adapters");
+  }
   const adapters = {
     runtime,
     cli,
@@ -791,6 +857,8 @@ export async function collectGuidedCheckpoint(
     vscodeInput,
     cliRestart,
     vscodeRestart,
+    cliTransfer,
+    vscodeTransfer,
     lifecycle,
   };
   const adapterDigests = Object.fromEntries(
@@ -832,7 +900,12 @@ export async function collectGuidedCheckpoint(
           ? { kernelStatus: vscodeInput.status }
           : checkpoint.id === "restart-resume"
             ? { serviceStatus: "observed" }
-            : {}),
+            : checkpoint.id === "writer-transfer"
+              ? {
+                  transferStatus:
+                    cliTransfer.status === "accepted" && vscodeTransfer.status === "accepted" ? "accepted" : "pending",
+                }
+              : {}),
     })),
   };
   const current = { ...checkpoint, checkpointId: sha256Json(checkpoint) };

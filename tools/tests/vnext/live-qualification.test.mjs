@@ -1268,6 +1268,29 @@ function checkpointAdapters(overrides = {}) {
     };
     return { ...content, evidenceId: sha256Json(content) };
   };
+  const transfer = (clientId, projectId, lockHash) => {
+    const content = {
+      schemaVersion: "1.0.0",
+      adapter: "apex-writer-transfer-v1",
+      client: { id: clientId },
+      projectId,
+      runId: `run-${clientId}`,
+      source: {
+        customizationLockSha256: lockHash,
+        managedFiles: 1,
+        journalHead: hash,
+        eventCount: 2,
+        claimHash: otherHash,
+        requestEventHash: "c".repeat(64),
+        requestPayloadHash: "f".repeat(64),
+        requestOwnerEpoch: 1,
+      },
+      status: "pending",
+      qualifiesClientParity: false,
+      qualifiesRelease: false,
+    };
+    return { ...content, evidenceId: sha256Json(content) };
+  };
   return {
     runtime: {
       schemaVersion: "1.0.0",
@@ -1295,6 +1318,8 @@ function checkpointAdapters(overrides = {}) {
     vscodeInput: input("github-copilot-vscode", "qualification-vscode", vscodeLockHash),
     cliRestart: restart("github-copilot-cli", "qualification-cli", cliLockHash),
     vscodeRestart: restart("github-copilot-vscode", "qualification-vscode", vscodeLockHash),
+    cliTransfer: transfer("github-copilot-cli", "qualification-cli", cliLockHash),
+    vscodeTransfer: transfer("github-copilot-vscode", "qualification-vscode", vscodeLockHash),
     lifecycle: { ...lifecycle, evidenceId: sha256Json(lifecycle) },
     ...overrides,
   };
@@ -1312,6 +1337,16 @@ function recordedInput(value) {
 function changedRestart(value) {
   const { evidenceId: _evidenceId, ...content } = structuredClone(value);
   content.source.stateDigest = "f".repeat(64);
+  return { ...content, evidenceId: sha256Json(content) };
+}
+
+function acceptedTransfer(value) {
+  const { evidenceId: _evidenceId, ...content } = structuredClone(value);
+  content.source.acceptedEventHash = "1".repeat(64);
+  content.source.acceptedPayloadHash = "2".repeat(64);
+  content.source.acceptedOwnerEpoch = content.source.requestOwnerEpoch + 1;
+  content.source.ownershipDigest = "3".repeat(64);
+  content.status = "accepted";
   return { ...content, evidenceId: sha256Json(content) };
 }
 
@@ -1335,6 +1370,7 @@ async function guidedCheckpoint(overrides = {}, dependencies = {}) {
       collectVscode: async () => adapters.vscode,
       collectInput: async ({ workspace }) => (workspace === "cli" ? adapters.cliInput : adapters.vscodeInput),
       collectRestart: async ({ workspace }) => (workspace === "cli" ? adapters.cliRestart : adapters.vscodeRestart),
+      collectTransfer: async ({ workspace }) => (workspace === "cli" ? adapters.cliTransfer : adapters.vscodeTransfer),
       collectLifecycle: async () => adapters.lifecycle,
       ...dependencies,
     },
@@ -1359,6 +1395,8 @@ test("composes source-bound adapters into pending interactive checkpoints", asyn
     "vscodeInput",
     "cliRestart",
     "vscodeRestart",
+    "cliTransfer",
+    "vscodeTransfer",
     "lifecycle",
   ]);
   assert.ok(Object.values(checkpoint.adapterDigests).every((value) => /^[0-9a-f]{64}$/u.test(value)));
@@ -1367,6 +1405,11 @@ test("composes source-bound adapters into pending interactive checkpoints", asyn
   assert.deepEqual(
     { status: restartStep.status, serviceStatus: restartStep.serviceStatus },
     { status: "pending", serviceStatus: "observed" },
+  );
+  const transferStep = checkpoint.interactiveCheckpoints.find(({ id }) => id === "writer-transfer");
+  assert.deepEqual(
+    { status: transferStep.status, transferStatus: transferStep.transferStatus },
+    { status: "pending", transferStatus: "pending" },
   );
   assert.notEqual(checkpoint.adapters.runtime.runId, checkpoint.adapters.cliInput.runId);
   assert.notEqual(checkpoint.adapters.runtime.runId, checkpoint.adapters.vscodeInput.runId);
@@ -1470,6 +1513,31 @@ test("checkpoint resume accepts exact sources and rejects tampering or stale ada
     );
   }
 
+  const acceptedCliTransfer = acceptedTransfer(checkpointAdapters().cliTransfer);
+  const acceptedVscodeTransfer = acceptedTransfer(checkpointAdapters().vscodeTransfer);
+  const acceptedTransferCheckpoint = await guidedCheckpoint({
+    cliTransfer: acceptedCliTransfer,
+    vscodeTransfer: acceptedVscodeTransfer,
+  });
+  const transferStep = acceptedTransferCheckpoint.interactiveCheckpoints.find(({ id }) => id === "writer-transfer");
+  assert.deepEqual(
+    { status: transferStep.status, transferStatus: transferStep.transferStatus },
+    { status: "pending", transferStatus: "accepted" },
+  );
+  const mixedTransferCheckpoint = await guidedCheckpoint({ cliTransfer: acceptedCliTransfer });
+  const mixedTransferStep = mixedTransferCheckpoint.interactiveCheckpoints.find(({ id }) => id === "writer-transfer");
+  assert.deepEqual(
+    { status: mixedTransferStep.status, transferStatus: mixedTransferStep.transferStatus },
+    { status: "pending", transferStatus: "pending" },
+  );
+  await assert.rejects(
+    guidedCheckpoint(
+      { cliTransfer: acceptedCliTransfer, vscodeTransfer: acceptedVscodeTransfer },
+      { previousCheckpoint: previous },
+    ),
+    /stale or belongs to different sources/,
+  );
+
   const forbidden = structuredClone(previous);
   forbidden.assertions = { forged: "pass" };
   const { checkpointId: _checkpointId, ...forbiddenContent } = forbidden;
@@ -1529,6 +1597,50 @@ test("checkpoint rejects mismatched and malformed adapter identities", async () 
   await assert.rejects(
     guidedCheckpoint({ vscodeRestart: { ...checkpointAdapters().vscodeRestart, evidenceId: "f".repeat(64) } }),
     /Checkpoint adapter apex-service-restart-v1/,
+  );
+  await assert.rejects(
+    guidedCheckpoint({ cliTransfer: { ...checkpointAdapters().cliTransfer, evidenceId: "f".repeat(64) } }),
+    /Checkpoint adapter apex-writer-transfer-v1/,
+  );
+  const invalidTransferEpoch = acceptedTransfer(checkpointAdapters().vscodeTransfer);
+  invalidTransferEpoch.source.acceptedOwnerEpoch += 1;
+  const { evidenceId: _transferEpochEvidenceId, ...invalidTransferEpochContent } = invalidTransferEpoch;
+  invalidTransferEpoch.evidenceId = sha256Json(invalidTransferEpochContent);
+  await assert.rejects(
+    guidedCheckpoint({ vscodeTransfer: invalidTransferEpoch }),
+    /Checkpoint adapter apex-writer-transfer-v1/,
+  );
+  const nonIntegerTransferEpoch = acceptedTransfer(checkpointAdapters().cliTransfer);
+  nonIntegerTransferEpoch.source.acceptedOwnerEpoch = 2.5;
+  const { evidenceId: _nonIntegerEpochEvidenceId, ...nonIntegerEpochContent } = nonIntegerTransferEpoch;
+  nonIntegerTransferEpoch.evidenceId = sha256Json(nonIntegerEpochContent);
+  await assert.rejects(
+    guidedCheckpoint({ cliTransfer: nonIntegerTransferEpoch }),
+    /Checkpoint adapter apex-writer-transfer-v1/,
+  );
+  const pendingWithAcceptedFields = acceptedTransfer(checkpointAdapters().vscodeTransfer);
+  pendingWithAcceptedFields.status = "pending";
+  const { evidenceId: _pendingAcceptedFieldsEvidenceId, ...pendingAcceptedFieldsContent } = pendingWithAcceptedFields;
+  pendingWithAcceptedFields.evidenceId = sha256Json(pendingAcceptedFieldsContent);
+  await assert.rejects(
+    guidedCheckpoint({ vscodeTransfer: pendingWithAcceptedFields }),
+    /Checkpoint adapter apex-writer-transfer-v1/,
+  );
+  const mismatchedTransferLock = structuredClone(checkpointAdapters().cliTransfer);
+  mismatchedTransferLock.source.customizationLockSha256 = "1".repeat(64);
+  const { evidenceId: _transferLockEvidenceId, ...mismatchedTransferLockContent } = mismatchedTransferLock;
+  mismatchedTransferLock.evidenceId = sha256Json(mismatchedTransferLockContent);
+  await assert.rejects(
+    guidedCheckpoint({ cliTransfer: mismatchedTransferLock }),
+    /Transfer adapter customization lock does not match/,
+  );
+  const mismatchedTransferRun = structuredClone(checkpointAdapters().vscodeTransfer);
+  mismatchedTransferRun.runId = "run-other";
+  const { evidenceId: _transferRunEvidenceId, ...mismatchedTransferRunContent } = mismatchedTransferRun;
+  mismatchedTransferRun.evidenceId = sha256Json(mismatchedTransferRunContent);
+  await assert.rejects(
+    guidedCheckpoint({ vscodeTransfer: mismatchedTransferRun }),
+    /Transfer adapter run identity does not match/,
   );
   const mismatchedRestart = structuredClone(checkpointAdapters().vscodeRestart);
   mismatchedRestart.source.customizationLockSha256 = "f".repeat(64);
@@ -1631,6 +1743,8 @@ test("checkpoint rejects mismatched and malformed adapter identities", async () 
           workspace === "cli" ? checkpointAdapters().cliInput : checkpointAdapters().vscodeInput,
         collectRestart: async ({ workspace }) =>
           workspace === "cli" ? checkpointAdapters().cliRestart : checkpointAdapters().vscodeRestart,
+        collectTransfer: async ({ workspace }) =>
+          workspace === "cli" ? checkpointAdapters().cliTransfer : checkpointAdapters().vscodeTransfer,
         collectLifecycle: async () => checkpointAdapters().lifecycle,
       },
     ),
@@ -1657,6 +1771,8 @@ test("checkpoint rejects mismatched and malformed adapter identities", async () 
           workspace === "cli" ? checkpointAdapters().cliInput : checkpointAdapters().vscodeInput,
         collectRestart: async ({ workspace }) =>
           workspace === "cli" ? checkpointAdapters().cliRestart : checkpointAdapters().vscodeRestart,
+        collectTransfer: async ({ workspace }) =>
+          workspace === "cli" ? checkpointAdapters().cliTransfer : checkpointAdapters().vscodeTransfer,
         collectLifecycle: async () => checkpointAdapters().lifecycle,
       },
     ),
