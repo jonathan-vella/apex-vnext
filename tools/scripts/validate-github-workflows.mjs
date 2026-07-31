@@ -138,8 +138,14 @@ function validateNodeSetupAction(text) {
   } catch (error) {
     return [`Node setup action YAML parse failed: ${error.message}`];
   }
-  const install = value?.runs?.steps?.find((step) => step?.name === "Install Node dependencies");
+  const steps = value?.runs?.steps;
+  const dependencyInstalls = Array.isArray(steps)
+    ? steps.filter((step) => /\bnpm\s+(?:ci|install)\b/u.test(String(step?.run ?? "")))
+    : [];
+  const install = dependencyInstalls[0];
   if (
+    dependencyInstalls.length !== 1 ||
+    install?.name !== "Install Node dependencies" ||
     install?.if !== "inputs.install-deps == 'true'" ||
     install?.shell !== "bash" ||
     install?.run !== "npm ci" ||

@@ -108,10 +108,15 @@ test("rejects local composite action drift", () => {
 
 test("rejects Node dependency registry weakening after action rebaselining", () => {
   const actionPath = ".github/actions/setup-node-repo/action.yml";
-  for (const replacement of ["https://registry.npmjs.org/", ""]) {
+  const mutations = [
+    (text) => text.replace("https://packagefeedproxy.microsoft.io/npm/", "https://registry.npmjs.org/"),
+    (text) => text.replace("https://packagefeedproxy.microsoft.io/npm/", ""),
+    (text) => `${text}\n    - name: Unbound install\n      shell: bash\n      run: npm install\n`,
+  ];
+  for (const mutateAction of mutations) {
     const changed = {
       ...localActionTexts,
-      [actionPath]: localActionTexts[actionPath].replace("https://packagefeedproxy.microsoft.io/npm/", replacement),
+      [actionPath]: mutateAction(localActionTexts[actionPath]),
     };
     const changedContract = structuredClone(contract);
     changedContract.localActions[actionPath] = createHash("sha256").update(changed[actionPath]).digest("hex");
