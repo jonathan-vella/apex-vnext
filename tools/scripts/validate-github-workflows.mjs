@@ -131,6 +131,26 @@ function validatePythonSetupAction(text) {
   return errors;
 }
 
+function validateNodeSetupAction(text) {
+  let value;
+  try {
+    value = yaml.load(text);
+  } catch (error) {
+    return [`Node setup action YAML parse failed: ${error.message}`];
+  }
+  const install = value?.runs?.steps?.find((step) => step?.name === "Install Node dependencies");
+  if (
+    install?.if !== "inputs.install-deps == 'true'" ||
+    install?.shell !== "bash" ||
+    install?.run !== "npm ci" ||
+    install?.env?.npm_config_registry !== "https://packagefeedproxy.microsoft.io/npm/" ||
+    Object.keys(install?.env ?? {}).length !== 1
+  ) {
+    return ["Node setup action dependency registry contract drift"];
+  }
+  return [];
+}
+
 function containsForbiddenReleaseAuthority(script) {
   for (const line of script.split(/\r?\n/u)) {
     const tokens = line
@@ -236,6 +256,11 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
   const pythonAction = localActionTexts[pythonActionPath];
   if (pythonAction !== undefined) {
     errors.push(...validatePythonSetupAction(pythonAction).map((error) => `${pythonActionPath}: ${error}`));
+  }
+  const nodeActionPath = ".github/actions/setup-node-repo/action.yml";
+  const nodeAction = localActionTexts[nodeActionPath];
+  if (nodeAction !== undefined) {
+    errors.push(...validateNodeSetupAction(nodeAction).map((error) => `${nodeActionPath}: ${error}`));
   }
 
   const values = new Map();

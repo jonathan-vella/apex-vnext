@@ -106,6 +106,25 @@ test("rejects local composite action drift", () => {
   assert.ok(errors.includes(".github/actions/setup-node-repo/action.yml: local action content drift"));
 });
 
+test("rejects Node dependency registry weakening after action rebaselining", () => {
+  const actionPath = ".github/actions/setup-node-repo/action.yml";
+  for (const replacement of ["https://registry.npmjs.org/", ""]) {
+    const changed = {
+      ...localActionTexts,
+      [actionPath]: localActionTexts[actionPath].replace("https://packagefeedproxy.microsoft.io/npm/", replacement),
+    };
+    const changedContract = structuredClone(contract);
+    changedContract.localActions[actionPath] = createHash("sha256").update(changed[actionPath]).digest("hex");
+    const errors = validateGithubWorkflowContract({
+      contract: changedContract,
+      schema,
+      workflowTexts,
+      localActionTexts: changed,
+    });
+    assert.ok(errors.includes(`${actionPath}: Node setup action dependency registry contract drift`));
+  }
+});
+
 test("rejects Python validation setup weakening and caller removal", () => {
   const actionPath = ".github/actions/setup-python-validation/action.yml";
   for (const [search, replacement, expected] of [
