@@ -55,4 +55,6 @@ runs:
     - name: Install Node dependencies
       if: inputs.install-deps == 'true'
       shell: bash
+      env:
+        npm_config_registry: https://packagefeedproxy.microsoft.io/npm/
       run: npm ci

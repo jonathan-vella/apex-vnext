@@ -15,7 +15,7 @@
     "peter-evans/create-pull-request": ["v8"]
   },
   "localActions": {
-    ".github/actions/setup-node-repo/action.yml": "16d513b787574744c65350192978410b636bcbd1e2734688c7ba48fd8eb7ca97",
+    ".github/actions/setup-node-repo/action.yml": "e00764f94893ff138f49bde2bc1fbe716c5ecd09b9113914225265119f5bfc81",
     ".github/actions/setup-python-validation/action.yml": "e458a774a10318bfbaec0f05929cf114a7fcbfdd161eff4a41f3e461ec64a812"
   },
   "workflows": [
