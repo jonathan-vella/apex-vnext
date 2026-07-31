@@ -110,10 +110,11 @@ The manifest must bind:
 
 | Field                                  | Purpose                                                                                                                                                                 |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `base_commit`, `issues[]`              | Verified `origin/main` base and the authorized issue set                                                                                                                |
+| `base_commit`, `issues[]`              | Authorized issue set and verified base. `base_commit` may be the literal `origin/main`, which bootstrap resolves once and freezes into the first checkpoint              |
 | `worktree`, `branch`, `upstream`       | Isolated worktree, dedicated branch, and its matching `origin` upstream                                                                                                 |
 | `allowed_paths[]`, `protected_paths[]` | Path policy applied to every launched task                                                                                                                              |
 | `allowed_commands[]`, `network`        | Command allowlist and network policy                                                                                                                                    |
+| `launcher`                             | Absolute `copilot` binary path, pinned version, and model id                                                                                                            |
 | `budgets`                              | File, line, iteration, wall-clock, and credit ceilings                                                                                                                  |
 | `expires_at`, `stop_conditions[]`      | Expiry and any additional stop triggers                                                                                                                                 |
 | `checkpoint_policy`                    | Commit and push frequency                                                                                                                                               |
@@ -152,12 +153,13 @@ deployment, release, destructive cloud operations, final validation, or managed-
 8. Create or resume the dedicated authorized branch from the verified base in the manifest's isolated worktree.
 9. Publish the dedicated branch to `origin` with upstream tracking after its first checkpoint commit.
 10. Refuse to continue when the selected branch is `main`, has a different upstream, or contains unrelated work.
-11. Complete the launcher preflight below before any item runs.
+11. Complete the **environment preflight** below. Defer the adapter preflight until the controller exists.
 12. Inspect issue #222 and existing controller code before implementing anything.
 13. Implement the smallest controller slice needed to prove one safety property at a time.
 14. Run focused controller checks for authorization binding, path protection, command allowlisting, budgets, expiry,
     lock handling, checkpoint integrity, diff rejection, and every stop condition.
-15. Do not start issue #220 remediation until the issue #222 safety proof passes.
+15. Complete the **adapter preflight** once the launcher exists, before the first launched item.
+16. Do not start issue #220 remediation until the issue #222 safety proof passes.
 
 If VS Code cannot edit the dedicated worktree, stop after creating it and report the exact path and resume command. Do
 not fall back to editing `main`.
@@ -184,9 +186,12 @@ Every engineering-run artifact is versioned under `docs/vnext/pre-agent-loop/`:
 The outer VS Code session supervises. The controller launches each bounded item as a fresh non-interactive Copilot CLI
 task, per DECISION-020 and issue #222.
 
-Preflight, before the first launch:
+Preflight runs in two stages because the adapter cannot be exercised before it exists.
 
-1. Resolve the `copilot` binary and record its version. Stop when it is absent.
+**Environment preflight** (bootstrap, before any controller work):
+
+1. Resolve the `copilot` binary from the manifest's recorded absolute path and record its version. Stop when it is
+   absent or the version differs from the manifest.
 2. Confirm non-interactive authentication is already present. Never run an interactive login and never read, echo, or
    log a token.
 3. Confirm the model named by the authorization is available and record it.
@@ -195,8 +200,11 @@ Preflight, before the first launch:
    `GUARD_MODE`, and treat `.github/hooks/**` as a protected path.
 5. Record the MCP servers declared in `.vscode/mcp.json` in the run evidence and disable MCP for every launched task.
    The GitHub MCP server is a mutation vector and must never be reachable from an unattended item.
-6. Run one dry-run task against a fixture item and validate its JSONL output against the structured-output contract.
-7. Prove the denied capabilities fail closed: interactive questions, remote control, MCP servers, GitHub mutation
+
+**Adapter preflight** (after the controller's safety proof, before the first launched item):
+
+1. Run one dry-run task against a fixture item and validate its JSONL output against the structured-output contract.
+2. Prove the denied capabilities fail closed: interactive questions, remote control, MCP servers, GitHub mutation
    tools, and undeclared commands.
 
 Per launch:
