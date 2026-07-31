@@ -11,13 +11,7 @@ const CONTRACT_PATH = "tools/registry/github-workflow-contract.json";
 const SCHEMA_PATH = "tools/registry/schemas/github-workflow-contract.schema.json";
 const WORKFLOW_DIRECTORY = ".github/workflows";
 
-export const EXPECTED_REQUIRED_CONTEXTS = [
-  "ci",
-  "External Python tests (apex-recall)",
-  "Analyze (actions)",
-  "Analyze (javascript-typescript)",
-  "Analyze (python)",
-];
+export const EXPECTED_REQUIRED_CONTEXTS = ["ci", "External Python tests (apex-recall)", "CodeQL"];
 const EXTERNAL_PYTHON_CONTEXT = "External Python tests (apex-recall)";
 
 function canonicalJson(value) {

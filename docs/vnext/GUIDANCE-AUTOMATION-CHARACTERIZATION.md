@@ -80,8 +80,8 @@ GitHub branch protection at characterization time is strict and requires `ci`,
 `External Python tests (apex-recall + azure-pricing MCP)`, and the `Analyze (actions)`,
 `Analyze (javascript-typescript)`, and `Analyze (python)` CodeQL contexts. PR #92 additionally passed independently
 visible documentation, branch-enforcement, CodeQL summary, and exact-head qualification checks.
-The legacy external-test label above is historical; current branch protection requires
-`External Python tests (apex-recall)`.
+The language-specific labels and legacy external-test label above are historical. Current branch protection requires
+`ci`, `External Python tests (apex-recall)`, and the always-emitted aggregate `CodeQL` context.
 
 Current-main CI run
 [`29898484667`](https://github.com/jonathan-vella/apex-vnext/actions/runs/29898484667) passed at `b27d173` in
