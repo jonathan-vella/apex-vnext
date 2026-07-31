@@ -1797,7 +1797,7 @@ async function vscodeSurfaceFixture(context, { managedHash, policy = rollingClie
   const managed = Buffer.from('{"servers":{}}\n');
   const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
   await mkdir(join(contractRoot, "config"), { recursive: true });
-  await mkdir(join(root, "bin"), { recursive: true });
+  await mkdir(join(root, "bin", "remote-cli"), { recursive: true });
   await mkdir(join(workspace, ".apex"), { recursive: true });
   await mkdir(join(workspace, ".vscode"), { recursive: true });
   await writeFile(
@@ -1807,7 +1807,7 @@ async function vscodeSurfaceFixture(context, { managedHash, policy = rollingClie
     })}\n`,
   );
   await writeFile(join(workspace, ".vscode", "mcp.json"), managed);
-  await writeFile(join(root, "bin", "code"), "code-host");
+  await writeFile(join(root, "bin", "remote-cli", "code"), "code-host");
   await writeFile(
     join(workspace, ".apex", "customizations.lock.json"),
     `${JSON.stringify({
@@ -1825,7 +1825,7 @@ async function vscodeSurfaceFixture(context, { managedHash, policy = rollingClie
       ],
     })}\n`,
   );
-  return { root, contractRoot, workspace, host: join(root, "bin", "code") };
+  return { root, contractRoot, workspace, host: join(root, "bin", "remote-cli", "code") };
 }
 
 test("exports observed rolling VS Code host, Copilot Chat, and managed projection binding", async (context) => {
@@ -1853,6 +1853,63 @@ test("exports observed rolling VS Code host, Copilot Chat, and managed projectio
   assert.equal(exported.workspace.files[0].matches, true);
   assert.deepEqual(calls, [["--version"], ["--list-extensions", "--show-versions"]]);
   assert.doesNotMatch(JSON.stringify(exported), /example\.unrelated|private\/source\/path/u);
+});
+
+test("binds host-bundled Copilot Chat when remote inventory omits built-in extensions", async (context) => {
+  const fixture = await vscodeSurfaceFixture(context);
+  const manifest = Buffer.from(
+    `${JSON.stringify({
+      name: "copilot-chat",
+      publisher: "GitHub",
+      version: "0.59.0",
+      engines: { vscode: "^1.131.0" },
+    })}\n`,
+  );
+  await mkdir(join(fixture.root, "extensions", "copilot"), { recursive: true });
+  await writeFile(join(fixture.root, "extensions", "copilot", "package.json"), manifest);
+  const exported = await collectVscodeSurfaceEvidence(
+    { workspace: "consumer", host: fixture.host },
+    {
+      root: fixture.root,
+      contractRoot: fixture.contractRoot,
+      runVscode: (_host, args) => (args[0] === "--version" ? "1.131.0\ncommit\nx64\n" : "example.other@1.0.0\n"),
+    },
+  );
+  assert.deepEqual(exported.disposition, { status: "pass" });
+  assert.equal(exported.client.observedExtensionVersion, "0.59.0");
+  assert.equal(exported.client.extensionInventorySha256, createHash("sha256").update(manifest).digest("hex"));
+
+  await writeFile(
+    join(fixture.root, "extensions", "copilot", "package.json"),
+    `${JSON.stringify({ name: "copilot-chat", publisher: "Other", version: "0.59.0" })}\n`,
+  );
+  await assert.rejects(
+    collectVscodeSurfaceEvidence(
+      { workspace: "consumer", host: fixture.host },
+      {
+        root: fixture.root,
+        contractRoot: fixture.contractRoot,
+        runVscode: (_host, args) => (args[0] === "--version" ? "1.131.0\ncommit\nx64\n" : "example.other@1.0.0\n"),
+      },
+    ),
+    /Built-in Copilot Chat manifest is invalid/,
+  );
+
+  const substituted = await vscodeSurfaceFixture(context);
+  await mkdir(join(substituted.root, "outside", "copilot"), { recursive: true });
+  await writeFile(join(substituted.root, "outside", "copilot", "package.json"), manifest);
+  await symlink(join(substituted.root, "outside"), join(substituted.root, "extensions"));
+  await assert.rejects(
+    collectVscodeSurfaceEvidence(
+      { workspace: "consumer", host: substituted.host },
+      {
+        root: substituted.root,
+        contractRoot: substituted.contractRoot,
+        runVscode: (_host, args) => (args[0] === "--version" ? "1.131.0\ncommit\nx64\n" : "example.other@1.0.0\n"),
+      },
+    ),
+    /Built-in Copilot Chat manifest path is not canonical/,
+  );
 });
 
 test("VS Code surface binding requires the rolling Copilot Chat capability", async (context) => {
