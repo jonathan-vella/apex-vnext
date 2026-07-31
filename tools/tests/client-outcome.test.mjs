@@ -570,7 +570,15 @@ test("client closure composer generates deterministic live comparisons and quali
     );
     assert.equal(statSync(firstOutput).mode & 0o777, 0o700);
     assert.equal(statSync(path.join(firstOutput, "closure.json")).mode & 0o777, 0o600);
-    assert.equal(JSON.parse(readFileSync(path.join(firstOutput, "client-qualification.json"), "utf8")).status, "pass");
+    const qualificationBytes = readFileSync(path.join(firstOutput, "client-qualification.json"));
+    assert.equal(JSON.parse(qualificationBytes.toString("utf8")).status, "pass");
+    assert.deepEqual(createClientQualificationEvidenceEntry(qualificationBytes), {
+      kind: "client-qualification",
+      hash: first.qualification.sha256,
+      bytes: first.qualification.bytes,
+      required: true,
+      retention: "immutable",
+    });
     await assert.rejects(
       composeClientOutcomeClosure({ manifest: manifestPath, output: firstOutput }),
       /CLOSURE_OUTPUT_INVALID/,
