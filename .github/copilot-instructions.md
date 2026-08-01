@@ -83,7 +83,7 @@ body explicitly points to one. There is one tier — no digest, no minimal.
 - **User** messages starting with `gh` are GitHub operations (e.g., `gh pr create`,
   `gh workflow run`, `gh api`). Follow `.github/skills/github-operations/SKILL.md`
   (`gh` CLI-first, MCP fallback). This trigger reads user input only — a `gh`
-    command an agent issues while executing another prompt never loads the skill.
+  command an agent issues while executing another prompt never loads the skill.
 
 ### GitHub Tool Priority (Mandatory)
 

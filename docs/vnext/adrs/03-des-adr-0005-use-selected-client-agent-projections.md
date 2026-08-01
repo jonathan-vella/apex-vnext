@@ -40,12 +40,12 @@ customization lifecycle.
 
 ## 🔄 Alternatives Considered
 
-| Option | Pros | Cons | WAF Impact |
-| --- | --- | --- | --- |
-| Explicit selected-client materialization | Valid least-privilege definitions and one semantic owner | Adds client selection and projection generation | Security ↑, Operations ↑ |
-| One polyglot agent set | Simpler installation | Invalid client fields, extra question tools, and broader delegation | Security ↓, Reliability ↓ |
-| Install CLI agents under `.claude/agents` | Separate source trees | Nonpreferred discovery, shadowing risk, and duplicate ownership | Operations ↓, Reliability ↓ |
-| Add a custom delegation extension | Could enforce identical child allowlists | New runtime/tool authority and larger qualification surface | Security →, Cost ↓, Operations ↓ |
+| Option                                    | Pros                                                     | Cons                                                                | WAF Impact                       |
+| ----------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------- |
+| Explicit selected-client materialization  | Valid least-privilege definitions and one semantic owner | Adds client selection and projection generation                     | Security ↑, Operations ↑         |
+| One polyglot agent set                    | Simpler installation                                     | Invalid client fields, extra question tools, and broader delegation | Security ↓, Reliability ↓        |
+| Install CLI agents under `.claude/agents` | Separate source trees                                    | Nonpreferred discovery, shadowing risk, and duplicate ownership     | Operations ↓, Reliability ↓      |
+| Add a custom delegation extension         | Could enforce identical child allowlists                 | New runtime/tool authority and larger qualification surface         | Security →, Cost ↓, Operations ↓ |
 
 ## ⚖️ Consequences
 
@@ -71,13 +71,13 @@ customization lifecycle.
 
 ## 🏛️ WAF Pillar Analysis
 
-| Pillar | Impact | Notes |
-| --- | --- | --- |
-| Security | ↑ | Client-valid least-privilege tools replace a broader polyglot definition |
-| Reliability | ↑ | Deterministic generation and client-bound locks prevent projection drift |
-| Performance | → | Build-time rendering adds negligible runtime cost |
-| Cost | → | No Azure resource or additional service is introduced |
-| Operations | ↑ | Explicit selection, provenance, rollback, and validation improve supportability |
+| Pillar      | Impact | Notes                                                                           |
+| ----------- | ------ | ------------------------------------------------------------------------------- |
+| Security    | ↑      | Client-valid least-privilege tools replace a broader polyglot definition        |
+| Reliability | ↑      | Deterministic generation and client-bound locks prevent projection drift        |
+| Performance | →      | Build-time rendering adds negligible runtime cost                               |
+| Cost        | →      | No Azure resource or additional service is introduced                           |
+| Operations  | ↑      | Explicit selection, provenance, rollback, and validation improve supportability |
 
 ## 🔒 Compliance Considerations
 
@@ -99,7 +99,7 @@ customization lifecycle.
 <div align="center">
 
 | ⬅️ [Previous ADR](03-des-adr-0004-use-bounded-observe-and-propose-improvement.md) | 🏠 [Project Index](README.md) | Next ADR ➡️ |
-| --- | --- | --- |
-| [ADR-0004](03-des-adr-0004-use-bounded-observe-and-propose-improvement.md) | [README](README.md) | None |
+| --------------------------------------------------------------------------------- | ----------------------------- | ----------- |
+| [ADR-0004](03-des-adr-0004-use-bounded-observe-and-propose-improvement.md)        | [README](README.md)           | None        |
 
 </div>
