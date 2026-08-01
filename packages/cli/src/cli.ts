@@ -452,6 +452,14 @@ export async function execute(argv: string[], root = process.cwd()): Promise<unk
       );
     case "project list":
       return service.listProjects();
+    case "project create":
+      return service.createProject({
+        projectId: required(flags, "project") as never,
+        ...(typeof flags.name === "string" ? { displayName: flags.name } : {}),
+        ...(typeof flags.environment === "string" ? { environment: flags.environment } : {}),
+        ...(typeof flags.target === "string" ? { targetScope: flags.target } : {}),
+        iacTool: flags.iac === "terraform" ? "terraform" : "bicep",
+      });
     case "project use":
       return service.use(
         required(flags, "project") as never,
@@ -463,6 +471,8 @@ export async function execute(argv: string[], root = process.cwd()): Promise<unk
       return service.search(required(flags, "query"));
     case "project history":
       return service.history(typeof flags.limit === "string" ? Number(flags.limit) : undefined);
+    case "project promote":
+      return service.promote(required(flags, "environment"), required(flags, "target"));
     case "state transfer-export": {
       confirmed(flags, "state transfer-export");
       const ttlSeconds = Number(required(flags, "ttl-seconds"));
