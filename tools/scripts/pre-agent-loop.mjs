@@ -12,14 +12,17 @@ import {
   appendFileSync,
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   renameSync,
+  rmSync,
   statSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { contextHashDrift } from "./pre-agent-loop-hashes.mjs";
 
@@ -194,6 +197,7 @@ export function buildTaskCommand({ authorization, item, prompt }) {
     "--no-custom-instructions",
     "--no-bash-env",
     "--no-auto-update",
+    "--disable-builtin-mcps",
     ...DENIED_TASK_TOOLS.flatMap((tool) => ["--deny-tool", tool]),
     ...writablePaths.flatMap((pathname) => ["--allow-tool", `write(${pathname})`]),
     "--add-dir",
@@ -409,6 +413,7 @@ export function assertControllerStateUnchanged(root, before) {
 }
 
 function taskPrompt(item) {
+  if (item.prompt) return item.prompt;
   return [
     `Process repository inventory item ${item.id}.`,
     `Classification: ${item.classification}.`,
@@ -421,16 +426,28 @@ function taskPrompt(item) {
 
 export function launchTask({ authorization, item, spawn = spawnSync }) {
   const [binary, ...args] = buildTaskCommand({ authorization, item, prompt: taskPrompt(item) });
-  const result = spawn(binary, args, {
-    cwd: authorization.worktree,
-    encoding: "utf8",
-    input: "",
-    maxBuffer: authorization.launcher.noninteractive.output_limit_bytes,
-    stdio: ["pipe", "pipe", "pipe"],
-    timeout: authorization.launcher.noninteractive.timeout_seconds * 1000 * 20,
-  });
-  if (result.error || result.status !== 0) throw new Error("bounded task failed");
-  return parseJsonLines(result.stdout ?? "");
+  const neutralDirectory = mkdtempSync(path.join(tmpdir(), "apex-pre-agent-task-"));
+  const copilotHome = path.join(neutralDirectory, "copilot-home");
+  mkdirSync(copilotHome);
+  try {
+    const result = spawn(binary, args, {
+      cwd: neutralDirectory,
+      encoding: "utf8",
+      env: { ...process.env, COPILOT_HOME: copilotHome },
+      input: "",
+      maxBuffer: authorization.launcher.noninteractive.output_limit_bytes,
+      stdio: ["pipe", "pipe", "pipe"],
+      timeout: authorization.launcher.noninteractive.timeout_seconds * 1000 * 20,
+    });
+    if (result.error || result.status !== 0) throw new Error("bounded task failed");
+    const events = parseJsonLines(result.stdout ?? "");
+    const serialized = JSON.stringify(events);
+    if (/mcp_server|mcp\.tools|github-mcp-server/iu.test(serialized)) throw new Error("bounded task loaded MCP");
+    if (/tool[^\n]{0,80}skill/iu.test(serialized)) throw new Error("bounded task invoked a skill");
+    return events;
+  } finally {
+    rmSync(neutralDirectory, { recursive: true, force: true });
+  }
 }
 
 function publishCheckpoint({ authorization, item, root, git = gitValue, now = new Date() }) {
@@ -451,20 +468,28 @@ function publishCheckpoint({ authorization, item, root, git = gitValue, now = ne
   git(["add", "--", path.relative(root, paths.checkpointPath)], root);
   git(["commit", "-m", `chore(tools): Record ${item.id} checkpoint`], root);
   git(["push", "origin", `HEAD:refs/heads/${authorization.branch}`], root);
+  const checkpointSha = git(["rev-parse", "HEAD"], root);
+  const checkpointRemote = git(["ls-remote", "--heads", "origin", `refs/heads/${authorization.branch}`], root).split(
+    /\s/u,
+  )[0];
+  if (checkpointRemote !== checkpointSha) throw new Error("checkpoint evidence SHA mismatch");
   return localSha;
 }
 
-function writeCompletion({ authorization, root, queue, now = new Date() }) {
+function writeCompletion({ authorization, root, queue, git = gitValue, now = new Date() }) {
   const paths = statePaths(root);
-  const tree = gitValue(["rev-parse", "HEAD^{tree}"], root);
+  const tree = git(["rev-parse", "HEAD^{tree}"], root);
   const content = `## Pre-Agent Loop Completion\n\n- Authorization: \`${authorization.authorization_id}\`\n- Branch: \`${authorization.branch}\`\n- Upstream: \`${authorization.upstream}\`\n- Tree before handoff: \`${tree}\`\n- Completed items: ${queue.items.length}\n- Completed at: ${now.toISOString()}\n\nNo final validation or managed-agent qualification was run.\n`;
   writeFileSync(paths.completionPath, content);
   unlinkSync(paths.lockPath);
   queue.state = "completed";
   writeJsonAtomically(paths.queuePath, queue);
-  gitValue(["add", "--", path.relative(root, paths.completionPath), path.relative(root, paths.queuePath)], root);
-  gitValue(["commit", "-m", "chore(tools): Complete pre-agent loop"], root);
-  gitValue(["push", "origin", `HEAD:refs/heads/${authorization.branch}`], root);
+  git(["add", "--", path.relative(root, paths.completionPath), path.relative(root, paths.queuePath)], root);
+  git(["commit", "-m", "chore(tools): Complete pre-agent loop"], root);
+  git(["push", "origin", `HEAD:refs/heads/${authorization.branch}`], root);
+  const localSha = git(["rev-parse", "HEAD"], root);
+  const remoteSha = git(["ls-remote", "--heads", "origin", `refs/heads/${authorization.branch}`], root).split(/\s/u)[0];
+  if (remoteSha !== localSha) throw new Error("completion handoff SHA mismatch");
 }
 
 export function processNextItem({ authorization, root, spawn = spawnSync, git = gitValue, now = new Date() }) {
@@ -473,7 +498,7 @@ export function processNextItem({ authorization, root, spawn = spawnSync, git = 
   const queue = readJson(paths.queuePath);
   const item = queue.items.find(({ status }) => status === "pending");
   if (!item) {
-    writeCompletion({ authorization, root, queue, now });
+    writeCompletion({ authorization, root, queue, git, now });
     return { state: "completed" };
   }
   const controllerState = snapshotControllerState(root);
@@ -511,6 +536,18 @@ export function runQueue({ authorization, root, spawn = spawnSync, git = gitValu
   throw new Error("queue item budget exhausted");
 }
 
+function statusRun({ authorization, root }) {
+  const paths = statePaths(root);
+  if (!existsSync(paths.queuePath)) return inspectRun({ authorization, root });
+  const queue = readJson(paths.queuePath);
+  return {
+    authorization_id: authorization.authorization_id,
+    admitted: admissionErrors({ authorization, root }).length === 0,
+    state: existsSync(paths.lockPath) ? "running" : queue.state === "completed" ? "completed" : "idle",
+    queue,
+  };
+}
+
 function main() {
   const { command, dryRun, manifest } = parseArguments(process.argv.slice(2));
   const manifestPath = path.resolve(ROOT, manifest);
@@ -529,7 +566,9 @@ function main() {
               if (!initialized.admitted) return initialized;
               return { state: "running", results: runQueue({ authorization, root: ROOT }) };
             })()
-          : result;
+          : command === "status"
+            ? statusRun({ authorization, root: ROOT })
+            : result;
   console.log(JSON.stringify({ command, dry_run: dryRun, ...output }, null, 2));
   process.exitCode = output.admitted === false ? 1 : 0;
 }

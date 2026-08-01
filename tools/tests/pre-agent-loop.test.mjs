@@ -12,8 +12,10 @@ import {
   buildTaskCommand,
   changedPathErrors,
   initializeRun,
+  launchTask,
   parseJsonLines,
   parseArguments,
+  processNextItem,
   probeLauncher,
   runFocusedChecks,
   resumeRun,
@@ -148,6 +150,26 @@ test("structured task output requires valid JSONL", () => {
   assert.throws(() => parseJsonLines("not-json"), /not valid JSONL/);
 });
 
+test("task launcher uses a neutral directory and rejects MCP events", () => {
+  let observedCwd;
+  let observedHome;
+  const success = (_binary, _args, options) => {
+    observedCwd = options.cwd;
+    observedHome = options.env.COPILOT_HOME;
+    return { status: 0, stdout: '{"type":"assistant.message"}\n', stderr: "" };
+  };
+  const mcp = () => ({
+    status: 0,
+    stdout: '{"type":"session.mcp_server_status_changed","data":{"serverName":"github-mcp-server"}}\n',
+    stderr: "",
+  });
+  const item = { paths: ["docs/vnext/pre-agent-loop/authorization.json"], prompt: "Read only." };
+  assert.equal(launchTask({ authorization, item, spawn: success }).length, 1);
+  assert.notEqual(observedCwd, authorization.worktree);
+  assert.ok(observedHome.startsWith(observedCwd));
+  assert.throws(() => launchTask({ authorization, item, spawn: mcp }), /loaded MCP/);
+});
+
 test("focused checks require authorization and a successful exit", () => {
   const success = () => ({ status: 0 });
   const failure = () => ({ status: 1 });
@@ -174,6 +196,7 @@ test("task command grants characterized file tools without Git or interactive ca
   assert.ok(command.includes("--no-ask-user"));
   assert.ok(command.includes("--no-remote"));
   assert.ok(command.includes("--no-custom-instructions"));
+  assert.ok(command.includes("--disable-builtin-mcps"));
   assert.ok(command.includes("--deny-tool"));
   assert.equal(
     command.some((part) => /shell\(git|allow-all|yolo/iu.test(part)),
@@ -231,5 +254,79 @@ test("resume reads only its owned lock and abort records then releases it", () =
     readFileSync(path.join(temporaryRoot, "docs/vnext/pre-agent-loop/checkpoints.jsonl"), "utf8"),
     /aborted/,
   );
+  rmSync(temporaryRoot, { recursive: true, force: true });
+});
+
+test("one queue item completes through launch, checks, evidence, and checkpoint publication", () => {
+  const temporaryRoot = mkdtempSync(path.join(tmpdir(), "pre-agent-loop-item-"));
+  const inventoryRoot = path.join(temporaryRoot, "tools/registry");
+  const binaryPath = path.join(temporaryRoot, "copilot");
+  mkdirSync(inventoryRoot, { recursive: true });
+  symlinkSync(
+    path.join(root, "tools/registry/modernization-ownership.json"),
+    path.join(inventoryRoot, "modernization-ownership.json"),
+  );
+  symlinkSync(authorization.launcher.binary, binaryPath);
+  const fixture = structuredClone(authorization);
+  fixture.worktree = temporaryRoot;
+  fixture.launcher.binary = binaryPath;
+  fixture.context_hashes = {};
+  const sha = "a".repeat(40);
+  const gitCalls = [];
+  const git = (args) => {
+    gitCalls.push(args);
+    if (args[0] === "branch") return fixture.branch;
+    if (args[0] === "config") return "origin";
+    if (args[0] === "status" || args[0] === "diff") return "";
+    if (args[0] === "rev-parse") return sha;
+    if (args[0] === "ls-remote") return `${sha}\trefs/heads/${fixture.branch}`;
+    return "";
+  };
+  const spawn = (_binary, args) =>
+    args.includes("--output-format")
+      ? { status: 0, stdout: '{"type":"result"}\n', stderr: "" }
+      : { status: 0, stdout: "", stderr: "" };
+  initializeRun({ authorization: fixture, root: temporaryRoot, git });
+  const result = processNextItem({ authorization: fixture, root: temporaryRoot, git, spawn });
+  assert.equal(result.state, "accepted");
+  assert.ok(gitCalls.some((args) => args[0] === "commit"));
+  assert.ok(gitCalls.some((args) => args[0] === "push"));
+  const inventory = JSON.parse(
+    readFileSync(path.join(temporaryRoot, "docs/vnext/pre-agent-loop/inventory.json"), "utf8"),
+  );
+  assert.equal(inventory.surfaces[0].disposition, "verified-no-change");
+  rmSync(temporaryRoot, { recursive: true, force: true });
+});
+
+test("an exhausted queue publishes completion and releases its lock", () => {
+  const temporaryRoot = mkdtempSync(path.join(tmpdir(), "pre-agent-loop-complete-"));
+  const inventoryRoot = path.join(temporaryRoot, "tools/registry");
+  const binaryPath = path.join(temporaryRoot, "copilot");
+  mkdirSync(inventoryRoot, { recursive: true });
+  symlinkSync(
+    path.join(root, "tools/registry/modernization-ownership.json"),
+    path.join(inventoryRoot, "modernization-ownership.json"),
+  );
+  symlinkSync(authorization.launcher.binary, binaryPath);
+  const fixture = structuredClone(authorization);
+  fixture.worktree = temporaryRoot;
+  fixture.launcher.binary = binaryPath;
+  fixture.context_hashes = {};
+  const sha = "b".repeat(40);
+  const git = (args) => {
+    if (args[0] === "branch") return fixture.branch;
+    if (args[0] === "config") return "origin";
+    if (args[0] === "rev-parse") return sha;
+    if (args[0] === "ls-remote") return `${sha}\trefs/heads/${fixture.branch}`;
+    return "";
+  };
+  initializeRun({ authorization: fixture, root: temporaryRoot, git });
+  const queuePath = path.join(temporaryRoot, "docs/vnext/pre-agent-loop/queue.json");
+  const queue = JSON.parse(readFileSync(queuePath, "utf8"));
+  for (const item of queue.items) item.status = "accepted";
+  writeFileSync(queuePath, `${JSON.stringify(queue, null, 2)}\n`);
+  assert.deepEqual(processNextItem({ authorization: fixture, root: temporaryRoot, git }), { state: "completed" });
+  assert.equal(existsSync(path.join(temporaryRoot, "docs/vnext/pre-agent-loop/run.lock.json")), false);
+  assert.equal(existsSync(path.join(temporaryRoot, "docs/vnext/pre-agent-loop/completion-handoff.md")), true);
   rmSync(temporaryRoot, { recursive: true, force: true });
 });

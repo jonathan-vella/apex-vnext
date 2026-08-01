@@ -118,7 +118,7 @@
     "mcp": "disabled",
     "noninteractive": {
       "timeout_seconds": 15,
-      "output_limit_bytes": 16384
+      "output_limit_bytes": 1048576
     }
   },
   "budgets": {
@@ -144,15 +144,15 @@
   ],
   "skill_allowlist": [],
   "context_hashes": {
-    ".github/prompts/apex-autonomous-pre-agent-loop.prompt.md": "ed3de64ed6d2e7f51720a5d4a3299beb1482c582b266735ae2881876a75ae528",
+    ".github/prompts/apex-autonomous-pre-agent-loop.prompt.md": "6491df45622b22c55c3b8cfe22484b4efc4aa1b56f1a3813c1796125d3318168",
     "AGENTS.md": "dad114b9f59e597437be286a41857d1f94d9666abc99fb118ffc6a7dbb465b9a",
     ".github/copilot-instructions.md": "aff580ed99b7c007caa4b5ce6b6c0670dbc2ccea619177d7d0cb84b0157c5e63",
     ".github/instructions/javascript.instructions.md": "f207cbea41680a3a20473ba6abea3580747be24771cc93525dcab08f1f019054",
     ".github/instructions/json.instructions.md": "7ad4662e52ad9f88aa96095bfd7d76ae488af94287c8860c306f9bbd7c9bbd75",
     ".github/instructions/code-quality.instructions.md": "5223713c1f411117df41bc6ddfed98ebac33c77bf098a5feaf752a8453e0cba1",
-    "docs/vnext/pre-agent-loop/authorization.schema.json": "08ef2fef82e7048e35ace17532f3785c75ee32ca13f87bea7c42c84805e278e0",
+    "docs/vnext/pre-agent-loop/authorization.schema.json": "e280ca57b32685d5a3d686e3c01430a74f11ef2ea28835c4e2acf5f963eabfe3",
     ".github/hooks/tool-guardian/guard-tool.sh": "8b7069d20fcd65906794a80e434953f335f0ad89ef134dff1443a56b14dc92d8",
-    "tools/scripts/pre-agent-loop.mjs": "beb42736eed1cfb994ce0e93238b7a767387abbd441872958221603314a58bfb"
+    "tools/scripts/pre-agent-loop.mjs": "bd672282aa69d1cf9116e0582328832099f104595f345c802b4e6fcccd335a32"
   },
   "notes": "The controller records an observed CLI version only after a closed-stdin, timeout-bound noninteractive probe succeeds. Context hashes cover the policy sources that control this run. allowed_commands entries are prefixes, so denied_commands excludes aggregates such as npm run validate:all that a prefix would otherwise reach; deny always wins."
 }

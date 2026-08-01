@@ -95,7 +95,7 @@
           "required": ["timeout_seconds", "output_limit_bytes"],
           "properties": {
             "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 60 },
-            "output_limit_bytes": { "type": "integer", "minimum": 256, "maximum": 65536 }
+            "output_limit_bytes": { "type": "integer", "minimum": 256, "maximum": 1048576 }
           }
         },
         "mcp": {
