@@ -4,10 +4,7 @@
     {
       "id": "workspace-operating-frame",
       "owner": "AGENTS.md",
-      "consumers": [
-        "contributors",
-        "GitHub Copilot agents"
-      ],
+      "consumers": ["contributors", "GitHub Copilot agents"],
       "classification": "keep",
       "disposition": "verified-no-change",
       "proof": [
@@ -22,10 +19,7 @@
     {
       "id": "scoped-instruction-discovery",
       "owner": ".github/instructions/*.instructions.md frontmatter",
-      "consumers": [
-        "Copilot instruction loader",
-        "repository validators"
-      ],
+      "consumers": ["Copilot instruction loader", "repository validators"],
       "classification": "consolidate",
       "disposition": "verified-no-change",
       "proof": [
@@ -44,11 +38,7 @@
     {
       "id": "user-documentation",
       "owner": "docs/",
-      "consumers": [
-        "APEX users",
-        "contributors",
-        "release reviewers"
-      ],
+      "consumers": ["APEX users", "contributors", "release reviewers"],
       "classification": "keep",
       "disposition": "verified-no-change",
       "proof": [
@@ -63,11 +53,7 @@
     {
       "id": "managed-agent-manifest",
       "owner": "customizations/manifest.json",
-      "consumers": [
-        "Copilot agent discovery",
-        "kernel task routing",
-        "model consistency checks"
-      ],
+      "consumers": ["Copilot agent discovery", "kernel task routing", "model consistency checks"],
       "classification": "keep",
       "disposition": "verified-no-change",
       "proof": [
@@ -86,11 +72,7 @@
     {
       "id": "model-catalog",
       "owner": ".github/model-catalog.json",
-      "consumers": [
-        "agent frontmatter",
-        "model validators",
-        "release checks"
-      ],
+      "consumers": ["agent frontmatter", "model validators", "release checks"],
       "classification": "keep",
       "disposition": "verified-no-change",
       "proof": [
@@ -109,11 +91,7 @@
     {
       "id": "skill-discovery",
       "owner": ".github/skills/*/SKILL.md frontmatter",
-      "consumers": [
-        "Copilot skill discovery",
-        "agents",
-        "orphan-content validation"
-      ],
+      "consumers": ["Copilot skill discovery", "agents", "orphan-content validation"],
       "classification": "consolidate",
       "disposition": "verified-no-change",
       "proof": [
@@ -132,11 +110,7 @@
     {
       "id": "workflow-dag",
       "owner": ".github/skills/workflow-engine/templates/workflow-graph.json",
-      "consumers": [
-        "orchestrator",
-        "handoff validation",
-        "documentation synchronization"
-      ],
+      "consumers": ["orchestrator", "handoff validation", "documentation synchronization"],
       "classification": "keep",
       "disposition": "verified-no-change",
       "proof": [
@@ -155,11 +129,7 @@
     {
       "id": "copilot-client-projections",
       "owner": "customizations/manifest.json",
-      "consumers": [
-        "GitHub Copilot in VS Code",
-        "GitHub Copilot CLI",
-        "client parity qualification"
-      ],
+      "consumers": ["GitHub Copilot in VS Code", "GitHub Copilot CLI", "client parity qualification"],
       "classification": "rewrite",
       "disposition": "verified-no-change",
       "proof": [
@@ -198,11 +168,7 @@
     {
       "id": "runtime-manifests",
       "owner": "config/*.v1.json",
-      "consumers": [
-        "runtime initialization",
-        "package assets",
-        "qualification"
-      ],
+      "consumers": ["runtime initialization", "package assets", "qualification"],
       "classification": "keep",
       "disposition": "verified-no-change",
       "proof": [
@@ -217,11 +183,7 @@
     {
       "id": "workspace-package-boundaries",
       "owner": "packages/*/package.json",
-      "consumers": [
-        "TypeScript build",
-        "clean-install tests",
-        "package consumers"
-      ],
+      "consumers": ["TypeScript build", "clean-install tests", "package consumers"],
       "classification": "keep",
       "disposition": "verified-no-change",
       "proof": [
@@ -240,11 +202,7 @@
     {
       "id": "schema-libraries",
       "owner": "packages/contracts/src/",
-      "consumers": [
-        "runtime contracts",
-        "repository artifact validators",
-        "external tooling"
-      ],
+      "consumers": ["runtime contracts", "repository artifact validators", "external tooling"],
       "classification": "investigate",
       "disposition": "verified-no-change",
       "proof": [
@@ -263,11 +221,7 @@
     {
       "id": "customization-distribution",
       "owner": "customizations/manifest.json",
-      "consumers": [
-        "CLI initialization",
-        "managed customization update",
-        "both supported Copilot clients"
-      ],
+      "consumers": ["CLI initialization", "managed customization update", "both supported Copilot clients"],
       "classification": "rewrite",
       "disposition": "verified-no-change",
       "proof": [
@@ -290,12 +244,7 @@
     {
       "id": "mcp-portfolio",
       "owner": "planned APEX MCP descriptor",
-      "consumers": [
-        "developer workspace",
-        "managed clients",
-        "capability packs",
-        "release packaging"
-      ],
+      "consumers": ["developer workspace", "managed clients", "capability packs", "release packaging"],
       "classification": "investigate",
       "disposition": "verified-no-change",
       "proof": [
@@ -326,12 +275,7 @@
     {
       "id": "pricing-evidence",
       "owner": "packages/contracts/src/pricing.ts",
-      "consumers": [
-        "architecture workflow",
-        "cost evidence",
-        "Gate 2 review",
-        "release qualification"
-      ],
+      "consumers": ["architecture workflow", "cost evidence", "Gate 2 review", "release qualification"],
       "classification": "rewrite",
       "disposition": "verified-no-change",
       "proof": [
@@ -370,11 +314,7 @@
     {
       "id": "improvement-outcome-ingestion",
       "owner": "config/improvement-policy.v1.json",
-      "consumers": [
-        "quality workflow",
-        "human proposal triage",
-        "release scorecard"
-      ],
+      "consumers": ["quality workflow", "human proposal triage", "release scorecard"],
       "classification": "rewrite",
       "disposition": "verified-no-change",
       "proof": [
@@ -393,12 +333,7 @@
     {
       "id": "workflow-validator-ownership",
       "owner": "packages/kernel/src/workflow-validator-ownership.ts",
-      "consumers": [
-        "workflow engine",
-        "task completion",
-        "Gate 4",
-        "terminal evidence"
-      ],
+      "consumers": ["workflow engine", "task completion", "Gate 4", "terminal evidence"],
       "classification": "keep",
       "disposition": "verified-no-change",
       "proof": [
@@ -413,12 +348,7 @@
     {
       "id": "repository-validator-graph",
       "owner": "tools/registry/repository-validator-graph.json",
-      "consumers": [
-        "package script projections",
-        "pull-request CI",
-        "contributors",
-        "pre-push validation"
-      ],
+      "consumers": ["package script projections", "pull-request CI", "contributors", "pre-push validation"],
       "classification": "consolidate",
       "disposition": "verified-no-change",
       "proof": [
@@ -437,13 +367,7 @@
     {
       "id": "language-validator-boundaries",
       "owner": "language-native tools invoked by package.json",
-      "consumers": [
-        "JavaScript",
-        "Python",
-        "Markdown",
-        "Bicep",
-        "Terraform"
-      ],
+      "consumers": ["JavaScript", "Python", "Markdown", "Bicep", "Terraform"],
       "classification": "keep",
       "disposition": "verified-no-change",
       "proof": [
@@ -458,12 +382,7 @@
     {
       "id": "markdown-policy-enforcement",
       "owner": ".markdownlint-cli2.jsonc and package.json scripts",
-      "consumers": [
-        "Markdown authors",
-        "pre-commit hooks",
-        "pull-request documentation checks",
-        "editor integration"
-      ],
+      "consumers": ["Markdown authors", "pre-commit hooks", "pull-request documentation checks", "editor integration"],
       "classification": "consolidate",
       "disposition": "verified-no-change",
       "proof": [
@@ -490,11 +409,7 @@
     {
       "id": "artifact-template-validation",
       "owner": ".github/skills/azure-artifacts/templates/",
-      "consumers": [
-        "artifact authors",
-        "pre-commit hook",
-        "challenger review"
-      ],
+      "consumers": ["artifact authors", "pre-commit hook", "challenger review"],
       "classification": "consolidate",
       "disposition": "verified-no-change",
       "proof": [
@@ -513,11 +428,7 @@
     {
       "id": "precommit-hooks",
       "owner": "lefthook.yml",
-      "consumers": [
-        "git pre-commit",
-        "contributors",
-        "artifact validation"
-      ],
+      "consumers": ["git pre-commit", "contributors", "artifact validation"],
       "classification": "rewrite",
       "disposition": "verified-no-change",
       "proof": [
@@ -536,11 +447,7 @@
     {
       "id": "github-required-checks",
       "owner": "GitHub branch protection and .github/workflows/ci.yml",
-      "consumers": [
-        "branch protection",
-        "pull requests",
-        "release qualification"
-      ],
+      "consumers": ["branch protection", "pull requests", "release qualification"],
       "classification": "keep",
       "disposition": "verified-no-change",
       "proof": [
@@ -575,11 +482,7 @@
     {
       "id": "exact-head-release-qualification",
       "owner": ".github/workflows/release-candidate-qualification.yml",
-      "consumers": [
-        "release reviewers",
-        "pull requests",
-        "exact-candidate evidence consumers"
-      ],
+      "consumers": ["release reviewers", "pull requests", "exact-candidate evidence consumers"],
       "classification": "keep",
       "disposition": "verified-no-change",
       "proof": [
@@ -606,11 +509,7 @@
     {
       "id": "maintenance-workflows",
       "owner": ".github/workflows/weekly-maintenance.yml",
-      "consumers": [
-        "maintainers",
-        "dependency freshness",
-        "branch hygiene"
-      ],
+      "consumers": ["maintainers", "dependency freshness", "branch hygiene"],
       "classification": "keep",
       "disposition": "verified-no-change",
       "proof": [
@@ -629,9 +528,7 @@
     {
       "id": "upstream-workflow-synchronization",
       "owner": ".archive/retired-automation/sync-workflows.mjs",
-      "consumers": [
-        "historical provenance and rollback review"
-      ],
+      "consumers": ["historical provenance and rollback review"],
       "classification": "retire",
       "disposition": "verified-no-change",
       "proof": [
@@ -654,10 +551,7 @@
     {
       "id": "model-catalog-generation",
       "owner": "tools/scripts/generate-model-catalog.mjs",
-      "consumers": [
-        "model catalog assignments",
-        "agent validators"
-      ],
+      "consumers": ["model catalog assignments", "agent validators"],
       "classification": "keep",
       "disposition": "verified-no-change",
       "proof": [
@@ -672,11 +566,7 @@
     {
       "id": "entity-count-generation",
       "owner": "tools/registry/count-manifest.json",
-      "consumers": [
-        "documentation",
-        "freshness checks",
-        "repository audits"
-      ],
+      "consumers": ["documentation", "freshness checks", "repository audits"],
       "classification": "keep",
       "disposition": "verified-no-change",
       "proof": [
@@ -691,11 +581,7 @@
     {
       "id": "avm-index-generation",
       "owner": "tools/scripts/refresh-avm-module-index.mjs",
-      "consumers": [
-        "IaC planners",
-        "module pin validators",
-        "weekly maintenance"
-      ],
+      "consumers": ["IaC planners", "module pin validators", "weekly maintenance"],
       "classification": "keep",
       "disposition": "verified-no-change",
       "proof": [
@@ -710,11 +596,7 @@
     {
       "id": "freshness-generation",
       "owner": "tools/registry/source-freshness.json",
-      "consumers": [
-        "documentation CI",
-        "skill references",
-        "quarterly audit"
-      ],
+      "consumers": ["documentation CI", "skill references", "quarterly audit"],
       "classification": "keep",
       "disposition": "verified-no-change",
       "proof": [
@@ -729,12 +611,7 @@
     {
       "id": "diagram-routing",
       "owner": ".github/skills/mermaid/ and .github/skills/python-diagrams/",
-      "consumers": [
-        "design workflow",
-        "IaC planning",
-        "as-built output",
-        "documentation"
-      ],
+      "consumers": ["design workflow", "IaC planning", "as-built output", "documentation"],
       "classification": "keep",
       "disposition": "verified-no-change",
       "proof": [
@@ -765,12 +642,7 @@
     {
       "id": "client-bundle-generation",
       "owner": "packages/cli/scripts/prepare-assets.mjs",
-      "consumers": [
-        "npm packages",
-        "CLI lifecycle",
-        "release manifest",
-        "SBOM and provenance"
-      ],
+      "consumers": ["npm packages", "CLI lifecycle", "release manifest", "SBOM and provenance"],
       "classification": "rewrite",
       "disposition": "verified-no-change",
       "proof": [
@@ -793,11 +665,7 @@
     {
       "id": "v1-compatibility-matrix",
       "owner": "docs/vnext/phase-0a/v1-behavior-compatibility.md",
-      "consumers": [
-        "modernization reviewers",
-        "cutover review",
-        "compatibility tests"
-      ],
+      "consumers": ["modernization reviewers", "cutover review", "compatibility tests"],
       "classification": "retire",
       "disposition": "verified-no-change",
       "proof": [
@@ -812,11 +680,7 @@
     {
       "id": "public-command-compatibility",
       "owner": "packages/cli/src/cli.ts",
-      "consumers": [
-        "CLI users",
-        "automation",
-        "consumer repositories"
-      ],
+      "consumers": ["CLI users", "automation", "consumer repositories"],
       "classification": "investigate",
       "disposition": "verified-no-change",
       "proof": [
@@ -835,11 +699,7 @@
     {
       "id": "validator-diagnostics",
       "owner": "tools/scripts/_lib/reporter.mjs",
-      "consumers": [
-        "local validation",
-        "CI logs",
-        "agent remediation"
-      ],
+      "consumers": ["local validation", "CI logs", "agent remediation"],
       "classification": "consolidate",
       "disposition": "verified-no-change",
       "proof": [
@@ -862,11 +722,7 @@
     {
       "id": "workflow-telemetry",
       "owner": "tools/scripts/measure-workflow-baseline.mjs",
-      "consumers": [
-        "modernization baselines",
-        "workflow retrospectives",
-        "release review"
-      ],
+      "consumers": ["modernization baselines", "workflow retrospectives", "release review"],
       "classification": "investigate",
       "disposition": "verified-no-change",
       "proof": [
@@ -881,10 +737,7 @@
     {
       "id": "debug-log-profiling",
       "owner": "client-specific profilers emitting apex-debug-profile",
-      "consumers": [
-        "context optimization",
-        "local investigations"
-      ],
+      "consumers": ["context optimization", "local investigations"],
       "classification": "investigate",
       "disposition": "verified-no-change",
       "proof": [
@@ -899,11 +752,7 @@
     {
       "id": "managed-consumer-guidance",
       "owner": "customizations/.github/copilot-instructions.md",
-      "consumers": [
-        "GitHub Copilot in VS Code",
-        "GitHub Copilot CLI",
-        "generated customization bundle"
-      ],
+      "consumers": ["GitHub Copilot in VS Code", "GitHub Copilot CLI", "generated customization bundle"],
       "classification": "consolidate",
       "disposition": "verified-no-change",
       "proof": [
