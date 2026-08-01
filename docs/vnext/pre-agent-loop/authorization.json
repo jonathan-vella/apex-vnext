@@ -1,9 +1,9 @@
 {
   "$schema": "./authorization.schema.json",
   "version": 1,
-  "authorization_id": "pre-agent-opt-2026-08-01-glob-bounds",
+  "authorization_id": "pre-agent-opt-2026-08-01-command-policy",
   "authored_by": "jonathan-vella",
-  "authored_at": "2026-08-01T09:59:56Z",
+  "authored_at": "2026-08-01T10:09:02Z",
   "expires_at": "2026-08-03T23:59:59Z",
   "base_commit": "origin/main",
   "issues": [222, 220, 219],
@@ -70,6 +70,13 @@
     "npm run validate:",
     "npm run test:",
     "npm run format:",
+    "npm run prove:bounded-improvement",
+    "npm run check:h2-order",
+    "npm run prepare:vnext-assets",
+    "npm run measure:baseline",
+    "npm run profile:debug-log",
+    "npm run profile:copilot-cli-otel",
+    "npm run profile:vscode-otel",
     "node tools/scripts/",
     "node --test",
     "python3 -m pytest",
@@ -152,7 +159,7 @@
     ".github/instructions/code-quality.instructions.md": "5223713c1f411117df41bc6ddfed98ebac33c77bf098a5feaf752a8453e0cba1",
     "docs/vnext/pre-agent-loop/authorization.schema.json": "e280ca57b32685d5a3d686e3c01430a74f11ef2ea28835c4e2acf5f963eabfe3",
     ".github/hooks/tool-guardian/guard-tool.sh": "8b7069d20fcd65906794a80e434953f335f0ad89ef134dff1443a56b14dc92d8",
-    "tools/scripts/pre-agent-loop.mjs": "12a671a6c5e6b3964aedaa1727443b5fbed5d9a909d0166468f9af412d3123c5"
+    "tools/scripts/pre-agent-loop.mjs": "5625513bf675cf682a8df9a41601461ca078a0b204b9d8a5e68abe4c2fa1ea6c"
   },
   "notes": "The controller records an observed CLI version only after a closed-stdin, timeout-bound noninteractive probe succeeds. Context hashes cover the policy sources that control this run. allowed_commands entries are prefixes, so denied_commands excludes aggregates such as npm run validate:all that a prefix would otherwise reach; deny always wins."
 }
