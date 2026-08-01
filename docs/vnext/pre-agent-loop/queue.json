@@ -1,6 +1,6 @@
 {
   "authorization_id": "pre-agent-opt-2026-08-01-command-policy",
-  "state": "running",
+  "state": "stopped",
   "items": [
     {
       "id": "workspace-operating-frame",
@@ -832,5 +832,6 @@
       "rationale": "Shipped consumer behavior needs one managed guidance owner distinct from repository contributor instructions.",
       "status": "pending"
     }
-  ]
+  ],
+  "stop_reason": "focused check failed: npm run check:h2-order"
 }
