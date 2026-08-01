@@ -240,6 +240,20 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "improvement-outcome-ingestion",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run test:bounded-improvement",
+          "status": 0
+        },
+        {
+          "command": "npm run prove:bounded-improvement",
+          "status": 0
+        }
+      ]
     }
   ]
 }
