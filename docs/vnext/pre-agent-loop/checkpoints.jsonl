@@ -33,3 +33,4 @@
 {"authorization_id":"pre-agent-opt-2026-08-01-proof-policy","item":"precommit-hooks","state":"accepted","sha":"29a1b8f7cececbdd288645bd9ff3fb0a86b5b721","at":"2026-08-01T10:26:11.699Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-proof-policy","item":"github-required-checks","state":"accepted","sha":"51518fffd57fd1363cf26150ec488b41d0cd3a80","at":"2026-08-01T10:28:44.022Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-proof-policy","item":"exact-head-release-qualification","state":"accepted","sha":"01c49299d97d813a08a24d3a0b067bf5d84fbbe3","at":"2026-08-01T10:31:08.664Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-proof-policy","item":"maintenance-workflows","state":"accepted","sha":"6056c836635328c12bbf26f6179bbe5f15b0d7b2","at":"2026-08-01T10:33:37.568Z"}
