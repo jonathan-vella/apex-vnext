@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Removed redundant and zero-consumer root npm scripts, merged overlapping live-validator tests, centralized shared
+  Node validation in `validate:_node-core`, and archived completed benchmark/dead-test utilities with provenance.
 - Consolidated shared GitHub Actions setup, removed no-op maintenance inputs and duplicate Markdown/IaC steps, and
   archived the devcontainer CI workflow already disabled by DECISION-009.
 - Consolidated duplicate lint aliases onto canonical validators, replaced repeated vNext CI steps with

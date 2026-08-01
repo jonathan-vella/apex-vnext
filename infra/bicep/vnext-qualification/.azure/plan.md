@@ -190,7 +190,7 @@ Official limit references:
 - [x] Re-run subscription validation and what-if with the exact replacement deployment principal
 - [x] Run the IaC security baseline and AVM pin validators
 - [x] Run `npm run validate:vnext-live-workflow`
-- [x] Run `npm run test:vnext-live-workflow`
+- [x] Run `npm run test:vnext-validator`
 - [x] Create and confirm the replacement federated credential in the current tenant
 - [x] Update this plan to `Validated` and populate validation proof
 

@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
@@ -70,28 +69,6 @@ const scripts = {
 
 const options = { graph, schema, scripts, consumers: { "ci-main": "validate:_node-ci" } };
 
-function runScript(script, args = []) {
-  const result = spawnSync("npm", ["run", "--silent", script, "--", ...args], {
-    cwd: process.cwd(),
-    encoding: "utf8",
-    env: { ...process.env, NO_COLOR: "1" },
-  });
-  if (result.error !== undefined) throw result.error;
-  assert.notEqual(result.status, null, `${script} terminated without an exit status`);
-  const output = `${result.stdout}${result.stderr}`;
-  const lines = output.split(/\r?\n/u);
-  const start = lines.findIndex((line) =>
-    /(?:Policy Precheck Output Validator|Agent Validators \(consolidated\))/u.test(line),
-  );
-  assert.notEqual(start, -1, `${script} emitted no recognizable validator diagnostics`);
-  const diagnostics = lines
-    .slice(start)
-    .filter((line) => !/^npm (?:error|ERR!)/iu.test(line))
-    .join("\n")
-    .trim();
-  return { status: result.status, output: diagnostics };
-}
-
 test("parses prerequisites, parallel members, continue-on-error, and epilogue", () => {
   assert.deepEqual(parseAggregate("npm run build:vnext && run-p validate:a validate:b"), {
     prerequisites: ["build:vnext"],
@@ -159,10 +136,6 @@ test("rejects a canonical script delegated back to its alias", () => {
   assert.ok(errors.some((error) => error.includes("canonical script delegates to alias")));
 });
 
-test("delegated aliases preserve canonical exits and diagnostics", () => {
-  assert.deepEqual(runScript("lint:policy-precheck", []), runScript("validate:policy-precheck", []));
-});
-
 test("rejects aggregate dependency cycles and missing consumer evidence", () => {
   const invalid = structuredClone(graph);
   invalid.aggregates.push({
@@ -209,4 +182,28 @@ test("rejects cycles through aggregate prerequisites", () => {
     },
   });
   assert.ok(errors.some((error) => error.includes("aggregate dependency cycle")));
+});
+
+test("rejects CI-unsafe commands hidden in nested aggregates", () => {
+  const invalid = structuredClone(graph);
+  invalid.profiles[0].ciSafety = "conditional";
+  invalid.aggregates.unshift({
+    id: "validate-node-core",
+    script: "validate:_node-core",
+    prerequisites: [],
+    members: ["validate:example"],
+    continueOnError: false,
+    epilogue: null,
+  });
+  invalid.aggregates[1].members = ["validate:_node-core"];
+  const errors = validateRepositoryValidatorGraph({
+    ...options,
+    graph: invalid,
+    scripts: {
+      ...scripts,
+      "validate:_node-core": "run-p validate:example",
+      "validate:_node-ci": "npm run build:vnext && run-p validate:_node-core",
+    },
+  });
+  assert.ok(errors.includes("validate:_node-ci: CI-unsafe dependency validate:example"));
 });

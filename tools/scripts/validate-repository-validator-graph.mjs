@@ -106,6 +106,14 @@ export function validateRepositoryValidatorGraph({ graph, schema, scripts, consu
   }
   for (const script of aggregates.keys()) visitAggregate(script);
 
+  function nestedCommands(script, seen = new Set()) {
+    if (seen.has(script)) return [];
+    seen.add(script);
+    const aggregate = aggregates.get(script);
+    if (aggregate === undefined) return commands.has(script) ? [script] : [];
+    return [...aggregate.prerequisites, ...aggregate.members].flatMap((dependency) => nestedCommands(dependency, seen));
+  }
+
   for (const command of graph.commands) {
     if (!profiles.has(command.profile)) errors.push(`${command.script}: unknown profile ${command.profile}`);
     if (scripts[command.script] === undefined) errors.push(`${command.script}: package script is missing`);
@@ -155,11 +163,16 @@ export function validateRepositoryValidatorGraph({ graph, schema, scripts, consu
       if (command?.retirement.status === "retired")
         errors.push(`${aggregate.script}: depends on retired command ${script}`);
       const profile = command === undefined ? null : profiles.get(command.profile);
-      if (aggregate.script === "validate:_node-ci" && profile?.ciSafety !== "safe") {
-        errors.push(`${aggregate.script}: CI-unsafe dependency ${script}`);
-      }
       if (aggregate.members.includes(script) && profile?.parallelSafety === "serial-only") {
         errors.push(`${aggregate.script}: parallel member is serial-only: ${script}`);
+      }
+    }
+    if (aggregate.script === "validate:_node-ci") {
+      for (const script of nestedCommands(aggregate.script)) {
+        const command = commands.get(script);
+        if (profiles.get(command?.profile)?.ciSafety !== "safe") {
+          errors.push(`${aggregate.script}: CI-unsafe dependency ${script}`);
+        }
       }
     }
   }

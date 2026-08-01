@@ -534,7 +534,7 @@ function validateTemplate(artifactName) {
     error(
       `Template ${templatePath} is missing required H2 headings: ${missing.join(
         ", ",
-      )}. Fix: Copy exact headings from the artifact template or run 'npm run fix:artifacts -- <file> --apply'.`,
+      )}. Fix: Copy exact headings from the artifact template or run 'npm run fix:artifact-h2 -- <file> --apply'.`,
       { filePath: templatePath, line: 1 },
     );
     return;
@@ -734,7 +734,7 @@ function validateArtifactCompliance(relPath) {
     reportFn(
       `Artifact ${relPath} is missing required H2 headings: ${missing.join(
         ", ",
-      )}. Fix: Copy exact headings from the template or run 'npm run fix:artifacts -- ${relPath} --apply'.`,
+      )}. Fix: Copy exact headings from the template or run 'npm run fix:artifact-h2 -- ${relPath} --apply'.`,
       { filePath: relPath, line: 1 },
     );
   }
@@ -1150,7 +1150,7 @@ function runFixMode(filePaths) {
   if (actualFiles.length === 0) {
     console.log(`
 Usage:
-  npm run fix:artifacts -- <artifact-path> [--apply]
+  npm run fix:artifact-h2 -- <artifact-path> [--apply]
 
 Options:
   --apply    Actually modify files (without this, only shows what would change)
