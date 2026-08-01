@@ -185,20 +185,10 @@ table with a Challenger-tagged informational finding.
 
 ## Output
 
-Write the final plan via `apex-recall`:
-
-```bash
-apex-recall decide <project> --key vnet_mode --value <create-new|use-existing> --step 2 --json
-apex-recall decide <project> --key existing_vnet_id --value "<id-or-empty>" --step 2 --json   # only when use-existing
-apex-recall decide <project> --key vnet_address_space --value "10.0.0.0/16" --step 2 --json
-apex-recall decide <project> --key subnet_plan --value "$(cat plan.json)" --step 2 --json
-apex-recall decide <project> --key vnet_plan_decision --value <confirmed|edited|deferred> --step 2 --json
-```
-
-`subnet_plan` MUST conform to
-The original session-state subnet-plan schema is retired. New vNext networking intent must use typed contract inputs.
-(v1). The schema remains the compatibility contract; the retired prose-key validator is preserved under
-`.archive/legacy-agents-v0.10/`.
+Record the final plan through the active client and kernel's typed networking inputs. The original `subnet_plan`
+session-state contract is retained only as an
+[archived schema](../../../../.archive/retired-compatibility/original-apex-v1/tools/schemas/subnet-plan.schema.json)
+for historical interpretation; do not use it for new vNext state.
 
 ## Defaults that always hold
 

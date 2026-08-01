@@ -17,7 +17,10 @@ import {
 } from "../scripts/vnext-live-handoff.mjs";
 import { validateWorkflowText } from "../scripts/validate-vnext-live-workflow.mjs";
 
-const baseline = readFileSync(new URL("../../.github/workflows/vnext-live-qualification.yml", import.meta.url), "utf8");
+const baseline = readFileSync(
+  new URL("../../.github/workflows/vnext-live-qualification.yml", import.meta.url),
+  "utf8",
+).replaceAll("\r\n", "\n");
 const launcher = readFileSync(new URL("../scripts/vnext-live-handoff.mjs", import.meta.url), "utf8").replaceAll(
   "\r\n",
   "\n",
