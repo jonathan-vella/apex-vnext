@@ -393,7 +393,7 @@
         "npm run test:repository-validator-graph"
       ],
       "rationale": "The graph owns validation metadata while package scripts remain the executable projection and hooks/workflows retain environment-specific behavior.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "language-validator-boundaries",

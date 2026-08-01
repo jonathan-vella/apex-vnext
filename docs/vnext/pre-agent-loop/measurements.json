@@ -264,6 +264,20 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "repository-validator-graph",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:repository-validator-graph",
+          "status": 0
+        },
+        {
+          "command": "npm run test:repository-validator-graph",
+          "status": 0
+        }
+      ]
     }
   ]
 }

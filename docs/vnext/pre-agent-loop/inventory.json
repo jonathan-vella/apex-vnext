@@ -420,9 +420,18 @@
         "pre-push validation"
       ],
       "classification": "consolidate",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:repository-validator-graph",
+          "status": 0
+        },
+        {
+          "command": "npm run test:repository-validator-graph",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "The graph owns validation metadata while package scripts remain the executable projection and hooks/workflows retain environment-specific behavior."
     },
     {
