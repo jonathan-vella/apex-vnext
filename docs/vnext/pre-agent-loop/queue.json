@@ -725,7 +725,7 @@
         "npm run validate:v1-compatibility-matrix"
       ],
       "rationale": "The matrix is required through modernization but becomes historical after accepted cutover.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "public-command-compatibility",

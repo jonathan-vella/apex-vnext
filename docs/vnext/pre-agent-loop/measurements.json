@@ -506,6 +506,16 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "v1-compatibility-matrix",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:v1-compatibility-matrix",
+          "status": 0
+        }
+      ]
     }
   ]
 }

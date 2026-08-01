@@ -799,9 +799,14 @@
         "compatibility tests"
       ],
       "classification": "retire",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:v1-compatibility-matrix",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "The matrix is required through modernization but becomes historical after accepted cutover."
     },
     {
