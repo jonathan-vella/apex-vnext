@@ -11,6 +11,7 @@ dependency-complete change.
 | Resource           | Link                                                                    |
 | ------------------ | ----------------------------------------------------------------------- |
 | User guides        | [Documentation](docs/README.md)                                          |
+| Contributor guide  | [Contribute to APEX vNext](docs/how-to/contribute.md)                    |
 | Project controls   | [vNext project hub](docs/vnext/README.md)                                |
 | Open issues        | Use the repository's **Issues** tab                                     |
 | Source provenance  | [Migration record](docs/MIGRATION.md)                                    |
@@ -26,6 +27,9 @@ npm ci
 npm run qualify:vnext
 npm run validate:all
 ```
+
+The [contributor guide](docs/how-to/contribute.md) explains package boundaries, source ownership, focused checks, and
+release authority.
 
 Report vulnerabilities through the confidential process in [SECURITY.md](SECURITY.md), never through a public issue or
 pull request.

@@ -125,19 +125,12 @@ template counts.
 
 **Auto-fix**: Update count reference.
 
-### 9. Project Health Files
+### 9. Support And Project Controls
 
-**Source of truth**: Filesystem agent/skill counts + CI validation results.
+**Source of truth**: `customizations/manifest.json`, versioned config, package source, and `docs/vnext/` controls.
 
-**Files to check**:
-
-| File                                          | What to verify                                      |
-| --------------------------------------------- | --------------------------------------------------- |
-| `QUALITY_SCORE.md`                            | Grades reflect current state; change log up to date |
-| `tools/tests/exec-plans/tech-debt-tracker.md` | Active items still relevant; resolved items moved   |
-
-**Auto-fix**: Update grades and log entries in `QUALITY_SCORE.md`. Mark resolved debt items
-as resolved with the current date.
+Verify that client, IaC, qualification, release, and product-status claims distinguish implementation from current
+evidence. Update the documentation inventory when ownership or lifecycle changes.
 
 ## Summary Table Template
 
@@ -149,16 +142,7 @@ When reporting audit results, use this format:
 | 1   | docs.instructions.md | 34   | Missing `design` and `orchestrator` agents | Add table rows |
 ```
 
-## Known Issues
+## Current Contract
 
-No known issues. Last audit: 2026-03-23.
-
-All 21 discrepancies identified during the initial audit have been
-resolved (Tasks A–D). Fixes included:
-
-- Version headers migrated to `[Current Version](../VERSION.md)` links
-- Agent counts corrected to 8, skill counts to 8
-- Orchestrator model corrected to Claude Opus 4.6, approval gates to 5
-- MCP path fixed, broken link removed
-- Glossary cross-references fixed, keyboard shortcut corrected, new terms added
-- Scenarios directory removed; replaced by prompt-guide section in published site
+Run `npm run validate:docs`. The generated CLI/MCP inventories, active navigation, retired-path guard, and predecessor
+history boundary must all pass.

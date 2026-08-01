@@ -52,7 +52,7 @@ Update when:
 - Use conventional commit type to determine section (Added, Changed,
   Fixed, Removed, Deprecated, Security)
 
-### User guides (`docs/guides/`)
+### Product documentation (`docs/tutorials/`, `docs/how-to/`, `docs/explanation/`, `docs/reference/`)
 
 Update when:
 

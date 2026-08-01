@@ -1,68 +1,56 @@
-## APEX vNext Project
+# APEX vNext Project Controls
 
-This directory is the durable project hub for completing and releasing APEX vNext. Start with
-[PROJECT.md](PROJECT.md) to resume work from the latest verified checkpoint.
+This directory contains binding repository-development and release controls. Product tutorials, procedures,
+explanations, and references start at the [documentation index](../README.md).
 
 ## Sources Of Truth
 
-| Concern | Authority | Update rule |
-| --- | --- | --- |
-| Product scope and acceptance | [PRD.md](PRD.md) | Requirement changes need a decision entry. |
-| Architecture and delivery order | [ROADMAP.md](ROADMAP.md) | Update at approved dependency or milestone changes. |
-| Daily work state | GitHub Issues | Issue state and assignee are authoritative. |
-| Prioritization and views | GitHub Project `APEX vNext` | The project is a view, never a second backlog. |
-| Risks and delivery concerns | [REGISTER.md](REGISTER.md) | Link actionable entries to an issue. |
-| Decisions | [DECISIONS.md](DECISIONS.md) | Append entries; use an ADR for consequential design choices. |
-| Supported client qualification | [CLIENT-QUALIFICATION.md](CLIENT-QUALIFICATION.md) | Pin clients and compare normalized outcomes. |
-| Managed custom-agent contract | [CUSTOM-AGENT-CONTRACT-PLAN.md](CUSTOM-AGENT-CONTRACT-PLAN.md) | Keep shared roles and client projections aligned with official agent schemas. |
-| Hidden-worker characterization | [HIDDEN-WORKER-CHARACTERIZATION.md](HIDDEN-WORKER-CHARACTERIZATION.md) | Preserve client visibility/delegation evidence and the resolution gate. |
-| Guidance and automation review | [GUIDANCE-AUTOMATION-REVIEW.md](GUIDANCE-AUTOMATION-REVIEW.md) | Characterize owners before consolidation. |
-| Guidance and automation evidence | [GUIDANCE-AUTOMATION-CHARACTERIZATION.md](GUIDANCE-AUTOMATION-CHARACTERIZATION.md) | Preserve consumer maps, baselines, and later change gates. |
-| Terraform MCP characterization | [TERRAFORM-MCP-CHARACTERIZATION.md](TERRAFORM-MCP-CHARACTERIZATION.md) | Preserve registry-only tools, consumers, provenance gaps, and replacement gates. |
-| Terraform Registry client | [TERRAFORM-REGISTRY-CLIENT.md](TERRAFORM-REGISTRY-CLIENT.md) | Define bounded public Registry operations, statuses, cache, and authority exclusions. |
-| Native Terraform provider introspection | [TERRAFORM-PROVIDER-INTROSPECTION.md](TERRAFORM-PROVIDER-INTROSPECTION.md) | Define bounded installed-schema inspection and official documentation routing. |
-| Qualification evidence | [FINAL-QUALIFICATION.md](FINAL-QUALIFICATION.md) | Preserve historical evidence; replace only with a new exact-candidate dossier. |
-| Modernization ownership | [Completed maintenance archive](../../.archive/retired-automation/pre-agent-loop-v1/README.md) | Historical evidence. |
-| Resume state | [PROJECT.md](PROJECT.md) | Update at checkpoints and milestone transitions. |
-| Historical product baseline | [phase-0a/](phase-0a/) | Frozen evidence; do not edit or repurpose. |
+| Concern | Authority |
+| --- | --- |
+| Current engineering checkpoint | [PROJECT.md](PROJECT.md) |
+| Product scope and acceptance | [PRD.md](PRD.md) |
+| Delivery order | [ROADMAP.md](ROADMAP.md) |
+| Risks and assumptions | [REGISTER.md](REGISTER.md) |
+| Decisions and ADR index | [DECISIONS.md](DECISIONS.md) and [ADRs](adrs/README.md) |
+| Client qualification | [CLIENT-QUALIFICATION.md](CLIENT-QUALIFICATION.md) |
+| Live Azure procedure | [LIVE-QUALIFICATION.md](LIVE-QUALIFICATION.md) |
+| Documentation ownership | [documentation-inventory.v1.json](documentation-inventory.v1.json) |
+| Frozen baseline evidence | [phase-0a](phase-0a/) |
 
-The product runtime stores project-run state under `.apex/`. It does not track vNext engineering work. Chat memory is a
-convenience and is never authoritative.
+Versioned runtime behavior is owned by `packages/`, `config/`, and `customizations/`. Project controls may add release
+requirements but may not create a competing runtime state machine.
+
+## Current Boundary
+
+APEX vNext is pre-release and no release candidate is selected. Deterministic and package qualification are required for
+ordinary changes. Live client, Azure, publication, tagging, and cutover actions require separate explicit authorization
+and candidate-bound evidence.
+
+GitHub Issues own actionable work state. These documents own durable requirements, decisions, risks, and procedures;
+chat history and generated summaries are never authoritative.
 
 ## Contribution Flow
 
-1. Read [PROJECT.md](PROJECT.md), then open the linked active GitHub issue.
-2. Verify the current `main` head, required checks, and all local worktrees before editing.
-3. Create or resume a short-lived issue branch in an isolated worktree.
-4. Characterize the selected behavior and define the cheapest falsifying check.
-5. Implement one dependency-complete slice and run focused validation immediately after the first edit.
-6. Update affected requirements, roadmap, register, decisions, and user documentation in the same slice.
-7. Add a resumable issue comment with the branch, head, completed work, next action, blockers, checks, and dirty files.
-8. Open the issue branch pull request against `main`; do not push feature work directly to `main`.
-
-## Repository Boundary
-
-- This repository's `main` branch is the durable vNext integration line.
-- The original `jonathan-vella/apex` repository remains the v1 maintenance and provenance source.
-- Issue branches target `main` through pull requests.
-- Package publication, release tags, deployment, and production cutover require separate authorization.
+1. Read the current checkpoint and linked issue.
+2. Verify `main`, worktrees, required checks, and local changes.
+3. Implement one dependency-complete slice on a short-lived branch.
+4. Run the cheapest falsifying check immediately after the first edit.
+5. Update affected controls and product documentation in the same slice.
+6. Run full validation and deterministic qualification.
+7. Merge only through protected checks.
 
 ## Validation
 
-Run `npm run validate:vnext-project-controls` after changing this document set or either vNext issue form. The offline
-validator enforces required documents and form fields, unique requirement and decision IDs, valid requirement references,
-local links, and the frozen Phase 0A evidence digest. It deliberately does not query mutable GitHub state.
+```bash
+npm run validate:vnext-project-controls
+npm run validate:all
+npm run qualify:vnext
+```
 
-## Historical Plans
+The project-control validator preserves required files, unique IDs, local links, issue-form fields, and the frozen Phase
+0A digest.
 
-The approved Phase 0A evidence under [phase-0a/](phase-0a/) is immutable. The historical
-[`plan-buildApexVnext.prompt.md`](../../.github/prompts/plan-buildApexVnext.prompt.md) and
-[`plan-governAndCompleteApexVnext.prompt.md`](../../.github/prompts/plan-governAndCompleteApexVnext.prompt.md) record
-superseded design and governance input. They are nonbinding. Current product commitments, decisions, and delivery order
-live in [PRD.md](PRD.md), [DECISIONS.md](DECISIONS.md), and [ROADMAP.md](ROADMAP.md).
+## Historical Material
 
-## Resume Protocol
-
-Use `/apex-vnext-continue` when the active Copilot client exposes the repository prompt. It re-verifies repository and
-GitHub state before selecting work. If the prompt is unavailable, read [PROJECT.md](PROJECT.md), the active issue
-checkpoint, and the current `main` check state directly.
+Predecessor history belongs only in [Migration](../MIGRATION.md) and frozen/archive evidence. Active product behavior is
+documented from vNext source authorities.

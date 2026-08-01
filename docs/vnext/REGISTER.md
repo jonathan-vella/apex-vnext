@@ -1,366 +1,68 @@
-## APEX vNext Register
+# APEX vNext Risk And Assumption Register
 
-This register contains high-signal release and project concerns. GitHub Issues own executable work state. Replace
-`Pending` related-issue values with issue links during the GitHub bootstrap, and add closure proof before closing an
-entry.
+Only unresolved or release-relevant items belong in this register. Closed implementation history is preserved by Git
+and the repository archives.
 
-Allowed entry types are `RISK`, `ASSUMPTION`, `ISSUE`, `DEPENDENCY`, `DEFECT`, and `REGRESSION`.
+## RISK-001: Client Behavior Can Drift Between Candidates
 
-## Open Entries
-
-### RISK-001: Re-Baselined Promotion Evidence Is Incomplete
-
-- **Type:** `RISK`
-- **Owner:** Release engineering
-- **Impact:** No prior receipt can authorize package publication, release tags, or cutover for the expanded contract.
-- **Evidence:** Candidate `25530c339410e9758ae34538427f24bddfd83e1d` and its exact-main automation qualified the
-  earlier contract. Current characterization base `1a1de02a3a17f496c713dd3c4e425c8df8d30d0e` follows the legacy-agent
-  archive and the approved client, MCP, diagram, improvement, and bundle re-baseline.
-- **Related issue:** Pending Milestone H issue.
-- **Mitigation:** Select a new candidate only after Milestones H through O, then bind all deterministic, client,
-  package, security, and live evidence to that exact commit and dependency set.
-- **State:** Open
-- **Closure proof:** A new exact-candidate dossier, passing receipt, and separate maintainer promotion decision.
-
-### RISK-003: GitHub Project Access Is Unavailable To The Current Token
-
-- **Type:** `RISK`
-- **Owner:** Repository maintainer
-- **Impact:** The `APEX vNext` planning view, fields, and views cannot be inspected or created in this execution.
-- **Evidence:** `gh project list --owner jonathan-vella` returned `Resource not accessible by personal access token` on
-  2026-07-14.
-- **Related issue:** [#541](https://github.com/jonathan-vella/apex/issues/541)
-- **Mitigation:** Grant the token Projects read/write scope or create the project through an authorized maintainer session.
-- **State:** Blocked
-- **Closure proof:** Project URL and verified field and view inventory.
-
-### RISK-005: Markdown Linter Carries A Moderate Parser Denial-Of-Service Advisory
-
-- **Type:** `RISK`
-- **Owner:** Release engineering
-- **Impact:** Adversarial Markdown could consume excess CI CPU during linting; shipped runtime packages are unaffected.
-- **Evidence:** `markdownlint-cli2@0.23.0` pins `js-yaml@5.2.0`, which is affected by the moderate `!!omap`
-  quadratic-complexity advisory. `npm audit --omit=dev` reports zero vulnerabilities, and the high-severity 4.x
-  merge-key advisory is removed by pinning the compatible `xmlbuilder2` branch to `js-yaml@4.3.0`.
-- **Related issue:** Dependabot alert `#1`.
-- **Mitigation:** Accept for the private trusted-contributor release line, retain bounded CI job timeouts, and update
-  `markdownlint-cli2` when an upstream release consumes `js-yaml@5.2.1` or newer.
-- **State:** Accepted
-- **Closure proof:** Full audit contains no critical or high finding; production-only audit contains no finding.
-
-### RISK-006: A Development Lock Entry Uses Mirror-Resolved SHA-1 Metadata
-
-- **Type:** `RISK`
-- **Owner:** Release engineering
-- **Impact:** Reproducing the development-only `xmlbuilder2` validation path depends on the approved npm proxy retaining
-  the exact `js-yaml@4.3.0` tarball identified by legacy SHA-1 lock metadata. Published runtime packages are unaffected.
-- **Evidence:** The nested lock entry is marked `dev: true`; `npm audit --package-lock-only --omit=dev` reports zero
-  vulnerabilities, and the exact-main independent review found no release-blocking supply-chain issue.
-- **Related issue:** Destination issue `#13`.
-- **Mitigation:** Retain lockfile and package-artifact SHA-256 qualification, then normalize this entry to canonical
-  registry metadata with SHA-512 integrity when the approved proxy emits it without changing the resolved dependency.
-- **State:** Accepted
-- **Closure proof:** A regenerated lock entry uses canonical registry metadata and SHA-512 integrity, with exact-head CI
-  and release qualification passing.
-
-### RISK-007: Public Visibility Exposes Operational Qualification Metadata
-
-- **Type:** `RISK`
-- **Owner:** Repository maintainer
-- **Impact:** Git history, issues, pull requests, Actions logs, Azure subscription identifiers, resource names, policy
-  evidence, and author email metadata become publicly readable and forkable.
-- **Evidence:** A history-wide Gitleaks scan found no secret, but the repository intentionally retains canonical
-  qualification journals and governance evidence. The maintainer reviewed and accepted this noncredential disclosure.
-- **Related issue:** Destination issue `#13`.
-- **Mitigation:** Delete transient live return/evidence artifacts before conversion, publish a confidential reporting
-  policy, restrict Actions and fork execution, protect `main`, enable secret scanning and push protection, and run native
-  CodeQL immediately after conversion.
-- **State:** Accepted
-- **Closure proof:** Public visibility, verified repository security settings, zero transient live artifacts, and native
-  CodeQL run `29830116910` passing all configured languages with zero open alerts.
-
-### RISK-008: Supported Copilot Clients Could Diverge
-
-- **Type:** `RISK`
 - **Owner:** Client experience
-- **Impact:** VS Code and Copilot CLI could produce different workflow outcomes or expose different authority.
-- **Evidence:** Historical exact-version context evidence is preserved. Live qualification now binds one observed
-  latest-stable client set per candidate. The deterministic corpus, proof-complete aggregate, and fail-closed binding
-  are implemented, but live paired execution has not run.
-- **Related issue:** [#91](https://github.com/jonathan-vella/apex-vnext/issues/91)
-- **Mitigation:** Generate thin projections from one bundle contract and compare normalized typed outcomes,
-  authorization denials, restart/resume behavior, and evidence hashes rather than UI mechanics.
+- **Impact:** Managed agents, input handling, MCP discovery, or routing may differ from deterministic projections.
+- **Mitigation:** Bind observed client versions and hashes; run the complete client matrix on the exact candidate.
 - **State:** Open
-- **Closure proof:** A passing two-client matrix on supported, version-recorded clients and the exact release candidate.
+- **Closure proof:** Current VS Code and Copilot CLI evidence satisfies [CLIENT-QUALIFICATION.md](CLIENT-QUALIFICATION.md).
 
-### RISK-009: ARM MCP Trust And Tool Shapes Could Drift
+## RISK-002: Live Cloud Behavior Can Differ From Deterministic Providers
 
-- **Type:** `RISK`
-- **Owner:** Azure capabilities
-- **Impact:** Authentication, tool-name, or response-shape drift could contaminate managed evidence or bypass policy.
-- **Evidence:** Issue #162 freezes parity and strict evidence contracts. Issue #169 binds the distinct Azure Resource
-  Manager MCP endpoint and its documented CostManagement/Pricing read and write tool inventory.
-- **Related issue:** [#164](https://github.com/jonathan-vella/apex-vnext/issues/164),
-  [#169](https://github.com/jonathan-vella/apex-vnext/issues/169)
-- **Mitigation:** Configure the exact managed endpoint in both supported clients, grant only explicit read tools to
-  managed agents, exclude unknown and mutating tools, and keep native Azure and IaC paths authoritative for mutation.
+- **Owner:** Platform operations
+- **Impact:** Bicep or Terraform could fail policy, provider, state, preview, apply, inventory, or cleanup checks.
+- **Mitigation:** Use isolated targets, current governance and availability evidence, exact previews, bounded credentials,
+  and owned cleanup.
 - **State:** Open
-- **Closure proof:** Clean-environment startup, authentication, schema, fault, allowlist, and denial tests on the exact
-  selected ARM MCP version.
+- **Closure proof:** Candidate-bound Bicep and Terraform live qualification both pass.
 
-### RISK-010: Replacement Surfaces Could Be Removed Too Early
+## RISK-003: Package Or Supply-Chain Drift Can Invalidate Qualification
 
-- **Type:** `RISK`
-- **Owner:** Runtime integration
-- **Impact:** Removing Terraform, custom pricing, or Draw.io MCP surfaces before replacement proof could break supported
-  workflows, packaging, documentation, or tests.
-- **Evidence:** Astro, Terraform, custom pricing, and Draw.io are retired from active surfaces. Issue #168 freezes
-  format-neutral semantics and Mermaid/Python routes. Issue #173 migrates active consumers. Maintainer approval records
-  the measured-parity bypass for Draw.io retirement.
-- **Related issue:** [#164](https://github.com/jonathan-vella/apex-vnext/issues/164) for pricing and
-  [#168](https://github.com/jonathan-vella/apex-vnext/issues/168) plus
-  [#173](https://github.com/jonathan-vella/apex-vnext/issues/173) for diagrams.
-- **Mitigation:** Retire one surface at a time only after its named gate passes; verify active references, package
-  contents, and a clean consumer after each removal.
-- **State:** Open
-- **Closure proof:** Zero active references, passing replacement tests, and clean package/install evidence for every
-  retired surface.
-
-### RISK-011: Improvement Measurements Could Be Misleading
-
-- **Type:** `RISK`
-- **Owner:** Quality engineering
-- **Impact:** Unbounded, sensitive, duplicated, or weakly attributed outcomes could create noisy proposals or false
-  claims of improvement.
-- **Evidence:** Existing observe-and-propose behavior is inert and characterized; structured outcome ingestion and
-  comparative measurement are not implemented.
-- **Related issue:** Pending Milestone M issue.
-- **Mitigation:** Accept bounded structured outcomes only, retain provenance and redaction, define denominators and
-  confidence explicitly, and keep all proposals human-decided.
-- **State:** Open
-- **Closure proof:** Passing redaction, deduplication, provenance, precision, recurrence, and no-mutation tests with a
-  reviewed measurement report.
-
-### RISK-012: Client Bundle Projections Could Drift
-
-- **Type:** `RISK`
 - **Owner:** Release engineering
-- **Impact:** npm artifacts could diverge from `customizations/manifest.json` or generate unequal client capabilities.
-- **Evidence:** npm remains the selected distribution channel, but the expanded two-client bundle has not been
-  generated or qualified.
-- **Related issue:** Pending Milestone N issue.
-- **Mitigation:** Keep one canonical manifest, generate both projections deterministically, and test reproducibility,
-  clean install, update, rollback, uninstall, package inventory, SBOM, and provenance.
-- **State:** Open
-- **Closure proof:** Byte-reproducible exact-candidate packages whose client projections pass parity and lifecycle tests.
+- **Impact:** Registry, lockfile, generated assets, SBOM, or package contents may differ from reviewed source.
+- **Mitigation:** Exact locks, reproducible pack tests, clean installation, source/generated validation, CodeQL, secret
+  scanning, SBOM, and provenance.
+- **State:** Open until release
+- **Closure proof:** Exact-head package and security evidence is included in the release receipt.
 
-### RISK-013: Guidance And Automation Consolidation Could Change Enforcement
+## RISK-004: Documentation Can Overstate Support
 
-- **Type:** `RISK`
-- **Owner:** Developer experience and validation engineering
-- **Impact:** Deduplication could change agent discovery, effective instructions, Markdown/artifact contracts, validator
-  diagnostics or exits, hook failure propagation, required checks, workflow permissions, or release evidence.
-- **Evidence:** [GUIDANCE-AUTOMATION-CHARACTERIZATION.md](GUIDANCE-AUTOMATION-CHARACTERIZATION.md) maps the distributed
-  owners and reproduces the Markdown pre-commit wrapper reporting missing tooling while exiting successfully.
-- **Related issues:** [#93](https://github.com/jonathan-vella/apex-vnext/issues/93),
-  [#95](https://github.com/jonathan-vella/apex-vnext/issues/95)
-- **Mitigation:** Complete the four-surface characterization before implementation; migrate independently by owner and
-  require behavior, diagnostic, security, timing/context, rollback, and hosted-check parity.
-- **State:** Open
-- **Closure proof:** Issue #93 provides complete maps and gates; later Milestone N/O slices pass their characterized
-  parity and removal tests on the exact candidate.
+- **Owner:** Documentation and product maintainers
+- **Impact:** Users may treat implementation, historical evidence, or local tests as production qualification.
+- **Mitigation:** Generate support/reference data where possible; distinguish implemented, deterministic, client, live,
+  and release evidence; validate navigation and stale references.
+- **State:** Open until release
+- **Closure proof:** Documentation inventory is complete and every blocking claim links to current authority.
 
-### RISK-014: Skill Simplification Could Remove Domain Capability
+## RISK-005: Approval Or Handoff Evidence Can Become Stale
 
-- **Type:** `RISK`
-- **Owner:** Client experience and capability owners
-- **Impact:** Concise role skills could preserve workflow routing while losing Azure architecture, WAF, ADR, pricing,
-  security, governance, IaC pattern, validation, deployment, or diagnostic behavior required by real workloads.
-- **Evidence:** The managed bundle contains role-oriented skills, while the active v1 domain catalog remains
-  repository-local and lacks a complete source-to-replacement qualification matrix.
-- **Related issue:** [#219](https://github.com/jonathan-vella/apex-vnext/issues/219)
-- **Mitigation:** Map every active skill and instruction to a managed guidance, contract, validator, capability, or
-  approved retirement owner. Require semantic scenarios and both-client evidence before optimization or removal.
-- **State:** Open
-- **Closure proof:** A candidate-bound migration matrix shows qualified replacement or approved retirement for every
-  source, with retained domain scenarios passing after measured context optimization in both supported clients.
+- **Owner:** Kernel and operations
+- **Impact:** A changed dependency, writer, recipient, target, plan, or TTL could authorize the wrong operation.
+- **Mitigation:** Fail closed on hash, epoch, recipient, sequence, expiry, and dependency mismatch; regenerate and
+  reapprove stale previews.
+- **State:** Open by design
+- **Closure proof:** Deterministic adversarial tests and live transfer scenarios pass on the candidate.
 
-### RISK-015: Agent Testing Could Mask Repository Defects
+## ASSUMPTION-001: Supported Clients Can Share Typed Outcomes
 
-- **Type:** `RISK`
-- **Owner:** Quality engineering and repository maintainers
-- **Impact:** Agent scenarios could produce plausible outcomes while duplicate commands, contradictory guidance, stale
-  package boundaries, inefficient workflows, or unowned root files remain and contaminate qualification evidence.
-- **Evidence:** Existing modernization work characterizes selected automation and guidance surfaces, but no single
-  candidate-bound gate inventories every requested path and blocks agent testing on unresolved findings.
-- **Related issue:** [#220](https://github.com/jonathan-vella/apex-vnext/issues/220)
-- **Mitigation:** Complete the repository-wide optimization inventory and independently revertible remediation slices;
-  allow implementation tests but block managed-agent and paired-client scenario execution until a signed gate receipt.
-- **State:** Open
-- **Closure proof:** The candidate-bound gate receipt covers every scoped path, full validation passes, accepted deferrals
-  are explicit, and subsequent agent qualification uses the same reviewed tree.
-
-### RISK-016: Autonomous Optimization Could Escape Its Authorized Scope
-
-- **Type:** `RISK`
-- **Owner:** Repository maintainers and quality engineering
-- **Impact:** An unattended coding task could alter protected files, amplify a mistaken assumption, expose credentials,
-  consume unbounded credits, or create repository and GitHub state that is difficult to review or reverse.
-- **Evidence:** Copilot CLI supports non-interactive execution and broad permission flags, while the repository has no
-  deterministic outer controller or candidate-bound run-authorization contract.
-- **Related issues:** [#222](https://github.com/jonathan-vella/apex-vnext/issues/222), parent gate
-  [#220](https://github.com/jonathan-vella/apex-vnext/issues/220)
-- **Mitigation:** Use a clean dedicated worktree, fresh bounded tasks, explicit path and command policy, disabled remote
-  and GitHub mutation tools, diff and secret checks, local-only commits, focused checks, budgets, hash-linked state, and
-  fail-closed stop conditions. Never use unrestricted permission flags.
-- **State:** Open
-- **Closure proof:** Mutation and fault tests prove scope escape, protected-file edits, command escalation, dirty-state
-  confusion, secret introduction, repeated failures, and exhausted budgets stop without push, merge, release, or deploy.
-
-### ASSUMPTION-001: Both Copilot Clients Can Project One Workflow Contract
-
-- **Type:** `ASSUMPTION`
 - **Owner:** Client experience
-- **Impact:** Failure would require a product-contract or projection redesign before release.
-- **Evidence:** Generated client-specific projections preserve different handoff, delegation, and input mechanics. The
-  deterministic two-client fixture matrix produces equivalent typed outcomes, but
-  [hidden-worker characterization](HIDDEN-WORKER-CHARACTERIZATION.md) found no observed CLI field combination that is
-  both non-selectable and `task`-callable.
-- **Related issues:** [#91](https://github.com/jonathan-vella/apex-vnext/issues/91),
-  [#179](https://github.com/jonathan-vella/apex-vnext/issues/179),
-  [#180](https://github.com/jonathan-vella/apex-vnext/issues/180)
-- **Mitigation:** Characterize real supported clients, preserve client-specific interaction mechanics, and compare their
-  normalized outcomes using one scenario corpus. Omit unsupported CLI workers under ADR-0006 and keep dependent
-  scenarios unavailable until exact-client controls pass.
-- **State:** Open
-- **Closure proof:** Versioned two-client qualification evidence on the exact candidate head.
+- **Assumption:** VS Code and Copilot CLI can produce equivalent kernel outcomes for their shared supported interactions.
+- **Constraint:** Copilot CLI autonomous workers remain omitted and unavailable scenarios cannot be inferred as passing.
+- **State:** Pending current-candidate proof
 
-### ASSUMPTION-002: ARM MCP Can Supply Selected Read-Only Azure Evidence
+## ASSUMPTION-002: Equal IaC Support Means Equivalent Governed Outcomes
 
-- **Type:** `ASSUMPTION`
-- **Owner:** Azure capabilities
-- **Impact:** Unsupported evidence would remain on existing trusted CLI or provider paths rather than block all ARM MCP
-  adoption.
-- **Evidence:** The upstream integration is selected conceptually; its exact qualified version and usable tool set are
-  not yet recorded.
-- **Related issue:** Pending Milestone K issue.
-- **Mitigation:** Discover and qualify only the evidence calls required by typed APEX contracts; do not expose direct
-  upstream tools to managed creative agents.
-- **State:** Open
-- **Closure proof:** An approved adapter inventory with passing availability, authentication, schema, and fault tests.
+- **Owner:** IaC maintainers
+- **Assumption:** Bicep and Terraform can share requirements, intent, gates, evidence, and inventory contracts while using
+  different native mechanics.
+- **Constraint:** Equality does not require identical commands, state models, preview TTLs, or provider metadata.
+- **State:** Deterministically supported; live proof pending
 
-### DEPENDENCY-001: Phase 0A Evidence Remains Frozen
+## Release Rule
 
-- **Type:** `DEPENDENCY`
-- **Owner:** Product governance
-- **Impact:** Editing the baseline would invalidate approved compatibility and defect dispositions.
-- **Evidence:** [Phase 0A baseline](phase-0a/README.md) and its sealed evidence manifest.
-- **Related issue:** Not applicable
-- **Mitigation:** Treat `docs/vnext/phase-0a/**` as read-only and express later decisions in this project document set.
-- **State:** Active
-- **Closure proof:** Retained through cutover; no closure expected before archival.
-
-### DEPENDENCY-002: Dedicated Repository Supersedes The Integration Branch
-
-- **Type:** `DEPENDENCY`
-- **Owner:** Repository maintainer
-- **Impact:** Delivery topology differs from the Phase 0A sequencing note while preserving source provenance and release
-  gates.
-- **Evidence:** [Repository migration](../MIGRATION.md) and
-  [DECISION-008](DECISIONS.md#decision-008-extract-vnext-to-a-dedicated-repository).
-- **Related issue:** [#536](https://github.com/jonathan-vella/apex/issues/536)
-- **Mitigation:** Use issue branches and pull requests into this repository's `main`; keep the original APEX `main`
-  untouched as the v1 line.
-- **State:** Accepted
-- **Closure proof:** Destination root commit, transferred issues, and source pull-request closure receipts.
-
-### REGRESSION-001: Former CodeQL Parser Finding Is Clear In Native Analysis
-
-- **Type:** `REGRESSION`
-- **Owner:** Capabilities and security
-- **Impact:** Any new critical or high native CodeQL finding blocks release.
-- **Evidence:** The vulnerable expression was replaced by a bounded line-oriented parser with adversarial dual-track
-  coverage. The approved equivalent review found no critical, high, or release-blocking issue. After public conversion,
-  native CodeQL run `29830116910` passed all configured languages with no open alert.
-- **Related issue:** [#537](https://github.com/jonathan-vella/apex/issues/537)
-- **Mitigation:** Preserve the bounded parser regression tests and required native CodeQL checks on `main`.
-- **State:** Accepted
-- **Closure proof:** Parser mutation tests, exact-main CI, native CodeQL run `29830116910`, and zero open alerts.
-
-### ISSUE-001: Supported Client Qualification Evidence Is Pending
-
-- **Type:** `ISSUE`
-- **Owner:** Release qualification
-- **Impact:** Final promotion remains blocked until VS Code and Copilot CLI pass the expanded contract.
-- **Evidence:** Earlier live Azure, package, and exact-version context results remain historical. A normalized matrix is
-  recorded, but no rolling-client parity result exists for the current candidate.
-- **Related issue:** [#91](https://github.com/jonathan-vella/apex-vnext/issues/91)
-- **Mitigation:** Use the latest stable supported clients, run the shared workflow and denial corpus, and bind their
-  observed versions and outcomes to the new exact candidate and generated bundle hashes.
-- **State:** Open
-- **Closure proof:** Versioned VS Code and Copilot CLI evidence with scenario outcomes and evidence hashes.
-
-## Closed Or Historical Entries
-
-### ISSUE-002: Scorecard Sample Requirements Were Satisfied
-
-- **Type:** `ISSUE`
-- **Owner:** Quality engineering
-- **Disposition:** Closed after release sampling collected 30 dual-track reports, 100 validation-mutation cases, 100
-  capability cases, and 100 cache cases. Every frozen scorecard rule passed. The release-candidate workflow now reruns
-  and compacts this evidence automatically whenever candidate inputs change.
-- **Related issue:** [#542](https://github.com/jonathan-vella/apex/issues/542)
-- **State:** Closed
-- **Closure proof:** Candidate `860bb459f9ac2d5db1423f400382e0d9ebc8fd12`; qualification artifact SHA-256
-  `00e6cc140eb9a221a7a47ea068f246498f7345de1614c83f41c217545619f769`; evaluation artifact SHA-256
-  `c2bc086ab0014716ddfc02b8ca5ed86c8cb1169b3c5f1e38d17b535b534d5a3d`.
-
-### DEFECT-001: CI Lint Resolved Unbuilt Generated Packages
-
-- **Type:** `DEFECT`
-- **Owner:** Validation and CI
-- **Disposition:** Closed after CI build ordering and generated-import validation were aligned.
-- **State:** Closed
-- **Closure proof:** Exact-main CI run `29760571466` passed build, lint, validators, and deterministic tests on
-  `e5509097aa7a1b9c389673a79ee7fbf7110de678`.
-
-### DEFECT-002: vNext Documentation Broken Links Were Corrected
-
-- **Type:** `DEFECT`
-- **Owner:** Documentation
-- **Disposition:** Closed after strict relative-link validation passed on the exact main candidate.
-- **State:** Closed
-- **Closure proof:** Exact-main docs run `29760571448` completed successfully on
-  `e5509097aa7a1b9c389673a79ee7fbf7110de678`.
-
-### DEFECT-003: Package Timeout Cleanup And Clean Install Were Repaired
-
-- **Type:** `DEFECT`
-- **Owner:** Release engineering
-- **Disposition:** Closed after abort-aware process-tree termination, bounded diagnostics, and deterministic package
-  installation coverage landed.
-- **State:** Closed
-- **Closure proof:** `npm run qualify:vnext` and all five package qualification tests passed on
-  `e5509097aa7a1b9c389673a79ee7fbf7110de678`, including timeout cleanup and offline clean install.
-
-### RISK-002: Terraform CI Plan Transport Is Not Qualified
-
-- **Type:** `RISK`
-- **Owner:** Terraform runtime
-- **Disposition:** Closed after live encrypted apply and destroy through separate GitHub Actions jobs.
-- **State:** Closed
-- **Closure proof:** Destination issue `#10`; apply run `29583857856`; destroy run `29584406631`; exact recipient,
-  digest, lineage, serial, owner epoch, expiry, authority return, and cleanup evidence.
-
-### RISK-004: Required Environment Reviewers Were Unavailable On The Current GitHub Plan
-
-- **Type:** `RISK`
-- **Owner:** Repository maintainer
-- **Evidence:** GitHub returned HTTP 422 for required-reviewer protection on the private repository.
-- **Disposition:** Closed by [DECISION-010](DECISIONS.md#decision-010-keep-deployment-approval-in-apex-gate-4).
-  External Environment review is not an APEX requirement; local Gate 4 owns exact-preview approval.
-- **State:** Closed
-- **Closure proof:** ADR-0002, rejection of CI-created approval, and exact post-approval transfer tests.
-
-The approved v1 defect ledger remains in [phase-0a/v1-known-defects.md](phase-0a/v1-known-defects.md). Do not duplicate
-or renumber those historical entries here. New vNext defects use this register and a linked GitHub issue.
+No open risk is silently waived. A release-blocking item must be closed by evidence or accepted through an explicit,
+auditable maintainer decision that names scope, rationale, owner, expiry, and rollback.

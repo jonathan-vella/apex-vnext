@@ -235,7 +235,8 @@ or self-modification loop.
 - `packages/renderers/src/**` and `packages/testkit/src/**` — deterministic views and
   qualification scenarios.
 - `customizations/**` — shipped VS Code agents/skills/MCP configuration and invocation graph.
-- `docs/guides/**` — user-facing product documentation, updated only for user-facing behavior.
+- `docs/tutorials/**`, `docs/how-to/**`, `docs/explanation/**`, and `docs/reference/**` — vNext product documentation,
+  updated only for user-facing behavior.
 
 **Verification**
 

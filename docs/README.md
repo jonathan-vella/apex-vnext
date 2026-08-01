@@ -1,47 +1,69 @@
-# Documentation
+# APEX vNext Documentation
 
-APEX vNext documentation is maintained as repository-native Markdown. No site
-build is required to read, review, or validate it.
+> [Current Version](../VERSION.md) | Pre-release documentation for the governed APEX runtime and clients.
 
-## User Guides
+APEX vNext is a deterministic workflow runtime for governed Azure platform engineering. The kernel owns state,
+authorization, gates, evidence, and bounded operations. Copilot clients guide people through that runtime; they do not
+replace its authority.
 
-| Guide | Purpose |
-| ----- | ------- |
-| [Preview overview](guides/index.md) | Scope, support boundary, and next actions |
-| [Installation](guides/installation.md) | Build, install, initialize, and verify the package set |
-| [Workflow](guides/workflow.md) | Specialists, workers, gates, and promotion |
-| [CLI and MCP reference](guides/cli-reference.md) | Commands, flags, errors, and narrow MCP tools |
-| [Operations](guides/operations.md) | Provider setup, preview, apply, recovery, and transfer |
-| [Security](guides/security.md) | Kernel authority, writer ownership, approval, and evidence boundaries |
-| [Qualification](guides/testing.md) | Deterministic lanes and manual test checklist |
-| [Live qualification](guides/live-qualification.md) | Bind manual and cloud evidence to one candidate |
-| [Devcontainer hygiene](guides/devcontainer-hygiene.md) | Keep Copilot context and extensions focused |
+## Start By Goal
 
-## Project And Release Controls
+| Goal | Start here |
+| --- | --- |
+| Evaluate APEX locally | [Complete the first local run](tutorials/first-run.md) |
+| Install or update APEX | [Manage installation](how-to/manage-installation.md) |
+| Run a governed workflow | [Run the workflow](how-to/run-workflow.md) |
+| Preview or reconcile infrastructure | [Operate a project](how-to/operate-project.md) |
+| Contribute to the repository | [Contribute to APEX vNext](how-to/contribute.md) |
+| Understand kernel authority | [Runtime architecture](explanation/runtime-architecture.md) |
+| Look up commands or support | [Reference index](reference/README.md) |
 
-- [Project hub](vnext/README.md)
-- [Current checkpoint](vnext/PROJECT.md)
-- [Product requirements](vnext/PRD.md)
-- [Roadmap](vnext/ROADMAP.md)
-- [Risk and issue register](vnext/REGISTER.md)
-- [Decision log](vnext/DECISIONS.md)
-- [Supported client qualification contract](vnext/CLIENT-QUALIFICATION.md)
-- [Guidance and automation review contract](vnext/GUIDANCE-AUTOMATION-REVIEW.md)
-- [Guidance and automation characterization evidence](vnext/GUIDANCE-AUTOMATION-CHARACTERIZATION.md)
-- [Historical qualification dossier and reopened gates](vnext/FINAL-QUALIFICATION.md)
-- [Live qualification procedure](vnext/LIVE-QUALIFICATION.md)
+## Tutorials
 
-## Historical Evidence
+- [Complete the first local run](tutorials/first-run.md) introduces initialization, readiness, and deterministic local
+  state without making cloud changes.
 
-The [Phase 0A evidence](vnext/phase-0a/README.md) is frozen source material from
-the original repository. Historical references inside that boundary are not
-rewritten during repository extraction.
+## How-To Guides
 
-## Validation
+- [Manage installation](how-to/manage-installation.md)
+- [Run the workflow](how-to/run-workflow.md)
+- [Operate a project](how-to/operate-project.md)
+- [Qualify a candidate](how-to/qualify-candidate.md)
+- [Contribute to APEX vNext](how-to/contribute.md)
+- [Maintain the development container](how-to/maintain-devcontainer.md)
+
+## Explanation
+
+- [Runtime architecture](explanation/runtime-architecture.md)
+- [Workflow and gates](explanation/workflow-and-gates.md)
+- [Security and authority](explanation/security-and-authority.md)
+- [Client projections](explanation/client-projections.md)
+
+## Reference
+
+- [Reference index](reference/README.md)
+- [Client support](reference/client-support.md)
+- [CLI commands](reference/cli.md)
+- [MCP tools](reference/mcp.md)
+- [Configuration and contracts](reference/configuration.md)
+- [Bicep and Terraform](reference/iac-tracks.md)
+- [Qualification](reference/qualification.md)
+
+## Project Controls
+
+Binding product requirements, decisions, risks, release controls, and qualification procedures remain under
+[`docs/vnext`](vnext/README.md). These files govern repository development and are not user tutorials.
+
+The [documentation inventory](vnext/documentation-inventory.v1.json) records content ownership and migration status.
+Frozen Phase 0A evidence remains immutable.
+
+## Migration History
+
+Predecessor history and extraction provenance are isolated in [Migration](MIGRATION.md). Active product documentation is
+vNext-only.
+
+## Validate Documentation
 
 ```bash
 npm run validate:docs
 ```
-
-This command checks Markdown style, local and external links, and repository
-documentation freshness.

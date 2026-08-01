@@ -1,13 +1,13 @@
-## APEX vNext Product Requirements
+# APEX vNext Product Requirements
 
-APEX vNext replaces the current prompt-led workflow with a deterministic TypeScript runtime and npm CLI while retaining
-selected v1 behavior. Managed GitHub Copilot experiences in VS Code and GitHub Copilot CLI provide client-specific
-interfaces; the kernel owns workflow, state, authorization, validation, evidence, and controlled capabilities.
+APEX vNext is a deterministic TypeScript runtime and npm CLI for governed Azure platform engineering. Managed GitHub
+Copilot experiences in VS Code and GitHub Copilot CLI provide client-specific interfaces; the kernel owns workflow,
+state, authorization, validation, evidence, and controlled capabilities.
 
 ## Goals
 
 - Make platform-engineering runs deterministic, resumable, auditable, and safe under one active writer.
-- Preserve the approved v1 behavior dispositions in [phase-0a/v1-behavior-compatibility.md](phase-0a/v1-behavior-compatibility.md).
+- Preserve the approved frozen compatibility dispositions without making them active product documentation.
 - Support Bicep and Terraform through one track-neutral workflow and equivalent logical outcomes.
 - Ship a clean-installable npm runtime plus managed Copilot customizations with safe update and rollback.
 - Provide equivalent governed workflow outcomes in GitHub Copilot for VS Code and GitHub Copilot CLI.
@@ -136,8 +136,8 @@ chat history. Model availability, grants, agents, skills, managed files, and MCP
 
 ### REQ-GUIDANCE-001: Skill And Instruction Capability Parity
 
-The release must migrate the approved domain behavior of active v1 skills and instructions into managed vNext skills,
-scoped instructions, executable capabilities, contracts, or explicit retirements. Every source must have a target owner,
+The release must preserve required Azure domain behavior in managed vNext skills, scoped instructions, executable
+capabilities, contracts, or explicit retirements. Every source must have a target owner,
 consumer map, disposition, replacement proof, rollback or removal gate, and supported-client qualification scenario.
 Concise role skills may route work, but must not silently replace Azure architecture, WAF, ADR, pricing, security,
 governance, IaC pattern, validation, deployment, or diagnostic knowledge with generic model reasoning. Deterministic
@@ -182,11 +182,10 @@ the immutable completion tree.
 ### REQ-DOCS-001: Documentation And Lifecycle
 
 Installation, workflow, CLI, security, operations, testing, capability packs, upgrade, downgrade, rollback, uninstall,
-release, supported Copilot clients, diagram formats, and v1 maintenance behavior must match the candidate implementation.
+release, supported Copilot clients, and diagram formats must match the candidate implementation.
 New inline diagrams use Mermaid; new standalone architecture and chart artifacts use editable Python sources and rendered
 outputs. Active `.github/copilot-instructions.md` and applicable `AGENTS.md` files must identify canonical owners without
-duplicating volatile values. The v1 support end date is set relative to cutover, and v1 sessions are not resumable in
-vNext.
+duplicating volatile values. Unsupported external state is not resumable in vNext.
 
 ### REQ-IMPROVE-001: Bounded Improvement
 
@@ -218,7 +217,7 @@ and triage outcomes; a noisy automatic adapter remains disabled without weakenin
 ## Exclusions
 
 - Distributed collaborative writers.
-- Cross-version resume of v1 sessions or artifacts.
+- Resume of state that does not satisfy current vNext contracts.
 - GitHub Copilot cloud coding-agent sessions, Copilot code review as an APEX client, and non-VS Code/non-Copilot-CLI
   runtimes.
 - Preview VS Code plugin behavior as a first-release dependency.
