@@ -1,6 +1,6 @@
 {
-  "authorization_id": "pre-agent-opt-2026-08-01-empty-retry",
-  "state": "stopped",
+  "authorization_id": "pre-agent-opt-2026-08-01-glob-bounds",
+  "state": "running",
   "items": [
     {
       "id": "workspace-operating-frame",
@@ -328,7 +328,7 @@
         "npm run test:vnext"
       ],
       "rationale": "Microsoft should own MCP transport, authentication, and pricing retrieval; APEX should own workflow state, evidence acceptance, and gates.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "improvement-outcome-ingestion",
@@ -832,6 +832,5 @@
       "rationale": "Shipped consumer behavior needs one managed guidance owner distinct from repository contributor instructions.",
       "status": "pending"
     }
-  ],
-  "stop_reason": "task produced no structured output"
+  ]
 }

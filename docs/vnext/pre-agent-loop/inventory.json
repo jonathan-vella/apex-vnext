@@ -333,9 +333,38 @@
         "release qualification"
       ],
       "classification": "rewrite",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:pricing-parity",
+          "status": 0
+        },
+        {
+          "command": "npm run test:pricing-parity",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:arm-mcp-cost-pricing",
+          "status": 0
+        },
+        {
+          "command": "npm run test:arm-mcp-cost-pricing",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:mcp-config",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:agents",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "Microsoft should own MCP transport, authentication, and pricing retrieval; APEX should own workflow state, evidence acceptance, and gates."
     },
     {
