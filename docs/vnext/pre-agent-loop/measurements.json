@@ -24,6 +24,16 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "user-documentation",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:docs",
+          "status": 0
+        }
+      ]
     }
   ]
 }

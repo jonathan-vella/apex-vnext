@@ -50,9 +50,14 @@
         "release reviewers"
       ],
       "classification": "keep",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:docs",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "User documentation is distinct from repository-authoring and runtime prompt guidance."
     },
     {
