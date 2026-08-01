@@ -23,6 +23,7 @@ import {
   resumeRun,
   snapshotControllerState,
   taskInvokedSkill,
+  taskLoadedMcp,
   taskPrompt,
 } from "../scripts/pre-agent-loop.mjs";
 
@@ -175,6 +176,15 @@ test("skill availability metadata is allowed while actual skill execution is den
   );
 });
 
+test("MCP prose is allowed while MCP lifecycle and tool events are denied", () => {
+  assert.equal(
+    taskLoadedMcp([{ type: "assistant.message", data: { content: "Review MCP runtime manifests." } }]),
+    false,
+  );
+  assert.equal(taskLoadedMcp([{ type: "session.mcp_server_status_changed", data: { serverName: "github" } }]), true);
+  assert.equal(taskLoadedMcp([{ type: "tool.execution_start", data: { toolName: "github-mcp/status" } }]), true);
+});
+
 test("queue item prompt explicitly prohibits skill invocation and skill-file reads", () => {
   const prompt = taskPrompt({ id: "fixture", classification: "keep", paths: ["README.md"] });
   assert.match(prompt, /Do not invoke skills/);
@@ -278,9 +288,9 @@ test("resume reads only its owned lock and abort records then releases it", () =
   fixture.launcher.binary = binaryPath;
   fixture.context_hashes = {};
   initializeRun({ authorization: fixture, root: temporaryRoot, git });
-  assert.equal(resumeRun({ authorization: fixture, root: temporaryRoot }).state, "bootstrapped");
+  assert.equal(resumeRun({ authorization: fixture, root: temporaryRoot, git }).state, "bootstrapped");
   assert.deepEqual(abortRun({ authorization: fixture, root: temporaryRoot }), { state: "aborted" });
-  assert.throws(() => resumeRun({ authorization: fixture, root: temporaryRoot }), /no pre-agent run lock/);
+  assert.throws(() => resumeRun({ authorization: fixture, root: temporaryRoot, git }), /no pre-agent run lock/);
   assert.match(
     readFileSync(path.join(temporaryRoot, "docs/vnext/pre-agent-loop/checkpoints.jsonl"), "utf8"),
     /aborted/,
@@ -402,5 +412,8 @@ test("queue failure records stopped evidence, publishes it, and releases the loc
   assert.match(readFileSync(path.join(stateRoot, "findings.jsonl"), "utf8"), /invoked a skill/);
   assert.match(readFileSync(path.join(stateRoot, "checkpoints.jsonl"), "utf8"), /previous_record_sha256/);
   assert.ok(gitCalls.some((args) => args[0] === "push"));
+  assert.equal(resumeRun({ authorization: fixture, root: temporaryRoot, git: fixtureGit }).state, "running");
+  assert.equal(existsSync(path.join(stateRoot, "run.lock.json")), true);
+  abortRun({ authorization: fixture, root: temporaryRoot });
   rmSync(temporaryRoot, { recursive: true, force: true });
 });

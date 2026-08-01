@@ -239,6 +239,14 @@ export function taskInvokedSkill(events) {
   });
 }
 
+export function taskLoadedMcp(events) {
+  return events.some((event) => {
+    if (event.type === "session.mcp_server_status_changed" || event.type === "mcp.tools.list_changed") return true;
+    if (!/(tool_call|tool\.execution)/u.test(event.type ?? "")) return false;
+    return /(?:mcp|serverName)/iu.test(JSON.stringify(event.data ?? event));
+  });
+}
+
 export function changedPathErrors({ changedPaths, authorization, addedLines = [], binaryPaths = [] }) {
   const errors = [];
   if (changedPaths.length > authorization.budgets.files_per_slice) errors.push("slice exceeds file budget");
@@ -343,11 +351,28 @@ function readOwnedLock(authorization, root) {
   return lock;
 }
 
-export function resumeRun({ authorization, root }) {
-  readOwnedLock(authorization, root);
-  const { queuePath } = statePaths(root);
+export function resumeRun({ authorization, root, git = gitValue, now = new Date() }) {
+  const errors = admissionErrors({ authorization, root, git, now });
+  if (errors.length > 0) throw new Error(errors.join("; "));
+  const { lockPath, queuePath } = statePaths(root);
   if (!existsSync(queuePath)) throw new Error("pre-agent run queue is missing");
-  return readJson(queuePath);
+  const queue = readJson(queuePath);
+  if (existsSync(lockPath)) {
+    readOwnedLock(authorization, root);
+    return queue;
+  }
+  if (queue.state !== "stopped") throw new Error("no pre-agent run lock exists");
+  writeJsonAtomically(lockPath, {
+    authorization_id: authorization.authorization_id,
+    branch: authorization.branch,
+    worktree: path.resolve(root),
+    started_at: now.toISOString(),
+  });
+  queue.authorization_id = authorization.authorization_id;
+  queue.state = "running";
+  delete queue.stop_reason;
+  writeJsonAtomically(queuePath, queue);
+  return queue;
 }
 
 export function abortRun({ authorization, root, now = new Date() }) {
@@ -499,8 +524,7 @@ export function launchTask({ authorization, item, spawn = spawnSync }) {
     });
     if (result.error || result.status !== 0) throw new Error("bounded task failed");
     const events = parseJsonLines(result.stdout ?? "");
-    const serialized = JSON.stringify(events);
-    if (/mcp_server|mcp\.tools|github-mcp-server/iu.test(serialized)) throw new Error("bounded task loaded MCP");
+    if (taskLoadedMcp(events)) throw new Error("bounded task loaded MCP");
     if (taskInvokedSkill(events)) throw new Error("bounded task invoked a skill");
     return events;
   } finally {
@@ -616,7 +640,7 @@ function statusRun({ authorization, root }) {
   return {
     authorization_id: authorization.authorization_id,
     admitted: admissionErrors({ authorization, root }).length === 0,
-    state: existsSync(paths.lockPath) ? "running" : queue.state === "completed" ? "completed" : "idle",
+    state: existsSync(paths.lockPath) ? "running" : (queue.state ?? "idle"),
     queue,
   };
 }
@@ -628,7 +652,12 @@ function main() {
   const result = inspectRun({ authorization, root: ROOT });
   const output =
     command === "resume"
-      ? { state: "running", results: runQueueGuarded({ authorization, root: ROOT }) }
+      ? (() => {
+          const probe = probeLauncher(authorization.launcher);
+          if (!probe.ok) throw new Error(probe.reason);
+          resumeRun({ authorization, root: ROOT });
+          return { state: "running", results: runQueueGuarded({ authorization, root: ROOT }) };
+        })()
       : command === "abort"
         ? abortRun({ authorization, root: ROOT })
         : command === "run" && !dryRun
