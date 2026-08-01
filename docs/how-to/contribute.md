@@ -15,14 +15,14 @@ keep unrelated user changes intact.
 
 ## Respect Package Boundaries
 
-| Package | Owns |
-| --- | --- |
-| `packages/contracts` | Versioned schemas and validation shapes |
-| `packages/kernel` | State, tasks, gates, authorization, journals, and evidence decisions |
-| `packages/capabilities` | Bounded provider and workflow operations |
-| `packages/renderers` | Client-neutral deterministic views |
-| `packages/cli` | Lifecycle, terminal commands, MCP facade, and managed installation |
-| `packages/testkit` | Deterministic fixtures and qualification support |
+| Package                 | Owns                                                                 |
+| ----------------------- | -------------------------------------------------------------------- |
+| `packages/contracts`    | Versioned schemas and validation shapes                              |
+| `packages/kernel`       | State, tasks, gates, authorization, journals, and evidence decisions |
+| `packages/capabilities` | Bounded provider and workflow operations                             |
+| `packages/renderers`    | Client-neutral deterministic views                                   |
+| `packages/cli`          | Lifecycle, terminal commands, MCP facade, and managed installation   |
+| `packages/testkit`      | Deterministic fixtures and qualification support                     |
 
 Client behavior belongs in `customizations` and adapters. Do not create workflow authority in agents, skills, prompts,
 renderers, or scripts.

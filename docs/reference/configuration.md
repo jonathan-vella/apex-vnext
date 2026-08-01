@@ -4,15 +4,15 @@
 
 ## Shipped Configuration
 
-| Path | Ownership |
-| --- | --- |
-| `config/workflow.v1.json` | Nodes, gates, dependencies, invalidation, and Bicep/Terraform routing |
-| `config/defaults.v1.json` | Security invariants, evidence budgets, task limits, preview TTLs, and telemetry defaults |
-| `config/toolchain.v1.json` | Supported toolchain selection and client qualification policy |
-| `config/capability-packs.v1.json` | Lazy optional runtime packs and absent behavior |
-| `config/runtime-bundle.v1.json` | Runtime bundle identity and source composition |
-| `config/quality-scorecard.v1.json` | Deterministic quality measurements and thresholds |
-| `config/improvement-policy.v1.json` | Bounded observation and proposal policy |
+| Path                                | Ownership                                                                                |
+| ----------------------------------- | ---------------------------------------------------------------------------------------- |
+| `config/workflow.v1.json`           | Nodes, gates, dependencies, invalidation, and Bicep/Terraform routing                    |
+| `config/defaults.v1.json`           | Security invariants, evidence budgets, task limits, preview TTLs, and telemetry defaults |
+| `config/toolchain.v1.json`          | Supported toolchain selection and client qualification policy                            |
+| `config/capability-packs.v1.json`   | Lazy optional runtime packs and absent behavior                                          |
+| `config/runtime-bundle.v1.json`     | Runtime bundle identity and source composition                                           |
+| `config/quality-scorecard.v1.json`  | Deterministic quality measurements and thresholds                                        |
+| `config/improvement-policy.v1.json` | Bounded observation and proposal policy                                                  |
 
 The packaged CLI embeds verified copies under `packages/cli/assets/config/`. Source and packaged assets must match.
 

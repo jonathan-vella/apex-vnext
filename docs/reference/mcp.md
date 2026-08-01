@@ -7,35 +7,35 @@ APEX server with independent state.
 
 ## Workflow Tools
 
-| Tool | Purpose |
-| --- | --- |
-| `status` | Read selected project and run status. |
-| `nextTask` | Get `needs_input`, `task`, or terminal workflow status. |
-| `taskContext` | Read context for the exact task ID returned by `nextTask`. |
-| `recordInput` | Submit answers for the exact pending input request. |
-| `stageArtifact` | Stage one or more typed outputs for a task. |
-| `stageFile` | Stage a bounded file for a task, optionally with an expected SHA-256. |
-| `generateIac` | Generate the selected task's Bicep or Terraform batch. |
-| `validateTask` | Validate staged or supplied task outputs without completion. |
-| `completeTask` | Validate and complete a task with typed outputs. |
+| Tool            | Purpose                                                               |
+| --------------- | --------------------------------------------------------------------- |
+| `status`        | Read selected project and run status.                                 |
+| `nextTask`      | Get `needs_input`, `task`, or terminal workflow status.               |
+| `taskContext`   | Read context for the exact task ID returned by `nextTask`.            |
+| `recordInput`   | Submit answers for the exact pending input request.                   |
+| `stageArtifact` | Stage one or more typed outputs for a task.                           |
+| `stageFile`     | Stage a bounded file for a task, optionally with an expected SHA-256. |
+| `generateIac`   | Generate the selected task's Bicep or Terraform batch.                |
+| `validateTask`  | Validate staged or supplied task outputs without completion.          |
+| `completeTask`  | Validate and complete a task with typed outputs.                      |
 
 Handle `needs_input` before requesting task context. Only a `nextTask` result with `status=task` provides a valid task
 ID.
 
 ## Read And Operations Tools
 
-| Tool | Purpose |
-| --- | --- |
-| `capabilityList` | Read capability-pack availability. |
-| `capabilityStatus` | Read one pack's state. |
-| `preview` | Read the current operator-created preview; it does not create one. |
-| `reconcile` | Reconcile selected-run state. |
-| `inventory` | Read the accepted resource inventory. |
-| `diagnose` | Produce bounded diagnostic state. |
-| `render` | Render status, requirements, preview, approval, or inventory Markdown. |
-| `promote` | Create a linked environment run. |
-| `doctor` | Check or repair local managed state. |
-| `submitEvidence` | Submit bounded JSON evidence for an active task. |
+| Tool               | Purpose                                                                |
+| ------------------ | ---------------------------------------------------------------------- |
+| `capabilityList`   | Read capability-pack availability.                                     |
+| `capabilityStatus` | Read one pack's state.                                                 |
+| `preview`          | Read the current operator-created preview; it does not create one.     |
+| `reconcile`        | Reconcile selected-run state.                                          |
+| `inventory`        | Read the accepted resource inventory.                                  |
+| `diagnose`         | Produce bounded diagnostic state.                                      |
+| `render`           | Render status, requirements, preview, approval, or inventory Markdown. |
+| `promote`          | Create a linked environment run.                                       |
+| `doctor`           | Check or repair local managed state.                                   |
+| `submitEvidence`   | Submit bounded JSON evidence for an active task.                       |
 
 ## Improvement Tools
 

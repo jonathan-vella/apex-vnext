@@ -12,14 +12,14 @@ A track cannot reuse the other track's preview or approval.
 
 ## Differences
 
-| Concern | Bicep | Terraform |
-| --- | --- | --- |
-| Validation | `bicep build` and repository checks | `terraform init`, format, validate, and provider schema checks |
-| Preview | Azure CLI deployment what-if | Saved Terraform plan plus JSON rendering |
-| Apply | Azure deployment create | Apply the exact saved plan |
-| Preview lifetime | Up to the configured Bicep TTL | Up to the shorter configured Terraform TTL |
-| State | Azure deployment control plane | Terraform backend; state must never be committed |
-| Provider metadata | Azure/Bicep schemas and AVM | Installed provider schema and bounded Registry client |
+| Concern           | Bicep                               | Terraform                                                      |
+| ----------------- | ----------------------------------- | -------------------------------------------------------------- |
+| Validation        | `bicep build` and repository checks | `terraform init`, format, validate, and provider schema checks |
+| Preview           | Azure CLI deployment what-if        | Saved Terraform plan plus JSON rendering                       |
+| Apply             | Azure deployment create             | Apply the exact saved plan                                     |
+| Preview lifetime  | Up to the configured Bicep TTL      | Up to the shorter configured Terraform TTL                     |
+| State             | Azure deployment control plane      | Terraform backend; state must never be committed               |
+| Provider metadata | Azure/Bicep schemas and AVM         | Installed provider schema and bounded Registry client          |
 
 The shipped defaults currently define a longer Bicep preview TTL than Terraform. Any dependency, target, owner,
 recipient, generated IaC, or provider change invalidates stale proof.

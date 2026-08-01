@@ -28,16 +28,16 @@ GitHub Issues and the repository project own day-to-day work selection. [ROADMAP
 
 ## Evidence Status
 
-| Evidence | Status |
-| --- | --- |
-| Contract, kernel, capability, renderer, CLI, and package tests | Required on every candidate |
-| Clean package installation | Required and deterministic |
-| Managed projection generation and lifecycle | Implemented and tested |
-| VS Code live client outcomes | Current candidate pending |
-| Copilot CLI live client outcomes | Current candidate pending with autonomous-worker omission |
-| Bicep live Azure outcomes | Current candidate pending |
-| Terraform live Azure outcomes | Current candidate pending |
-| Release authority | Not granted |
+| Evidence                                                       | Status                                                    |
+| -------------------------------------------------------------- | --------------------------------------------------------- |
+| Contract, kernel, capability, renderer, CLI, and package tests | Required on every candidate                               |
+| Clean package installation                                     | Required and deterministic                                |
+| Managed projection generation and lifecycle                    | Implemented and tested                                    |
+| VS Code live client outcomes                                   | Current candidate pending                                 |
+| Copilot CLI live client outcomes                               | Current candidate pending with autonomous-worker omission |
+| Bicep live Azure outcomes                                      | Current candidate pending                                 |
+| Terraform live Azure outcomes                                  | Current candidate pending                                 |
+| Release authority                                              | Not granted                                               |
 
 Historical candidate dossiers are archived and do not satisfy current gates.
 

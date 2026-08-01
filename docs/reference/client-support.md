@@ -7,15 +7,15 @@ passed.
 
 ## Support Matrix
 
-| Surface | Implementation | Deterministic proof | Live client proof | Current status |
-| --- | --- | --- | --- | --- |
-| Direct APEX CLI | Implemented | Required CI and package qualification | Not applicable | Preview-supported |
-| GitHub Copilot in VS Code | Managed projection implemented | Projection generation and lifecycle tests | Current candidate pending | Conditional |
-| GitHub Copilot CLI | Coordinator and specialist projection implemented | Projection generation and lifecycle tests | Current candidate pending | Conditional |
-| VS Code autonomous workers | Implemented | Projection and delegation tests | Current candidate pending | Conditional |
-| Copilot CLI autonomous workers | Intentionally omitted | Omission and routing tests | Unavailable by design | Unsupported |
-| Bicep track | Implemented | Deterministic provider and package tests | Current cloud candidate pending | Conditional |
-| Terraform track | Implemented | Deterministic provider and package tests | Current cloud candidate pending | Conditional |
+| Surface                        | Implementation                                    | Deterministic proof                       | Live client proof               | Current status    |
+| ------------------------------ | ------------------------------------------------- | ----------------------------------------- | ------------------------------- | ----------------- |
+| Direct APEX CLI                | Implemented                                       | Required CI and package qualification     | Not applicable                  | Preview-supported |
+| GitHub Copilot in VS Code      | Managed projection implemented                    | Projection generation and lifecycle tests | Current candidate pending       | Conditional       |
+| GitHub Copilot CLI             | Coordinator and specialist projection implemented | Projection generation and lifecycle tests | Current candidate pending       | Conditional       |
+| VS Code autonomous workers     | Implemented                                       | Projection and delegation tests           | Current candidate pending       | Conditional       |
+| Copilot CLI autonomous workers | Intentionally omitted                             | Omission and routing tests                | Unavailable by design           | Unsupported       |
+| Bicep track                    | Implemented                                       | Deterministic provider and package tests  | Current cloud candidate pending | Conditional       |
+| Terraform track                | Implemented                                       | Deterministic provider and package tests  | Current cloud candidate pending | Conditional       |
 
 ## Client Differences
 
