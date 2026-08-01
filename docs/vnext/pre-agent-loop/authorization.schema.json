@@ -85,44 +85,17 @@
     "launcher": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "binary",
-        "version",
-        "model",
-        "mcp",
-        "copilot_home",
-        "working_directory",
-        "builtin_skills",
-        "tool_registry"
-      ],
+      "required": ["binary", "model", "mcp", "noninteractive"],
       "properties": {
         "binary": { "type": "string", "minLength": 1 },
-        "version": { "type": "string", "minLength": 1 },
         "model": { "type": "string", "minLength": 1 },
-        "copilot_home": { "type": "string", "pattern": "^/" },
-        "working_directory": { "type": "string", "pattern": "^/" },
-        "builtin_skills": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["name", "sha256"],
-            "properties": {
-              "name": { "type": "string", "minLength": 1 },
-              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
-            }
-          }
-        },
-        "tool_registry": {
+        "noninteractive": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["path", "schema_version", "characterization_version", "sha256"],
+          "required": ["timeout_seconds", "output_limit_bytes"],
           "properties": {
-            "path": { "const": "tools/registry/copilot-cli-agent-tools.json" },
-            "schema_version": { "type": "string", "minLength": 1 },
-            "characterization_version": { "type": "string", "minLength": 1 },
-            "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 60 },
+            "output_limit_bytes": { "type": "integer", "minimum": 256, "maximum": 65536 }
           }
         },
         "mcp": {
@@ -161,7 +134,7 @@
     },
     "context_hashes": {
       "type": "object",
-      "description": "SHA-256 of each context input. Keys are repository-relative paths, or a derived key such as 'skill-metadata-inventory' whose value is computed by tools/scripts/pre-agent-loop-hashes.mjs. Bootstrap stops on any mismatch.",
+      "description": "SHA-256 of policy-defining repository-relative context inputs. Bootstrap stops on any mismatch.",
       "minProperties": 1,
       "additionalProperties": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
     },
