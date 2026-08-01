@@ -32,8 +32,8 @@ current billing plan, and the maintainer determined that external reviewer prote
 The Environment remains useful as the Microsoft Entra workload-identity subject and as a scope for nonsecret variables
 and encrypted secrets. It must not create a second approval authority or let CI manufacture the human Gate 4 decision.
 This ADR supersedes the Environment-approval and incoming transport-route parts of
-[ADR-0001](03-des-adr-0001-use-split-encrypted-ci-transport.md). Its separate encrypted envelopes, exact-plan, network,
-cleanup, and production boundaries remain accepted.
+[ADR-0001](../../../.archive/qualification/vnext-qualification-v1/README.md). Its separate encrypted envelopes,
+exact-plan, network, cleanup, and production boundaries remain accepted.
 
 ## ✅ Decision
 
@@ -127,8 +127,8 @@ evidence is accepted. Production Terraform CI apply remains blocked by its separ
 
 <div align="center">
 
-| ⬅️ [Previous ADR](03-des-adr-0001-use-split-encrypted-ci-transport.md) | 🏠 [Project Index](README.md) | Next ADR ➡️ |
+| ⬅️ [Previous ADR](../../../.archive/qualification/vnext-qualification-v1/agent-output/vnext-qualification/03-des-adr-0001-use-split-encrypted-ci-transport.md) | 🏠 [Project Index](README.md) | Next ADR ➡️ |
 | --- | --- | --- |
-| [ADR-0001](03-des-adr-0001-use-split-encrypted-ci-transport.md) | [README](README.md) | None |
+| [ADR-0001](../../../.archive/qualification/vnext-qualification-v1/agent-output/vnext-qualification/03-des-adr-0001-use-split-encrypted-ci-transport.md) | [README](README.md) | None |
 
 </div>

@@ -86,9 +86,9 @@ Adopt a policy-controlled observe-and-propose subsystem with these properties:
 - The proof produced active recurring evidence, one deduplicated repeat, one quarantined injection, one inert proposal,
   and a human rejection with zero autonomous actions.
 - CLI operations and authority boundaries are documented in
-  [the CLI reference](../../docs/guides/cli-reference.md#operate-bounded-improvement).
+  [the CLI reference](../../guides/cli-reference.md#operate-bounded-improvement).
 - Security and lifecycle controls are documented in
-  [the security guide](../../docs/guides/security.md#bound-improvement-authority).
+  [the security guide](../../guides/security.md#bound-improvement-authority).
 
 ---
 

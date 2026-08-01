@@ -168,7 +168,7 @@ when a decision has lasting architectural consequences that need alternatives an
   one-hop transfer may move the exact preview and approval to the intended CI recipient. Missing, stale, expired,
   changed-recipient, changed-preview, or second-hop authority fails closed. Real apply/destroy remains limited to the
   isolated non-production qualification sandbox until live evidence is accepted.
-- **ADR:** [ADR-0002](../../agent-output/vnext-qualification/03-des-adr-0002-use-local-gate-4-before-ci-handoff.md).
+- **ADR:** [ADR-0002](adrs/03-des-adr-0002-use-local-gate-4-before-ci-handoff.md).
 - **Issue/PR:** Destination issue `#9`.
 
 ## DECISION-011: Use A Bounded Entra-Only Handoff Endpoint Session
@@ -189,7 +189,7 @@ when a decision has lasting architectural consequences that need alternatives an
 - **Consequences:** During the short transaction, the endpoint is network-reachable from public networks but accepts only
   authenticated, authorized Entra requests. Any cleanup failure is blocking. The exception expires after 24 hours and
   requires fresh review before another session.
-- **ADR:** [ADR-0003](../../agent-output/vnext-qualification/03-des-adr-0003-use-bounded-entra-only-handoff-session.md).
+- **ADR:** [ADR-0003](adrs/03-des-adr-0003-use-bounded-entra-only-handoff-session.md).
 - **Issue/PR:** Destination issue `#9`.
 
 ## DECISION-012: Support VS Code And GitHub Copilot CLI
@@ -208,7 +208,7 @@ when a decision has lasting architectural consequences that need alternatives an
   `vscode/askQuestions`; Copilot CLI may use custom-agent delegation and `ask_user`. Both must record typed answers through
   APEX and pass client-specific discovery, MCP, resume, hidden-worker, model, and cross-device qualification. ARM MCP
   support in cloud coding-agent sessions is not a requirement and needs no fallback.
-- **ADR:** [ADR-0005](../../agent-output/vnext-qualification/03-des-adr-0005-use-selected-client-agent-projections.md).
+- **ADR:** [ADR-0005](adrs/03-des-adr-0005-use-selected-client-agent-projections.md).
 - **Issue/PR:** Destination issue `#152`.
 
 ## DECISION-013: Re-Baseline The 0.10.0 Release Candidate

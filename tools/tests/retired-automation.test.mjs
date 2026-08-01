@@ -9,6 +9,8 @@ const expectedHash = "e1111eb1f9a60e4273c1302a9af8666a555f7b5c6f079451ecaa37f50e
 const terraformArchivePath = ".archive/retired-automation/terraform-mcp";
 const e2eArchivePath = ".archive/retired-automation/e2e-v1";
 const promptArchivePath = ".archive/retired-prompts/original-apex-v1";
+const utilityArchivePath = ".archive/retired-utilities/original-apex-v1";
+const qualificationArchivePath = ".archive/qualification/vnext-qualification-v1";
 
 function textSha256(path) {
   const normalized = readFileSync(path, "utf8").replace(/\r\n/gu, "\n");
@@ -133,4 +135,65 @@ test("original APEX workflow prompts remain provenance-only", () => {
     forbidden.some((marker) => readFileSync(path, "utf8").includes(marker)),
   );
   assert.deepEqual(activeReferences, [], `active prompt retirement references: ${activeReferences.join(", ")}`);
+});
+
+test("original APEX utilities remain provenance-only", () => {
+  const provenance = JSON.parse(readFileSync(`${utilityArchivePath}/provenance.json`, "utf8"));
+  assert.equal(provenance.archivedFrom, "901adcbc4b033c912cfbd198307c44b4979b089e");
+  for (const artifact of provenance.artifacts) {
+    assert.equal(existsSync(artifact.path), false, `${artifact.path} must stay out of active paths`);
+    const archiveFile = `${utilityArchivePath}/${artifact.path}`;
+    assert.equal(existsSync(archiveFile), true, `missing archived utility: ${artifact.path}`);
+    assert.equal(textSha256(archiveFile), artifact.sha256);
+  }
+
+  const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts ?? {};
+  for (const command of ["smoke:verify", "export:agent-output-html", "init", "setup", "test:lib-e2e"]) {
+    assert.equal(scripts[command], undefined, `${command} must stay retired`);
+  }
+
+  const activeFiles = globSync(
+    [
+      "package.json",
+      "tools/**/*.{mjs,js,py,json,md,sh}",
+      "tests/**/*.{mjs,js,py,json,md,sh}",
+      "docs/**/*.md",
+      ".github/**/*.{yml,yaml,json,md,mjs,js,py,sh}",
+      "AGENTS.md",
+    ],
+    {
+      exclude: [
+        "**/node_modules/**",
+        ".archive/**",
+        "docs/vnext/phase-0a/**",
+        "docs/vnext/pre-agent-loop/**",
+        "CHANGELOG.md",
+        "tools/registry/modernization-ownership.json",
+      ],
+    },
+  ).filter((path) => path !== "tools/tests/retired-automation.test.mjs");
+  const forbidden = provenance.artifacts.map(({ path }) => path);
+  const activeReferences = activeFiles.filter((path) =>
+    forbidden.some((marker) => readFileSync(path, "utf8").includes(marker)),
+  );
+  assert.deepEqual(activeReferences, [], `active utility retirement references: ${activeReferences.join(", ")}`);
+});
+
+test("stale vNext qualification narrative remains provenance-only", () => {
+  const provenance = JSON.parse(readFileSync(`${qualificationArchivePath}/provenance.json`, "utf8"));
+  assert.equal(provenance.archivedFrom, "901adcbc4b033c912cfbd198307c44b4979b089e");
+  for (const artifact of provenance.artifacts) {
+    assert.equal(existsSync(artifact.path), false, `${artifact.path} must stay out of active qualification paths`);
+    const archiveFile = `${qualificationArchivePath}/${artifact.path}`;
+    assert.equal(existsSync(archiveFile), true, `missing archived qualification artifact: ${artifact.path}`);
+    assert.equal(textSha256(archiveFile), artifact.sha256);
+  }
+
+  for (const activeContract of [
+    "agent-output/vnext-qualification/04-governance-constraints.json",
+    "agent-output/vnext-qualification/sku-manifest.json",
+    "agent-output/vnext-qualification/sku-manifest.md",
+  ]) {
+    assert.equal(existsSync(activeContract), true, `missing active qualification contract: ${activeContract}`);
+  }
 });
