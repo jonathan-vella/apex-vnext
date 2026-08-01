@@ -57,7 +57,7 @@ npm run validate:vnext
 npm run test:vnext
 npm run test:vnext-validator
 npm run test:vnext-pack
-npm run lint:vnext
+npm run build:vnext
 npm run test:bounded-improvement
 npm run validate:client-outcomes
 npm run test:client-outcomes
