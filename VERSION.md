@@ -6,7 +6,7 @@
 
 **Status:** Unreleased - re-baseline and characterization in progress on `main`; no release candidate selected
 
-**Last Content Update:** 2026-07-21
+**Last Content Update:** 2026-08-01
 
 **Build:** standalone-vnext
 
@@ -29,15 +29,9 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/):
 
 <div align="right"><a href="#top"><b>⬆️ Back to Top</b></a></div>
 
-## Automated Versioning
+## Release Versioning
 
-Version bumps are automated via GitHub Actions based on [Conventional Commits](https://www.conventionalcommits.org/):
-
-| Commit Type                    | Version Bump | Example                    |
-| ------------------------------ | ------------ | -------------------------- |
-| `feat:`                        | Minor        | `feat: add new agent`      |
-| `fix:`                         | Patch        | `fix: correct typo`        |
-| `feat!:` or `BREAKING CHANGE:` | Major        | `feat!: redesign workflow` |
-| `docs:`, `chore:`, etc.        | None         | `docs: update README`      |
+Conventional Commits communicate change intent, but they do not publish or bump versions automatically. Version
+changes, package publication, tags, and releases require explicit maintainer authorization and qualification evidence.
 
 <div align="right"><a href="#top"><b>⬆️ Back to Top</b></a></div>

@@ -147,20 +147,6 @@
     ".pytest_cache/**",
     "coverage/**",
 
-    // Archived content
-
-    // Upstream vendored files (not hand-authored)
-
-    // pytest cache (auto-generated, not hand-authored)
-
-    // Presenter/demo content and planning docs (intentionally less strict)
-    "docs/audit-checklists/**",
-    "docs/presenter/**",
-    "docs/tf-support/**",
-
-    // Planning prompts (long inline examples, not production code)
-    "tools/apex-prompts/**",
-
     // Agent-generated output (validated by artifact-templates validator)
     "agent-output/**",
 
@@ -180,12 +166,6 @@
     // Archived content (deprecated skills moved out of the active tree).
     // Read-only history; not subject to lint rules.
     ".archive/**",
-
-    // E2E test input documents (long-form RFQ/RFP prose, not production docs)
-    "tools/tests/e2e-inputs/**",
-
-    // Test prompt files (long-form examples, not production docs)
-    "tools/tests/prompts/**",
 
     // Reproducible package assets are validated against canonical source by
     // validate:vnext and pack tests; lint customizations/ instead.

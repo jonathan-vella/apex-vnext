@@ -46,7 +46,7 @@
     "test:governance-discovery": "python3 -m pytest .github/skills/azure-governance-discovery/scripts/test_discover.py -q",
     "validate:instruction-checks": "node tools/scripts/validate-instruction-checks.mjs",
     "validate:session-state": "node tools/scripts/validate-session-state.mjs",
-    "lint:prose": "vale --config .vale.ini docs/ .github/ README.md || echo 'Vale not installed - run: brew install vale'",
+    "lint:prose": "if command -v vale >/dev/null 2>&1; then vale --config .vale.ini docs/ .github/ README.md; else echo 'Vale not installed - run: brew install vale'; fi",
     "lint:json": "node tools/scripts/lint-json.mjs",
     "lint:json-schemas": "node tools/scripts/validate-json-schemas.mjs",
     "lint:python": "cd tools/apex-recall && python3 -m ruff check src/",

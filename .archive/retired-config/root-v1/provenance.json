@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0.0",
+  "archivedFrom": "ab8cea2b1d9767ca33e905072c6f83b1439b86ce",
+  "replacementOwners": [
+    ".markdown-link-check.json",
+    "package.json",
+    "Git history"
+  ],
+  "artifacts": [
+    {
+      "path": ".git-blame-ignore-revs",
+      "sha256": "8787a560540d38b2cfa002df57a4eef0195f6f65ba2ae661302f8f8a9935269a"
+    },
+    {
+      "path": ".markdown-link-check-site.json",
+      "sha256": "0421351da1f09f29d30364b8c0c484cf3ad8c0b0d31f063656723ae28f2d1e26"
+    }
+  ]
+}

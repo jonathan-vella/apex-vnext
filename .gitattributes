@@ -56,7 +56,6 @@ docs/vnext/phase-0a/evidence/*.log binary
 # GitHub specific files
 .gitattributes text eol=lf
 .gitignore text eol=lf
-.editorconfig text eol=lf
 
 # Copilot instructions (file-type specific guidance)
 .github/instructions/*.instructions.md linguist-documentation
@@ -75,6 +74,3 @@ azure-pipelines*.yml text eol=lf
 .github/**/*.tgz binary
 .github/**/*.tar binary
 .github/**/*.zip binary
-
-# Git hooks (husky)
-.husky/* text eol=lf

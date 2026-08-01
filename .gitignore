@@ -34,8 +34,6 @@ desktop.ini
 # Logs
 *.log
 logs/
-# Astro docs review audit trail is committable
-!logs/copilot/docs-review/
 
 # Root decision snapshots are generated artifacts, not source files.
 decisions*.json
@@ -72,11 +70,11 @@ build/
 packages/*/dist/
 packages/cli/assets/
 
-# Node (if any demos use it)
+# Node
 node_modules/
 .pnpm-store/
 
-# Python (if any scripts)
+# Python
 __pycache__/
 *.pyc
 .venv/
@@ -93,8 +91,6 @@ TODO.md
 Copilot-Processing.md
 scratch/
 
-# Extracted sample apps (use .zip files instead to avoid Dependabot alerts)
-scenarios/S06-sbom-generator/sample-app/
 freshness-report.json
 
 # Baseline snapshots (local working data for context optimizer).

@@ -1,11 +1,4 @@
-[project]
-name = "apex"
-version = "0.10.0"
-description = "APEX - Agentic Platform Engineering eXperience for Azure"
-requires-python = ">=3.14"
-
 [tool.ruff]
-# Exclude infrastructure folder and generated files
 exclude = [
     "infra/",
     "node_modules/",
@@ -15,10 +8,7 @@ exclude = [
     ".venv/",
 ]
 
-# Line length to match markdown lint
 line-length = 120
-
-# Target Python 3.14 (latest stable)
 target-version = "py314"
 
 [tool.ruff.lint]
@@ -34,19 +24,14 @@ select = [
     "SIM",    # flake8-simplify
 ]
 
-# Ignore rules that conflict with diagrams library patterns
 ignore = [
-    "E501",   # Line too long (handled by formatter)
-    "B008",   # Function call in default argument (common in diagrams)
-    "SIM108", # Use ternary operator (readability preference)
+    "E501",   # Line length is owned by the formatter.
+    "SIM108", # Explicit branches are clearer in validation code.
 ]
 
 [tool.ruff.lint.isort]
 known-first-party = ["mcp", "scripts", "apex_recall"]
 
 [tool.ruff.format]
-# Use double quotes for strings
 quote-style = "double"
-
-# Indent with spaces
 indent-style = "space"

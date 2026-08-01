@@ -16,6 +16,7 @@ const compatibilityArchivePath = ".archive/retired-compatibility/original-apex-v
 const devcontainerArchivePath = ".archive/retired-automation/devcontainer-base-v1";
 const npmUtilitiesArchivePath = ".archive/retired-utilities/npm-scripts-v1";
 const devcontainerUtilitiesArchivePath = ".archive/retired-utilities/devcontainer-v1";
+const rootConfigArchivePath = ".archive/retired-config/root-v1";
 
 function textSha256(path) {
   const normalized = readFileSync(path, "utf8").replace(/\r\n/gu, "\n");
@@ -132,6 +133,18 @@ test("original devcontainer utilities remain provenance-only", () => {
       false,
       `${retiredTool} must stay out of bootstrap`,
     );
+  }
+});
+
+test("zero-consumer root configuration remains provenance-only", () => {
+  const provenance = JSON.parse(readFileSync(`${rootConfigArchivePath}/provenance.json`, "utf8"));
+  assert.equal(provenance.archivedFrom, "ab8cea2b1d9767ca33e905072c6f83b1439b86ce");
+
+  for (const artifact of provenance.artifacts) {
+    assert.equal(existsSync(artifact.path), false, `${artifact.path} must stay retired`);
+    const archiveFile = `${rootConfigArchivePath}/${artifact.path}`;
+    assert.equal(existsSync(archiveFile), true, `missing archived root configuration: ${artifact.path}`);
+    assert.equal(textSha256(archiveFile), artifact.sha256);
   }
 });
 

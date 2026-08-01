@@ -2,7 +2,7 @@
 
 # Contributors
 
-Thank you to everyone who has contributed to making this project better!
+Thank you to everyone who has contributed to APEX and its vNext runtime.
 
 ## Project Contributors
 
@@ -12,50 +12,15 @@ Thank you to everyone who has contributed to making this project better!
 - **Storm Gibson** ([@StormyDevil](https://github.com/StormyDevil)) - Contributor
 - **Fares Zekri** ([@farez_microsoft](https://github.com/farez_microsoft)) - Contributor
 
-<div align="right"><a href="#top"><b>⬆️ Back to Top</b></a></div>
+### Historical Component Contributors
 
-## Azure Pricing MCP Server Contributors
+- **Chris Harris** ([@charris-msft](https://github.com/charris-msft)) - Original Azure Pricing MCP implementation
+- **Nadav Bar Hama** ([@msftnadavbh](https://github.com/msftnadavbh)) - Azure Pricing MCP maintenance
+- **Mike** ([@notoriousmic](https://github.com/notoriousmic)) - Azure Pricing MCP testing infrastructure
+- **cmb211087** ([@cmb211087](https://github.com/cmb211087)) - Original Azure diagrams skill
 
-The [Azure Pricing MCP Server](tools/mcp-servers/azure-pricing/) is a key component that provides
-real-time Azure pricing information to AI assistants.
-
-### Original Author
-
-- **Chris Harris** ([@charris-msft](https://github.com/charris-msft)) - Created the initial Azure Pricing MCP implementation
-
-### Current Maintainer
-
-- **Nadav Bar Hama** ([@msftnadavbh](https://github.com/msftnadavbh)) - Maintainer and Version 2.1 development
-
-### Additional Contributors
-
-- **Mike** ([@notoriousmic](https://github.com/notoriousmic)) - Testing infrastructure and best practices
-
-### Acknowledgments
-
-- [Model Context Protocol](https://modelcontextprotocol.io/) - Protocol foundation
-- [Azure Retail Prices API][azure-pricing] - Pricing data source
-
-[azure-pricing]: https://learn.microsoft.com/en-us/rest/api/cost-management/retail-prices/azure-retail-prices
-
-<div align="right"><a href="#top"><b>⬆️ Back to Top</b></a></div>
-
-## Azure Diagrams Skill Contributors
-
-The [Azure Diagrams Skill](.github/skills/azure-diagrams/) provides comprehensive technical
-diagramming capabilities for architecture documentation.
-
-### Original Author
-
-- **cmb211087** ([@cmb211087](https://github.com/cmb211087)) - Created the Azure Diagrams Skill
-
-### Source Repository
-
-- [azure-diagrams-skill](https://github.com/cmb211087/azure-diagrams-skill) - Original skill implementation
-
-<div align="right"><a href="#top"><b>⬆️ Back to Top</b></a></div>
-
-<div align="right"><a href="#top"><b>⬆️ Back to Top</b></a></div>
+These components informed the original APEX repository and are retained in project history. They are not active vNext
+runtime components.
 
 ## How to Contribute
 
@@ -67,8 +32,6 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 All contributors are recognized for their valuable contributions to the project, whether through
 code, documentation, feedback, or community support.
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="section divider" width="100%">
 
 _Want to see your name here? Check out our [contribution guidelines](CONTRIBUTING.md) and submit a pull request!_
 
