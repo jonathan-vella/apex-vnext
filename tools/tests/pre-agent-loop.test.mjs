@@ -10,6 +10,7 @@ import {
   buildDryRunQueue,
   initializeRun,
   parseArguments,
+  probeLauncher,
   resumeRun,
 } from "../scripts/pre-agent-loop.mjs";
 
@@ -90,6 +91,16 @@ test("dry-run queue preserves source paths and focused checks", () => {
       focused_checks: ["npm run validate:fixture"],
     },
   ]);
+});
+
+test("launcher probe accepts only noninteractive version output", () => {
+  const launcher = authorization.launcher;
+  const success = () => ({ status: 0, stdout: "GitHub Copilot CLI 1.0.77\n", stderr: "" });
+  const prompt = () => ({ status: 0, stdout: "Install GitHub Copilot CLI?\n", stderr: "" });
+  const failure = () => ({ status: 1, stdout: "", stderr: "failed" });
+  assert.equal(probeLauncher(launcher, success).ok, true);
+  assert.deepEqual(probeLauncher(launcher, prompt), { ok: false, reason: "launcher version probe requested setup" });
+  assert.deepEqual(probeLauncher(launcher, failure), { ok: false, reason: "launcher version probe failed" });
 });
 
 test("admitted run writes an atomic lock and queue once", () => {

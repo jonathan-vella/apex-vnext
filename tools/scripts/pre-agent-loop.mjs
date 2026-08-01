@@ -7,7 +7,7 @@
  * node tools/scripts/pre-agent-loop.mjs run --dry-run
  */
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -126,6 +126,23 @@ export function admissionErrors({ authorization, root, git = gitValue, now = new
   return errors;
 }
 
+export function probeLauncher(launcher, spawn = spawnSync) {
+  const result = spawn(launcher.binary, ["version", "--no-auto-update"], {
+    encoding: "utf8",
+    input: "",
+    maxBuffer: launcher.noninteractive.output_limit_bytes,
+    stdio: ["pipe", "pipe", "pipe"],
+    timeout: launcher.noninteractive.timeout_seconds * 1000,
+  });
+  const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+  if (result.error || result.status !== 0) return { ok: false, reason: "launcher version probe failed" };
+  if (/install|bootstrap|sign[ -]?in|authenticate/iu.test(output)) {
+    return { ok: false, reason: "launcher version probe requested setup" };
+  }
+  if (!/GitHub Copilot CLI\s+\S+/u.test(output)) return { ok: false, reason: "launcher version output is invalid" };
+  return { ok: true, version: output.trim() };
+}
+
 export function buildDryRunQueue(ownership) {
   return ownership.surfaces.map((surface) => ({
     id: surface.id,
@@ -229,7 +246,11 @@ function main() {
       : command === "abort"
         ? abortRun({ authorization, root: ROOT })
         : command === "run" && !dryRun
-          ? initializeRun({ authorization, root: ROOT })
+          ? (() => {
+              const probe = probeLauncher(authorization.launcher);
+              if (!probe.ok) throw new Error(probe.reason);
+              return initializeRun({ authorization, root: ROOT });
+            })()
           : result;
   console.log(JSON.stringify({ command, dry_run: dryRun, ...output }, null, 2));
   process.exitCode = output.admitted === false ? 1 : 0;
