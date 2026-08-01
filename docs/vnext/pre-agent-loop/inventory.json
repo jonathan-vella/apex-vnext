@@ -27,9 +27,18 @@
         "repository validators"
       ],
       "classification": "consolidate",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:instruction-checks",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:glob-audit",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "Instruction files remain authoritative, but their overlapping scopes need one computed audit view."
     },
     {

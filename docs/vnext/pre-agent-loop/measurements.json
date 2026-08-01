@@ -10,6 +10,20 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "scoped-instruction-discovery",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:instruction-checks",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:glob-audit",
+          "status": 0
+        }
+      ]
     }
   ]
 }
