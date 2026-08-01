@@ -1,9 +1,5 @@
 # Paths Prettier should ignore. Keep in sync with eslint.config.mjs ignores.
 node_modules/
-# Adopt-narrow: site/ is deferred for eslint AND prettier (90-day reassessment).
-# It also contains *.astro files that require prettier-plugin-astro (not installed),
-# so formatting site/ would hard-error. Mirror the eslint ignore here.
-site/
 agent-output/
 .apex/
 .archive/
@@ -34,10 +30,8 @@ packages/cli/assets/
 # Linting is handled by markdownlint-cli2; line length by MD013 (120 chars).
 # Run `npx prettier --check '.github/agents/**/*.md'` to verify the
 # disagreement is intentional before removing these globs.
-.github/agents/
 .github/instructions/
 .github/skills/
-tools/apex-prompts/
 AGENTS.md
 
 # Root + repo markdown is owned by markdownlint-cli2, not Prettier (consistent
@@ -46,7 +40,6 @@ README.md
 CHANGELOG.md
 CONTRIBUTING.md
 CONTRIBUTORS.md
-QUALITY_SCORE.md
 VERSION.md
 
 # Generated JSON — owned by their generators; Prettier must not fight them.

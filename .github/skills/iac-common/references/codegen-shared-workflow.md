@@ -153,7 +153,7 @@ Write results to `challenge-findings-iac-code-pass{N}.json`.
 Fix any `must_fix` items, re-validate, re-run failing pass.
 Save validation status in `05-implementation-reference.md`. Artifact lint is
 owned by the lefthook `artifact-validation` pre-commit hook and the
-`10-Challenger` review — do not invoke `npm run lint:artifact-templates` here
+`10-Challenger` review — do not invoke `npm run validate:artifacts` here
 (see
 [`agent-authoring.instructions.md`](../../../instructions/agent-authoring.instructions.md#no-direct-markdownlint-on-agent-output-rule)).
 

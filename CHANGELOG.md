@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Consolidated duplicate lint aliases onto canonical validators, replaced repeated vNext CI steps with
+  `qualify:vnext`, and removed obsolete hook paths and the unused model-catalog index writer.
 - Archived the broken original-APEX E2E workflow, benchmark scripts, prompts, and fixtures after vNext deterministic,
   package, and exact-head qualification became authoritative.
 - Linked previously unreachable skill references from their parent indexes and tightened repetitive discovery

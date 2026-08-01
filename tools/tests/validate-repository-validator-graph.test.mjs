@@ -160,12 +160,7 @@ test("rejects a canonical script delegated back to its alias", () => {
 });
 
 test("delegated aliases preserve canonical exits and diagnostics", () => {
-  for (const scenario of [
-    { canonical: "validate:policy-precheck", alias: "lint:policy-precheck", args: [] },
-    { canonical: "validate:agents", alias: "lint:agent-checks", args: ["--only=unknown"] },
-  ]) {
-    assert.deepEqual(runScript(scenario.alias, scenario.args), runScript(scenario.canonical, scenario.args));
-  }
+  assert.deepEqual(runScript("lint:policy-precheck", []), runScript("validate:policy-precheck", []));
 });
 
 test("rejects aggregate dependency cycles and missing consumer evidence", () => {

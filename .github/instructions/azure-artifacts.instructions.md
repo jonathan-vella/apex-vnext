@@ -18,7 +18,7 @@ The `azure-artifacts/SKILL.md` is authoritative — read it for templates, workf
 
 Templates define structural elements that agents reproduce.
 Validated by the lefthook `artifact-validation` pre-commit hook (wraps
-`npm run validate:artifacts` / `lint:artifact-templates`) and CI — agents do
+`npm run validate:artifacts`) and CI — agents do
 not self-lint.
 
 | Element              | What to Copy from Template                               |
@@ -53,7 +53,7 @@ Canonical H2 heading lists for all 15 artifact types live in the template files:
 | Layer           | Mechanism                                                                            | When                 |
 | --------------- | ------------------------------------------------------------------------------------ | -------------------- |
 | 1. Instructions | This file auto-applies to all agent-output                                           | Generation time      |
-| 2. Pre-commit   | `lefthook` `artifact-validation` hook — wraps `npm run lint:artifact-templates`     | Before commit        |
+| 2. Pre-commit   | `lefthook` `artifact-validation` hook — wraps `npm run validate:artifacts`          | Before commit        |
 | 3. CI/CD        | Same validation in GitHub Actions                                                    | Before merge         |
 | 4. Auto-fix     | `npm run fix:artifact-h2` (human-run / pre-commit, not agent-run)                    | On-demand correction |
 

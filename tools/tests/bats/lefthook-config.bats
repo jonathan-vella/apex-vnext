@@ -56,7 +56,7 @@ create_markdown_fixture() {
   fi
 }
 
-@test "only generating pre-commit hooks own the serial Git index" {
+@test "one generating pre-commit hook allows parallel execution" {
   local parallel
   local writers
   parallel=$(awk '/^pre-commit:/{in_precommit=1; next} in_precommit && /^  parallel:/{print $2; exit}' "$REPO_ROOT/lefthook.yml")
@@ -64,8 +64,8 @@ create_markdown_fixture() {
     /^    [a-z][a-z0-9-]*:/ { command=$1; sub(/:$/, "", command) }
     /^      stage_fixed: true$/ { print command }
   ' "$REPO_ROOT/lefthook.yml" | sort)
-  [ "$parallel" = "false" ]
-  [ "$writers" = $'model-catalog-sync\nsku-manifest-render' ]
+  [ "$parallel" = "true" ]
+  [ "$writers" = "sku-manifest-render" ]
 }
 
 @test "Terraform formatting delegates validator behavior to its canonical npm script" {

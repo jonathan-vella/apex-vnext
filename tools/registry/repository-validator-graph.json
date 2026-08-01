@@ -324,14 +324,14 @@
       "id": "validate-agents",
       "script": "validate:agents",
       "profile": "node-validation",
-      "aliases": ["lint:agent-checks", "lint:agent-frontmatter", "lint:model-alignment"],
+      "aliases": [],
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
       "id": "validate-artifacts",
       "script": "validate:artifacts",
       "profile": "node-validation",
-      "aliases": ["lint:artifact-templates", "lint:h2-sync"],
+      "aliases": [],
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
@@ -506,7 +506,7 @@
       "id": "validate-skills",
       "script": "validate:skills",
       "profile": "node-validation",
-      "aliases": ["lint:skill-references", "lint:skills-format", "validate:stale-refs"],
+      "aliases": [],
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
@@ -598,7 +598,6 @@
         "validate:lens-references",
         "validate:challenger-findings",
         "validate:challenger-presence",
-        "lint:workflow-handoffs",
         "validate:skill-checks",
         "lint:json",
         "lint:json-schemas",
@@ -667,7 +666,6 @@
         "validate:lens-references",
         "validate:challenger-findings",
         "validate:challenger-presence",
-        "lint:workflow-handoffs",
         "validate:skill-checks",
         "lint:json",
         "lint:json-schemas",
