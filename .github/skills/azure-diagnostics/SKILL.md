@@ -1,6 +1,6 @@
 ---
 name: azure-diagnostics
-description: "**WORKFLOW SKILL** — Debug and troubleshoot Azure production issues: Container Apps + Function Apps diagnostics, KQL log analysis, health checks. WHEN: 'debug production issues', 'troubleshoot container apps', 'troubleshoot function apps', 'image pull failures', 'cold start issues', 'health probe failures'. DO NOT USE FOR: pre-deployment validation (azure-validate), cost analysis (azure-cost-optimization)."
+description: "**WORKFLOW SKILL** — Diagnoses Azure production issues with Container Apps, Functions, KQL, and health checks. WHEN: 'debug production', 'container app failure', 'function failure', 'image pull', 'cold start', 'health probe'. EXCLUDES pre-deployment validation and cost analysis."
 license: MIT
 metadata:
   author: Microsoft

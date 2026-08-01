@@ -1,6 +1,6 @@
 ---
 name: azure-storage
-description: '**UTILITY SKILL** — Azure Storage Services: Blob, File Shares, Queue, Table, and Data Lake. Object storage, SMB shares, async messaging, NoSQL key-value, big-data analytics. Access tiers + lifecycle management. WHEN: "blob storage", "file shares", "queue storage", "table storage", "data lake", "access tiers", "lifecycle management". DO NOT USE FOR: SQL databases, Cosmos DB (use azure-prepare), Event Hubs / Service Bus messaging.'
+description: '**UTILITY SKILL** — Covers Azure Blob, Files, Queue, Table, and Data Lake, including access tiers and lifecycle management. WHEN: "blob storage", "file shares", "queue storage", "table storage", "data lake", "access tiers". EXCLUDES SQL, Cosmos DB, Event Hubs, and Service Bus.'
 license: MIT
 metadata:
   author: Microsoft

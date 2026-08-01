@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Linked previously unreachable skill references from their parent indexes and tightened repetitive discovery
+  descriptions without changing capability behavior or routing boundaries.
 - Fixed Requirements input and authoring so blank or inferred sentinel answers are rejected, kernel questions identify
   the decision areas to cover, and MCP task context returns recorded answers plus stageable output templates without
   requiring filesystem access.

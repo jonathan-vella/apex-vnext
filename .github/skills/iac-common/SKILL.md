@@ -71,6 +71,15 @@ Full procedure (`azd up` / `azd provision --preview`, environment preflight chec
 | Bootstrap backend templates   | `terraform-patterns/references/bootstrap-backend-template.md`                                                                         |
 | Deploy script templates       | `terraform-patterns/references/deploy-script-template.md`                                                                             |
 | Circuit breaker               | `references/circuit-breaker.md`                                                                                                       |
+| Contract emission and handoff | `references/contract-emission-and-handoff.md`                                                                                         |
+| Shared deployment workflow    | `references/deploy-shared-workflow.md`                                                                                                |
+| Deployment validation         | `references/deploy-validation-checklist.md`                                                                                           |
+| Governance drift routing      | `references/governance-drift-routing.md`                                                                                              |
+| Planner approval gate         | `references/iac-planner-approval-gate.md`                                                                                             |
+| Placeholder scan              | `references/placeholder-scan-protocol.md`                                                                                             |
+| Plan consistency              | `references/plan-consistency-checks.md`                                                                                               |
+| Policy precheck contract      | `references/policy-precheck-contract.md`                                                                                              |
+| Required Step 4 artifacts     | `references/step4-required-artifacts.md`                                                                                              |
 
 ## Circuit Breaker
 
