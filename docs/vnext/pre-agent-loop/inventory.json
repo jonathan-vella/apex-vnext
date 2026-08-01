@@ -269,9 +269,22 @@
         "both supported Copilot clients"
       ],
       "classification": "rewrite",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext-pack",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "The approved lifecycle extends the existing npm and manifest authority rather than adding APM or another installer."
     },
     {
