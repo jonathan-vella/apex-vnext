@@ -180,6 +180,32 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "mcp-portfolio",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run lint:mcp-config",
+          "status": 0
+        },
+        {
+          "command": "npm run test:mcp-config",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:terraform-mcp-retirement",
+          "status": 0
+        },
+        {
+          "command": "npm run test:terraform-mcp-retirement",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        }
+      ]
     }
   ]
 }

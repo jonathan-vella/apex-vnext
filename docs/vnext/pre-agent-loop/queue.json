@@ -290,7 +290,7 @@
         "npm run validate:vnext"
       ],
       "rationale": "MCP ownership is currently distributed across client config, packs, setup, tests, and documentation.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "pricing-evidence",
