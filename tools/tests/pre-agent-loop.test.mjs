@@ -8,6 +8,7 @@ import {
   abortRun,
   admissionErrors,
   buildDryRunQueue,
+  changedPathErrors,
   initializeRun,
   parseArguments,
   probeLauncher,
@@ -91,6 +92,20 @@ test("dry-run queue preserves source paths and focused checks", () => {
       focused_checks: ["npm run validate:fixture"],
     },
   ]);
+});
+
+test("changed path guard rejects protected, out-of-scope, binary, secret, and oversized slices", () => {
+  const errors = changedPathErrors({
+    authorization,
+    changedPaths: ["docs/vnext/pre-agent-loop/authorization.json", "outside/file.txt"],
+    addedLines: ["token=secret-value", ...Array.from({ length: authorization.budgets.lines_per_slice }, () => "line")],
+    binaryPaths: ["tools/file.bin"],
+  });
+  assert.ok(errors.some((error) => error.includes("protected path")));
+  assert.ok(errors.some((error) => error.includes("outside authorization")));
+  assert.ok(errors.some((error) => error.includes("binary")));
+  assert.ok(errors.some((error) => error.includes("line budget")));
+  assert.ok(errors.some((error) => error.includes("secret")));
 });
 
 test("launcher probe accepts only noninteractive version output", () => {
