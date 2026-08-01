@@ -537,7 +537,7 @@
         "npm run test:vnext-pack"
       ],
       "rationale": "Release qualification has a longer evidence-producing trust boundary than required deterministic CI and must remain independently visible.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "maintenance-workflows",

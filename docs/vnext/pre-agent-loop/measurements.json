@@ -368,6 +368,28 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "exact-head-release-qualification",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:github-workflows",
+          "status": 0
+        },
+        {
+          "command": "npm run test:github-workflows",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext-pack",
+          "status": 0
+        },
+        {
+          "command": "npm run qualify:vnext-release",
+          "status": "reserved-for-terminal-stage"
+        }
+      ]
     }
   ]
 }
