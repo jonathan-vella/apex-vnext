@@ -124,6 +124,16 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "runtime-manifests",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        }
+      ]
     }
   ]
 }
