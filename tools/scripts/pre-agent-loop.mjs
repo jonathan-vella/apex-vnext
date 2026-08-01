@@ -8,7 +8,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -17,6 +17,7 @@ import { contextHashDrift } from "./pre-agent-loop-hashes.mjs";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const DEFAULT_MANIFEST = "docs/vnext/pre-agent-loop/authorization.json";
 const INVENTORY = "tools/registry/modernization-ownership.json";
+const STATE_DIRECTORY = "docs/vnext/pre-agent-loop";
 
 function readJson(filePath) {
   return JSON.parse(readFileSync(filePath, "utf8"));
@@ -144,6 +145,38 @@ export function inspectRun({ authorization, root, git, now }) {
   };
 }
 
+function writeJsonAtomically(filePath, value) {
+  const temporaryPath = `${filePath}.tmp`;
+  writeFileSync(temporaryPath, `${JSON.stringify(value, null, 2)}\n`);
+  renameSync(temporaryPath, filePath);
+}
+
+export function initializeRun({ authorization, root, git, now = new Date() }) {
+  const result = inspectRun({ authorization, root, git, now });
+  if (!result.admitted) return result;
+
+  const stateDirectory = path.join(root, STATE_DIRECTORY);
+  const lockPath = path.join(stateDirectory, "run.lock.json");
+  const queuePath = path.join(stateDirectory, "queue.json");
+  if (existsSync(lockPath)) {
+    return { ...result, admitted: false, errors: ["another pre-agent run already holds the lock"] };
+  }
+
+  mkdirSync(stateDirectory, { recursive: true });
+  writeJsonAtomically(lockPath, {
+    authorization_id: authorization.authorization_id,
+    branch: authorization.branch,
+    worktree: path.resolve(root),
+    started_at: now.toISOString(),
+  });
+  writeJsonAtomically(queuePath, {
+    authorization_id: authorization.authorization_id,
+    state: "bootstrapped",
+    items: result.queue,
+  });
+  return result;
+}
+
 function main() {
   const { command, dryRun, manifest } = parseArguments(process.argv.slice(2));
   if (command === "resume" || command === "abort")
@@ -153,9 +186,10 @@ function main() {
     authorization: readJson(manifestPath),
     root: ROOT,
   });
-  if (command === "run" && !dryRun) throw new Error("Only run --dry-run is available before task execution lands.");
-  console.log(JSON.stringify({ command, dry_run: dryRun, ...result }, null, 2));
-  process.exitCode = result.admitted ? 0 : 1;
+  const output =
+    command === "run" && !dryRun ? initializeRun({ authorization: readJson(manifestPath), root: ROOT }) : result;
+  console.log(JSON.stringify({ command, dry_run: dryRun, ...output }, null, 2));
+  process.exitCode = output.admitted ? 0 : 1;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
