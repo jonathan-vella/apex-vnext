@@ -30,7 +30,7 @@ Start `06-deployment-summary.md` from the template, never from memory.
 2. Fill each `{placeholder}` with real deployment data — do not add, remove, or reorder H2 headings
 3. Artifact lint is enforced by the lefthook `artifact-validation` pre-commit
    hook and the `10-Challenger` review — do **not** invoke
-   `npm run lint:artifact-templates` or `markdownlint-cli2` directly against
+  `npm run validate:artifacts` or `markdownlint-cli2` directly against
    `agent-output/**` (see
    [`agent-authoring.instructions.md`](../../../instructions/agent-authoring.instructions.md#no-direct-markdownlint-on-agent-output-rule)).
 

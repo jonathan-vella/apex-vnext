@@ -82,7 +82,7 @@ Use the output to plan your `apply_patch` calls (max 3 patches total).
 Run **once** after all annotations are done. Validates JSON parse +
 remaining-placeholder count. Artifact markdown lint (H2 order, etc.) is owned
 by the lefthook `artifact-validation` pre-commit hook and the `10-Challenger`
-review — do not run `npm run lint:artifact-templates` here (see
+review — do not run `npm run validate:artifacts` here (see
 [`agent-authoring.instructions.md`](../../../instructions/agent-authoring.instructions.md#no-direct-markdownlint-on-agent-output-rule)).
 
 ```bash

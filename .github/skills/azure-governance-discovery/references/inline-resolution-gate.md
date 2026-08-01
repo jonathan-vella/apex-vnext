@@ -212,7 +212,7 @@ python3 -m json.tool agent-output/{project}/04-governance-constraints.json > /de
 
 Artifact lint (H2 order, markdownlint) is owned by the lefthook
 `artifact-validation` pre-commit hook and the `10-Challenger` review — do not
-invoke `npm run lint:artifact-templates` or `markdownlint-cli2` here. See
+invoke `npm run validate:artifacts` or `markdownlint-cli2` here. See
 [`agent-authoring.instructions.md`](../../../instructions/agent-authoring.instructions.md#no-direct-markdownlint-on-agent-output-rule).
 
 ### Step 7: Checkpoint

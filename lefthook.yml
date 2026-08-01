@@ -3,10 +3,7 @@
 # https://github.com/evilmartians/lefthook
 
 pre-commit:
-  # SAFETY: serial because model-catalog-sync and sku-manifest-render both
-  # generate files and re-stage them through one Git index. Keep serial unless
-  # an explicit index-lock coordination layer is introduced.
-  parallel: false
+  parallel: true
   commands:
     markdown-lint:
       glob: "*.md"
@@ -52,7 +49,7 @@ pre-commit:
         ❌ H2 heading sync failed!
 
         Sources must match: SKILL.md ↔ azure-artifacts ↔ validator
-        🔧 Run: npm run lint:h2-sync
+        🔧 Run: npm run validate:artifacts
 
     artifact-validation:
       glob: "{agent-output,.github/skills/azure-artifacts/templates}/**/*.md"
@@ -101,7 +98,7 @@ pre-commit:
         🔧 Challenger:  re-run challenger-review-subagent or 10-Challenger
 
     agents:
-      glob: "customizations/.github/agents/**/*.agent.md,.github/prompts/**/*.prompt.md,tools/apex-prompts/**/*.prompt.md,tools/tests/prompts/**/*.prompt.md"
+      glob: "customizations/.github/agents/**/*.agent.md,.github/prompts/**/*.prompt.md"
       run: |
         STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(agent|prompt)\.md$' || true)
         if [ -n "$STAGED" ]; then
@@ -123,30 +120,8 @@ pre-commit:
         managed role and hidden-worker contracts
         📚 Reference: .github/instructions/agent-authoring.instructions.md
 
-    model-catalog-sync:
-      glob: ".github/agents/**/*.agent.md"
-      run: |
-        STAGED_AGENTS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^\.github/agents/.*\.agent\.md$' || true)
-        if [ -n "$STAGED_AGENTS" ]; then
-          echo "🔄 Regenerating model-catalog assignments from frontmatter..."
-          node tools/scripts/generate-model-catalog.mjs
-          # Re-stage the catalog if the generator changed it
-          if ! git diff --quiet .github/model-catalog.json 2>/dev/null; then
-            git add .github/model-catalog.json
-            echo "  ↳ Re-staged .github/model-catalog.json"
-          fi
-        else
-          echo "ℹ️  No agent frontmatter staged — catalog regeneration skipped"
-        fi
-      stage_fixed: true
-      fail_text: |
-        ❌ Model catalog regeneration failed!
-
-        🔧 Manually run: node tools/scripts/generate-model-catalog.mjs
-        📚 Reference: .github/model-catalog.json governance block
-
     instructions:
-      glob: "**/*.instructions.md,{.github/agents/**,.github/skills/**,.github/instructions/**}"
+      glob: "**/*.instructions.md,{.github/skills/**,.github/instructions/**}"
       run: |
         STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(instructions|agent)\.md$|SKILL\.md$' || true)
         if [ -n "$STAGED" ]; then
