@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0.0",
+  "completedCommit": "901adcbc4b033c912cfbd198307c44b4979b089e",
+  "evidenceTree": "a9184248096c5e8c77e012e745a4d0013a003e37",
+  "replacementOwners": ["packages", "config", "customizations", "protected pull-request validation"],
+  "artifacts": [
+    { "path": ".github/prompts/apex-autonomous-pre-agent-loop.prompt.md", "sha256": "6491df45622b22c55c3b8cfe22484b4efc4aa1b56f1a3813c1796125d3318168" },
+    { "path": "tools/scripts/pre-agent-loop.mjs", "sha256": "22dc1fc0c35be723e6f7191e3397c8bc3a7b38c5c7979f77885ddf0dff8b35fd" },
+    { "path": "tools/scripts/pre-agent-loop-hashes.mjs", "sha256": "79e8d01128ed9dd7a6d45195bf82e29f542202ba8554e9e5b93513a8af6b66ac" },
+    { "path": "tools/tests/pre-agent-loop.test.mjs", "sha256": "a1918bad90407b7dbb5645552825071fe6048c4fff0954fca9cbd639f3947e84" },
+    { "path": "tools/registry/modernization-ownership.json", "sha256": "b9532ddb901e026062e4f6d0e31440df787b77cd414549dd529d340381d90592" },
+    { "path": "tools/registry/schemas/modernization-ownership.schema.json", "sha256": "ccf15dde387bfbbb571e5bb5b957eb2cf57ad43576d465a420237974710601d0" },
+    { "path": "tools/scripts/validate-modernization-ownership.mjs", "sha256": "650cde913423540d5b4faf6d182fbd9ace11edfe2bf6593c107c6f9fd13b80c8" },
+    { "path": "tools/tests/validate-modernization-ownership.test.mjs", "sha256": "59a2b3da7029666e4aa44538cd4595862c9cd6e78a50373fe0553fb2e8e8d50f" },
+    { "path": "docs/vnext/MODERNIZATION-INVENTORY.md", "sha256": "2209cc6b72b25d863ac790a8f5274a77be70708817cf4c370c10faafa3e7ec31" }
+  ]
+}

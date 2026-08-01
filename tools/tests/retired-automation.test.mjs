@@ -11,6 +11,7 @@ const e2eArchivePath = ".archive/retired-automation/e2e-v1";
 const promptArchivePath = ".archive/retired-prompts/original-apex-v1";
 const utilityArchivePath = ".archive/retired-utilities/original-apex-v1";
 const qualificationArchivePath = ".archive/qualification/vnext-qualification-v1";
+const preAgentArchivePath = ".archive/retired-automation/pre-agent-loop-v1";
 
 function textSha256(path) {
   const normalized = readFileSync(path, "utf8").replace(/\r\n/gu, "\n");
@@ -195,5 +196,28 @@ test("stale vNext qualification narrative remains provenance-only", () => {
     "agent-output/vnext-qualification/sku-manifest.md",
   ]) {
     assert.equal(existsSync(activeContract), true, `missing active qualification contract: ${activeContract}`);
+  }
+});
+
+test("completed pre-agent maintenance loop remains provenance-only", () => {
+  const provenance = JSON.parse(readFileSync(`${preAgentArchivePath}/provenance.json`, "utf8"));
+  assert.equal(provenance.completedCommit, "901adcbc4b033c912cfbd198307c44b4979b089e");
+  for (const artifact of provenance.artifacts) {
+    assert.equal(existsSync(artifact.path), false, `${artifact.path} must stay retired`);
+    const archiveFile = `${preAgentArchivePath}/${artifact.path}`;
+    assert.equal(existsSync(archiveFile), true, `missing archived controller artifact: ${artifact.path}`);
+    assert.equal(textSha256(archiveFile), artifact.sha256);
+  }
+  assert.equal(existsSync(`${preAgentArchivePath}/docs/vnext/pre-agent-loop/completion-handoff.md`), true);
+
+  const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts ?? {};
+  for (const command of [
+    "validate:pre-agent-loop",
+    "pre-agent-loop",
+    "test:pre-agent-loop",
+    "validate:modernization-ownership",
+    "test:modernization-ownership",
+  ]) {
+    assert.equal(scripts[command], undefined, `${command} must stay retired`);
   }
 });

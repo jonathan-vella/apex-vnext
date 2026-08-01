@@ -237,13 +237,6 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
-      "id": "test-modernization-ownership",
-      "script": "test:modernization-ownership",
-      "profile": "node-test",
-      "aliases": [],
-      "retirement": { "status": "active", "replacementIds": [] }
-    },
-    {
       "id": "test-repository-validator-graph",
       "script": "test:repository-validator-graph",
       "profile": "node-test",
@@ -440,13 +433,6 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
-      "id": "validate-modernization-ownership",
-      "script": "validate:modernization-ownership",
-      "profile": "node-validation",
-      "aliases": [],
-      "retirement": { "status": "active", "replacementIds": [] }
-    },
-    {
       "id": "validate-client-outcomes",
       "script": "validate:client-outcomes",
       "profile": "node-validation",
@@ -638,8 +624,6 @@
         "validate:no-hardcoded-counts",
         "validate:hooks",
         "validate:context-budget",
-        "validate:modernization-ownership",
-        "test:modernization-ownership",
         "validate:repository-validator-graph",
         "test:repository-validator-graph",
         "validate:github-workflows",
@@ -720,8 +704,6 @@
         "validate:sku-iac-coverage",
         "validate:banned-phrases",
         "validate:context-budget",
-        "validate:modernization-ownership",
-        "test:modernization-ownership",
         "validate:repository-validator-graph",
         "test:repository-validator-graph",
         "validate:github-workflows",

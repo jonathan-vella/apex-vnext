@@ -30,10 +30,6 @@
   "chat.useAgentSkills": true,
   "json.schemas": [
     {
-      "fileMatch": ["docs/vnext/pre-agent-loop/authorization.json"],
-      "url": "./docs/vnext/pre-agent-loop/authorization.schema.json"
-    },
-    {
       "fileMatch": [".github/data/governance-policy-baseline.fixture.json"],
       "url": "./tools/schemas/governance-baseline.schema.json"
     },
