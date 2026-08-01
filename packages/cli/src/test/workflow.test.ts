@@ -82,6 +82,49 @@ test("requirements task remains blocked until pending input is recorded", async 
   );
 });
 
+test("an initialized workspace can create and select independent projects", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "payments", displayName: "Payments" });
+  const dataPlatform = await service.createProject({
+    projectId: "data-platform",
+    displayName: "Data platform",
+    environment: "test",
+    targetScope: "resource-group:data-platform-test",
+    iacTool: "terraform",
+  });
+
+  assert.deepEqual(await service.listProjects(), [
+    { projectId: "data-platform", displayName: "Data platform" },
+    { projectId: "payments", displayName: "Payments" },
+  ]);
+  assert.equal((await service.status()).run.projectId, "data-platform");
+  assert.equal((await service.status()).run.runId, dataPlatform.runId);
+  assert.equal((await service.status()).run.iacTool, "terraform");
+
+  await service.use("payments" as never);
+  assert.equal((await service.status()).run.projectId, "payments");
+});
+
+test("a project promotes independently through multiple environments", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const initialized = await service.init({ projectId: "demo", environment: "dev", targetScope: "local" });
+  await prepareValidatedRun(service, initialized.runId, "bicep");
+
+  const testRun = await service.promote("test", "resource-group:payments-test");
+  assert.equal(testRun.projectId, "demo");
+  assert.equal(testRun.environment, "test");
+  assert.equal(testRun.parentRunId, initialized.runId);
+  assert.equal(testRun.gates[0]?.state, "inherited");
+  assert.equal(testRun.gates[1]?.state, "closed");
+
+  await service.use("demo" as never, initialized.runId);
+  assert.equal((await service.status()).run.environment, "dev");
+  await service.use("demo" as never, testRun.runId);
+  assert.equal((await service.status()).run.environment, "test");
+});
+
 test("typed input recording rejects premature, stale, malformed, duplicate, and replayed answers", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
