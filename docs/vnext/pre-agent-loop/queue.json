@@ -1,14 +1,22 @@
 {
-  "authorization_id": "pre-agent-opt-2026-08-01-command-policy",
-  "state": "stopped",
+  "authorization_id": "pre-agent-opt-2026-08-01-proof-policy",
+  "state": "running",
   "items": [
     {
       "id": "workspace-operating-frame",
       "classification": "keep",
       "owner": "AGENTS.md",
-      "consumers": ["contributors", "GitHub Copilot agents"],
-      "paths": ["AGENTS.md", ".github/copilot-instructions.md"],
-      "focused_checks": ["npm run validate:instruction-checks"],
+      "consumers": [
+        "contributors",
+        "GitHub Copilot agents"
+      ],
+      "paths": [
+        "AGENTS.md",
+        ".github/copilot-instructions.md"
+      ],
+      "focused_checks": [
+        "npm run validate:instruction-checks"
+      ],
       "rationale": "The root frame owns repository-wide conventions; Copilot instructions own editor-specific routing.",
       "status": "accepted"
     },
@@ -16,9 +24,18 @@
       "id": "scoped-instruction-discovery",
       "classification": "consolidate",
       "owner": ".github/instructions/*.instructions.md frontmatter",
-      "consumers": ["Copilot instruction loader", "repository validators"],
-      "paths": [".github/instructions/*.instructions.md", "tools/scripts/validate-instruction-checks.mjs"],
-      "focused_checks": ["npm run validate:instruction-checks", "npm run lint:glob-audit"],
+      "consumers": [
+        "Copilot instruction loader",
+        "repository validators"
+      ],
+      "paths": [
+        ".github/instructions/*.instructions.md",
+        "tools/scripts/validate-instruction-checks.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:instruction-checks",
+        "npm run lint:glob-audit"
+      ],
       "rationale": "Instruction files remain authoritative, but their overlapping scopes need one computed audit view.",
       "status": "accepted"
     },
@@ -26,9 +43,18 @@
       "id": "user-documentation",
       "classification": "keep",
       "owner": "docs/",
-      "consumers": ["APEX users", "contributors", "release reviewers"],
-      "paths": ["docs/**/*.md", ".github/instructions/docs.instructions.md"],
-      "focused_checks": ["npm run validate:docs"],
+      "consumers": [
+        "APEX users",
+        "contributors",
+        "release reviewers"
+      ],
+      "paths": [
+        "docs/**/*.md",
+        ".github/instructions/docs.instructions.md"
+      ],
+      "focused_checks": [
+        "npm run validate:docs"
+      ],
       "rationale": "User documentation is distinct from repository-authoring and runtime prompt guidance.",
       "status": "accepted"
     },
@@ -36,9 +62,19 @@
       "id": "managed-agent-manifest",
       "classification": "keep",
       "owner": "customizations/manifest.json",
-      "consumers": ["Copilot agent discovery", "kernel task routing", "model consistency checks"],
-      "paths": ["customizations/manifest.json", "customizations/.github/agents/*.agent.md"],
-      "focused_checks": ["npm run validate:model-consistency", "npm run validate:agents"],
+      "consumers": [
+        "Copilot agent discovery",
+        "kernel task routing",
+        "model consistency checks"
+      ],
+      "paths": [
+        "customizations/manifest.json",
+        "customizations/.github/agents/*.agent.md"
+      ],
+      "focused_checks": [
+        "npm run validate:model-consistency",
+        "npm run validate:agents"
+      ],
       "rationale": "The managed manifest owns roles and invocation edges while agent frontmatter remains executable definition.",
       "status": "accepted"
     },
@@ -46,9 +82,19 @@
       "id": "model-catalog",
       "classification": "keep",
       "owner": ".github/model-catalog.json",
-      "consumers": ["agent frontmatter", "model validators", "release checks"],
-      "paths": [".github/model-catalog.json", "tools/scripts/generate-model-catalog.mjs"],
-      "focused_checks": ["npm run validate:models", "npm run validate:model-catalog"],
+      "consumers": [
+        "agent frontmatter",
+        "model validators",
+        "release checks"
+      ],
+      "paths": [
+        ".github/model-catalog.json",
+        "tools/scripts/generate-model-catalog.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:models",
+        "npm run validate:model-catalog"
+      ],
       "rationale": "Definitions are maintained centrally and assignments are generated from executable frontmatter.",
       "status": "accepted"
     },
@@ -56,9 +102,19 @@
       "id": "skill-discovery",
       "classification": "consolidate",
       "owner": ".github/skills/*/SKILL.md frontmatter",
-      "consumers": ["Copilot skill discovery", "agents", "orphan-content validation"],
-      "paths": [".github/skills/*/SKILL.md", "tools/scripts/validate-skills.mjs"],
-      "focused_checks": ["npm run validate:skills", "npm run lint:orphaned-content"],
+      "consumers": [
+        "Copilot skill discovery",
+        "agents",
+        "orphan-content validation"
+      ],
+      "paths": [
+        ".github/skills/*/SKILL.md",
+        "tools/scripts/validate-skills.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:skills",
+        "npm run lint:orphaned-content"
+      ],
       "rationale": "Skill frontmatter stays canonical; a computed consumer view should replace repeated inventory prose.",
       "status": "accepted"
     },
@@ -66,12 +122,19 @@
       "id": "workflow-dag",
       "classification": "keep",
       "owner": ".github/skills/workflow-engine/templates/workflow-graph.json",
-      "consumers": ["orchestrator", "handoff validation", "documentation synchronization"],
+      "consumers": [
+        "orchestrator",
+        "handoff validation",
+        "documentation synchronization"
+      ],
       "paths": [
         ".github/skills/workflow-engine/templates/workflow-graph.json",
         "tools/schemas/workflow-graph.schema.json"
       ],
-      "focused_checks": ["npm run validate:workflow-graph", "npm run lint:workflow-table-sync"],
+      "focused_checks": [
+        "npm run validate:workflow-graph",
+        "npm run lint:workflow-table-sync"
+      ],
       "rationale": "The DAG is the machine-readable owner of workflow order and handoffs.",
       "status": "accepted"
     },
@@ -79,7 +142,11 @@
       "id": "copilot-client-projections",
       "classification": "rewrite",
       "owner": "customizations/manifest.json",
-      "consumers": ["GitHub Copilot in VS Code", "GitHub Copilot CLI", "client parity qualification"],
+      "consumers": [
+        "GitHub Copilot in VS Code",
+        "GitHub Copilot CLI",
+        "client parity qualification"
+      ],
       "paths": [
         "customizations/manifest.json",
         "customizations/.github/agents/*.agent.md",
@@ -112,9 +179,18 @@
       "id": "runtime-manifests",
       "classification": "keep",
       "owner": "config/*.v1.json",
-      "consumers": ["runtime initialization", "package assets", "qualification"],
-      "paths": ["config/*.v1.json", "tools/scripts/validate-vnext.mjs"],
-      "focused_checks": ["npm run validate:vnext"],
+      "consumers": [
+        "runtime initialization",
+        "package assets",
+        "qualification"
+      ],
+      "paths": [
+        "config/*.v1.json",
+        "tools/scripts/validate-vnext.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:vnext"
+      ],
       "rationale": "Versioned manifests separate runtime configuration from repository authoring details.",
       "status": "accepted"
     },
@@ -122,9 +198,20 @@
       "id": "workspace-package-boundaries",
       "classification": "keep",
       "owner": "packages/*/package.json",
-      "consumers": ["TypeScript build", "clean-install tests", "package consumers"],
-      "paths": ["packages/*/package.json", "tsconfig.vnext.json", "package-lock.json"],
-      "focused_checks": ["npm run test:vnext", "npm run test:vnext-pack"],
+      "consumers": [
+        "TypeScript build",
+        "clean-install tests",
+        "package consumers"
+      ],
+      "paths": [
+        "packages/*/package.json",
+        "tsconfig.vnext.json",
+        "package-lock.json"
+      ],
+      "focused_checks": [
+        "npm run test:vnext",
+        "npm run test:vnext-pack"
+      ],
       "rationale": "Workspace packages are the executable ownership units for contracts, kernel, CLI, and adapters.",
       "status": "accepted"
     },
@@ -132,13 +219,20 @@
       "id": "schema-libraries",
       "classification": "investigate",
       "owner": "packages/contracts/src/",
-      "consumers": ["runtime contracts", "repository artifact validators", "external tooling"],
+      "consumers": [
+        "runtime contracts",
+        "repository artifact validators",
+        "external tooling"
+      ],
       "paths": [
         "packages/contracts/src/*.ts",
         "packages/contracts/schemas/*.schema.json",
         "tools/schemas/*.schema.json"
       ],
-      "focused_checks": ["npm run lint:json-schemas", "npm run test:vnext"],
+      "focused_checks": [
+        "npm run lint:json-schemas",
+        "npm run test:vnext"
+      ],
       "rationale": "TypeBox contracts and repository JSON schemas overlap in purpose but serve different consumers.",
       "status": "accepted"
     },
@@ -146,9 +240,20 @@
       "id": "customization-distribution",
       "classification": "rewrite",
       "owner": "customizations/manifest.json",
-      "consumers": ["CLI initialization", "managed customization update", "both supported Copilot clients"],
-      "paths": ["customizations/manifest.json", "packages/cli/scripts/prepare-assets.mjs"],
-      "focused_checks": ["npm run validate:vnext", "npm run test:vnext", "npm run test:vnext-pack"],
+      "consumers": [
+        "CLI initialization",
+        "managed customization update",
+        "both supported Copilot clients"
+      ],
+      "paths": [
+        "customizations/manifest.json",
+        "packages/cli/scripts/prepare-assets.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:vnext",
+        "npm run test:vnext",
+        "npm run test:vnext-pack"
+      ],
       "rationale": "The approved lifecycle extends the existing npm and manifest authority rather than adding APM or another installer.",
       "status": "accepted"
     },
@@ -156,7 +261,12 @@
       "id": "mcp-portfolio",
       "classification": "investigate",
       "owner": "planned APEX MCP descriptor",
-      "consumers": ["developer workspace", "managed clients", "capability packs", "release packaging"],
+      "consumers": [
+        "developer workspace",
+        "managed clients",
+        "capability packs",
+        "release packaging"
+      ],
       "paths": [
         ".vscode/mcp.json",
         "customizations/.vscode/mcp.json",
@@ -186,7 +296,12 @@
       "id": "pricing-evidence",
       "classification": "rewrite",
       "owner": "packages/contracts/src/pricing.ts",
-      "consumers": ["architecture workflow", "cost evidence", "Gate 2 review", "release qualification"],
+      "consumers": [
+        "architecture workflow",
+        "cost evidence",
+        "Gate 2 review",
+        "release qualification"
+      ],
       "paths": [
         "packages/contracts/src/pricing.ts",
         "packages/contracts/schemas/pricing-*-v1.schema.json",
@@ -219,13 +334,20 @@
       "id": "improvement-outcome-ingestion",
       "classification": "rewrite",
       "owner": "config/improvement-policy.v1.json",
-      "consumers": ["quality workflow", "human proposal triage", "release scorecard"],
+      "consumers": [
+        "quality workflow",
+        "human proposal triage",
+        "release scorecard"
+      ],
       "paths": [
         "config/improvement-policy.v1.json",
         "packages/contracts/src/improvement.ts",
         "packages/kernel/src/improvement-store.ts"
       ],
-      "focused_checks": ["npm run test:bounded-improvement", "npm run prove:bounded-improvement"],
+      "focused_checks": [
+        "npm run test:bounded-improvement",
+        "npm run prove:bounded-improvement"
+      ],
       "rationale": "Existing inert improvement contracts need a bounded outcome adapter and defensible measurements, not a second learning store.",
       "status": "accepted"
     },
@@ -233,9 +355,19 @@
       "id": "workflow-validator-ownership",
       "classification": "keep",
       "owner": "packages/kernel/src/workflow-validator-ownership.ts",
-      "consumers": ["workflow engine", "task completion", "Gate 4", "terminal evidence"],
-      "paths": ["packages/kernel/src/workflow-validator-ownership.ts", "packages/cli/src/workflow-validators.ts"],
-      "focused_checks": ["npm run test:vnext"],
+      "consumers": [
+        "workflow engine",
+        "task completion",
+        "Gate 4",
+        "terminal evidence"
+      ],
+      "paths": [
+        "packages/kernel/src/workflow-validator-ownership.ts",
+        "packages/cli/src/workflow-validators.ts"
+      ],
+      "focused_checks": [
+        "npm run test:vnext"
+      ],
       "rationale": "This is the runtime authorization map, not merely a repository lint registry.",
       "status": "accepted"
     },
@@ -243,7 +375,12 @@
       "id": "repository-validator-graph",
       "classification": "consolidate",
       "owner": "tools/registry/repository-validator-graph.json",
-      "consumers": ["package script projections", "pull-request CI", "contributors", "pre-push validation"],
+      "consumers": [
+        "package script projections",
+        "pull-request CI",
+        "contributors",
+        "pre-push validation"
+      ],
       "paths": [
         "tools/registry/repository-validator-graph.json",
         "tools/registry/schemas/repository-validator-graph.schema.json",
@@ -251,7 +388,10 @@
         ".github/workflows/ci.yml",
         "lefthook.yml"
       ],
-      "focused_checks": ["npm run validate:repository-validator-graph", "npm run test:repository-validator-graph"],
+      "focused_checks": [
+        "npm run validate:repository-validator-graph",
+        "npm run test:repository-validator-graph"
+      ],
       "rationale": "The graph owns validation metadata while package scripts remain the executable projection and hooks/workflows retain environment-specific behavior.",
       "status": "accepted"
     },
@@ -259,9 +399,21 @@
       "id": "language-validator-boundaries",
       "classification": "keep",
       "owner": "language-native tools invoked by package.json",
-      "consumers": ["JavaScript", "Python", "Markdown", "Bicep", "Terraform"],
-      "paths": ["package.json", "pyproject.toml", "eslint.config.mjs"],
-      "focused_checks": ["npm run validate:all"],
+      "consumers": [
+        "JavaScript",
+        "Python",
+        "Markdown",
+        "Bicep",
+        "Terraform"
+      ],
+      "paths": [
+        "package.json",
+        "pyproject.toml",
+        "eslint.config.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:all"
+      ],
       "rationale": "Language tools should not be reimplemented by generic string validators.",
       "status": "accepted"
     },
@@ -269,7 +421,12 @@
       "id": "markdown-policy-enforcement",
       "classification": "consolidate",
       "owner": ".markdownlint-cli2.jsonc and package.json scripts",
-      "consumers": ["Markdown authors", "pre-commit hooks", "pull-request documentation checks", "editor integration"],
+      "consumers": [
+        "Markdown authors",
+        "pre-commit hooks",
+        "pull-request documentation checks",
+        "editor integration"
+      ],
       "paths": [
         ".markdownlint-cli2.jsonc",
         ".github/instructions/markdown.instructions.md",
@@ -278,7 +435,12 @@
         "lefthook.yml",
         ".github/workflows/docs.yml"
       ],
-      "focused_checks": ["npm run lint:md", "npm run validate:docs", "npm run validate:hooks", "npm run test:hooks"],
+      "focused_checks": [
+        "npm run lint:md",
+        "npm run validate:docs",
+        "npm run validate:hooks",
+        "npm run test:hooks"
+      ],
       "rationale": "Audience-specific authoring guidance is distinct from executable lint policy, but hooks and workflows should consume the same npm-owned command contract.",
       "status": "accepted"
     },
@@ -286,7 +448,11 @@
       "id": "artifact-template-validation",
       "classification": "consolidate",
       "owner": ".github/skills/azure-artifacts/templates/",
-      "consumers": ["artifact authors", "pre-commit hook", "challenger review"],
+      "consumers": [
+        "artifact authors",
+        "pre-commit hook",
+        "challenger review"
+      ],
       "paths": [
         ".github/skills/azure-artifacts/templates/*.md",
         "tools/scripts/_lib/artifact-heading-sources.mjs",
@@ -294,17 +460,31 @@
         "tools/scripts/validate-artifacts.mjs",
         "tools/scripts/_lib/artifact-headings.mjs"
       ],
-      "focused_checks": ["npm run validate:artifacts", "npm run validate:headings-summary"],
+      "focused_checks": [
+        "npm run validate:artifacts",
+        "npm run validate:headings-summary"
+      ],
       "rationale": "Templates are canonical; runtime and compact heading registries are deterministic generated derivatives with explicit non-template exceptions.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "precommit-hooks",
       "classification": "rewrite",
       "owner": "lefthook.yml",
-      "consumers": ["git pre-commit", "contributors", "artifact validation"],
-      "paths": ["lefthook.yml", "tools/scripts/validate-hooks.mjs", "tools/tests/test-hooks.sh"],
-      "focused_checks": ["npm run validate:hooks", "npm run test:hooks"],
+      "consumers": [
+        "git pre-commit",
+        "contributors",
+        "artifact validation"
+      ],
+      "paths": [
+        "lefthook.yml",
+        "tools/scripts/validate-hooks.mjs",
+        "tools/tests/test-hooks.sh"
+      ],
+      "focused_checks": [
+        "npm run validate:hooks",
+        "npm run test:hooks"
+      ],
       "rationale": "Serial execution protects the model-catalog and SKU-manifest generators, which both re-stage output through one Git index; read-only hooks must not claim stage_fixed ownership.",
       "status": "pending"
     },
@@ -312,7 +492,11 @@
       "id": "github-required-checks",
       "classification": "keep",
       "owner": "GitHub branch protection and .github/workflows/ci.yml",
-      "consumers": ["branch protection", "pull requests", "release qualification"],
+      "consumers": [
+        "branch protection",
+        "pull requests",
+        "release qualification"
+      ],
       "paths": [
         "tools/registry/github-workflow-contract.json",
         "tools/registry/schemas/github-workflow-contract.schema.json",
@@ -335,7 +519,11 @@
       "id": "exact-head-release-qualification",
       "classification": "keep",
       "owner": ".github/workflows/release-candidate-qualification.yml",
-      "consumers": ["release reviewers", "pull requests", "exact-candidate evidence consumers"],
+      "consumers": [
+        "release reviewers",
+        "pull requests",
+        "exact-candidate evidence consumers"
+      ],
       "paths": [
         "tools/registry/github-workflow-contract.json",
         ".github/workflows/release-candidate-qualification.yml",
@@ -355,9 +543,19 @@
       "id": "maintenance-workflows",
       "classification": "keep",
       "owner": ".github/workflows/weekly-maintenance.yml",
-      "consumers": ["maintainers", "dependency freshness", "branch hygiene"],
-      "paths": [".github/workflows/weekly-maintenance.yml", ".github/workflows/sensei-branch-maintenance.yml"],
-      "focused_checks": ["npm run validate:tool-versions", "npm run lint:docs-freshness"],
+      "consumers": [
+        "maintainers",
+        "dependency freshness",
+        "branch hygiene"
+      ],
+      "paths": [
+        ".github/workflows/weekly-maintenance.yml",
+        ".github/workflows/sensei-branch-maintenance.yml"
+      ],
+      "focused_checks": [
+        "npm run validate:tool-versions",
+        "npm run lint:docs-freshness"
+      ],
       "rationale": "Scheduled automation is distinct from required pull-request checks.",
       "status": "pending"
     },
@@ -365,8 +563,13 @@
       "id": "upstream-workflow-synchronization",
       "classification": "retire",
       "owner": ".archive/retired-automation/sync-workflows.mjs",
-      "consumers": ["historical provenance and rollback review"],
-      "paths": [".archive/retired-automation/sync-workflows.mjs", ".archive/retired-automation/README.md"],
+      "consumers": [
+        "historical provenance and rollback review"
+      ],
+      "paths": [
+        ".archive/retired-automation/sync-workflows.mjs",
+        ".archive/retired-automation/README.md"
+      ],
       "focused_checks": [
         "npm run test:retired-automation",
         "npm run validate:github-workflows",
@@ -379,9 +582,17 @@
       "id": "model-catalog-generation",
       "classification": "keep",
       "owner": "tools/scripts/generate-model-catalog.mjs",
-      "consumers": ["model catalog assignments", "agent validators"],
-      "paths": ["tools/scripts/generate-model-catalog.mjs", ".github/model-catalog.json"],
-      "focused_checks": ["npm run validate:model-catalog"],
+      "consumers": [
+        "model catalog assignments",
+        "agent validators"
+      ],
+      "paths": [
+        "tools/scripts/generate-model-catalog.mjs",
+        ".github/model-catalog.json"
+      ],
+      "focused_checks": [
+        "npm run validate:model-catalog"
+      ],
       "rationale": "Assignments are derived data and should remain generated.",
       "status": "pending"
     },
@@ -389,9 +600,18 @@
       "id": "entity-count-generation",
       "classification": "keep",
       "owner": "tools/registry/count-manifest.json",
-      "consumers": ["documentation", "freshness checks", "repository audits"],
-      "paths": ["tools/registry/count-manifest.json", "tools/scripts/validate-no-hardcoded-counts.mjs"],
-      "focused_checks": ["npm run validate:no-hardcoded-counts"],
+      "consumers": [
+        "documentation",
+        "freshness checks",
+        "repository audits"
+      ],
+      "paths": [
+        "tools/registry/count-manifest.json",
+        "tools/scripts/validate-no-hardcoded-counts.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:no-hardcoded-counts"
+      ],
       "rationale": "Exact entity counts are derived facts and must not be copied into prose.",
       "status": "pending"
     },
@@ -399,9 +619,18 @@
       "id": "avm-index-generation",
       "classification": "keep",
       "owner": "tools/scripts/refresh-avm-module-index.mjs",
-      "consumers": ["IaC planners", "module pin validators", "weekly maintenance"],
-      "paths": ["tools/scripts/refresh-avm-module-index.mjs", ".github/data/avm-module-index.json"],
-      "focused_checks": ["npm run validate:avm-versions:offline"],
+      "consumers": [
+        "IaC planners",
+        "module pin validators",
+        "weekly maintenance"
+      ],
+      "paths": [
+        "tools/scripts/refresh-avm-module-index.mjs",
+        ".github/data/avm-module-index.json"
+      ],
+      "focused_checks": [
+        "npm run validate:avm-versions:offline"
+      ],
       "rationale": "The index is generated cache data; module declarations remain canonical in IaC.",
       "status": "pending"
     },
@@ -409,9 +638,18 @@
       "id": "freshness-generation",
       "classification": "keep",
       "owner": "tools/registry/source-freshness.json",
-      "consumers": ["documentation CI", "skill references", "quarterly audit"],
-      "paths": ["tools/registry/source-freshness.json", "tools/scripts/check-docs-freshness.mjs"],
-      "focused_checks": ["npm run lint:docs-freshness"],
+      "consumers": [
+        "documentation CI",
+        "skill references",
+        "quarterly audit"
+      ],
+      "paths": [
+        "tools/registry/source-freshness.json",
+        "tools/scripts/check-docs-freshness.mjs"
+      ],
+      "focused_checks": [
+        "npm run lint:docs-freshness"
+      ],
       "rationale": "Freshness metadata is a dedicated drift-control surface.",
       "status": "pending"
     },
@@ -419,7 +657,12 @@
       "id": "diagram-routing",
       "classification": "keep",
       "owner": ".github/skills/mermaid/ and .github/skills/python-diagrams/",
-      "consumers": ["design workflow", "IaC planning", "as-built output", "documentation"],
+      "consumers": [
+        "design workflow",
+        "IaC planning",
+        "as-built output",
+        "documentation"
+      ],
       "paths": [
         ".github/skills/mermaid/SKILL.md",
         ".github/skills/python-diagrams/SKILL.md",
@@ -446,13 +689,22 @@
       "id": "client-bundle-generation",
       "classification": "rewrite",
       "owner": "packages/cli/scripts/prepare-assets.mjs",
-      "consumers": ["npm packages", "CLI lifecycle", "release manifest", "SBOM and provenance"],
+      "consumers": [
+        "npm packages",
+        "CLI lifecycle",
+        "release manifest",
+        "SBOM and provenance"
+      ],
       "paths": [
         "packages/cli/scripts/prepare-assets.mjs",
         "customizations/manifest.json",
         "config/runtime-bundle.v1.json"
       ],
-      "focused_checks": ["npm run prepare:vnext-assets", "npm run validate:vnext", "npm run test:vnext-pack"],
+      "focused_checks": [
+        "npm run prepare:vnext-assets",
+        "npm run validate:vnext",
+        "npm run test:vnext-pack"
+      ],
       "rationale": "Generated install payloads must stay derived from canonical customizations inside the npm lifecycle.",
       "status": "pending"
     },
@@ -460,12 +712,18 @@
       "id": "v1-compatibility-matrix",
       "classification": "retire",
       "owner": "docs/vnext/phase-0a/v1-behavior-compatibility.md",
-      "consumers": ["modernization reviewers", "cutover review", "compatibility tests"],
+      "consumers": [
+        "modernization reviewers",
+        "cutover review",
+        "compatibility tests"
+      ],
       "paths": [
         "docs/vnext/phase-0a/v1-behavior-compatibility.md",
         "tools/scripts/validate-v1-compatibility-matrix.mjs"
       ],
-      "focused_checks": ["npm run validate:v1-compatibility-matrix"],
+      "focused_checks": [
+        "npm run validate:v1-compatibility-matrix"
+      ],
       "rationale": "The matrix is required through modernization but becomes historical after accepted cutover.",
       "status": "pending"
     },
@@ -473,9 +731,19 @@
       "id": "public-command-compatibility",
       "classification": "investigate",
       "owner": "packages/cli/src/cli.ts",
-      "consumers": ["CLI users", "automation", "consumer repositories"],
-      "paths": ["packages/cli/src/cli.ts", "docs/guides/cli-reference.md"],
-      "focused_checks": ["npm run test:vnext", "npm run validate:v1-compatibility-matrix"],
+      "consumers": [
+        "CLI users",
+        "automation",
+        "consumer repositories"
+      ],
+      "paths": [
+        "packages/cli/src/cli.ts",
+        "docs/guides/cli-reference.md"
+      ],
+      "focused_checks": [
+        "npm run test:vnext",
+        "npm run validate:v1-compatibility-matrix"
+      ],
       "rationale": "Public command compatibility cannot be inferred safely from implementation names alone.",
       "status": "pending"
     },
@@ -483,13 +751,21 @@
       "id": "validator-diagnostics",
       "classification": "consolidate",
       "owner": "tools/scripts/_lib/reporter.mjs",
-      "consumers": ["local validation", "CI logs", "agent remediation"],
+      "consumers": [
+        "local validation",
+        "CI logs",
+        "agent remediation"
+      ],
       "paths": [
         "tools/scripts/_lib/reporter.mjs",
         "tools/scripts/_lib/registry-validator-reporter.mjs",
         "tools/scripts/validate-*.mjs"
       ],
-      "focused_checks": ["npm run test:lib-json", "npm run test:lib-ajv", "npm run test:registry-validator-reporter"],
+      "focused_checks": [
+        "npm run test:lib-json",
+        "npm run test:lib-ajv",
+        "npm run test:registry-validator-reporter"
+      ],
       "rationale": "Shared reporter adoption is partial, producing inconsistent output and remediation context.",
       "status": "pending"
     },
@@ -497,9 +773,18 @@
       "id": "workflow-telemetry",
       "classification": "investigate",
       "owner": "tools/scripts/measure-workflow-baseline.mjs",
-      "consumers": ["modernization baselines", "workflow retrospectives", "release review"],
-      "paths": ["tools/scripts/measure-workflow-baseline.mjs", "tools/schemas/session-state.schema.json"],
-      "focused_checks": ["npm run measure:baseline"],
+      "consumers": [
+        "modernization baselines",
+        "workflow retrospectives",
+        "release review"
+      ],
+      "paths": [
+        "tools/scripts/measure-workflow-baseline.mjs",
+        "tools/schemas/session-state.schema.json"
+      ],
+      "focused_checks": [
+        "npm run measure:baseline"
+      ],
       "rationale": "The aggregator exists, but the current repository contains no telemetry records.",
       "status": "pending"
     },
@@ -507,7 +792,10 @@
       "id": "debug-log-profiling",
       "classification": "investigate",
       "owner": "client-specific profilers emitting apex-debug-profile",
-      "consumers": ["context optimization", "local investigations"],
+      "consumers": [
+        "context optimization",
+        "local investigations"
+      ],
       "paths": [
         "tools/scripts/profile_debug_log.py",
         "tools/scripts/profile-copilot-cli-otel.mjs",
@@ -527,16 +815,22 @@
       "id": "managed-consumer-guidance",
       "classification": "consolidate",
       "owner": "customizations/.github/copilot-instructions.md",
-      "consumers": ["GitHub Copilot in VS Code", "GitHub Copilot CLI", "generated customization bundle"],
+      "consumers": [
+        "GitHub Copilot in VS Code",
+        "GitHub Copilot CLI",
+        "generated customization bundle"
+      ],
       "paths": [
         "customizations/.github/copilot-instructions.md",
         "customizations/.github/agents/*.agent.md",
         "customizations/.github/skills/*/SKILL.md"
       ],
-      "focused_checks": ["npm run validate:instruction-checks", "npm run validate:vnext"],
+      "focused_checks": [
+        "npm run validate:instruction-checks",
+        "npm run validate:vnext"
+      ],
       "rationale": "Shipped consumer behavior needs one managed guidance owner distinct from repository contributor instructions.",
       "status": "pending"
     }
-  ],
-  "stop_reason": "focused check failed: npm run check:h2-order"
+  ]
 }

@@ -310,6 +310,20 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "artifact-template-validation",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:artifacts",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:headings-summary",
+          "status": 0
+        }
+      ]
     }
   ]
 }
