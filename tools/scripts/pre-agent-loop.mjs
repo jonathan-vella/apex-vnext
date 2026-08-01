@@ -234,7 +234,7 @@ export function taskInvokedSkill(events) {
     if (event.type === "session.skills_loaded") return false;
     if (!/(tool_call|tool\.execution)/u.test(event.type ?? "")) return false;
     const payload = JSON.stringify(event.data ?? event);
-    return /(?:"(?:name|toolName|tool_name)"\s*:\s*"skill"|SKILL\.md)/iu.test(payload);
+    return /"(?:name|toolName|tool_name)"\s*:\s*"skill"/iu.test(payload);
   });
 }
 

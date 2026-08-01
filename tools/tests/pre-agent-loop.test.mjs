@@ -161,7 +161,7 @@ test("skill availability metadata is allowed while actual skill execution is den
   assert.equal(taskInvokedSkill([{ type: "tool.execution_start", data: { toolName: "skill" } }]), true);
   assert.equal(
     taskInvokedSkill([{ type: "tool.execution_start", data: { toolName: "view", path: ".github/skills/x/SKILL.md" } }]),
-    true,
+    false,
   );
 });
 
