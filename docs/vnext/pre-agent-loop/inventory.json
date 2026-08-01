@@ -868,9 +868,14 @@
         "release review"
       ],
       "classification": "investigate",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run measure:baseline",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "The aggregator exists, but the current repository contains no telemetry records."
     },
     {
