@@ -102,7 +102,7 @@ test("an initialized workspace can create and select independent projects", asyn
   assert.equal((await service.status()).run.runId, dataPlatform.runId);
   assert.equal((await service.status()).run.iacTool, "terraform");
 
-  await service.use("payments" as never);
+  await service.use("payments");
   assert.equal((await service.status()).run.projectId, "payments");
 });
 
@@ -119,9 +119,9 @@ test("a project promotes independently through multiple environments", async () 
   assert.equal(testRun.gates[0]?.state, "inherited");
   assert.equal(testRun.gates[1]?.state, "closed");
 
-  await service.use("demo" as never, initialized.runId);
+  await service.use("demo", initialized.runId);
   assert.equal((await service.status()).run.environment, "dev");
-  await service.use("demo" as never, testRun.runId);
+  await service.use("demo", testRun.runId);
   assert.equal((await service.status()).run.environment, "test");
 });
 

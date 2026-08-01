@@ -28,7 +28,7 @@ apex project create \
 
 Project creation selects the new project's first run. Use `apex project use` to return to another workload.
 
-## Promote An Environment
+## Promote A Project Environment
 
 Each workload has one run per environment. After Gates 1 through 3 for the selected run are approved, create the next
 environment run:
@@ -88,7 +88,7 @@ apex validate --json
 apex status --json
 ```
 
-## Promote An Environment
+## Legacy Promotion Alias
 
 ```bash
 apex promote --environment test --target TARGET_SCOPE --json
