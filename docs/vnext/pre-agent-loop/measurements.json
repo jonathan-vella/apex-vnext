@@ -278,6 +278,16 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "language-validator-boundaries",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:all",
+          "status": "reserved-for-terminal-stage"
+        }
+      ]
     }
   ]
 }

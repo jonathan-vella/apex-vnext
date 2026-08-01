@@ -415,7 +415,7 @@
         "npm run validate:all"
       ],
       "rationale": "Language tools should not be reimplemented by generic string validators.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "markdown-policy-enforcement",
