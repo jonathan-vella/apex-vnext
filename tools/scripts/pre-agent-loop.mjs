@@ -8,7 +8,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -177,19 +177,62 @@ export function initializeRun({ authorization, root, git, now = new Date() }) {
   return result;
 }
 
+function statePaths(root) {
+  const stateDirectory = path.join(root, STATE_DIRECTORY);
+  return {
+    checkpointPath: path.join(stateDirectory, "checkpoints.jsonl"),
+    lockPath: path.join(stateDirectory, "run.lock.json"),
+    queuePath: path.join(stateDirectory, "queue.json"),
+  };
+}
+
+function readOwnedLock(authorization, root) {
+  const { lockPath } = statePaths(root);
+  if (!existsSync(lockPath)) throw new Error("no pre-agent run lock exists");
+  const lock = readJson(lockPath);
+  if (
+    lock.authorization_id !== authorization.authorization_id ||
+    lock.branch !== authorization.branch ||
+    lock.worktree !== path.resolve(root)
+  ) {
+    throw new Error("pre-agent run lock is not owned by this authorization");
+  }
+  return lock;
+}
+
+export function resumeRun({ authorization, root }) {
+  readOwnedLock(authorization, root);
+  const { queuePath } = statePaths(root);
+  if (!existsSync(queuePath)) throw new Error("pre-agent run queue is missing");
+  return readJson(queuePath);
+}
+
+export function abortRun({ authorization, root, now = new Date() }) {
+  const lock = readOwnedLock(authorization, root);
+  const { checkpointPath, lockPath } = statePaths(root);
+  appendFileSync(
+    checkpointPath,
+    `${JSON.stringify({ authorization_id: lock.authorization_id, state: "aborted", at: now.toISOString() })}\n`,
+  );
+  unlinkSync(lockPath);
+  return { state: "aborted" };
+}
+
 function main() {
   const { command, dryRun, manifest } = parseArguments(process.argv.slice(2));
-  if (command === "resume" || command === "abort")
-    throw new Error(`${command} is not available before state handling lands.`);
   const manifestPath = path.resolve(ROOT, manifest);
-  const result = inspectRun({
-    authorization: readJson(manifestPath),
-    root: ROOT,
-  });
+  const authorization = readJson(manifestPath);
+  const result = inspectRun({ authorization, root: ROOT });
   const output =
-    command === "run" && !dryRun ? initializeRun({ authorization: readJson(manifestPath), root: ROOT }) : result;
+    command === "resume"
+      ? resumeRun({ authorization, root: ROOT })
+      : command === "abort"
+        ? abortRun({ authorization, root: ROOT })
+        : command === "run" && !dryRun
+          ? initializeRun({ authorization, root: ROOT })
+          : result;
   console.log(JSON.stringify({ command, dry_run: dryRun, ...output }, null, 2));
-  process.exitCode = output.admitted ? 0 : 1;
+  process.exitCode = output.admitted === false ? 1 : 0;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
