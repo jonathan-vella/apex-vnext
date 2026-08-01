@@ -14,6 +14,7 @@ const qualificationArchivePath = ".archive/qualification/vnext-qualification-v1"
 const preAgentArchivePath = ".archive/retired-automation/pre-agent-loop-v1";
 const compatibilityArchivePath = ".archive/retired-compatibility/original-apex-v1";
 const devcontainerArchivePath = ".archive/retired-automation/devcontainer-base-v1";
+const npmUtilitiesArchivePath = ".archive/retired-utilities/npm-scripts-v1";
 
 function textSha256(path) {
   const normalized = readFileSync(path, "utf8").replace(/\r\n/gu, "\n");
@@ -71,6 +72,42 @@ test("disabled devcontainer CI remains provenance-only", () => {
   }
   const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts ?? {};
   assert.equal(scripts["test:devcontainer-verdicts"], undefined);
+});
+
+test("retired npm utilities remain provenance-only", () => {
+  const provenance = JSON.parse(readFileSync(`${npmUtilitiesArchivePath}/provenance.json`, "utf8"));
+  assert.equal(provenance.archivedFrom, "f6ef8c3");
+  for (const artifact of provenance.artifacts) {
+    assert.equal(existsSync(artifact.path), false, `${artifact.path} must stay retired`);
+    const archiveFile = `${npmUtilitiesArchivePath}/${artifact.path}`;
+    assert.equal(existsSync(archiveFile), true, `missing archived npm utility: ${artifact.path}`);
+    assert.equal(textSha256(archiveFile), artifact.sha256);
+  }
+
+  const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts ?? {};
+  for (const command of [
+    "check:context-redundancy",
+    "derive:sku-allowlist",
+    "fetch:deprecations",
+    "fix:artifacts",
+    "lint:docs-frontmatter",
+    "lint:policy-precheck",
+    "lint:yaml",
+    "lint:vnext",
+    "measure:precommit-baseline",
+    "report:challenger-gaps",
+    "test:context-budget",
+    "test:orphan-skill-discovery",
+    "test:precommit-baseline",
+    "test:subagent-file-contract",
+    "test:vnext-live-workflow",
+    "validate:avm-versions:ci",
+    "validate:avm-versions:offline",
+    "validate:challenger-decisions",
+    "validate:plan-avm-pins:local",
+  ]) {
+    assert.equal(scripts[command], undefined, `${command} must stay retired`);
+  }
 });
 
 test("original APEX E2E automation remains provenance-only", () => {

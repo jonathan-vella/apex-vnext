@@ -133,7 +133,7 @@ without subprocess or network use.
 
 ```bash
 npm run validate:vnext-live-workflow
-npm run test:vnext-live-workflow
+npm run test:vnext-validator
 npm run test:vnext-validator
 npm run qualify:vnext
 ```

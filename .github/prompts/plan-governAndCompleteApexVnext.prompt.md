@@ -243,7 +243,7 @@ or self-modification loop.
    source-of-truth audit proving no item has two mutable status owners.
 2. Baseline/current head: clean worktree inventory, exact branch/PR SHA match, all current required checks classified,
    and every product failure represented by a reproducer or explicit external-risk record.
-3. vNext deterministic surface: `npm run lint:vnext`, `npm run validate:vnext`, `npm run test:vnext`,
+3. vNext deterministic surface: `npm run build:vnext`, `npm run validate:vnext`, `npm run test:vnext`,
    `npm run test:vnext-validator`, `npm run test:vnext-pack`, scorecard qualification, package dry-run, audit, and
    reproducibility comparisons.
 4. Modernization: characterization/mutation suites, `validate:agents`, `validate:skills`, instruction checks, workflow and

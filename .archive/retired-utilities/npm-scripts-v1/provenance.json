@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0.0",
+  "archivedFrom": "f6ef8c3",
+  "replacementOwners": ["package.json", "tools/registry/repository-validator-graph.json", "required CI"],
+  "artifacts": [
+    { "path": ".yamllint.yml", "sha256": "34afc9989547c23a0d814a62723b67d188d91decb9ec28982bc07441ab70ee7e" },
+    { "path": "tools/scripts/check-context-redundancy.mjs", "sha256": "78403d6d6727a20ceba71a6cc08ecfd6e4208766383de3e080f47fbe03a7c47e" },
+    { "path": "tools/scripts/lint-docs-frontmatter.mjs", "sha256": "089e75da3f7a7134dbff0a1de456fc85cc63f13bef9b429011cce765b2c0fcac" },
+    { "path": "tools/scripts/lessons-to-checklists.mjs", "sha256": "2d31198d64f6e3696298fe37642dadd4c7a5b8d89b7d8652e1b26d9627ce378a" },
+    { "path": "tools/scripts/measure-precommit-baseline.mjs", "sha256": "a938447aa41aba6be1a49e4937ae6fd790b130e17754c8c94c1550a42e257204" },
+    { "path": "tools/tests/subagent-file-contract.test.mjs", "sha256": "61bc7ee97daf25f464228c23a943b137d3dce75781ce509c1fb0495602978630" },
+    { "path": "tools/tests/orphan-skill-discovery.test.mjs", "sha256": "c8f4a0440facdbd95e4348bc17bdfee91fc91880853acd6e3ca4b4e784229bbc" },
+    { "path": "tools/tests/validate-context-budget.test.mjs", "sha256": "5bd681a824a3a1cf122558cb4ac3be62ddc060f8d2b606d032d9be5c34e3e599" },
+    { "path": "tools/tests/measure-precommit-baseline.test.mjs", "sha256": "a38eb45089aefc88db1b84fb101bdb7396f7fbad0d075f8873d1a3f96b5b06aa" },
+    { "path": "tools/registry/precommit-baseline.json", "sha256": "cfad311715fed6ff1cc01510f8bdc25e4fe4a59197da7923ef8006cd9656f3fa" },
+    { "path": "tools/tests/fixtures/subagent-file-contract/cost-estimate.findings.json", "sha256": "773baafdf0a11d552f82c0aaf7d748e8300754b93d50d2d07bd62d06cfdf00b5" },
+    { "path": "tools/tests/fixtures/subagent-file-contract/challenger-review.findings.json", "sha256": "8a2f1f86bc82bfee1fd15f9dd23bf24a40d6a8751bab34716a9544beb9275bfc" },
+    { "path": "tools/tests/fixtures/subagent-file-contract/challenger-review.summary.txt", "sha256": "0fa7e67c2f3f4ce12147dfb32010b73ed9cdbf6094e0d70c6b42745a3400bf4f" },
+    { "path": "tools/tests/fixtures/subagent-file-contract/cost-estimate.summary.txt", "sha256": "167b21ab40e4045b8b5224630a77246fde06e1d84d43f6e592e2733879b9c1a6" }
+  ]
+}

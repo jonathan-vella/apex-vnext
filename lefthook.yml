@@ -67,7 +67,7 @@ pre-commit:
             echo "🔧 To fix:"
             echo "   1. Check .github/instructions/azure-artifacts.instructions.md"
             echo "   2. Use EXACT H2 headings from that file"
-            echo "   3. Run: npm run fix:artifacts -- <file> --apply"
+            echo "   3. Run: npm run fix:artifact-h2 -- <file> --apply"
             echo "   4. Re-stage and commit"
             echo ""
             exit 1
@@ -94,7 +94,7 @@ pre-commit:
         📚 References:
         - .github/instructions/azure-artifacts.instructions.md
         - AGENTS.md "Agent Workflow" (mandatory challenger reviews)
-        🔧 Auto-fix H2: npm run fix:artifacts -- <file> --apply
+        🔧 Auto-fix H2: npm run fix:artifact-h2 -- <file> --apply
         🔧 Challenger:  re-run challenger-review-subagent or 10-Challenger
 
     agents:
