@@ -288,6 +288,28 @@
           "status": "reserved-for-terminal-stage"
         }
       ]
+    },
+    {
+      "id": "markdown-policy-enforcement",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run lint:md",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:docs",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:hooks",
+          "status": 0
+        },
+        {
+          "command": "npm run test:hooks",
+          "status": 0
+        }
+      ]
     }
   ]
 }
