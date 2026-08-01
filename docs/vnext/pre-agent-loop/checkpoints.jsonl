@@ -19,3 +19,4 @@
 {"authorization_id":"pre-agent-opt-2026-08-01-mcp-tool-id","item":"schema-libraries","state":"accepted","sha":"ada7dd551d4d78f365c90234881a073a1c0689eb","at":"2026-08-01T09:47:09.980Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-mcp-tool-id","item":"customization-distribution","state":"accepted","sha":"0314733b64453f36b3a1f16c9c567a116f9e18c1","at":"2026-08-01T09:51:12.530Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-mcp-tool-id","item":"mcp-portfolio","state":"accepted","sha":"e06b1334fd535cd6f0e259d9d882c2f91bfc2437","at":"2026-08-01T09:55:39.336Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-mcp-tool-id","state":"stopped","reason":"task produced no structured output","at":"2026-08-01T09:57:14.953Z","previous_record_sha256":"63a09d1e2c6a2c9b171faf5c377aa2cb0e84dfbd698bb9b65b7250395cc17d3e"}

@@ -4,3 +4,4 @@
 {"authorization_id":"pre-agent-opt-2026-08-01-status-parser","severity":"blocking","finding":"bounded task loaded MCP","at":"2026-08-01T09:30:47.712Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-resume-mcp","severity":"blocking","finding":"bounded task loaded MCP","at":"2026-08-01T09:35:15.330Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-item-isolation","severity":"blocking","finding":"bounded task loaded MCP","at":"2026-08-01T09:39:03.389Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-mcp-tool-id","severity":"blocking","finding":"task produced no structured output","at":"2026-08-01T09:57:14.953Z"}
