@@ -2,7 +2,9 @@
 
 ## Status
 
-This directory preserves original APEX workflow prompts and two compatibility utility prompts that are not part of the APEX vNext product surface. Their original relative paths are retained below this directory for audit and rollback.
+This directory preserves original APEX workflow and utility prompts that are not part of the APEX vNext product
+surface. It also retains the orphan structural test for the execution-subagent prompt contract. Original relative paths
+are retained below this directory for audit and rollback.
 
 ## Replacement Owners
 

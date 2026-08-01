@@ -8,9 +8,7 @@
 #   3. Verifies the branch still exists; opens a tracking issue if it does
 #      not (catches the rare case where branch protection is bypassed).
 #
-# Companion to:
-#   - `.github/prompts/merge-sensei-free-pr.prompt.md` (sensei → main egress)
-#   - Ruleset "Protect feat/skills-sensei" (configured via gh api, not in
+# Companion to Ruleset "Protect feat/skills-sensei" (configured via gh api, not in
 #     this repo). The ruleset blocks deletion + force-push; this workflow
 #     handles the day-to-day keep-alive work.
 
