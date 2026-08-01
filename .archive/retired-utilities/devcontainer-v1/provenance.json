@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0.0",
+  "archivedFrom": "2c3a42b8c42136dc85b01de5aea5f2f3e6983c0e",
+  "replacementOwners": [
+    ".devcontainer/devcontainer.json",
+    ".devcontainer/post-create.sh",
+    "tools/scripts/validate-vscode-config.mjs",
+    "config/toolchain.v1.json"
+  ],
+  "artifacts": [
+    {
+      "path": ".devcontainer/post-create.sh",
+      "sha256": "5634f75859b4a358d3d28baf02beddc4a84c253384c1dd83873ee01f591bde2c"
+    },
+    {
+      "path": ".devcontainer/post-start.sh",
+      "sha256": "0a5b0566ea1993b59ab5e3fc7fec5f116de1517ee9563b1e5d95874ece62e2ea"
+    },
+    {
+      "path": ".devcontainer/update-tools.sh",
+      "sha256": "783aa4025967d078ef43e60430af876fe2f3d0b545cf2252c7153000b9b1cc08"
+    },
+    {
+      "path": "requirements.txt",
+      "sha256": "fd66b1a63e7cd2bd9e648b87ff4ab732cc3bb3e2678a10d3ef799fd18b2efcf4"
+    },
+    {
+      "path": "tools/scripts/validate-devcontainer.sh",
+      "sha256": "5f8f925d98665f7ef1cbf623008e23c42a94f54e3808e115972740bc788bdf12"
+    }
+  ]
+}

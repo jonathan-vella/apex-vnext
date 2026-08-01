@@ -34,7 +34,7 @@ const DEFAULT_PINS = {
     bicep: { min: "0.21.0", check_cmd: "bicep --version", parser: "bicep" },
     terraform: { min: "1.6.0", check_cmd: "terraform version -json", parser: "terraform-json" },
     az: { min: "2.55.0", check_cmd: "az version --output json", parser: "az-json" },
-    node: { min: "20.0.0", check_cmd: "node --version", parser: "node" },
+    node: { min: "24.0.0", check_cmd: "node --version", parser: "node" },
   },
 };
 

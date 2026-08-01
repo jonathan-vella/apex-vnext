@@ -2,10 +2,10 @@
 /**
  * VS Code Configuration Validator
  *
- * Validates that VS Code 1.109 orchestration settings are correctly configured:
+ * Validates the vNext devcontainer and VS Code configuration:
  * 1. Required settings exist in devcontainer.json
- * 2. Extensions.json includes all required extensions
- * 3. Devcontainer.json extension drift is explicitly allowlisted
+ * 2. Features and mounts remain portable across supported hosts and CPUs
+ * 3. Both extension inventories exactly match the approved vNext surface
  */
 
 import { readFileSync, existsSync } from "node:fs";
@@ -24,19 +24,36 @@ const REQUIRED_SETTINGS = [
   "chat.useAgentSkills",
 ];
 
-// Required extensions for full orchestration support
-const REQUIRED_EXTENSIONS = ["GitHub.copilot-chat", "ms-azuretools.vscode-bicep", "DavidAnson.vscode-markdownlint"];
-
-// Extensions intentionally installed only in devcontainer.json.
-// Keep this list explicit and minimal to avoid silent drift.
-const ALLOWED_DEVCONTAINER_ONLY_EXTENSIONS = new Set([
+const REQUIRED_EXTENSIONS = [
+  "GitHub.copilot-chat",
+  "ms-python.python",
+  "ms-python.vscode-pylance",
+  "ms-azuretools.vscode-bicep",
+  "ms-vscode.powershell",
+  "DavidAnson.vscode-markdownlint",
   "github.vscode-github-actions",
-  "mechatroner.rainbow-csv",
-  "ms-azuretools.vscode-containers",
-  "ms-kubernetes-tools.vscode-aks-tools",
-  "ms-kubernetes-tools.vscode-kubernetes-tools",
-  "mutantdino.resourcemonitor",
+  "github.vscode-pull-request-github",
+  "esbenp.prettier-vscode",
+  "redhat.vscode-yaml",
+  "HashiCorp.terraform",
+];
+const REQUIRED_FEATURES = new Map([
+  ["ghcr.io/devcontainers/features/azure-cli:1", "latest"],
+  ["ghcr.io/devcontainers/features/powershell:2", "latest"],
+  ["ghcr.io/devcontainers/features/python:1", "3.14"],
+  ["ghcr.io/devcontainers/features/node:1", "24"],
+  ["ghcr.io/devcontainers/features/github-cli:1", "latest"],
+  ["ghcr.io/azure/azure-dev/azd:latest", undefined],
+  ["./features/terraform", undefined],
 ]);
+const REQUIRED_VOLUME_TARGETS = new Set([
+  "/home/vscode/.azure",
+  "/home/vscode/.azd",
+  "/home/vscode/.config/gh",
+  "/home/vscode/.cache/uv",
+  "/home/vscode/.terraform.d/plugin-cache",
+]);
+const ARCHITECTURE_AWARE_SCRIPTS = [".devcontainer/features/terraform/install.sh", ".devcontainer/post-create.sh"];
 
 const errors = [];
 const warnings = [];
@@ -92,6 +109,58 @@ function validateDevcontainer() {
 
     const settings = config?.customizations?.vscode?.settings || {};
     const extensions = config?.customizations?.vscode?.extensions || [];
+    const features = config?.features || {};
+    const mounts = config?.mounts || [];
+
+    if (config.image !== "mcr.microsoft.com/devcontainers/base:ubuntu26.04") {
+      errors.push("❌ Devcontainer must use the Ubuntu 26.04 multi-architecture base image");
+    }
+
+    for (const featureId of Object.keys(features)) {
+      if (featureId.endsWith(":")) {
+        errors.push(`❌ Malformed devcontainer feature ID: ${featureId}`);
+      }
+      if (featureId.toLowerCase().includes("deno")) {
+        errors.push(`❌ Optional Deno runtime must not be installed by the core devcontainer: ${featureId}`);
+      }
+    }
+    for (const [featureId, version] of REQUIRED_FEATURES) {
+      if (!(featureId in features)) {
+        errors.push(`❌ Missing required devcontainer feature: ${featureId}`);
+      } else if (version !== undefined && features[featureId]?.version !== version) {
+        errors.push(`❌ ${featureId} must use version ${version}`);
+      }
+    }
+
+    const mountTargets = new Set();
+    for (const mount of mounts) {
+      if (mount?.type !== "volume") {
+        errors.push(`❌ Devcontainer mounts must use named volumes, not host binds: ${mount?.target ?? "unknown"}`);
+      }
+      if (typeof mount?.source !== "string" || !mount.source.includes("${devcontainerId}")) {
+        errors.push(`❌ Named volume must be scoped by devcontainerId: ${mount?.source ?? "unknown"}`);
+      }
+      mountTargets.add(mount?.target);
+    }
+    for (const target of REQUIRED_VOLUME_TARGETS) {
+      if (!mountTargets.has(target)) {
+        errors.push(`❌ Missing cross-platform named volume target: ${target}`);
+      }
+    }
+
+    if (config.postCreateCommand !== "bash .devcontainer/post-create.sh") {
+      errors.push("❌ postCreateCommand must use the deterministic vNext bootstrap");
+    }
+    if (config.postStartCommand !== "npx lefthook install") {
+      errors.push("❌ postStartCommand must not perform network upgrades or legacy setup");
+    }
+
+    for (const relativePath of ARCHITECTURE_AWARE_SCRIPTS) {
+      const script = readFileSync(resolve(REPO_ROOT, relativePath), "utf8");
+      if (!script.includes("dpkg --print-architecture") || !script.includes("amd64|arm64")) {
+        errors.push(`❌ ${relativePath} must explicitly support amd64 and arm64`);
+      }
+    }
 
     // Check required settings
     for (const setting of REQUIRED_SETTINGS) {
@@ -206,20 +275,10 @@ function crossCheckExtensions(devcontainerExts, extensionsJsonExts) {
   const onlyInExtensionsJson = [...extSet].filter((extension) => !devSet.has(extension)).sort();
 
   for (const extension of onlyInDevcontainer) {
-    if (!ALLOWED_DEVCONTAINER_ONLY_EXTENSIONS.has(extension)) {
-      errors.push(`❌ Non-allowlisted extension only in devcontainer.json: ${extension}`);
-    }
+    errors.push(`❌ Extension only in devcontainer.json: ${extension}`);
   }
-
   for (const extension of onlyInExtensionsJson) {
     errors.push(`❌ Extension only in extensions.json: ${extension}`);
-  }
-
-  const allowlistedPresent = onlyInDevcontainer.filter((extension) =>
-    ALLOWED_DEVCONTAINER_ONLY_EXTENSIONS.has(extension),
-  );
-  for (const extension of allowlistedPresent) {
-    console.log(`   ℹ allowlisted devcontainer-only extension: ${extension}`);
   }
 
   console.log(`   ✓ ${devcontainerExts.length} extensions in devcontainer.json`);

@@ -1,9 +1,8 @@
 # Dependabot configuration for automated dependency updates.
 #
 # Scope: dev container features, GitHub Actions, root npm, and the
-# the in-repo apex-recall Python package. Top-level
-# requirements.txt is intentionally out of scope (managed via uv pin in
-# .devcontainer/post-start.sh).
+# in-repo apex-recall Python package. Repository Python test tools are
+# installed by the deterministic devcontainer bootstrap.
 #
 # Update cadence is weekly to balance freshness with PR noise. Open PR limit
 # is conservative (3 per ecosystem) to avoid review-queue overload.
