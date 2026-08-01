@@ -612,9 +612,18 @@
         "branch hygiene"
       ],
       "classification": "keep",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:tool-versions",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:docs-freshness",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "Scheduled automation is distinct from required pull-request checks."
     },
     {

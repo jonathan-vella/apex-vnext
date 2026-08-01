@@ -557,7 +557,7 @@
         "npm run lint:docs-freshness"
       ],
       "rationale": "Scheduled automation is distinct from required pull-request checks.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "upstream-workflow-synchronization",

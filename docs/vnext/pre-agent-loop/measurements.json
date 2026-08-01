@@ -390,6 +390,20 @@
           "status": "reserved-for-terminal-stage"
         }
       ]
+    },
+    {
+      "id": "maintenance-workflows",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:tool-versions",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:docs-freshness",
+          "status": 0
+        }
+      ]
     }
   ]
 }
