@@ -90,6 +90,40 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "copilot-client-projections",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext-pack",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:agents",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:vscode",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:client-outcomes",
+          "status": 0
+        },
+        {
+          "command": "npm run test:client-outcomes",
+          "status": 0
+        }
+      ]
     }
   ]
 }
