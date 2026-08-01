@@ -5,3 +5,4 @@
 {"authorization_id":"pre-agent-opt-2026-08-01-cli-compat","state":"stopped","reason":"path outside authorization: ocs/vnext/pre-agent-loop/queue.json; path outside queue item: ocs/vnext/pre-agent-loop/queue.json","at":"2026-08-01T09:02:53.491Z","previous_record_sha256":"e24870798809b85d37c6e1a6a01588130abe94bddf2b52cf3819d0dd61dc3957"}
 {"authorization_id":"pre-agent-opt-2026-08-01-status-parser","item":"workspace-operating-frame","state":"accepted","sha":"d9403d8bf4d17b188e2209aa8ae6f247c92d4d1a","at":"2026-08-01T09:04:04.729Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-status-parser","item":"scoped-instruction-discovery","state":"accepted","sha":"3af3648b24b617db094dfaac5e8ddd7a33a82b68","at":"2026-08-01T09:06:42.303Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-status-parser","item":"user-documentation","state":"accepted","sha":"45d7e931c84168e8ceee55769c7325039d93e988","at":"2026-08-01T09:10:20.859Z"}
