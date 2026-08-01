@@ -462,6 +462,32 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "diagram-routing",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:skills",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:diagram-semantics",
+          "status": 0
+        },
+        {
+          "command": "npm run test:diagram-semantics",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:artifacts",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:workflow-graph",
+          "status": 0
+        }
+      ]
     }
   ]
 }
