@@ -152,7 +152,7 @@
     ".github/instructions/code-quality.instructions.md": "5223713c1f411117df41bc6ddfed98ebac33c77bf098a5feaf752a8453e0cba1",
     "docs/vnext/pre-agent-loop/authorization.schema.json": "08ef2fef82e7048e35ace17532f3785c75ee32ca13f87bea7c42c84805e278e0",
     ".github/hooks/tool-guardian/guard-tool.sh": "8b7069d20fcd65906794a80e434953f335f0ad89ef134dff1443a56b14dc92d8",
-    "tools/scripts/pre-agent-loop.mjs": "227f4e08cdd461f5ccbad727a8913490e23667b1dd6aebf9cb33e0646af20ada"
+    "tools/scripts/pre-agent-loop.mjs": "5423b884e014019845ed4d6bd791dd903f5be65557b8659c142563705a6962fb"
   },
   "notes": "The controller records an observed CLI version only after a closed-stdin, timeout-bound noninteractive probe succeeds. Context hashes cover the policy sources that control this run. allowed_commands entries are prefixes, so denied_commands excludes aggregates such as npm run validate:all that a prefix would otherwise reach; deny always wins."
 }

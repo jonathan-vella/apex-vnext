@@ -18,6 +18,15 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const DEFAULT_MANIFEST = "docs/vnext/pre-agent-loop/authorization.json";
 const INVENTORY = "tools/registry/modernization-ownership.json";
 const STATE_DIRECTORY = "docs/vnext/pre-agent-loop";
+const SECRET_PATTERN = /(api[_-]?key|password|secret|token)\s*[:=]\s*[^\s]+/iu;
+
+function matchesPath(pathname, pattern) {
+  const expression = `^${pattern
+    .replace(/[.+^${}()|[\]\\]/gu, "\\$&")
+    .replace(/\*\*/gu, ".*")
+    .replace(/\*/gu, "[^/]*")}$`;
+  return new RegExp(expression, "u").test(pathname);
+}
 
 function readJson(filePath) {
   return JSON.parse(readFileSync(filePath, "utf8"));
@@ -150,6 +159,23 @@ export function buildDryRunQueue(ownership) {
     paths: surface.sourceRefs,
     focused_checks: surface.proofCommands,
   }));
+}
+
+export function changedPathErrors({ changedPaths, authorization, addedLines = [], binaryPaths = [] }) {
+  const errors = [];
+  if (changedPaths.length > authorization.budgets.files_per_slice) errors.push("slice exceeds file budget");
+  for (const pathname of changedPaths) {
+    if (authorization.protected_paths.some((pattern) => matchesPath(pathname, pattern))) {
+      errors.push(`protected path changed: ${pathname}`);
+    }
+    if (!authorization.allowed_paths.some((pattern) => matchesPath(pathname, pattern))) {
+      errors.push(`path outside authorization: ${pathname}`);
+    }
+  }
+  for (const pathname of binaryPaths) errors.push(`binary path changed: ${pathname}`);
+  if (addedLines.length > authorization.budgets.lines_per_slice) errors.push("slice exceeds line budget");
+  if (addedLines.some((line) => SECRET_PATTERN.test(line))) errors.push("potential secret in changed content");
+  return [...new Set(errors)];
 }
 
 export function inspectRun({ authorization, root, git, now }) {
