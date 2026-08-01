@@ -697,9 +697,14 @@
         "weekly maintenance"
       ],
       "classification": "keep",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:avm-versions:offline",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "The index is generated cache data; module declarations remain canonical in IaC."
     },
     {

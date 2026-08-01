@@ -442,6 +442,16 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "avm-index-generation",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:avm-versions:offline",
+          "status": 0
+        }
+      ]
     }
   ]
 }

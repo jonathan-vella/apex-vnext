@@ -632,7 +632,7 @@
         "npm run validate:avm-versions:offline"
       ],
       "rationale": "The index is generated cache data; module declarations remain canonical in IaC.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "freshness-generation",
