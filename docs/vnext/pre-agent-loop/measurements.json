@@ -1,4 +1,15 @@
 {
   "version": 1,
-  "items": []
+  "items": [
+    {
+      "id": "workspace-operating-frame",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:instruction-checks",
+          "status": 0
+        }
+      ]
+    }
+  ]
 }
