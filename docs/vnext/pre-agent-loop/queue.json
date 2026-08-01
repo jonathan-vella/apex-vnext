@@ -513,7 +513,7 @@
         "npm run test:arm-mcp-cost-pricing"
       ],
       "rationale": "GitHub branch protection owns required contexts, workflows own hosted execution, and npm scripts own reusable command implementation.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "exact-head-release-qualification",
