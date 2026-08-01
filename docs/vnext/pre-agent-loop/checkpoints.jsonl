@@ -29,3 +29,4 @@
 {"authorization_id":"pre-agent-opt-2026-08-01-command-policy","item":"language-validator-boundaries","state":"accepted","sha":"dff6f8d124d26ae397b562fd5465ee93383f076c","at":"2026-08-01T10:17:16.309Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-command-policy","item":"markdown-policy-enforcement","state":"accepted","sha":"609c41123707b645887ddf3c467719d5d9485006","at":"2026-08-01T10:19:01.880Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-command-policy","state":"stopped","reason":"focused check failed: npm run check:h2-order","at":"2026-08-01T10:22:17.699Z","previous_record_sha256":"91becc6dc9ffd491cc2ea80f4409f8f01bf70f7a99c735ca2a7d22c38c55e8b1"}
+{"authorization_id":"pre-agent-opt-2026-08-01-proof-policy","item":"artifact-template-validation","state":"accepted","sha":"401f554af9fa49fb82a9dfe1a118856141b98b03","at":"2026-08-01T10:24:24.392Z"}
