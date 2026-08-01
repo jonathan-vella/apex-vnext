@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { admissionErrors, buildDryRunQueue, initializeRun, parseArguments } from "../scripts/pre-agent-loop.mjs";
+import {
+  abortRun,
+  admissionErrors,
+  buildDryRunQueue,
+  initializeRun,
+  parseArguments,
+  resumeRun,
+} from "../scripts/pre-agent-loop.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const authorization = JSON.parse(readFileSync(path.join(root, "docs/vnext/pre-agent-loop/authorization.json"), "utf8"));
@@ -90,13 +97,7 @@ test("admitted run writes an atomic lock and queue once", () => {
   const stateRoot = path.join(temporaryRoot, "docs/vnext/pre-agent-loop");
   const inventoryRoot = path.join(temporaryRoot, "tools/registry");
   const binaryPath = path.join(temporaryRoot, "copilot");
-  try {
-    symlinkSync(path.join(root, "tools/registry/modernization-ownership.json"), path.join(inventoryRoot, "ownership"));
-  } catch {
-    rmSync(temporaryRoot, { recursive: true, force: true });
-    return;
-  }
-  rmSync(path.join(inventoryRoot, "ownership"));
+  mkdirSync(inventoryRoot, { recursive: true });
   symlinkSync(
     path.join(root, "tools/registry/modernization-ownership.json"),
     path.join(inventoryRoot, "modernization-ownership.json"),
@@ -116,5 +117,30 @@ test("admitted run writes an atomic lock and queue once", () => {
   assert.equal(existsSync(path.join(stateRoot, "run.lock.json")), true);
   assert.equal(existsSync(path.join(stateRoot, "queue.json")), true);
   assert.equal(initializeRun({ authorization: fixture, root: temporaryRoot, git }).admitted, false);
+  rmSync(temporaryRoot, { recursive: true, force: true });
+});
+
+test("resume reads only its owned lock and abort records then releases it", () => {
+  const temporaryRoot = mkdtempSync(path.join(tmpdir(), "pre-agent-loop-"));
+  const inventoryRoot = path.join(temporaryRoot, "tools/registry");
+  const binaryPath = path.join(temporaryRoot, "copilot");
+  mkdirSync(inventoryRoot, { recursive: true });
+  symlinkSync(
+    path.join(root, "tools/registry/modernization-ownership.json"),
+    path.join(inventoryRoot, "modernization-ownership.json"),
+  );
+  symlinkSync(authorization.launcher.binary, binaryPath);
+  const fixture = structuredClone(authorization);
+  fixture.worktree = temporaryRoot;
+  fixture.launcher.binary = binaryPath;
+  fixture.context_hashes = {};
+  initializeRun({ authorization: fixture, root: temporaryRoot, git });
+  assert.equal(resumeRun({ authorization: fixture, root: temporaryRoot }).state, "bootstrapped");
+  assert.deepEqual(abortRun({ authorization: fixture, root: temporaryRoot }), { state: "aborted" });
+  assert.throws(() => resumeRun({ authorization: fixture, root: temporaryRoot }), /no pre-agent run lock/);
+  assert.match(
+    readFileSync(path.join(temporaryRoot, "docs/vnext/pre-agent-loop/checkpoints.jsonl"), "utf8"),
+    /aborted/,
+  );
   rmSync(temporaryRoot, { recursive: true, force: true });
 });
