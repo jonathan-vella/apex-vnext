@@ -178,7 +178,7 @@
     "brace-expansion": "5.0.9",
     "encoding-sniffer": "1.0.2",
     "xmlbuilder2": {
-      "js-yaml": "4.3.1"
+      "js-yaml": "4.3.0"
     }
   },
   "engines": {
