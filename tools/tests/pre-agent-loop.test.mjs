@@ -22,6 +22,7 @@ import {
   resumeRun,
   snapshotControllerState,
   taskInvokedSkill,
+  taskPrompt,
 } from "../scripts/pre-agent-loop.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -162,6 +163,12 @@ test("skill availability metadata is allowed while actual skill execution is den
     taskInvokedSkill([{ type: "tool.execution_start", data: { toolName: "view", path: ".github/skills/x/SKILL.md" } }]),
     true,
   );
+});
+
+test("queue item prompt explicitly prohibits skill invocation and skill-file reads", () => {
+  const prompt = taskPrompt({ id: "fixture", classification: "keep", paths: ["README.md"] });
+  assert.match(prompt, /Do not invoke skills/);
+  assert.match(prompt, /do not read any SKILL\.md/);
 });
 
 test("task launcher uses a neutral directory and rejects MCP events", () => {

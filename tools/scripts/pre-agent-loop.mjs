@@ -468,13 +468,14 @@ export function assertControllerStateUnchanged(root, before) {
   }
 }
 
-function taskPrompt(item) {
+export function taskPrompt(item) {
   if (item.prompt) return item.prompt;
   return [
     `Process repository inventory item ${item.id}.`,
     `Classification: ${item.classification}.`,
     `Allowed paths: ${item.paths.join(", ")}.`,
     "Inspect the current implementation and make the smallest justified improvement within those paths.",
+    "Do not invoke skills and do not read any SKILL.md file.",
     "Do not use Git, do not modify any other path, and do not run aggregate validation.",
     "If no change is justified, leave files unchanged and report that conclusion.",
   ].join("\n");
