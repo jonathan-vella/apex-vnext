@@ -589,12 +589,7 @@
         "docs/vnext/CLIENT-CONTEXT-BASELINE.md"
       ],
       "consumers": ["context optimization", "local investigations"],
-      "proofCommands": [
-        "npm run profile:debug-log",
-        "npm run profile:copilot-cli-otel",
-        "npm run profile:vscode-otel",
-        "npm run test:client-context-samples"
-      ],
+      "proofCommands": ["npm run test:client-context-samples"],
       "removalGate": "A privacy-safe supported source supplies repeatable context measurements or the profiler is explicitly retired.",
       "rationale": "Client-specific profilers read only allowlisted counters and emit one shared aggregate-only contract; raw local telemetry is never a portable CI baseline.",
       "followUp": "Issue #126 completed the version-bound live matrix; retain the same contract for candidate remeasurement and comparative claims.",

@@ -65,7 +65,7 @@ test("inventory rejects missing sources, proof scripts, baseline domains, and do
   const invalid = structuredClone(manifest);
   invalid.baselines.at(-1).id = "context";
   invalid.surfaces[0].classification = "consolidate";
-  invalid.surfaces[0].proofCommands = ["npm run missing"];
+  invalid.surfaces[0].proofCommands = ["npm run missing", "npm run profile:debug-log"];
   const errors = validateModernizationOwnership({
     ...options,
     manifest: invalid,
@@ -75,6 +75,7 @@ test("inventory rejects missing sources, proof scripts, baseline domains, and do
   assert.ok(errors.some((error) => error.includes("baselines must contain exactly")));
   assert.ok(errors.some((error) => error.includes("sourceRef matches no files")));
   assert.ok(errors.some((error) => error.includes("unknown npm script")));
+  assert.ok(errors.some((error) => error.includes("proof script requires an explicit target")));
   assert.ok(errors.some((error) => error.includes("missing from")));
 });
 
