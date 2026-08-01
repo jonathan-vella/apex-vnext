@@ -7,3 +7,4 @@
 {"authorization_id":"pre-agent-opt-2026-08-01-mcp-tool-id","severity":"blocking","finding":"task produced no structured output","at":"2026-08-01T09:57:14.953Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-empty-retry","severity":"blocking","finding":"task produced no structured output","at":"2026-08-01T09:59:06.067Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-glob-bounds","severity":"blocking","finding":"focused command is not authorized: npm run prove:bounded-improvement","at":"2026-08-01T10:07:41.751Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-command-policy","severity":"blocking","finding":"focused check failed: npm run check:h2-order","at":"2026-08-01T10:22:17.699Z"}
