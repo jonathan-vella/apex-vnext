@@ -136,7 +136,7 @@
         "npm run lint:workflow-table-sync"
       ],
       "rationale": "The DAG is the machine-readable owner of workflow order and handoffs.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "copilot-client-projections",

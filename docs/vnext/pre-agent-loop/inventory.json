@@ -138,9 +138,18 @@
         "documentation synchronization"
       ],
       "classification": "keep",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:workflow-graph",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:workflow-table-sync",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "The DAG is the machine-readable owner of workflow order and handoffs."
     },
     {

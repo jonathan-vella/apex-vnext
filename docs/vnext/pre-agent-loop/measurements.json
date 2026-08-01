@@ -76,6 +76,20 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "workflow-dag",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:workflow-graph",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:workflow-table-sync",
+          "status": 0
+        }
+      ]
     }
   ]
 }
