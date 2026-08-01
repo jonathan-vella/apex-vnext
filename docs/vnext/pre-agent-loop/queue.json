@@ -234,7 +234,7 @@
         "npm run test:vnext"
       ],
       "rationale": "TypeBox contracts and repository JSON schemas overlap in purpose but serve different consumers.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "customization-distribution",
