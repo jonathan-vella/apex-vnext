@@ -422,6 +422,16 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "model-catalog-generation",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:model-catalog",
+          "status": 0
+        }
+      ]
     }
   ]
 }

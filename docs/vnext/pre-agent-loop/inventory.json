@@ -659,9 +659,14 @@
         "agent validators"
       ],
       "classification": "keep",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:model-catalog",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "Assignments are derived data and should remain generated."
     },
     {

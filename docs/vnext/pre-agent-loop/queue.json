@@ -594,7 +594,7 @@
         "npm run validate:model-catalog"
       ],
       "rationale": "Assignments are derived data and should remain generated.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "entity-count-generation",
