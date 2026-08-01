@@ -22,6 +22,14 @@
     { "path": "tools/apex-prompts/workflow-prompts/09-diagnose-resource.prompt.md", "sha256": "d3a8bed659e91cc2687e164867afd06b25e106feb17a4f6a9c684948d2a38181" },
     { "path": "tools/apex-prompts/workflow-prompts/10-challenger-review.prompt.md", "sha256": "33bb2a05586d92948d08dfc64738a3ef9e9efb73fd151a7c4819ebc1cff1c3e2" },
     { "path": "tools/apex-prompts/utility-prompts/as-built-from-azure.prompt.md", "sha256": "25d457e647b4d606b334860553b8585537269bf4ba585cfd81cc6eec8f14716d" },
-    { "path": "tools/apex-prompts/utility-prompts/review-imported-iac.prompt.md", "sha256": "729cd457b740ca9b8a1c0e2a8adbe63d23dfb9f75f2184e87aaade457081e01f" }
+    { "path": "tools/apex-prompts/utility-prompts/review-imported-iac.prompt.md", "sha256": "729cd457b740ca9b8a1c0e2a8adbe63d23dfb9f75f2184e87aaade457081e01f" },
+    { "path": "tools/apex-prompts/utility-prompts/context-audit.prompt.md", "sha256": "2ea2c83eec166494576bc33a7db72b41381b110d7caa6d84662395d67cb224bb" },
+    { "path": "tools/apex-prompts/utility-prompts/execution-subagent-claude.prompt.md", "sha256": "072acd06e2d8930e5168ed171a5bad7623388e0b7f7ceac1d84cea9d1d609dae" },
+    { "path": "tools/apex-prompts/utility-prompts/execution-subagent-gpt.prompt.md", "sha256": "8e41bf8d82fe330cc37d22ee1b90e68ce17beaf455e9a2f3281e131b58f624f1" },
+    { "path": "tools/apex-prompts/utility-prompts/execution-subagent.prompt.md", "sha256": "37b43d502801ec23e851a1a12d6382399e555d410d10f50ec442f7305b971e05" },
+    { "path": "tools/apex-prompts/utility-prompts/merge-sensei-free-pr.prompt.md", "sha256": "cc4a93681f01da9d2c6d45f10b99cd4784863d26fb45f0c2a428071ebcbc66a6" },
+    { "path": "tools/apex-prompts/utility-prompts/project-wide-review.prompt.md", "sha256": "da3a81b5096440198501e4339098d6e232f33e69994b8e07a348db0b30565626" },
+    { "path": "tools/apex-prompts/utility-prompts/review-markdown-docs.prompt.md", "sha256": "eae8ecb34636bb4eb22ddf74368e6080506848eca7586c0d899a89aca09b26fc" },
+    { "path": "tests/scripts/test_execution_subagent_contract.mjs", "sha256": "9bb0039782bf255adab01ba93565b8457849aa3be59d15e422a5c0d029f0ac92" }
   ]
 }
