@@ -1,6 +1,6 @@
 {
-  "authorization_id": "pre-agent-opt-2026-08-01-item-isolation",
-  "state": "stopped",
+  "authorization_id": "pre-agent-opt-2026-08-01-mcp-tool-id",
+  "state": "running",
   "items": [
     {
       "id": "workspace-operating-frame",
@@ -192,7 +192,7 @@
         "npm run validate:vnext"
       ],
       "rationale": "Versioned manifests separate runtime configuration from repository authoring details.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "workspace-package-boundaries",
@@ -832,6 +832,5 @@
       "rationale": "Shipped consumer behavior needs one managed guidance owner distinct from repository contributor instructions.",
       "status": "pending"
     }
-  ],
-  "stop_reason": "bounded task loaded MCP"
+  ]
 }
