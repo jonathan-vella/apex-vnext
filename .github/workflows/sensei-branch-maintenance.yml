@@ -17,7 +17,7 @@ name: Sensei Branch Maintenance
 on:
   schedule:
     # Mondays at 08:00 UTC. See .github/workflows/README.md#weekly-cron-schedule
-    # for the full Monday stagger (05:00 governance → 06:00 maintenance → 08:00 sensei → 09:00 e2e).
+    # for the full Monday stagger (05:00 governance → 06:00 maintenance → 08:00 sensei).
     - cron: "0 8 * * 1"
   workflow_dispatch:
     inputs:
@@ -30,14 +30,6 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
-# Disable lefthook hooks on the runner — `npm ci` triggers the `prepare`
-# script (`lefthook install`), which registers a pre-commit hook that calls
-# `gitleaks`. gitleaks is not installed on the GitHub-hosted runner, so the
-# main → sensei merge commit fails with `gitleaks: not found`. Secrets
-# scanning via gitleaks is a local pre-commit hook only.
-env:
-  LEFTHOOK: "0"
 
 permissions:
   contents: write # required to merge main into the sensei branch
@@ -185,14 +177,8 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-repo
 
-      - name: Validate skills
-        run: npm run validate:skills
-
-      - name: Validate agents
-        run: npm run validate:agents
-
-      - name: Lint markdown
-        run: npm run lint:md
+      - name: Validate Sensei branch
+        run: npm run validate:skills && npm run validate:agents && npm run lint:md
 
       - name: Open issue on failure
         if: failure()

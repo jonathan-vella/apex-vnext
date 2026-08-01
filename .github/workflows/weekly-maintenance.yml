@@ -21,23 +21,10 @@ on:
         required: false
         default: true
         type: boolean
-      force_update:
-        description: "Force PR creation for refresh jobs even when no changes"
-        required: false
-        default: false
-        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
-# Disable lefthook hooks on the runner — `npm ci` triggers the `prepare`
-# script (`lefthook install`), which registers a pre-commit hook that calls
-# `gitleaks`. gitleaks is not installed on the GitHub-hosted runner, so any
-# automated `git commit` (e.g. peter-evans/create-pull-request) fails with
-# `gitleaks: not found`. Gitleaks secret scanning is a local pre-commit hook only.
-env:
-  LEFTHOOK: "0"
 
 # Default permissions are read-only with issue-creation for audit jobs.
 # PR-creating jobs (refresh-avm-module-index, track-deprecations) declare
@@ -66,21 +53,7 @@ jobs:
       - name: Refresh AVM module index + version cache
         run: npm run refresh:avm-module-index
 
-      - name: Detect changes
-        id: changes
-        run: |
-          git add .github/data/avm-bicep-modules.csv \
-                  .github/data/avm-terraform-modules.csv \
-                  .github/data/avm-module-index.json \
-                  tools/scripts/_data/avm-module-cache.json
-          if git diff --cached --quiet; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Open pull request
-        if: steps.changes.outputs.changed == 'true' || github.event.inputs.force_update == 'true'
         id: cpr
         uses: peter-evans/create-pull-request@v8
         with:
@@ -127,26 +100,12 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-repo
 
-      - name: Create data directory
-        run: mkdir -p .github/data
-
       - name: Fetch Azure deprecation feed
         run: node tools/scripts/fetch-azure-deprecations.mjs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Detect changes
-        id: changes
-        run: |
-          git add .github/data/azure-deprecations.json
-          if git diff --cached --quiet; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Open pull request
-        if: steps.changes.outputs.changed == 'true' || github.event.inputs.force_update == 'true'
         id: cpr
         uses: peter-evans/create-pull-request@v8
         with:
@@ -172,7 +131,7 @@ jobs:
           echo "🔗 ${{ steps.cpr.outputs.pull-request-url }}"
 
       - name: Log deprecation summary
-        if: steps.changes.outputs.changed == 'true'
+        if: steps.cpr.outputs.pull-request-number != ''
         run: |
           echo "📋 Deprecation data updated"
           jq '.totalCount, .lastUpdated' .github/data/azure-deprecations.json

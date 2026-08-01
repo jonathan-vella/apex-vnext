@@ -10,13 +10,12 @@
     "actions/setup-python": ["v6"],
     "actions/upload-artifact": ["v7"],
     "azure/login": ["v3"],
-    "devcontainers/ci": ["v0.3"],
     "hashicorp/setup-terraform": ["v4"],
     "peter-evans/create-pull-request": ["v8"]
   },
   "localActions": {
-    ".github/actions/setup-node-repo/action.yml": "e00764f94893ff138f49bde2bc1fbe716c5ecd09b9113914225265119f5bfc81",
-    ".github/actions/setup-python-validation/action.yml": "e458a774a10318bfbaec0f05929cf114a7fcbfdd161eff4a41f3e461ec64a812"
+    ".github/actions/setup-node-repo/action.yml": "3e0ed2924808a54c0f178dfabd7ea7a3cb7b1195cbaff677b85a6fbfb23df57b",
+    ".github/actions/setup-python-validation/action.yml": "1a3ed62358e60f10d5b94a8f684fe75afbc9cd47622489560354e9a0441cd352"
   },
   "workflows": [
     {
@@ -26,8 +25,8 @@
       "triggerDigest": "d200653bd7eeaf47f016907cfad28dff6696409693f772b5ed42f02e1e1d0723",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "c1e93493cdfe701e2fe1b37ab0a64f45be9e6e2b52da18a8560f520efd511325",
-      "jobs": { "branch-naming": "Branch Naming Convention", "branch-scope": "Branch Scope Check" }
+      "jobsDigest": "e096ac61b6a99d7e8a60d1d3182b2da8ed89d06494c8d9cdfd069a7270773ede",
+      "jobs": { "policy": "Branch Policy" }
     },
     {
       "id": "ci",
@@ -46,20 +45,20 @@
       "id": "docs",
       "path": ".github/workflows/docs.yml",
       "name": "docs",
-      "triggerDigest": "9528c5fafe290dd59af3621087da54e10c4f283fe6ba52a94bbe9c90baa2aded",
+      "triggerDigest": "a0ac18069f4b7b00102abf752b0dfdcc30eedbfb4a326c5eda263b7cb9a615a9",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "aca1e80ddb2246870cacb21926529fa2fa4180bb3ade3c34edb09ca94abc3614",
+      "jobsDigest": "66dc42a8f8d8a3402ee88a262ab57f05d46a45c0595b0c793ecfc5111f3e4bcf",
       "jobs": { "validate": "Markdown docs" }
     },
     {
       "id": "governance-policy-baseline",
       "path": ".github/workflows/governance-policy-baseline.yml",
       "name": "Governance Policy Baseline",
-      "triggerDigest": "5276e95ef02255815cf3f19de909ba100d57992ad286bdae15cf8f64e2eefdeb",
+      "triggerDigest": "37f673b0e102c919b3f5ca1275e591d4b46b9b44f0e7a9b02d1497725ece322c",
       "permissionsDigest": "e780d99acb8992dbb7dd375a4e4167b135d1ace462209423726fdfe650ac01c7",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "ac4605702b950156c5457f3177219488b03e164391d9aa6693bf69dae37a129d",
+      "jobsDigest": "ca128029c3a978503c43d2751a4ef3ad47011a59c33e1b2ded221e0d0a227031",
       "jobs": { "collect-baseline": "collect-baseline" }
     },
     {
@@ -69,7 +68,7 @@
       "triggerDigest": "c487b034aea7bf4b37f8630c60a34ca80cd25c7cb411cab154b9009a3d8d5440",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "4b809338437e2a900681f437b6ded24069bc03fa404cdf675ec03b47236edd50",
+      "jobsDigest": "f6575fea1c5d37bb9f05c230778d9501541226c8e35b073ab475f7de38b6719f",
       "jobs": { "terraform": "Terraform fmt + validate", "bicep": "Bicep fmt" }
     },
     {
@@ -89,25 +88,11 @@
       "triggerDigest": "790fda8901d7b6df162030cafd9d442fcab98722edcbb9520aede9b90755d456",
       "permissionsDigest": "89bca53c88856951c2b5fadca05cdef10954ff73e93f0a1f6df49919b7acc8fd",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "8bc7bedaea6def989fa15d37f25a9f0baeb5337f74b8893e76ca9fe648c35c13",
+      "jobsDigest": "158cbc38c27822fe74bb305b6e2ac1778b252f8d5a73812303fea738bd00c146",
       "jobs": {
         "verify-branch-exists": "Verify feat/skills-sensei still exists",
         "merge-main-into-sensei": "Merge main into feat/skills-sensei",
         "validate-sensei-branch": "Validate skills + agents on feat/skills-sensei"
-      }
-    },
-    {
-      "id": "validate-devcontainer-base",
-      "path": ".github/workflows/validate-devcontainer-base.yml",
-      "name": "Dev Container Base Validation",
-      "triggerDigest": "4788f5e6b2b3479da96ef6011b4e733c70939f6fcecfd4a77c41612d49753841",
-      "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
-      "concurrencyDigest": "178eb943266420af611c930c78ccc7c035add7d4b4fa78adfd302cff1d6f6f30",
-      "jobsDigest": "39a3a25b5b9fcde07a7b9fb11b8bd80834c74204d9feb1edda70f5ecd8158294",
-      "jobs": {
-        "preflight": "Resolve images and manifest",
-        "validate": "${{ matrix.variant }} / ${{ matrix.arch }}",
-        "compare": "Compare base-image verdicts"
       }
     },
     {
@@ -127,10 +112,10 @@
       "id": "weekly-maintenance",
       "path": ".github/workflows/weekly-maintenance.yml",
       "name": "Weekly Maintenance",
-      "triggerDigest": "e1a2eeace4ec779df21a7a24202de6cb681e873d0678ae11869c10ff1db45f92",
+      "triggerDigest": "41f525188d27cb3a1fea9eff84337b73795b50d52df7d806b8d4d6a899e7d39a",
       "permissionsDigest": "0686420875052835389cb6e71bf20b413979858f142d3c2eb5c3efd881b5b4c9",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "8eeca00ad5b5b1afce672e5da79a19b2d3afdeb83d3cc5691ce9d43b8aa44253",
+      "jobsDigest": "860bc37c239ecd743c74092cbf0d3c6221a8d71b89bef468272d7b0a4510fd7f",
       "jobs": {
         "refresh-avm-module-index": "Refresh AVM Module Index",
         "track-deprecations": "Track Azure Deprecations",

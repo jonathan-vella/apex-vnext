@@ -17,27 +17,16 @@
 # Use:
 #   - uses: actions/checkout@v7
 #   - uses: ./.github/actions/setup-node-repo
-#   # Or with a custom Node version / skipping npm ci:
+#   # Or when skipping npm ci:
 #   - uses: actions/checkout@v7
 #   - uses: ./.github/actions/setup-node-repo
 #     with:
-#       node-version: "22"
 #       install-deps: "false"
-#
-# Not used by:
-#   - governance-policy-baseline.yml — pwsh + azure/login, no Node
-#   - docs.yml — validates repository-native Markdown documentation
-#   - branch-enforcement.yml — neither job needs Node
-#   - validate-devcontainer-base.yml — disabled reference workflow
 
 name: Setup Node Repo
 description: Node.js setup + npm ci (shared workflow prelude — caller must check out repo first)
 
 inputs:
-  node-version:
-    description: Node.js major version (default 24)
-    required: false
-    default: "24"
   install-deps:
     description: Set to "false" to skip `npm ci` (e.g. matrix workflows that install per-job)
     required: false
@@ -49,12 +38,13 @@ runs:
     - name: Setup Node.js
       uses: actions/setup-node@v6
       with:
-        node-version: ${{ inputs.node-version }}
+        node-version: "24"
         cache: npm
 
     - name: Install Node dependencies
       if: inputs.install-deps == 'true'
       shell: bash
       env:
+        LEFTHOOK: "0"
         npm_config_registry: https://packagefeedproxy.microsoft.io/npm/
       run: npm ci
