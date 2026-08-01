@@ -11,6 +11,7 @@ import {
   buildDryRunQueue,
   buildTaskCommand,
   changedPathErrors,
+  collectGitChanges,
   initializeRun,
   launchTask,
   parseJsonLines,
@@ -123,6 +124,15 @@ test("changed path guard rejects protected, out-of-scope, binary, secret, and ov
   assert.ok(errors.some((error) => error.includes("binary")));
   assert.ok(errors.some((error) => error.includes("line budget")));
   assert.ok(errors.some((error) => error.includes("secret")));
+});
+
+test("Git porcelain parsing preserves path prefixes and excludes controller state", () => {
+  const fixtureGit = (args) => {
+    if (args[0] === "status") return " M docs/vnext/pre-agent-loop/queue.json\0?? README.md";
+    return "";
+  };
+  const changes = collectGitChanges(root, fixtureGit);
+  assert.deepEqual(changes.changedPaths, ["README.md"]);
 });
 
 test("task mutation of controller state is rejected", () => {
