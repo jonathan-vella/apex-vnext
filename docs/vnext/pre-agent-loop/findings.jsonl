@@ -1,2 +1,3 @@
 {"authorization_id":"pre-agent-opt-2026-08-01-repair","severity":"blocking","finding":"bounded task invoked a skill","at":"2026-08-01T08:57:08.327Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-skill-routing","severity":"blocking","finding":"bounded task invoked a skill","at":"2026-08-01T08:59:34.525Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-cli-compat","severity":"blocking","finding":"path outside authorization: ocs/vnext/pre-agent-loop/queue.json; path outside queue item: ocs/vnext/pre-agent-loop/queue.json","at":"2026-08-01T09:02:53.491Z"}

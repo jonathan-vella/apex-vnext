@@ -1,5 +1,5 @@
 {
-  "authorization_id": "pre-agent-opt-2026-08-01-skill-routing",
+  "authorization_id": "pre-agent-opt-2026-08-01-cli-compat",
   "state": "stopped",
   "items": [
     {
@@ -833,5 +833,5 @@
       "status": "pending"
     }
   ],
-  "stop_reason": "bounded task invoked a skill"
+  "stop_reason": "path outside authorization: ocs/vnext/pre-agent-loop/queue.json; path outside queue item: ocs/vnext/pre-agent-loop/queue.json"
 }
