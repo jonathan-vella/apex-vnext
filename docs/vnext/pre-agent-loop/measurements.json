@@ -452,6 +452,16 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "freshness-generation",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run lint:docs-freshness",
+          "status": 0
+        }
+      ]
     }
   ]
 }
