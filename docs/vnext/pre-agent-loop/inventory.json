@@ -9,9 +9,14 @@
         "GitHub Copilot agents"
       ],
       "classification": "keep",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:instruction-checks",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "The root frame owns repository-wide conventions; Copilot instructions own editor-specific routing."
     },
     {
