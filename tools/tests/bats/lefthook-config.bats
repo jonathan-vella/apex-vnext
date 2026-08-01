@@ -77,6 +77,11 @@ create_markdown_fixture() {
   [[ "$terraform_hook" == *"npm run lint:terraform-fmt failed"* ]]
 }
 
+@test "Gitleaks configuration retains default secret detectors" {
+  grep -q '^\[extend\]' "$REPO_ROOT/.gitleaks.toml"
+  grep -q '^useDefault = true' "$REPO_ROOT/.gitleaks.toml"
+}
+
 @test "a held Git index lock rejects a concurrent writer" {
   local fixture="$TEST_LOG_DIR/repository"
   mkdir -p "$fixture"

@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Audited repository-root files, restored Gitleaks default secret detection, retired zero-consumer root configuration,
+  and removed stale original-APEX metadata, exclusions, and release automation claims.
 - Reviewed every direct npm dependency and selected the newest releases available through the required package feed,
   removed unused `jsdom` and redundant overrides, corrected workspace ownership, patched vulnerable transitives, and
   replaced deprecated `whatwg-encoding` with maintained `encoding-sniffer` backed by `@exodus/bytes`.
