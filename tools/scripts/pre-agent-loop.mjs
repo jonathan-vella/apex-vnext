@@ -19,6 +19,8 @@ const DEFAULT_MANIFEST = "docs/vnext/pre-agent-loop/authorization.json";
 const INVENTORY = "tools/registry/modernization-ownership.json";
 const STATE_DIRECTORY = "docs/vnext/pre-agent-loop";
 const SECRET_PATTERN = /(api[_-]?key|password|secret|token)\s*[:=]\s*[^\s]+/iu;
+const TASK_TOOLS = ["view", "glob", "rg", "apply_patch"];
+const DENIED_TASK_TOOLS = ["ask_user", "task", "skill", "web_fetch", "session_store_sql"];
 
 function matchesPath(pathname, pattern) {
   const expression = `^${pattern
@@ -150,6 +152,29 @@ export function probeLauncher(launcher, spawn = spawnSync) {
   }
   if (!/GitHub Copilot CLI\s+\S+/u.test(output)) return { ok: false, reason: "launcher version output is invalid" };
   return { ok: true, version: output.trim() };
+}
+
+export function buildTaskCommand({ authorization, item, prompt }) {
+  const writablePaths = item.paths.map((pathname) => path.resolve(authorization.worktree, pathname));
+  return [
+    authorization.launcher.binary,
+    "--prompt",
+    prompt,
+    "--output-format",
+    "json",
+    "--available-tools",
+    TASK_TOOLS.join(","),
+    "--no-ask-user",
+    "--no-remote",
+    "--no-remote-export",
+    "--no-custom-instructions",
+    "--no-bash-env",
+    "--no-auto-update",
+    ...DENIED_TASK_TOOLS.flatMap((tool) => ["--deny-tool", tool]),
+    ...writablePaths.flatMap((pathname) => ["--allow-tool", `write(${pathname})`]),
+    "--add-dir",
+    authorization.worktree,
+  ];
 }
 
 export function buildDryRunQueue(ownership) {
