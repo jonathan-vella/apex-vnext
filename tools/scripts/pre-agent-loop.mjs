@@ -46,9 +46,9 @@ const DENIED_TASK_TOOLS = ["ask_user", "task", "skill", "web_fetch", "session_st
 const DISABLED_MCP_SERVERS = ["github-mcp-server", "github", "azure-resource-manager-mcp", "apex"];
 const RESERVED_COMMANDS = new Set(["npm run validate:all", "npm run qualify:vnext-release"]);
 
-function matchesPath(pathname, pattern) {
+export function matchesPath(pathname, pattern) {
   const expression = `^${pattern
-    .replace(/[.+^${}()|[\]\\]/gu, "\\$&")
+    .replace(/[.+?^${}()|[\]\\]/gu, "\\$&")
     .replace(/\*\*/gu, ".*")
     .replace(/\*/gu, "[^/]*")}$`;
   return new RegExp(expression, "u").test(pathname);
@@ -98,6 +98,9 @@ function authorizationShapeErrors(authorization) {
   }
   if (!Number.isInteger(authorization.launcher?.noninteractive?.timeout_seconds)) {
     errors.push("launcher noninteractive timeout is invalid");
+  }
+  if (!Number.isInteger(authorization.launcher?.noninteractive?.task_timeout_seconds)) {
+    errors.push("launcher task timeout is invalid");
   }
   if (!Number.isInteger(authorization.launcher?.noninteractive?.output_limit_bytes)) {
     errors.push("launcher noninteractive output limit is invalid");
@@ -181,7 +184,7 @@ export function probeLauncher(launcher, spawn = spawnSync) {
 
 export function buildTaskCommand({ authorization, item, prompt }) {
   const boundedPaths = item.paths.map((pathname) => {
-    const wildcard = pathname.search(/[*?[\]]/u);
+    const wildcard = pathname.search(/\*/u);
     const prefix = wildcard === -1 ? pathname : pathname.slice(0, wildcard);
     const boundedPath = wildcard === -1 ? pathname : prefix.endsWith("/") ? prefix : path.dirname(prefix);
     return { pathname, wildcard, absolutePath: path.resolve(authorization.worktree, boundedPath || ".") };
@@ -545,7 +548,7 @@ export function launchTask({ authorization, item, spawn = spawnSync }) {
         input: "",
         maxBuffer: authorization.launcher.noninteractive.output_limit_bytes,
         stdio: ["pipe", "pipe", "pipe"],
-        timeout: authorization.launcher.noninteractive.timeout_seconds * 1000 * 20,
+        timeout: authorization.launcher.noninteractive.task_timeout_seconds * 1000,
       });
       if (result.error || result.status !== 0) throw new Error("bounded task failed");
       if ((result.stdout ?? "").trim() === "" && attempt < authorization.budgets.repair_attempts) continue;

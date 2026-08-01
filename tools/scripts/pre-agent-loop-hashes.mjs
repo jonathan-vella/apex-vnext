@@ -38,7 +38,7 @@ function frontmatter(source) {
 }
 
 function skillInventoryHash(root) {
-  const files = SKILL_GLOBS.flatMap((pattern) => globSync(pattern, { cwd: ROOT })).sort();
+  const files = SKILL_GLOBS.flatMap((pattern) => globSync(pattern, { cwd: root })).sort();
   const metadata = files
     .map((file) => `${file}\n${frontmatter(readFileSync(path.join(root, file), "utf8"))}`)
     .join("\n");

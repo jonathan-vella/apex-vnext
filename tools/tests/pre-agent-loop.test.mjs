@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -15,6 +16,7 @@ import {
   focusedCheckPlan,
   initializeRun,
   launchTask,
+  matchesPath,
   parseJsonLines,
   parseArguments,
   processNextItem,
@@ -27,6 +29,7 @@ import {
   taskLoadedMcp,
   taskPrompt,
 } from "../scripts/pre-agent-loop.mjs";
+import { contextHashDrift } from "../scripts/pre-agent-loop-hashes.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const authorization = JSON.parse(readFileSync(path.join(root, "docs/vnext/pre-agent-loop/authorization.json"), "utf8"));
@@ -128,6 +131,22 @@ test("changed path guard rejects protected, out-of-scope, binary, secret, and ov
   assert.ok(errors.some((error) => error.includes("secret")));
 });
 
+test("path matching treats question marks as literals", () => {
+  assert.equal(matchesPath("docs/file?.md", "docs/file?.md"), true);
+  assert.equal(matchesPath("docs/file1.md", "docs/file?.md"), false);
+});
+
+test("skill inventory hashing uses the caller-provided root", () => {
+  const temporaryRoot = mkdtempSync(path.join(tmpdir(), "pre-agent-loop-hash-"));
+  const skillDirectory = path.join(temporaryRoot, ".github/skills/fixture");
+  mkdirSync(skillDirectory, { recursive: true });
+  writeFileSync(path.join(skillDirectory, "SKILL.md"), "---\nname: fixture\ndescription: fixture\n---\n");
+  const metadata = ".github/skills/fixture/SKILL.md\nname: fixture\ndescription: fixture";
+  const expected = createHash("sha256").update(metadata).digest("hex");
+  assert.deepEqual(contextHashDrift({ "skill-metadata-inventory": expected }, temporaryRoot), []);
+  rmSync(temporaryRoot, { recursive: true, force: true });
+});
+
 test("Git porcelain parsing preserves path prefixes and excludes controller state", () => {
   const fixtureGit = (args) => {
     if (args[0] === "status") return " M docs/vnext/pre-agent-loop/queue.json\0?? README.md";
@@ -199,9 +218,11 @@ test("queue item prompt explicitly prohibits skill invocation and skill-file rea
 test("task launcher uses a neutral directory and rejects MCP events", () => {
   let observedCwd;
   let observedHome;
+  let observedTimeout;
   const success = (_binary, _args, options) => {
     observedCwd = options.cwd;
     observedHome = options.env.COPILOT_HOME;
+    observedTimeout = options.timeout;
     return { status: 0, stdout: '{"type":"assistant.message"}\n', stderr: "" };
   };
   const mcp = () => ({
@@ -213,6 +234,7 @@ test("task launcher uses a neutral directory and rejects MCP events", () => {
   assert.equal(launchTask({ authorization, item, spawn: success }).length, 1);
   assert.notEqual(observedCwd, authorization.worktree);
   assert.ok(observedHome.startsWith(observedCwd));
+  assert.equal(observedTimeout, authorization.launcher.noninteractive.task_timeout_seconds * 1000);
   assert.throws(() => launchTask({ authorization, item, spawn: mcp }), /loaded MCP/);
 });
 

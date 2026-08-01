@@ -87,7 +87,7 @@ test("inventory rejects proof scripts that require an explicit target", () => {
     manifest: invalid,
     scripts: { ...options.scripts, "check:h2-order": "node tools/scripts/check-h2-order.mjs" },
   });
-  assert.ok(errors.some((error) => error.includes("proof script requires an explicit target")));
+  assert.ok(errors.some((error) => error.includes("npm run check:h2-order -- <target>")));
 });
 
 test("context baseline receipt rejects incomplete, duplicated, and wrong-version evidence", () => {
