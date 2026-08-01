@@ -81,7 +81,7 @@ Follow the structure in
 2. Update the frontmatter (`name`, `description`, `compatibility`) per
    the instruction file's rules.
 3. Place deep reference material under `references/` (loaded on demand).
-4. Run `npm run lint:skills-format` and `npm run validate:agents` to verify.
+4. Run `npm run validate:skills` and `npm run validate:agents` to verify.
 
 The [`sensei`](./sensei/SKILL.md) skill iteratively improves frontmatter
 quality (Ralph-loop pattern) once the new skill is in place. For
