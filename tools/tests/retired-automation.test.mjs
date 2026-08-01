@@ -12,6 +12,7 @@ const promptArchivePath = ".archive/retired-prompts/original-apex-v1";
 const utilityArchivePath = ".archive/retired-utilities/original-apex-v1";
 const qualificationArchivePath = ".archive/qualification/vnext-qualification-v1";
 const preAgentArchivePath = ".archive/retired-automation/pre-agent-loop-v1";
+const compatibilityArchivePath = ".archive/retired-compatibility/original-apex-v1";
 
 function textSha256(path) {
   const normalized = readFileSync(path, "utf8").replace(/\r\n/gu, "\n");
@@ -220,4 +221,19 @@ test("completed pre-agent maintenance loop remains provenance-only", () => {
   ]) {
     assert.equal(scripts[command], undefined, `${command} must stay retired`);
   }
+});
+
+test("original APEX compatibility utilities remain provenance-only", () => {
+  const provenance = JSON.parse(readFileSync(`${compatibilityArchivePath}/provenance.json`, "utf8"));
+  assert.equal(provenance.archivedFrom, "901adcbc4b033c912cfbd198307c44b4979b089e");
+  for (const artifact of provenance.artifacts) {
+    assert.equal(existsSync(artifact.path), false, `${artifact.path} must stay retired`);
+    const archiveFile = `${compatibilityArchivePath}/${artifact.path}`;
+    assert.equal(existsSync(archiveFile), true, `missing archived compatibility artifact: ${artifact.path}`);
+    assert.equal(textSha256(archiveFile), artifact.sha256);
+  }
+
+  const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts ?? {};
+  assert.equal(scripts["assess:agents"], undefined);
+  assert.equal(scripts["challenger-telemetry"], undefined);
 });

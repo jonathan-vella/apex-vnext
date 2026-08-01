@@ -196,7 +196,7 @@ apex-recall decide <project> --key vnet_plan_decision --value <confirmed|edited|
 ```
 
 `subnet_plan` MUST conform to
-[`tools/schemas/subnet-plan.schema.json`](../../../../tools/schemas/subnet-plan.schema.json)
+The original session-state subnet-plan schema is retired. New vNext networking intent must use typed contract inputs.
 (v1). The schema remains the compatibility contract; the retired prose-key validator is preserved under
 `.archive/legacy-agents-v0.10/`.
 

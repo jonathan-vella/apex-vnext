@@ -134,10 +134,10 @@ Consumed by 05-IaC Planner, 06b/06t CodeGen, and 04g-Governance.
 | `vnet_mode`           | `create-new` \| `use-existing`                          | n/a (required when gate fires)                      | 03-Architect   | 05-IaC Planner, 06b/06t CodeGen                    |
 | `existing_vnet_id`    | Azure resource ID (string)                              | n/a (required when `vnet_mode = use-existing`)      | 03-Architect   | 05-IaC Planner, 06b/06t CodeGen                    |
 | `vnet_address_space`  | CIDR string (e.g. `10.0.0.0/16`)                        | `10.0.0.0/16` (greenfield)                          | 03-Architect   | 05-IaC Planner, 06b/06t CodeGen, 04g-Governance    |
-| `subnet_plan`         | JSON array conforming to `tools/schemas/subnet-plan.schema.json` | n/a (gate emits placeholder `[]` in `deferred`)     | 03-Architect   | 05-IaC Planner, 06b/06t CodeGen, 04g-Governance    |
+| `subnet_plan`         | Historical JSON array                                                  | n/a (gate emits placeholder `[]` in `deferred`)     | 03-Architect   | 05-IaC Planner, 06b/06t CodeGen, 04g-Governance    |
 | `vnet_plan_decision`  | `confirmed` \| `edited` \| `deferred`                   | n/a (only set after gate fires)                     | 03-Architect   | 05-IaC Planner, 04g-Governance, 10-Challenger      |
 
-`subnet-plan.schema.json` remains the shape contract for historical `decisions.subnet_plan` values.
+Historical `decisions.subnet_plan` values are preserved without an active repository schema.
 
 ### Free-form decision-log entries
 
