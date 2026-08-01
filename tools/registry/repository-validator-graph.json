@@ -209,13 +209,6 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
-      "id": "lint-workflow-table-sync",
-      "script": "lint:workflow-table-sync",
-      "profile": "node-lint",
-      "aliases": [],
-      "retirement": { "status": "active", "replacementIds": [] }
-    },
-    {
       "id": "test-apex-recall",
       "script": "test:apex-recall",
       "profile": "external-test",
@@ -605,7 +598,6 @@
         "validate:lens-references",
         "validate:challenger-findings",
         "validate:challenger-presence",
-        "lint:workflow-table-sync",
         "lint:workflow-handoffs",
         "validate:skill-checks",
         "lint:json",
@@ -675,7 +667,6 @@
         "validate:lens-references",
         "validate:challenger-findings",
         "validate:challenger-presence",
-        "lint:workflow-table-sync",
         "lint:workflow-handoffs",
         "validate:skill-checks",
         "lint:json",

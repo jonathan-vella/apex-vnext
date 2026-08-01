@@ -30,6 +30,10 @@ The retired `tools/scripts/validate-v1-compatibility-matrix.mjs` has SHA-256
 `fabb0f1365cef398b2e1648faeb2bf2510bb9fc2e9e148c9a85bf64b193d9c20`. Phase 0A evidence remains frozen, while current
 release validation no longer reads this archive.
 
+The retired `tools/scripts/validate-workflow-table-sync.mjs` has SHA-256
+`99dfa2cf3f28a1cf4665ea043ca5b22a316dd4d8ef7189c0efd222dc59911ff7`. vNext root guidance no longer publishes the
+original step-agent workflow table.
+
 ## Boundaries
 
 - Do not add this directory to `chat.agentFilesLocations`.
