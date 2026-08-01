@@ -206,6 +206,40 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "pricing-evidence",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:pricing-parity",
+          "status": 0
+        },
+        {
+          "command": "npm run test:pricing-parity",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:arm-mcp-cost-pricing",
+          "status": 0
+        },
+        {
+          "command": "npm run test:arm-mcp-cost-pricing",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:mcp-config",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:agents",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        }
+      ]
     }
   ]
 }
