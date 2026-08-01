@@ -99,31 +99,6 @@
       "path": "tools/scripts/validate-artifacts.mjs",
       "outputClass": "validation",
       "requiredMarkers": ["07-ab-diagram.py", "07-ab-diagram.png"]
-    },
-    {
-      "id": "e2e-step-validator",
-      "path": "tools/scripts/validate-e2e-step.mjs",
-      "outputClass": "validation",
-      "requiredMarkers": ["03-des-diagram.py", "04-dependency-diagram", "04-runtime-diagram", "07-ab-diagram.py"]
-    },
-    {
-      "id": "e2e-benchmark",
-      "path": "tools/scripts/benchmark-e2e.mjs",
-      "outputClass": "validation",
-      "requiredMarkers": [
-        "04-dependency-diagram.py",
-        "04-dependency-diagram.png",
-        "04-dependency-diagram.svg",
-        "04-runtime-diagram.py",
-        "04-runtime-diagram.png",
-        "04-runtime-diagram.svg"
-      ]
-    },
-    {
-      "id": "e2e-workflow-prompt",
-      "path": "tools/tests/prompts/e2e-contoso-rfp.prompt.md",
-      "outputClass": "validation",
-      "requiredMarkers": ["03-des-diagram.py", "03-des-diagram.png", "03-des-diagram.svg"]
     }
   ],
   "scenarios": [

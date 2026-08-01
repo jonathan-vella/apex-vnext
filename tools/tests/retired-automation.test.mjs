@@ -7,13 +7,19 @@ const archivePath = ".archive/retired-automation/sync-workflows.mjs";
 const provenancePath = ".archive/retired-automation/README.md";
 const expectedHash = "e1111eb1f9a60e4273c1302a9af8666a555f7b5c6f079451ecaa37f50ec4cffa";
 const terraformArchivePath = ".archive/retired-automation/terraform-mcp";
+const e2eArchivePath = ".archive/retired-automation/e2e-v1";
+
+function textSha256(path) {
+  const normalized = readFileSync(path, "utf8").replace(/\r\n/gu, "\n");
+  return createHash("sha256").update(normalized).digest("hex");
+}
 
 test("workflow synchronization remains provenance-only retired automation", () => {
   const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts ?? {};
   assert.equal(scripts["sync:workflows"], undefined);
   assert.equal(existsSync("tools/scripts/sync-workflows.mjs"), false);
   assert.equal(existsSync(archivePath), true);
-  assert.equal(createHash("sha256").update(readFileSync(archivePath)).digest("hex"), expectedHash);
+  assert.equal(textSha256(archivePath), expectedHash);
 
   const provenance = readFileSync(provenancePath, "utf8");
   assert.match(provenance, new RegExp(expectedHash));
@@ -46,4 +52,49 @@ test("Terraform MCP characterization remains provenance-only retired automation"
   assert.match(provenance, /7b3dee20b2713430c7302f5cdfc7b4a19e5a73e4/u);
   assert.match(provenance, /## Replacement Owners/u);
   assert.match(provenance, /## Rollback/u);
+});
+
+test("original APEX E2E automation remains provenance-only", () => {
+  const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts ?? {};
+  for (const command of ["e2e:validate", "e2e:benchmark", "e2e:combine"]) {
+    assert.equal(scripts[command], undefined, `${command} must stay retired`);
+  }
+  for (const path of [
+    ".github/workflows/e2e-validation.yml",
+    "tools/scripts/benchmark-e2e.mjs",
+    "tools/scripts/combine-e2e-runs.mjs",
+    "tools/scripts/validate-e2e-step.mjs",
+    "tools/scripts/_lib/e2e-helpers.mjs",
+    "tools/tests/lib/e2e-helpers.test.mjs",
+    "tools/tests/prompts/e2e-contoso-rfp.prompt.md",
+  ]) {
+    assert.equal(existsSync(path), false, `${path} must stay out of active paths`);
+  }
+
+  const provenance = JSON.parse(readFileSync(`${e2eArchivePath}/provenance.json`, "utf8"));
+  assert.equal(provenance.archivedFrom, "901adcbc4b033c912cfbd198307c44b4979b089e");
+  assert.equal(provenance.introducedBy, "946c72c5c7785e16ded06b4dc26dbf189b194677");
+  for (const artifact of provenance.artifacts) {
+    const archiveFile = `${e2eArchivePath}/${artifact.path}`;
+    assert.equal(existsSync(archiveFile), true, `missing archived artifact: ${artifact.path}`);
+    assert.equal(textSha256(archiveFile), artifact.sha256);
+  }
+
+  const activeFiles = globSync(
+    ["package.json", "tools/**/*.{mjs,js,json,md,sh}", "docs/**/*.md", ".github/**/*.{yml,yaml,json,md,mjs,js,sh}"],
+    { exclude: ["**/node_modules/**", ".archive/**", "docs/vnext/phase-0a/**", "CHANGELOG.md"] },
+  ).filter((path) => path !== "tools/tests/retired-automation.test.mjs");
+  const forbidden = [
+    "e2e:validate",
+    "e2e:benchmark",
+    "e2e:combine",
+    ".github/workflows/e2e-validation.yml",
+    "tools/scripts/benchmark-e2e.mjs",
+    "tools/scripts/combine-e2e-runs.mjs",
+    "tools/scripts/validate-e2e-step.mjs",
+  ];
+  const activeReferences = activeFiles.filter((path) =>
+    forbidden.some((marker) => readFileSync(path, "utf8").includes(marker)),
+  );
+  assert.deepEqual(activeReferences, [], `active E2E retirement references: ${activeReferences.join(", ")}`);
 });

@@ -353,7 +353,7 @@ If the environment variable `APEX_UNATTENDED=1` is set, the protocol
 - Agent emits a chat warning listing every deferred `must_fix` title so
   the user can audit the run later.
 
-This unblocks `e2e-orchestrator.agent.md` and `npm run e2e:benchmark`.
+This preserves the review boundary formerly exercised by the archived v1 E2E harness.
 
 ### 2e. Multi-source merge order
 

@@ -53,16 +53,6 @@
       "jobs": { "validate": "Markdown docs" }
     },
     {
-      "id": "e2e-validation",
-      "path": ".github/workflows/e2e-validation.yml",
-      "name": "e2e-validation",
-      "triggerDigest": "1c20ce1b37f4e47081e6db26abc2dd6c028c16be7a0ddb464e7eb9ca589a0d5e",
-      "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
-      "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "feb3b244ed2fc9dadb237866cdee38ef96b1eeaa82839ca1f3af3377ab83d2ed",
-      "jobs": { "validate": "Validate E2E artifacts", "benchmark": "Benchmark E2E projects" }
-    },
-    {
       "id": "governance-policy-baseline",
       "path": ".github/workflows/governance-policy-baseline.yml",
       "name": "Governance Policy Baseline",

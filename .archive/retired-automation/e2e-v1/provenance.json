@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "1.0.0",
+  "topic": "original-apex-e2e",
+  "introducedBy": "946c72c5c7785e16ded06b4dc26dbf189b194677",
+  "archivedFrom": "901adcbc4b033c912cfbd198307c44b4979b089e",
+  "retiredAt": "2026-08-01",
+  "issue": 220,
+  "artifacts": [
+    {
+      "path": ".github/workflows/e2e-validation.yml",
+      "sha256": "cfbadde605e0cd388f64d2fe52373cbc537c3f10cda5ae12862bc2b89c69bc6c"
+    },
+    {
+      "path": "tools/scripts/benchmark-e2e.mjs",
+      "sha256": "d35e8b24e97493f91597cf4ef1f07ef54fdf831617b130c2bdfc6bd75248be3b"
+    },
+    {
+      "path": "tools/scripts/combine-e2e-runs.mjs",
+      "sha256": "bd336890db665b21db0e6e39411e72e10f4162c7ad0bcce50dd69b91f2c5c33e"
+    },
+    {
+      "path": "tools/scripts/validate-e2e-step.mjs",
+      "sha256": "1ce6a817c22a0a00f64e62caf7813d85dd204d19e54a369079257b13f0346329"
+    },
+    {
+      "path": "tools/scripts/_lib/e2e-helpers.mjs",
+      "sha256": "b8689b45da83613b6851c0f4ed644238195a95860e05fd0c97993970022a2610"
+    },
+    {
+      "path": "tools/tests/lib/e2e-helpers.test.mjs",
+      "sha256": "013e0f22d34ea520e463e1738e5ead281fba2bffbf1ab2e4c223de05fa2895de"
+    },
+    {
+      "path": "tools/tests/prompts/e2e-analyze-lessons.prompt.md",
+      "sha256": "1f26b26099493cdbd5ed5c8f3bd89ad7ce8e9471b7283de106a3d3b428395de4"
+    },
+    {
+      "path": "tools/tests/prompts/e2e-contoso-rfp.prompt.md",
+      "sha256": "43745dfd6bb5cab0238428cc92b40421e5d3418c472ccaa10e6ee6eda4732d5d"
+    },
+    {
+      "path": "tools/tests/e2e-inputs/README.md",
+      "sha256": "2f3dc359a2f4b8e58008157223f9ca909ba0835359eace988deded2a051aebf9"
+    },
+    {
+      "path": "tools/tests/e2e-inputs/contoso-rfq.md",
+      "sha256": "38d34f97f38fb1265403ce38d677b50b0779eacb91d6c02659112251fed5dbe2"
+    },
+    {
+      "path": "tools/tests/README.md",
+      "sha256": "17dfedfaabaf8439dd54620e3584f44b8a426c0ac6dba46d5824d792c17b412e"
+    }
+  ],
+  "replacementOwners": [
+    "npm run qualify:vnext",
+    "npm run qualify:vnext-release",
+    ".github/workflows/release-candidate-qualification.yml",
+    ".github/workflows/vnext-live-qualification.yml"
+  ],
+  "rollback": [
+    "restore-artifacts-to-original-paths",
+    "restore-package-commands",
+    "restore-workflow-and-diagram-contracts",
+    "restore-compatible-fixture-corpus",
+    "run-full-validation"
+  ]
+}
