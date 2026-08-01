@@ -934,8 +934,6 @@ function findArtifacts() {
       if (!entry.isFile()) return false;
       if (!artifactPatterns.some((p) => entry.name.endsWith(p))) return false;
       const dir = entry.parentPath ?? entry.path;
-      // Skip the top-level agent-output/README.md
-      if (entry.name === "README.md" && dir === baseDir) return false;
       // Skip historical baseline snapshots
       const rel = path.relative(baseDir, dir);
       if (rel.startsWith("_baselines")) return false;

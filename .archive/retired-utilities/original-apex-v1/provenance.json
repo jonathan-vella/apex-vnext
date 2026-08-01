@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1.0.0",
+  "archivedFrom": "901adcbc4b033c912cfbd198307c44b4979b089e",
+  "replacementOwners": ["packages/cli", "packages/capabilities", "tools/scripts/live-qualification.mjs"],
+  "artifacts": [
+    { "path": "agent-output/README.md", "sha256": "63d26d57db543f8614e0c4a1c57260b9010e8439b2cc773efffe017ad5b3de0f" },
+    { "path": "tools/scripts/export-agent-output-html.py", "sha256": "ad92aa550d22298023b90ae2665662f2b342043da1b2dba9bce10e6b8aa78fbf" },
+    { "path": "tools/scripts/smoke_verify.py", "sha256": "0104c29c119ba63e1f0c917d70eb5a1cb7f23362e459419115935328b8ffb7eb" },
+    { "path": "tools/scripts/promote-sku-aliases.mjs", "sha256": "4316201ab35e38ba5e0de13369bbca653e3f878f48348583559bfb31364ad03f" },
+    { "path": "tools/scripts/init-from-template.mjs", "sha256": "7ea1cc863da17e0a1fdd0774f1bf87e0255b15f98d7d48515ff08a43f9fae804" },
+    { "path": "tools/scripts/setup-azure.sh", "sha256": "9e80183d679205338475863d24c691e7255c09f49ec128a17d440e83114f930d" },
+    { "path": "tests/integration/smoke-run.md", "sha256": "db0ad9c667850de15c45b0c80895fb6aa2bc03099b7ada7b06973ae10885d17c" },
+    { "path": "tests/scripts/test_smoke_verify.py", "sha256": "4a8dfcea8a70548bdda122cbfd2554c270d454d8e053bfe559251fe09c35320b" },
+    { "path": "tests/scripts/test_validate_orchestrator_handoff.py", "sha256": "9e359dd72fa35e6d60a7cbc818abeb68421fcc2b9e37f899cf02049fd42e2733" },
+    { "path": "tests/scripts/test_validate_question_batching.py", "sha256": "16061a6cfc794dd50857b54dc3008019ad3400f8d21b8279e3947600dd43d690" },
+    { "path": "tests/scripts/test_validate_review_ceiling.py", "sha256": "d85eb199652be3049ee97b61f006a567c8b765e6369492770b1b90cc00a1f5de" }
+  ]
+}
