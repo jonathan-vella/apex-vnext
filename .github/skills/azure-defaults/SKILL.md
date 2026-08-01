@@ -1,6 +1,6 @@
 ---
 name: azure-defaults
-description: '**UTILITY SKILL** — Azure infrastructure defaults: regions, tags, naming (CAF), AVM-first policy, security baseline, unique suffix patterns. WHEN: "Azure naming convention", "CAF naming", "resource tags", "AVM module", "security baseline", "region default". USE FOR: any agent generating or planning Azure resources. DO NOT USE FOR: artifact template structures (use azure-artifacts), pricing lookups (read references/pricing-guidance.md on demand).'
+description: '**UTILITY SKILL** — Provides Azure defaults for regions, tags, CAF naming, AVM-first policy, security, and unique suffixes. WHEN: "Azure naming", "CAF", "resource tags", "AVM module", "security baseline", "region default". EXCLUDES artifact templates and live pricing lookups.'
 compatibility: Works with Claude Code, GitHub Copilot, VS Code, and any Agent Skills compatible tool.
 license: MIT
 metadata:
@@ -250,3 +250,8 @@ Load these on demand — do NOT read all at once:
 | `references/cost-alerts-bicep.md`           | Bicep snippets for budget + Action Group + scheduledActions |
 | `references/cost-alerts-terraform.md`       | Terraform snippets for budget + Action Group + anomaly  |
 | `references/vnet-planning.md`               | VNet planning gate — trigger contract, askQuestions templates, subnet sizing matrix |
+| `references/adversarial-checklists.md`      | Checklist catalog for bounded adversarial reviews     |
+| `references/adversarial-review-deep.md`     | Opt-in deep adversarial review procedure               |
+| `references/artifact-type-categories.md`    | Artifact category and review-routing taxonomy          |
+| `references/identity-resolution.md`         | Identity and principal-resolution rules                |
+| `references/plan-design-decisions.md`       | Infrastructure plan decision checklist                 |

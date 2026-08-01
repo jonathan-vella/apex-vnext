@@ -1,6 +1,6 @@
 ---
 name: azure-cloud-migrate
-description: '**WORKFLOW SKILL** — Assess and migrate cross-cloud workloads to Azure. Generates assessment reports and converts code from AWS, GCP, or other providers to Azure services. WHEN: "migrate Lambda to Azure Functions", "migrate AWS to Azure", "convert AWS serverless to Azure", "migration readiness report", "cross-cloud migration". DO NOT USE FOR: greenfield Azure deployment (azure-prepare), Azure-only refactor (azure-prepare).'
+description: '**WORKFLOW SKILL** — Assesses and migrates AWS, GCP, and other cloud workloads to Azure. WHEN: "migrate Lambda to Azure Functions", "migrate AWS to Azure", "migration readiness report", "cross-cloud migration". EXCLUDES greenfield Azure deployment and Azure-only refactoring.'
 license: MIT
 metadata:
   author: Microsoft

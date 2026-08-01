@@ -112,3 +112,5 @@ Applying a Terraform pattern in a root module:
 | `references/avm-authoring-requirements.md` | AVM certification: 37 requirements, compliance checklist          |
 | `references/refactor-module.md`            | Module extraction, state migration, refactoring patterns          |
 | `references/module-composition.md`         | Canonical AVM module composition example with output wiring       |
+| `references/azuread-pattern.md`             | Microsoft Entra resources, identities, and role assignments       |
+| `references/codegen-validation-checklist.md` | Final generated-tree validation checklist                        |

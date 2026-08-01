@@ -1,0 +1,587 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "workspace-operating-frame",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:instruction-checks",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "scoped-instruction-discovery",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:instruction-checks",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:glob-audit",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "user-documentation",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:docs",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "managed-agent-manifest",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:model-consistency",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:agents",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "model-catalog",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:models",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:model-catalog",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "skill-discovery",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:skills",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:orphaned-content",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "workflow-dag",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:workflow-graph",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:workflow-table-sync",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "copilot-client-projections",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext-pack",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:agents",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:vscode",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:client-outcomes",
+          "status": 0
+        },
+        {
+          "command": "npm run test:client-outcomes",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "runtime-manifests",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "workspace-package-boundaries",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext-pack",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "schema-libraries",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run lint:json-schemas",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "customization-distribution",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext-pack",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp-portfolio",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run lint:mcp-config",
+          "status": 0
+        },
+        {
+          "command": "npm run test:mcp-config",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:terraform-mcp-retirement",
+          "status": 0
+        },
+        {
+          "command": "npm run test:terraform-mcp-retirement",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "pricing-evidence",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:pricing-parity",
+          "status": 0
+        },
+        {
+          "command": "npm run test:pricing-parity",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:arm-mcp-cost-pricing",
+          "status": 0
+        },
+        {
+          "command": "npm run test:arm-mcp-cost-pricing",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:mcp-config",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:agents",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "improvement-outcome-ingestion",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run test:bounded-improvement",
+          "status": 0
+        },
+        {
+          "command": "npm run prove:bounded-improvement",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "workflow-validator-ownership",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "repository-validator-graph",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:repository-validator-graph",
+          "status": 0
+        },
+        {
+          "command": "npm run test:repository-validator-graph",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "language-validator-boundaries",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:all",
+          "status": "reserved-for-terminal-stage"
+        }
+      ]
+    },
+    {
+      "id": "markdown-policy-enforcement",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run lint:md",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:docs",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:hooks",
+          "status": 0
+        },
+        {
+          "command": "npm run test:hooks",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "artifact-template-validation",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:artifacts",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:headings-summary",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "precommit-hooks",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:hooks",
+          "status": 0
+        },
+        {
+          "command": "npm run test:hooks",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "github-required-checks",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:github-workflows",
+          "status": 0
+        },
+        {
+          "command": "npm run test:github-workflows",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:_node-ci",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:docs",
+          "status": 0
+        },
+        {
+          "command": "npm run test:apex-recall",
+          "status": 0
+        },
+        {
+          "command": "npm run test:arm-mcp-cost-pricing",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "exact-head-release-qualification",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:github-workflows",
+          "status": 0
+        },
+        {
+          "command": "npm run test:github-workflows",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext-pack",
+          "status": 0
+        },
+        {
+          "command": "npm run qualify:vnext-release",
+          "status": "reserved-for-terminal-stage"
+        }
+      ]
+    },
+    {
+      "id": "maintenance-workflows",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:tool-versions",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:docs-freshness",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "upstream-workflow-synchronization",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run test:retired-automation",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:github-workflows",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:deprecated-refs",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "model-catalog-generation",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:model-catalog",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "entity-count-generation",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:no-hardcoded-counts",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "avm-index-generation",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:avm-versions:offline",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "freshness-generation",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run lint:docs-freshness",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "diagram-routing",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:skills",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:diagram-semantics",
+          "status": 0
+        },
+        {
+          "command": "npm run test:diagram-semantics",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:artifacts",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:workflow-graph",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "client-bundle-generation",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run prepare:vnext-assets",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext-pack",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "v1-compatibility-matrix",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:v1-compatibility-matrix",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "public-command-compatibility",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:v1-compatibility-matrix",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "validator-diagnostics",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run test:lib-json",
+          "status": 0
+        },
+        {
+          "command": "npm run test:lib-ajv",
+          "status": 0
+        },
+        {
+          "command": "npm run test:registry-validator-reporter",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "workflow-telemetry",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run measure:baseline",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "debug-log-profiling",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run test:client-context-samples",
+          "status": 0
+        }
+      ]
+    },
+    {
+      "id": "managed-consumer-guidance",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:instruction-checks",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        }
+      ]
+    }
+  ]
+}

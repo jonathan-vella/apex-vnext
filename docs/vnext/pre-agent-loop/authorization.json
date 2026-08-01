@@ -1,9 +1,9 @@
 {
   "$schema": "./authorization.schema.json",
   "version": 1,
-  "authorization_id": "pre-agent-opt-2026-07-31",
+  "authorization_id": "pre-agent-opt-2026-08-01-proof-policy",
   "authored_by": "jonathan-vella",
-  "authored_at": "2026-07-31T17:20:00Z",
+  "authored_at": "2026-08-01T10:23:41Z",
   "expires_at": "2026-08-03T23:59:59Z",
   "base_commit": "origin/main",
   "issues": [222, 220, 219],
@@ -70,6 +70,12 @@
     "npm run validate:",
     "npm run test:",
     "npm run format:",
+    "npm run prove:bounded-improvement",
+    "npm run prepare:vnext-assets",
+    "npm run measure:baseline",
+    "npm run profile:debug-log",
+    "npm run profile:copilot-cli-otel",
+    "npm run profile:vscode-otel",
     "node tools/scripts/",
     "node --test",
     "python3 -m pytest",
@@ -114,29 +120,19 @@
   },
   "launcher": {
     "binary": "/home/vscode/.vscode-server/data/User/globalStorage/github.copilot-chat/copilotCli/copilot",
-    "version": "1.0.77",
     "model": "auto",
     "mcp": "disabled",
-    "copilot_home": "/tmp/apex-pre-agent-loop/copilot-home",
-    "working_directory": "/tmp/apex-pre-agent-loop/neutral-cwd",
-    "builtin_skills": [
-      {
-        "name": "customize-cloud-agent",
-        "sha256": "6acee791cd48a31eb881431c0f1394d3c79d33d62f0d58b2d9b699e4a275ea93"
-      }
-    ],
-    "tool_registry": {
-      "path": "tools/registry/copilot-cli-agent-tools.json",
-      "schema_version": "1.1.0",
-      "characterization_version": "1.0.77",
-      "sha256": "5f1fec548262accd1360a77f60aabe2194ec9abfacadf3c9075c81e003ec92cf"
+    "noninteractive": {
+      "timeout_seconds": 15,
+      "task_timeout_seconds": 300,
+      "output_limit_bytes": 1048576
     }
   },
   "budgets": {
     "files_per_slice": 10,
     "lines_per_slice": 800,
     "repair_attempts": 1,
-    "queue_items": 15,
+    "queue_items": 50,
     "wall_clock_minutes": 240
   },
   "checkpoint_policy": {
@@ -155,25 +151,15 @@
   ],
   "skill_allowlist": [],
   "context_hashes": {
-    ".github/prompts/apex-autonomous-pre-agent-loop.prompt.md": "ed3de64ed6d2e7f51720a5d4a3299beb1482c582b266735ae2881876a75ae528",
+    ".github/prompts/apex-autonomous-pre-agent-loop.prompt.md": "6491df45622b22c55c3b8cfe22484b4efc4aa1b56f1a3813c1796125d3318168",
     "AGENTS.md": "dad114b9f59e597437be286a41857d1f94d9666abc99fb118ffc6a7dbb465b9a",
     ".github/copilot-instructions.md": "aff580ed99b7c007caa4b5ce6b6c0670dbc2ccea619177d7d0cb84b0157c5e63",
-    ".vscode/settings.json": "30cbdf32b28aecf68c31d14ba750c488647057e7efce3fbd31af432cfa0e66f0",
-    ".github/instructions/agent-skills.instructions.md": "d6e88a7c5ad63db5c5352e304f3c1c1ffa8e8941fa034870d53008b722632c18",
-    ".github/instructions/agent-authoring.instructions.md": "f2253cd8f22c6f9eba35f2c7dc44575a1b91f07807b23c8e5379aa9590411e0e",
-    ".github/instructions/instructions.instructions.md": "a354e64fb2d294815fee33eb24809076efb0226e0d7b47d3a82e6f003648e19c",
-    ".github/instructions/prompt.instructions.md": "c154b7aafe41533e7bba125013c174a16b025b088bd48bd6d4851c44937ae312",
-    ".github/instructions/no-interactive-shell.instructions.md": "738836cadc6c943e0871b6fdb45aef02c21e94f4affdb60ed3bbb8923ab8d9e0",
     ".github/instructions/javascript.instructions.md": "f207cbea41680a3a20473ba6abea3580747be24771cc93525dcab08f1f019054",
     ".github/instructions/json.instructions.md": "7ad4662e52ad9f88aa96095bfd7d76ae488af94287c8860c306f9bbd7c9bbd75",
-    ".github/instructions/shell.instructions.md": "cd20e996d2980b65ca3c5c29e4347a342e127219420ac30228b47a7c97fa7286",
     ".github/instructions/code-quality.instructions.md": "5223713c1f411117df41bc6ddfed98ebac33c77bf098a5feaf752a8453e0cba1",
-    ".github/instructions/no-hardcoded-counts.instructions.md": "e8370c5108842341f559a91797574d3e9f24ebd50c8362cb8c3341e6ebb40641",
-    ".github/instructions/context-optimization.instructions.md": "549a67d43feb89999908f201a6897cbf2771128ab172fa652550e4b3b1680d3e",
+    "docs/vnext/pre-agent-loop/authorization.schema.json": "e7c3feac98b5e4eadb983517bb9cb5ca23068df70342ce92f0f006c3a12187d1",
     ".github/hooks/tool-guardian/guard-tool.sh": "8b7069d20fcd65906794a80e434953f335f0ad89ef134dff1443a56b14dc92d8",
-    ".github/hooks/tool-guardian/hooks.json": "dc2db4d0bba987895ce694cba215bc36c453e393008e7dcc96bde26015e7b6d3",
-    ".github/hooks/lib/common.sh": "ae7832a163288d1befc0dc60ce8e12ef765e7ebb40baac4f097be0f35631a404",
-    "skill-metadata-inventory": "6b3f9bf444488525336821baf17951bb035a9dc95e7c9b42e86dd8349d0f24c3"
+    "tools/scripts/pre-agent-loop.mjs": "22dc1fc0c35be723e6f7191e3397c8bc3a7b38c5c7979f77885ddf0dff8b35fd"
   },
-  "notes": "Hashes were computed at authoring time. Re-run tools/scripts/pre-agent-loop-hashes.mjs and update context_hashes after any change to a listed file. skill-metadata-inventory is the SHA-256 of each discoverable SKILL.md path plus its YAML frontmatter block, across .github/skills and customizations/.github/skills. allowed_commands entries are prefixes, so denied_commands exists to exclude aggregates such as npm run validate:all that a prefix would otherwise reach; deny always wins. model 'auto' lets the Copilot CLI select; pin an explicit id to make runs reproducible."
+  "notes": "The controller records an observed CLI version only after a closed-stdin, timeout-bound noninteractive probe succeeds. Context hashes cover the policy sources that control this run. allowed_commands entries are prefixes, so denied_commands excludes aggregates such as npm run validate:all that a prefix would otherwise reach; deny always wins."
 }

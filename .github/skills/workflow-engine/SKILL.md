@@ -1,6 +1,6 @@
 ---
 name: workflow-engine
-description: '**UTILITY SKILL** — Machine-readable workflow DAG for the multi-step agent pipeline. Defines node types, edge conditions, gates, and fan-out patterns. WHEN: "orchestrator step routing", "resume from graph", "workflow validation", "workflow DAG", "workflow gate", "fan-out pattern". USE FOR: orchestrator step routing, resume-from-graph, workflow validation. DO NOT USE FOR: Azure infrastructure, code generation, troubleshooting.'
+description: '**UTILITY SKILL** — Defines the machine-readable workflow DAG, nodes, edges, gates, and fan-out. WHEN: "orchestrator routing", "resume from graph", "workflow validation", "workflow DAG", "workflow gate". EXCLUDES Azure infrastructure, code generation, and troubleshooting.'
 ---
 
 # Workflow Engine Skill

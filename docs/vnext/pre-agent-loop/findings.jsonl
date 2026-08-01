@@ -1,0 +1,11 @@
+{"authorization_id":"pre-agent-opt-2026-08-01-repair","severity":"blocking","finding":"bounded task invoked a skill","at":"2026-08-01T08:57:08.327Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-skill-routing","severity":"blocking","finding":"bounded task invoked a skill","at":"2026-08-01T08:59:34.525Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-cli-compat","severity":"blocking","finding":"path outside authorization: ocs/vnext/pre-agent-loop/queue.json; path outside queue item: ocs/vnext/pre-agent-loop/queue.json","at":"2026-08-01T09:02:53.491Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-status-parser","severity":"blocking","finding":"bounded task loaded MCP","at":"2026-08-01T09:30:47.712Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-resume-mcp","severity":"blocking","finding":"bounded task loaded MCP","at":"2026-08-01T09:35:15.330Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-item-isolation","severity":"blocking","finding":"bounded task loaded MCP","at":"2026-08-01T09:39:03.389Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-mcp-tool-id","severity":"blocking","finding":"task produced no structured output","at":"2026-08-01T09:57:14.953Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-empty-retry","severity":"blocking","finding":"task produced no structured output","at":"2026-08-01T09:59:06.067Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-glob-bounds","severity":"blocking","finding":"focused command is not authorized: npm run prove:bounded-improvement","at":"2026-08-01T10:07:41.751Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-command-policy","severity":"blocking","finding":"focused check failed: npm run check:h2-order","at":"2026-08-01T10:22:17.699Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-proof-policy","severity":"blocking","finding":"focused check failed: npm run profile:debug-log","at":"2026-08-01T10:53:00.436Z"}

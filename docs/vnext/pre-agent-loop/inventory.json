@@ -1,0 +1,772 @@
+{
+  "version": 1,
+  "surfaces": [
+    {
+      "id": "workspace-operating-frame",
+      "owner": "AGENTS.md",
+      "consumers": ["contributors", "GitHub Copilot agents"],
+      "classification": "keep",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:instruction-checks",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "The root frame owns repository-wide conventions; Copilot instructions own editor-specific routing."
+    },
+    {
+      "id": "scoped-instruction-discovery",
+      "owner": ".github/instructions/*.instructions.md frontmatter",
+      "consumers": ["Copilot instruction loader", "repository validators"],
+      "classification": "consolidate",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:instruction-checks",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:glob-audit",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Instruction files remain authoritative, but their overlapping scopes need one computed audit view."
+    },
+    {
+      "id": "user-documentation",
+      "owner": "docs/",
+      "consumers": ["APEX users", "contributors", "release reviewers"],
+      "classification": "keep",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:docs",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "User documentation is distinct from repository-authoring and runtime prompt guidance."
+    },
+    {
+      "id": "managed-agent-manifest",
+      "owner": "customizations/manifest.json",
+      "consumers": ["Copilot agent discovery", "kernel task routing", "model consistency checks"],
+      "classification": "keep",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:model-consistency",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:agents",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "The managed manifest owns roles and invocation edges while agent frontmatter remains executable definition."
+    },
+    {
+      "id": "model-catalog",
+      "owner": ".github/model-catalog.json",
+      "consumers": ["agent frontmatter", "model validators", "release checks"],
+      "classification": "keep",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:models",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:model-catalog",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Definitions are maintained centrally and assignments are generated from executable frontmatter."
+    },
+    {
+      "id": "skill-discovery",
+      "owner": ".github/skills/*/SKILL.md frontmatter",
+      "consumers": ["Copilot skill discovery", "agents", "orphan-content validation"],
+      "classification": "consolidate",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:skills",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:orphaned-content",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Skill frontmatter stays canonical; a computed consumer view should replace repeated inventory prose."
+    },
+    {
+      "id": "workflow-dag",
+      "owner": ".github/skills/workflow-engine/templates/workflow-graph.json",
+      "consumers": ["orchestrator", "handoff validation", "documentation synchronization"],
+      "classification": "keep",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:workflow-graph",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:workflow-table-sync",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "The DAG is the machine-readable owner of workflow order and handoffs."
+    },
+    {
+      "id": "copilot-client-projections",
+      "owner": "customizations/manifest.json",
+      "consumers": ["GitHub Copilot in VS Code", "GitHub Copilot CLI", "client parity qualification"],
+      "classification": "rewrite",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext-pack",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:agents",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:vscode",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:client-outcomes",
+          "status": 0
+        },
+        {
+          "command": "npm run test:client-outcomes",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "One managed role graph must produce client-specific mechanics without creating separate workflow authorities."
+    },
+    {
+      "id": "runtime-manifests",
+      "owner": "config/*.v1.json",
+      "consumers": ["runtime initialization", "package assets", "qualification"],
+      "classification": "keep",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Versioned manifests separate runtime configuration from repository authoring details."
+    },
+    {
+      "id": "workspace-package-boundaries",
+      "owner": "packages/*/package.json",
+      "consumers": ["TypeScript build", "clean-install tests", "package consumers"],
+      "classification": "keep",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext-pack",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Workspace packages are the executable ownership units for contracts, kernel, CLI, and adapters."
+    },
+    {
+      "id": "schema-libraries",
+      "owner": "packages/contracts/src/",
+      "consumers": ["runtime contracts", "repository artifact validators", "external tooling"],
+      "classification": "investigate",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run lint:json-schemas",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "TypeBox contracts and repository JSON schemas overlap in purpose but serve different consumers."
+    },
+    {
+      "id": "customization-distribution",
+      "owner": "customizations/manifest.json",
+      "consumers": ["CLI initialization", "managed customization update", "both supported Copilot clients"],
+      "classification": "rewrite",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext-pack",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "The approved lifecycle extends the existing npm and manifest authority rather than adding APM or another installer."
+    },
+    {
+      "id": "mcp-portfolio",
+      "owner": "planned APEX MCP descriptor",
+      "consumers": ["developer workspace", "managed clients", "capability packs", "release packaging"],
+      "classification": "investigate",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run lint:mcp-config",
+          "status": 0
+        },
+        {
+          "command": "npm run test:mcp-config",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:terraform-mcp-retirement",
+          "status": 0
+        },
+        {
+          "command": "npm run test:terraform-mcp-retirement",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "MCP ownership is currently distributed across client config, packs, setup, tests, and documentation."
+    },
+    {
+      "id": "pricing-evidence",
+      "owner": "packages/contracts/src/pricing.ts",
+      "consumers": ["architecture workflow", "cost evidence", "Gate 2 review", "release qualification"],
+      "classification": "rewrite",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:pricing-parity",
+          "status": 0
+        },
+        {
+          "command": "npm run test:pricing-parity",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:arm-mcp-cost-pricing",
+          "status": 0
+        },
+        {
+          "command": "npm run test:arm-mcp-cost-pricing",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:mcp-config",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:agents",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Microsoft should own MCP transport, authentication, and pricing retrieval; APEX should own workflow state, evidence acceptance, and gates."
+    },
+    {
+      "id": "improvement-outcome-ingestion",
+      "owner": "config/improvement-policy.v1.json",
+      "consumers": ["quality workflow", "human proposal triage", "release scorecard"],
+      "classification": "rewrite",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run test:bounded-improvement",
+          "status": 0
+        },
+        {
+          "command": "npm run prove:bounded-improvement",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Existing inert improvement contracts need a bounded outcome adapter and defensible measurements, not a second learning store."
+    },
+    {
+      "id": "workflow-validator-ownership",
+      "owner": "packages/kernel/src/workflow-validator-ownership.ts",
+      "consumers": ["workflow engine", "task completion", "Gate 4", "terminal evidence"],
+      "classification": "keep",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "This is the runtime authorization map, not merely a repository lint registry."
+    },
+    {
+      "id": "repository-validator-graph",
+      "owner": "tools/registry/repository-validator-graph.json",
+      "consumers": ["package script projections", "pull-request CI", "contributors", "pre-push validation"],
+      "classification": "consolidate",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:repository-validator-graph",
+          "status": 0
+        },
+        {
+          "command": "npm run test:repository-validator-graph",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "The graph owns validation metadata while package scripts remain the executable projection and hooks/workflows retain environment-specific behavior."
+    },
+    {
+      "id": "language-validator-boundaries",
+      "owner": "language-native tools invoked by package.json",
+      "consumers": ["JavaScript", "Python", "Markdown", "Bicep", "Terraform"],
+      "classification": "keep",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:all",
+          "status": "reserved-for-terminal-stage"
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Language tools should not be reimplemented by generic string validators."
+    },
+    {
+      "id": "markdown-policy-enforcement",
+      "owner": ".markdownlint-cli2.jsonc and package.json scripts",
+      "consumers": ["Markdown authors", "pre-commit hooks", "pull-request documentation checks", "editor integration"],
+      "classification": "consolidate",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run lint:md",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:docs",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:hooks",
+          "status": 0
+        },
+        {
+          "command": "npm run test:hooks",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Audience-specific authoring guidance is distinct from executable lint policy, but hooks and workflows should consume the same npm-owned command contract."
+    },
+    {
+      "id": "artifact-template-validation",
+      "owner": ".github/skills/azure-artifacts/templates/",
+      "consumers": ["artifact authors", "pre-commit hook", "challenger review"],
+      "classification": "consolidate",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:artifacts",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:headings-summary",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Templates are canonical; runtime and compact heading registries are deterministic generated derivatives with explicit non-template exceptions."
+    },
+    {
+      "id": "precommit-hooks",
+      "owner": "lefthook.yml",
+      "consumers": ["git pre-commit", "contributors", "artifact validation"],
+      "classification": "rewrite",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:hooks",
+          "status": 0
+        },
+        {
+          "command": "npm run test:hooks",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Serial execution protects the model-catalog and SKU-manifest generators, which both re-stage output through one Git index; read-only hooks must not claim stage_fixed ownership."
+    },
+    {
+      "id": "github-required-checks",
+      "owner": "GitHub branch protection and .github/workflows/ci.yml",
+      "consumers": ["branch protection", "pull requests", "release qualification"],
+      "classification": "keep",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:github-workflows",
+          "status": 0
+        },
+        {
+          "command": "npm run test:github-workflows",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:_node-ci",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:docs",
+          "status": 0
+        },
+        {
+          "command": "npm run test:apex-recall",
+          "status": 0
+        },
+        {
+          "command": "npm run test:arm-mcp-cost-pricing",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "GitHub branch protection owns required contexts, workflows own hosted execution, and npm scripts own reusable command implementation."
+    },
+    {
+      "id": "exact-head-release-qualification",
+      "owner": ".github/workflows/release-candidate-qualification.yml",
+      "consumers": ["release reviewers", "pull requests", "exact-candidate evidence consumers"],
+      "classification": "keep",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:github-workflows",
+          "status": 0
+        },
+        {
+          "command": "npm run test:github-workflows",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext-pack",
+          "status": 0
+        },
+        {
+          "command": "npm run qualify:vnext-release",
+          "status": "reserved-for-terminal-stage"
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Release qualification has a longer evidence-producing trust boundary than required deterministic CI and must remain independently visible."
+    },
+    {
+      "id": "maintenance-workflows",
+      "owner": ".github/workflows/weekly-maintenance.yml",
+      "consumers": ["maintainers", "dependency freshness", "branch hygiene"],
+      "classification": "keep",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:tool-versions",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:docs-freshness",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Scheduled automation is distinct from required pull-request checks."
+    },
+    {
+      "id": "upstream-workflow-synchronization",
+      "owner": ".archive/retired-automation/sync-workflows.mjs",
+      "consumers": ["historical provenance and rollback review"],
+      "classification": "retire",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run test:retired-automation",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:github-workflows",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:deprecated-refs",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Upstream workflow copying belongs to the former accelerator model and conflicts with standalone repository workflow ownership."
+    },
+    {
+      "id": "model-catalog-generation",
+      "owner": "tools/scripts/generate-model-catalog.mjs",
+      "consumers": ["model catalog assignments", "agent validators"],
+      "classification": "keep",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:model-catalog",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Assignments are derived data and should remain generated."
+    },
+    {
+      "id": "entity-count-generation",
+      "owner": "tools/registry/count-manifest.json",
+      "consumers": ["documentation", "freshness checks", "repository audits"],
+      "classification": "keep",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:no-hardcoded-counts",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Exact entity counts are derived facts and must not be copied into prose."
+    },
+    {
+      "id": "avm-index-generation",
+      "owner": "tools/scripts/refresh-avm-module-index.mjs",
+      "consumers": ["IaC planners", "module pin validators", "weekly maintenance"],
+      "classification": "keep",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:avm-versions:offline",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "The index is generated cache data; module declarations remain canonical in IaC."
+    },
+    {
+      "id": "freshness-generation",
+      "owner": "tools/registry/source-freshness.json",
+      "consumers": ["documentation CI", "skill references", "quarterly audit"],
+      "classification": "keep",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run lint:docs-freshness",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Freshness metadata is a dedicated drift-control surface."
+    },
+    {
+      "id": "diagram-routing",
+      "owner": ".github/skills/mermaid/ and .github/skills/python-diagrams/",
+      "consumers": ["design workflow", "IaC planning", "as-built output", "documentation"],
+      "classification": "keep",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:skills",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:diagram-semantics",
+          "status": 0
+        },
+        {
+          "command": "npm run test:diagram-semantics",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:artifacts",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:workflow-graph",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Inline and standalone diagram outputs are now owned by Mermaid and Python only."
+    },
+    {
+      "id": "client-bundle-generation",
+      "owner": "packages/cli/scripts/prepare-assets.mjs",
+      "consumers": ["npm packages", "CLI lifecycle", "release manifest", "SBOM and provenance"],
+      "classification": "rewrite",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run prepare:vnext-assets",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext-pack",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Generated install payloads must stay derived from canonical customizations inside the npm lifecycle."
+    },
+    {
+      "id": "v1-compatibility-matrix",
+      "owner": "docs/vnext/phase-0a/v1-behavior-compatibility.md",
+      "consumers": ["modernization reviewers", "cutover review", "compatibility tests"],
+      "classification": "retire",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:v1-compatibility-matrix",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "The matrix is required through modernization but becomes historical after accepted cutover."
+    },
+    {
+      "id": "public-command-compatibility",
+      "owner": "packages/cli/src/cli.ts",
+      "consumers": ["CLI users", "automation", "consumer repositories"],
+      "classification": "investigate",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:v1-compatibility-matrix",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Public command compatibility cannot be inferred safely from implementation names alone."
+    },
+    {
+      "id": "validator-diagnostics",
+      "owner": "tools/scripts/_lib/reporter.mjs",
+      "consumers": ["local validation", "CI logs", "agent remediation"],
+      "classification": "consolidate",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run test:lib-json",
+          "status": 0
+        },
+        {
+          "command": "npm run test:lib-ajv",
+          "status": 0
+        },
+        {
+          "command": "npm run test:registry-validator-reporter",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Shared reporter adoption is partial, producing inconsistent output and remediation context."
+    },
+    {
+      "id": "workflow-telemetry",
+      "owner": "tools/scripts/measure-workflow-baseline.mjs",
+      "consumers": ["modernization baselines", "workflow retrospectives", "release review"],
+      "classification": "investigate",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run measure:baseline",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "The aggregator exists, but the current repository contains no telemetry records."
+    },
+    {
+      "id": "debug-log-profiling",
+      "owner": "client-specific profilers emitting apex-debug-profile",
+      "consumers": ["context optimization", "local investigations"],
+      "classification": "investigate",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run test:client-context-samples",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Client-specific profilers read only allowlisted counters and emit one shared aggregate-only contract; raw local telemetry is never a portable CI baseline."
+    },
+    {
+      "id": "managed-consumer-guidance",
+      "owner": "customizations/.github/copilot-instructions.md",
+      "consumers": ["GitHub Copilot in VS Code", "GitHub Copilot CLI", "generated customization bundle"],
+      "classification": "consolidate",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:instruction-checks",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
+      "rationale": "Shipped consumer behavior needs one managed guidance owner distinct from repository contributor instructions."
+    }
+  ]
+}
