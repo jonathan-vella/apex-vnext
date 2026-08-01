@@ -486,7 +486,7 @@
         "npm run test:hooks"
       ],
       "rationale": "Serial execution protects the model-catalog and SKU-manifest generators, which both re-stage output through one Git index; read-only hooks must not claim stage_fixed ownership.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "github-required-checks",
