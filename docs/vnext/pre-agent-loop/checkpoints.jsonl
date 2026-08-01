@@ -23,3 +23,4 @@
 {"authorization_id":"pre-agent-opt-2026-08-01-empty-retry","state":"stopped","reason":"task produced no structured output","at":"2026-08-01T09:59:06.067Z","previous_record_sha256":"5bd46c201e15301ca0d22c04b096aa43501276b6f05bde5e51433566ef43305f"}
 {"authorization_id":"pre-agent-opt-2026-08-01-glob-bounds","item":"pricing-evidence","state":"accepted","sha":"a7d8b004bb6c73eb5308c16a6135a81d6a07526f","at":"2026-08-01T10:00:31.942Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-glob-bounds","state":"stopped","reason":"focused command is not authorized: npm run prove:bounded-improvement","at":"2026-08-01T10:07:41.751Z","previous_record_sha256":"bcf59bd3833f652824835371bc78a4d654146b631b3a166ae393604b0727ccac"}
+{"authorization_id":"pre-agent-opt-2026-08-01-command-policy","item":"improvement-outcome-ingestion","state":"accepted","sha":"dae166f3a6a3e832ca99cf4af2c46bffd3fd00a0","at":"2026-08-01T10:09:47.353Z"}
