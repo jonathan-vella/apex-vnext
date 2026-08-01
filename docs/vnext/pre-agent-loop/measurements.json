@@ -488,6 +488,24 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "client-bundle-generation",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run prepare:vnext-assets",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext-pack",
+          "status": 0
+        }
+      ]
     }
   ]
 }
