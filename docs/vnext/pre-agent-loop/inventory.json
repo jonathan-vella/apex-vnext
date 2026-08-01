@@ -841,9 +841,22 @@
         "agent remediation"
       ],
       "classification": "consolidate",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run test:lib-json",
+          "status": 0
+        },
+        {
+          "command": "npm run test:lib-ajv",
+          "status": 0
+        },
+        {
+          "command": "npm run test:registry-validator-reporter",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "Shared reporter adoption is partial, producing inconsistent output and remediation context."
     },
     {

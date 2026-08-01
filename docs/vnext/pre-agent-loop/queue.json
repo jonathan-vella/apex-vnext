@@ -767,7 +767,7 @@
         "npm run test:registry-validator-reporter"
       ],
       "rationale": "Shared reporter adoption is partial, producing inconsistent output and remediation context.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "workflow-telemetry",

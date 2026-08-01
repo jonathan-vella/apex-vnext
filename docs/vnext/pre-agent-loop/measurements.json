@@ -530,6 +530,24 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "validator-diagnostics",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run test:lib-json",
+          "status": 0
+        },
+        {
+          "command": "npm run test:lib-ajv",
+          "status": 0
+        },
+        {
+          "command": "npm run test:registry-validator-reporter",
+          "status": 0
+        }
+      ]
     }
   ]
 }
