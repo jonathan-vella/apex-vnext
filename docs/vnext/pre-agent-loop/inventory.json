@@ -376,9 +376,18 @@
         "release scorecard"
       ],
       "classification": "rewrite",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run test:bounded-improvement",
+          "status": 0
+        },
+        {
+          "command": "npm run prove:bounded-improvement",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "Existing inert improvement contracts need a bounded outcome adapter and defensible measurements, not a second learning store."
     },
     {

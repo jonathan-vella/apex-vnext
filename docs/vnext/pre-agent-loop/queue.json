@@ -1,6 +1,6 @@
 {
-  "authorization_id": "pre-agent-opt-2026-08-01-glob-bounds",
-  "state": "stopped",
+  "authorization_id": "pre-agent-opt-2026-08-01-command-policy",
+  "state": "running",
   "items": [
     {
       "id": "workspace-operating-frame",
@@ -349,7 +349,7 @@
         "npm run prove:bounded-improvement"
       ],
       "rationale": "Existing inert improvement contracts need a bounded outcome adapter and defensible measurements, not a second learning store.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "workflow-validator-ownership",
@@ -832,6 +832,5 @@
       "rationale": "Shipped consumer behavior needs one managed guidance owner distinct from repository contributor instructions.",
       "status": "pending"
     }
-  ],
-  "stop_reason": "focused command is not authorized: npm run prove:bounded-improvement"
+  ]
 }
