@@ -254,6 +254,16 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "workflow-validator-ownership",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        }
+      ]
     }
   ]
 }
