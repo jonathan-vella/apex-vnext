@@ -255,7 +255,7 @@
         "npm run test:vnext-pack"
       ],
       "rationale": "The approved lifecycle extends the existing npm and manifest authority rather than adding APM or another installer.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "mcp-portfolio",

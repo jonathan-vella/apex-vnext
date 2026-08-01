@@ -162,6 +162,24 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "customization-distribution",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext-pack",
+          "status": 0
+        }
+      ]
     }
   ]
 }
