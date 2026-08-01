@@ -213,7 +213,7 @@
         "npm run test:vnext-pack"
       ],
       "rationale": "Workspace packages are the executable ownership units for contracts, kernel, CLI, and adapters.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "schema-libraries",
