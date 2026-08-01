@@ -1,6 +1,6 @@
 ---
 name: azure-bicep-patterns
-description: '**UTILITY SKILL** — Reusable Azure Bicep patterns: hub-spoke, private endpoints, diagnostics, AVM composition. WHEN: "hub-spoke Bicep", "private endpoint module", "diagnostic settings", "AVM Bicep composition". USE FOR: Bicep template design, hub-spoke networking, private endpoint patterns, AVM modules. DO NOT USE FOR: Terraform code (use terraform-patterns), architecture decisions (use azure-adr), troubleshooting, diagram generation (use python-diagrams or mermaid).'
+description: '**UTILITY SKILL** — Provides reusable Azure Bicep patterns for hub-spoke networks, private endpoints, diagnostics, and AVM composition. WHEN: "hub-spoke Bicep", "private endpoint module", "diagnostic settings", "AVM Bicep". EXCLUDES Terraform, ADRs, and diagrams.'
 compatibility: Requires Azure CLI with Bicep extension
 ---
 
@@ -123,6 +123,8 @@ Applying a pattern in a Bicep template:
 | [budget-pattern.md](references/budget-pattern.md)                     | Consumption budget, forecast alerts, anomaly detection                |
 | [avm-pitfalls.md](references/avm-pitfalls.md)                         | What-if interpretation, AVM gotchas, learn more links                 |
 | [module-interface.md](references/module-interface.md)                 | Canonical module input/output contract                                |
+| [bicepparam-pattern.md](references/bicepparam-pattern.md)             | Parameter-file structure and environment overrides                    |
+| [codegen-validation-checklist.md](references/codegen-validation-checklist.md) | Final generated-tree validation checklist                     |
 
 ## Learn More
 

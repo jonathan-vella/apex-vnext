@@ -1,6 +1,6 @@
 ---
 name: azure-artifacts
-description: '**UTILITY SKILL** — Artifact template structures, H2 compliance rules, and documentation styling for agent outputs (Steps 1-7). WHEN: "generate artifact", "check H2 structure", "artifact template", "step 7 as-built". USE FOR: generating any agent artifact, checking H2 structure compliance. DO NOT USE FOR: Azure resource configuration (use azure-defaults), Bicep/Terraform patterns (use azure-bicep-patterns or terraform-patterns).'
+description: '**UTILITY SKILL** — Defines artifact templates, required H2 structure, and output styling for Steps 1-7. WHEN: "generate artifact", "check H2 structure", "artifact template", "as-built docs". EXCLUDES: Azure configuration and IaC patterns.'
 compatibility: Works with Claude Code, GitHub Copilot, VS Code, and any Agent Skills compatible tool.
 license: MIT
 metadata:
@@ -152,4 +152,5 @@ When generating a Step N artifact, read the corresponding template:
 | `references/07-docs-template.md`         | Generating Step 7 workload documentation             |
 | `references/styling-standards.md`        | Applying callouts, badges, emoji, navigation         |
 | `references/cost-estimate-sections.md`   | Cost estimate H2 structure and formatting rules      |
+| `references/cost-estimate-standards.md`  | Cost estimate evidence and quality standards         |
 | `references/revision-workflow.md`        | Detailed targeted-edit revision procedure (Step 7+)  |

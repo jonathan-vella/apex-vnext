@@ -113,3 +113,4 @@ one-line summary so the agent knows which one to load.
 | `references/freshness-checklist.md` | When running freshness audits                     |
 | `references/repo-architecture.md`   | When analyzing repo structure                     |
 | `references/extended-workflows.md`  | Changelog generation, proofreading, freshness fix |
+| `references/workload-documentation.md` | Workload guide structure and lifecycle documentation |

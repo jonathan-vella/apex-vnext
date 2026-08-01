@@ -1,6 +1,6 @@
 ---
 name: context-management
-description: '**UTILITY SKILL** — Two-mode context-window management. RUNTIME: artifact compression (full/summarized/minimal) used by orchestrator and codegen agents. AUDIT: post-mortem analysis of Copilot debug logs (token profiling, redundancy + hand-off gap detection) used by 11-Context Optimizer. WHEN: "context optimization", "token budget", "runtime compression", "log parsing". DO NOT USE FOR: infra, IaC code, deployments.'
+description: '**UTILITY SKILL** — Manages context through runtime artifact compression and post-run Copilot log audits. WHEN: "context optimization", "token budget", "runtime compression", "log parsing", "handoff gaps". EXCLUDES infrastructure generation and deployment.'
 compatibility: Audit mode requires Python 3.14 for log parser script
 ---
 
@@ -129,5 +129,6 @@ Load on demand:
 | `references/token-estimation.md`      | Audit   | Estimating token counts for context optimisation                           |
 | `references/analysis-methodology.md`  | Audit   | Log format, 5-step methodology, optimisation patterns, baseline comparison |
 | `references/audit-setup.md`           | Audit   | Prerequisites, enabling debug logs, audit capabilities, portability        |
+| `references/log-profiling.md`         | Audit   | Profiling normalized debug-log metrics and interpreting results            |
 | `scripts/parse-chat-logs.py`          | Audit   | Log parser producing structured JSON                                       |
 | `templates/optimization-report.md`    | Audit   | Report output template                                                     |
