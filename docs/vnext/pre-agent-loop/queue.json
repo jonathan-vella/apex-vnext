@@ -76,7 +76,7 @@
         "npm run validate:agents"
       ],
       "rationale": "The managed manifest owns roles and invocation edges while agent frontmatter remains executable definition.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "model-catalog",

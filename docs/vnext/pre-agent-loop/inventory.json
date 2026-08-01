@@ -69,9 +69,18 @@
         "model consistency checks"
       ],
       "classification": "keep",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:model-consistency",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:agents",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "The managed manifest owns roles and invocation edges while agent frontmatter remains executable definition."
     },
     {
