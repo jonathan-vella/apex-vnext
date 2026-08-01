@@ -1,3 +1,4 @@
 {"authorization_id":"pre-agent-opt-2026-07-31","state":"aborted","at":"2026-08-01T08:20:16.718Z"}
 {"authorization_id":"pre-agent-opt-2026-07-31","state":"aborted","at":"2026-08-01T08:43:42.172Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-repair","state":"stopped","reason":"bounded task invoked a skill","at":"2026-08-01T08:57:08.327Z","previous_record_sha256":"47fe1424a588965129f8c24c9de60aacb8f32349349d031b91b0be97c9aef95d"}
+{"authorization_id":"pre-agent-opt-2026-08-01-skill-routing","state":"stopped","reason":"bounded task invoked a skill","at":"2026-08-01T08:59:34.525Z","previous_record_sha256":"e163079dbda6fd9d90ce30d597926a27462d4f4fab96b51b057f282e1c6c4fe7"}
