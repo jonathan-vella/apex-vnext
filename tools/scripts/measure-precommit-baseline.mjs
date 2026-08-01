@@ -40,7 +40,7 @@ export const PRECOMMIT_SCENARIOS = [
   },
   {
     id: "artifact",
-    file: "agent-output/vnext-qualification/03-des-adr-0001-use-split-encrypted-ci-transport.md",
+    file: "agent-output/vnext-qualification/sku-manifest.md",
     mutation: "\n<!-- pre-commit benchmark fixture -->\n",
     expectedHooks: ["artifact-validation", "markdown-lint", "secrets-baseline"],
   },

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "archivedFrom": "901adcbc4b033c912cfbd198307c44b4979b089e",
+  "replacementOwners": ["packages/contracts", "packages/cli", ".github/hooks/tool-guardian"],
+  "artifacts": [
+    { "path": ".github/hooks/subagent-validation/hooks.json", "sha256": "915f9e635e137cc0243417b2492e2f352bd48592c6cad3f3f4f9d71ef68a1d57" },
+    { "path": ".github/hooks/subagent-validation/subagent-validation.sh", "sha256": "41e9cdaf189807350f7700363b610e4f7e27ea98a02d74866be49f6533994111" },
+    { "path": "tools/tests/bats/subagent-validation.bats", "sha256": "54337b055b9280683ff67b12b11e058155790143e7e06b624404edbc8310b5dd" },
+    { "path": "tools/schemas/subnet-plan.schema.json", "sha256": "dc0306064306ce3ac1b0a811315c314d301c12fb277d2ec5017080e82b2a95c1" },
+    { "path": "tools/schemas/agent-scorecard.schema.json", "sha256": "8fac6629bc806d602f5ccb494d3587e94161b03099e4ad85965ab978b5d05908" },
+    { "path": "tools/scripts/assess-agents.mjs", "sha256": "8e061ccd780b9bf51f3183e55750f54f5437c4c9a727d0165e3a8e89c2316914" },
+    { "path": "tools/scripts/challenger-telemetry.mjs", "sha256": "3d86d31ac1687d358f24021513fc494e03c701114e08c4a99fbb81c1ad9ffeab" },
+    { "path": "tools/registry/challenger-telemetry.json", "sha256": "fb783133431b9b3aa99146e2acda24f47d490e4a0242a3a3886e4265aed7bac0" },
+    { "path": "tools/registry/challenger-effectiveness.md", "sha256": "485d24422b95e3cc95dad25952c516d4522630fd14e792da45fbcb765cca5228" },
+    { "path": "tools/registry/challenger-coverage-evidence.md", "sha256": "3aa1c3fd38afd172441962ed79278acadeae07f001c0698eee2cc8081b71e02e" },
+    { "path": "tools/apex-prompts/utility-prompts/assess-agents.prompt.md", "sha256": "f6a2cba0d84a98e685ab77cd97276d7588ab57c242239f9463e2b25a09bebde7" },
+    { "path": "tools/apex-prompts/utility-prompts/plan-fourLayerAgentAssessment.prompt.md", "sha256": "eb0452b725e76a5f35e564551526b2348ce04f2e4afb463e71b30d1f07c7dd4e" },
+    { "path": "tools/apex-prompts/utility-prompts/assess-github-folder.prompt.md", "sha256": "332dae5570c391345571c7c3bb9ce22ee145388afab790c9d975ba4ef4548c98" },
+    { "path": "tools/apex-prompts/utility-prompts/doc-gardening.prompt.md", "sha256": "afb3c0ea7d14e4f715abfe02307394584678ca102a085ba2f6c981311f2f1aa0" },
+    { "path": "tools/apex-prompts/utility-prompts/references/agent-adversarial-checklist.md", "sha256": "380d83351df8f733297d32377ec59f2610ec8969a9a1119fa047c547cf97430c" },
+    { "path": "tools/apex-prompts/utility-prompts/references/agent-scorecard-rubric.md", "sha256": "94792ade198210a98dd3cd787dbad6e18dea3e83c884c310462b699aff98f96c" },
+    { "path": "tests/cost-estimate-subagent/sku-alias-resolution.test.mjs", "sha256": "e19cc5ae7f4dec5a132e13ae3ad137c3da8090c616c66d7c0cc17ff774542689" },
+    { "path": "QUALITY_SCORE.md", "sha256": "fa9befa399cb980c29570fb611d20669c42544f4556be764edcb950697036861" }
+  ]
+}

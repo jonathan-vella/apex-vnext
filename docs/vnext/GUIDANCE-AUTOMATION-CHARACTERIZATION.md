@@ -5,9 +5,9 @@ This record completes the issue
 `b27d17350870a0ed3d5411346701cbb2eb6a4d4b`. It records current behavior and later change gates only. No active
 instruction, skill, lint rule, hook, package command, or GitHub workflow changes are authorized here.
 
-The machine-readable owner, classification, proof command, and removal gate for each cluster remain in
-[`modernization-ownership.json`](../../tools/registry/modernization-ownership.json). This record explains the consumer
-and trust-boundary distinctions behind those entries.
+The completed machine-readable owner, classification, proof command, and removal gate inventory is retained in the
+[pre-agent loop archive](../../.archive/retired-automation/pre-agent-loop-v1/README.md). This record explains the
+consumer and trust-boundary distinctions behind those entries.
 
 ## Outcome
 

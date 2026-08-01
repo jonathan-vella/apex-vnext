@@ -138,10 +138,9 @@ through this table before calling `azure_bulk_estimate` — alias
 mismatches are the #1 historical cause of `unresolved_items` and
 `status: FAILED` runs (Phase C of the nordic-foods lessons plan).
 
-The table is the **only** legitimate source of alias rewrites. New
-aliases are added via `tools/scripts/promote-sku-aliases.mjs` (monthly
-cron + on-demand) which scans recent `cost-estimate-*.json` files for
-`proposed_aliases[]` and opens a PR.
+The table is the **only** legitimate source of compatibility alias
+rewrites. Changes require review against current pricing-parity evidence;
+the original report-driven promotion script is retired.
 
 | Service              | Variant input                             | Canonical `sku_name`           | `product_filter`                   | Notes                                                         |
 | -------------------- | ----------------------------------------- | ------------------------------ | ---------------------------------- | ------------------------------------------------------------- |

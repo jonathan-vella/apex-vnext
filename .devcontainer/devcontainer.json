@@ -127,8 +127,7 @@
           "~/.claude/rules": false
         },
         "chat.hookFilesLocations": {
-          ".github/hooks/tool-guardian": true,
-          ".github/hooks/subagent-validation": true
+          ".github/hooks/tool-guardian": true
         },
         "chat.useCustomAgentHooks": true,
         "chat.useAgentSkills": true,

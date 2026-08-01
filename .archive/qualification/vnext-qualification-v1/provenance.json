@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0.0",
+  "archivedFrom": "901adcbc4b033c912cfbd198307c44b4979b089e",
+  "replacementOwners": ["docs/vnext/adrs", "packages/contracts", "tools/scripts/qualify-vnext-release.mjs"],
+  "artifacts": [
+    { "path": "agent-output/vnext-qualification/README.md", "sha256": "6a644a90c088e14473dcf4a60a70ec66d7cdebad69de32bd632f7fd0abef8d34" },
+    { "path": "agent-output/vnext-qualification/03-des-adr-0001-use-split-encrypted-ci-transport.md", "sha256": "0f2bd4e302347ace2f9701600b35275020576e812054f384715e75550d5ad606" },
+    { "path": "agent-output/vnext-qualification/04-governance-constraints.md", "sha256": "0b555e5dcc1a15ac6e7ca3cb16c5a5decdee030607d96a6429287db63bdb24b0" },
+    { "path": "agent-output/vnext-qualification/challenge-findings-governance-constraints-pass1.json", "sha256": "75d804a1da96f93f9d9a20444e885c0fc276091066e24a49031cfc21ebd11fa4" },
+    { "path": "agent-output/vnext-qualification/challenge-findings-governance-constraints-pass2.json", "sha256": "a277ee609cc8d9ba95ad685cf4a931750da52eabca343012f6de338723f02e48" },
+    { "path": "agent-output/vnext-qualification/challenge-findings-governance-constraints-pass3.json", "sha256": "676783fd8c8911eaf36939d9c53059ea3dff84d3ec3e6925e141a7fa951e27d8" },
+    { "path": "agent-output/vnext-qualification/challenge-findings-governance-constraints-pass4.json", "sha256": "89f5b15efd4e1aaa021ef9fcecb4d3d621c03f42c9eea5269facba180803ca8c" },
+    { "path": "agent-output/vnext-qualification/challenge-findings-governance-constraints-pass5.json", "sha256": "cfd42cb5903696e865f1634e863cf0c31317f7b0b4fa4e9f3aa2c943db5d1ef6" },
+    { "path": "agent-output/vnext-qualification/challenge-findings-governance-constraints-pass6.json", "sha256": "cf17c97e49b9855ebc38bcaa0a78b6fccba19aa822b7fb417ffb13cce6d0d04e" },
+    { "path": "agent-output/vnext-qualification/challenge-findings-governance-constraints-pass7.json", "sha256": "d52fa6cd3574280e547d3f733e5572de6eb879873c13642eec2c4a6ae31189ab" },
+    { "path": "agent-output/vnext-qualification/challenge-findings-governance-constraints-pass8.json", "sha256": "f31c2873a64bf2aaff3923e39f048ff676192152692f11c58a4c3fce0658dcda" },
+    { "path": "agent-output/vnext-qualification/challenge-findings-governance-constraints-pass9.json", "sha256": "94717f8b804e27b42d264bec6792d02ebd94d2806a69fc1f143c29ccb8c36e05" },
+    { "path": "agent-output/vnext-qualification/challenge-findings-governance-constraints-pass10.json", "sha256": "7ca6407b02ddb2437a1b58f3c9a9a65dcde9f083b5d319861804d0cc52776fa7" }
+  ]
+}

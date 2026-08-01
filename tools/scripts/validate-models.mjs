@@ -205,7 +205,6 @@ const ALLOWED_FILES = new Set([
   ".github/model-catalog.json",
   "CHANGELOG.md",
   "docs/CHANGELOG.md",
-  "QUALITY_SCORE.md",
   ".github/skills/docs-writer/references/freshness-checklist.md",
   "tools/scripts/validate-models.mjs",
 ]);

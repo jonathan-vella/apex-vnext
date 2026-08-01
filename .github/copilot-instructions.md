@@ -14,8 +14,8 @@ and reference index lives in
 ## Repository Maintenance Mode
 
 When a prompt explicitly declares repository maintenance, its approved branch, scope, testing, validation, archive,
-and stop boundaries govern that run. Do not route maintenance through `apex-recall`, the workload workflow, Azure
-defaults, artifact generation, or managed APEX roles unless the current bounded item directly evaluates that surface.
+and stop boundaries govern that run. Do not route maintenance through managed APEX roles or live cloud operations
+unless the current bounded item directly evaluates that surface.
 Path-scoped instructions and repository safety rules still apply.
 
 ### Default Regions
@@ -28,11 +28,8 @@ Path-scoped instructions and repository safety rules still apply.
 
 ### Required Tags (Azure Policy Enforced)
 
-Tag schema is **whatever live Azure Policy enforces** in the target
-subscription. Governance Discovery (Step 3.5) discovers the real
-contract via `discover.py` and writes it to
-`04-governance-constraints.json` (`tag_contract.tags[]`,
-`tag_contract.source: "policy"`); that always wins.
+Tag schema is **whatever live Azure Policy enforces** in the target subscription. A typed governance contract with
+`tag_contract.source: "policy"` always wins.
 
 **Greenfield fallback** (no tag policy found at any inherited scope):
 the APEX-standard 9-tag set — `environment`, `owner`, `costcenter`,
@@ -62,59 +59,18 @@ and
 
 Creative SKU decisions (App Service, VM, SQL, Cosmos, AKS pools, Redis,
 APIM, App Gateway, Storage replication) flow through
-`agent-output/{project}/sku-manifest.{json,md}` — never re-derive SKUs
-from artifact prose. Authoring rules:
-[`sku-manifest.instructions.md`](instructions/sku-manifest.instructions.md).
+the versioned `sku-manifest-v1` contract. Never re-derive SKUs from prose.
 
-## Session State — apex-recall
+## vNext Runtime
 
-All session state flows through `apex-recall`. Do not read or write
-`00-session-state.json` directly.
+The deterministic runtime in `packages/kernel/` owns state transitions, gates, authorization, evidence, and bounded
+improvement. `packages/contracts/` owns versioned schemas; `packages/capabilities/` owns bounded operations;
+`packages/cli/` owns lifecycle and terminal interaction. Managed projections under `customizations/` may guide or
+delegate, but may not create an independent state machine or bypass kernel authorization.
 
-```bash
-# Lifecycle
-apex-recall init <project> --json                                    # new project
-apex-recall show <project> --json                                    # context: step, decisions, findings, artifacts
-apex-recall checkpoint <project> <step> <phase> --json               # after each phase
-apex-recall complete-step <project> <step> --json                    # on step completion
-apex-recall review-audit <project> <step> ... --json                 # after challenger reviews
-
-# Atomic step transition — PREFERRED for moving between steps. Bundles
-# complete-step (with challenger gate) + decide + start-step into one
-# 00-session-state.json write, avoiding partial-update drift.
-apex-recall transition <project> --from-step <s> --to-step <t> \
-    --complete --decision key=value --json
-
-# Decisions + findings
-apex-recall decide <project> --key <k> --value <v> --json
-apex-recall decide <project> --decision "<text>" --rationale "<why>" --json
-apex-recall finding <project> --add "<text>" --json
-
-# Read-only orientation: sessions | files | search '<term>' | decisions (all accept --json)
-```
-
-If `apex-recall` returns useful context, skip redundant file reads.
-If empty/errored, continue normally — it's a convenience, not a blocker.
-
-Canonical `show --json` schema (including the `session.steps` shape and
-jq query templates) lives at
-[`tools/apex-recall/docs/show-schema.md`](../tools/apex-recall/docs/show-schema.md).
-The valid decision-keys registry lives at
-[`tools/apex-recall/docs/decision-keys.md`](../tools/apex-recall/docs/decision-keys.md).
-
-## Multi-Step Workflow
-
-The Steps 1–7 + Post-Lessons table is in [AGENTS.md](../AGENTS.md#agent-workflow);
-the machine-readable source is
-[`.github/skills/workflow-engine/templates/workflow-graph.json`](skills/workflow-engine/templates/workflow-graph.json).
-Each step's outputs land in `agent-output/{project}/`; context flows via artifact
-files + handoffs. Reviews are adversarial passes by challenger subagents —
-**default flow is single-pass `comprehensive`** (mandatory at Steps 1, 2, 4;
-Step 3.5 uses `governance-reconciliation`). Multi-pass deep review is **opt-in
-only** via `decisions.review_depth = "deep"` or an explicit `10-Challenger`
-invocation; never auto-fires by complexity tier. Reviews target AI-generated
-creative decisions only (Steps 1, 2, 3.5, 4, with Step 3 ADRs and Step 5 code
-as opt-in).
+Use the packaged `apex` CLI for consumer-project lifecycle. Repository changes target source packages, config, and
+managed customizations, then run `npm run qualify:vnext`. Live qualification and deployment require explicit human
+authorization and are never implied by a code-generation or maintenance request.
 
 ## Skills
 
@@ -127,8 +83,7 @@ body explicitly points to one. There is one tier — no digest, no minimal.
 - **User** messages starting with `gh` are GitHub operations (e.g., `gh pr create`,
   `gh workflow run`, `gh api`). Follow `.github/skills/github-operations/SKILL.md`
   (`gh` CLI-first, MCP fallback). This trigger reads user input only — a `gh`
-  command an agent issues while executing another prompt or an authorized
-  automation loop never loads the skill.
+  command an agent issues while executing another prompt never loads the skill.
 
 ### GitHub Tool Priority (Mandatory)
 
@@ -164,8 +119,4 @@ output to a file. See `.github/instructions/no-interactive-shell.instructions.md
 for the full ruleset; `npm run lint:safe-shell` enforces it on committed
 agent/skill/instruction snippets.
 
-**Artifact lint delegation**: Agents do not call `npm run lint:artifact-templates`
-or `markdownlint-cli2` directly against `agent-output/**`. The lefthook
-`artifact-validation` pre-commit hook and the `10-Challenger` review own the
-contract. Validator-tracked anti-pattern — see
-[`agent-authoring.instructions.md`](instructions/agent-authoring.instructions.md#no-direct-markdownlint-on-agent-output-rule).
+For vNext implementation, prefer package-level tests and typed contract validation before broad repository checks.

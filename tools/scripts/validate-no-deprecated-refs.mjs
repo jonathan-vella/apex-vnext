@@ -159,7 +159,6 @@ const EXCLUDE_PATTERNS = [
   /node_modules/,
   /infra\//,
   /(?:^|\/)changelog\.md$/i, // Historical logs may reference retired paths intentionally
-  /^QUALITY_SCORE\.md$/,
   /^tests\/exec-plans\/tech-debt-tracker\.md$/,
   /agent-output\//, // Generated artifacts may contain old references
 ];

@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Archived the broken original-APEX E2E workflow, benchmark scripts, prompts, and fixtures after vNext deterministic,
+  package, and exact-head qualification became authoritative.
 - Linked previously unreachable skill references from their parent indexes and tightened repetitive discovery
   descriptions without changing capability behavior or routing boundaries.
 - Fixed Requirements input and authoring so blank or inferred sentinel answers are rejected, kernel questions identify

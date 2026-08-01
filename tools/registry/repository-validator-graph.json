@@ -209,13 +209,6 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
-      "id": "lint-workflow-table-sync",
-      "script": "lint:workflow-table-sync",
-      "profile": "node-lint",
-      "aliases": [],
-      "retirement": { "status": "active", "replacementIds": [] }
-    },
-    {
       "id": "test-apex-recall",
       "script": "test:apex-recall",
       "profile": "external-test",
@@ -232,13 +225,6 @@
     {
       "id": "test-devcontainer-verdicts",
       "script": "test:devcontainer-verdicts",
-      "profile": "node-test",
-      "aliases": [],
-      "retirement": { "status": "active", "replacementIds": [] }
-    },
-    {
-      "id": "test-modernization-ownership",
-      "script": "test:modernization-ownership",
       "profile": "node-test",
       "aliases": [],
       "retirement": { "status": "active", "replacementIds": [] }
@@ -440,13 +426,6 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
-      "id": "validate-modernization-ownership",
-      "script": "validate:modernization-ownership",
-      "profile": "node-validation",
-      "aliases": [],
-      "retirement": { "status": "active", "replacementIds": [] }
-    },
-    {
       "id": "validate-client-outcomes",
       "script": "validate:client-outcomes",
       "profile": "node-validation",
@@ -566,13 +545,6 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
-      "id": "validate-v1-compatibility-matrix",
-      "script": "validate:v1-compatibility-matrix",
-      "profile": "node-validation",
-      "aliases": [],
-      "retirement": { "status": "active", "replacementIds": [] }
-    },
-    {
       "id": "validate-vnext-live-workflow",
       "script": "validate:vnext-live-workflow",
       "profile": "node-validation",
@@ -621,13 +593,11 @@
         "validate:instruction-checks",
         "validate:session-state",
         "validate:workflow-graph",
-        "validate:v1-compatibility-matrix",
         "validate:vnext-project-controls",
         "validate:vnext-live-workflow",
         "validate:lens-references",
         "validate:challenger-findings",
         "validate:challenger-presence",
-        "lint:workflow-table-sync",
         "lint:workflow-handoffs",
         "validate:skill-checks",
         "lint:json",
@@ -638,8 +608,6 @@
         "validate:no-hardcoded-counts",
         "validate:hooks",
         "validate:context-budget",
-        "validate:modernization-ownership",
-        "test:modernization-ownership",
         "validate:repository-validator-graph",
         "test:repository-validator-graph",
         "validate:github-workflows",
@@ -694,13 +662,11 @@
         "validate:instruction-checks",
         "validate:session-state",
         "validate:workflow-graph",
-        "validate:v1-compatibility-matrix",
         "validate:vnext-project-controls",
         "validate:vnext-live-workflow",
         "validate:lens-references",
         "validate:challenger-findings",
         "validate:challenger-presence",
-        "lint:workflow-table-sync",
         "lint:workflow-handoffs",
         "validate:skill-checks",
         "lint:json",
@@ -720,8 +686,6 @@
         "validate:sku-iac-coverage",
         "validate:banned-phrases",
         "validate:context-budget",
-        "validate:modernization-ownership",
-        "test:modernization-ownership",
         "validate:repository-validator-graph",
         "test:repository-validator-graph",
         "validate:github-workflows",

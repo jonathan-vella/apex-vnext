@@ -48,12 +48,12 @@ Use a bounded Entra-only public endpoint session for qualification handoffs:
 
 ## 🔄 Alternatives Considered
 
-| Option | Pros | Cons | WAF Impact |
-| --- | --- | --- | --- |
-| Microsoft egress IP ranges | Retains firewall allowlisting | Broad, rotating ranges are hard to discover and maintain | Security ↓, Operations ↓ |
-| Stable-egress external runner | Preserves one-host rule | Adds runner trust, cost, patching, and operational ownership | Security →, Cost ↓, Operations ↓ |
-| Private GitHub release asset | Avoids opening Storage | Adds another encrypted object lifecycle and deletion authority | Reliability ↓, Operations ↓ |
-| Bounded Entra-only session | Identity-authorized, auditable, no new runner | Endpoint is briefly network-reachable | Security →, Reliability ↑, Operations ↑ |
+| Option                        | Pros                                          | Cons                                                           | WAF Impact                              |
+| ----------------------------- | --------------------------------------------- | -------------------------------------------------------------- | --------------------------------------- |
+| Microsoft egress IP ranges    | Retains firewall allowlisting                 | Broad, rotating ranges are hard to discover and maintain       | Security ↓, Operations ↓                |
+| Stable-egress external runner | Preserves one-host rule                       | Adds runner trust, cost, patching, and operational ownership   | Security →, Cost ↓, Operations ↓        |
+| Private GitHub release asset  | Avoids opening Storage                        | Adds another encrypted object lifecycle and deletion authority | Reliability ↓, Operations ↓             |
+| Bounded Entra-only session    | Identity-authorized, auditable, no new runner | Endpoint is briefly network-reachable                          | Security →, Reliability ↑, Operations ↑ |
 
 ## ⚖️ Consequences
 
@@ -75,13 +75,13 @@ Use a bounded Entra-only public endpoint session for qualification handoffs:
 
 ## 🏛️ WAF Pillar Analysis
 
-| Pillar | Impact | Notes |
-| --- | --- | --- |
-| Security | → | Network restriction is relaxed briefly; strong identity, platform encryption, and cleanup remain |
-| Reliability | ↑ | Removes dependence on unstable egress addresses |
-| Performance | ↑ | Avoids repeated firewall mismatch and propagation retries |
-| Cost | ↑ | No dedicated runner or private networking service is added |
-| Operations | ↑ | One deterministic endpoint transaction replaces IP discovery and stale-rule cleanup |
+| Pillar      | Impact | Notes                                                                                            |
+| ----------- | ------ | ------------------------------------------------------------------------------------------------ |
+| Security    | →      | Network restriction is relaxed briefly; strong identity, platform encryption, and cleanup remain |
+| Reliability | ↑      | Removes dependence on unstable egress addresses                                                  |
+| Performance | ↑      | Avoids repeated firewall mismatch and propagation retries                                        |
+| Cost        | ↑      | No dedicated runner or private networking service is added                                       |
+| Operations  | ↑      | One deterministic endpoint transaction replaces IP discovery and stale-rule cleanup              |
 
 ## 🔒 Compliance Considerations
 
@@ -102,7 +102,7 @@ Use a bounded Entra-only public endpoint session for qualification handoffs:
 <div align="center">
 
 | ⬅️ [Previous ADR](03-des-adr-0002-use-local-gate-4-before-ci-handoff.md) | 🏠 [Project Index](README.md) | Next ADR ➡️ |
-| --- | --- | --- |
-| [ADR-0002](03-des-adr-0002-use-local-gate-4-before-ci-handoff.md) | [README](README.md) | None |
+| ------------------------------------------------------------------------ | ----------------------------- | ----------- |
+| [ADR-0002](03-des-adr-0002-use-local-gate-4-before-ci-handoff.md)        | [README](README.md)           | None        |
 
 </div>

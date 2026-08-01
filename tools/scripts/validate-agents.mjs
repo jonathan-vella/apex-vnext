@@ -1215,7 +1215,7 @@ const CHALLENGER_DISPATCHER_ALLOWLIST = new Set([
   // 10-Challenger is the standalone wrapper agent for ad-hoc adversarial
   // reviews. Its entire purpose is to dispatch the challenger subagent.
   // Retirement decision pending (see
-  // `tools/registry/challenger-effectiveness.md` + tracking issue per Phase 12).
+  // tracking issue per Phase 12).
   "10-Challenger",
   // E2E Orchestrator runs the full pipeline unattended for benchmarks;
   // it dispatches every step agent, including the challenger, on the

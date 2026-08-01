@@ -46,7 +46,7 @@
     },
     {
       "id": "artifact",
-      "file": "agent-output/vnext-qualification/03-des-adr-0001-use-split-encrypted-ci-transport.md",
+      "file": "agent-output/vnext-qualification/sku-manifest.md",
       "selectedHooks": ["artifact-validation", "markdown-lint", "secrets-baseline"],
       "baseSamplesMilliseconds": [1623, 1386, 1450],
       "candidateSamplesMilliseconds": [1455, 1477, 1544],
