@@ -18,3 +18,4 @@
 {"authorization_id":"pre-agent-opt-2026-08-01-mcp-tool-id","item":"workspace-package-boundaries","state":"accepted","sha":"72c6cb8a45e2d2799449898e999dd1aed8438aad","at":"2026-08-01T09:42:45.425Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-mcp-tool-id","item":"schema-libraries","state":"accepted","sha":"ada7dd551d4d78f365c90234881a073a1c0689eb","at":"2026-08-01T09:47:09.980Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-mcp-tool-id","item":"customization-distribution","state":"accepted","sha":"0314733b64453f36b3a1f16c9c567a116f9e18c1","at":"2026-08-01T09:51:12.530Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-mcp-tool-id","item":"mcp-portfolio","state":"accepted","sha":"e06b1334fd535cd6f0e259d9d882c2f91bfc2437","at":"2026-08-01T09:55:39.336Z"}
