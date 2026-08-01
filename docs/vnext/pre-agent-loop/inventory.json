@@ -818,9 +818,18 @@
         "consumer repositories"
       ],
       "classification": "investigate",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:v1-compatibility-matrix",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "Public command compatibility cannot be inferred safely from implementation names alone."
     },
     {
