@@ -558,6 +558,16 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "debug-log-profiling",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run test:client-context-samples",
+          "status": 0
+        }
+      ]
     }
   ]
 }
