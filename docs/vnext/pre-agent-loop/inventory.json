@@ -633,9 +633,22 @@
         "historical provenance and rollback review"
       ],
       "classification": "retire",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run test:retired-automation",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:github-workflows",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:deprecated-refs",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "Upstream workflow copying belongs to the former accelerator model and conflicts with standalone repository workflow ownership."
     },
     {
