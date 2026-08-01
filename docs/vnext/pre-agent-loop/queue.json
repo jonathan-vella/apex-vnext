@@ -706,7 +706,7 @@
         "npm run test:vnext-pack"
       ],
       "rationale": "Generated install payloads must stay derived from canonical customizations inside the npm lifecycle.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "v1-compatibility-matrix",
