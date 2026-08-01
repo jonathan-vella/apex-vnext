@@ -683,7 +683,7 @@
         "npm run validate:workflow-graph"
       ],
       "rationale": "Inline and standalone diagram outputs are now owned by Mermaid and Python only.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "client-bundle-generation",
