@@ -886,9 +886,14 @@
         "local investigations"
       ],
       "classification": "investigate",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run test:client-context-samples",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "Client-specific profilers read only allowlisted counters and emit one shared aggregate-only contract; raw local telemetry is never a portable CI baseline."
     },
     {
