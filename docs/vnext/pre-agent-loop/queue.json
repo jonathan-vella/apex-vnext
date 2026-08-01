@@ -827,7 +827,7 @@
         "npm run validate:vnext"
       ],
       "rationale": "Shipped consumer behavior needs one managed guidance owner distinct from repository contributor instructions.",
-      "status": "pending"
+      "status": "accepted"
     }
   ]
 }
