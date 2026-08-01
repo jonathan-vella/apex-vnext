@@ -254,7 +254,11 @@ export function taskLoadedMcp(events) {
   return events.some((event) => {
     if (event.type === "session.mcp_server_status_changed" || event.type === "mcp.tools.list_changed") return true;
     if (!/(tool_call|tool\.execution)/u.test(event.type ?? "")) return false;
-    return /(?:mcp|serverName)/iu.test(JSON.stringify(event.data ?? event));
+    const data = event.data ?? event;
+    const toolName = data.toolName ?? data.tool_name ?? data.name ?? "";
+    return (
+      typeof data.serverName === "string" || /(?:mcp|^(?:github|apex|azure-resource-manager)[/(:])/iu.test(toolName)
+    );
   });
 }
 

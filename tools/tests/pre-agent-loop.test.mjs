@@ -181,6 +181,10 @@ test("MCP prose is allowed while MCP lifecycle and tool events are denied", () =
     taskLoadedMcp([{ type: "assistant.message", data: { content: "Review MCP runtime manifests." } }]),
     false,
   );
+  assert.equal(
+    taskLoadedMcp([{ type: "tool.execution_start", data: { toolName: "rg", arguments: { query: "MCP manifests" } } }]),
+    false,
+  );
   assert.equal(taskLoadedMcp([{ type: "session.mcp_server_status_changed", data: { serverName: "github" } }]), true);
   assert.equal(taskLoadedMcp([{ type: "tool.execution_start", data: { toolName: "github-mcp/status" } }]), true);
 });
