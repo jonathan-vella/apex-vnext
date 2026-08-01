@@ -14,3 +14,4 @@
 {"authorization_id":"pre-agent-opt-2026-08-01-status-parser","state":"stopped","reason":"bounded task loaded MCP","at":"2026-08-01T09:30:47.712Z","previous_record_sha256":"49e568f56d99145056c3e457f6a045c3e19eda9dafe3afa50abfe849fa8257ac"}
 {"authorization_id":"pre-agent-opt-2026-08-01-resume-mcp","state":"stopped","reason":"bounded task loaded MCP","at":"2026-08-01T09:35:15.330Z","previous_record_sha256":"bb3ced7d675819479016137a0fe4006fd159374e50fa37979c8db1693834d493"}
 {"authorization_id":"pre-agent-opt-2026-08-01-item-isolation","state":"stopped","reason":"bounded task loaded MCP","at":"2026-08-01T09:39:03.389Z","previous_record_sha256":"ced11a15a5f29d4512e6a588d118579d204d5c05b052a1b36ba769268cbcff61"}
+{"authorization_id":"pre-agent-opt-2026-08-01-mcp-tool-id","item":"runtime-manifests","state":"accepted","sha":"e7b9d538749a1adab8d579d9317c86b6d04b93ac","at":"2026-08-01T09:41:02.497Z"}
