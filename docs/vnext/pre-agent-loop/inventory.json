@@ -246,9 +246,18 @@
         "external tooling"
       ],
       "classification": "investigate",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run lint:json-schemas",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "TypeBox contracts and repository JSON schemas overlap in purpose but serve different consumers."
     },
     {
