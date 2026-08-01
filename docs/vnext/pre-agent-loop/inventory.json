@@ -400,9 +400,14 @@
         "terminal evidence"
       ],
       "classification": "keep",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "This is the runtime authorization map, not merely a repository lint registry."
     },
     {

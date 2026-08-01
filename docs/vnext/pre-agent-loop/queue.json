@@ -369,7 +369,7 @@
         "npm run test:vnext"
       ],
       "rationale": "This is the runtime authorization map, not merely a repository lint registry.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "repository-validator-graph",
