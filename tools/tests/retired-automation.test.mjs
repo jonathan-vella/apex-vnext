@@ -15,6 +15,7 @@ const preAgentArchivePath = ".archive/retired-automation/pre-agent-loop-v1";
 const compatibilityArchivePath = ".archive/retired-compatibility/original-apex-v1";
 const devcontainerArchivePath = ".archive/retired-automation/devcontainer-base-v1";
 const npmUtilitiesArchivePath = ".archive/retired-utilities/npm-scripts-v1";
+const devcontainerUtilitiesArchivePath = ".archive/retired-utilities/devcontainer-v1";
 
 function textSha256(path) {
   const normalized = readFileSync(path, "utf8").replace(/\r\n/gu, "\n");
@@ -107,6 +108,30 @@ test("retired npm utilities remain provenance-only", () => {
     "validate:plan-avm-pins:local",
   ]) {
     assert.equal(scripts[command], undefined, `${command} must stay retired`);
+  }
+});
+
+test("original devcontainer utilities remain provenance-only", () => {
+  const provenance = JSON.parse(readFileSync(`${devcontainerUtilitiesArchivePath}/provenance.json`, "utf8"));
+  assert.equal(provenance.archivedFrom, "2c3a42b8c42136dc85b01de5aea5f2f3e6983c0e");
+
+  for (const artifact of provenance.artifacts) {
+    const activePath = artifact.path;
+    const archiveFile = `${devcontainerUtilitiesArchivePath}/${activePath}`;
+    assert.equal(existsSync(archiveFile), true, `missing archived devcontainer utility: ${activePath}`);
+    assert.equal(textSha256(archiveFile), artifact.sha256);
+    if (activePath !== ".devcontainer/post-create.sh") {
+      assert.equal(existsSync(activePath), false, `${activePath} must stay retired`);
+    }
+  }
+
+  const activeBootstrap = readFileSync(".devcontainer/post-create.sh", "utf8");
+  for (const retiredTool of ["checkov", "deno", "graphviz", "k6", "matplotlib", "pillow", "tflint"]) {
+    assert.equal(
+      activeBootstrap.toLowerCase().includes(retiredTool),
+      false,
+      `${retiredTool} must stay out of bootstrap`,
+    );
   }
 });
 

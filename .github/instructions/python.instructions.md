@@ -1,5 +1,5 @@
 ---
-description: "Python coding conventions for diagram generation, MCP servers, and tooling scripts"
+description: "Python coding conventions for vNext validation, governance discovery, and repository tooling"
 applyTo: "**/*.py"
 ---
 
@@ -12,8 +12,8 @@ Instructions for writing clean, consistent Python in this repository. Target Pyt
 
 Python is used for two active purposes in this repo:
 
-1. **Architecture diagrams** — `diagrams` library scripts in `agent-output/` and `.github/skills/`
-2. **Utility scripts** — Checkov scanning, diagram verification, and `apex-recall`
+1. **Governance discovery** — policy discovery and deterministic contract rendering
+2. **Repository tooling** — `apex-recall`, profiling, and Python tests
 
 ## Style & Formatting
 
@@ -27,30 +27,8 @@ Python is used for two active purposes in this repo:
 ## Package Management
 
 - Use `uv` (Astral) as the package manager — installed in devcontainer
-- Root dependencies in `requirements.txt`: `diagrams`, `matplotlib`, `pillow`, `checkov`
 - Package-specific dependencies live with their owning Python tool.
-
-## Diagram Scripts
-
-Follow the existing pattern for architecture diagram generation:
-
-```python
-"""Brief description of what the diagram shows."""
-
-from diagrams import Cluster, Diagram
-from diagrams.azure.compute import AppServices
-from diagrams.azure.network import FrontDoors
-
-with Diagram("Diagram Title", show=False, filename="output-name", direction="TB"):
-    with Cluster("Resource Group"):
-        # Resources...
-        pass
-```
-
-- Always set `show=False` to prevent auto-opening
-- Use `direction="TB"` (top-to-bottom) for consistency
-- Group resources in `Cluster` blocks matching Azure resource groups
-- Set explicit `filename` parameter to control output location
+- Keep repository test dependencies in the deterministic devcontainer bootstrap or an owning `pyproject.toml`.
 
 ## Conventions
 
@@ -63,7 +41,6 @@ with Diagram("Diagram Title", show=False, filename="output-name", direction="TB"
 
 ## Testing
 
-- Test framework: `pytest` with `pytest-asyncio` for async tests
-- Mock framework: `pytest-mock`
+- Test framework: `pytest`
 - Tests live alongside source in `tests/` subdirectories
 - Use `@pytest.mark.asyncio` for async test functions

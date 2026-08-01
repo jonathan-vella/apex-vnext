@@ -19,6 +19,9 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Reduced the development container to the vNext toolchain, removed Deno and original APEX authoring utilities,
+  synchronized the exact VS Code extension inventory, and enforced portable named volumes plus Linux `amd64`/`arm64`
+  support through repository validation.
 - Removed redundant and zero-consumer root npm scripts, merged overlapping live-validator tests, centralized shared
   Node validation in `validate:_node-core`, and archived completed benchmark/dead-test utilities with provenance.
 - Consolidated shared GitHub Actions setup, removed no-op maintenance inputs and duplicate Markdown/IaC steps, and

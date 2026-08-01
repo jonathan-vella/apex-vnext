@@ -16,13 +16,8 @@
 //   - docs/devcontainer-hygiene.md (rationale + per-developer cleanup)
 //   - .vscode/extensions.json (unwantedRecommendations dialog)
 //
-// Known gap: this validator only scans the literal `extensions` array, not
-// the transitive `extensionPack` members of an installed pack. As of
-// 2026-06-30, `ms-vscode.vscode-node-azure-pack` (Azure Tools) is declared
-// in devcontainer.json and its extensionPack bundles two DENYLIST entries
-// (vscode-azure-github-copilot, ms-windows-ai-studio) — those install
-// transitively and are NOT caught here. Disable them manually per the
-// devcontainer.json comment near `customizations.vscode.extensions`.
+// Extension packs are also denied because their transitive members bypass
+// the repository's exact editor inventory.
 
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -40,6 +35,7 @@ const devcontainerPath = resolve(repoRoot, ".devcontainer/devcontainer.json");
 // `contributes.chatSkills` / `chatAgents` / `chatPromptFiles` inspection
 // against the test03 debug log (a3ca0888).
 const DENYLIST = new Map([
+  ["ms-vscode.vscode-node-azure-pack", "Azure Tools extension pack installs untracked transitive extensions"],
   [
     "ms-azuretools.vscode-azure-github-copilot",
     "9 chatAgents + 7 chatPromptFiles duplicating APEX's own end-to-end agent set",

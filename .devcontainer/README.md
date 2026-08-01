@@ -1,260 +1,94 @@
-# Development Container for APEX
+# APEX vNext Development Container
 
-> **[Version](../VERSION.md)**
+The development container provides the repository tooling needed to build, test, validate, and package APEX vNext.
+It supports Docker hosts on Windows, macOS, and Linux and container architectures `amd64` and `arm64`.
 
-This devcontainer provides a **complete, pre-configured development environment** for APEX.
-It includes all required tools, extensions, and configurations to build Azure infrastructure
-with AI agents.
+## Prerequisites
 
-**Base image:** `mcr.microsoft.com/devcontainers/base:ubuntu26.04` (`amd64` and `arm64`)
+- Docker Desktop or a compatible Docker Engine
+- Visual Studio Code with the Dev Containers extension
+- At least 4 GB of memory available to Docker
 
-## What's Included
+Open the repository in Visual Studio Code and run **Dev Containers: Reopen in Container**.
 
-### Devcontainer Features (installed via `devcontainer.json`)
+## Core Toolchain
 
-| Feature                   | Version | Purpose                           |
-| ------------------------- | ------- | --------------------------------- |
-| Azure CLI                 | latest  | Azure management with Bicep CLI   |
-| PowerShell                | latest  | Scripting and Az module host      |
-| Python                    | 3.14    | Diagrams, MCP servers, tooling    |
-| Node.js                   | LTS     | Validation scripts, npm tooling   |
-| GitHub CLI                | latest  | Repository operations             |
-| Terraform                 | latest  | Signed HashiCorp APT repository    |
-| Deno                      | latest  | Optional capability-pack runtime   |
-| Azure Developer CLI (azd) | latest  | Standardized Azure deployments    |
+Devcontainer features install:
 
-### Tools Installed by `post-create.sh`
+| Tool | Version policy | Purpose |
+| --- | --- | --- |
+| Node.js | 24 | vNext packages and repository validation |
+| Python | 3.14 | Python validation and tests |
+| Azure CLI and Bicep | Current feature release | Azure contracts and IaC validation |
+| PowerShell | Current feature release | Governance discovery scripts |
+| Terraform | Current signed HashiCorp release | Terraform validation |
+| GitHub CLI | Current feature release | Repository operations |
+| Azure Developer CLI | Current feature release | Authorized Azure lifecycle operations |
+| Bats and gitleaks | Ubuntu release | Hook tests and staged secret scanning |
 
-| Step | Tool                           | Method                                                                       |
-| ---- | ------------------------------ | ---------------------------------------------------------------------------- |
-| 1    | npm dependencies               | Root `npm install`                                                           |
-| 2    | markdownlint-cli2              | `npm install -g`                                                             |
-| 3    | k6 load testing                | deb repo (amd64) or GitHub release (arm64)                                   |
-| 5    | Git config and cache dirs      | `git config`, `mkdir`                                                        |
-| 6    | Python packages                | `uv pip install` — diagrams, matplotlib, pillow, checkov, ruff, pytest       |
-| 7    | PowerShell Az modules          | `Install-Module` — Accounts, Resources, Storage, Network, KeyVault, Websites |
-| 9.4  | TFLint v0.63.1                | GitHub release with SHA-256 verification                                     |
-| 9.5  | Terraform CLI hardening        | Ensures `TF_PLUGIN_CACHE_DIR` exists; `terraform version` smoke test         |
-| 10   | Python dependency verification | Validates imports against `requirements.txt`                                 |
-| 11   | apex-recall CLI                | `uv pip install -e` from `tools/apex-recall/`                                |
-| 12   | gitleaks                       | Binary from GitHub releases (pre-commit soft-skips if missing)               |
-| 13   | Azure CLI config               | Auto-install stable extensions without prompt                                |
-| 14   | MCP config and verification    | Ensures `.vscode/mcp.json`, prints tool versions                             |
+The bootstrap runs `npm ci`, installs `pytest`, Ruff, and the in-repository apex-recall test package, then validates the
+tool and editor contracts. Optional capability-pack runtimes are resolved by their owning vNext contracts; they are not
+installed globally in the core container.
 
-### System Packages (installed via `onCreateCommand`)
+## Editor Extensions
 
-graphviz, dos2unix, bats, uv
+The exact extension inventory is declared identically in `.devcontainer/devcontainer.json` and
+`.vscode/extensions.json`. It contains Copilot Chat, Python/Pylance, Bicep, PowerShell, Markdownlint, GitHub Actions and
+Pull Requests, Prettier, YAML, and Terraform support.
 
-### MCP Servers (auto-configured in `.vscode/mcp.json`)
+Extension packs are prohibited because transitive extensions bypass inventory validation and can contribute unrelated
+agents, prompts, and tools.
 
-| Server            | Transport         | Purpose                                          |
-| ----------------- | ----------------- | ------------------------------------------------ |
-| ARM MCP           | http              | Microsoft-hosted Azure cost and pricing tools     |
-| GitHub MCP        | http              | Copilot-provided GitHub context                  |
-| Azure MCP Server  | VS Code extension | RBAC-aware Azure context for agents              |
+## Portability
 
-### VS Code Extensions
+Azure CLI, azd, GitHub CLI, uv, and Terraform caches use container-scoped named volumes. No host credential directory
+is bind-mounted, so the same configuration works across Windows, macOS, and Linux hosts.
 
-- **GitHub Copilot** — Copilot Chat
-- **Python** — IntelliSense (Pylance), linting, debugging
-- **Azure** — Bicep, Resource Groups, Container Apps, Static Web Apps, CLI, azd, Azure MCP Server
-- **PowerShell** — language support
-- **Markdown** — Mermaid diagrams, GitHub preview, linting, Prettier formatting
-- **Kubernetes** — AKS tools, Container Tools
-- **GitHub** — Actions, Pull Requests
-- **Terraform** — HashiCorp + Azure Terraform
-- **Other** — Rainbow CSV, YAML, Resource Monitor
+The local Terraform feature explicitly accepts Linux `amd64` and `arm64` and fails closed on unsupported CPU
+architectures. The post-create bootstrap applies the same architecture check.
 
-## Quick Start
+## Lifecycle
 
-### Prerequisites
+- `onCreateCommand` installs Bats and uv.
+- `postCreateCommand` runs the deterministic `.devcontainer/post-create.sh` bootstrap.
+- `postStartCommand` installs repository Git hooks from the already locked npm dependencies.
 
-- **Docker Desktop** installed and running
-- **VS Code** with **Dev Containers** extension (`ms-vscode-remote.remote-containers`)
-- **4 GB RAM** minimum allocated to Docker
-- **10 GB disk space** for container image and tools
+Container start does not upgrade packages or mutate tool versions. Rebuild the container when feature definitions or
+the lock file change.
 
-### Opening the Devcontainer
+## Authentication
 
-**Option 1: Command Palette** (recommended)
+Run `az login` or `az login --use-device-code` inside the container when live Azure access is explicitly required.
+Azure credentials persist in a named volume and are never committed.
 
-1. Open VS Code in this repository folder
-2. Press `F1` or `Ctrl+Shift+P`
-3. Type and select: `Dev Containers: Reopen in Container`
-4. Wait 3-5 minutes for initial build (subsequent opens are faster)
-
-**Option 2: Notification Prompt**
-
-1. Open VS Code in this repository folder
-2. Click "Reopen in Container" when prompted
-
-### First-Time Setup (inside container)
-
-```bash
-# 1. Authenticate with Azure
-az login
-
-# 2. Set your default subscription
-az account set --subscription "<your-subscription-id>"
-
-# 3. Start working
-# Open Chat (Ctrl+Shift+I) → Select Orchestrator → Describe your project
-```
-
-## GitHub CLI Authentication (GH_TOKEN)
-
-HTTPS-based `gh auth login` can fail inside devcontainers on some platforms (Windows, ARM, WSL 2).
-The **only supported** approach is a **Personal Access Token (PAT)** set in **VS Code User Settings**.
-The container reads it automatically — no `gh auth login` required inside the container.
-
-> **Why not shell exports?** Setting `GH_TOKEN` in `~/.bashrc`, `~/.profile`, or PowerShell
-> environment variables does **not** propagate reliably into devcontainers. VS Code reads
-> `${localEnv:GH_TOKEN}` from its own process environment, which only inherits from the
-> specific shell session that launched it. The VS Code settings method is deterministic and
-> survives rebuilds, reboots, and IDE restarts.
-
-### Step 1: Create a Fine-Grained PAT
-
-Fine-grained PATs work here. The `gh` CLI fully supports fine-grained tokens (`github_pat_...`)
-via the `GH_TOKEN` environment variable for all repository-scoped operations.
-
-1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens**
-2. Click **Generate new token**
-3. Set expiry (90 days recommended; rotate via calendar reminder)
-4. **Repository access**: All repositories, or select specific ones
-5. **Permissions** — minimum required:
-
-   | Permission    | Level      |
-   | ------------- | ---------- |
-   | Contents      | Read/Write |
-   | Metadata      | Read       |
-   | Pull requests | Read/Write |
-   | Issues        | Read/Write |
-   | Workflows     | Read/Write |
-
-6. Copy the token (`github_pat_...`)
-
-### Step 2: Add to VS Code User Settings (once per machine)
-
-1. Open VS Code Settings: **Ctrl+,** (or **Cmd+,** on macOS)
-2. Click the **Open Settings (JSON)** icon (top-right)
-3. Add this entry (replace the placeholder with your actual token):
-
-```jsonc
-"terminal.integrated.env.linux": { "GH_TOKEN": "github_pat_your_token_here" }
-```
-
-<!-- markdownlint-disable MD029 -->
-
-4. Save the file
-5. Rebuild the devcontainer: **F1 → Dev Containers: Rebuild Container**
-<!-- markdownlint-enable MD029 -->
-
-The devcontainer forwards `GH_TOKEN` from VS Code's environment automatically
-(`"GH_TOKEN": "${localEnv:GH_TOKEN}"` in `devcontainer.json`).
-
-### Step 3: Verify inside the container
+For GitHub CLI operations, provide `GH_TOKEN` to the Visual Studio Code process. The devcontainer forwards it without
+persisting it in repository files. Verify access with:
 
 ```bash
 gh auth status
-# Expected: ✓ Logged in to github.com as <your-username> (token)
 ```
 
-> **Token rotation**: When your PAT expires, update the value in VS Code User Settings and
-> rebuild the container (`F1 → Dev Containers: Rebuild Container`).
+## Validation
 
-## Environment Configuration
-
-### Environment Variables
-
-| Variable                  | Value                         | Purpose                                                  |
-| ------------------------- | ----------------------------- | -------------------------------------------------------- |
-| `AZURE_DEFAULTS_LOCATION` | `swedencentral`               | Default Azure region (EU GDPR-compliant)                 |
-| `GH_TOKEN`                | `${localEnv:GH_TOKEN}`        | GitHub PAT forwarded from host via VS Code User Settings |
-| `PYTHONDONTWRITEBYTECODE` | `1`                           | Skip `.pyc` generation                                   |
-| `PYTHONUNBUFFERED`        | `1`                           | Unbuffered Python output                                 |
-| `UV_CACHE_DIR`            | `~/.cache/uv`                 | uv package cache                                         |
-| `TF_PLUGIN_CACHE_DIR`     | `~/.terraform.d/plugin-cache` | Terraform provider cache                                 |
-
-### Azure CLI Extension Auto-Install
-
-`post-create.sh` configures Azure CLI so extension-backed commands do not pause for prompts:
+Run the focused configuration checks with:
 
 ```bash
-az config set extension.use_dynamic_install=yes_without_prompt
-az config set extension.dynamic_install_allow_preview=false
+npm run validate:vscode
+npm run validate:extension-bloat
+npm run validate:tool-versions
 ```
 
-Preview extensions remain opt-in. To auto-install preview extensions too, change
-`extension.dynamic_install_allow_preview` to `true` in `~/.azure/config`.
-
-## Lifecycle Scripts
-
-### `onCreateCommand` — system packages
-
-Runs once when the container is created. Installs `graphviz`, `dos2unix`, `bats`, and `uv`.
-
-### `postCreateCommand` — `post-create.sh`
-
-Runs once after container creation. Performs multi-step setup (npm, Python, PowerShell modules,
-MCP servers, gitleaks, Git config, and tool verification). Output is logged to
-`~/.devcontainer-install.log`.
-
-### `postStartCommand` — `post-start.sh`
-
-Runs on every container start. Lightweight updates only:
-
-| Tool                 | Method                                                                   |
-| -------------------- | ------------------------------------------------------------------------ |
-| npm local deps       | Root `npm install`                                                       |
-| Python packages      | `uv pip install --upgrade` (checkov, ruff, diagrams, matplotlib, pillow) |
-| apex-recall          | `uv pip install --upgrade -e`                                            |
-| azd auth             | Status check (warns if not authenticated)                                |
-| lefthook             | `npx lefthook install` (Git hooks)                                       |
-
-### When to Rebuild vs. Restart
-
-| Situation                       | Action                                       |
-| ------------------------------- | -------------------------------------------- |
-| Tool not found or broken        | `bash .devcontainer/post-create.sh`          |
-| New devcontainer feature needed | `F1` → Rebuild Container                     |
-| OS-level or base image update   | `F1` → Rebuild Container Without Cache       |
-| Routine tool updates            | Automatic on every start via `post-start.sh` |
+Run `npm run qualify:vnext` for deterministic product qualification. Live Azure qualification remains a separate,
+explicitly authorized operation.
 
 ## Troubleshooting
 
-| Issue                      | Solution                                                 |
-| -------------------------- | -------------------------------------------------------- |
-| Container won't start      | Check Docker is running; increase memory to 4 GB+        |
-| Tool not found             | Run `bash .devcontainer/post-create.sh`                  |
-| Azure auth fails           | Use `az login --use-device-code`                         |
-| `gh` CLI not authenticated | Set `GH_TOKEN` in VS Code User Settings (see above)      |
-| Stale tool versions        | Restart container (triggers `post-start.sh`)             |
-| Full rebuild needed        | `F1` → `Dev Containers: Rebuild Container Without Cache` |
+| Issue | Action |
+| --- | --- |
+| Feature or tool is missing | Rebuild the container without cache |
+| Bootstrap failed | Review `~/.devcontainer-install.log`, fix the reported contract failure, and rebuild |
+| Azure authentication expired | Run `az login --use-device-code` |
+| GitHub CLI is unauthenticated | Set `GH_TOKEN` for the Visual Studio Code process and rebuild |
+| Cached provider is stale | Remove the relevant named volume and rebuild |
 
-Full troubleshooting guide: [Troubleshooting](https://apexops.pro/guides/troubleshooting/)
-
-## Resource Usage
-
-| Metric             | Value   |
-| ------------------ | ------- |
-| Container image    | ~1.5 GB |
-| Memory (idle)      | ~1 GB   |
-| Memory (active)    | ~2-3 GB |
-| Disk (with caches) | ~4-6 GB |
-
-## Security Notes
-
-- Azure credentials persist in `~/.azure/` (mounted volume) — never commit to Git (already in `.gitignore`)
-- `GH_TOKEN` is injected via VS Code User Settings, not stored in any repo file
-- gitleaks runs as a pre-commit hook for secret scanning (soft-skips if not installed)
-- Use Azure Key Vault for production secrets
-- Use service principals for CI/CD environments
-
-## Related Documentation
-
-- [Workflow Guide](https://apexops.pro/concepts/workflow/)
-- [Prompt Guide](https://apexops.pro/guides/prompt-guide/)
-- [Troubleshooting](https://apexops.pro/guides/troubleshooting/)
-- [Copilot Instructions](../.github/copilot-instructions.md)
-- [Repository README](../README.md)
+See the [repository instructions](../AGENTS.md) for validation and architecture conventions.
