@@ -37,44 +37,71 @@ function frontmatter(source) {
   return end === -1 ? "" : lines.slice(1, end).join("\n");
 }
 
-function skillInventoryHash() {
+function skillInventoryHash(root) {
   const files = SKILL_GLOBS.flatMap((pattern) => globSync(pattern, { cwd: ROOT })).sort();
   const metadata = files
-    .map((file) => `${file}\n${frontmatter(readFileSync(path.join(ROOT, file), "utf8"))}`)
+    .map((file) => `${file}\n${frontmatter(readFileSync(path.join(root, file), "utf8"))}`)
     .join("\n");
   return sha256(metadata);
 }
 
-function computeHashes(keys) {
+function computeHashes(keys, root = ROOT) {
   const computed = {};
   for (const key of keys) {
-    computed[key] = key === SKILL_INVENTORY_KEY ? skillInventoryHash() : sha256(readFileSync(path.join(ROOT, key)));
+    computed[key] = key === SKILL_INVENTORY_KEY ? skillInventoryHash(root) : sha256(readFileSync(path.join(root, key)));
   }
   return computed;
 }
 
+export function contextHashDrift(contextHashes, root = ROOT) {
+  const computed = computeHashes(Object.keys(contextHashes), root);
+  return Object.keys(contextHashes).filter((key) => contextHashes[key] !== computed[key]);
+}
+
+function parseArguments(args) {
+  let manifestPath = MANIFEST;
+  let write = false;
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === "--write") {
+      write = true;
+    } else if (args[index] === "--manifest") {
+      manifestPath = path.resolve(ROOT, args[index + 1]);
+      index += 1;
+      if (!args[index]) throw new Error("--manifest requires a path.");
+    } else {
+      throw new Error(`Unsupported option: ${args[index]}`);
+    }
+  }
+  return { manifestPath, write };
+}
+
 function main() {
-  const write = process.argv.includes("--write");
-  const manifest = JSON.parse(readFileSync(MANIFEST, "utf8"));
+  const { manifestPath, write } = parseArguments(process.argv.slice(2));
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const expected = manifest.context_hashes;
   const computed = computeHashes(Object.keys(expected));
-
-  const drifted = Object.keys(expected).filter((key) => expected[key] !== computed[key]);
+  const drifted = contextHashDrift(expected);
 
   if (write) {
     manifest.context_hashes = computed;
-    writeFileSync(MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
     // JSON.stringify expands short arrays that Prettier keeps inline, which would
     // fail the repository format check on the next commit.
     try {
-      execFileSync("npx", ["prettier", "--write", "--log-level", "warn", MANIFEST_REL], {
-        cwd: ROOT,
-        stdio: "inherit",
-      });
+      execFileSync(
+        "npx",
+        ["--no-install", "prettier", "--write", "--log-level", "warn", path.relative(ROOT, manifestPath)],
+        {
+          cwd: ROOT,
+          stdio: "inherit",
+        },
+      );
     } catch {
-      console.warn(`⚠️  Prettier unavailable — run 'npx prettier --write ${MANIFEST_REL}' before committing`);
+      console.warn(
+        `⚠️  Prettier unavailable — run 'npx prettier --write ${path.relative(ROOT, manifestPath)}' before committing`,
+      );
     }
-    console.log(`✅ Rewrote ${drifted.length} context hash(es) in ${MANIFEST_REL}`);
+    console.log(`✅ Rewrote ${drifted.length} context hash(es) in ${path.relative(ROOT, manifestPath)}`);
     return;
   }
 
@@ -90,4 +117,6 @@ function main() {
   console.log(`✅ Context hashes match (${Object.keys(expected).length} inputs)`);
 }
 
-main();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main();
+}

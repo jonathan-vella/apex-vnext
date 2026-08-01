@@ -142,6 +142,7 @@
     "derive:sku-allowlist": "node tools/scripts/derive-sku-allowlist.mjs",
     "validate:terminology": "node tools/scripts/validate-terminology.mjs",
     "validate:pre-agent-loop": "node tools/scripts/pre-agent-loop-hashes.mjs",
+    "test:pre-agent-loop": "node --test tools/tests/pre-agent-loop.test.mjs",
     "validate:region-canonical": "node tools/scripts/validate-region-canonical.mjs",
     "validate:modernization-ownership": "node tools/scripts/validate-modernization-ownership.mjs",
     "test:modernization-ownership": "node --test tools/tests/validate-modernization-ownership.test.mjs",
