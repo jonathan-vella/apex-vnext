@@ -27,6 +27,9 @@
   "dependencies": {
     "@apex/contracts": "0.10.0"
   },
+  "devDependencies": {
+    "@sinclair/typebox": "0.34.52"
+  },
   "scripts": {
     "build": "tsc -b",
     "test": "node --test dist/test/*.test.js"
