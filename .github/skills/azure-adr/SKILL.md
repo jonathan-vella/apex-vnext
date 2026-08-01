@@ -1,6 +1,6 @@
 ---
 name: azure-adr
-description: '**ANALYSIS SKILL** — Creates Azure Architecture Decision Records (ADRs) with WAF pillar mapping, alternatives, and consequences. WHEN: "create ADR", "document decision", "architecture decision record", "record why we chose", "WAF pillar justification", "trade-off analysis". DO NOT USE FOR: IaC code (06b/06t agents), architecture diagrams (python-diagrams or mermaid), cost estimates (cost-estimate-subagent).'
+description: '**ANALYSIS SKILL** — Creates Azure ADRs with WAF mapping, alternatives, and consequences. WHEN: "create ADR", "document decision", "record why we chose", "WAF justification", "trade-off analysis". EXCLUDES: IaC code, diagrams, and cost estimates.'
 compatibility: Works with Claude Code, GitHub Copilot, VS Code, and any Agent Skills compatible tool; no external dependencies required.
 license: MIT
 metadata:
@@ -61,3 +61,4 @@ Load on demand:
 | `references/example-prompts.md`    | Looking for trigger phrasing / common ADR topics      |
 | `references/quality-checklist.md`  | Final self-check before saving                        |
 | `references/guardrails.md`         | DO/DON'T rules, anti-pattern table                    |
+| `references/step-3-adr-review.md`  | Reviewing design-phase ADR quality and completeness   |

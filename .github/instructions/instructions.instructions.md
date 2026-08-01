@@ -90,5 +90,6 @@ see `.github/instructions/references/precedence-matrix.md` for resolution rules.
 
 ## Resources
 
+- [Instruction file structure](references/agent-file-structure.md)
 - [Custom Instructions docs](https://code.visualstudio.com/docs/copilot/customization/custom-instructions)
 - [Community examples](https://github.com/github/awesome-copilot)
