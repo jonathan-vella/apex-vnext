@@ -155,6 +155,22 @@ function validateDevcontainer() {
       errors.push("❌ postStartCommand must not perform network upgrades or legacy setup");
     }
 
+    const postCreateScript = readFileSync(resolve(REPO_ROOT, ".devcontainer/post-create.sh"), "utf8");
+    if (!postCreateScript.includes("sudo install -d") || !postCreateScript.includes('test -w "$volume_directory"')) {
+      errors.push("❌ post-create must normalize and verify named-volume ownership");
+    }
+    for (const target of REQUIRED_VOLUME_TARGETS) {
+      if (!postCreateScript.includes(target.replace("/home/vscode", "$HOME"))) {
+        errors.push(`❌ post-create must initialize named volume target: ${target}`);
+      }
+    }
+    if (
+      postCreateScript.includes("--editable") ||
+      !postCreateScript.includes("rm -rf tools/apex-recall/src/apex_recall.egg-info")
+    ) {
+      errors.push("❌ post-create must install apex-recall without leaving source metadata");
+    }
+
     for (const relativePath of ARCHITECTURE_AWARE_SCRIPTS) {
       const script = readFileSync(resolve(REPO_ROOT, relativePath), "utf8");
       if (!script.includes("dpkg --print-architecture") || !script.includes("amd64|arm64")) {
