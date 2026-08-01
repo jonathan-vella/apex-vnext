@@ -432,6 +432,16 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "entity-count-generation",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:no-hardcoded-counts",
+          "status": 0
+        }
+      ]
     }
   ]
 }
