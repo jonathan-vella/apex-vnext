@@ -41,6 +41,10 @@ function walk(directory) {
   });
 }
 
+function repositoryPath(path) {
+  return relative(root, path).replaceAll("\\", "/");
+}
+
 const cliSource = "packages/cli/src/cli.ts";
 const mcpSource = "packages/cli/src/mcp.ts";
 const commands = uniqueMatches(readFileSync(join(root, cliSource), "utf8"), /case "([^"]+)":/gu);
@@ -74,13 +78,13 @@ if (check) {
     process.exitCode = 1;
   }
   const activeDocs = walk(join(root, "docs")).filter(
-    (path) => !path.includes("/phase-0a/") && relative(root, path) !== "docs/MIGRATION.md",
+    (path) => !repositoryPath(path).startsWith("docs/vnext/phase-0a/") && repositoryPath(path) !== "docs/MIGRATION.md",
   );
   const forbidden = /original APEX|github\.com\/jonathan-vella\/apex(?!-vnext)/iu;
   for (const path of activeDocs) {
     if (forbidden.test(readFileSync(path, "utf8"))) {
       console.error(
-        `❌ Predecessor history must stay in docs/MIGRATION.md or frozen evidence: ${relative(root, path)}`,
+        `❌ Predecessor history must stay in docs/MIGRATION.md or frozen evidence: ${repositoryPath(path)}`,
       );
       process.exitCode = 1;
     }

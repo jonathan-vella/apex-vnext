@@ -1,4 +1,4 @@
-## APEX vNext Product Requirements
+# APEX vNext Product Requirements
 
 APEX vNext is a deterministic TypeScript runtime and npm CLI for governed Azure platform engineering. Managed GitHub
 Copilot experiences in VS Code and GitHub Copilot CLI provide client-specific interfaces; the kernel owns workflow,

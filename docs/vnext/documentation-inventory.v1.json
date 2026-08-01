@@ -124,7 +124,7 @@
       "lifecycle": "active",
       "classification": "keep",
       "targetFamily": "reference",
-      "targetPaths": ["docs/reference/terraform.md"],
+      "targetPaths": ["docs/reference/iac-tracks.md"],
       "authorityBindings": ["workflow"]
     },
     {
