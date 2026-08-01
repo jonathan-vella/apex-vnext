@@ -1,9 +1,9 @@
 {
   "$schema": "./authorization.schema.json",
   "version": 1,
-  "authorization_id": "pre-agent-opt-2026-08-01-mcp-tool-id",
+  "authorization_id": "pre-agent-opt-2026-08-01-empty-retry",
   "authored_by": "jonathan-vella",
-  "authored_at": "2026-08-01T09:40:28Z",
+  "authored_at": "2026-08-01T09:58:21Z",
   "expires_at": "2026-08-03T23:59:59Z",
   "base_commit": "origin/main",
   "issues": [222, 220, 219],
@@ -152,7 +152,7 @@
     ".github/instructions/code-quality.instructions.md": "5223713c1f411117df41bc6ddfed98ebac33c77bf098a5feaf752a8453e0cba1",
     "docs/vnext/pre-agent-loop/authorization.schema.json": "e280ca57b32685d5a3d686e3c01430a74f11ef2ea28835c4e2acf5f963eabfe3",
     ".github/hooks/tool-guardian/guard-tool.sh": "8b7069d20fcd65906794a80e434953f335f0ad89ef134dff1443a56b14dc92d8",
-    "tools/scripts/pre-agent-loop.mjs": "b010dea2493c6b12ff63069db335eba76564cd510f6e15c1d26cf39fcb2ab163"
+    "tools/scripts/pre-agent-loop.mjs": "4b1ddf0294779005baecdf7d7e880f83a54f8c675a5747435d403f26a07f4a88"
   },
   "notes": "The controller records an observed CLI version only after a closed-stdin, timeout-bound noninteractive probe succeeds. Context hashes cover the policy sources that control this run. allowed_commands entries are prefixes, so denied_commands excludes aggregates such as npm run validate:all that a prefix would otherwise reach; deny always wins."
 }

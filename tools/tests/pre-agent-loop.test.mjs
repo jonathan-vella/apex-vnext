@@ -215,6 +215,23 @@ test("task launcher uses a neutral directory and rejects MCP events", () => {
   assert.throws(() => launchTask({ authorization, item, spawn: mcp }), /loaded MCP/);
 });
 
+test("task launcher retries one empty response but never accepts repeated empty output", () => {
+  const item = { paths: ["docs/vnext/pre-agent-loop/authorization.json"], prompt: "Read only." };
+  let attempts = 0;
+  const transient = () => {
+    attempts += 1;
+    return attempts === 1
+      ? { status: 0, stdout: "", stderr: "" }
+      : { status: 0, stdout: '{"type":"result"}\n', stderr: "" };
+  };
+  assert.equal(launchTask({ authorization, item, spawn: transient }).length, 1);
+  assert.equal(attempts, 2);
+  assert.throws(
+    () => launchTask({ authorization, item, spawn: () => ({ status: 0, stdout: "", stderr: "" }) }),
+    /no structured output/,
+  );
+});
+
 test("focused checks require authorization and a successful exit", () => {
   const success = () => ({ status: 0 });
   const failure = () => ({ status: 1 });

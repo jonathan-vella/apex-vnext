@@ -524,27 +524,31 @@ export function taskPrompt(item) {
 
 export function launchTask({ authorization, item, spawn = spawnSync }) {
   const [binary, ...args] = buildTaskCommand({ authorization, item, prompt: taskPrompt(item) });
-  const neutralDirectory = mkdtempSync(path.join(tmpdir(), "apex-pre-agent-task-"));
-  const copilotHome = path.join(neutralDirectory, "copilot-home");
-  mkdirSync(copilotHome);
-  try {
-    const result = spawn(binary, args, {
-      cwd: neutralDirectory,
-      encoding: "utf8",
-      env: { ...process.env, COPILOT_HOME: copilotHome },
-      input: "",
-      maxBuffer: authorization.launcher.noninteractive.output_limit_bytes,
-      stdio: ["pipe", "pipe", "pipe"],
-      timeout: authorization.launcher.noninteractive.timeout_seconds * 1000 * 20,
-    });
-    if (result.error || result.status !== 0) throw new Error("bounded task failed");
-    const events = parseJsonLines(result.stdout ?? "");
-    if (taskLoadedMcp(events)) throw new Error("bounded task loaded MCP");
-    if (taskInvokedSkill(events)) throw new Error("bounded task invoked a skill");
-    return events;
-  } finally {
-    rmSync(neutralDirectory, { recursive: true, force: true });
+  for (let attempt = 0; attempt <= authorization.budgets.repair_attempts; attempt += 1) {
+    const neutralDirectory = mkdtempSync(path.join(tmpdir(), "apex-pre-agent-task-"));
+    const copilotHome = path.join(neutralDirectory, "copilot-home");
+    mkdirSync(copilotHome);
+    try {
+      const result = spawn(binary, args, {
+        cwd: neutralDirectory,
+        encoding: "utf8",
+        env: { ...process.env, COPILOT_HOME: copilotHome },
+        input: "",
+        maxBuffer: authorization.launcher.noninteractive.output_limit_bytes,
+        stdio: ["pipe", "pipe", "pipe"],
+        timeout: authorization.launcher.noninteractive.timeout_seconds * 1000 * 20,
+      });
+      if (result.error || result.status !== 0) throw new Error("bounded task failed");
+      if ((result.stdout ?? "").trim() === "" && attempt < authorization.budgets.repair_attempts) continue;
+      const events = parseJsonLines(result.stdout ?? "");
+      if (taskLoadedMcp(events)) throw new Error("bounded task loaded MCP");
+      if (taskInvokedSkill(events)) throw new Error("bounded task invoked a skill");
+      return events;
+    } finally {
+      rmSync(neutralDirectory, { recursive: true, force: true });
+    }
   }
+  throw new Error("task produced no structured output");
 }
 
 function publishCheckpoint({ authorization, item, root, git = gitValue, now = new Date() }) {
