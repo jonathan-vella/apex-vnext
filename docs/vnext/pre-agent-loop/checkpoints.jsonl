@@ -46,3 +46,4 @@
 {"authorization_id":"pre-agent-opt-2026-08-01-proof-policy","item":"validator-diagnostics","state":"accepted","sha":"29035d7ed956f79e13bc2820ae483a0fada476e7","at":"2026-08-01T10:49:31.460Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-proof-policy","item":"workflow-telemetry","state":"accepted","sha":"c51f823ef665bcd8a3b060fd990923e447769788","at":"2026-08-01T10:51:40.261Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-proof-policy","state":"stopped","reason":"focused check failed: npm run profile:debug-log","at":"2026-08-01T10:53:00.436Z","previous_record_sha256":"bbe79793b45678f32f96cd8e92133bed822b07360febadcc610229a7c2f6cac8"}
+{"authorization_id":"pre-agent-opt-2026-08-01-proof-policy","item":"debug-log-profiling","state":"accepted","sha":"01939908f87ea3be38d8ceca83697f18bae19f66","at":"2026-08-01T10:54:38.768Z"}
