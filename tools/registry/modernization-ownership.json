@@ -335,7 +335,7 @@
         "tools/scripts/_lib/artifact-headings.mjs"
       ],
       "consumers": ["artifact authors", "pre-commit hook", "challenger review"],
-      "proofCommands": ["npm run validate:artifacts", "npm run check:h2-order"],
+      "proofCommands": ["npm run validate:artifacts", "npm run validate:headings-summary"],
       "removalGate": "One template-derived heading model replaces hand-synchronized heading lists with parity tests.",
       "rationale": "Templates are canonical; runtime and compact heading registries are deterministic generated derivatives with explicit non-template exceptions.",
       "followUp": "Issue #115 derives both heading registries from templates, replaces JavaScript source regex parsing with structured metadata, and adds byte-parity and mutation tests.",
