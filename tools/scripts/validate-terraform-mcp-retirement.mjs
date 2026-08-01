@@ -46,7 +46,8 @@ const FORBIDDEN_MARKERS = [
 ];
 
 function sha256(value) {
-  return createHash("sha256").update(value).digest("hex");
+  const normalized = value.toString("utf8").replaceAll("\r\n", "\n");
+  return createHash("sha256").update(normalized).digest("hex");
 }
 
 const EXPECTED_PROVENANCE = {
