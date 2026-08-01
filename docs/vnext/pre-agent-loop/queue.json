@@ -116,7 +116,7 @@
         "npm run lint:orphaned-content"
       ],
       "rationale": "Skill frontmatter stays canonical; a computed consumer view should replace repeated inventory prose.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "workflow-dag",

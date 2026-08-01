@@ -115,9 +115,18 @@
         "orphan-content validation"
       ],
       "classification": "consolidate",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:skills",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:orphaned-content",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "Skill frontmatter stays canonical; a computed consumer view should replace repeated inventory prose."
     },
     {
