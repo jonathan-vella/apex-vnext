@@ -157,7 +157,7 @@ See `tools/registry/count-manifest.json` for canonical counts.
 | `iac-plan-best-practices.instructions.md`      | `**/04-implementation-plan.md`                                  |
 | `code-quality.instructions.md`                 | `**/*.{js,mjs,cjs,ts,tsx,jsx,py,ps1,sh,bicep,tf}`               |
 | `context-optimization.instructions.md`         | `customizations/.github/agents/**/*.agent.md, .github/skills/**/SKILL.md` |
-| `docs.instructions.md`                         | `docs/guides/**/*.md`                                         |
+| `docs.instructions.md`                         | `docs/{tutorials,how-to,explanation,reference}/**/*.md`        |
 | `docs-trigger.instructions.md`                 | `**/*.agent.md, **/SKILL.md, **/scripts/*.mjs`                  |
 | `github-actions.instructions.md`               | `.github/workflows/*.yml`                                       |
 | `governance-discovery.instructions.md`         | `**/04-governance-*.md`                                         |
@@ -199,7 +199,6 @@ updating when agents or skills change:
 | --------------------------------------------- | --------------------------------------- |
 | `docs/`                                        | Repository documentation pages          |
 | `docs.instructions.md`                         | User-guide standards                     |
-| `QUALITY_SCORE.md`                            | Project health grades (doc-gardening)   |
 | `tools/tests/exec-plans/tech-debt-tracker.md` | Tech debt inventory                     |
 | `VERSION.md`                                  | Canonical version number                |
 | `CHANGELOG.md`                                | Release history                         |
@@ -211,8 +210,11 @@ updating when agents or skills change:
 | ----------------- | -------------------------------------------------------- |
 | `README.md`       | Documentation index                                      |
 | `MIGRATION.md`    | Dedicated-repository extraction record                   |
-| `guides/`         | Installation, workflow, CLI, operations, and security    |
-| `vnext/`          | Product controls, roadmap, risks, decisions, and evidence |
+| `tutorials/`      | Learning-oriented local evaluation                       |
+| `how-to/`         | Installation, workflow, operations, and contribution     |
+| `explanation/`    | Architecture, workflow, security, and client concepts     |
+| `reference/`      | Commands, tools, support, configuration, IaC, qualification |
+| `vnext/`          | Binding product and release controls                      |
 
 ## Skill Discovery & Auto-Invocation
 

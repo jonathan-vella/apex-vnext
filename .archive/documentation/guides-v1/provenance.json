@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0.0",
+  "archivedFrom": "da708ef5e0ff63a9ff1bf1a43112c6670e3bfc0a",
+  "replacementOwners": [
+    "docs/tutorials",
+    "docs/how-to",
+    "docs/explanation",
+    "docs/reference"
+  ],
+  "artifacts": [
+    { "path": "docs/guides/cli-reference.md", "sha256": "47ef4edeb6742dcefd8ca2349e5d0526a698f50422b69e0259c3e7aadeaf3781" },
+    { "path": "docs/guides/devcontainer-hygiene.md", "sha256": "e494069c0bda66a4c3116772d2e125e56b01711ddf8b85d5c05aac3c0115a7a7" },
+    { "path": "docs/guides/index.md", "sha256": "9d879209d8ca112103410e75f612d2c084dfb0c8d7798219fd495116730d9ef9" },
+    { "path": "docs/guides/installation.md", "sha256": "a68ae9668dabd4c9a218967b4d34edb987b7b96c24dd16bff864123f6d96143e" },
+    { "path": "docs/guides/live-qualification.md", "sha256": "c3117e563111404deb0b2a34883d703456bf4b55db7b64d64ceb46721f1a9572" },
+    { "path": "docs/guides/operations.md", "sha256": "d11269ca13d70fe0a2335afdf6c7f8ebb61dc223f144515d4bcb49ae468e5c80" },
+    { "path": "docs/guides/security.md", "sha256": "e2d19a8bda840b0243c3e19bb11c068f94f074505c0e5635500a32c5e522c756" },
+    { "path": "docs/guides/testing.md", "sha256": "e60480372e90f62ebce5ed18de434bb13a669e7d5d73d1eb2f8fc2e2c2e754ad" },
+    { "path": "docs/guides/workflow.md", "sha256": "8e8ea2e256e47d5a8a631ef612914796277719e5e04417e78aa129091ff28937" }
+  ]
+}

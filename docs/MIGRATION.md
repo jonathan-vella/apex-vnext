@@ -22,9 +22,8 @@ The snapshot retains the runtime packages, customizations, configuration,
 qualification infrastructure, validators, tests, project controls, and frozen
 evidence that existed at the source commit.
 
-The Astro documentation site was intentionally excluded. Its vNext user pages
-were migrated into `docs/guides/` as ordinary Markdown, and documentation CI was
-replaced with Markdown lint, link, and freshness validation.
+The Astro documentation site was intentionally excluded. Its useful vNext content was first extracted as ordinary
+Markdown, then rebuilt under `docs/tutorials/`, `docs/how-to/`, `docs/explanation/`, and `docs/reference/`.
 
 Devcontainer CI is disabled in the destination repository and is not an
 acceptance gate. Re-enabling or dispatching it requires a new explicit

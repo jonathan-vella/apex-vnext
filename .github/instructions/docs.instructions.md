@@ -1,11 +1,11 @@
 ---
-description: "Standards for user-facing Markdown documentation in docs/guides"
-applyTo: "docs/guides/**/*.md"
+description: "Standards for vNext tutorials, how-to guides, explanations, and reference documentation"
+applyTo: "docs/{tutorials,how-to,explanation,reference}/**/*.md"
 ---
 
 # Documentation Standards
 
-Instructions for creating and maintaining user-facing documentation in `docs/guides/`.
+Instructions for creating and maintaining vNext product documentation under `docs/`.
 
 ## Structure Requirements
 
@@ -73,7 +73,7 @@ Rules:
 
 ## Related footers
 
-Every guide under `docs/guides/` ends with a `## Related`
+Every product documentation page ends with a `## Related`
 section listing 2–4 adjacent topics (sibling guides, upstream concepts,
 downstream references). Use bullet links with a one-line description each.
 Example:
@@ -94,11 +94,11 @@ Example:
 | **Current state**          | No historical context in main docs                      |
 | **Action-oriented**        | Every section answers "how do I...?"                    |
 | **Minimal**                | If it doesn't help users today, remove it               |
-| **Prompt guide for depth** | Point to the prompt guide section in the published site |
+| **Source grounded**        | Link commands and claims to executable vNext authority |
 
 ## Validation
 
-Documentation is validated in CI (warn-only):
+Documentation is validated in CI:
 
 - No references to removed agents
 - Version numbers match `VERSION.md` (repo root)
