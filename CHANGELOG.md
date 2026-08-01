@@ -19,6 +19,9 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Reviewed every direct npm dependency and selected the newest releases available through the required package feed,
+  removed unused `jsdom` and redundant overrides, corrected workspace ownership, patched vulnerable transitives, and
+  replaced deprecated `whatwg-encoding` with maintained `encoding-sniffer` backed by `@exodus/bytes`.
 - Reduced the development container to the vNext toolchain, removed Deno and original APEX authoring utilities,
   synchronized the exact VS Code extension inventory, and enforced portable named volumes plus Linux `amd64`/`arm64`
   support through repository validation.
