@@ -141,7 +141,8 @@ when a decision has lasting architectural consequences that need alternatives an
 - **Context:** The dedicated repository already has runtime, package, Markdown, IaC, and aggregate validation gates.
 - **Options:** Require the multi-architecture devcontainer workflow; keep it advisory; disable it.
 - **Choice:** Disable `validate-devcontainer-base.yml` in GitHub Actions and exclude devcontainer CI from migration and
-  release acceptance.
+  release acceptance. The retired implementation is retained in the
+  [automation archive](../../.archive/retired-automation/devcontainer-base-v1/README.md).
 - **Rationale:** The maintainer explicitly declined devcontainer CI for ongoing vNext work.
 - **Consequences:** Agents must not dispatch, rerun, or treat this workflow as a gate. Re-enabling it requires another
   explicit maintainer decision. Local devcontainer configuration and non-CI validation remain available.

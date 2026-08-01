@@ -13,6 +13,7 @@ const utilityArchivePath = ".archive/retired-utilities/original-apex-v1";
 const qualificationArchivePath = ".archive/qualification/vnext-qualification-v1";
 const preAgentArchivePath = ".archive/retired-automation/pre-agent-loop-v1";
 const compatibilityArchivePath = ".archive/retired-compatibility/original-apex-v1";
+const devcontainerArchivePath = ".archive/retired-automation/devcontainer-base-v1";
 
 function textSha256(path) {
   const normalized = readFileSync(path, "utf8").replace(/\r\n/gu, "\n");
@@ -57,6 +58,19 @@ test("Terraform MCP characterization remains provenance-only retired automation"
   assert.match(provenance, /7b3dee20b2713430c7302f5cdfc7b4a19e5a73e4/u);
   assert.match(provenance, /## Replacement Owners/u);
   assert.match(provenance, /## Rollback/u);
+});
+
+test("disabled devcontainer CI remains provenance-only", () => {
+  const provenance = JSON.parse(readFileSync(`${devcontainerArchivePath}/provenance.json`, "utf8"));
+  assert.equal(provenance.decision, "DECISION-009");
+  for (const artifact of provenance.artifacts) {
+    assert.equal(existsSync(artifact.path), false, `${artifact.path} must stay retired`);
+    const archiveFile = `${devcontainerArchivePath}/${artifact.path}`;
+    assert.equal(existsSync(archiveFile), true, `missing archived devcontainer artifact: ${artifact.path}`);
+    assert.equal(textSha256(archiveFile), artifact.sha256);
+  }
+  const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts ?? {};
+  assert.equal(scripts["test:devcontainer-verdicts"], undefined);
 });
 
 test("original APEX E2E automation remains provenance-only", () => {

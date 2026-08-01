@@ -80,7 +80,7 @@ export function buildAssignments() {
     generated: true,
     generated_by: "tools/scripts/generate-model-catalog.mjs",
     description:
-      "Auto-generated inventory of agent → model assignments derived from frontmatter (canonical source). Do not edit by hand; run `node tools/scripts/generate-model-catalog.mjs` or let the lefthook pre-commit hook refresh it when frontmatter changes.",
+      "Auto-generated inventory of agent → model assignments derived from frontmatter (canonical source). Do not edit by hand; run `npm run generate:model-catalog` and commit the result.",
     agents: main,
     subagents: subs,
   };

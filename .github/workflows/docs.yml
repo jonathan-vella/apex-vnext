@@ -7,10 +7,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - "docs/**"
-      - "README.md"
-      - "CONTRIBUTING.md"
-      - "CHANGELOG.md"
+      - "**/*.md"
       - ".markdown-link-check.json"
       - ".markdownlint-cli2.jsonc"
       - "package.json"
@@ -18,10 +15,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "docs/**"
-      - "README.md"
-      - "CONTRIBUTING.md"
-      - "CHANGELOG.md"
+      - "**/*.md"
       - ".markdown-link-check.json"
       - ".markdownlint-cli2.jsonc"
       - "package.json"
@@ -46,5 +40,5 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-repo
 
-      - name: Validate Markdown documentation
-        run: npm run validate:docs
+      - name: Validate documentation links and freshness
+        run: npm run lint:links && npm run lint:docs-freshness

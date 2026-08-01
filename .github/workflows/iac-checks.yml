@@ -50,14 +50,8 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
 
-      - name: Terraform format check
-        run: npm run lint:terraform-fmt
-
-      # validate:terraform is advisory by contract (per-dir `|| true` so a
-      # missing local terraform never blocks). The fmt check above is the
-      # hard gate; this surfaces validation output when templates exist.
-      - name: Terraform validate
-        run: npm run validate:terraform
+      - name: Terraform checks
+        run: npm run lint:terraform-fmt && npm run validate:terraform
 
   bicep:
     name: Bicep fmt

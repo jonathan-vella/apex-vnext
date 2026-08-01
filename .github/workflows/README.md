@@ -7,17 +7,18 @@
 
 | Workflow                                                           | Trigger                       | Purpose                                                                                                                    | Side effects                                                         |
 | ------------------------------------------------------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| [`ci.yml`](ci.yml)                                                 | PR + push to `main`           | Single required status check: markdown lint, every `validate:*` script, handoff/contract checks.                           | None — fails the PR on regression.                                   |
-| [`branch-enforcement.yml`](branch-enforcement.yml)                 | PR to `main`                  | Enforces branch naming + file-scope rules so PRs stay reviewable.                                                          | None — fails the PR on violation.                                    |
-| [`docs.yml`](docs.yml) | PR + push to `main` (docs) | Validate Markdown style, links, and freshness. | None - fails on documentation regression. |
+| [`ci.yml`](ci.yml)                                                 | PR + push to `main`           | Required code check: formatting, Node validators, hook tests, and deterministic vNext qualification.                     | None — fails the PR on regression.                                   |
+| [`branch-enforcement.yml`](branch-enforcement.yml)                 | PR to `main`                  | Runs canonical branch naming and strict file-scope policy so PRs stay reviewable.                                           | None — fails the PR on violation.                                    |
+| [`docs.yml`](docs.yml) | PR + push to `main` (Markdown) | Validate documentation links and freshness; required CI owns Markdown lint. | None - fails on documentation regression. |
 | [`governance-policy-baseline.yml`](governance-policy-baseline.yml) | Weekly Mon 05:00 UTC + manual | Refresh `.github/data/governance-policy-baseline.json` from a live subscription.                                           | Opens a PR (manual review + merge required) when baseline drifts.    |
 | [`release-candidate-qualification.yml`](release-candidate-qualification.yml) | Release-relevant PR/push + manual | Run the release-unique exact-head scorecard after required CI proves validators, tests, and packaging. | Uploads a compact evidence bundle; cannot deploy, merge, publish, tag, or authorize cutover. |
 | [`sensei-branch-maintenance.yml`](sensei-branch-maintenance.yml)   | Weekly Mon 08:00 UTC + manual | Keep `feat/skills-sensei` long-lived branch healthy: merge `main` weekly, run validators, file issue if branch is missing. | Pushes merge commit to `feat/skills-sensei`; may open issue.         |
 | [`vnext-live-qualification.yml`](vnext-live-qualification.yml)     | Manual only; default-branch bootstrap required | Import a locally approved exact Bicep or Terraform preview and run sandbox apply/destroy.                               | Opens a bounded backend session and mutates qualification resources after local APEX Gate 4 approval. |
 | [`weekly-maintenance.yml`](weekly-maintenance.yml)                 | Weekly Mon 06:00 UTC + manual | Consolidated data-refresh + audit umbrella — see [Weekly Maintenance](#weekly-maintenance) below.                          | Opens PRs (refresh jobs, manual merge) + GitHub issues (audit jobs). |
 
-`validate-devcontainer-base.yml` is retained for reference but disabled in GitHub Actions. Do not dispatch or use it as
-a validation gate unless the maintainer records a new explicit decision.
+The retired devcontainer CI implementation is preserved in the
+[automation archive](../../.archive/retired-automation/devcontainer-base-v1/README.md). Do not restore or dispatch it
+without a new explicit decision.
 
 ## Weekly Maintenance
 
@@ -45,8 +46,6 @@ This keeps the blast radius small if any other job is later added.
 
 - `create_issue` — set `false` to suppress GitHub-issue creation in the
   audit jobs (`docs-freshness`).
-- `force_update` — set `true` to force the refresh jobs to open a PR
-  even when no upstream change is detected (smoke-test the PR path).
 
 ## Adding a new workflow
 

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0.0",
+  "decision": "DECISION-009",
+  "archivedFrom": "1d20d81",
+  "replacementOwners": ["validate:vscode", "required CI", "exact-head qualification"],
+  "artifacts": [
+    { "path": ".github/workflows/validate-devcontainer-base.yml", "sha256": "9651f41df11f2d6b848cdb8f9f16c545c74fc0d445704029c94346f9d5e85662" },
+    { "path": "tools/scripts/compare-devcontainer-verdicts.mjs", "sha256": "82d6397e2769e99c760b9493290479cb704cdd4293512dc2ab81aa98a4ac6ff3" },
+    { "path": "tools/tests/compare-devcontainer-verdicts.test.mjs", "sha256": "d0e79f1f462f5e5fb9b8b49419669bc2114a156a837cb9c535c6bd8d870c655c" }
+  ]
+}
