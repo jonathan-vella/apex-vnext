@@ -223,9 +223,18 @@
         "package consumers"
       ],
       "classification": "keep",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext-pack",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "Workspace packages are the executable ownership units for contracts, kernel, CLI, and adapters."
     },
     {

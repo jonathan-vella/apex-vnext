@@ -134,6 +134,20 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "workspace-package-boundaries",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext-pack",
+          "status": 0
+        }
+      ]
     }
   ]
 }
