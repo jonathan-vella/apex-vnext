@@ -136,7 +136,10 @@ export function validateModernizationOwnership({ manifest, schema, document, scr
       const match = command.match(/^npm run ([^ ]+)$/);
       if (match && scripts[match[1]] === undefined) errors.push(`${surface.id}: unknown npm script: ${match[1]}`);
       if (match && ARGUMENT_REQUIRED_PROOF_SCRIPTS.has(match[1])) {
-        errors.push(`${surface.id}: proof script requires an explicit target: ${match[1]}`);
+        errors.push(
+          `${surface.id}: proof script requires an explicit target: ${match[1]} ` +
+            `(for example, npm run ${match[1]} -- <target>); use an argument-free validator when no target is available`,
+        );
       }
     }
     if (!document.includes(`\`${surface.id}\``)) errors.push(`${surface.id}: missing from ${DOCUMENT}`);

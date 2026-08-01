@@ -124,6 +124,7 @@
     "mcp": "disabled",
     "noninteractive": {
       "timeout_seconds": 15,
+      "task_timeout_seconds": 300,
       "output_limit_bytes": 1048576
     }
   },
@@ -156,9 +157,9 @@
     ".github/instructions/javascript.instructions.md": "f207cbea41680a3a20473ba6abea3580747be24771cc93525dcab08f1f019054",
     ".github/instructions/json.instructions.md": "7ad4662e52ad9f88aa96095bfd7d76ae488af94287c8860c306f9bbd7c9bbd75",
     ".github/instructions/code-quality.instructions.md": "5223713c1f411117df41bc6ddfed98ebac33c77bf098a5feaf752a8453e0cba1",
-    "docs/vnext/pre-agent-loop/authorization.schema.json": "e280ca57b32685d5a3d686e3c01430a74f11ef2ea28835c4e2acf5f963eabfe3",
+    "docs/vnext/pre-agent-loop/authorization.schema.json": "e7c3feac98b5e4eadb983517bb9cb5ca23068df70342ce92f0f006c3a12187d1",
     ".github/hooks/tool-guardian/guard-tool.sh": "8b7069d20fcd65906794a80e434953f335f0ad89ef134dff1443a56b14dc92d8",
-    "tools/scripts/pre-agent-loop.mjs": "5625513bf675cf682a8df9a41601461ca078a0b204b9d8a5e68abe4c2fa1ea6c"
+    "tools/scripts/pre-agent-loop.mjs": "22dc1fc0c35be723e6f7191e3397c8bc3a7b38c5c7979f77885ddf0dff8b35fd"
   },
   "notes": "The controller records an observed CLI version only after a closed-stdin, timeout-bound noninteractive probe succeeds. Context hashes cover the policy sources that control this run. allowed_commands entries are prefixes, so denied_commands excludes aggregates such as npm run validate:all that a prefix would otherwise reach; deny always wins."
 }
