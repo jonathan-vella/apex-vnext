@@ -161,9 +161,38 @@
         "client parity qualification"
       ],
       "classification": "rewrite",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext",
+          "status": 0
+        },
+        {
+          "command": "npm run test:vnext-pack",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:agents",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:vscode",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:client-outcomes",
+          "status": 0
+        },
+        {
+          "command": "npm run test:client-outcomes",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "One managed role graph must produce client-specific mechanics without creating separate workflow authorities."
     },
     {

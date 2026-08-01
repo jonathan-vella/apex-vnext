@@ -173,7 +173,7 @@
         "npm run test:client-outcomes"
       ],
       "rationale": "One managed role graph must produce client-specific mechanics without creating separate workflow authorities.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "runtime-manifests",
