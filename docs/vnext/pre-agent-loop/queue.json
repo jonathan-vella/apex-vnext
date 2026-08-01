@@ -576,7 +576,7 @@
         "npm run lint:deprecated-refs"
       ],
       "rationale": "Upstream workflow copying belongs to the former accelerator model and conflicts with standalone repository workflow ownership.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "model-catalog-generation",
