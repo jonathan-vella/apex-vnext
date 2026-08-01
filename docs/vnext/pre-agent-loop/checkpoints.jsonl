@@ -10,3 +10,4 @@
 {"authorization_id":"pre-agent-opt-2026-08-01-status-parser","item":"model-catalog","state":"accepted","sha":"36154a9b1ca7b9f0f71f9fed31eb48db67dd55ee","at":"2026-08-01T09:15:10.502Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-status-parser","item":"skill-discovery","state":"accepted","sha":"23a88a0394e7f53618dc1f025861bb0d45d1391f","at":"2026-08-01T09:21:36.381Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-status-parser","item":"workflow-dag","state":"accepted","sha":"ab51cc151b58d4f449ce8e92dc320e37ea7545c3","at":"2026-08-01T09:23:00.722Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-status-parser","item":"copilot-client-projections","state":"accepted","sha":"121f0005382446f55ae2979044a04b4e3dd6233b","at":"2026-08-01T09:24:09.703Z"}
