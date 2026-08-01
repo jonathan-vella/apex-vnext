@@ -519,9 +519,18 @@
         "artifact validation"
       ],
       "classification": "rewrite",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:hooks",
+          "status": 0
+        },
+        {
+          "command": "npm run test:hooks",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "Serial execution protects the model-catalog and SKU-manifest generators, which both re-stage output through one Git index; read-only hooks must not claim stage_fixed ownership."
     },
     {
