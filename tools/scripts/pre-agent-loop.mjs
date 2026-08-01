@@ -181,7 +181,8 @@ export function probeLauncher(launcher, spawn = spawnSync) {
 export function buildTaskCommand({ authorization, item, prompt }) {
   const boundedPaths = item.paths.map((pathname) => {
     const wildcard = pathname.search(/[*?[\]]/u);
-    const boundedPath = wildcard === -1 ? pathname : pathname.slice(0, wildcard).replace(/\/$/u, "");
+    const prefix = wildcard === -1 ? pathname : pathname.slice(0, wildcard);
+    const boundedPath = wildcard === -1 ? pathname : prefix.endsWith("/") ? prefix : path.dirname(prefix);
     return { pathname, wildcard, absolutePath: path.resolve(authorization.worktree, boundedPath || ".") };
   });
   const writablePaths = boundedPaths
