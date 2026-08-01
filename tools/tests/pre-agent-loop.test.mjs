@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -7,13 +7,17 @@ import { fileURLToPath } from "node:url";
 import {
   abortRun,
   admissionErrors,
+  assertControllerStateUnchanged,
   buildDryRunQueue,
   buildTaskCommand,
   changedPathErrors,
   initializeRun,
+  parseJsonLines,
   parseArguments,
   probeLauncher,
+  runFocusedChecks,
   resumeRun,
+  snapshotControllerState,
 } from "../scripts/pre-agent-loop.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -80,8 +84,11 @@ test("dry-run queue preserves source paths and focused checks", () => {
       {
         id: "fixture",
         classification: "keep",
+        canonicalOwner: "config/fixture.json",
+        consumers: ["fixture consumer"],
         sourceRefs: ["config/fixture.json"],
         proofCommands: ["npm run validate:fixture"],
+        rationale: "Fixture rationale.",
       },
     ],
   });
@@ -89,8 +96,12 @@ test("dry-run queue preserves source paths and focused checks", () => {
     {
       id: "fixture",
       classification: "keep",
+      owner: "config/fixture.json",
+      consumers: ["fixture consumer"],
       paths: ["config/fixture.json"],
       focused_checks: ["npm run validate:fixture"],
+      rationale: "Fixture rationale.",
+      status: "pending",
     },
   ]);
 });
@@ -109,6 +120,18 @@ test("changed path guard rejects protected, out-of-scope, binary, secret, and ov
   assert.ok(errors.some((error) => error.includes("secret")));
 });
 
+test("task mutation of controller state is rejected", () => {
+  const temporaryRoot = mkdtempSync(path.join(tmpdir(), "pre-agent-loop-state-"));
+  const stateRoot = path.join(temporaryRoot, "docs/vnext/pre-agent-loop");
+  mkdirSync(stateRoot, { recursive: true });
+  const queuePath = path.join(stateRoot, "queue.json");
+  writeFileSync(queuePath, "{}\n");
+  const before = snapshotControllerState(temporaryRoot);
+  writeFileSync(queuePath, '{"changed":true}\n');
+  assert.throws(() => assertControllerStateUnchanged(temporaryRoot, before), /task changed controller state/);
+  rmSync(temporaryRoot, { recursive: true, force: true });
+});
+
 test("launcher probe accepts only noninteractive version output", () => {
   const launcher = authorization.launcher;
   const success = () => ({ status: 0, stdout: "GitHub Copilot CLI 1.0.77\n", stderr: "" });
@@ -117,6 +140,28 @@ test("launcher probe accepts only noninteractive version output", () => {
   assert.equal(probeLauncher(launcher, success).ok, true);
   assert.deepEqual(probeLauncher(launcher, prompt), { ok: false, reason: "launcher version probe requested setup" });
   assert.deepEqual(probeLauncher(launcher, failure), { ok: false, reason: "launcher version probe failed" });
+});
+
+test("structured task output requires valid JSONL", () => {
+  assert.deepEqual(parseJsonLines('{"type":"start"}\n{"type":"result"}\n'), [{ type: "start" }, { type: "result" }]);
+  assert.throws(() => parseJsonLines(""), /no structured output/);
+  assert.throws(() => parseJsonLines("not-json"), /not valid JSONL/);
+});
+
+test("focused checks require authorization and a successful exit", () => {
+  const success = () => ({ status: 0 });
+  const failure = () => ({ status: 1 });
+  assert.deepEqual(runFocusedChecks({ commands: ["npm run lint:json"], authorization, root, spawn: success }), [
+    { command: "npm run lint:json", status: 0 },
+  ]);
+  assert.throws(
+    () => runFocusedChecks({ commands: ["npm run validate:all"], authorization, root, spawn: success }),
+    /not authorized/,
+  );
+  assert.throws(
+    () => runFocusedChecks({ commands: ["npm run lint:json"], authorization, root, spawn: failure }),
+    /focused check failed/,
+  );
 });
 
 test("task command grants characterized file tools without Git or interactive capabilities", () => {
