@@ -11,6 +11,8 @@ Commands that change installation, capability, transfer, or improvement state ma
 | ------------------------------- | -------------------------------------------------------------------------------------------- |
 | `apex version`                  | None                                                                                         |
 | `apex init`                     | `--project`; optional `--name --environment --target --iac --client --customizations-source` |
+| `apex project create`           | `--project`; optional `--name --environment --target --iac`                                  |
+| `apex project promote`          | `--environment --target`                                                                     |
 | `apex update`                   | Optional `--customizations-source`                                                           |
 | `apex setup`                    | Optional `--live`                                                                            |
 | `apex doctor`                   | Optional `--fix --yes`                                                                       |
@@ -20,6 +22,14 @@ Commands that change installation, capability, transfer, or improvement state ma
 
 `--client` accepts the bundled VS Code or Copilot CLI projection ID. `--iac terraform` selects Terraform; otherwise
 initialization selects Bicep.
+
+Initialize a customer workspace once, then create additional independently governed workloads with
+`apex project create`. The shared client projection is installed only by `apex init`; project creation adds a project,
+its first run, and its selected IaC track under the existing `.apex` state.
+
+Each project can have multiple environment-scoped runs. Use `apex project promote` after Gates 1 through 3 are approved
+to create a linked run for the next environment. It inherits only still-valid upstream proof and always requires a
+new preview and Gate 4 approval. `apex promote` remains available as a compatibility alias.
 
 ## Workflow
 
