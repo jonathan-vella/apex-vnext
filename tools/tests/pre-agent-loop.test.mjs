@@ -239,6 +239,14 @@ test("task command grants characterized file tools without Git or interactive ca
   assert.ok(command.includes("--no-custom-instructions"));
   assert.ok(command.includes("--disable-builtin-mcps"));
   assert.ok(command.includes("--deny-tool"));
+  const addDirectories = command
+    .map((part, index) => (part === "--add-dir" ? command[index + 1] : null))
+    .filter(Boolean);
+  assert.deepEqual(addDirectories, [path.join(authorization.worktree, "tools/scripts")]);
+  assert.equal(addDirectories.includes(authorization.worktree), false);
+  for (const server of ["github-mcp-server", "github", "azure-resource-manager-mcp", "apex"]) {
+    assert.ok(command.some((part, index) => part === "--disable-mcp-server" && command[index + 1] === server));
+  }
   assert.equal(
     command.some((part) => /shell\(git|allow-all|yolo/iu.test(part)),
     false,

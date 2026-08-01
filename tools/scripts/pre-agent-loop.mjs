@@ -43,6 +43,7 @@ const CONTROLLER_STATE_PATHS = new Set([
 const SECRET_PATTERN = /(api[_-]?key|password|secret|token)\s*[:=]\s*[^\s]+/iu;
 const TASK_TOOLS = ["view", "glob", "rg", "apply_patch"];
 const DENIED_TASK_TOOLS = ["ask_user", "task", "skill", "web_fetch", "session_store_sql", "apex", "github"];
+const DISABLED_MCP_SERVERS = ["github-mcp-server", "github", "azure-resource-manager-mcp", "apex"];
 
 function matchesPath(pathname, pattern) {
   const expression = `^${pattern
@@ -178,13 +179,23 @@ export function probeLauncher(launcher, spawn = spawnSync) {
 }
 
 export function buildTaskCommand({ authorization, item, prompt }) {
-  const writablePaths = item.paths
-    .filter((pathname) => !authorization.protected_paths.some((pattern) => matchesPath(pathname, pattern)))
-    .map((pathname) => {
-      const wildcard = pathname.search(/[*?[\]]/u);
-      const boundedPath = wildcard === -1 ? pathname : pathname.slice(0, wildcard).replace(/\/$/u, "");
-      return path.resolve(authorization.worktree, boundedPath || ".");
-    });
+  const boundedPaths = item.paths.map((pathname) => {
+    const wildcard = pathname.search(/[*?[\]]/u);
+    const boundedPath = wildcard === -1 ? pathname : pathname.slice(0, wildcard).replace(/\/$/u, "");
+    return { pathname, wildcard, absolutePath: path.resolve(authorization.worktree, boundedPath || ".") };
+  });
+  const writablePaths = boundedPaths
+    .filter(({ pathname }) => !authorization.protected_paths.some((pattern) => matchesPath(pathname, pattern)))
+    .map(({ absolutePath }) => absolutePath);
+  const readableDirectories = [
+    ...new Set(
+      boundedPaths.map(({ absolutePath, wildcard }) =>
+        wildcard !== -1 || (existsSync(absolutePath) && statSync(absolutePath).isDirectory())
+          ? absolutePath
+          : path.dirname(absolutePath),
+      ),
+    ),
+  ];
   return [
     authorization.launcher.binary,
     "--prompt",
@@ -200,10 +211,10 @@ export function buildTaskCommand({ authorization, item, prompt }) {
     "--no-bash-env",
     "--no-auto-update",
     "--disable-builtin-mcps",
+    ...DISABLED_MCP_SERVERS.flatMap((server) => ["--disable-mcp-server", server]),
     ...DENIED_TASK_TOOLS.flatMap((tool) => ["--deny-tool", tool]),
     ...writablePaths.flatMap((pathname) => ["--allow-tool", `write(${pathname})`]),
-    "--add-dir",
-    authorization.worktree,
+    ...readableDirectories.flatMap((pathname) => ["--add-dir", pathname]),
   ];
 }
 
