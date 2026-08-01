@@ -63,14 +63,14 @@ test("required edge labels match exact slash-delimited segments", () => {
 
 test("active consumers reject Draw.io output and missing Python markers", () => {
   const files = new Map(registry.activeConsumers.map(({ path }) => [path, readFileSync(path, "utf8")]));
-  const designPrompt = registry.activeConsumers.find(({ id }) => id === "step-3-design-prompt");
-  files.set(designPrompt.path, files.get(designPrompt.path).replaceAll("03-des-diagram.py", "03-des-diagram.drawio"));
+  const designTemplate = registry.activeConsumers.find(({ id }) => id === "as-built-design-template");
+  files.set(designTemplate.path, files.get(designTemplate.path).replaceAll("07-ab-diagram.py", "07-ab-diagram.drawio"));
 
   assert.deepEqual(
     validateActiveConsumers(registry.activeConsumers, (filePath) => files.get(filePath)),
     [
-      "step-3-design-prompt: active consumer references retired Draw.io output",
-      "step-3-design-prompt: required marker 03-des-diagram.py is missing",
+      "as-built-design-template: active consumer references retired Draw.io output",
+      "as-built-design-template: required marker 07-ab-diagram.py is missing",
     ],
   );
 });

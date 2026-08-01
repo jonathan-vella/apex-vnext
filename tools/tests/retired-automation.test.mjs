@@ -8,6 +8,7 @@ const provenancePath = ".archive/retired-automation/README.md";
 const expectedHash = "e1111eb1f9a60e4273c1302a9af8666a555f7b5c6f079451ecaa37f50ec4cffa";
 const terraformArchivePath = ".archive/retired-automation/terraform-mcp";
 const e2eArchivePath = ".archive/retired-automation/e2e-v1";
+const promptArchivePath = ".archive/retired-prompts/original-apex-v1";
 
 function textSha256(path) {
   const normalized = readFileSync(path, "utf8").replace(/\r\n/gu, "\n");
@@ -97,4 +98,39 @@ test("original APEX E2E automation remains provenance-only", () => {
     forbidden.some((marker) => readFileSync(path, "utf8").includes(marker)),
   );
   assert.deepEqual(activeReferences, [], `active E2E retirement references: ${activeReferences.join(", ")}`);
+});
+
+test("original APEX workflow prompts remain provenance-only", () => {
+  const provenance = JSON.parse(readFileSync(`${promptArchivePath}/provenance.json`, "utf8"));
+  assert.equal(provenance.archivedFrom, "901adcbc4b033c912cfbd198307c44b4979b089e");
+  for (const artifact of provenance.artifacts) {
+    assert.equal(existsSync(artifact.path), false, `${artifact.path} must stay out of active paths`);
+    const archiveFile = `${promptArchivePath}/${artifact.path}`;
+    assert.equal(existsSync(archiveFile), true, `missing archived prompt: ${artifact.path}`);
+    assert.equal(textSha256(archiveFile), artifact.sha256);
+  }
+
+  const activeFiles = globSync(
+    ["package.json", "tools/**/*.{mjs,js,json,md,sh}", "docs/**/*.md", ".github/**/*.{yml,yaml,json,md,mjs,js,sh}"],
+    {
+      exclude: [
+        "**/node_modules/**",
+        ".archive/**",
+        "docs/vnext/phase-0a/**",
+        "docs/vnext/pre-agent-loop/**",
+        "CHANGELOG.md",
+        "tools/registry/modernization-ownership.json",
+      ],
+    },
+  ).filter((path) => path !== "tools/tests/retired-automation.test.mjs");
+  const forbidden = [
+    "tools/apex-prompts/workflow-prompts/",
+    "tools/apex-prompts/utility-prompts/as-built-from-azure.prompt.md",
+    "tools/apex-prompts/utility-prompts/review-imported-iac.prompt.md",
+    ".github/prompts/apex-resume-workflow.prompt.md",
+  ];
+  const activeReferences = activeFiles.filter((path) =>
+    forbidden.some((marker) => readFileSync(path, "utf8").includes(marker)),
+  );
+  assert.deepEqual(activeReferences, [], `active prompt retirement references: ${activeReferences.join(", ")}`);
 });
