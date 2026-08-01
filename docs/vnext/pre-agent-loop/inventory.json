@@ -465,9 +465,26 @@
         "editor integration"
       ],
       "classification": "consolidate",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run lint:md",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:docs",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:hooks",
+          "status": 0
+        },
+        {
+          "command": "npm run test:hooks",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "Audience-specific authoring guidance is distinct from executable lint policy, but hooks and workflows should consume the same npm-owned command contract."
     },
     {

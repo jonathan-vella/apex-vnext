@@ -442,7 +442,7 @@
         "npm run test:hooks"
       ],
       "rationale": "Audience-specific authoring guidance is distinct from executable lint policy, but hooks and workflows should consume the same npm-owned command contract.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "artifact-template-validation",
