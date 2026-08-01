@@ -27,3 +27,4 @@
 {"authorization_id":"pre-agent-opt-2026-08-01-command-policy","item":"workflow-validator-ownership","state":"accepted","sha":"45dfe987528893139de9b299b35a6c5d9cf91c27","at":"2026-08-01T10:12:07.848Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-command-policy","item":"repository-validator-graph","state":"accepted","sha":"1e9636fea42adc713b8537cf0ddab516614f203f","at":"2026-08-01T10:15:12.935Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-command-policy","item":"language-validator-boundaries","state":"accepted","sha":"dff6f8d124d26ae397b562fd5465ee93383f076c","at":"2026-08-01T10:17:16.309Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-command-policy","item":"markdown-policy-enforcement","state":"accepted","sha":"609c41123707b645887ddf3c467719d5d9485006","at":"2026-08-01T10:19:01.880Z"}
