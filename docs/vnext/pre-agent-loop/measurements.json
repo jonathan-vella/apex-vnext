@@ -62,6 +62,20 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "skill-discovery",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:skills",
+          "status": 0
+        },
+        {
+          "command": "npm run lint:orphaned-content",
+          "status": 0
+        }
+      ]
     }
   ]
 }
