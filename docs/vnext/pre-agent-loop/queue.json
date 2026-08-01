@@ -651,7 +651,7 @@
         "npm run lint:docs-freshness"
       ],
       "rationale": "Freshness metadata is a dedicated drift-control surface.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "diagram-routing",

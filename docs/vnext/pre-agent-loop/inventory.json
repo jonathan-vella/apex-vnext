@@ -716,9 +716,14 @@
         "quarterly audit"
       ],
       "classification": "keep",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run lint:docs-freshness",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "Freshness metadata is a dedicated drift-control surface."
     },
     {
