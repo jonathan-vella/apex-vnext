@@ -12,6 +12,7 @@ const SCHEMA = "tools/registry/schemas/modernization-ownership.schema.json";
 const DOCUMENT = "docs/vnext/MODERNIZATION-INVENTORY.md";
 const CONTEXT_RECEIPT = "tools/registry/client-context-baseline-receipt.json";
 const REQUIRED_BASELINES = ["ci", "context", "dependencies", "diagnostics", "drift", "hooks"];
+const ARGUMENT_REQUIRED_PROOF_SCRIPTS = new Set(["check:h2-order"]);
 const SHA256 = /^[0-9a-f]{64}$/u;
 const CONTEXT_RECEIPT_SHA256 = "197cbc48abfebc3d01c8511557d7b852ed35b5169e8cb2fdcb747d1dc013f42a";
 const CONTEXT_CLIENTS = [
@@ -129,6 +130,9 @@ export function validateModernizationOwnership({ manifest, schema, document, scr
     for (const command of surface.proofCommands) {
       const match = command.match(/^npm run ([^ ]+)$/);
       if (match && scripts[match[1]] === undefined) errors.push(`${surface.id}: unknown npm script: ${match[1]}`);
+      if (match && ARGUMENT_REQUIRED_PROOF_SCRIPTS.has(match[1])) {
+        errors.push(`${surface.id}: proof script requires an explicit target: ${match[1]}`);
+      }
     }
     if (!document.includes(`\`${surface.id}\``)) errors.push(`${surface.id}: missing from ${DOCUMENT}`);
   }

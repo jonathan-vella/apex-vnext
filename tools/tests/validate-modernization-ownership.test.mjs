@@ -78,6 +78,17 @@ test("inventory rejects missing sources, proof scripts, baseline domains, and do
   assert.ok(errors.some((error) => error.includes("missing from")));
 });
 
+test("inventory rejects proof scripts that require an explicit target", () => {
+  const invalid = structuredClone(manifest);
+  invalid.surfaces[0].proofCommands = ["npm run check:h2-order"];
+  const errors = validateModernizationOwnership({
+    ...options,
+    manifest: invalid,
+    scripts: { ...options.scripts, "check:h2-order": "node tools/scripts/check-h2-order.mjs" },
+  });
+  assert.ok(errors.some((error) => error.includes("proof script requires an explicit target")));
+});
+
 test("context baseline receipt rejects incomplete, duplicated, and wrong-version evidence", () => {
   const invalid = structuredClone(options.receipt);
   invalid.clients[0].version = "latest";
