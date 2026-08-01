@@ -18,8 +18,10 @@ import {
   processNextItem,
   probeLauncher,
   runFocusedChecks,
+  runQueueGuarded,
   resumeRun,
   snapshotControllerState,
+  taskInvokedSkill,
 } from "../scripts/pre-agent-loop.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -148,6 +150,18 @@ test("structured task output requires valid JSONL", () => {
   assert.deepEqual(parseJsonLines('{"type":"start"}\n{"type":"result"}\n'), [{ type: "start" }, { type: "result" }]);
   assert.throws(() => parseJsonLines(""), /no structured output/);
   assert.throws(() => parseJsonLines("not-json"), /not valid JSONL/);
+});
+
+test("skill availability metadata is allowed while actual skill execution is denied", () => {
+  assert.equal(
+    taskInvokedSkill([{ type: "session.skills_loaded", data: { skills: ["customize-cloud-agent"] } }]),
+    false,
+  );
+  assert.equal(taskInvokedSkill([{ type: "tool.execution_start", data: { toolName: "skill" } }]), true);
+  assert.equal(
+    taskInvokedSkill([{ type: "tool.execution_start", data: { toolName: "view", path: ".github/skills/x/SKILL.md" } }]),
+    true,
+  );
 });
 
 test("task launcher uses a neutral directory and rejects MCP events", () => {
@@ -328,5 +342,48 @@ test("an exhausted queue publishes completion and releases its lock", () => {
   assert.deepEqual(processNextItem({ authorization: fixture, root: temporaryRoot, git }), { state: "completed" });
   assert.equal(existsSync(path.join(temporaryRoot, "docs/vnext/pre-agent-loop/run.lock.json")), false);
   assert.equal(existsSync(path.join(temporaryRoot, "docs/vnext/pre-agent-loop/completion-handoff.md")), true);
+  rmSync(temporaryRoot, { recursive: true, force: true });
+});
+
+test("queue failure records stopped evidence, publishes it, and releases the lock", () => {
+  const temporaryRoot = mkdtempSync(path.join(tmpdir(), "pre-agent-loop-stopped-"));
+  const inventoryRoot = path.join(temporaryRoot, "tools/registry");
+  const binaryPath = path.join(temporaryRoot, "copilot");
+  mkdirSync(inventoryRoot, { recursive: true });
+  symlinkSync(
+    path.join(root, "tools/registry/modernization-ownership.json"),
+    path.join(inventoryRoot, "modernization-ownership.json"),
+  );
+  symlinkSync(authorization.launcher.binary, binaryPath);
+  const fixture = structuredClone(authorization);
+  fixture.worktree = temporaryRoot;
+  fixture.launcher.binary = binaryPath;
+  fixture.context_hashes = {};
+  const sha = "c".repeat(40);
+  const gitCalls = [];
+  const fixtureGit = (args) => {
+    gitCalls.push(args);
+    if (args[0] === "branch") return fixture.branch;
+    if (args[0] === "config") return "origin";
+    if (args[0] === "rev-parse") return sha;
+    if (args[0] === "ls-remote") return `${sha}\trefs/heads/${fixture.branch}`;
+    return "";
+  };
+  const skillSpawn = () => ({
+    status: 0,
+    stdout: '{"type":"tool.execution_start","data":{"toolName":"skill"}}\n',
+    stderr: "",
+  });
+  initializeRun({ authorization: fixture, root: temporaryRoot, git: fixtureGit });
+  assert.throws(
+    () => runQueueGuarded({ authorization: fixture, root: temporaryRoot, git: fixtureGit, spawn: skillSpawn }),
+    /invoked a skill/,
+  );
+  const stateRoot = path.join(temporaryRoot, "docs/vnext/pre-agent-loop");
+  assert.equal(existsSync(path.join(stateRoot, "run.lock.json")), false);
+  assert.equal(JSON.parse(readFileSync(path.join(stateRoot, "queue.json"), "utf8")).state, "stopped");
+  assert.match(readFileSync(path.join(stateRoot, "findings.jsonl"), "utf8"), /invoked a skill/);
+  assert.match(readFileSync(path.join(stateRoot, "checkpoints.jsonl"), "utf8"), /previous_record_sha256/);
+  assert.ok(gitCalls.some((args) => args[0] === "push"));
   rmSync(temporaryRoot, { recursive: true, force: true });
 });

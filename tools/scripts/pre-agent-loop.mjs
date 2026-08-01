@@ -8,6 +8,7 @@
  */
 
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   appendFileSync,
   existsSync,
@@ -228,6 +229,15 @@ export function parseJsonLines(output) {
   }
 }
 
+export function taskInvokedSkill(events) {
+  return events.some((event) => {
+    if (event.type === "session.skills_loaded") return false;
+    if (!/(tool_call|tool\.execution)/u.test(event.type ?? "")) return false;
+    const payload = JSON.stringify(event.data ?? event);
+    return /(?:"(?:name|toolName|tool_name)"\s*:\s*"skill"|SKILL\.md)/iu.test(payload);
+  });
+}
+
 export function changedPathErrors({ changedPaths, authorization, addedLines = [], binaryPaths = [] }) {
   const errors = [];
   if (changedPaths.length > authorization.budgets.files_per_slice) errors.push("slice exceeds file budget");
@@ -350,6 +360,52 @@ export function abortRun({ authorization, root, now = new Date() }) {
   return { state: "aborted" };
 }
 
+function checkpointRecord({ checkpointPath, record }) {
+  const existing = existsSync(checkpointPath) ? readFileSync(checkpointPath, "utf8").trimEnd() : "";
+  const previous = existing === "" ? null : existing.split(/\r?\n/u).at(-1);
+  return {
+    ...record,
+    previous_record_sha256: previous === null ? null : createHash("sha256").update(previous).digest("hex"),
+  };
+}
+
+export function stopRun({ authorization, root, reason, git = gitValue, now = new Date() }) {
+  const paths = statePaths(root);
+  if (!existsSync(paths.lockPath)) return { state: "stopped", evidence_published: false };
+  const lock = readOwnedLock(authorization, root);
+  const queue = existsSync(paths.queuePath) ? readJson(paths.queuePath) : { authorization_id: lock.authorization_id };
+  queue.state = "stopped";
+  queue.stop_reason = reason;
+  writeJsonAtomically(paths.queuePath, queue);
+  appendFileSync(
+    paths.findingsPath,
+    `${JSON.stringify({ authorization_id: lock.authorization_id, severity: "blocking", finding: reason, at: now.toISOString() })}\n`,
+  );
+  const checkpoint = checkpointRecord({
+    checkpointPath: paths.checkpointPath,
+    record: { authorization_id: lock.authorization_id, state: "stopped", reason, at: now.toISOString() },
+  });
+  appendFileSync(paths.checkpointPath, `${JSON.stringify(checkpoint)}\n`);
+  unlinkSync(paths.lockPath);
+
+  const evidencePaths = [paths.queuePath, paths.findingsPath, paths.checkpointPath].map((pathname) =>
+    path.relative(root, pathname),
+  );
+  try {
+    git(["add", "--", ...evidencePaths], root);
+    git(["commit", "-m", "chore(tools): Record stopped pre-agent run"], root);
+    git(["push", "origin", `HEAD:refs/heads/${authorization.branch}`], root);
+    const localSha = git(["rev-parse", "HEAD"], root);
+    const remoteSha = git(["ls-remote", "--heads", "origin", `refs/heads/${authorization.branch}`], root).split(
+      /\s/u,
+    )[0];
+    if (remoteSha !== localSha) throw new Error("stopped checkpoint SHA mismatch");
+    return { state: "stopped", evidence_published: true, sha: localSha };
+  } catch {
+    return { state: "stopped", evidence_published: false };
+  }
+}
+
 function commandAllowed(command, authorization) {
   return (
     authorization.allowed_commands.some((prefix) => command.startsWith(prefix)) &&
@@ -443,7 +499,7 @@ export function launchTask({ authorization, item, spawn = spawnSync }) {
     const events = parseJsonLines(result.stdout ?? "");
     const serialized = JSON.stringify(events);
     if (/mcp_server|mcp\.tools|github-mcp-server/iu.test(serialized)) throw new Error("bounded task loaded MCP");
-    if (/tool[^\n]{0,80}skill/iu.test(serialized)) throw new Error("bounded task invoked a skill");
+    if (taskInvokedSkill(events)) throw new Error("bounded task invoked a skill");
     return events;
   } finally {
     rmSync(neutralDirectory, { recursive: true, force: true });
@@ -536,6 +592,21 @@ export function runQueue({ authorization, root, spawn = spawnSync, git = gitValu
   throw new Error("queue item budget exhausted");
 }
 
+export function runQueueGuarded(options) {
+  try {
+    return runQueue(options);
+  } catch (error) {
+    stopRun({
+      authorization: options.authorization,
+      root: options.root,
+      reason: error.message,
+      git: options.git,
+      now: options.now?.() ?? new Date(),
+    });
+    throw error;
+  }
+}
+
 function statusRun({ authorization, root }) {
   const paths = statePaths(root);
   if (!existsSync(paths.queuePath)) return inspectRun({ authorization, root });
@@ -555,7 +626,7 @@ function main() {
   const result = inspectRun({ authorization, root: ROOT });
   const output =
     command === "resume"
-      ? { state: "running", results: runQueue({ authorization, root: ROOT }) }
+      ? { state: "running", results: runQueueGuarded({ authorization, root: ROOT }) }
       : command === "abort"
         ? abortRun({ authorization, root: ROOT })
         : command === "run" && !dryRun
@@ -564,7 +635,7 @@ function main() {
               if (!probe.ok) throw new Error(probe.reason);
               const initialized = initializeRun({ authorization, root: ROOT });
               if (!initialized.admitted) return initialized;
-              return { state: "running", results: runQueue({ authorization, root: ROOT }) };
+              return { state: "running", results: runQueueGuarded({ authorization, root: ROOT }) };
             })()
           : command === "status"
             ? statusRun({ authorization, root: ROOT })
