@@ -274,6 +274,27 @@ test("task command grants characterized file tools without Git or interactive ca
   );
 });
 
+test("task command bounds glob patterns to their containing directories", () => {
+  const command = buildTaskCommand({
+    authorization,
+    item: {
+      paths: ["packages/contracts/schemas/pricing-*-v1.schema.json", "customizations/.github/agents/*.agent.md"],
+    },
+    prompt: "Inspect the bounded item.",
+  });
+  const addDirectories = command
+    .map((part, index) => (part === "--add-dir" ? command[index + 1] : null))
+    .filter(Boolean);
+  assert.deepEqual(addDirectories, [
+    path.join(authorization.worktree, "packages/contracts/schemas"),
+    path.join(authorization.worktree, "customizations/.github/agents"),
+  ]);
+  assert.equal(
+    addDirectories.every((pathname) => existsSync(pathname)),
+    true,
+  );
+});
+
 test("admitted run writes an atomic lock and queue once", () => {
   const temporaryRoot = mkdtempSync(path.join(tmpdir(), "pre-agent-loop-"));
   const stateRoot = path.join(temporaryRoot, "docs/vnext/pre-agent-loop");
