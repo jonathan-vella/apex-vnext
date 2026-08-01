@@ -37,7 +37,7 @@
         "npm run lint:glob-audit"
       ],
       "rationale": "Instruction files remain authoritative, but their overlapping scopes need one computed audit view.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "user-documentation",
