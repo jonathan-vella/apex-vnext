@@ -42,3 +42,4 @@
 {"authorization_id":"pre-agent-opt-2026-08-01-proof-policy","item":"diagram-routing","state":"accepted","sha":"e4474f03f8512593fb5c862998ff064d2cae837d","at":"2026-08-01T10:39:09.732Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-proof-policy","item":"client-bundle-generation","state":"accepted","sha":"79430bbb63cefc9fb062c8053c9ed732b3ac4225","at":"2026-08-01T10:40:37.367Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-proof-policy","item":"v1-compatibility-matrix","state":"accepted","sha":"5725aa4ffb8d5c13fac7fb971ff97f16273eb600","at":"2026-08-01T10:43:06.027Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-proof-policy","item":"public-command-compatibility","state":"accepted","sha":"651d4774f092010c2bee39320e0fb536482ac0f4","at":"2026-08-01T10:46:21.739Z"}
