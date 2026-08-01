@@ -44,6 +44,7 @@ const SECRET_PATTERN = /(api[_-]?key|password|secret|token)\s*[:=]\s*[^\s]+/iu;
 const TASK_TOOLS = ["view", "glob", "rg", "apply_patch"];
 const DENIED_TASK_TOOLS = ["ask_user", "task", "skill", "web_fetch", "session_store_sql", "apex", "github"];
 const DISABLED_MCP_SERVERS = ["github-mcp-server", "github", "azure-resource-manager-mcp", "apex"];
+const RESERVED_COMMANDS = new Set(["npm run validate:all", "npm run qualify:vnext-release"]);
 
 function matchesPath(pathname, pattern) {
   const expression = `^${pattern
@@ -468,6 +469,13 @@ export function runFocusedChecks({ commands, authorization, root, spawn = spawnS
   return results;
 }
 
+export function focusedCheckPlan(commands) {
+  return {
+    executable: commands.filter((command) => !RESERVED_COMMANDS.has(command)),
+    reserved: commands.filter((command) => RESERVED_COMMANDS.has(command)),
+  };
+}
+
 export function collectGitChanges(root, git = gitValue) {
   const status = git(["status", "--porcelain=v1", "-z"], root);
   const changedPaths = status
@@ -612,7 +620,11 @@ export function processNextItem({ authorization, root, spawn = spawnSync, git = 
     .filter((pathname) => !item.paths.some((pattern) => matchesPath(pathname, pattern)))
     .map((pathname) => `path outside queue item: ${pathname}`);
   if (errors.length > 0 || itemScopeErrors.length > 0) throw new Error([...errors, ...itemScopeErrors].join("; "));
-  const checks = runFocusedChecks({ commands: item.focused_checks, authorization, root, spawn });
+  const checkPlan = focusedCheckPlan(item.focused_checks);
+  const checks = [
+    ...runFocusedChecks({ commands: checkPlan.executable, authorization, root, spawn }),
+    ...checkPlan.reserved.map((command) => ({ command, status: "reserved-for-terminal-stage" })),
+  ];
   item.status = "accepted";
   const inventory = readJson(paths.inventoryPath);
   const surface = inventory.surfaces.find(({ id }) => id === item.id);

@@ -12,6 +12,7 @@ import {
   buildTaskCommand,
   changedPathErrors,
   collectGitChanges,
+  focusedCheckPlan,
   initializeRun,
   launchTask,
   parseJsonLines,
@@ -246,6 +247,13 @@ test("focused checks require authorization and a successful exit", () => {
     () => runFocusedChecks({ commands: ["npm run lint:json"], authorization, root, spawn: failure }),
     /focused check failed/,
   );
+});
+
+test("terminal validation and release qualification remain reserved", () => {
+  assert.deepEqual(focusedCheckPlan(["npm run lint:json", "npm run validate:all", "npm run qualify:vnext-release"]), {
+    executable: ["npm run lint:json"],
+    reserved: ["npm run validate:all", "npm run qualify:vnext-release"],
+  });
 });
 
 test("task command grants characterized file tools without Git or interactive capabilities", () => {
