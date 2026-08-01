@@ -92,9 +92,18 @@
         "release checks"
       ],
       "classification": "keep",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:models",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:model-catalog",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "Definitions are maintained centrally and assignments are generated from executable frontmatter."
     },
     {
