@@ -35,3 +35,4 @@
 {"authorization_id":"pre-agent-opt-2026-08-01-proof-policy","item":"exact-head-release-qualification","state":"accepted","sha":"01c49299d97d813a08a24d3a0b067bf5d84fbbe3","at":"2026-08-01T10:31:08.664Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-proof-policy","item":"maintenance-workflows","state":"accepted","sha":"6056c836635328c12bbf26f6179bbe5f15b0d7b2","at":"2026-08-01T10:33:37.568Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-proof-policy","item":"upstream-workflow-synchronization","state":"accepted","sha":"67709740af3e55b21458ec9910e837bd59f7bd58","at":"2026-08-01T10:34:34.568Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-proof-policy","item":"model-catalog-generation","state":"accepted","sha":"44579ada84a190c2b835e4d61a137461f83f7ee6","at":"2026-08-01T10:35:14.792Z"}
