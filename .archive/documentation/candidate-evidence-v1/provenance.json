@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0.0",
+  "archivedFrom": "da708ef5e0ff63a9ff1bf1a43112c6670e3bfc0a",
+  "replacementOwners": [
+    "docs/reference/client-support.md",
+    "docs/explanation/client-projections.md",
+    "docs/reference/iac-tracks.md",
+    "docs/vnext"
+  ],
+  "artifacts": [
+    { "path": "docs/vnext/CLIENT-CONTEXT-BASELINE.md", "sha256": "1980d7c82fbc33bc919a8a57bce833139b18b9ef24f3e38c9fcc75c71df17df2" },
+    { "path": "docs/vnext/CUSTOM-AGENT-CONTRACT-PLAN.md", "sha256": "fb2071457ae8ce88caa875f1aba66c9e0c0b46d71ffd5399264a84cef38b9929" },
+    { "path": "docs/vnext/FINAL-QUALIFICATION.md", "sha256": "6d6ac919641491847f7166f88862efd181e19dac2b24c07ebc7635366b4c8385" },
+    { "path": "docs/vnext/GUIDANCE-AUTOMATION-CHARACTERIZATION.md", "sha256": "f404c033e1f6e3917aeec47b6fca875d8bbdff452663bcb8ee954328dce16985" },
+    { "path": "docs/vnext/GUIDANCE-AUTOMATION-REVIEW.md", "sha256": "2fff246571309e25741e1c89697bf5db073cc7e90f74a8da7e9b699a90249e38" },
+    { "path": "docs/vnext/HIDDEN-WORKER-CHARACTERIZATION.md", "sha256": "5cd65516a12240748ca386afab4d3649da331527fa1927acc0bd21cc0ed8ee43" },
+    { "path": "docs/vnext/SECURITY-REVIEW.md", "sha256": "4d399eaa3aff220e98298b9b5a7299fe6b41ac88e7851adace10ea51d74a83c3" },
+    { "path": "docs/vnext/TERRAFORM-MCP-CHARACTERIZATION.md", "sha256": "ab1f99f08607aacc9e465035cf571d9c20caa5e034cc168fa413a9eacd5e106c" },
+    { "path": "docs/vnext/TERRAFORM-PROVIDER-INTROSPECTION.md", "sha256": "2684aac7b9c0dc97c6210e408ff3e5a82bc2e09004cad38f53f633fe572806fd" },
+    { "path": "docs/vnext/TERRAFORM-REGISTRY-CLIENT.md", "sha256": "047af523384690b53391c5fdef12466fc1212ec2c0700d5cea4001d04a31bebb" }
+  ]
+}

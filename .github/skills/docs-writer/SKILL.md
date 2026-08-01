@@ -37,12 +37,11 @@ None — all tools and references are workspace-local.
 
 All markdown documentation **except** `agent-output/**/*.md`:
 
-- `docs/` — user-facing Markdown docs (quickstart, workflow, troubleshooting, etc.)
+- `docs/` — vNext tutorials, how-to guides, explanations, references, migration, and project controls
 - `tools/tests/exec-plans/tech-debt-tracker.md` — tech debt inventory
 - `README.md` — repo root README
 - `CONTRIBUTING.md` — contribution guidelines
 - `CHANGELOG.md` — release history
-- `QUALITY_SCORE.md` — project health grades
 - `.github/instructions/docs.instructions.md` — user-guide standards
 
 ### Out of Scope (Has Own Validators)

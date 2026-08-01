@@ -31,13 +31,13 @@ npm run test:vnext-pack
 ## Documentation
 
 - [Documentation index](docs/README.md)
-- [Installation](docs/guides/installation.md)
-- [Workflow](docs/guides/workflow.md)
-- [CLI and MCP reference](docs/guides/cli-reference.md)
-- [Operations](docs/guides/operations.md)
-- [Security](docs/guides/security.md)
+- [First local run](docs/tutorials/first-run.md)
+- [Workflow](docs/how-to/run-workflow.md)
+- [CLI reference](docs/reference/cli.md)
+- [Operations](docs/how-to/operate-project.md)
+- [Security and authority](docs/explanation/security-and-authority.md)
 - [Security policy and vulnerability reporting](SECURITY.md)
-- [Qualification](docs/guides/testing.md)
+- [Qualification](docs/how-to/qualify-candidate.md)
 - [Project and release controls](docs/vnext/README.md)
 
 Documentation is maintained as ordinary Markdown under `docs/`. This repository
@@ -52,7 +52,7 @@ does not include or publish an Astro site.
 | `config/` | Runtime, workflow, capability-pack, toolchain, and scorecard contracts |
 | `infra/` | Bicep and Terraform qualification infrastructure |
 | `tools/` | Validators, packaging, live qualification, MCP servers, and project utilities |
-| `docs/guides/` | User-facing Markdown guides |
+| `docs/tutorials/`, `docs/how-to/`, `docs/explanation/`, `docs/reference/` | vNext product documentation |
 | `docs/vnext/` | Product scope, roadmap, decisions, risks, and qualification procedures |
 
 ## Release Safety
@@ -64,10 +64,7 @@ not substitute for the live evidence required by the
 
 ## Provenance
 
-This repository began as a clean snapshot of the qualified vNext integration
-head from the original APEX repository. See [docs/MIGRATION.md](docs/MIGRATION.md)
-and [SOURCE_PROVENANCE.json](SOURCE_PROVENANCE.json) for the immutable source
-reference and extraction policy.
+See [Migration](docs/MIGRATION.md) and [SOURCE_PROVENANCE.json](SOURCE_PROVENANCE.json) for extraction provenance.
 
 ## License
 

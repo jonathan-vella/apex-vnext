@@ -107,9 +107,8 @@ These agents were removed and converted to skills. Never reference them:
 
 Also avoid references to removed paths:
 
-- `docs/guides/` — removed
-- `docs/reference/` — removed
-- `docs/getting-started.md` — superseded by `docs/quickstart.md`
+- `docs/guides/` — replaced by the Diátaxis tree
+- `docs/getting-started.md` and `docs/quickstart.md` — replaced by `docs/tutorials/first-run.md`
 
 ## Content Principles
 
@@ -119,7 +118,7 @@ Also avoid references to removed paths:
 | **Current state**          | No historical context in main docs                      |
 | **Action-oriented**        | Every section answers "how do I...?"                    |
 | **Minimal**                | If it doesn't help users today, remove it               |
-| **Prompt guide for depth** | Point to the prompt guide section in the published site |
+| **Source grounded**        | Link commands and claims to executable vNext authority |
 
 ## Validation Commands
 

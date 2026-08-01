@@ -10,34 +10,16 @@ in the in-repo `docs/**` folder. Cross-cutting rules (line length, ATX headings,
 link syntax, patterns-to-avoid) live in
 [`markdown.instructions.md`](markdown.instructions.md) and apply here too.
 
-## Template-First Approach
+## Content Families
 
-For documentation pages that mirror agent-output structure, preserve
-the H2 heading order from the canonical agent-output templates so that
-internal links from agent-output pages resolve.
+- Tutorials teach one bounded local learning path.
+- How-to guides solve one operational task.
+- Explanations describe architecture, workflow, or trust boundaries.
+- References list exact interfaces and source authorities.
+- `docs/vnext/` contains binding project controls, not product tutorials.
 
-- Preserve H2 heading order — invariant sections come first
-- No embedded skeletons — link to templates instead of copying them
-- Optional sections after the last required H2
-- The full template registry is enforced by
-  `tools/scripts/validate-artifacts.mjs` (applies to `agent-output/**`,
-  not repository documentation — included here for reference)
-
-## Visual Styling
-
-See `azure-artifacts/SKILL.md` for the canonical styling reference
-(badges, emoji, callouts, status icons, collapsible sections). Reproduce
-these conventions consistently in repository documentation so links between
-docs and agent-output artifacts feel unified.
-
-Common reusable elements:
-
-| Element              | Source                                                   |
-| -------------------- | -------------------------------------------------------- |
-| Badge row            | `![Step]` / `![Status]` / `![Agent]` shields             |
-| Collapsible TOC      | `<details open>` block with section links                |
-| Traffic-light status | ✅ / ⚠️ / ❌ (all three required when used as a column) |
-| Cross-navigation     | Header table with ⬅️ Previous / 📑 Index / Next ➡️       |
+Keep pages quiet and repository-native. Do not copy agent-output badge rows,
+collapsible tables of contents, or step-navigation chrome into product docs.
 
 ## Validation
 

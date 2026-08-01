@@ -17,6 +17,8 @@ const devcontainerArchivePath = ".archive/retired-automation/devcontainer-base-v
 const npmUtilitiesArchivePath = ".archive/retired-utilities/npm-scripts-v1";
 const devcontainerUtilitiesArchivePath = ".archive/retired-utilities/devcontainer-v1";
 const rootConfigArchivePath = ".archive/retired-config/root-v1";
+const guideArchivePath = ".archive/documentation/guides-v1";
+const candidateDocumentationArchivePath = ".archive/documentation/candidate-evidence-v1";
 
 function textSha256(path) {
   const normalized = readFileSync(path, "utf8").replace(/\r\n/gu, "\n");
@@ -145,6 +147,19 @@ test("zero-consumer root configuration remains provenance-only", () => {
     const archiveFile = `${rootConfigArchivePath}/${artifact.path}`;
     assert.equal(existsSync(archiveFile), true, `missing archived root configuration: ${artifact.path}`);
     assert.equal(textSha256(archiveFile), artifact.sha256);
+  }
+});
+
+test("superseded documentation remains provenance-only", () => {
+  for (const archiveRoot of [guideArchivePath, candidateDocumentationArchivePath]) {
+    const provenance = JSON.parse(readFileSync(`${archiveRoot}/provenance.json`, "utf8"));
+    assert.equal(provenance.archivedFrom, "da708ef5e0ff63a9ff1bf1a43112c6670e3bfc0a");
+    for (const artifact of provenance.artifacts) {
+      assert.equal(existsSync(artifact.path), false, `${artifact.path} must stay out of active documentation`);
+      const archiveFile = `${archiveRoot}/${artifact.path}`;
+      assert.equal(existsSync(archiveFile), true, `missing archived documentation: ${artifact.path}`);
+      assert.equal(textSha256(archiveFile), artifact.sha256);
+    }
   }
 });
 

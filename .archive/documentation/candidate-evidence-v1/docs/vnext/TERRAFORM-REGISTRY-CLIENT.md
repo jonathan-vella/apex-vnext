@@ -57,6 +57,6 @@ Live results are compatibility evidence only; deterministic fixtures own regress
 ## Retirement Status
 
 Issue #147 migrated active consumers and retired Terraform MCP after native lifecycle parity passed. The prior
-characterization, replacement owners, archive hashes, and rollback procedure are recorded in
-[TERRAFORM-MCP-CHARACTERIZATION.md](TERRAFORM-MCP-CHARACTERIZATION.md). Active reintroduction is blocked by
-`validate:terraform-mcp-retirement` and MCP config mutation tests.
+characterization, replacement owners, archive hashes, and rollback procedure are preserved in the
+[Terraform MCP retirement archive](../../.archive/retired-automation/terraform-mcp/README.md). Active reintroduction is
+blocked by `validate:terraform-mcp-retirement` and MCP config mutation tests.

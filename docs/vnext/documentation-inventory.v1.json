@@ -1,0 +1,142 @@
+{
+  "schemaVersion": "documentation-inventory-v1",
+  "inventoryBinding": {
+    "commit": "da708ef5e0ff63a9ff1bf1a43112c6670e3bfc0a",
+    "capturedAt": "2026-08-01",
+    "scope": "mutable repository documentation; docs/vnext/phase-0a is frozen"
+  },
+  "authorities": {
+    "productStatus": "VERSION.md",
+    "migrationHistory": "docs/MIGRATION.md",
+    "workflow": "config/workflow.v1.json",
+    "defaults": "config/defaults.v1.json",
+    "clients": "customizations/manifest.json",
+    "cli": "packages/cli/src/cli.ts",
+    "errors": "packages/cli/src/errors.ts",
+    "mcp": "packages/cli/src/mcp.ts",
+    "projectControls": "docs/vnext/README.md",
+    "qualification": "tools/scripts/validate-vnext.mjs"
+  },
+  "records": [
+    {
+      "id": "root-readme",
+      "currentPath": "README.md",
+      "contentClass": "user-doc",
+      "audiences": ["platform-engineer", "repository-contributor"],
+      "lifecycle": "active",
+      "classification": "rewrite",
+      "targetFamily": "navigation",
+      "targetPaths": ["README.md"],
+      "authorityBindings": ["productStatus", "clients"]
+    },
+    {
+      "id": "contributing",
+      "currentPath": "CONTRIBUTING.md",
+      "contentClass": "contributor-doc",
+      "audiences": ["repository-contributor"],
+      "lifecycle": "active",
+      "classification": "split",
+      "targetFamily": "how-to",
+      "targetPaths": ["CONTRIBUTING.md", "docs/how-to/contribute.md"],
+      "authorityBindings": ["projectControls", "qualification"]
+    },
+    {
+      "id": "documentation-index",
+      "currentPath": "docs/README.md",
+      "contentClass": "user-doc",
+      "audiences": ["platform-engineer", "repository-contributor"],
+      "lifecycle": "active",
+      "classification": "rewrite",
+      "targetFamily": "navigation",
+      "targetPaths": ["docs/README.md"],
+      "authorityBindings": ["productStatus", "projectControls"]
+    },
+    {
+      "id": "migration",
+      "currentPath": "docs/MIGRATION.md",
+      "contentClass": "historical",
+      "audiences": ["repository-contributor", "maintainer"],
+      "lifecycle": "active",
+      "classification": "keep",
+      "targetFamily": "migration",
+      "targetPaths": ["docs/MIGRATION.md"],
+      "authorityBindings": ["migrationHistory"]
+    },
+    {
+      "id": "legacy-user-guides",
+      "currentPath": ".archive/documentation/guides-v1/docs/guides/**",
+      "contentClass": "user-doc",
+      "audiences": ["platform-engineer", "repository-contributor"],
+      "lifecycle": "archived",
+      "classification": "retire",
+      "targetFamily": "none",
+      "targetPaths": ["docs/tutorials/**", "docs/how-to/**", "docs/reference/**", "docs/explanation/**"],
+      "authorityBindings": ["cli", "workflow", "clients", "qualification"],
+      "archive": {
+        "destination": ".archive/documentation/guides-v1",
+        "provenanceRequired": true,
+        "negativeGuardRequired": true
+      }
+    },
+    {
+      "id": "project-controls",
+      "currentPath": "docs/vnext/{README,PRD,ROADMAP,REGISTER,DECISIONS,CLIENT-QUALIFICATION,LIVE-QUALIFICATION}.md",
+      "contentClass": "project-control",
+      "audiences": ["repository-contributor", "maintainer", "release-reviewer"],
+      "lifecycle": "active",
+      "classification": "keep",
+      "targetFamily": "project-control",
+      "targetPaths": ["docs/vnext/**"],
+      "authorityBindings": ["projectControls", "qualification"]
+    },
+    {
+      "id": "phase-0a",
+      "currentPath": "docs/vnext/phase-0a/**",
+      "contentClass": "qualification-evidence",
+      "audiences": ["maintainer", "release-reviewer"],
+      "lifecycle": "frozen",
+      "classification": "keep",
+      "targetFamily": "project-control",
+      "targetPaths": ["docs/vnext/phase-0a/**"],
+      "authorityBindings": ["projectControls"]
+    },
+    {
+      "id": "candidate-evidence",
+      "currentPath": ".archive/documentation/candidate-evidence-v1/docs/vnext/**",
+      "contentClass": "qualification-evidence",
+      "audiences": ["maintainer", "release-reviewer"],
+      "lifecycle": "archived",
+      "classification": "retire",
+      "targetFamily": "none",
+      "targetPaths": ["docs/reference/client-support.md", "docs/explanation/client-projections.md"],
+      "authorityBindings": ["clients", "qualification"],
+      "archive": {
+        "destination": ".archive/documentation/candidate-evidence-v1",
+        "provenanceRequired": true,
+        "negativeGuardRequired": true
+      }
+    },
+    {
+      "id": "terraform-reference",
+      "currentPath": "docs/reference/iac-tracks.md",
+      "contentClass": "user-doc",
+      "audiences": ["platform-engineer", "repository-contributor"],
+      "lifecycle": "active",
+      "classification": "keep",
+      "targetFamily": "reference",
+      "targetPaths": ["docs/reference/iac-tracks.md"],
+      "authorityBindings": ["workflow"]
+    },
+    {
+      "id": "adrs",
+      "currentPath": "docs/vnext/adrs/**",
+      "contentClass": "binding-contract",
+      "audiences": ["repository-contributor", "maintainer"],
+      "lifecycle": "active",
+      "classification": "keep",
+      "targetFamily": "project-control",
+      "targetPaths": ["docs/vnext/adrs/**"],
+      "authorityBindings": ["projectControls"]
+    }
+  ]
+}

@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Rebuilt documentation as a vNext-only Diátaxis set, generated CLI and MCP inventories from source, simplified active
+  project controls, and archived superseded guides and candidate narratives with provenance and reintroduction guards.
 - Audited repository-root files, restored Gitleaks default secret detection, retired zero-consumer root configuration,
   and removed stale original-APEX metadata, exclusions, and release automation claims.
 - Reviewed every direct npm dependency and selected the newest releases available through the required package feed,
