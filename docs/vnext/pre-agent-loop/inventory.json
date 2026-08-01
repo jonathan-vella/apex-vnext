@@ -678,9 +678,14 @@
         "repository audits"
       ],
       "classification": "keep",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:no-hardcoded-counts",
+          "status": 0
+        }
+      ],
+      "release_impact": "none",
       "rationale": "Exact entity counts are derived facts and must not be copied into prose."
     },
     {

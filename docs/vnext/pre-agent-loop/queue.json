@@ -613,7 +613,7 @@
         "npm run validate:no-hardcoded-counts"
       ],
       "rationale": "Exact entity counts are derived facts and must not be copied into prose.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "avm-index-generation",
