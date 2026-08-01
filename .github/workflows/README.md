@@ -10,7 +10,6 @@
 | [`ci.yml`](ci.yml)                                                 | PR + push to `main`           | Single required status check: markdown lint, every `validate:*` script, handoff/contract checks.                           | None — fails the PR on regression.                                   |
 | [`branch-enforcement.yml`](branch-enforcement.yml)                 | PR to `main`                  | Enforces branch naming + file-scope rules so PRs stay reviewable.                                                          | None — fails the PR on violation.                                    |
 | [`docs.yml`](docs.yml) | PR + push to `main` (docs) | Validate Markdown style, links, and freshness. | None - fails on documentation regression. |
-| [`e2e-validation.yml`](e2e-validation.yml)                         | Weekly Mon 09:00 UTC + manual | Validate Ralph Loop E2E artifacts (required) + run benchmark scoring (informational).                                      | Uploads benchmark report artifact.                                   |
 | [`governance-policy-baseline.yml`](governance-policy-baseline.yml) | Weekly Mon 05:00 UTC + manual | Refresh `.github/data/governance-policy-baseline.json` from a live subscription.                                           | Opens a PR (manual review + merge required) when baseline drifts.    |
 | [`release-candidate-qualification.yml`](release-candidate-qualification.yml) | Release-relevant PR/push + manual | Run the release-unique exact-head scorecard after required CI proves validators, tests, and packaging. | Uploads a compact evidence bundle; cannot deploy, merge, publish, tag, or authorize cutover. |
 | [`sensei-branch-maintenance.yml`](sensei-branch-maintenance.yml)   | Weekly Mon 08:00 UTC + manual | Keep `feat/skills-sensei` long-lived branch healthy: merge `main` weekly, run validators, file issue if branch is missing. | Pushes merge commit to `feat/skills-sensei`; may open issue.         |
@@ -76,7 +75,6 @@ behind each other on the free-tier runner pool. All times UTC.
 | Monday | 05:00 | `governance-policy-baseline.yml` |
 | Monday | 06:00 | `weekly-maintenance.yml`         |
 | Monday | 08:00 | `sensei-branch-maintenance.yml`  |
-| Monday | 09:00 | `e2e-validation.yml`             |
 
 ## See also
 

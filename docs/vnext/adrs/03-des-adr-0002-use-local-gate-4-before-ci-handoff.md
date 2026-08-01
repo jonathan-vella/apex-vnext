@@ -32,8 +32,8 @@ current billing plan, and the maintainer determined that external reviewer prote
 The Environment remains useful as the Microsoft Entra workload-identity subject and as a scope for nonsecret variables
 and encrypted secrets. It must not create a second approval authority or let CI manufacture the human Gate 4 decision.
 This ADR supersedes the Environment-approval and incoming transport-route parts of
-[ADR-0001](03-des-adr-0001-use-split-encrypted-ci-transport.md). Its separate encrypted envelopes, exact-plan, network,
-cleanup, and production boundaries remain accepted.
+[ADR-0001](../../../.archive/qualification/vnext-qualification-v1/README.md). Its separate encrypted envelopes,
+exact-plan, network, cleanup, and production boundaries remain accepted.
 
 ## ✅ Decision
 
@@ -55,13 +55,13 @@ evidence is accepted. Production Terraform CI apply remains blocked by its separ
 
 ## 🔄 Alternatives Considered
 
-| Option | Pros | Cons | WAF Impact |
-| --- | --- | --- | --- |
-| Upgrade GitHub for required reviewers | Native protected-job pause | Adds cost and an external approval control APEX does not require | Security →, Cost ↓, Operations ↓ |
-| Add a second manual apply workflow | GitHub actor starts apply after preview | Adds cross-run artifact, expiry, and state coordination | Reliability ↓, Operations ↓ |
-| Let CI approve Gate 4 | Minimal workflow change | CI would manufacture its own authorization and mislabel it as human approval | Security ↓, Operations ↑ |
-| Remove Gate 4 entirely | Simplest execution path | Removes exact-preview human authorization for state-changing operations | Security ↓, Reliability ↓ |
-| Local Gate 4 before CI handoff | Keeps one exact approval in APEX and one CI run | Requires one-hop post-approval transfer validation | Security ↑, Operations ↑ |
+| Option                                | Pros                                            | Cons                                                                         | WAF Impact                       |
+| ------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------- |
+| Upgrade GitHub for required reviewers | Native protected-job pause                      | Adds cost and an external approval control APEX does not require             | Security →, Cost ↓, Operations ↓ |
+| Add a second manual apply workflow    | GitHub actor starts apply after preview         | Adds cross-run artifact, expiry, and state coordination                      | Reliability ↓, Operations ↓      |
+| Let CI approve Gate 4                 | Minimal workflow change                         | CI would manufacture its own authorization and mislabel it as human approval | Security ↓, Operations ↑         |
+| Remove Gate 4 entirely                | Simplest execution path                         | Removes exact-preview human authorization for state-changing operations      | Security ↓, Reliability ↓        |
+| Local Gate 4 before CI handoff        | Keeps one exact approval in APEX and one CI run | Requires one-hop post-approval transfer validation                           | Security ↑, Operations ↑         |
 
 ## ⚖️ Consequences
 
@@ -90,13 +90,13 @@ evidence is accepted. Production Terraform CI apply remains blocked by its separ
 
 ## 🏛️ WAF Pillar Analysis
 
-| Pillar | Impact | Notes |
-| --- | --- | --- |
-| Security | ↑ | One exact APEX approval remains; CI self-approval and misleading reviewer evidence are removed |
-| Reliability | ↑ | Imported approval and one-hop lineage fail closed on stale, changed, expired, or second-hop state |
-| Performance | → | Local preview moves work out of CI but does not materially change qualification duration |
-| Cost | ↑ | No GitHub plan upgrade or additional hosted approval workflow is required |
-| Operations | ↑ | One local ceremony followed by one CI run is simpler than cross-run manual approval coordination |
+| Pillar      | Impact | Notes                                                                                             |
+| ----------- | ------ | ------------------------------------------------------------------------------------------------- |
+| Security    | ↑      | One exact APEX approval remains; CI self-approval and misleading reviewer evidence are removed    |
+| Reliability | ↑      | Imported approval and one-hop lineage fail closed on stale, changed, expired, or second-hop state |
+| Performance | →      | Local preview moves work out of CI but does not materially change qualification duration          |
+| Cost        | ↑      | No GitHub plan upgrade or additional hosted approval workflow is required                         |
+| Operations  | ↑      | One local ceremony followed by one CI run is simpler than cross-run manual approval coordination  |
 
 ## 🔒 Compliance Considerations
 
@@ -127,8 +127,8 @@ evidence is accepted. Production Terraform CI apply remains blocked by its separ
 
 <div align="center">
 
-| ⬅️ [Previous ADR](03-des-adr-0001-use-split-encrypted-ci-transport.md) | 🏠 [Project Index](README.md) | Next ADR ➡️ |
-| --- | --- | --- |
-| [ADR-0001](03-des-adr-0001-use-split-encrypted-ci-transport.md) | [README](README.md) | None |
+| ⬅️ [Previous ADR](../../../.archive/qualification/vnext-qualification-v1/agent-output/vnext-qualification/03-des-adr-0001-use-split-encrypted-ci-transport.md) | 🏠 [Project Index](README.md) | Next ADR ➡️ |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | ----------- |
+| [ADR-0001](../../../.archive/qualification/vnext-qualification-v1/agent-output/vnext-qualification/03-des-adr-0001-use-split-encrypted-ci-transport.md)        | [README](README.md)           | None        |
 
 </div>

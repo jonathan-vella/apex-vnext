@@ -134,7 +134,6 @@ const SAFE_NUMBERS = new Set(["0", "1", "2", "3", "4", "5"]);
 const ALLOWLIST_PATHS = [
   /count-manifest\.json$/,
   /CHANGELOG\.md$/,
-  /QUALITY_SCORE\.md$/, // Health dashboard — counts are its purpose
   /validate-no-hardcoded-counts\.mjs$/,
   /no-hardcoded-counts\.instructions\.md$/,
   /node_modules\//,
@@ -167,7 +166,7 @@ const ALLOWLIST_LINE_PATTERNS = [
 ];
 
 const SCAN_DIRS = [".github", "docs", "scripts", "mcp", ".devcontainer"];
-const SCAN_ROOT_FILES = ["AGENTS.md", "README.md", "QUALITY_SCORE.md", "CONTRIBUTING.md"];
+const SCAN_ROOT_FILES = ["AGENTS.md", "README.md", "CONTRIBUTING.md"];
 
 const TEXT_EXTS = new Set([
   ".md",

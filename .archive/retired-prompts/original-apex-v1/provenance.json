@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0.0",
+  "archivedFrom": "901adcbc4b033c912cfbd198307c44b4979b089e",
+  "replacementOwners": [
+    "packages/kernel",
+    "customizations/.github/agents",
+    "customizations/.github/skills"
+  ],
+  "artifacts": [
+    { "path": ".github/prompts/apex-resume-workflow.prompt.md", "sha256": "63bac5d29cfa1a4281ddf9c28a9f0dfa75df04501acf3f81295f3479407a1688" },
+    { "path": "tools/apex-prompts/workflow-prompts/00-resume-workflow.prompt.md", "sha256": "5faa641c2b515d8bee154e184b3479f422c6fd04797761507ccdb801fe587e29" },
+    { "path": "tools/apex-prompts/workflow-prompts/02-requirements.prompt.md", "sha256": "e966a9c706c997263e71d85e207aa5f2736b519bb3a4de74f02c2cfabc869bf0" },
+    { "path": "tools/apex-prompts/workflow-prompts/03-architect.prompt.md", "sha256": "59ff064c1f602e54b8fe05831a59b4ed900756f88d25d71b8728765031d1219d" },
+    { "path": "tools/apex-prompts/workflow-prompts/04-design.prompt.md", "sha256": "9986da69373125ba07cb5ce16175eb741711a33d18879cc55d893148ecd5f94c" },
+    { "path": "tools/apex-prompts/workflow-prompts/04g-governance.prompt.md", "sha256": "ae26b4b9050f5964bc90039a81c34597da63940338040d9595695863231ecf56" },
+    { "path": "tools/apex-prompts/workflow-prompts/05-iac-planner.prompt.md", "sha256": "68dba98d1b27b925115a276947dcc27156c4a592d8352de92138dd483b144071" },
+    { "path": "tools/apex-prompts/workflow-prompts/06b-bicep-codegen.prompt.md", "sha256": "aa70e9c3be77a633a4326ea58e5da039823361fa2d64fd89561a7a79493a8e5d" },
+    { "path": "tools/apex-prompts/workflow-prompts/06t-terraform-codegen.prompt.md", "sha256": "2a2956bb65ef62b106acdf21e559788342d465e01c38b18311ece62ba9522c3a" },
+    { "path": "tools/apex-prompts/workflow-prompts/07b-bicep-deploy.prompt.md", "sha256": "2c9cadf2803d8c3c41c59429d2379d99cf7eabb0d480798c9c68bf5cf66bbbe1" },
+    { "path": "tools/apex-prompts/workflow-prompts/07t-terraform-deploy.prompt.md", "sha256": "dab009819263866f42016de789c8fb36eb2f0f0dfd07e01a34c8a29703ffdf26" },
+    { "path": "tools/apex-prompts/workflow-prompts/08-as-built.prompt.md", "sha256": "2c431d22999cd5b87e198a34cf1fa778fe4ce74d47d355c1567509013e496297" },
+    { "path": "tools/apex-prompts/workflow-prompts/09-diagnose-resource.prompt.md", "sha256": "d3a8bed659e91cc2687e164867afd06b25e106feb17a4f6a9c684948d2a38181" },
+    { "path": "tools/apex-prompts/workflow-prompts/10-challenger-review.prompt.md", "sha256": "33bb2a05586d92948d08dfc64738a3ef9e9efb73fd151a7c4819ebc1cff1c3e2" },
+    { "path": "tools/apex-prompts/utility-prompts/as-built-from-azure.prompt.md", "sha256": "25d457e647b4d606b334860553b8585537269bf4ba585cfd81cc6eec8f14716d" },
+    { "path": "tools/apex-prompts/utility-prompts/review-imported-iac.prompt.md", "sha256": "729cd457b740ca9b8a1c0e2a8adbe63d23dfb9f75f2184e87aaade457081e01f" }
+  ]
+}

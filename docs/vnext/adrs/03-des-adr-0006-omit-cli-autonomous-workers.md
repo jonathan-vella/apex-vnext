@@ -46,12 +46,12 @@ selection visibility and declared-parent invocation.
 
 ## 🔄 Alternatives Considered
 
-| Option | Pros | Cons | WAF Impact |
-| --- | --- | --- | --- |
-| Omit CLI autonomous workers | Fail-closed, explicit, reversible | Worker-dependent CLI flows remain unavailable | Security ↑, Reliability ↑ |
-| Accept directly selectable workers | Retains profile tools and models | User can bypass declared parents; kernel cannot authenticate caller profile | Security ↓ |
-| Use generic `task` prompts | Avoids selectable worker profiles | Loses profile-bound model, tools, and deterministic role identity | Security ↓, Operations ↓ |
-| Re-pin to CLI `1.0.75` | Uses a newer exact stable binary | Exact probe reproduced the same visibility/delegation gap | Reliability → |
+| Option                             | Pros                              | Cons                                                                        | WAF Impact                |
+| ---------------------------------- | --------------------------------- | --------------------------------------------------------------------------- | ------------------------- |
+| Omit CLI autonomous workers        | Fail-closed, explicit, reversible | Worker-dependent CLI flows remain unavailable                               | Security ↑, Reliability ↑ |
+| Accept directly selectable workers | Retains profile tools and models  | User can bypass declared parents; kernel cannot authenticate caller profile | Security ↓                |
+| Use generic `task` prompts         | Avoids selectable worker profiles | Loses profile-bound model, tools, and deterministic role identity           | Security ↓, Operations ↓  |
+| Re-pin to CLI `1.0.75`             | Uses a newer exact stable binary  | Exact probe reproduced the same visibility/delegation gap                   | Reliability →             |
 
 ## ⚖️ Consequences
 
@@ -74,13 +74,13 @@ selection visibility and declared-parent invocation.
 
 ## 🏛️ WAF Pillar Analysis
 
-| Pillar | Impact | Notes |
-| --- | --- | --- |
-| Security | ↑ | Removes directly selectable autonomous worker profiles from the CLI projection |
-| Reliability | ↑ | Unsupported delegation fails through deterministic absence rather than prompt convention |
-| Performance | → | Fewer generated files have negligible runtime impact |
-| Cost | → | No service, model, or infrastructure cost changes |
-| Operations | ↓ | Some CLI workflows remain unavailable and require explicit qualification status |
+| Pillar      | Impact | Notes                                                                                    |
+| ----------- | ------ | ---------------------------------------------------------------------------------------- |
+| Security    | ↑      | Removes directly selectable autonomous worker profiles from the CLI projection           |
+| Reliability | ↑      | Unsupported delegation fails through deterministic absence rather than prompt convention |
+| Performance | →      | Fewer generated files have negligible runtime impact                                     |
+| Cost        | →      | No service, model, or infrastructure cost changes                                        |
+| Operations  | ↓      | Some CLI workflows remain unavailable and require explicit qualification status          |
 
 ## 🔒 Compliance Considerations
 
@@ -103,7 +103,7 @@ selection visibility and declared-parent invocation.
 <div align="center">
 
 | ⬅️ [Previous ADR](03-des-adr-0005-use-selected-client-agent-projections.md) | 🏠 [Project Index](README.md) | Next ADR ➡️ |
-| --- | --- | --- |
-| [ADR-0005](03-des-adr-0005-use-selected-client-agent-projections.md) | [README](README.md) | None |
+| --------------------------------------------------------------------------- | ----------------------------- | ----------- |
+| [ADR-0005](03-des-adr-0005-use-selected-client-agent-projections.md)        | [README](README.md)           | None        |
 
 </div>

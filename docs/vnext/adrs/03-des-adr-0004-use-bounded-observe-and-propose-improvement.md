@@ -38,12 +38,12 @@ Adopt a policy-controlled observe-and-propose subsystem with these properties:
 
 ## 🔄 Alternatives Considered
 
-| Option | Pros | Cons | WAF Impact |
-| --- | --- | --- | --- |
-| Autonomous self-modification | Fast feedback loop | Prompt injection and unreviewed mutation become authority | Security ↓, Operations ↓ |
-| Copy either reference project | Lower implementation effort | No usable license or APEX authority guarantees | Security ↓, Operations ↓ |
-| Manual issue notes only | Minimal code | No deterministic deduplication, recurrence, or retention | Reliability ↓, Operations ↓ |
-| Bounded observe-and-propose | Measurable and reviewable | Requires human triage and lifecycle maintenance | Security ↑, Operations ↑ |
+| Option                        | Pros                        | Cons                                                      | WAF Impact                  |
+| ----------------------------- | --------------------------- | --------------------------------------------------------- | --------------------------- |
+| Autonomous self-modification  | Fast feedback loop          | Prompt injection and unreviewed mutation become authority | Security ↓, Operations ↓    |
+| Copy either reference project | Lower implementation effort | No usable license or APEX authority guarantees            | Security ↓, Operations ↓    |
+| Manual issue notes only       | Minimal code                | No deterministic deduplication, recurrence, or retention  | Reliability ↓, Operations ↓ |
+| Bounded observe-and-propose   | Measurable and reviewable   | Requires human triage and lifecycle maintenance           | Security ↑, Operations ↑    |
 
 ## ⚖️ Consequences
 
@@ -65,13 +65,13 @@ Adopt a policy-controlled observe-and-propose subsystem with these properties:
 
 ## 🏛️ WAF Pillar Analysis
 
-| Pillar | Impact | Notes |
-| --- | --- | --- |
-| Security | ↑ | Redaction, quarantine, no context injection, and no autonomous mutation |
-| Reliability | ↑ | Stable IDs, distinct-run recurrence, atomic writes, and deterministic replay |
-| Performance | → | Bounded local scans add small storage and CPU costs outside deployment authority |
-| Cost | → | Local processing adds no Azure resource or external model requirement |
-| Operations | ↑ | Proposals and immutable decisions provide an auditable human triage path |
+| Pillar      | Impact | Notes                                                                            |
+| ----------- | ------ | -------------------------------------------------------------------------------- |
+| Security    | ↑      | Redaction, quarantine, no context injection, and no autonomous mutation          |
+| Reliability | ↑      | Stable IDs, distinct-run recurrence, atomic writes, and deterministic replay     |
+| Performance | →      | Bounded local scans add small storage and CPU costs outside deployment authority |
+| Cost        | →      | Local processing adds no Azure resource or external model requirement            |
+| Operations  | ↑      | Proposals and immutable decisions provide an auditable human triage path         |
 
 ## 🔒 Compliance Considerations
 
@@ -86,16 +86,16 @@ Adopt a policy-controlled observe-and-propose subsystem with these properties:
 - The proof produced active recurring evidence, one deduplicated repeat, one quarantined injection, one inert proposal,
   and a human rejection with zero autonomous actions.
 - CLI operations and authority boundaries are documented in
-  [the CLI reference](../../docs/guides/cli-reference.md#operate-bounded-improvement).
+  [the CLI reference](../../guides/cli-reference.md#operate-bounded-improvement).
 - Security and lifecycle controls are documented in
-  [the security guide](../../docs/guides/security.md#bound-improvement-authority).
+  [the security guide](../../guides/security.md#bound-improvement-authority).
 
 ---
 
 <div align="center">
 
 | ⬅️ [Previous ADR](03-des-adr-0003-use-bounded-entra-only-handoff-session.md) | 🏠 [Project Index](README.md) | ➡️ [Next ADR](03-des-adr-0005-use-selected-client-agent-projections.md) |
-| --- | --- | --- |
-| [ADR-0003](03-des-adr-0003-use-bounded-entra-only-handoff-session.md) | [README](README.md) | [ADR-0005](03-des-adr-0005-use-selected-client-agent-projections.md) |
+| ---------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------- |
+| [ADR-0003](03-des-adr-0003-use-bounded-entra-only-handoff-session.md)        | [README](README.md)           | [ADR-0005](03-des-adr-0005-use-selected-client-agent-projections.md)    |
 
 </div>

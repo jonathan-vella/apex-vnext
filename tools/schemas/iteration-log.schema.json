@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/jonathan-vella/apex-vnext/schemas/iteration-log.schema.json",
   "title": "APEX Iteration Log",
-  "description": "Shape of agent-output/{project}/08-iteration-log.json \u2014 per-step iteration records appended by the orchestrator. Read by tools/scripts/benchmark-e2e.mjs (scoreTimingPerformance, scoreRegenerationRate).",
+  "description": "Historical shape of agent-output/{project}/08-iteration-log.json retained for v1 compatibility evidence.",
   "type": "object",
   "required": ["schema_version", "entries"],
   "additionalProperties": true,
@@ -73,7 +73,7 @@
         },
         "artifact_retries": {
           "type": "object",
-          "description": "Per-artifact retry counts. Keys are artifact filenames produced in this iteration; values are integers >= 0 counting how many times the artifact was regenerated before acceptance. Consumed by tools/scripts/benchmark-e2e.mjs scoreRegenerationRate().",
+          "description": "Per-artifact retry counts. Keys are artifact filenames produced in this iteration; values are integers >= 0 counting how many times the artifact was regenerated before acceptance.",
           "additionalProperties": {
             "type": "integer",
             "minimum": 0

@@ -3,18 +3,11 @@
 ## Setup Commands
 
 ```bash
-# Clone the Accelerator template and open in dev container
-# https://github.com/jonathan-vella/apex-accelerator
-git clone https://github.com/YOUR-USERNAME/my-infraops-project.git && cd my-infraops-project
-code . # then: F1 → Dev Containers: Reopen in Container
-
-npm install                              # Node.js deps (validators, linting)
-npm run setup                            # Azure + GitHub OIDC/secrets/RBAC
+npm install                              # Install repository dependencies
+npm run qualify:vnext                    # Build, test, validate, and pack vNext
 ```
 
-> Python deps (diagrams and apex-recall) install automatically
-> via the dev container's `post-create.sh`. Setup details:
-> https://apexops.pro/getting-started/azure-setup/
+Use the packaged `apex` CLI for consumer-project lifecycle and setup operations.
 
 ## Build & Validation
 
@@ -56,71 +49,24 @@ blob, no shared key, Managed Identity, Entra-only SQL, App Service HTTP/2,
 Container Registry admin disabled, MySQL/PostgreSQL SSL, no public network
 access for prod data services, no hardcoded secrets) is documented in
 [.github/instructions/references/iac-policy-compliance.md](.github/instructions/references/iac-policy-compliance.md).
-This is the source of truth for IaC validators (`validate:iac-security-baseline`)
-and the Architect / IaC Planner / CodeGen agents. Always cross-check
-`04-governance-constraints.md` for subscription-level Azure Policy
-requirements that may add to the baseline.
+This is the source of truth for `validate:iac-security-baseline`. Typed governance
+inputs may add subscription-level Azure Policy requirements.
+## vNext Architecture
 
-## Commit & PR Guidelines
+- `packages/kernel/` owns deterministic state, gates, authorization, evidence, and improvement decisions.
+- `packages/contracts/` owns versioned JSON schemas and contract validation.
+- `packages/capabilities/` owns bounded provider and workflow capabilities.
+- `packages/renderers/` owns client-neutral rendering.
+- `packages/cli/` owns install, update, setup, lifecycle, and terminal interaction.
+- `customizations/` owns managed VS Code and Copilot CLI projections.
+- `config/*.v1.json` owns shipped workflow, policy, toolchain, and runtime defaults.
 
-Use [Conventional Commits](https://www.conventionalcommits.org/):
-`<type>[optional scope]: <description>`. Types: `feat` (feature), `fix`,
-`docs`, `refactor`, `ci`, `chore`. Scopes: `agents`, `skills`, `instructions`,
-`bicep`, `terraform`, `mcp`, `docs`, `scripts`. Run `npm run lint:md` and
-relevant validations before committing.
+State-changing behavior belongs behind kernel authorization and typed contracts. Custom agents and skills guide users;
+they do not become an independent workflow authority. Preserve stable error codes, fail closed on stale evidence, and
+keep client-specific behavior at adapter boundaries.
 
-## Agent Workflow
-
-This section governs APEX workload execution. Repository engineering and maintenance prompts do not use this workflow,
-`apex-recall`, agent-output artifacts, or challenger gates unless their current bounded item explicitly evaluates those
-surfaces.
-
-| Step | Phase        | Output                                                   | Review                                                    |
-| ---- | ------------ | -------------------------------------------------------- | --------------------------------------------------------- |
-| 1    | Requirements | `01-requirements.md` + `sku-manifest.{json,md}` (rev 1)  | 1× comprehensive (mandatory)                              |
-| 2    | Architecture | `02-architecture-assessment.md` + cost estimate          | 1× comprehensive + 1 cost-feasibility (opt-in: deep)      |
-| 3    | Design (opt) | `03-des-*.{py,png,md}` diagrams and ADRs                 | opt-in: 1× comprehensive on ADRs (skipped when no Step 3) |
-| 3.5  | Governance   | `04-governance-constraints.md/.json`                     | 1× governance-reconciliation (skip when no constraints)   |
-| 4    | IaC Plan     | `04-implementation-plan.md` + `04-*-diagram.py/.png`     | 1× comprehensive (mandatory; opt-in: deep)                |
-| 5    | IaC Code     | `infra/bicep/{project}/` or `infra/terraform/{project}/` | opt-in (default: skip)                                    |
-| 6    | Deploy       | `06-deployment-summary.md`                               | none (policy precheck folded in as informational H2)      |
-| 7    | As-Built     | `07-*.md` documentation suite                            | —                                                         |
-| Post | Lessons      | `09-lessons-learned.json/.md`                            | —                                                         |
-
-All outputs → `agent-output/{project}/`. Source of truth:
-`.github/skills/workflow-engine/templates/workflow-graph.json`.
-The Orchestrator drives all steps with human approval gates. The unified
-05-IaC Planner feeds dual IaC tracks: Bicep (06b/07b) and Terraform (06t/07t).
-Review column = single-pass `comprehensive` (or `governance-reconciliation` at
-Step 3.5) by challenger subagents — the default flow never auto-fires
-multi-pass. Multi-pass reviews are an explicit opt-in via
-`decisions.review_depth = "deep"` (captured once per project by
-01-Orchestrator) or via direct `10-Challenger` invocation. Reviews target
-AI-generated creative decisions — not tool output (what-if/plan previews).
-
-**Mandatory challenger reviews are enforced at runtime, not just at commit.**
-`apex-recall complete-step` refuses to mark Steps 1, 2, 3.5, or 4 as complete
-when the gating artifact exists but the matching `challenge-findings-*.json`
-sidecar is missing (exit code 2). Intentional bypass requires
-`--allow-missing-challenger --challenger-skip-reason "<text>"`, which
-persists an audit entry in `decisions.challenger_skip[]`. A CI/commit
-fallback (`npm run validate:challenger-presence`, also wired into the
-lefthook `artifact-validation` hook) catches the same drift if session
-state was edited by hand.
-
-Artifact lint is enforced by the lefthook `artifact-validation` pre-commit
-hook and the `10-Challenger` review — agents do not call
-`lint:artifact-templates` or `markdownlint-cli2` directly against
-`agent-output/**` (see
-[`.github/instructions/agent-authoring.instructions.md`](.github/instructions/agent-authoring.instructions.md#no-direct-markdownlint-on-agent-output-rule)).
-
-`sku-manifest.{json,md}` is created at Step 1 (user pins only — empty
-`services[]` is the common case) and mutated through Step 7: Step 2
-authoring, Step 3.5 read-only findings, Step 4 reconciliation +
-`requires[]` cross-check, Step 6 substitution on quota/region conflict
-(via the block-with-escalation pattern), Step 7 bidirectional drift
-detection. Authoring rules:
-[`.github/instructions/sku-manifest.instructions.md`](.github/instructions/sku-manifest.instructions.md).
+Use `npm run qualify:vnext` for deterministic product qualification. Live cloud qualification is a separate,
+explicitly authorized operation and must not run as part of ordinary repository validation.
 
 ## Conventions Detail
 
@@ -132,5 +78,6 @@ For deeper guidance, agents read these on demand:
 - Terminal hygiene (no `mv -i`/`rm -i`/`read -p`, pipe long output to file):
   `.github/instructions/no-interactive-shell.instructions.md` (enforced by `lint:safe-shell`)
 - Azure defaults: `.github/skills/azure-defaults/SKILL.md`
-- Workflow DAG: `.github/skills/workflow-engine/templates/workflow-graph.json`
+- vNext product contracts: `packages/contracts/schemas/`
+- Managed customization manifest: `customizations/manifest.json`
 - Full validation reference: <https://apexops.pro/reference/validation-reference/>

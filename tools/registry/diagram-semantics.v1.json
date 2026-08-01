@@ -15,37 +15,6 @@
   },
   "activeConsumers": [
     {
-      "id": "step-3-design-prompt",
-      "path": "tools/apex-prompts/workflow-prompts/04-design.prompt.md",
-      "outputClass": "architecture",
-      "requiredMarkers": ["03-des-diagram.py", "03-des-diagram.png", "03-des-diagram.svg"]
-    },
-    {
-      "id": "step-4-planner-prompt",
-      "path": "tools/apex-prompts/workflow-prompts/05-iac-planner.prompt.md",
-      "outputClass": "dependency-runtime",
-      "requiredMarkers": [
-        "04-dependency-diagram.py",
-        "04-dependency-diagram.png",
-        "04-dependency-diagram.svg",
-        "04-runtime-diagram.py",
-        "04-runtime-diagram.png",
-        "04-runtime-diagram.svg"
-      ]
-    },
-    {
-      "id": "step-7-as-built-prompt",
-      "path": "tools/apex-prompts/workflow-prompts/08-as-built.prompt.md",
-      "outputClass": "as-built",
-      "requiredMarkers": ["07-ab-diagram.py", "07-ab-diagram.png", "07-ab-diagram.svg"]
-    },
-    {
-      "id": "existing-as-built-prompt",
-      "path": "tools/apex-prompts/utility-prompts/as-built-from-azure.prompt.md",
-      "outputClass": "as-built",
-      "requiredMarkers": ["07-ab-diagram.py", "07-ab-diagram.png", "07-ab-diagram.svg"]
-    },
-    {
       "id": "workflow-graph",
       "path": ".github/skills/workflow-engine/templates/workflow-graph.json",
       "outputClass": "workflow",
@@ -99,31 +68,6 @@
       "path": "tools/scripts/validate-artifacts.mjs",
       "outputClass": "validation",
       "requiredMarkers": ["07-ab-diagram.py", "07-ab-diagram.png"]
-    },
-    {
-      "id": "e2e-step-validator",
-      "path": "tools/scripts/validate-e2e-step.mjs",
-      "outputClass": "validation",
-      "requiredMarkers": ["03-des-diagram.py", "04-dependency-diagram", "04-runtime-diagram", "07-ab-diagram.py"]
-    },
-    {
-      "id": "e2e-benchmark",
-      "path": "tools/scripts/benchmark-e2e.mjs",
-      "outputClass": "validation",
-      "requiredMarkers": [
-        "04-dependency-diagram.py",
-        "04-dependency-diagram.png",
-        "04-dependency-diagram.svg",
-        "04-runtime-diagram.py",
-        "04-runtime-diagram.png",
-        "04-runtime-diagram.svg"
-      ]
-    },
-    {
-      "id": "e2e-workflow-prompt",
-      "path": "tools/tests/prompts/e2e-contoso-rfp.prompt.md",
-      "outputClass": "validation",
-      "requiredMarkers": ["03-des-diagram.py", "03-des-diagram.png", "03-des-diagram.svg"]
     }
   ],
   "scenarios": [
