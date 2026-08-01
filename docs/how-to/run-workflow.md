@@ -11,6 +11,39 @@ apex status --json
 apex task next --json
 ```
 
+## Add A Project
+
+After initializing the customer workspace, add each additional workload without reinstalling the shared client
+projection:
+
+```bash
+apex project create \
+  --project payments \
+  --name "Payments platform" \
+  --environment dev \
+  --target local \
+  --iac bicep \
+  --json
+```
+
+Project creation selects the new project's first run. Use `apex project use` to return to another workload.
+
+## Promote A Project Environment
+
+Each workload has one run per environment. After Gates 1 through 3 for the selected run are approved, create the next
+environment run:
+
+```bash
+apex project promote \
+  --environment test \
+  --target resource-group:payments-test \
+  --json
+```
+
+The promoted run remains in the same project and is selected automatically. It inherits only applicable upstream
+evidence; it always needs its own code generation, validation, preview, and Gate 4 approval. Repeat for production
+with its production target. Return to a prior environment with `apex project use --project payments --run RUN_ID`.
+
 Use the visible APEX coordinator in VS Code or Copilot CLI as the normal interactive entry point. Direct CLI commands
 remain useful for inspection and bounded operations.
 
@@ -55,7 +88,7 @@ apex validate --json
 apex status --json
 ```
 
-## Promote An Environment
+## Legacy Promotion Alias
 
 ```bash
 apex promote --environment test --target TARGET_SCOPE --json

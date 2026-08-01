@@ -28,8 +28,10 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 - `inventory`
 - `mcp serve`
 - `preview`
+- `project create`
 - `project history`
 - `project list`
+- `project promote`
 - `project search`
 - `project show`
 - `project use`

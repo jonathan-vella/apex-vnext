@@ -481,21 +481,8 @@ export class ApexService {
       );
       await this.installCapabilityAssets(assets);
       const runtimeLock = await this.createRuntimeLock(assets);
-      const runtimeLockHash = sha256Json(runtimeLock);
       await atomicWriteJson(join(this.root, ".apex", "apex.lock.json"), runtimeLock);
-      await this.projects.initializeProject({
-        projectId: input.projectId,
-        displayName: input.displayName ?? input.projectId,
-        defaultIacTool: input.iacTool ?? "bicep",
-      });
-      const run = await this.projects.createRun(input.projectId, {
-        environment: input.environment ?? "dev",
-        targetScope: input.targetScope ?? "local",
-        runtimeLockHash,
-      });
-      await this.writeSelection({ projectId: input.projectId, runId: run.runId });
-      await this.append(run, "workspace.initialized", { runtimeLockHash });
-      return { projectId: input.projectId, runId: run.runId };
+      return this.createProject(input);
     } catch (error) {
       if (await this.pathExistsLstat(join(this.root, ".apex", "customizations.lock.json"))) {
         await this.uninstallCustomizations();
@@ -503,6 +490,42 @@ export class ApexService {
       await rm(join(this.root, ".apex"), { recursive: true, force: true });
       throw error;
     }
+  }
+
+  async createProject(input: {
+    projectId: ProjectId;
+    displayName?: string;
+    environment?: string;
+    targetScope?: string;
+    iacTool?: "bicep" | "terraform";
+  }): Promise<{ projectId: ProjectId; runId: RunId }> {
+    let runtimeLock: unknown;
+    try {
+      runtimeLock = JSON.parse(await readFile(join(this.root, ".apex", "apex.lock.json"), "utf8")) as unknown;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        throw new ApexError(
+          "APEX_NOT_FOUND",
+          "Initialize the workspace with apex init before creating a project",
+          EXIT_CODES.notFound,
+        );
+      }
+      throw error;
+    }
+    const runtimeLockHash = sha256Json(runtimeLock);
+    await this.projects.initializeProject({
+      projectId: input.projectId,
+      displayName: input.displayName ?? input.projectId,
+      defaultIacTool: input.iacTool ?? "bicep",
+    });
+    const run = await this.projects.createRun(input.projectId, {
+      environment: input.environment ?? "dev",
+      targetScope: input.targetScope ?? "local",
+      runtimeLockHash,
+    });
+    await this.writeSelection({ projectId: input.projectId, runId: run.runId });
+    await this.append(run, "project.created", { runtimeLockHash });
+    return { projectId: input.projectId, runId: run.runId };
   }
 
   async update(customizationsSource?: string): Promise<{ updated: string[] }> {
