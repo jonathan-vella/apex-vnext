@@ -15,15 +15,34 @@ esac
 
 printf '\nAPEX vNext devcontainer bootstrap (%s)\n' "$architecture"
 
+# Docker creates new named-volume roots as root. Normalize only the mounted
+# directory itself so package caches remain writable without recursive churn.
+volume_directories=(
+    "$HOME/.azure"
+    "$HOME/.azd"
+    "$HOME/.config/gh"
+    "$HOME/.cache/uv"
+    "$HOME/.terraform.d/plugin-cache"
+)
+for volume_directory in "${volume_directories[@]}"; do
+    sudo install -d -m 0755 -o "$(id -un)" -g "$(id -gn)" "$volume_directory"
+    test -w "$volume_directory" || {
+        printf 'Named volume is not writable: %s\n' "$volume_directory" >&2
+        exit 1
+    }
+done
+
 # package-lock.json is the only Node dependency authority.
 npm ci --loglevel=error
 
 # Python is repository test support only. Capability packs resolve their own
 # locked Python dependencies when installed by the vNext runtime.
 uv pip install --system --quiet pytest ruff
-uv pip install --system --quiet --editable tools/apex-recall
+uv pip install --system --quiet tools/apex-recall
+# Setuptools may emit metadata beside the source even for a non-editable local
+# install. It is build output, not repository state.
+rm -rf tools/apex-recall/src/apex_recall.egg-info
 
-install -d -m 0755 "$HOME/.cache/uv" "$HOME/.config/gh" "$HOME/.terraform.d/plugin-cache"
 git config --global --add safe.directory "$PWD"
 git config --global core.autocrlf input
 

@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Fixed clean devcontainer creation by normalizing named-volume ownership before cache use and removing generated
+  Python package metadata after the local apex-recall install.
 - Rebuilt documentation as a vNext-only Diátaxis set, generated CLI and MCP inventories from source, simplified active
   project controls, and archived superseded guides and candidate narratives with provenance and reintroduction guards.
 - Audited repository-root files, restored Gitleaks default secret detection, retired zero-consumer root configuration,
