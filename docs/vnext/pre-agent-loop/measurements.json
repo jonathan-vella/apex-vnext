@@ -548,6 +548,16 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "workflow-telemetry",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run measure:baseline",
+          "status": 0
+        }
+      ]
     }
   ]
 }

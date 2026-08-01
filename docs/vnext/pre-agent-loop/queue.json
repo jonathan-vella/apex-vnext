@@ -786,7 +786,7 @@
         "npm run measure:baseline"
       ],
       "rationale": "The aggregator exists, but the current repository contains no telemetry records.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "debug-log-profiling",
