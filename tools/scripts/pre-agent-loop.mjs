@@ -8,7 +8,16 @@
  */
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -18,9 +27,18 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const DEFAULT_MANIFEST = "docs/vnext/pre-agent-loop/authorization.json";
 const INVENTORY = "tools/registry/modernization-ownership.json";
 const STATE_DIRECTORY = "docs/vnext/pre-agent-loop";
+const CONTROLLER_STATE_PATHS = new Set([
+  "docs/vnext/pre-agent-loop/checkpoints.jsonl",
+  "docs/vnext/pre-agent-loop/completion-handoff.md",
+  "docs/vnext/pre-agent-loop/findings.jsonl",
+  "docs/vnext/pre-agent-loop/inventory.json",
+  "docs/vnext/pre-agent-loop/measurements.json",
+  "docs/vnext/pre-agent-loop/queue.json",
+  "docs/vnext/pre-agent-loop/run.lock.json",
+]);
 const SECRET_PATTERN = /(api[_-]?key|password|secret|token)\s*[:=]\s*[^\s]+/iu;
 const TASK_TOOLS = ["view", "glob", "rg", "apply_patch"];
-const DENIED_TASK_TOOLS = ["ask_user", "task", "skill", "web_fetch", "session_store_sql"];
+const DENIED_TASK_TOOLS = ["ask_user", "task", "skill", "web_fetch", "session_store_sql", "apex", "github"];
 
 function matchesPath(pathname, pattern) {
   const expression = `^${pattern
@@ -155,7 +173,13 @@ export function probeLauncher(launcher, spawn = spawnSync) {
 }
 
 export function buildTaskCommand({ authorization, item, prompt }) {
-  const writablePaths = item.paths.map((pathname) => path.resolve(authorization.worktree, pathname));
+  const writablePaths = item.paths
+    .filter((pathname) => !authorization.protected_paths.some((pattern) => matchesPath(pathname, pattern)))
+    .map((pathname) => {
+      const wildcard = pathname.search(/[*?[\]]/u);
+      const boundedPath = wildcard === -1 ? pathname : pathname.slice(0, wildcard).replace(/\/$/u, "");
+      return path.resolve(authorization.worktree, boundedPath || ".");
+    });
   return [
     authorization.launcher.binary,
     "--prompt",
@@ -181,9 +205,23 @@ export function buildDryRunQueue(ownership) {
   return ownership.surfaces.map((surface) => ({
     id: surface.id,
     classification: surface.classification,
+    owner: surface.canonicalOwner,
+    consumers: surface.consumers,
     paths: surface.sourceRefs,
     focused_checks: surface.proofCommands,
+    rationale: surface.rationale,
+    status: "pending",
   }));
+}
+
+export function parseJsonLines(output) {
+  const lines = output.split(/\r?\n/u).filter((line) => line.trim() !== "");
+  if (lines.length === 0) throw new Error("task produced no structured output");
+  try {
+    return lines.map((line) => JSON.parse(line));
+  } catch {
+    throw new Error("task output is not valid JSONL");
+  }
 }
 
 export function changedPathErrors({ changedPaths, authorization, addedLines = [], binaryPaths = [] }) {
@@ -219,6 +257,22 @@ function writeJsonAtomically(filePath, value) {
   renameSync(temporaryPath, filePath);
 }
 
+function initialInventory(queue) {
+  return {
+    version: 1,
+    surfaces: queue.map((item) => ({
+      id: item.id,
+      owner: item.owner,
+      consumers: item.consumers,
+      classification: item.classification,
+      disposition: "pending",
+      proof: [],
+      release_impact: "undetermined",
+      rationale: item.rationale,
+    })),
+  };
+}
+
 export function initializeRun({ authorization, root, git, now = new Date() }) {
   const result = inspectRun({ authorization, root, git, now });
   if (!result.admitted) return result;
@@ -242,6 +296,8 @@ export function initializeRun({ authorization, root, git, now = new Date() }) {
     state: "bootstrapped",
     items: result.queue,
   });
+  writeJsonAtomically(path.join(stateDirectory, "inventory.json"), initialInventory(result.queue));
+  writeJsonAtomically(path.join(stateDirectory, "measurements.json"), { version: 1, items: [] });
   return result;
 }
 
@@ -249,7 +305,11 @@ function statePaths(root) {
   const stateDirectory = path.join(root, STATE_DIRECTORY);
   return {
     checkpointPath: path.join(stateDirectory, "checkpoints.jsonl"),
+    completionPath: path.join(stateDirectory, "completion-handoff.md"),
+    findingsPath: path.join(stateDirectory, "findings.jsonl"),
+    inventoryPath: path.join(stateDirectory, "inventory.json"),
     lockPath: path.join(stateDirectory, "run.lock.json"),
+    measurementsPath: path.join(stateDirectory, "measurements.json"),
     queuePath: path.join(stateDirectory, "queue.json"),
   };
 }
@@ -286,6 +346,171 @@ export function abortRun({ authorization, root, now = new Date() }) {
   return { state: "aborted" };
 }
 
+function commandAllowed(command, authorization) {
+  return (
+    authorization.allowed_commands.some((prefix) => command.startsWith(prefix)) &&
+    !authorization.denied_commands.some((prefix) => command.startsWith(prefix)) &&
+    !/[;&|`$<>\n]/u.test(command)
+  );
+}
+
+export function runFocusedChecks({ commands, authorization, root, spawn = spawnSync }) {
+  const results = [];
+  for (const command of commands) {
+    if (!commandAllowed(command, authorization)) throw new Error(`focused command is not authorized: ${command}`);
+    const [executable, ...args] = command.split(/\s+/u);
+    const result = spawn(executable, args, { cwd: root, encoding: "utf8", stdio: "pipe" });
+    results.push({ command, status: result.status });
+    if (result.error || result.status !== 0) throw new Error(`focused check failed: ${command}`);
+  }
+  return results;
+}
+
+export function collectGitChanges(root, git = gitValue) {
+  const status = git(["status", "--porcelain=v1", "-z"], root);
+  const changedPaths = status
+    .split("\0")
+    .filter(Boolean)
+    .map((entry) => entry.slice(3).split(" -> ").at(-1))
+    .filter((pathname) => !CONTROLLER_STATE_PATHS.has(pathname));
+  const diff = git(["diff", "--no-ext-diff", "--unified=0", "--", ...changedPaths], root);
+  const addedLines = diff
+    .split(/\r?\n/u)
+    .filter((line) => line.startsWith("+") && !line.startsWith("+++"))
+    .map((line) => line.slice(1));
+  for (const pathname of changedPaths) {
+    const absolutePath = path.join(root, pathname);
+    if (!existsSync(absolutePath) || !status.includes(`?? ${pathname}`)) continue;
+    const content = readFileSync(absolutePath);
+    if (!content.subarray(0, 8192).includes(0)) addedLines.push(...content.toString("utf8").split(/\r?\n/u));
+  }
+  const binaryPaths = changedPaths.filter((pathname) => {
+    const absolutePath = path.join(root, pathname);
+    if (!existsSync(absolutePath) || !statSync(absolutePath).isFile()) return false;
+    return readFileSync(absolutePath).subarray(0, 8192).includes(0);
+  });
+  return { changedPaths, addedLines, binaryPaths };
+}
+
+export function snapshotControllerState(root) {
+  return Object.fromEntries(
+    [...CONTROLLER_STATE_PATHS].map((pathname) => {
+      const absolutePath = path.join(root, pathname);
+      return [pathname, existsSync(absolutePath) ? readFileSync(absolutePath, "utf8") : null];
+    }),
+  );
+}
+
+export function assertControllerStateUnchanged(root, before) {
+  const after = snapshotControllerState(root);
+  for (const [pathname, content] of Object.entries(before)) {
+    if (after[pathname] !== content) throw new Error(`task changed controller state: ${pathname}`);
+  }
+}
+
+function taskPrompt(item) {
+  return [
+    `Process repository inventory item ${item.id}.`,
+    `Classification: ${item.classification}.`,
+    `Allowed paths: ${item.paths.join(", ")}.`,
+    "Inspect the current implementation and make the smallest justified improvement within those paths.",
+    "Do not use Git, do not modify any other path, and do not run aggregate validation.",
+    "If no change is justified, leave files unchanged and report that conclusion.",
+  ].join("\n");
+}
+
+export function launchTask({ authorization, item, spawn = spawnSync }) {
+  const [binary, ...args] = buildTaskCommand({ authorization, item, prompt: taskPrompt(item) });
+  const result = spawn(binary, args, {
+    cwd: authorization.worktree,
+    encoding: "utf8",
+    input: "",
+    maxBuffer: authorization.launcher.noninteractive.output_limit_bytes,
+    stdio: ["pipe", "pipe", "pipe"],
+    timeout: authorization.launcher.noninteractive.timeout_seconds * 1000 * 20,
+  });
+  if (result.error || result.status !== 0) throw new Error("bounded task failed");
+  return parseJsonLines(result.stdout ?? "");
+}
+
+function publishCheckpoint({ authorization, item, root, git = gitValue, now = new Date() }) {
+  const paths = statePaths(root);
+  const evidencePaths = [paths.queuePath, paths.inventoryPath, paths.measurementsPath].map((pathname) =>
+    path.relative(root, pathname),
+  );
+  git(["add", "--", ...item.paths, ...evidencePaths], root);
+  git(["commit", "-m", `chore(tools): Process ${item.id}`], root);
+  const localSha = git(["rev-parse", "HEAD"], root);
+  git(["push", "origin", `HEAD:refs/heads/${authorization.branch}`], root);
+  const remoteSha = git(["ls-remote", "--heads", "origin", `refs/heads/${authorization.branch}`], root).split(/\s/u)[0];
+  if (remoteSha !== localSha) throw new Error("published checkpoint SHA mismatch");
+  appendFileSync(
+    paths.checkpointPath,
+    `${JSON.stringify({ authorization_id: authorization.authorization_id, item: item.id, state: "accepted", sha: localSha, at: now.toISOString() })}\n`,
+  );
+  git(["add", "--", path.relative(root, paths.checkpointPath)], root);
+  git(["commit", "-m", `chore(tools): Record ${item.id} checkpoint`], root);
+  git(["push", "origin", `HEAD:refs/heads/${authorization.branch}`], root);
+  return localSha;
+}
+
+function writeCompletion({ authorization, root, queue, now = new Date() }) {
+  const paths = statePaths(root);
+  const tree = gitValue(["rev-parse", "HEAD^{tree}"], root);
+  const content = `## Pre-Agent Loop Completion\n\n- Authorization: \`${authorization.authorization_id}\`\n- Branch: \`${authorization.branch}\`\n- Upstream: \`${authorization.upstream}\`\n- Tree before handoff: \`${tree}\`\n- Completed items: ${queue.items.length}\n- Completed at: ${now.toISOString()}\n\nNo final validation or managed-agent qualification was run.\n`;
+  writeFileSync(paths.completionPath, content);
+  unlinkSync(paths.lockPath);
+  queue.state = "completed";
+  writeJsonAtomically(paths.queuePath, queue);
+  gitValue(["add", "--", path.relative(root, paths.completionPath), path.relative(root, paths.queuePath)], root);
+  gitValue(["commit", "-m", "chore(tools): Complete pre-agent loop"], root);
+  gitValue(["push", "origin", `HEAD:refs/heads/${authorization.branch}`], root);
+}
+
+export function processNextItem({ authorization, root, spawn = spawnSync, git = gitValue, now = new Date() }) {
+  readOwnedLock(authorization, root);
+  const paths = statePaths(root);
+  const queue = readJson(paths.queuePath);
+  const item = queue.items.find(({ status }) => status === "pending");
+  if (!item) {
+    writeCompletion({ authorization, root, queue, now });
+    return { state: "completed" };
+  }
+  const controllerState = snapshotControllerState(root);
+  launchTask({ authorization, item, spawn });
+  assertControllerStateUnchanged(root, controllerState);
+  const changes = collectGitChanges(root, git);
+  const errors = changedPathErrors({ authorization, ...changes });
+  const itemScopeErrors = changes.changedPaths
+    .filter((pathname) => !item.paths.some((pattern) => matchesPath(pathname, pattern)))
+    .map((pathname) => `path outside queue item: ${pathname}`);
+  if (errors.length > 0 || itemScopeErrors.length > 0) throw new Error([...errors, ...itemScopeErrors].join("; "));
+  const checks = runFocusedChecks({ commands: item.focused_checks, authorization, root, spawn });
+  item.status = "accepted";
+  const inventory = readJson(paths.inventoryPath);
+  const surface = inventory.surfaces.find(({ id }) => id === item.id);
+  surface.disposition = changes.changedPaths.length === 0 ? "verified-no-change" : "improved";
+  surface.proof = checks;
+  surface.release_impact = changes.changedPaths.length === 0 ? "none" : "pending-review";
+  writeJsonAtomically(paths.queuePath, queue);
+  writeJsonAtomically(paths.inventoryPath, inventory);
+  const measurements = readJson(paths.measurementsPath);
+  measurements.items.push({ id: item.id, files_changed: changes.changedPaths.length, checks });
+  writeJsonAtomically(paths.measurementsPath, measurements);
+  const sha = publishCheckpoint({ authorization, item, root, git, now });
+  return { state: "accepted", item: item.id, sha };
+}
+
+export function runQueue({ authorization, root, spawn = spawnSync, git = gitValue, now = () => new Date() }) {
+  const results = [];
+  for (let count = 0; count <= authorization.budgets.queue_items; count += 1) {
+    const result = processNextItem({ authorization, root, spawn, git, now: now() });
+    results.push(result);
+    if (result.state === "completed") return results;
+  }
+  throw new Error("queue item budget exhausted");
+}
+
 function main() {
   const { command, dryRun, manifest } = parseArguments(process.argv.slice(2));
   const manifestPath = path.resolve(ROOT, manifest);
@@ -293,14 +518,16 @@ function main() {
   const result = inspectRun({ authorization, root: ROOT });
   const output =
     command === "resume"
-      ? resumeRun({ authorization, root: ROOT })
+      ? { state: "running", results: runQueue({ authorization, root: ROOT }) }
       : command === "abort"
         ? abortRun({ authorization, root: ROOT })
         : command === "run" && !dryRun
           ? (() => {
               const probe = probeLauncher(authorization.launcher);
               if (!probe.ok) throw new Error(probe.reason);
-              return initializeRun({ authorization, root: ROOT });
+              const initialized = initializeRun({ authorization, root: ROOT });
+              if (!initialized.admitted) return initialized;
+              return { state: "running", results: runQueue({ authorization, root: ROOT }) };
             })()
           : result;
   console.log(JSON.stringify({ command, dry_run: dryRun, ...output }, null, 2));
