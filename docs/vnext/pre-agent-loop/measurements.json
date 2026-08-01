@@ -48,6 +48,20 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "model-catalog",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:models",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:model-catalog",
+          "status": 0
+        }
+      ]
     }
   ]
 }

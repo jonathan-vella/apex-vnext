@@ -96,7 +96,7 @@
         "npm run validate:model-catalog"
       ],
       "rationale": "Definitions are maintained centrally and assignments are generated from executable frontmatter.",
-      "status": "pending"
+      "status": "accepted"
     },
     {
       "id": "skill-discovery",
