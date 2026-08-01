@@ -445,9 +445,14 @@
         "Terraform"
       ],
       "classification": "keep",
-      "disposition": "pending",
-      "proof": [],
-      "release_impact": "undetermined",
+      "disposition": "verified-no-change",
+      "proof": [
+        {
+          "command": "npm run validate:all",
+          "status": "reserved-for-terminal-stage"
+        }
+      ],
+      "release_impact": "none",
       "rationale": "Language tools should not be reimplemented by generic string validators."
     },
     {
