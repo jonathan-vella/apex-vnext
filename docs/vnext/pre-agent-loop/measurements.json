@@ -34,6 +34,20 @@
           "status": 0
         }
       ]
+    },
+    {
+      "id": "managed-agent-manifest",
+      "files_changed": 0,
+      "checks": [
+        {
+          "command": "npm run validate:model-consistency",
+          "status": 0
+        },
+        {
+          "command": "npm run validate:agents",
+          "status": 0
+        }
+      ]
     }
   ]
 }
