@@ -552,13 +552,6 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
-      "id": "validate-v1-compatibility-matrix",
-      "script": "validate:v1-compatibility-matrix",
-      "profile": "node-validation",
-      "aliases": [],
-      "retirement": { "status": "active", "replacementIds": [] }
-    },
-    {
       "id": "validate-vnext-live-workflow",
       "script": "validate:vnext-live-workflow",
       "profile": "node-validation",
@@ -607,7 +600,6 @@
         "validate:instruction-checks",
         "validate:session-state",
         "validate:workflow-graph",
-        "validate:v1-compatibility-matrix",
         "validate:vnext-project-controls",
         "validate:vnext-live-workflow",
         "validate:lens-references",
@@ -678,7 +670,6 @@
         "validate:instruction-checks",
         "validate:session-state",
         "validate:workflow-graph",
-        "validate:v1-compatibility-matrix",
         "validate:vnext-project-controls",
         "validate:vnext-live-workflow",
         "validate:lens-references",

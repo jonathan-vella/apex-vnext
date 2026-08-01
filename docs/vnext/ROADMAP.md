@@ -137,8 +137,9 @@ consumer map, classification, proof test, and removal gate before consolidation 
 choices are decisions; characterization and mutation tests protect selected boundaries.
 
 The candidate-bound inventory and baseline gaps are recorded in
-[MODERNIZATION-INVENTORY.md](MODERNIZATION-INVENTORY.md). Its machine-readable manifest is validated in the Node CI
-graph so later slices cannot move ownership without updating consumers, proof, decisions, and removal gates.
+the [completed maintenance archive](../../.archive/retired-automation/pre-agent-loop-v1/README.md). Its machine-readable
+manifest was validated during the bounded run so later slices could not move ownership without updating consumers,
+proof, decisions, and removal gates.
 
 **Historical traceability:** Governance completion plan Phase 3.
 

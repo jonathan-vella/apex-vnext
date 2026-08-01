@@ -26,6 +26,10 @@ The archive also contains the retired manual agent registry and schema, prompt-c
 instructions that applied only to the step-agent fleet. Archived validator source is retained for audit and is not part
 of the active npm validation graph.
 
+The retired `tools/scripts/validate-v1-compatibility-matrix.mjs` has SHA-256
+`fabb0f1365cef398b2e1648faeb2bf2510bb9fc2e9e148c9a85bf64b193d9c20`. Phase 0A evidence remains frozen, while current
+release validation no longer reads this archive.
+
 ## Boundaries
 
 - Do not add this directory to `chat.agentFilesLocations`.
