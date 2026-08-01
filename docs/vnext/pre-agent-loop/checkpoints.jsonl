@@ -8,3 +8,4 @@
 {"authorization_id":"pre-agent-opt-2026-08-01-status-parser","item":"user-documentation","state":"accepted","sha":"45d7e931c84168e8ceee55769c7325039d93e988","at":"2026-08-01T09:10:20.859Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-status-parser","item":"managed-agent-manifest","state":"accepted","sha":"864db3e37a29886d4b657f4fe82fb61a5835649d","at":"2026-08-01T09:12:30.737Z"}
 {"authorization_id":"pre-agent-opt-2026-08-01-status-parser","item":"model-catalog","state":"accepted","sha":"36154a9b1ca7b9f0f71f9fed31eb48db67dd55ee","at":"2026-08-01T09:15:10.502Z"}
+{"authorization_id":"pre-agent-opt-2026-08-01-status-parser","item":"skill-discovery","state":"accepted","sha":"23a88a0394e7f53618dc1f025861bb0d45d1391f","at":"2026-08-01T09:21:36.381Z"}
