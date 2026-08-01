@@ -8,6 +8,7 @@ import {
   abortRun,
   admissionErrors,
   buildDryRunQueue,
+  buildTaskCommand,
   changedPathErrors,
   initializeRun,
   parseArguments,
@@ -116,6 +117,23 @@ test("launcher probe accepts only noninteractive version output", () => {
   assert.equal(probeLauncher(launcher, success).ok, true);
   assert.deepEqual(probeLauncher(launcher, prompt), { ok: false, reason: "launcher version probe requested setup" });
   assert.deepEqual(probeLauncher(launcher, failure), { ok: false, reason: "launcher version probe failed" });
+});
+
+test("task command grants characterized file tools without Git or interactive capabilities", () => {
+  const command = buildTaskCommand({
+    authorization,
+    item: { paths: ["tools/scripts/pre-agent-loop.mjs"] },
+    prompt: "Inspect the bounded item.",
+  });
+  assert.ok(command.includes("view,glob,rg,apply_patch"));
+  assert.ok(command.includes("--no-ask-user"));
+  assert.ok(command.includes("--no-remote"));
+  assert.ok(command.includes("--no-custom-instructions"));
+  assert.ok(command.includes("--deny-tool"));
+  assert.equal(
+    command.some((part) => /shell\(git|allow-all|yolo/iu.test(part)),
+    false,
+  );
 });
 
 test("admitted run writes an atomic lock and queue once", () => {
