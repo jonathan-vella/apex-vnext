@@ -104,7 +104,8 @@ function authorizationShapeErrors(authorization) {
 }
 
 function gitValue(args, cwd) {
-  return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
+  const output = execFileSync("git", args, { cwd, encoding: "utf8" });
+  return args[0] === "status" ? output.replace(/\0$/u, "") : output.trim();
 }
 
 export function parseArguments(args) {
