@@ -1,0 +1,537 @@
+{
+  "authorization_id": "pre-agent-opt-2026-07-31",
+  "state": "bootstrapped",
+  "items": [
+    {
+      "id": "workspace-operating-frame",
+      "classification": "keep",
+      "paths": [
+        "AGENTS.md",
+        ".github/copilot-instructions.md"
+      ],
+      "focused_checks": [
+        "npm run validate:instruction-checks"
+      ]
+    },
+    {
+      "id": "scoped-instruction-discovery",
+      "classification": "consolidate",
+      "paths": [
+        ".github/instructions/*.instructions.md",
+        "tools/scripts/validate-instruction-checks.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:instruction-checks",
+        "npm run lint:glob-audit"
+      ]
+    },
+    {
+      "id": "user-documentation",
+      "classification": "keep",
+      "paths": [
+        "docs/**/*.md",
+        ".github/instructions/docs.instructions.md"
+      ],
+      "focused_checks": [
+        "npm run validate:docs"
+      ]
+    },
+    {
+      "id": "managed-agent-manifest",
+      "classification": "keep",
+      "paths": [
+        "customizations/manifest.json",
+        "customizations/.github/agents/*.agent.md"
+      ],
+      "focused_checks": [
+        "npm run validate:model-consistency",
+        "npm run validate:agents"
+      ]
+    },
+    {
+      "id": "model-catalog",
+      "classification": "keep",
+      "paths": [
+        ".github/model-catalog.json",
+        "tools/scripts/generate-model-catalog.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:models",
+        "npm run validate:model-catalog"
+      ]
+    },
+    {
+      "id": "skill-discovery",
+      "classification": "consolidate",
+      "paths": [
+        ".github/skills/*/SKILL.md",
+        "tools/scripts/validate-skills.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:skills",
+        "npm run lint:orphaned-content"
+      ]
+    },
+    {
+      "id": "workflow-dag",
+      "classification": "keep",
+      "paths": [
+        ".github/skills/workflow-engine/templates/workflow-graph.json",
+        "tools/schemas/workflow-graph.schema.json"
+      ],
+      "focused_checks": [
+        "npm run validate:workflow-graph",
+        "npm run lint:workflow-table-sync"
+      ]
+    },
+    {
+      "id": "copilot-client-projections",
+      "classification": "rewrite",
+      "paths": [
+        "customizations/manifest.json",
+        "customizations/.github/agents/*.agent.md",
+        "customizations/.github/mcp.json",
+        "customizations/.vscode/mcp.json",
+        "packages/contracts/src/runtime.ts",
+        "packages/cli/src/service.ts",
+        "packages/cli/src/mcp.ts",
+        "packages/cli/scripts/prepare-assets.mjs",
+        "tools/registry/copilot-cli-agent-tools.json",
+        "packages/contracts/src/evidence.ts",
+        "tools/registry/client-outcome-scenarios.v1.json",
+        "tools/scripts/collect-client-outcome.mjs",
+        "tools/scripts/compare-client-outcomes.mjs",
+        "tools/scripts/qualify-client-outcomes.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:vnext",
+        "npm run test:vnext",
+        "npm run test:vnext-pack",
+        "npm run validate:agents",
+        "npm run validate:vscode",
+        "npm run validate:client-outcomes",
+        "npm run test:client-outcomes"
+      ]
+    },
+    {
+      "id": "runtime-manifests",
+      "classification": "keep",
+      "paths": [
+        "config/*.v1.json",
+        "tools/scripts/validate-vnext.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:vnext"
+      ]
+    },
+    {
+      "id": "workspace-package-boundaries",
+      "classification": "keep",
+      "paths": [
+        "packages/*/package.json",
+        "tsconfig.vnext.json",
+        "package-lock.json"
+      ],
+      "focused_checks": [
+        "npm run test:vnext",
+        "npm run test:vnext-pack"
+      ]
+    },
+    {
+      "id": "schema-libraries",
+      "classification": "investigate",
+      "paths": [
+        "packages/contracts/src/*.ts",
+        "packages/contracts/schemas/*.schema.json",
+        "tools/schemas/*.schema.json"
+      ],
+      "focused_checks": [
+        "npm run lint:json-schemas",
+        "npm run test:vnext"
+      ]
+    },
+    {
+      "id": "customization-distribution",
+      "classification": "rewrite",
+      "paths": [
+        "customizations/manifest.json",
+        "packages/cli/scripts/prepare-assets.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:vnext",
+        "npm run test:vnext",
+        "npm run test:vnext-pack"
+      ]
+    },
+    {
+      "id": "mcp-portfolio",
+      "classification": "investigate",
+      "paths": [
+        ".vscode/mcp.json",
+        "customizations/.vscode/mcp.json",
+        "config/capability-packs.v1.json",
+        "tools/scripts/validate-mcp-config.mjs",
+        ".archive/retired-automation/terraform-mcp/README.md",
+        "tools/scripts/validate-terraform-mcp-retirement.mjs",
+        "tools/tests/validate-terraform-mcp-retirement.test.mjs",
+        "packages/capabilities/src/terraform-registry-client.ts",
+        "packages/capabilities/src/test/terraform-registry-client.test.ts",
+        "packages/capabilities/src/test/fixtures/terraform-registry.ts",
+        "packages/capabilities/src/terraform-provider-schema.ts",
+        "packages/capabilities/src/test/terraform-provider-schema.test.ts",
+        "packages/capabilities/src/test/fixtures/terraform-provider-schema.ts"
+      ],
+      "focused_checks": [
+        "npm run lint:mcp-config",
+        "npm run test:mcp-config",
+        "npm run validate:terraform-mcp-retirement",
+        "npm run test:terraform-mcp-retirement",
+        "npm run validate:vnext"
+      ]
+    },
+    {
+      "id": "pricing-evidence",
+      "classification": "rewrite",
+      "paths": [
+        "packages/contracts/src/pricing.ts",
+        "packages/contracts/schemas/pricing-*-v1.schema.json",
+        ".vscode/mcp.json",
+        "customizations/.vscode/mcp.json",
+        "customizations/.github/mcp.json",
+        "customizations/.github/agents/*.agent.md",
+        "tools/registry/pricing-parity-scenarios.v1.json",
+        "tools/registry/schemas/pricing-parity-scenarios.schema.json",
+        "tools/registry/arm-mcp-cost-pricing.v1.json",
+        "tools/registry/schemas/arm-mcp-cost-pricing.schema.json",
+        "tools/scripts/validate-pricing-parity.mjs",
+        "tools/tests/validate-pricing-parity.test.mjs",
+        "tools/scripts/validate-arm-mcp-cost-pricing.mjs",
+        "tools/tests/validate-arm-mcp-cost-pricing.test.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:pricing-parity",
+        "npm run test:pricing-parity",
+        "npm run validate:arm-mcp-cost-pricing",
+        "npm run test:arm-mcp-cost-pricing",
+        "npm run lint:mcp-config",
+        "npm run validate:agents",
+        "npm run test:vnext"
+      ]
+    },
+    {
+      "id": "improvement-outcome-ingestion",
+      "classification": "rewrite",
+      "paths": [
+        "config/improvement-policy.v1.json",
+        "packages/contracts/src/improvement.ts",
+        "packages/kernel/src/improvement-store.ts"
+      ],
+      "focused_checks": [
+        "npm run test:bounded-improvement",
+        "npm run prove:bounded-improvement"
+      ]
+    },
+    {
+      "id": "workflow-validator-ownership",
+      "classification": "keep",
+      "paths": [
+        "packages/kernel/src/workflow-validator-ownership.ts",
+        "packages/cli/src/workflow-validators.ts"
+      ],
+      "focused_checks": [
+        "npm run test:vnext"
+      ]
+    },
+    {
+      "id": "repository-validator-graph",
+      "classification": "consolidate",
+      "paths": [
+        "tools/registry/repository-validator-graph.json",
+        "tools/registry/schemas/repository-validator-graph.schema.json",
+        "package.json",
+        ".github/workflows/ci.yml",
+        "lefthook.yml"
+      ],
+      "focused_checks": [
+        "npm run validate:repository-validator-graph",
+        "npm run test:repository-validator-graph"
+      ]
+    },
+    {
+      "id": "language-validator-boundaries",
+      "classification": "keep",
+      "paths": [
+        "package.json",
+        "pyproject.toml",
+        "eslint.config.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:all"
+      ]
+    },
+    {
+      "id": "markdown-policy-enforcement",
+      "classification": "consolidate",
+      "paths": [
+        ".markdownlint-cli2.jsonc",
+        ".github/instructions/markdown.instructions.md",
+        ".github/instructions/markdown-docs.instructions.md",
+        "package.json",
+        "lefthook.yml",
+        ".github/workflows/docs.yml"
+      ],
+      "focused_checks": [
+        "npm run lint:md",
+        "npm run validate:docs",
+        "npm run validate:hooks",
+        "npm run test:hooks"
+      ]
+    },
+    {
+      "id": "artifact-template-validation",
+      "classification": "consolidate",
+      "paths": [
+        ".github/skills/azure-artifacts/templates/*.md",
+        "tools/scripts/_lib/artifact-heading-sources.mjs",
+        "tools/scripts/_lib/artifact-heading-generator.mjs",
+        "tools/scripts/validate-artifacts.mjs",
+        "tools/scripts/_lib/artifact-headings.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:artifacts",
+        "npm run check:h2-order"
+      ]
+    },
+    {
+      "id": "precommit-hooks",
+      "classification": "rewrite",
+      "paths": [
+        "lefthook.yml",
+        "tools/scripts/validate-hooks.mjs",
+        "tools/tests/test-hooks.sh"
+      ],
+      "focused_checks": [
+        "npm run validate:hooks",
+        "npm run test:hooks"
+      ]
+    },
+    {
+      "id": "github-required-checks",
+      "classification": "keep",
+      "paths": [
+        "tools/registry/github-workflow-contract.json",
+        "tools/registry/schemas/github-workflow-contract.schema.json",
+        ".github/workflows/ci.yml",
+        ".github/workflows/docs.yml",
+        ".github/workflows/branch-enforcement.yml"
+      ],
+      "focused_checks": [
+        "npm run validate:github-workflows",
+        "npm run test:github-workflows",
+        "npm run validate:_node-ci",
+        "npm run validate:docs",
+        "npm run test:apex-recall",
+        "npm run test:arm-mcp-cost-pricing"
+      ]
+    },
+    {
+      "id": "exact-head-release-qualification",
+      "classification": "keep",
+      "paths": [
+        "tools/registry/github-workflow-contract.json",
+        ".github/workflows/release-candidate-qualification.yml",
+        "tools/scripts/qualify-vnext-release.mjs",
+        "tools/scripts/pack-vnext.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:github-workflows",
+        "npm run test:github-workflows",
+        "npm run qualify:vnext-release",
+        "npm run test:vnext-pack"
+      ]
+    },
+    {
+      "id": "maintenance-workflows",
+      "classification": "keep",
+      "paths": [
+        ".github/workflows/weekly-maintenance.yml",
+        ".github/workflows/sensei-branch-maintenance.yml"
+      ],
+      "focused_checks": [
+        "npm run validate:tool-versions",
+        "npm run lint:docs-freshness"
+      ]
+    },
+    {
+      "id": "upstream-workflow-synchronization",
+      "classification": "retire",
+      "paths": [
+        ".archive/retired-automation/sync-workflows.mjs",
+        ".archive/retired-automation/README.md"
+      ],
+      "focused_checks": [
+        "npm run test:retired-automation",
+        "npm run validate:github-workflows",
+        "npm run lint:deprecated-refs"
+      ]
+    },
+    {
+      "id": "model-catalog-generation",
+      "classification": "keep",
+      "paths": [
+        "tools/scripts/generate-model-catalog.mjs",
+        ".github/model-catalog.json"
+      ],
+      "focused_checks": [
+        "npm run validate:model-catalog"
+      ]
+    },
+    {
+      "id": "entity-count-generation",
+      "classification": "keep",
+      "paths": [
+        "tools/registry/count-manifest.json",
+        "tools/scripts/validate-no-hardcoded-counts.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:no-hardcoded-counts"
+      ]
+    },
+    {
+      "id": "avm-index-generation",
+      "classification": "keep",
+      "paths": [
+        "tools/scripts/refresh-avm-module-index.mjs",
+        ".github/data/avm-module-index.json"
+      ],
+      "focused_checks": [
+        "npm run validate:avm-versions:offline"
+      ]
+    },
+    {
+      "id": "freshness-generation",
+      "classification": "keep",
+      "paths": [
+        "tools/registry/source-freshness.json",
+        "tools/scripts/check-docs-freshness.mjs"
+      ],
+      "focused_checks": [
+        "npm run lint:docs-freshness"
+      ]
+    },
+    {
+      "id": "diagram-routing",
+      "classification": "keep",
+      "paths": [
+        ".github/skills/mermaid/SKILL.md",
+        ".github/skills/python-diagrams/SKILL.md",
+        "tools/registry/diagram-semantics.v1.json",
+        "tools/registry/schemas/diagram-semantics.schema.json",
+        "tools/scripts/validate-diagram-semantics.mjs",
+        "tools/tests/validate-diagram-semantics.test.mjs",
+        "tools/apex-prompts/workflow-prompts/04-design.prompt.md",
+        "tools/apex-prompts/workflow-prompts/05-iac-planner.prompt.md",
+        "tools/apex-prompts/workflow-prompts/08-as-built.prompt.md",
+        ".github/skills/workflow-engine/templates/workflow-graph.json"
+      ],
+      "focused_checks": [
+        "npm run validate:skills",
+        "npm run validate:diagram-semantics",
+        "npm run test:diagram-semantics",
+        "npm run validate:artifacts",
+        "npm run validate:workflow-graph"
+      ]
+    },
+    {
+      "id": "client-bundle-generation",
+      "classification": "rewrite",
+      "paths": [
+        "packages/cli/scripts/prepare-assets.mjs",
+        "customizations/manifest.json",
+        "config/runtime-bundle.v1.json"
+      ],
+      "focused_checks": [
+        "npm run prepare:vnext-assets",
+        "npm run validate:vnext",
+        "npm run test:vnext-pack"
+      ]
+    },
+    {
+      "id": "v1-compatibility-matrix",
+      "classification": "retire",
+      "paths": [
+        "docs/vnext/phase-0a/v1-behavior-compatibility.md",
+        "tools/scripts/validate-v1-compatibility-matrix.mjs"
+      ],
+      "focused_checks": [
+        "npm run validate:v1-compatibility-matrix"
+      ]
+    },
+    {
+      "id": "public-command-compatibility",
+      "classification": "investigate",
+      "paths": [
+        "packages/cli/src/cli.ts",
+        "docs/guides/cli-reference.md"
+      ],
+      "focused_checks": [
+        "npm run test:vnext",
+        "npm run validate:v1-compatibility-matrix"
+      ]
+    },
+    {
+      "id": "validator-diagnostics",
+      "classification": "consolidate",
+      "paths": [
+        "tools/scripts/_lib/reporter.mjs",
+        "tools/scripts/_lib/registry-validator-reporter.mjs",
+        "tools/scripts/validate-*.mjs"
+      ],
+      "focused_checks": [
+        "npm run test:lib-json",
+        "npm run test:lib-ajv",
+        "npm run test:registry-validator-reporter"
+      ]
+    },
+    {
+      "id": "workflow-telemetry",
+      "classification": "investigate",
+      "paths": [
+        "tools/scripts/measure-workflow-baseline.mjs",
+        "tools/schemas/session-state.schema.json"
+      ],
+      "focused_checks": [
+        "npm run measure:baseline"
+      ]
+    },
+    {
+      "id": "debug-log-profiling",
+      "classification": "investigate",
+      "paths": [
+        "tools/scripts/profile_debug_log.py",
+        "tools/scripts/profile-copilot-cli-otel.mjs",
+        "tools/scripts/profile-vscode-otel.mjs",
+        "docs/vnext/CLIENT-CONTEXT-BASELINE.md"
+      ],
+      "focused_checks": [
+        "npm run profile:debug-log",
+        "npm run profile:copilot-cli-otel",
+        "npm run profile:vscode-otel",
+        "npm run test:client-context-samples"
+      ]
+    },
+    {
+      "id": "managed-consumer-guidance",
+      "classification": "consolidate",
+      "paths": [
+        "customizations/.github/copilot-instructions.md",
+        "customizations/.github/agents/*.agent.md",
+        "customizations/.github/skills/*/SKILL.md"
+      ],
+      "focused_checks": [
+        "npm run validate:instruction-checks",
+        "npm run validate:vnext"
+      ]
+    }
+  ]
+}
