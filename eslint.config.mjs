@@ -1,9 +1,6 @@
 // eslint.config.mjs — Adopt-narrow (tools-only) flat config.
 //
-// Mechanical conventions enforced here are the single source of truth for the rules listed in
-// .github/instructions/javascript.instructions.md. Keep the rule list in sync with
-// agent-output/_plans/eslint-adoption/findings.md (Phase 2.1 source of truth) and the
-// "Mechanical conventions" pointer in .github/instructions/javascript.instructions.md.
+// Mechanical conventions enforced here are the single source of truth for JavaScript tooling.
 
 import js from "@eslint/js";
 import nodePlugin from "eslint-plugin-n";
@@ -16,7 +13,6 @@ export default [
       "node_modules/**",
       "**/.venv/**", // Python virtualenvs ship vendored JS (matplotlib/urllib3) — never lint
       "**/venv/**",
-      ".github/skills/sensei/**", // Self-contained sub-project with its own toolchain
       "agent-output/**",
       ".archive/**", // Provenance-only retired source; not active tooling
       "tmp/**",
@@ -54,9 +50,7 @@ export default [
       // Validators all use `#!/usr/bin/env node` shebangs intentionally; n/hashbang
       // (recommended-module preset) flags this. Disable repo-wide.
       "n/hashbang": "off",
-      // The plugin's data lags real Node 22 APIs — `fs.globSync` is stable in
-      // Node 22 (our engines.node minimum) but still flagged "experimental" by
-      // eslint-plugin-n@17. The version contract in package.json is the source
+      // The plugin's data can lag current Node APIs. The Node 24 contract in package.json is the source
       // of truth; disabling avoids chasing the plugin's catalog.
       "n/no-unsupported-features/node-builtins": "off",
       // Validators print error lists by design; suppressing console.log would

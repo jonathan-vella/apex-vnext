@@ -1,15 +1,8 @@
 /**
  * Commitlint Configuration
  *
- * Enforces Conventional Commits format for semantic versioning automation.
+ * Enforces Conventional Commits for readable repository history.
  * See: https://www.conventionalcommits.org/
- *
- * Version bumps are triggered by:
- * - feat: → minor version bump
- * - fix: → patch version bump
- * - feat!: or BREAKING CHANGE: → major version bump
- *
- * Other types (docs:, chore:, style:, refactor:, perf:, test:, ci:) do not trigger version bumps.
  */
 module.exports = {
   extends: ["@commitlint/config-conventional"],
@@ -19,8 +12,8 @@ module.exports = {
       2,
       "always",
       [
-        "feat", // New feature (minor version bump)
-        "fix", // Bug fix (patch version bump)
+        "feat", // New feature
+        "fix", // Bug fix
         "docs", // Documentation only changes
         "style", // Code style changes (formatting, semicolons, etc.)
         "refactor", // Code refactoring (no functional change)
