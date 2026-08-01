@@ -7,9 +7,8 @@
  * `models` and `governance` blocks are hand-maintained metadata and are
  * preserved verbatim. Only `assignments` is rewritten.
  *
- * Run on demand (`npm run generate:model-catalog`) or automatically via
- * the lefthook pre-commit hook whenever an agent frontmatter file is
- * staged. The validator (`validate-models.mjs --only=catalog`) compares the
+ * Run on demand (`npm run generate:model-catalog`). The validator
+ * (`validate-models.mjs --only=catalog`) compares the
  * committed `assignments` block against this generator's output and
  * fails CI on drift.
  *

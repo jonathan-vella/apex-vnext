@@ -6,7 +6,8 @@
 # Called by lefthook pre-push hook and can be run standalone.
 set -euo pipefail
 
-BRANCH=$(git rev-parse --abbrev-ref HEAD)
+BRANCH="${BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
+BRANCH_SCOPE_STRICT="${BRANCH_SCOPE_STRICT:-false}"
 
 # Skip enforcement for main, HEAD (detached), and dependabot branches
 if [[ "$BRANCH" == "main" || "$BRANCH" == "HEAD" || "$BRANCH" == dependabot/* ]]; then
@@ -17,7 +18,7 @@ PREFIX=$(echo "$BRANCH" | cut -d'/' -f1)
 
 # Cross-cutting prefixes: no file scope restriction
 case "$PREFIX" in
-  feat|fix|chore|refactor|revert|perf|test|build|ci)
+  feat|fix|chore|refactor|revert|perf|test|build|ci|dependabot|automation)
     echo "ℹ️  Branch prefix '$PREFIX/' is cross-cutting — no file scope restriction"
     exit 0
     ;;
@@ -72,13 +73,16 @@ while IFS= read -r file; do
 done <<< "$CHANGED_FILES"
 
 if [ -n "$OUT_OF_SCOPE" ]; then
-  echo "⚠️  Branch scope notice: '$BRANCH' also modifies files outside $LABEL"
+  echo "⚠️  Branch '$BRANCH' modifies files outside $LABEL"
   echo ""
   echo "   Files outside scope:"
   echo -e "$OUT_OF_SCOPE"
   echo "   💡 Consider a feat/ or fix/ branch for cross-cutting changes."
   echo ""
-  # Warning only — do not block push
+  if [[ "$BRANCH_SCOPE_STRICT" == "true" ]]; then
+    exit 1
+  fi
+  echo "   Local scope checks are advisory; CI enforces this policy."
   exit 0
 fi
 

@@ -4,14 +4,14 @@
 # Called by lefthook pre-push hook and can be run standalone.
 set -euo pipefail
 
-BRANCH=$(git rev-parse --abbrev-ref HEAD)
+BRANCH="${BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
 
 # Skip enforcement for main, HEAD (detached), and dependabot branches
 if [[ "$BRANCH" == "main" || "$BRANCH" == "HEAD" || "$BRANCH" == dependabot/* ]]; then
   exit 0
 fi
 
-ALLOWED_PREFIXES="docs/|agents/|skills/|infra/|tools/scripts/|instructions/|fix/|chore/|feat/|ci/|refactor/|perf/|test/|build/|revert/"
+ALLOWED_PREFIXES="docs/|agents/|skills/|infra/|scripts/|instructions/|fix/|chore/|feat/|ci/|refactor/|perf/|test/|build/|revert/|automation/"
 
 if ! echo "$BRANCH" | grep -qE "^($ALLOWED_PREFIXES)"; then
   echo "❌ Branch name '$BRANCH' does not follow naming convention."
@@ -21,7 +21,7 @@ if ! echo "$BRANCH" | grep -qE "^($ALLOWED_PREFIXES)"; then
   echo "     agents/       Managed agent definitions (customizations/.github/agents/)"
   echo "     skills/       Skill files (.github/skills/)"
   echo "     infra/        Infrastructure code (infra/bicep/, infra/terraform/)"
-  echo "     tools/scripts/      Validation scripts, linters"
+  echo "     scripts/      Validation scripts, linters"
   echo "     instructions/ Instruction files (.github/instructions/)"
   echo "     fix/          Bug fixes (cross-cutting)"
   echo "     feat/         New features (cross-cutting)"

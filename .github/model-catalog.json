@@ -102,7 +102,9 @@
       "tier": "frontier",
       "released": "2026-07",
       "deprecated": false,
-      "use_for": ["repository-maintenance"],
+      "use_for": [
+        "repository-maintenance"
+      ],
       "notes": "Authorized 2026-07 for the pre-agent automation loop prompt. Shares the GPT-5.5 outcome-first prompting contract (Role / Goal / Success criteria / Constraints / Output / Stop rules, decision rules over absolutes, no Anthropic XML blocks), so `classifyModel()` assigns it the enforced `gpt-5.6` family and the `gpt55-*` rules in the vendor-prompting registry apply unchanged."
     },
     "GPT-5.6 Terra": {
@@ -110,7 +112,9 @@
       "tier": "frontier",
       "released": "2026-07",
       "deprecated": false,
-      "use_for": ["repository-maintenance"],
+      "use_for": [
+        "repository-maintenance"
+      ],
       "notes": "Authorized 2026-07 for the pre-agent automation loop prompt. Shares the GPT-5.5 outcome-first prompting contract, so `classifyModel()` assigns it the enforced `gpt-5.6` family and the `gpt55-*` rules apply unchanged."
     },
     "GPT-5.5": {
@@ -165,7 +169,7 @@
   "assignments": {
     "generated": true,
     "generated_by": "tools/scripts/generate-model-catalog.mjs",
-    "description": "Auto-generated inventory of agent → model assignments derived from frontmatter (canonical source). Do not edit by hand; run `node tools/scripts/generate-model-catalog.mjs` or let the lefthook pre-commit hook refresh it when frontmatter changes.",
+    "description": "Auto-generated inventory of agent → model assignments derived from frontmatter (canonical source). Do not edit by hand; run `npm run generate:model-catalog` and commit the result.",
     "agents": {
       "apex-architect.agent.md": "Claude Opus 4.8",
       "apex-operator.agent.md": "GPT-5.5",

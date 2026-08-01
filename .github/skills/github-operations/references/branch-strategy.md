@@ -15,7 +15,7 @@ Validated by `scripts/validate-branch-naming.sh` and `scripts/validate-branch-sc
 | `agents/`       | `customizations/.github/agents/`, `customizations/manifest.json` |
 | `skills/`       | `.github/skills/`                                       |
 | `infra/`        | `infra/`                                                |
-| `scripts/`      | `scripts/`, `package.json`                              |
+| `scripts/`      | `tools/scripts/`, `package.json`                        |
 | `instructions/` | `.github/instructions/`                                 |
 
 ### Cross-Cutting (any files allowed)

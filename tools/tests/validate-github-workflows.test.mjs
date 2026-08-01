@@ -60,7 +60,7 @@ test("rejects required context and external-runtime check drift", () => {
 
 test("rejects trigger, permission, and action-version drift", () => {
   assert.ok(
-    validate(mutate(".github/workflows/docs.yml", '      - "docs/**"', '      - "other/**"')).some((error) =>
+    validate(mutate(".github/workflows/docs.yml", '      - "**/*.md"', '      - "other/**"')).some((error) =>
       error.includes("on contract drift"),
     ),
   );
@@ -111,6 +111,7 @@ test("rejects Node dependency registry weakening after action rebaselining", () 
   const mutations = [
     (text) => text.replace("https://packagefeedproxy.microsoft.io/npm/", "https://registry.npmjs.org/"),
     (text) => text.replace("https://packagefeedproxy.microsoft.io/npm/", ""),
+    (text) => text.replace('        LEFTHOOK: "0"\n', ""),
     (text) => `${text}\n    - name: Unbound install\n      shell: bash\n      run: npm install\n`,
   ];
   for (const mutateAction of mutations) {
@@ -135,12 +136,12 @@ test("rejects Python validation setup weakening and caller removal", () => {
   for (const [search, replacement, expected] of [
     ['python-version: "3.14"', 'python-version: "3.13"', "version or cache contract drift"],
     ["cache: pip", "cache: none", "version or cache contract drift"],
-    ["set -euo pipefail", "set -e", "dependency bootstrap drift"],
     [
       "python -m pip install -e tools/apex-recall",
       "python -m pip install tools/apex-recall",
       "dependency bootstrap drift",
     ],
+    ["tools/apex-recall pytest ruff", "tools/apex-recall pytest", "dependency bootstrap drift"],
     ["using: composite", "using: node20", "structure or runtime drift"],
     ["      shell: bash", "      continue-on-error: true\n      shell: bash", "dependency bootstrap drift"],
     [

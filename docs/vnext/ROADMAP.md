@@ -427,8 +427,8 @@ dynamic two-client context and cache samples remain explicitly assigned to Miles
 2. Apply the characterized linting owner map by validator family; preserve focused commands, diagnostics, exit codes,
    language-native parsing, and externally consumed aliases until proven unused.
 3. Repair the Markdown pre-commit lookup so missing executables fail closed and match direct repository lint behavior.
-4. Make lefthook a thin consumer of canonical validators; retain serial execution until Git-index evidence permits
-   change.
+4. Keep lefthook a thin consumer of canonical validators; permit parallel execution only while structural tests prove
+   there is one Git-index writer.
 5. Consolidate workflow setup and responsibility only where characterization proves duplicate ownership while keeping
    required check names, triggers, permissions, pins, artifacts, and independent external-runtime visibility stable.
 6. Archive obsolete scripts and workflows with provenance instead of retaining successful no-op compatibility paths.

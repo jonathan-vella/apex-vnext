@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Consolidated shared GitHub Actions setup, removed no-op maintenance inputs and duplicate Markdown/IaC steps, and
+  archived the devcontainer CI workflow already disabled by DECISION-009.
 - Consolidated duplicate lint aliases onto canonical validators, replaced repeated vNext CI steps with
   `qualify:vnext`, and removed obsolete hook paths and the unused model-catalog index writer.
 - Archived the broken original-APEX E2E workflow, benchmark scripts, prompts, and fixtures after vNext deterministic,

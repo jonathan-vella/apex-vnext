@@ -7,24 +7,10 @@ on:
     # workflows/README.md). Weekly is enough to keep the baseline fresh.
     - cron: "0 5 * * 1"
   workflow_dispatch:
-    inputs:
-      force_update:
-        description: "Force PR creation even if no changes detected"
-        required: false
-        default: false
-        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
-# Disable lefthook hooks on the runner — `npm ci` triggers the `prepare`
-# script (`lefthook install`), which registers a pre-commit hook that calls
-# `gitleaks`. gitleaks is not installed on the GitHub-hosted runner, so the
-# create-pull-request commit fails with `gitleaks: not found`. Secrets
-# scanning via gitleaks is a local pre-commit hook only.
-env:
-  LEFTHOOK: "0"
 
 permissions:
   contents: write
@@ -33,48 +19,26 @@ permissions:
 
 jobs:
   collect-baseline:
+    if: vars.GOVERNANCE_BASELINE_ENABLED != 'false'
     runs-on: ubuntu-latest
     steps:
-      # Kill switch — exit cleanly if disabled
-      - name: Check kill switch
-        if: vars.GOVERNANCE_BASELINE_ENABLED == 'false'
-        run: |
-          echo "::notice::Governance baseline collection is disabled (GOVERNANCE_BASELINE_ENABLED=false). Exiting."
-          exit 0
-
-      - name: Skip remaining steps if disabled
-        if: vars.GOVERNANCE_BASELINE_ENABLED == 'false'
-        id: disabled
-        run: echo "skip=true" >> "$GITHUB_OUTPUT"
-
       - name: Checkout repository
-        if: steps.disabled.outputs.skip != 'true'
         uses: actions/checkout@v7
-        with:
-          ref: ${{ github.ref_name }}
-          fetch-depth: 2
 
       - name: Azure Login (OIDC)
-        if: steps.disabled.outputs.skip != 'true'
         uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Create data directory
-        if: steps.disabled.outputs.skip != 'true'
-        run: mkdir -p .github/data
-
       - name: Collect governance baseline
-        if: steps.disabled.outputs.skip != 'true'
         run: |
           pwsh tools/scripts/collect-governance-baseline.ps1 \
             -ManagementGroupId "${{ vars.GOVERNANCE_MG_ID }}" \
             -MaxSubscriptions "${{ vars.GOVERNANCE_MAX_SUBSCRIPTIONS || '100' }}"
 
       - name: Stage baseline file
-        if: steps.disabled.outputs.skip != 'true'
         id: changes
         run: |
           git add .github/data/governance-policy-baseline.json
@@ -85,7 +49,7 @@ jobs:
           fi
 
       - name: Detect MG ID change
-        if: steps.disabled.outputs.skip != 'true' && steps.changes.outputs.changed == 'true'
+        if: steps.changes.outputs.changed == 'true'
         id: mg-check
         run: |
           CURRENT_MG=$(jq -r '.management_group_id' .github/data/governance-policy-baseline.json)
@@ -98,7 +62,7 @@ jobs:
           fi
 
       - name: Read baseline summary
-        if: steps.disabled.outputs.skip != 'true' && steps.changes.outputs.changed == 'true'
+        if: steps.changes.outputs.changed == 'true'
         id: summary
         run: |
           COVERAGE=$(jq -r '.coverage_status' .github/data/governance-policy-baseline.json)
@@ -113,7 +77,7 @@ jobs:
           echo "mg_id=$MG_ID" >> "$GITHUB_OUTPUT"
 
       - name: Create pull request
-        if: (steps.changes.outputs.changed == 'true' || github.event.inputs.force_update == 'true') && steps.disabled.outputs.skip != 'true'
+        if: steps.changes.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -155,5 +119,5 @@ jobs:
           echo "🔗 ${{ steps.cpr.outputs.pull-request-url }}"
 
       - name: Log no changes
-        if: steps.changes.outputs.changed == 'false' && steps.disabled.outputs.skip != 'true'
+        if: steps.changes.outputs.changed == 'false'
         run: echo "ℹ️ No governance baseline changes detected — no PR created."

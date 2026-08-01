@@ -102,12 +102,7 @@ function validatePythonSetupAction(text) {
   }
   if (!Array.isArray(steps) || steps.length !== 2) return ["Python setup action must contain exactly two steps"];
   const [setup, install] = steps;
-  const expectedInstall = [
-    "set -euo pipefail",
-    "python -m pip install --upgrade pip",
-    "python -m pip install -e tools/apex-recall",
-    "python -m pip install pytest ruff",
-  ];
+  const expectedInstall = ["python -m pip install -e tools/apex-recall pytest ruff"];
   const actualInstall = String(install?.run ?? "")
     .split(/\r?\n/u)
     .map((line) => line.trim())
@@ -149,8 +144,9 @@ function validateNodeSetupAction(text) {
     install?.if !== "inputs.install-deps == 'true'" ||
     install?.shell !== "bash" ||
     install?.run !== "npm ci" ||
+    install?.env?.LEFTHOOK !== "0" ||
     install?.env?.npm_config_registry !== "https://packagefeedproxy.microsoft.io/npm/" ||
-    Object.keys(install?.env ?? {}).length !== 1
+    Object.keys(install?.env ?? {}).length !== 2
   ) {
     return ["Node setup action dependency registry contract drift"];
   }

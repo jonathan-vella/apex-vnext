@@ -223,13 +223,6 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
-      "id": "test-devcontainer-verdicts",
-      "script": "test:devcontainer-verdicts",
-      "profile": "node-test",
-      "aliases": [],
-      "retirement": { "status": "active", "replacementIds": [] }
-    },
-    {
       "id": "test-repository-validator-graph",
       "script": "test:repository-validator-graph",
       "profile": "node-test",
@@ -635,7 +628,6 @@
         "validate:model-catalog",
         "validate:region-canonical",
         "test:classify-model",
-        "test:devcontainer-verdicts",
         "lint:safe-shell",
         "validate:tool-versions"
       ],
@@ -677,7 +669,6 @@
         "validate:model-catalog",
         "validate:region-canonical",
         "test:classify-model",
-        "test:devcontainer-verdicts",
         "validate:no-hardcoded-counts",
         "validate:terminology",
         "validate:sku-manifest",
@@ -763,11 +754,18 @@
       "script": "test:apex-recall"
     },
     {
-      "id": "docs-validation",
+      "id": "docs-links",
       "kind": "github-actions",
       "path": ".github/workflows/docs.yml",
-      "name": "Validate Markdown documentation",
-      "script": "validate:docs"
+      "name": "Validate documentation links and freshness",
+      "script": "lint:links"
+    },
+    {
+      "id": "docs-freshness",
+      "kind": "github-actions",
+      "path": ".github/workflows/docs.yml",
+      "name": "Validate documentation links and freshness",
+      "script": "lint:docs-freshness"
     },
     {
       "id": "hook-markdown-lint",

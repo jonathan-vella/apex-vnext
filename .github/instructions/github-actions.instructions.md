@@ -41,9 +41,9 @@ For general GitHub Actions best practices, rely on
 | `actions/checkout`                | `@v7`   |
 | `actions/setup-node`              | `@v6`   |
 | `actions/upload-artifact`         | `@v7`   |
-| `actions/download-artifact`       | `@v4`   |
+| `actions/download-artifact`       | `@v8`   |
 | `actions/cache`                   | `@v4`   |
-| `actions/github-script`           | `@v8`   |
+| `actions/github-script`           | `@v9`   |
 | `peter-evans/create-pull-request` | `@v8`   |
 
 ### Naming and Structure
@@ -69,8 +69,11 @@ concurrency:
 | Workflow                        | Purpose                                          | Trigger                     |
 | ------------------------------- | ------------------------------------------------ | --------------------------- |
 | `ci.yml`                        | Required PR check: lint + all Node.js validators | PR + push to main/feature   |
-| `docs.yml` | Markdown lint, link, and freshness validation | PR + push to main (docs/) |
-| `weekly-maintenance.yml`        | AVM version audit + docs freshness + Azure deprecation tracking (folds the retired `azure-deprecation-tracker.yml`) | Weekly (Mon 07:00) + manual |
+| `docs.yml` | Link and freshness validation; required CI owns Markdown lint | PR + push to main (Markdown) |
+| `weekly-maintenance.yml`        | AVM version audit + docs freshness + Azure deprecation tracking (folds the retired `azure-deprecation-tracker.yml`) | Weekly (Mon 06:00) + manual |
+
+The shared `setup-node-repo` action fixes Node.js 24, configures the package-feed proxy, disables repository Git hooks
+for CI installs, and optionally runs `npm ci`. Do not repeat those settings in individual workflows.
 
 ## Validation Scripts
 
