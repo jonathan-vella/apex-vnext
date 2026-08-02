@@ -2624,7 +2624,11 @@ export class ApexService {
         "APEX_CONFLICT",
         "Run uses retired sku-manifest-v1; start a new run and regenerate artifacts",
         EXIT_CODES.conflict,
-        { retiredArtifact: "sku-manifest-v1", replacementArtifact: "workload-decision-manifest-v1", recovery: "start-new-run" },
+        {
+          retiredArtifact: "sku-manifest-v1",
+          replacementArtifact: "workload-decision-manifest-v1",
+          recovery: "start-new-run",
+        },
       );
     }
     return run;
@@ -3041,7 +3045,11 @@ export class ApexService {
         manifest.architectureHash !== sha256Json(byKind.architecture) ||
         manifest.costEstimateHash !== sha256Json(byKind["cost-estimate"])
       ) {
-        throw new ApexError("APEX_VALIDATION", "Workload decision manifest does not bind accepted artifacts", EXIT_CODES.validation);
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Workload decision manifest does not bind accepted artifacts",
+          EXIT_CODES.validation,
+        );
       }
     }
     if (descriptor.id === "plan") {

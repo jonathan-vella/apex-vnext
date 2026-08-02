@@ -198,8 +198,14 @@ function workloadDecisionCoverage(value: unknown): ValidationIssue[] {
     .map(({ id }) => id)
     .sort();
   const traces = new Map(manifest.requirementTraceability.map((trace) => [trace.requirementId, trace]));
-  if (traces.size !== manifest.requirementTraceability.length || JSON.stringify([...traces.keys()].sort()) !== JSON.stringify(requiredIds)) {
-    return issue("/outputs/workload-decision-manifest", "Traceability must cover exactly all confirmed must requirements");
+  if (
+    traces.size !== manifest.requirementTraceability.length ||
+    JSON.stringify([...traces.keys()].sort()) !== JSON.stringify(requiredIds)
+  ) {
+    return issue(
+      "/outputs/workload-decision-manifest",
+      "Traceability must cover exactly all confirmed must requirements",
+    );
   }
   const components = new Map(architecture.components.map((component) => [component.id, component]));
   const sku = new Map(manifest.skuDecisions.map((decision) => [decision.id, decision]));
@@ -227,13 +233,19 @@ function workloadDecisionCoverage(value: unknown): ValidationIssue[] {
       !decision.requirementIds.every((id) => component.requirementIds.includes(id)) ||
       costMatches.length !== 1
     ) {
-      return issue("/outputs/workload-decision-manifest/skuDecisions", `SKU decision ${decision.id} is not architecture and cost traceable`);
+      return issue(
+        "/outputs/workload-decision-manifest/skuDecisions",
+        `SKU decision ${decision.id} is not architecture and cost traceable`,
+      );
     }
   }
   for (const decision of manifest.sloDecisions) {
     const component = components.get(decision.logicalId);
     if (component === undefined || !decision.requirementIds.every((id) => component.requirementIds.includes(id))) {
-      return issue("/outputs/workload-decision-manifest/sloDecisions", `SLO decision ${decision.id} is not architecture traceable`);
+      return issue(
+        "/outputs/workload-decision-manifest/sloDecisions",
+        `SLO decision ${decision.id} is not architecture traceable`,
+      );
     }
   }
   return [];

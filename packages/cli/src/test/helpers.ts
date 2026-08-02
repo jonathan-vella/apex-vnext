@@ -401,9 +401,7 @@ export async function prepareValidatedRun(service: ApexService, runId: string, t
   };
   const complete = async (expected: string, outputs: TaskOutput[]) =>
     service.completeTaskOutputs(await nextTask(expected), outputs);
-  const requirementHashes = await complete("requirements", [
-    { kind: "requirements", value: requirements() },
-  ]);
+  const requirementHashes = await complete("requirements", [{ kind: "requirements", value: requirements() }]);
   await complete("requirements-review", [
     { kind: "review-findings", value: review(runId, "requirements", requirementHashes.outputHashes.requirements!) },
   ]);

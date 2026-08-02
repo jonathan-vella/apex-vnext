@@ -503,9 +503,34 @@ function workloadDecisionManifest(
     costEstimateHash,
     environments: ["dev", "prod"],
     requirementTraceability: [{ requirementId: "REQ-1", skuDecisionIds: ["api-sku"], sloDecisionIds: ["api-slo"] }],
-    skuDecisions: [{ id: "api-sku", logicalId: "api", service: "fake/service", sku: "test", quantity: 1, rationale: "qualification", requirementIds: ["REQ-1"], environmentOverrides: [] }],
-    sloDecisions: [{ id: "api-slo", logicalId: "api", availabilityPercent: 99.9, rtoMinutes: 60, rpoMinutes: 15, supportWindow: "business-hours", complianceScopes: ["gdpr"], requirementIds: ["REQ-1"], environmentOverrides: [] }],
-    revisions: [{ number: 1, createdAt: "2026-01-01T00:00:00.000Z", sourceHash: requirementsHash, reason: "qualification" }],
+    skuDecisions: [
+      {
+        id: "api-sku",
+        logicalId: "api",
+        service: "fake/service",
+        sku: "test",
+        quantity: 1,
+        rationale: "qualification",
+        requirementIds: ["REQ-1"],
+        environmentOverrides: [],
+      },
+    ],
+    sloDecisions: [
+      {
+        id: "api-slo",
+        logicalId: "api",
+        availabilityPercent: 99.9,
+        rtoMinutes: 60,
+        rpoMinutes: 15,
+        supportWindow: "business-hours",
+        complianceScopes: ["gdpr"],
+        requirementIds: ["REQ-1"],
+        environmentOverrides: [],
+      },
+    ],
+    revisions: [
+      { number: 1, createdAt: "2026-01-01T00:00:00.000Z", sourceHash: requirementsHash, reason: "qualification" },
+    ],
   };
 }
 function architecture(context: TrackContext) {

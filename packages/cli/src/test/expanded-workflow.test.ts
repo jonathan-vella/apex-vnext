@@ -379,9 +379,7 @@ test("task validation refuses workflow bytes outside the run lock", async () => 
   const workflowBytes = await readFile(workflowPath);
   await writeFile(workflowPath, Buffer.concat([workflowBytes, Buffer.from("\n")]));
   await assert.rejects(
-    service.completeTaskOutputs(issued.task.taskId, [
-      { kind: "requirements", value: requirements() },
-    ]),
+    service.completeTaskOutputs(issued.task.taskId, [{ kind: "requirements", value: requirements() }]),
     (error: unknown) => error instanceof ApexError && error.code === "APEX_STALE",
   );
 });
@@ -391,9 +389,7 @@ test("gate approval records executed manifest validators in order", async () => 
   const service = new ApexService(root);
   const { runId } = await service.init({ projectId: "demo" });
   await service.nextTask();
-  const requirementHashes = await complete(service, "requirements", [
-    { kind: "requirements", value: requirements() },
-  ]);
+  const requirementHashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
   await complete(service, "requirements-review", [
     {
       kind: "review-findings",
@@ -427,9 +423,7 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
   const duplicateRequirements = structuredClone(requirements());
   duplicateRequirements.requirements.push({ ...duplicateRequirements.requirements[0]! });
   await assert.rejects(
-    service.completeTaskOutputs(requirementTask, [
-      { kind: "requirements", value: duplicateRequirements },
-    ]),
+    service.completeTaskOutputs(requirementTask, [{ kind: "requirements", value: duplicateRequirements }]),
     /business:requirements-completeness/,
   );
   const requirementValues = requirements();
@@ -629,9 +623,7 @@ test("architecture requires current scope-bound availability evidence", async ()
   const service = new ApexService(root);
   const { runId } = await service.init({ projectId: "demo" });
   await service.nextTask();
-  const requirementHashes = await complete(service, "requirements", [
-    { kind: "requirements", value: requirements() },
-  ]);
+  const requirementHashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
   await complete(service, "requirements-review", [
     {
       kind: "review-findings",
@@ -1205,9 +1197,7 @@ test("review blockers persist, resolve, and permit gate approval", async () => {
   const service = new ApexService(root);
   const { runId } = await service.init({ projectId: "demo" });
   await service.nextTask();
-  const hashes = await complete(service, "requirements", [
-    { kind: "requirements", value: requirements() },
-  ]);
+  const hashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
   const reviewHashes = await complete(service, "requirements-review", [
     {
       kind: "review-findings",
@@ -1254,9 +1244,7 @@ test("expired accepted risk can be replaced without reopening an open gate", asy
   const service = new ApexService(await tempRoot(), { clock: () => new Date(now) });
   const { runId } = await service.init({ projectId: "demo" });
   await service.nextTask();
-  const hashes = await complete(service, "requirements", [
-    { kind: "requirements", value: requirements() },
-  ]);
+  const hashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
   const reviewHashes = await complete(service, "requirements-review", [
     {
       kind: "review-findings",
@@ -1433,9 +1421,7 @@ test("MCP completeTask accepts an output bundle", async () => {
     name: "completeTask",
     arguments: {
       taskId: issued.task.taskId,
-      outputs: [
-        { kind: "requirements", value: requirements() },
-      ],
+      outputs: [{ kind: "requirements", value: requirements() }],
     },
   });
   assert.equal(response.isError, undefined);
