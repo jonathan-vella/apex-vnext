@@ -2,15 +2,17 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
+import { CONTRACT_VERSION } from "@apex/contracts";
+import type { ProcessRequest } from "@apex/capabilities";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createMcpServer } from "../mcp.js";
 import { execute } from "../cli.js";
 import { ApexService } from "../service.js";
-import { nextTaskAfterInput, requirements, skuManifest, tempRoot, writeJson } from "./helpers.js";
-import { sha256Json } from "@apex/kernel";
+import { nextTaskAfterInput, requirements, tempRoot, writeJson } from "./helpers.js";
 
 test("CLI emits a stable JSON envelope", async () => {
   const child = spawn(process.execPath, [join(import.meta.dirname, "..", "cli.js"), "version", "--json"], {
@@ -26,6 +28,155 @@ test("CLI emits a stable JSON envelope", async () => {
     ok: true,
     result: { version: "0.10.0", bundleVersion: "0.10.0", configVersion: "1.0.0" },
   });
+});
+
+test("CLI bootstrap validates onboarding files before initializing a selected client", async () => {
+  const root = await tempRoot();
+  const configPath = join(root, "onboarding.json");
+  await writeJson(configPath, {
+    schemaVersion: CONTRACT_VERSION,
+    projectId: "payments",
+    displayName: "Payments platform",
+    client: "github-copilot-cli",
+    environment: "test",
+    targetScope: "resource-group:payments-test",
+    iacTool: "terraform",
+    createRepository: true,
+  });
+  await assert.rejects(execute(["bootstrap", "--file", configPath], root), /requires --yes/u);
+  const requests: ProcessRequest[] = [];
+  const initialized = (await execute(["bootstrap", "--file", configPath, "--yes"], root, {
+    processRunner: {
+      run: async (request) => {
+        requests.push(request);
+        return { exitCode: 0, signal: null, stdout: "", stderr: "", timedOut: false, outputTruncated: false };
+      },
+    },
+  })) as {
+    projectId: string;
+    runId: string;
+    runtimeInstalled: boolean;
+  };
+  assert.equal(initialized.projectId, "payments");
+  assert.equal(initialized.runtimeInstalled, true);
+  assert.deepEqual(requests, [
+    {
+      executable: "git",
+      args: ["init"],
+      cwd: root,
+      timeoutMs: 30_000,
+      maxOutputBytes: 64 * 1024,
+    },
+    {
+      executable: "npm",
+      args: [
+        "install",
+        "--save-dev",
+        "--save-exact",
+        "--ignore-scripts",
+        "--no-audit",
+        "--no-fund",
+        "@apex/cli@0.10.0",
+      ],
+      cwd: root,
+      timeoutMs: 120_000,
+      maxOutputBytes: 1_048_576,
+    },
+  ]);
+  assert.equal(
+    ((await execute(["status"], root)) as { run: { environment: string; iacTool: string } }).run.environment,
+    "test",
+  );
+  assert.equal(
+    ((await execute(["status"], root)) as { run: { environment: string; iacTool: string } }).run.iacTool,
+    "terraform",
+  );
+
+  const invalidPath = join(root, "invalid-onboarding.json");
+  await writeJson(invalidPath, { schemaVersion: CONTRACT_VERSION, projectId: "Payments" });
+  await assert.rejects(
+    execute(["bootstrap", "--file", invalidPath, "--yes"], root),
+    /Onboarding configuration is malformed/u,
+  );
+  await assert.rejects(
+    execute(["bootstrap", "--file", configPath, "--client", "github-copilot-vscode", "--yes"], await tempRoot()),
+    /conflicts with the onboarding configuration/u,
+  );
+  const noGitPath = join(root, "no-git-onboarding.json");
+  await writeJson(noGitPath, { schemaVersion: CONTRACT_VERSION, projectId: "no-git" });
+  await assert.rejects(
+    execute(["bootstrap", "--file", noGitPath, "--yes"], await tempRoot()),
+    /requires a Git repository/u,
+  );
+});
+
+test("bootstrap reuses an exact local runtime and rejects a conflicting version", async () => {
+  const root = await tempRoot();
+  await mkdir(join(root, ".git"));
+  await mkdir(join(root, "node_modules", "@apex", "cli"), { recursive: true });
+  await writeFile(join(root, "node_modules", "@apex", "cli", "package.json"), '{"version":"0.10.0"}\n');
+  const service = new ApexService(root, {
+    processRunner: {
+      run: async () => {
+        throw new Error("npm must not run when the exact runtime is installed");
+      },
+    },
+  });
+  assert.equal((await service.bootstrap({ projectId: "existing" })).runtimeInstalled, false);
+
+  const conflictingRoot = await tempRoot();
+  await mkdir(join(conflictingRoot, ".git"));
+  await mkdir(join(conflictingRoot, "node_modules", "@apex", "cli"), { recursive: true });
+  await writeFile(join(conflictingRoot, "node_modules", "@apex", "cli", "package.json"), '{"version":"0.9.0"}\n');
+  await assert.rejects(
+    new ApexService(conflictingRoot).bootstrap({ projectId: "conflicting" }),
+    /Workspace has @apex\/cli@0\.9\.0/u,
+  );
+});
+
+test("bootstrap derives a project ID from the workspace folder", async () => {
+  const root = await tempRoot();
+  await mkdir(join(root, ".git"));
+  const result = (await execute(["bootstrap", "--yes"], root, {
+    processRunner: {
+      run: async () => ({ exitCode: 0, signal: null, stdout: "", stderr: "", timedOut: false, outputTruncated: false }),
+    },
+  })) as { projectId: string };
+  assert.match(result.projectId, /^apex-cli-[a-z0-9-]+$/u);
+});
+
+test("CLI manages only its own VS Code profile bootstrap agent", async () => {
+  const root = await tempRoot();
+  const profileRoot = join(await tempRoot(), "agents");
+  const profileAgent = join(profileRoot, "apex-bootstrap.agent.md");
+  await assert.rejects(execute(["profile", "install"], root, { profileRoot }), /requires --yes/u);
+  assert.deepEqual(await execute(["profile", "status"], root, { profileRoot }), { installed: false, modified: false });
+  assert.deepEqual(await execute(["profile", "install", "--yes"], root, { profileRoot }), {
+    installed: true,
+    version: "0.10.0",
+  });
+  assert.deepEqual(await execute(["profile", "status"], root, { profileRoot }), {
+    installed: true,
+    modified: false,
+    version: "0.10.0",
+  });
+  await assert.rejects(
+    execute(["profile", "install", "--client", "github-copilot-cli", "--yes"], root, { profileRoot }),
+    /supported only for github-copilot-vscode/u,
+  );
+  await writeFile(profileAgent, "local modification\n");
+  await assert.rejects(execute(["profile", "update", "--yes"], root, { profileRoot }), /was modified/u);
+  await assert.rejects(execute(["profile", "uninstall", "--yes"], root, { profileRoot }), /was modified/u);
+});
+
+test("CLI rejects a symlinked profile bootstrap agent", async () => {
+  const root = await tempRoot();
+  const profileRoot = join(await tempRoot(), "agents");
+  const outside = join(await tempRoot(), "outside.agent.md");
+  await writeFile(outside, "outside\n");
+  await mkdir(profileRoot, { recursive: true });
+  await symlink(outside, join(profileRoot, "apex-bootstrap.agent.md"));
+  await assert.rejects(execute(["profile", "install", "--yes"], root, { profileRoot }), /regular file/u);
 });
 
 test("MCP registers only narrow tools and calls the service", async () => {
@@ -145,10 +296,7 @@ test("CLI completes an artifact bundle from JSON", async () => {
   const path = join(root, "bundle.json");
   await writeJson(path, {
     taskId: issued.task.taskId,
-    outputs: [
-      { kind: "requirements", value: requirements() },
-      { kind: "sku-manifest", value: skuManifest(sha256Json(requirements())) },
-    ],
+    outputs: [{ kind: "requirements", value: requirements() }],
   });
   const completed = (await execute(["task", "complete-bundle", "--file", path], root)) as {
     outputHashes: Record<string, string>;
@@ -164,14 +312,12 @@ test("CLI task complete accepts repeated self-describing files", async () => {
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
   const requirementsPath = join(root, "requirements-output.json");
-  const skuPath = join(root, "sku-output.json");
-  await writeJson(requirementsPath, { kind: "requirements", value: requirements() });
-  await writeJson(skuPath, { kind: "sku-manifest", value: skuManifest(sha256Json(requirements())) });
+  await writeJson(requirementsPath, requirements());
   const completed = (await execute(
-    ["task", "complete", "--task", issued.task.taskId, "--file", requirementsPath, "--file", skuPath],
+    ["task", "complete", "--task", issued.task.taskId, "--kind", "requirements", "--file", requirementsPath],
     root,
-  )) as { outputHashes: Record<string, string> };
-  assert.match(completed.outputHashes["sku-manifest"]!, /^[0-9a-f]{64}$/);
+  )) as { outputHash: string };
+  assert.match(completed.outputHash, /^[0-9a-f]{64}$/);
 });
 
 test("CLI rejects incomplete native provider config before execution", async () => {

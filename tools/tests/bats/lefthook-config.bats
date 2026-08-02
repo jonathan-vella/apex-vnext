@@ -35,28 +35,11 @@ create_markdown_fixture() {
   extract_markdown_lint_hook >"$hook_script"
 }
 
-@test "post-commit block contains only the allow-listed stamp-sku-manifest hook" {
-  # post-commit hooks are normally rejected to keep the commit path
-  # blocking-free. The only sanctioned exception is the
-  # stamp-sku-manifest hook from the SKU Manifest workflow, which
-  # writes commit_sha onto sku-manifest.json revisions and is
-  # explicitly best-effort (cannot block a commit).
-  if grep -q '^post-commit:' "$REPO_ROOT/lefthook.yml"; then
-    # Extract the post-commit block (from "^post-commit:" until next top-level key or EOF).
-    local block
-    block=$(awk '/^post-commit:/{f=1; next} /^[a-z][a-z-]*:/{f=0} f' "$REPO_ROOT/lefthook.yml")
-    # Allow only stamp-sku-manifest as a command name under post-commit.
-    local extra
-    extra=$(echo "$block" | grep -E '^    [a-z][a-z0-9_-]*:' | grep -v '^    stamp-sku-manifest:' || true)
-    if [ -n "$extra" ]; then
-      echo "Unexpected post-commit hooks (only stamp-sku-manifest is allow-listed):"
-      echo "$extra"
-      false
-    fi
-  fi
+@test "post-commit has no retired SKU manifest stamp hook" {
+  ! grep -q '^post-commit:' "$REPO_ROOT/lefthook.yml"
 }
 
-@test "one generating pre-commit hook allows parallel execution" {
+@test "no generating pre-commit hook remains after SKU manifest retirement" {
   local parallel
   local writers
   parallel=$(awk '/^pre-commit:/{in_precommit=1; next} in_precommit && /^  parallel:/{print $2; exit}' "$REPO_ROOT/lefthook.yml")
@@ -65,7 +48,7 @@ create_markdown_fixture() {
     /^      stage_fixed: true$/ { print command }
   ' "$REPO_ROOT/lefthook.yml" | sort)
   [ "$parallel" = "true" ]
-  [ "$writers" = "sku-manifest-render" ]
+  [ -z "$writers" ]
 }
 
 @test "Terraform formatting delegates validator behavior to its canonical npm script" {

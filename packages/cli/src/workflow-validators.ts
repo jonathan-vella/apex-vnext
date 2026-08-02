@@ -5,6 +5,7 @@ import {
   ImplementationIntentV1Schema,
   PolicyPropertyMapV1Schema,
   RequirementsV1Schema,
+  WorkloadDecisionManifestV1Schema,
   SECRET_FIELD_PATTERN,
   SECRET_VALUE_PATTERN,
   hasValidCostArithmetic,
@@ -26,6 +27,7 @@ import {
   type QualityReportV1,
   type QualityScorecardV1,
   type RequirementsV1,
+  type WorkloadDecisionManifestV1,
   type ReviewFindingsV1,
   type ResourceInventoryV1,
   type RunConfigV1,
@@ -182,6 +184,77 @@ function requirementsTraceability(value: unknown): ValidationIssue[] {
 function costArithmetic(value: unknown): ValidationIssue[] {
   const estimate = taskContext(value).outputs["cost-estimate"] as CostEstimateV1;
   return hasValidCostArithmetic(estimate) ? [] : issue("/outputs/cost-estimate", "Cost arithmetic does not reconcile");
+}
+
+function workloadDecisionCoverage(value: unknown): ValidationIssue[] {
+  const context = taskContext(value);
+  const manifest = context.outputs["workload-decision-manifest"] as WorkloadDecisionManifestV1;
+  const requirements = context.artifacts.requirements as RequirementsV1 | undefined;
+  const architecture = context.outputs.architecture as ArchitectureV1;
+  const estimate = context.outputs["cost-estimate"] as CostEstimateV1;
+  if (requirements === undefined) return issue("/artifacts/requirements", "Accepted requirements are required");
+  const requiredIds = requirements.requirements
+    .filter(({ priority, status }) => priority === "must" && status === "confirmed")
+    .map(({ id }) => id)
+    .sort();
+  if (requiredIds.length === 0) {
+    return issue(
+      "/artifacts/requirements",
+      "At least one confirmed must requirement is required for workload decisions",
+    );
+  }
+  const traces = new Map(manifest.requirementTraceability.map((trace) => [trace.requirementId, trace]));
+  if (
+    traces.size !== manifest.requirementTraceability.length ||
+    JSON.stringify([...traces.keys()].sort()) !== JSON.stringify(requiredIds)
+  ) {
+    return issue(
+      "/outputs/workload-decision-manifest",
+      "Traceability must cover exactly all confirmed must requirements",
+    );
+  }
+  const components = new Map(architecture.components.map((component) => [component.id, component]));
+  const sku = new Map(manifest.skuDecisions.map((decision) => [decision.id, decision]));
+  const slo = new Map(manifest.sloDecisions.map((decision) => [decision.id, decision]));
+  if (sku.size !== manifest.skuDecisions.length || slo.size !== manifest.sloDecisions.length) {
+    return issue("/outputs/workload-decision-manifest", "SKU and SLO decision IDs must be unique");
+  }
+  for (const id of requiredIds) {
+    const trace = traces.get(id)!;
+    if (
+      trace.skuDecisionIds.some((decisionId) => sku.get(decisionId)?.requirementIds.includes(id) !== true) ||
+      trace.sloDecisionIds.some((decisionId) => slo.get(decisionId)?.requirementIds.includes(id) !== true)
+    ) {
+      return issue("/outputs/workload-decision-manifest", `Decisions do not cover requirement ${id}`);
+    }
+  }
+  for (const decision of manifest.skuDecisions) {
+    const component = components.get(decision.logicalId);
+    const costMatches = estimate.lineItems.filter(
+      (line) => line.service === decision.service && line.sku === decision.sku && line.quantity === decision.quantity,
+    );
+    if (
+      component === undefined ||
+      component.service !== decision.service ||
+      !decision.requirementIds.every((id) => component.requirementIds.includes(id)) ||
+      costMatches.length !== 1
+    ) {
+      return issue(
+        "/outputs/workload-decision-manifest/skuDecisions",
+        `SKU decision ${decision.id} is not architecture and cost traceable`,
+      );
+    }
+  }
+  for (const decision of manifest.sloDecisions) {
+    const component = components.get(decision.logicalId);
+    if (component === undefined || !decision.requirementIds.every((id) => component.requirementIds.includes(id))) {
+      return issue(
+        "/outputs/workload-decision-manifest/sloDecisions",
+        `SLO decision ${decision.id} is not architecture traceable`,
+      );
+    }
+  }
+  return [];
 }
 
 function availabilityCurrent(value: unknown): ValidationIssue[] {
@@ -386,8 +459,8 @@ function gateContext(value: unknown): WorkflowGateValidatorContext {
 function gateReady(expectedGate: 1 | 2 | 3, value: unknown): ValidationIssue[] {
   const context = gateContext(value);
   const requiredArtifacts: Record<1 | 2 | 3, readonly string[]> = {
-    1: ["requirements", "sku-manifest"],
-    2: ["architecture", "cost-estimate", "governance-constraints", "policy-property-map"],
+    1: ["requirements"],
+    2: ["architecture", "cost-estimate", "workload-decision-manifest", "governance-constraints", "policy-property-map"],
     3: ["implementation-intent", "iac-binding", "environment-inputs"],
   };
   const requiredReviews: Record<1 | 2 | 3, readonly string[]> = {
@@ -903,6 +976,7 @@ function qualityNoSubjectiveClaims(value: unknown): ValidationIssue[] {
 export function registerWorkflowValidators(registry: ValidatorRegistry): void {
   registry.register("schema:requirements-v1", RequirementsV1Schema);
   registry.register("schema:architecture-v1", ArchitectureV1Schema);
+  registry.register("schema:workload-decision-manifest-v1", WorkloadDecisionManifestV1Schema);
   registry.register("schema:governance-constraints-v1", GovernanceConstraintsV1Schema);
   registry.register("schema:policy-property-map-v1", PolicyPropertyMapV1Schema);
   registry.register("schema:implementation-intent-v1", ImplementationIntentV1Schema);
@@ -910,6 +984,7 @@ export function registerWorkflowValidators(registry: ValidatorRegistry): void {
 
   registry.registerHandler("business:requirements-completeness", requirementsCompleteness);
   registry.registerHandler("business:requirements-traceability", requirementsTraceability);
+  registry.registerHandler("business:workload-decision-manifest-coverage", workloadDecisionCoverage);
   registry.registerHandler("business:cost-arithmetic", costArithmetic);
   registry.registerHandler("business:availability-current", availabilityCurrent, "freshness");
   registry.registerHandler("business:governance-completeness", governanceCompleteness);
@@ -987,6 +1062,7 @@ export function taskWorkflowValidatorInput(id: string, context: WorkflowTaskVali
   const schemaInputs: Readonly<Record<string, string>> = {
     "schema:requirements-v1": "requirements",
     "schema:architecture-v1": "architecture",
+    "schema:workload-decision-manifest-v1": "workload-decision-manifest",
     "schema:governance-constraints-v1": "governance-constraints",
     "schema:policy-property-map-v1": "policy-property-map",
     "schema:implementation-intent-v1": "implementation-intent",

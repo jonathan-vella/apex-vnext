@@ -225,10 +225,6 @@ test("requirements task context includes recorded input and stageable output tem
     kind: "requirements",
     value: context.outputTemplates.requirements,
   });
-  await service.stageArtifact(issued.task.taskId, {
-    kind: "sku-manifest",
-    value: context.outputTemplates["sku-manifest"],
-  });
 });
 
 test("requirements template preserves explicit unresolved status", async () => {

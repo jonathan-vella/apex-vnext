@@ -24,7 +24,7 @@ import {
   ResourceInventoryV1Schema,
   ReviewFindingsV1Schema,
   RuntimeBundleLockV1Schema,
-  SkuManifestV1Schema,
+  WorkloadDecisionManifestV1Schema,
   hasOnlyTypedSecretReferences,
   hasValidInputRequestQuestions,
   hasValidCostArithmetic,
@@ -55,6 +55,7 @@ import {
   type RunConfigV1,
   type RunId,
   type RuntimeBundleLockV1,
+  type WorkloadDecisionManifestV1,
   type TaskEnvelopeV1,
   type EventV1,
   type ExecutionPlanAttestationV1,
@@ -105,10 +106,12 @@ import {
 } from "@apex/renderers";
 import { constants } from "node:fs";
 import { access, cp, lstat, mkdir, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
+import { homedir } from "node:os";
 import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { resolveBundledAssets, type BundledClientProjection } from "./assets.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
 import { ApexError, EXIT_CODES } from "./errors.js";
+import { APEX_VERSION } from "./version.js";
 import {
   registerWorkflowValidators,
   taskWorkflowValidatorInput,
@@ -172,6 +175,52 @@ interface CustomizationTransaction {
   entries: CustomizationTransactionEntry[];
 }
 
+interface ProfileBootstrapReceipt {
+  version: 1;
+  packageVersion: string;
+  contentHash: string;
+}
+
+const PROFILE_BOOTSTRAP_FILENAME = "apex-bootstrap.agent.md";
+const PROFILE_BOOTSTRAP_RECEIPT = ".apex-bootstrap.lock.json";
+
+function profileBootstrapAgent(): Buffer {
+  return Buffer.from(
+    `---
+name: APEX Bootstrap
+description: Create an APEX workspace through the supported bootstrap workflow.
+target: vscode
+user-invocable: true
+disable-model-invocation: true
+tools:
+  - vscode/askQuestions
+  - run_in_terminal
+---
+
+## Role
+
+Guide a user through creating an APEX workspace. Ask for the project ID, display
+name, environment, target scope, IaC track, and whether Git may be initialized.
+
+## Workflow
+
+1. Confirm the open folder is the intended workspace and is trusted.
+2. Collect the onboarding values with \`vscode/askQuestions\`.
+3. Run \`npx --yes @apex/cli@${APEX_VERSION} bootstrap --project PROJECT_ID --name "DISPLAY_NAME" --environment ENVIRONMENT --target TARGET_SCOPE --iac IAC_TOOL --client github-copilot-vscode --yes\`.
+  Include \`--create-repo\` only after the user explicitly approves Git initialization.
+4. Run \`apex setup --json\` and \`apex doctor --json\` from the workspace.
+5. Ask the user to reload the VS Code window, then select the workspace APEX agent.
+
+## Boundaries
+
+Do not write workspace files, .apex state, MCP configuration, or managed agents.
+Do not approve gates, deploy resources, or infer workflow state. The CLI owns
+workspace initialization and the kernel owns all workflow authority.
+`,
+    "utf8",
+  );
+}
+
 export interface TaskOutput {
   kind: ArtifactKind;
   value: unknown;
@@ -230,6 +279,7 @@ export interface ServiceOptions {
   azureAuthStatus?: (live: boolean) => Promise<{ authenticated: boolean; detail: string }>;
   customizationFailureInjector?: (index: number, destination: string) => void | Promise<void>;
   processRunner?: ProcessRunnerLike;
+  profileRoot?: string;
   improvementPolicy?: ImprovementPolicyV1;
 }
 
@@ -242,7 +292,7 @@ interface DoctorCheck {
 
 const ARTIFACTS = {
   requirements: ["requirements", RequirementsV1Schema],
-  "sku-manifest": ["sku-manifest", SkuManifestV1Schema],
+  "workload-decision-manifest": ["workload-decision-manifest", WorkloadDecisionManifestV1Schema],
   architecture: ["architecture", ArchitectureV1Schema],
   "cost-estimate": ["cost-estimate", CostEstimateV1Schema],
   "review-findings": ["review-findings", ReviewFindingsV1Schema],
@@ -282,9 +332,9 @@ interface WorkflowValidationExecution {
 }
 
 const TASKS: readonly WorkflowTaskDescriptor[] = [
-  { id: "requirements", role: "requirements", outputs: ["requirements", "sku-manifest"] },
+  { id: "requirements", role: "requirements", outputs: ["requirements"] },
   { id: "requirements-review", role: "reviewer", outputs: ["review-findings"], reviewSubject: "requirements", gate: 1 },
-  { id: "architecture", role: "architect", outputs: ["architecture", "cost-estimate"] },
+  { id: "architecture", role: "architect", outputs: ["architecture", "cost-estimate", "workload-decision-manifest"] },
   { id: "architecture-review", role: "reviewer", outputs: ["review-findings"], reviewSubject: "architecture" },
   {
     id: "governance-discovery",
@@ -329,6 +379,7 @@ export class ApexService {
   private readonly azureAuthStatus: (live: boolean) => Promise<{ authenticated: boolean; detail: string }>;
   private readonly customizationFailureInjector?: ServiceOptions["customizationFailureInjector"];
   private readonly processRunner: ProcessRunnerLike;
+  private readonly profileRoot: string;
   private readonly improvementPolicy: ImprovementPolicyV1 | undefined;
   private improvementRuntime?: ImprovementStore;
 
@@ -355,6 +406,7 @@ export class ApexService {
       options.azureAuthStatus ?? (async () => ({ authenticated: false, detail: "not-checked; run setup --live" }));
     this.customizationFailureInjector = options.customizationFailureInjector;
     this.processRunner = options.processRunner ?? new ProcessRunner();
+    this.profileRoot = resolve(options.profileRoot ?? join(homedir(), ".copilot", "agents"));
     this.improvementPolicy = options.improvementPolicy;
   }
 
@@ -490,6 +542,90 @@ export class ApexService {
       await rm(join(this.root, ".apex"), { recursive: true, force: true });
       throw error;
     }
+  }
+
+  async bootstrap(input: {
+    projectId: ProjectId;
+    displayName?: string;
+    environment?: string;
+    targetScope?: string;
+    iacTool?: "bicep" | "terraform";
+    clientId?: BundledClientProjection["id"];
+    createRepository?: boolean;
+  }): Promise<{ projectId: ProjectId; runId: RunId; runtimeInstalled: boolean }> {
+    await this.assertCleanInitialization();
+    await this.ensureWorkspaceGitRepository(input.createRepository === true);
+    const runtimeInstalled = await this.ensureWorkspaceRuntime();
+    const initialized = await this.init(input);
+    return { ...initialized, runtimeInstalled };
+  }
+
+  async profileStatus(): Promise<{ installed: boolean; modified: boolean; version?: string }> {
+    const paths = this.profilePaths();
+    const receipt = await this.readProfileReceipt(paths.receipt);
+    const agent = await this.readProfileOptional(paths.agent);
+    if (receipt === undefined || agent === undefined)
+      return { installed: false, modified: receipt !== undefined || agent !== undefined };
+    return {
+      installed: sha256Bytes(agent) === receipt.contentHash,
+      modified: sha256Bytes(agent) !== receipt.contentHash,
+      version: receipt.packageVersion,
+    };
+  }
+
+  async profileInstall(): Promise<{ installed: boolean; version: string }> {
+    await this.ensureProfileRoot();
+    const paths = this.profilePaths();
+    const content = profileBootstrapAgent();
+    const current = await this.readProfileOptional(paths.agent);
+    if (current !== undefined && !current.equals(content)) {
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "Profile APEX bootstrap agent was modified or is owned by another tool",
+        EXIT_CODES.conflict,
+      );
+    }
+    await atomicWriteBytes(paths.agent, content);
+    await atomicWriteJson(paths.receipt, {
+      version: 1,
+      packageVersion: APEX_VERSION,
+      contentHash: sha256Bytes(content),
+    } satisfies ProfileBootstrapReceipt);
+    return { installed: current === undefined, version: APEX_VERSION };
+  }
+
+  async profileUpdate(): Promise<{ updated: boolean; version: string }> {
+    await this.ensureProfileRoot();
+    const paths = this.profilePaths();
+    const receipt = await this.readProfileReceipt(paths.receipt);
+    const current = await this.readProfileOptional(paths.agent);
+    if (receipt === undefined || current === undefined) {
+      throw new ApexError("APEX_NOT_FOUND", "Profile APEX bootstrap agent is not installed", EXIT_CODES.notFound);
+    }
+    if (sha256Bytes(current) !== receipt.contentHash) {
+      throw new ApexError("APEX_CONFLICT", "Profile APEX bootstrap agent was modified", EXIT_CODES.conflict);
+    }
+    const content = profileBootstrapAgent();
+    await atomicWriteBytes(paths.agent, content);
+    await atomicWriteJson(paths.receipt, {
+      version: 1,
+      packageVersion: APEX_VERSION,
+      contentHash: sha256Bytes(content),
+    } satisfies ProfileBootstrapReceipt);
+    return { updated: !current.equals(content), version: APEX_VERSION };
+  }
+
+  async profileUninstall(): Promise<{ removed: boolean }> {
+    await this.ensureProfileRoot();
+    const paths = this.profilePaths();
+    const receipt = await this.readProfileReceipt(paths.receipt);
+    const current = await this.readProfileOptional(paths.agent);
+    if (receipt !== undefined && current !== undefined && sha256Bytes(current) !== receipt.contentHash) {
+      throw new ApexError("APEX_CONFLICT", "Profile APEX bootstrap agent was modified", EXIT_CODES.conflict);
+    }
+    await rm(paths.agent, { force: true });
+    await rm(paths.receipt, { force: true });
+    return { removed: receipt !== undefined || current !== undefined };
   }
 
   async createProject(input: {
@@ -1144,9 +1280,7 @@ export class ApexService {
       throw new ApexError("APEX_VALIDATION", `Unknown task type ${task.taskType}`, EXIT_CODES.validation);
     const missing = descriptor.outputs.filter((kind) => !kinds.includes(kind));
     if (missing.length > 0) {
-      if (legacy && descriptor.id === "requirements" && kinds.length === 1 && kinds[0] === "requirements") {
-        outputs = [...outputs, { kind: "sku-manifest", value: this.initialSkuManifest(run, outputs[0]!.value) }];
-      } else if (legacy && descriptor.id === "plan" && kinds.length === 1 && kinds[0] === "implementation-intent") {
+      if (legacy && descriptor.id === "plan" && kinds.length === 1 && kinds[0] === "implementation-intent") {
         outputs = [...outputs, ...this.legacyPlanOutputs(run, outputs[0]!.value)];
       } else {
         throw new ApexError("APEX_VALIDATION", `Task bundle is missing: ${missing.join(", ")}`, EXIT_CODES.validation);
@@ -2479,7 +2613,25 @@ export class ApexService {
     return this.run(await this.selection());
   }
   private async run(selection: Selection): Promise<RunConfigV1> {
-    return this.runRepository(selection).read();
+    const run = await this.runRepository(selection).read();
+    const retired = (await this.journal(run).replay()).some((event) => {
+      if (event.type !== "task.completed") return false;
+      const hashes = (event.payload as { artifactHashes?: Record<string, unknown> }).artifactHashes;
+      return typeof hashes?.["sku-manifest"] === "string";
+    });
+    if (retired) {
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "Run uses retired sku-manifest-v1; start a new run and regenerate artifacts",
+        EXIT_CODES.conflict,
+        {
+          retiredArtifact: "sku-manifest-v1",
+          replacementArtifact: "workload-decision-manifest-v1",
+          recovery: "start-new-run",
+        },
+      );
+    }
+    return run;
   }
 
   private runRepository(selection: Selection): RunRepository {
@@ -2610,22 +2762,6 @@ export class ApexService {
         unknowns: [],
       };
     }
-    if (kind === "sku-manifest") {
-      return {
-        schemaVersion: CONTRACT_VERSION,
-        projectId: run.projectId,
-        environments: [run.environment],
-        services: [],
-        revisions: [
-          {
-            number: 1,
-            createdAt: run.createdAt,
-            sourceHash: events.at(-1)?.hash ?? ZERO_HASH,
-            reason: "Initial requirements capture",
-          },
-        ],
-      };
-    }
     return { schemaId: ARTIFACTS[kind][1].$id };
   }
 
@@ -2753,7 +2889,7 @@ export class ApexService {
     const engine = await this.lockedWorkflowEngine(run);
     const aliases: Partial<Record<ArtifactKind, string>> = {
       requirements: "requirements-v1",
-      "sku-manifest": "sku-manifest-v1",
+      "workload-decision-manifest": "workload-decision-manifest-v1",
       architecture: "architecture-v1",
       "cost-estimate": "cost-estimate-v1",
       "governance-constraints": "governance-constraints-v1",
@@ -2896,6 +3032,26 @@ export class ApexService {
     const byKind = Object.fromEntries(outputs.map((output) => [output.kind, output.value])) as Partial<
       Record<ArtifactKind, unknown>
     >;
+    if (descriptor.id === "architecture") {
+      const manifest = byKind["workload-decision-manifest"] as WorkloadDecisionManifestV1;
+      const requirementsHash = this.artifactHash(events, "requirements");
+      if (
+        requirementsHash === undefined ||
+        manifest.projectId !== run.projectId ||
+        manifest.runId !== run.runId ||
+        manifest.environment !== run.environment ||
+        !manifest.environments.includes(run.environment) ||
+        manifest.sourceRequirementsHash !== requirementsHash ||
+        manifest.architectureHash !== sha256Json(byKind.architecture) ||
+        manifest.costEstimateHash !== sha256Json(byKind["cost-estimate"])
+      ) {
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Workload decision manifest does not bind accepted artifacts",
+          EXIT_CODES.validation,
+        );
+      }
+    }
     if (descriptor.id === "plan") {
       const intent = byKind["implementation-intent"] as ImplementationIntentV1;
       const binding = byKind["iac-binding"] as IacBindingV1;
@@ -3299,7 +3455,7 @@ export class ApexService {
     );
     const artifactAliases: Readonly<Record<string, string>> = {
       requirements: "requirements-v1",
-      "sku-manifest": "sku-manifest-v1",
+      "workload-decision-manifest": "workload-decision-manifest-v1",
       architecture: "architecture-v1",
       "cost-estimate": "cost-estimate-v1",
       "governance-constraints": "governance-constraints-v1",
@@ -3403,23 +3559,6 @@ export class ApexService {
       ...(legacy ? { legacy: true } : {}),
     });
     return this.journal(run).replay();
-  }
-
-  private initialSkuManifest(run: RunConfigV1, requirements: unknown): unknown {
-    return {
-      schemaVersion: CONTRACT_VERSION,
-      projectId: run.projectId,
-      environments: [run.environment],
-      services: [],
-      revisions: [
-        {
-          number: 1,
-          createdAt: this.clock().toISOString(),
-          sourceHash: sha256Json(requirements),
-          reason: "Initial requirements",
-        },
-      ],
-    };
   }
 
   private legacyPlanOutputs(run: RunConfigV1, intent: unknown): TaskOutput[] {
@@ -3732,6 +3871,125 @@ export class ApexService {
     if (current !== undefined && !repair)
       throw new ApexError("APEX_CONFLICT", "APEX local Git boundary was modified", EXIT_CODES.conflict);
     await atomicWriteBytes(path, Buffer.from(APEX_GITIGNORE));
+  }
+
+  private async ensureWorkspaceRuntime(): Promise<boolean> {
+    const packagePath = join(this.root, "node_modules", "@apex", "cli", "package.json");
+    try {
+      const installed = JSON.parse(await readFile(packagePath, "utf8")) as { version?: unknown };
+      if (installed.version === APEX_VERSION) return false;
+      if (typeof installed.version === "string") {
+        throw new ApexError(
+          "APEX_CONFLICT",
+          `Workspace has @apex/cli@${installed.version}; expected ${APEX_VERSION}`,
+          EXIT_CODES.conflict,
+        );
+      }
+    } catch (error) {
+      if (error instanceof ApexError) throw error;
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+    try {
+      await this.processRunner.run({
+        executable: "npm",
+        args: [
+          "install",
+          "--save-dev",
+          "--save-exact",
+          "--ignore-scripts",
+          "--no-audit",
+          "--no-fund",
+          `@apex/cli@${APEX_VERSION}`,
+        ],
+        cwd: this.root,
+        timeoutMs: 120_000,
+        maxOutputBytes: 1_048_576,
+      });
+    } catch (error) {
+      throw new ApexError(
+        "APEX_INTERNAL",
+        `Unable to install @apex/cli@${APEX_VERSION} in the workspace`,
+        EXIT_CODES.internal,
+        undefined,
+        { cause: error },
+      );
+    }
+    return true;
+  }
+
+  private async ensureWorkspaceGitRepository(createRepository: boolean): Promise<void> {
+    const gitPath = join(this.root, ".git");
+    if (await this.pathExistsLstat(gitPath)) return;
+    if (!createRepository) {
+      throw new ApexError(
+        "APEX_USAGE",
+        "Bootstrap requires a Git repository; rerun with createRepository: true and --yes to initialize one",
+        EXIT_CODES.usage,
+      );
+    }
+    try {
+      await this.processRunner.run({
+        executable: "git",
+        args: ["init"],
+        cwd: this.root,
+        timeoutMs: 30_000,
+        maxOutputBytes: 64 * 1024,
+      });
+    } catch (error) {
+      throw new ApexError(
+        "APEX_INTERNAL",
+        "Unable to initialize the workspace Git repository",
+        EXIT_CODES.internal,
+        undefined,
+        { cause: error },
+      );
+    }
+  }
+
+  private profilePaths(): { agent: string; receipt: string } {
+    return {
+      agent: join(this.profileRoot, PROFILE_BOOTSTRAP_FILENAME),
+      receipt: join(this.profileRoot, PROFILE_BOOTSTRAP_RECEIPT),
+    };
+  }
+
+  private async ensureProfileRoot(): Promise<void> {
+    await mkdir(this.profileRoot, { recursive: true });
+    const metadata = await lstat(this.profileRoot);
+    if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
+      throw new ApexError("APEX_VALIDATION", "Profile agent directory must be a real directory", EXIT_CODES.validation);
+    }
+  }
+
+  private async readProfileReceipt(path: string): Promise<ProfileBootstrapReceipt | undefined> {
+    const bytes = await this.readProfileOptional(path);
+    if (bytes === undefined) return undefined;
+    const receipt = JSON.parse(bytes.toString("utf8")) as ProfileBootstrapReceipt;
+    if (
+      receipt.version !== 1 ||
+      typeof receipt.packageVersion !== "string" ||
+      !/^[a-f0-9]{64}$/.test(receipt.contentHash)
+    ) {
+      throw new ApexError("APEX_VALIDATION", "Profile APEX bootstrap receipt is invalid", EXIT_CODES.validation);
+    }
+    return receipt;
+  }
+
+  private async readProfileOptional(path: string): Promise<Buffer | undefined> {
+    try {
+      const metadata = await lstat(path);
+      if (metadata.isSymbolicLink() || !metadata.isFile()) {
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Profile APEX bootstrap path must be a regular file",
+          EXIT_CODES.validation,
+        );
+      }
+      return await readFile(path);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      throw error;
+    }
   }
 
   private async localGitBoundaryCheck(): Promise<DoctorCheck> {

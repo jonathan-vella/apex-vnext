@@ -22,7 +22,7 @@ architecture:
 
 1. Any `services[].requires[]` row in `sku-manifest.json` contains
    `vnet-integration` or `private-endpoints` (canonical tokens owned
-   by [`sku-manifest.instructions.md`](../../../instructions/sku-manifest.instructions.md)).
+  by the [workload decision SSOT](../../../../docs/reference/sources-of-truth.md)).
 2. Any `services[].service_name` is in the **vnet-attached service
    whitelist** below.
 
