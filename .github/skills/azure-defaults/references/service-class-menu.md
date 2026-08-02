@@ -35,7 +35,7 @@ Required batching (saves ~10 turns per Phase 3):
 - **Batch D — SKU & sizing preferences** (Step 3j): one batched call per
   service class confirmed at 3i, asking for pinned SKU/size, tier floor,
   or explicit "no preference". Mandatory for every project (see
-  [`sku-manifest.instructions.md`](../../../instructions/sku-manifest.instructions.md#mandatory-elicitation-at-step-1)).
+  [workload decision SSOT](../../../../docs/reference/sources-of-truth.md)).
 
 Use business-friendly descriptions with Azure service names in parentheses.
 
