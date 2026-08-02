@@ -86,10 +86,11 @@ async function inputJson(flags: Flags): Promise<unknown> {
 }
 
 function defaultProjectId(root: string): string {
-  const value = basename(resolve(root))
+  let value = basename(resolve(root))
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/[^a-z0-9]+/g, "-");
+  while (value.startsWith("-")) value = value.slice(1);
+  while (value.endsWith("-")) value = value.slice(0, -1);
   return value.length === 0 ? "apex-project" : value;
 }
 
