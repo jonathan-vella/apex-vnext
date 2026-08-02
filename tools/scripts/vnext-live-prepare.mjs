@@ -219,6 +219,7 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
     unknowns: [],
   };
   const requirementsHash = sha256Json(requirements);
+  const price = availability.pricing;
   const targetResourceGroup = `rg-vnext-qualification-${track}`;
   const targetScope = `/subscriptions/${subscription}/resourceGroups/${targetResourceGroup}`;
   const architecture = {
@@ -231,7 +232,7 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
     components: [
       {
         id: "qualification-storage",
-        service: "Microsoft.Storage/storageAccounts",
+        service: price.productName,
         purpose: "Isolated lifecycle marker and diagnostics target",
         requirementIds: requirements.requirements.map(({ id }) => id),
         dependsOn: [],
@@ -240,7 +241,6 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
     decisions: ["Use equivalent AVM-backed Bicep and Terraform implementations", "Use local Gate 4 before CI handoff"],
     risks: ["Qualification evidence is non-production and cannot authorize a production deployment"],
   };
-  const price = availability.pricing;
   const monthlyCost = price.unitPrice;
   const costEstimate = {
     schemaVersion: "1.0.0",
