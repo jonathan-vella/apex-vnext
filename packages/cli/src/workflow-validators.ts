@@ -197,6 +197,12 @@ function workloadDecisionCoverage(value: unknown): ValidationIssue[] {
     .filter(({ priority, status }) => priority === "must" && status === "confirmed")
     .map(({ id }) => id)
     .sort();
+  if (requiredIds.length === 0) {
+    return issue(
+      "/artifacts/requirements",
+      "At least one confirmed must requirement is required for workload decisions",
+    );
+  }
   const traces = new Map(manifest.requirementTraceability.map((trace) => [trace.requirementId, trace]));
   if (
     traces.size !== manifest.requirementTraceability.length ||

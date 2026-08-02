@@ -7,18 +7,26 @@ generated summaries, and historical evidence do not create authority.
 
 ## Authority Matrix
 
-| Concern                          | Authoritative owner                                                                      | Derived or non-authoritative views                  | Update and proof                                                                   |
-| -------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Product scope                    | [PRD](../vnext/PRD.md)                                                                   | Issues, plans, and chat                             | Update requirements and acceptance evidence together.                              |
-| Decisions                        | [Decision register](../vnext/DECISIONS.md) and [ADRs](../vnext/adrs/README.md)           | Architecture prose and discussion                   | Record the decision and prove its implementation.                                  |
-| Risks and delivery               | [Risk register](../vnext/REGISTER.md), [roadmap](../vnext/ROADMAP.md), and GitHub Issues | Checkpoints and dashboards                          | Issues own actionable work; controls own durable status.                           |
-| Runtime behavior                 | `packages/` and kernel-managed `.apex/` state                                            | CLI, MCP, renderers, and chat                       | Mutate only through authorized CLI or MCP operations.                              |
-| Contracts                        | `packages/contracts/src/` and generated `packages/contracts/schemas/`                    | Type declarations, fixtures, and rendered artifacts | Change schema, metadata, consumer, and contract tests together.                    |
-| Runtime configuration            | `config/*.v1.json`                                                                       | Packaged CLI assets and documentation               | Regenerate assets and validate the workflow/configuration.                         |
-| Managed clients                  | `customizations/manifest.json` and `customizations/.github/`                             | Client projections and installed files              | Regenerate projections; lifecycle and client qualification prove behavior.         |
-| IaC intent and bindings          | Accepted kernel artifacts for the selected project and run                               | Generated Bicep/Terraform trees and rendered plans  | Planner/code generation, validation, and preview bind the accepted hashes.         |
-| Preview, approval, and operation | Kernel-accepted preview, approval, operation, inventory, and evidence in `.apex/`        | CI protection, portal state, and rendered views     | Fresh, exact evidence must pass target, hash, recipient, epoch, and expiry checks. |
-| Qualification                    | Candidate-bound qualification scripts and project controls                               | Fixtures, logs, and historical dossiers             | Run deterministic qualification; authorize live and release evidence separately.   |
+- **Product scope:** [PRD](../vnext/PRD.md). Issues, plans, and chat are derived views; update requirements and
+  acceptance evidence together.
+- **Decisions:** [Decision register](../vnext/DECISIONS.md) and [ADRs](../vnext/adrs/README.md). Architecture prose
+  and discussion are derived; record the decision and prove its implementation.
+- **Risks and delivery:** [Risk register](../vnext/REGISTER.md), [roadmap](../vnext/ROADMAP.md), and GitHub Issues.
+  Issues own actionable work; controls own durable status.
+- **Runtime behavior:** `packages/` and kernel-managed `.apex/` state. CLI, MCP, renderers, and chat are views;
+  mutate only through authorized CLI or MCP operations.
+- **Contracts:** `packages/contracts/src/` and generated `packages/contracts/schemas/`. Types, fixtures, and rendered
+  artifacts are derived; change schema, metadata, consumer, and contract tests together.
+- **Runtime configuration:** `config/*.v1.json`. Packaged CLI assets and documentation are derived; regenerate assets
+  and validate workflow/configuration.
+- **Managed clients:** `customizations/manifest.json` and `customizations/.github/`. Projections and installed files
+  are derived; lifecycle and client qualification prove behavior.
+- **IaC intent and bindings:** accepted kernel artifacts for the selected project/run. Generated trees and rendered
+  plans are derived; planner, validation, and preview bind accepted hashes.
+- **Preview, approval, and operation:** accepted kernel evidence in `.apex/`. CI protection, portal state, and rendered
+  views are derived; fresh evidence must bind target, hash, recipient, epoch, and expiry.
+- **Qualification:** candidate-bound qualification scripts and project controls. Fixtures, logs, and historical dossiers
+  are derived; authorize live and release evidence separately.
 
 ## Consumer Workspace Boundary
 

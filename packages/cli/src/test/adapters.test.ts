@@ -174,7 +174,7 @@ test("CLI rejects a symlinked profile bootstrap agent", async () => {
   const profileRoot = join(await tempRoot(), "agents");
   const outside = join(await tempRoot(), "outside.agent.md");
   await writeFile(outside, "outside\n");
-  await import("node:fs/promises").then(async ({ mkdir }) => mkdir(profileRoot, { recursive: true }));
+  await mkdir(profileRoot, { recursive: true });
   await symlink(outside, join(profileRoot, "apex-bootstrap.agent.md"));
   await assert.rejects(execute(["profile", "install", "--yes"], root, { profileRoot }), /regular file/u);
 });

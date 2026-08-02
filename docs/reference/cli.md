@@ -7,23 +7,23 @@ Commands that change installation, capability, transfer, or improvement state ma
 
 ## Lifecycle
 
-| Command                         | Required or notable flags                                                                               |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `apex version`                  | None                                                                                                    |
-| `apex init`                     | `--project`; optional `--name --environment --target --iac --client --customizations-source`            |
-| `apex bootstrap`                | `--project` or `--file`; `--yes`; optional `--client --name --environment --target --iac --create-repo` |
-| `apex profile status`           | Optional `--client github-copilot-vscode`                                                               |
-| `apex profile install`          | `--yes`; optional `--client github-copilot-vscode`                                                      |
-| `apex profile update`           | `--yes`; optional `--client github-copilot-vscode`                                                      |
-| `apex profile uninstall`        | `--yes`; optional `--client github-copilot-vscode`                                                      |
-| `apex project create`           | `--project`; optional `--name --environment --target --iac`                                             |
-| `apex project promote`          | `--environment --target`                                                                                |
-| `apex update`                   | Optional `--customizations-source`                                                                      |
-| `apex setup`                    | Optional `--live`                                                                                       |
-| `apex doctor`                   | Optional `--fix --yes`                                                                                  |
-| `apex customizations rollback`  | None                                                                                                    |
-| `apex customizations uninstall` | None                                                                                                    |
-| `apex customizations reinstall` | Optional `--customizations-source`                                                                      |
+| Command | Required or notable flags |
+| --- | --- |
+| `apex version` | None |
+| `apex init` | `--project`; optional `--name --environment --target --iac --client --customizations-source` |
+| `apex bootstrap` | `--project` or `--file`; `--yes`; optional client, name, environment, target, IaC, and repo creation flags |
+| `apex profile status` | Optional VS Code client selection |
+| `apex profile install` | `--yes`; optional VS Code client selection |
+| `apex profile update` | `--yes`; optional VS Code client selection |
+| `apex profile uninstall` | `--yes`; optional VS Code client selection |
+| `apex project create` | `--project`; optional `--name --environment --target --iac` |
+| `apex project promote` | `--environment --target` |
+| `apex update` | Optional `--customizations-source` |
+| `apex setup` | Optional `--live` |
+| `apex doctor` | Optional `--fix --yes` |
+| `apex customizations rollback` | None |
+| `apex customizations uninstall` | None |
+| `apex customizations reinstall` | Optional `--customizations-source` |
 
 `--client` accepts the bundled VS Code or Copilot CLI projection ID. `--iac terraform` selects Terraform; otherwise
 initialization selects Bicep.
