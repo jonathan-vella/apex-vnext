@@ -180,13 +180,11 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
   const governancePath = join(root, "agent-output/vnext-qualification/04-governance-constraints.json");
   const governanceBytes = await readFile(governancePath);
   const governance = JSON.parse(governanceBytes.toString("utf8"));
-  const skuBytes = await readFile(join(root, "agent-output/vnext-qualification/sku-manifest.json"));
   const mainPath = join(tree.absoluteRoot, track === "bicep" ? "main.bicep" : "main.tf");
   const mainSource = await readFile(mainPath, "utf8");
   const sourceHash = sha256Json({
     candidate: availability.candidateSha,
     governance: sha256Bytes(governanceBytes),
-    skuManifest: sha256Bytes(skuBytes),
     tree: tree.treeHash,
   });
   const requirements = {
@@ -221,22 +219,6 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
     unknowns: [],
   };
   const requirementsHash = sha256Json(requirements);
-  const skuManifest = {
-    schemaVersion: "1.0.0",
-    projectId: PROJECT_ID,
-    environments: [ENVIRONMENT],
-    services: [
-      {
-        logicalId: "qualification-storage",
-        service: "Azure Storage Account",
-        environment: ENVIRONMENT,
-        sku: "Standard_LRS",
-        userPinned: false,
-        rationale: "Cost-optimized ephemeral qualification marker",
-      },
-    ],
-    revisions: [{ number: 1, createdAt: now, sourceHash, reason: "Exact repository qualification candidate" }],
-  };
   const targetResourceGroup = `rg-vnext-qualification-${track}`;
   const targetScope = `/subscriptions/${subscription}/resourceGroups/${targetResourceGroup}`;
   const architecture = {
@@ -291,6 +273,47 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
     ],
     totalMonthlyCost: monthlyCost,
     assumptions: ["One unit is retained only to bind a current public price; live cost is measured from evidence"],
+  };
+  const workloadDecisionManifest = {
+    schemaVersion: "1.0.0",
+    projectId: PROJECT_ID,
+    runId,
+    environment: ENVIRONMENT,
+    sourceRequirementsHash: requirementsHash,
+    architectureHash: sha256Json(architecture),
+    costEstimateHash: sha256Json(costEstimate),
+    environments: [ENVIRONMENT],
+    requirementTraceability: requirements.requirements.map(({ id }) => ({
+      requirementId: id,
+      skuDecisionIds: ["qualification-storage-sku"],
+      sloDecisionIds: ["qualification-storage-slo"],
+    })),
+    skuDecisions: [
+      {
+        id: "qualification-storage-sku",
+        logicalId: "qualification-storage",
+        service: price.productName,
+        sku: price.skuName,
+        quantity: 1,
+        rationale: "Cost-optimized ephemeral qualification marker",
+        requirementIds: requirements.requirements.map(({ id }) => id),
+        environmentOverrides: [],
+      },
+    ],
+    sloDecisions: [
+      {
+        id: "qualification-storage-slo",
+        logicalId: "qualification-storage",
+        availabilityPercent: 99.9,
+        rtoMinutes: 60,
+        rpoMinutes: 15,
+        supportWindow: "business-hours",
+        complianceScopes: ["gdpr"],
+        requirementIds: requirements.requirements.map(({ id }) => id),
+        environmentOverrides: [],
+      },
+    ],
+    revisions: [{ number: 1, createdAt: now, sourceHash, reason: "Exact repository qualification candidate" }],
   };
   const exceptionExpiry = governance.security_exceptions?.find(
     ({ id }) => id === "vnext-qualification-backend-entra-session",
@@ -410,7 +433,7 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
   return {
     targetScope,
     requirements,
-    skuManifest,
+    workloadDecisionManifest,
     architecture,
     costEstimate,
     governanceArtifact,
@@ -676,7 +699,6 @@ export async function prepareQualificationState(args, dependencies = {}) {
     });
     const requirements = await complete(service, "requirements", [
       { kind: "requirements", value: artifacts.requirements },
-      { kind: "sku-manifest", value: artifacts.skuManifest },
     ]);
     await complete(service, "requirements-review", [
       {
@@ -688,6 +710,7 @@ export async function prepareQualificationState(args, dependencies = {}) {
     const architecture = await complete(service, "architecture", [
       { kind: "architecture", value: artifacts.architecture },
       { kind: "cost-estimate", value: artifacts.costEstimate },
+      { kind: "workload-decision-manifest", value: artifacts.workloadDecisionManifest },
     ]);
     await complete(service, "architecture-review", [
       {

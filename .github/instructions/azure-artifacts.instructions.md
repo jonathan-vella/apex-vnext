@@ -46,7 +46,6 @@ Canonical H2 heading lists for all 15 artifact types live in the template files:
 | 06-deployment-summary                | `references/06-deploy-template.md`                                                                                                                                                             |
 | 07-\* (all Step 7 docs)              | `references/07-docs-template.md`                                                                                                                                                               |
 | project README (`agent-output/<project>/README.md`) | `references/PROJECT-README.template.md` — H2 set is byte-exact incl. emoji: `📋 Project Summary`, `✅ Workflow Progress`, `🏛️ Architecture`, `📄 Generated Artifacts`, `🔗 Related Resources` |
-| sku-manifest                         | `templates/sku-manifest.template.md` + [`sku-manifest.instructions.md`](sku-manifest.instructions.md) (authoritative; rendered from `sku-manifest.json` — schema-driven, not H2-sync-enforced) |
 
 ## Enforcement Layers
 
@@ -105,12 +104,11 @@ For these specific artifacts, **revision-2+ writes MUST use
 single-spot fix). `create_file` is permitted only on the **first**
 write of each:
 
-- `agent-output/{project}/sku-manifest.json`
 - `agent-output/{project}/00-handoff.md`
 - `agent-output/{project}/README.md`
 
 These artifacts are mutated frequently across the workflow
-(every gate updates 00-handoff.md; sku-manifest evolves Step 1 → 7;
+(every gate updates 00-handoff.md; workload decisions are kernel-bound at architecture;
 README accumulates the workflow progress checklist). A full
 `create_file` on each revision re-emits the entire prior content
 into the assistant output and re-enters the context on every

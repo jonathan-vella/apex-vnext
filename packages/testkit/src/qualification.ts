@@ -368,7 +368,6 @@ async function completeCreativeWorkflow(context: TrackContext): Promise<void> {
   const requirementValue = requirements(track);
   const requirementHashes = await complete(context, "requirements", [
     { kind: "requirements", value: requirementValue },
-    { kind: "sku-manifest", value: skuManifest(track, sha256Json(requirementValue)) },
   ]);
   await complete(context, "requirements-review", [
     { kind: "review-findings", value: review(context, "requirements", requirementHashes.requirements!) },
@@ -392,9 +391,20 @@ async function completeCreativeWorkflow(context: TrackContext): Promise<void> {
     required: true,
   });
   restart(context);
+  const architectureValue = architecture(context);
+  const costValue = costEstimate(context);
   const architectureHashes = await complete(context, "architecture", [
-    { kind: "architecture", value: architecture(context) },
-    { kind: "cost-estimate", value: costEstimate(context) },
+    { kind: "architecture", value: architectureValue },
+    { kind: "cost-estimate", value: costValue },
+    {
+      kind: "workload-decision-manifest",
+      value: workloadDecisionManifest(
+        context,
+        requirementHashes.requirements!,
+        sha256Json(architectureValue),
+        sha256Json(costValue),
+      ),
+    },
   ]);
   await complete(context, "architecture-review", [
     { kind: "review-findings", value: review(context, "architecture", architectureHashes.architecture!) },
@@ -477,13 +487,25 @@ function intentFor(id: string, runId: string, sourceHashes: Record<string, strin
     outputs: ["endpoint"],
   };
 }
-function skuManifest(track: QualificationTrack, sourceHash: string) {
+function workloadDecisionManifest(
+  context: TrackContext,
+  requirementsHash: string,
+  architectureHash: string,
+  costEstimateHash: string,
+) {
   return {
     schemaVersion: CONTRACT_VERSION,
-    projectId: projectId(track),
+    projectId: projectId(context.track),
+    runId: context.runId,
+    environment: "dev",
+    sourceRequirementsHash: requirementsHash,
+    architectureHash,
+    costEstimateHash,
     environments: ["dev", "prod"],
-    services: [],
-    revisions: [{ number: 1, createdAt: "2026-01-01T00:00:00.000Z", sourceHash, reason: "qualification" }],
+    requirementTraceability: [{ requirementId: "REQ-1", skuDecisionIds: ["api-sku"], sloDecisionIds: ["api-slo"] }],
+    skuDecisions: [{ id: "api-sku", logicalId: "api", service: "fake/service", sku: "test", quantity: 1, rationale: "qualification", requirementIds: ["REQ-1"], environmentOverrides: [] }],
+    sloDecisions: [{ id: "api-slo", logicalId: "api", availabilityPercent: 99.9, rtoMinutes: 60, rpoMinutes: 15, supportWindow: "business-hours", complianceScopes: ["gdpr"], requirementIds: ["REQ-1"], environmentOverrides: [] }],
+    revisions: [{ number: 1, createdAt: "2026-01-01T00:00:00.000Z", sourceHash: requirementsHash, reason: "qualification" }],
   };
 }
 function architecture(context: TrackContext) {

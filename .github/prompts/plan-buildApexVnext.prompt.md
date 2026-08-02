@@ -130,7 +130,7 @@ Terraform breadth while preserving selected v1 operational behavior.
 
 - Runtime and execution: `runtime-bundle-lock-v1`, `project-config-v1`, `run-config-v1`, `task-envelope-v1`,
   `task-result-v1`, `event-v1`, `operation-record-v1`, `approval-evidence-v1`, and `evidence-manifest-v1`.
-- Creative intent: `requirements-v1`, `sku-manifest-v1`, `architecture-v1`, `cost-estimate-v1`, and
+- Creative intent: `requirements-v1`, `workload-decision-manifest-v1`, `architecture-v1`, `cost-estimate-v1`, and
   `review-findings-v1`.
 - Governance and planning: `governance-constraints-v1`, `policy-property-map-v1`, `implementation-intent-v1`,
   `iac-binding-v1`, and `environment-inputs-v1`.

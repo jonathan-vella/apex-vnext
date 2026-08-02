@@ -1,18 +1,27 @@
 #!/usr/bin/env node
 import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { NativeBicepProvider, NativeTerraformProvider, ProcessRunner, type IacProvider } from "@apex/capabilities";
-import { QualityMeasurementsV1Schema, type QualityMeasurementsV1, type QualityScorecardV1 } from "@apex/contracts";
+import {
+  CONTRACT_VERSION,
+  OnboardingConfigV1Schema,
+  QualityMeasurementsV1Schema,
+  type OnboardingConfigV1,
+  type QualityMeasurementsV1,
+  type QualityScorecardV1,
+} from "@apex/contracts";
+import { Value } from "@sinclair/typebox/value";
 import { EventJournal, ValidatorRegistry, WriterTransferStore, atomicWriteJson, sha256Json } from "@apex/kernel";
 import { evaluateQualityScorecard, renderQualityScorecardEvaluation, type ScorecardMeasurement } from "@apex/renderers";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { ApexError, EXIT_CODES, normalizeError } from "./errors.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
 import { resolveBundledAssets } from "./assets.js";
 import { serveMcp } from "./mcp.js";
 import { createFileProviderRuntime, hashTerraformConfiguration, hashTerraformLockFile } from "./provider-runtime.js";
 import { exportProviderTransfer, importProviderTransfer } from "./provider-transfer.js";
-import { ApexService, type ArtifactKind, type TaskOutput } from "./service.js";
+import { ApexService, type ArtifactKind, type ServiceOptions, type TaskOutput } from "./service.js";
 import { exportStateTransfer, importStateTransfer } from "./state-transfer.js";
+import { APEX_VERSION } from "./version.js";
 
 type FlagValue = string | string[] | boolean;
 type Flags = Record<string, FlagValue>;
@@ -60,8 +69,48 @@ function clientId(flags: Flags): "github-copilot-cli" | "github-copilot-vscode" 
   return value;
 }
 
+function profileClientId(flags: Flags): "github-copilot-vscode" {
+  const value = clientId(flags);
+  if (value !== "github-copilot-vscode") {
+    throw new ApexError(
+      "APEX_USAGE",
+      "Profile bootstrap is supported only for github-copilot-vscode",
+      EXIT_CODES.usage,
+    );
+  }
+  return value;
+}
+
 async function inputJson(flags: Flags): Promise<unknown> {
   return JSON.parse(await readFile(required(flags, "file"), "utf8")) as unknown;
+}
+
+function defaultProjectId(root: string): string {
+  const value = basename(resolve(root))
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return value.length === 0 ? "apex-project" : value;
+}
+
+async function onboardingConfig(flags: Flags, root: string): Promise<OnboardingConfigV1> {
+  const config =
+    typeof flags.file === "string"
+      ? await inputJson(flags)
+      : {
+          schemaVersion: CONTRACT_VERSION,
+          projectId: typeof flags.project === "string" ? flags.project : defaultProjectId(root),
+          ...(typeof flags.name === "string" ? { displayName: flags.name } : {}),
+          ...(typeof flags.client === "string" ? { client: flags.client } : {}),
+          ...(typeof flags.environment === "string" ? { environment: flags.environment } : {}),
+          ...(typeof flags.target === "string" ? { targetScope: flags.target } : {}),
+          ...(flags.iac === "terraform" ? { iacTool: "terraform" } : {}),
+          ...(flags["create-repo"] === true ? { createRepository: true } : {}),
+        };
+  if (!Value.Check(OnboardingConfigV1Schema, config)) {
+    throw new ApexError("APEX_VALIDATION", "Onboarding configuration is malformed", EXIT_CODES.validation);
+  }
+  return config;
 }
 
 interface NativeProviderConfig {
@@ -358,36 +407,39 @@ async function qualityStatus(root: string): Promise<QualityEvaluationArtifact> {
   }
 }
 
-export async function execute(argv: string[], root = process.cwd()): Promise<unknown> {
+export async function execute(argv: string[], root = process.cwd(), options: ServiceOptions = {}): Promise<unknown> {
   const { words, flags } = parse(argv);
   const command = words.join(" ");
   const runner = new ProcessRunner();
   const service = new ApexService(root, {
-    providers: await configuredProviders(root, flags),
-    azureAuthStatus: async (live) => {
-      if (!live || command !== "setup") return { authenticated: false, detail: "not-checked; run setup --live" };
-      try {
-        const result = await runner.run({
-          executable: "az",
-          args: ["account", "show", "--output", "json"],
-          timeoutMs: 15_000,
-          maxOutputBytes: 64 * 1024,
-        });
-        const account = JSON.parse(result.stdout) as { id?: unknown; tenantId?: unknown };
-        return {
-          authenticated: typeof account.id === "string",
-          detail: typeof account.tenantId === "string" ? `tenant:${account.tenantId}` : "authenticated",
-        };
-      } catch {
-        return { authenticated: false, detail: "Azure CLI is not authenticated" };
-      }
-    },
+    ...options,
+    providers: { ...options.providers, ...(await configuredProviders(root, flags)) },
+    azureAuthStatus:
+      options.azureAuthStatus ??
+      (async (live) => {
+        if (!live || command !== "setup") return { authenticated: false, detail: "not-checked; run setup --live" };
+        try {
+          const result = await runner.run({
+            executable: "az",
+            args: ["account", "show", "--output", "json"],
+            timeoutMs: 15_000,
+            maxOutputBytes: 64 * 1024,
+          });
+          const account = JSON.parse(result.stdout) as { id?: unknown; tenantId?: unknown };
+          return {
+            authenticated: typeof account.id === "string",
+            detail: typeof account.tenantId === "string" ? `tenant:${account.tenantId}` : "authenticated",
+          };
+        } catch {
+          return { authenticated: false, detail: "Azure CLI is not authenticated" };
+        }
+      }),
   });
   switch (command) {
     case "version": {
       const assets = await resolveBundledAssets();
       return {
-        version: "0.10.0",
+        version: APEX_VERSION,
         bundleVersion: assets.manifest.sources.customizations,
         configVersion: assets.manifest.sources.config,
       };
@@ -404,6 +456,37 @@ export async function execute(argv: string[], root = process.cwd()): Promise<unk
           ? { customizationsSource: flags["customizations-source"] }
           : {}),
       });
+    case "bootstrap": {
+      confirmed(flags, "bootstrap");
+      const config = await onboardingConfig(flags, root);
+      if (typeof flags.client === "string" && config.client !== undefined && flags.client !== config.client) {
+        throw new ApexError("APEX_USAGE", "--client conflicts with the onboarding configuration", EXIT_CODES.usage);
+      }
+      return service.bootstrap({
+        projectId: config.projectId,
+        ...(config.displayName === undefined ? {} : { displayName: config.displayName }),
+        ...(config.environment === undefined ? {} : { environment: config.environment }),
+        ...(config.targetScope === undefined ? {} : { targetScope: config.targetScope }),
+        ...(config.iacTool === undefined ? {} : { iacTool: config.iacTool }),
+        clientId: config.client ?? clientId(flags),
+        ...(config.createRepository === undefined ? {} : { createRepository: config.createRepository }),
+      });
+    }
+    case "profile status":
+      profileClientId(flags);
+      return service.profileStatus();
+    case "profile install":
+      confirmed(flags, "profile install");
+      profileClientId(flags);
+      return service.profileInstall();
+    case "profile update":
+      confirmed(flags, "profile update");
+      profileClientId(flags);
+      return service.profileUpdate();
+    case "profile uninstall":
+      confirmed(flags, "profile uninstall");
+      profileClientId(flags);
+      return service.profileUninstall();
     case "update":
       return service.update(
         typeof flags["customizations-source"] === "string" ? flags["customizations-source"] : undefined,

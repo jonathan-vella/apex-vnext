@@ -10,6 +10,7 @@ replace its authority.
 
 | Goal | Start here |
 | --- | --- |
+| Start on Windows 11 with WSL2 | [Windows 11 first run](tutorials/windows-11-first-run.md) |
 | Evaluate APEX locally | [Complete the first local run](tutorials/first-run.md) |
 | Install or update APEX | [Manage installation](how-to/manage-installation.md) |
 | Run a governed workflow | [Run the workflow](how-to/run-workflow.md) |
@@ -22,9 +23,11 @@ replace its authority.
 
 - [Complete the first local run](tutorials/first-run.md) introduces initialization, readiness, and deterministic local
   state without making cloud changes.
+- [Windows 11 first run](tutorials/windows-11-first-run.md) prepares WSL2, Azure, and a selected Copilot client.
 
 ## How-To Guides
 
+- [Prepare Windows 11](how-to/prepare-windows-11.md)
 - [Manage installation](how-to/manage-installation.md)
 - [Run the workflow](how-to/run-workflow.md)
 - [Operate a project](how-to/operate-project.md)
@@ -46,6 +49,7 @@ replace its authority.
 - [CLI commands](reference/cli.md)
 - [MCP tools](reference/mcp.md)
 - [Configuration and contracts](reference/configuration.md)
+- [Sources of truth](reference/sources-of-truth.md)
 - [Bicep and Terraform](reference/iac-tracks.md)
 - [Qualification](reference/qualification.md)
 

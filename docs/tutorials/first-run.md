@@ -91,6 +91,7 @@ Delete the disposable consumer repository only when its local state is no longer
 
 ## Related
 
+- [Windows 11 first run](windows-11-first-run.md) - use the published-package onboarding flow on WSL2.
 - [Manage installation](../how-to/manage-installation.md)
 - [Run the workflow](../how-to/run-workflow.md)
 - [CLI commands](../reference/cli.md)
