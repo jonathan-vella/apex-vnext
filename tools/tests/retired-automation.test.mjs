@@ -297,8 +297,7 @@ test("stale vNext qualification narrative remains provenance-only", () => {
 
   for (const activeContract of [
     "agent-output/vnext-qualification/04-governance-constraints.json",
-    "agent-output/vnext-qualification/sku-manifest.json",
-    "agent-output/vnext-qualification/sku-manifest.md",
+    "packages/contracts/schemas/workload-decision-manifest-v1.schema.json",
   ]) {
     assert.equal(existsSync(activeContract), true, `missing active qualification contract: ${activeContract}`);
   }
