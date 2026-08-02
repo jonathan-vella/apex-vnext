@@ -510,20 +510,6 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
-      "id": "validate-sku-iac-coverage",
-      "script": "validate:sku-iac-coverage",
-      "profile": "node-validation",
-      "aliases": [],
-      "retirement": { "status": "active", "replacementIds": [] }
-    },
-    {
-      "id": "validate-sku-manifest",
-      "script": "validate:sku-manifest",
-      "profile": "node-validation",
-      "aliases": [],
-      "retirement": { "status": "active", "replacementIds": [] }
-    },
-    {
       "id": "validate-terminology",
       "script": "validate:terminology",
       "profile": "node-validation",
@@ -611,8 +597,6 @@
         "test:classify-model",
         "validate:no-hardcoded-counts",
         "validate:terminology",
-        "validate:sku-manifest",
-        "validate:sku-iac-coverage",
         "validate:banned-phrases",
         "validate:context-budget",
         "validate:repository-validator-graph",

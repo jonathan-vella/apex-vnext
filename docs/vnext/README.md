@@ -20,6 +20,13 @@ explanations, and references start at the [documentation index](../README.md).
 Versioned runtime behavior is owned by `packages/`, `config/`, and `customizations/`. Project controls may add release
 requirements but may not create a competing runtime state machine.
 
+## Scope Boundary
+
+This table governs the APEX repository: its product requirements, delivery, release, and qualification. In a consumer
+workspace, the installed kernel and its managed `.apex/` state own project/run state, gates, approvals, evidence, and
+selected-client state. Consumer state cannot change repository requirements, release status, or distribution authority.
+See [Sources of truth](../reference/sources-of-truth.md) for the complete boundary.
+
 ## Current Boundary
 
 APEX vNext is pre-release and no release candidate is selected. Deterministic and package qualification are required for

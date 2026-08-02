@@ -1,0 +1,320 @@
+{
+  "$id": "https://schemas.apexops.dev/workload-decision-manifest-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "architectureHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "costEstimateHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "environment": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "environments": {
+      "items": {
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "projectId": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "requirementTraceability": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "requirementId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "skuDecisionIds": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "sloDecisionIds": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "requirementId",
+          "skuDecisionIds",
+          "sloDecisionIds"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "revisions": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "number": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "reason": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "sourceHash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "createdAt",
+          "sourceHash",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "runId": {
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "skuDecisions": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "environmentOverrides": {
+            "items": {
+              "additionalProperties": false,
+              "minProperties": 2,
+              "properties": {
+                "environment": {
+                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                  "type": "string"
+                },
+                "quantity": {
+                  "exclusiveMinimum": 0,
+                  "type": "number"
+                },
+                "sku": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "environment"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "logicalId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "quantity": {
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          "rationale": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "requirementIds": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "service": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "sku": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "logicalId",
+          "service",
+          "sku",
+          "quantity",
+          "rationale",
+          "requirementIds",
+          "environmentOverrides"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "sloDecisions": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "availabilityPercent": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number"
+          },
+          "complianceScopes": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "environmentOverrides": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "environment": {
+                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                  "type": "string"
+                },
+                "patch": {
+                  "additionalProperties": false,
+                  "minProperties": 1,
+                  "properties": {
+                    "availabilityPercent": {
+                      "maximum": 100,
+                      "minimum": 0,
+                      "type": "number"
+                    },
+                    "complianceScopes": {
+                      "items": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "minItems": 1,
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "rpoMinutes": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "rtoMinutes": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "supportWindow": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "required": [
+                "environment",
+                "patch"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "logicalId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "requirementIds": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "rpoMinutes": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "rtoMinutes": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "supportWindow": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "logicalId",
+          "availabilityPercent",
+          "rtoMinutes",
+          "rpoMinutes",
+          "supportWindow",
+          "complianceScopes",
+          "requirementIds",
+          "environmentOverrides"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "sourceRequirementsHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "runId",
+    "environment",
+    "sourceRequirementsHash",
+    "architectureHash",
+    "costEstimateHash",
+    "environments",
+    "requirementTraceability",
+    "skuDecisions",
+    "sloDecisions",
+    "revisions"
+  ],
+  "type": "object"
+}

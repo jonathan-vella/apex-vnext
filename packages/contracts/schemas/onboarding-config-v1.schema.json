@@ -1,0 +1,59 @@
+{
+  "$id": "https://schemas.apexops.dev/onboarding-config-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "client": {
+      "anyOf": [
+        {
+          "const": "github-copilot-vscode",
+          "type": "string"
+        },
+        {
+          "const": "github-copilot-cli",
+          "type": "string"
+        }
+      ]
+    },
+    "createRepository": {
+      "type": "boolean"
+    },
+    "displayName": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "environment": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "iacTool": {
+      "anyOf": [
+        {
+          "const": "bicep",
+          "type": "string"
+        },
+        {
+          "const": "terraform",
+          "type": "string"
+        }
+      ]
+    },
+    "projectId": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "targetScope": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId"
+  ],
+  "type": "object"
+}

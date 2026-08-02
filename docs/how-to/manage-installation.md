@@ -18,6 +18,42 @@ npx apex version --json
 Initialize exactly one client projection with `apex init --client github-copilot-vscode` or
 `--client github-copilot-cli`.
 
+## Bootstrap A Workspace
+
+For a published package, use either a global CLI or a one-shot command. Both routes install the exact APEX CLI as a
+workspace `devDependency`, update the npm lockfile, and create one selected client projection.
+
+```bash
+npm install -g @apex/cli
+apex bootstrap --project payments --client github-copilot-vscode --create-repo --yes
+```
+
+```bash
+npx --yes @apex/cli bootstrap --project payments --client github-copilot-cli --create-repo --yes
+```
+
+Omit `--create-repo` only when the workspace already has a `.git` boundary. When `--project` is omitted, APEX derives a
+valid project ID from the workspace folder. Use `--file onboarding.json --yes` to provide the same settings as a
+validated onboarding file.
+
+## Install The VS Code Bootstrap Agent
+
+The optional VS Code profile agent appears before a workspace APEX projection exists. It only guides and launches the
+same bootstrap command; it does not own MCP configuration, `.apex` state, approvals, or deployment.
+
+```bash
+apex profile install --client github-copilot-vscode --yes
+```
+
+In VS Code, select **APEX Bootstrap**, complete its questions, reload the window, and then select the workspace
+**APEX** agent. Manage the profile agent explicitly:
+
+```bash
+apex profile status --client github-copilot-vscode
+apex profile update --client github-copilot-vscode --yes
+apex profile uninstall --client github-copilot-vscode --yes
+```
+
 ## Update Managed Files
 
 ```bash
@@ -66,6 +102,8 @@ optional pack is absent; workflows that require the missing pack block explicitl
 
 ## Related
 
+- [Prepare Windows 11](prepare-windows-11.md) - install WSL2, Azure, and Copilot prerequisites.
+- [Windows 11 first run](../tutorials/windows-11-first-run.md) - bootstrap an Azure-ready workspace.
 - [Complete the first local run](../tutorials/first-run.md)
 - [Client support](../reference/client-support.md)
 - [Client projections](../explanation/client-projections.md)

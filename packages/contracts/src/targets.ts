@@ -37,27 +37,88 @@ const RevisionV1Schema = Type.Object(
   { additionalProperties: false },
 );
 
-export const SkuManifestV1Schema = Type.Object(
+const SloOverridePatchV1Schema = Type.Partial(
+  Type.Object({
+    availabilityPercent: Type.Number({ minimum: 0, maximum: 100 }),
+    rtoMinutes: Type.Integer({ minimum: 0 }),
+    rpoMinutes: Type.Integer({ minimum: 0 }),
+    supportWindow: NonEmptyStringSchema,
+    complianceScopes: Type.Array(NonEmptyStringSchema, { minItems: 1, uniqueItems: true }),
+  }),
+  { minProperties: 1, additionalProperties: false },
+);
+
+export const WorkloadDecisionManifestV1Schema = Type.Object(
   {
     schemaVersion: ContractVersionSchema,
     projectId: ProjectIdSchema,
+    runId: RunIdSchema,
+    environment: EnvironmentSchema,
+    sourceRequirementsHash: Sha256Schema,
+    architectureHash: Sha256Schema,
+    costEstimateHash: Sha256Schema,
     environments: Type.Array(EnvironmentSchema, { minItems: 1, uniqueItems: true }),
-    services: Type.Array(
+    requirementTraceability: Type.Array(
       Type.Object(
         {
-          logicalId: NonEmptyStringSchema,
-          service: NonEmptyStringSchema,
-          environment: EnvironmentSchema,
-          sku: Type.Optional(NonEmptyStringSchema),
-          userPinned: Type.Boolean(),
-          rationale: Type.Optional(NonEmptyStringSchema),
+          requirementId: NonEmptyStringSchema,
+          skuDecisionIds: Type.Array(NonEmptyStringSchema, { minItems: 1, uniqueItems: true }),
+          sloDecisionIds: Type.Array(NonEmptyStringSchema, { minItems: 1, uniqueItems: true }),
         },
         { additionalProperties: false },
       ),
+      { minItems: 1 },
+    ),
+    skuDecisions: Type.Array(
+      Type.Object(
+        {
+          id: NonEmptyStringSchema,
+          logicalId: NonEmptyStringSchema,
+          service: NonEmptyStringSchema,
+          sku: NonEmptyStringSchema,
+          quantity: Type.Number({ exclusiveMinimum: 0 }),
+          rationale: NonEmptyStringSchema,
+          requirementIds: Type.Array(NonEmptyStringSchema, { minItems: 1, uniqueItems: true }),
+          environmentOverrides: Type.Array(
+            Type.Object(
+              {
+                environment: EnvironmentSchema,
+                sku: Type.Optional(NonEmptyStringSchema),
+                quantity: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
+              },
+              { minProperties: 2, additionalProperties: false },
+            ),
+          ),
+        },
+        { additionalProperties: false },
+      ),
+      { minItems: 1 },
+    ),
+    sloDecisions: Type.Array(
+      Type.Object(
+        {
+          id: NonEmptyStringSchema,
+          logicalId: NonEmptyStringSchema,
+          availabilityPercent: Type.Number({ minimum: 0, maximum: 100 }),
+          rtoMinutes: Type.Integer({ minimum: 0 }),
+          rpoMinutes: Type.Integer({ minimum: 0 }),
+          supportWindow: NonEmptyStringSchema,
+          complianceScopes: Type.Array(NonEmptyStringSchema, { minItems: 1, uniqueItems: true }),
+          requirementIds: Type.Array(NonEmptyStringSchema, { minItems: 1, uniqueItems: true }),
+          environmentOverrides: Type.Array(
+            Type.Object(
+              { environment: EnvironmentSchema, patch: SloOverridePatchV1Schema },
+              { additionalProperties: false },
+            ),
+          ),
+        },
+        { additionalProperties: false },
+      ),
+      { minItems: 1 },
     ),
     revisions: Type.Array(RevisionV1Schema, { minItems: 1 }),
   },
-  { $id: "https://schemas.apexops.dev/sku-manifest-v1.json", additionalProperties: false },
+  { $id: "https://schemas.apexops.dev/workload-decision-manifest-v1.json", additionalProperties: false },
 );
 
 export const ArchitectureV1Schema = Type.Object(
@@ -476,7 +537,7 @@ export const CustomizationLockV1Schema = Type.Object(
   { $id: "https://schemas.apexops.dev/customization-lock-v1.json", additionalProperties: false },
 );
 
-export type SkuManifestV1 = Static<typeof SkuManifestV1Schema>;
+export type WorkloadDecisionManifestV1 = Static<typeof WorkloadDecisionManifestV1Schema>;
 export type ArchitectureV1 = Static<typeof ArchitectureV1Schema>;
 export type CostEstimateV1 = Static<typeof CostEstimateV1Schema>;
 export type ReviewFindingsV1 = Static<typeof ReviewFindingsV1Schema>;

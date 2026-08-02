@@ -27,6 +27,12 @@ the required hidden-but-delegable boundary is unavailable. The projection must n
 update. Rollback, uninstall, and reinstall preserve unrelated files and report conflicts rather than overwriting user
 content silently.
 
+`apex bootstrap` is the common onboarding path for global CLI, one-shot `npx`, and Copilot-agent entry points. It pins
+the runtime that workspace MCP configuration executes, then delegates workspace projection installation to `apex init`.
+The optional VS Code profile bootstrap agent is deliberately outside the customization manifest and both client
+projections. It is a discovery and command-launching aid only; it cannot own workspace MCP configuration or kernel
+state.
+
 ## Support Versus Qualification
 
 Generated projection tests prove deterministic shape and lifecycle behavior. Live support additionally requires exact

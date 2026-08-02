@@ -59,7 +59,7 @@ and
 
 Creative SKU decisions (App Service, VM, SQL, Cosmos, AKS pools, Redis,
 APIM, App Gateway, Storage replication) flow through
-the versioned `sku-manifest-v1` contract. Never re-derive SKUs from prose.
+the versioned `workload-decision-manifest-v1` contract. Never re-derive SKUs from prose.
 
 ## vNext Runtime
 

@@ -30,7 +30,7 @@ import {
   qualityReport,
   requirements,
   review,
-  skuManifest,
+  workloadDecisionManifest,
   tempRoot,
   validationEvidence,
   writeJson,
@@ -59,10 +59,7 @@ async function reachCodegen(
   track: "bicep" | "terraform",
 ): Promise<{ taskId: string; plan: ReturnType<typeof planBundle> }> {
   await service.nextTask();
-  const requirementValues: TaskOutput[] = [
-    { kind: "requirements", value: requirements() },
-    { kind: "sku-manifest", value: skuManifest(sha256Json(requirements())) },
-  ];
+  const requirementValues: TaskOutput[] = [{ kind: "requirements", value: requirements() }];
   const requirementHashes = await complete(service, "requirements", requirementValues);
   await complete(service, "requirements-review", [
     { kind: "review-findings", value: review(runId, "requirements", requirementHashes.requirements!) },
@@ -70,9 +67,20 @@ async function reachCodegen(
   await service.decideGateNumber(1, "approved", "tester");
   await acceptAvailabilityEvidence(service, runId);
 
+  const architectureValue = architecture(runId);
+  const costValue = costEstimate(runId);
   const architectureValues: TaskOutput[] = [
-    { kind: "architecture", value: architecture(runId) },
-    { kind: "cost-estimate", value: costEstimate(runId) },
+    { kind: "architecture", value: architectureValue },
+    { kind: "cost-estimate", value: costValue },
+    {
+      kind: "workload-decision-manifest",
+      value: workloadDecisionManifest({
+        runId,
+        requirementsHash: requirementHashes.requirements!,
+        architectureHash: sha256Json(architectureValue),
+        costEstimateHash: sha256Json(costValue),
+      }),
+    },
   ];
   const architectureHashes = await complete(service, "architecture", architectureValues);
   await complete(service, "architecture-review", [
@@ -348,10 +356,7 @@ test("task completion records executed manifest validators in order", async () =
   const service = new ApexService(root);
   const { runId } = await service.init({ projectId: "demo" });
   await service.nextTask();
-  await complete(service, "requirements", [
-    { kind: "requirements", value: requirements() },
-    { kind: "sku-manifest", value: skuManifest(sha256Json(requirements())) },
-  ]);
+  await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
 
   const events = await new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal")).replay();
   const completed = events.find(
@@ -374,10 +379,7 @@ test("task validation refuses workflow bytes outside the run lock", async () => 
   const workflowBytes = await readFile(workflowPath);
   await writeFile(workflowPath, Buffer.concat([workflowBytes, Buffer.from("\n")]));
   await assert.rejects(
-    service.completeTaskOutputs(issued.task.taskId, [
-      { kind: "requirements", value: requirements() },
-      { kind: "sku-manifest", value: skuManifest(sha256Json(requirements())) },
-    ]),
+    service.completeTaskOutputs(issued.task.taskId, [{ kind: "requirements", value: requirements() }]),
     (error: unknown) => error instanceof ApexError && error.code === "APEX_STALE",
   );
 });
@@ -387,10 +389,7 @@ test("gate approval records executed manifest validators in order", async () => 
   const service = new ApexService(root);
   const { runId } = await service.init({ projectId: "demo" });
   await service.nextTask();
-  const requirementHashes = await complete(service, "requirements", [
-    { kind: "requirements", value: requirements() },
-    { kind: "sku-manifest", value: skuManifest(sha256Json(requirements())) },
-  ]);
+  const requirementHashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
   await complete(service, "requirements-review", [
     {
       kind: "review-findings",
@@ -424,16 +423,12 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
   const duplicateRequirements = structuredClone(requirements());
   duplicateRequirements.requirements.push({ ...duplicateRequirements.requirements[0]! });
   await assert.rejects(
-    service.completeTaskOutputs(requirementTask, [
-      { kind: "requirements", value: duplicateRequirements },
-      { kind: "sku-manifest", value: skuManifest(sha256Json(duplicateRequirements)) },
-    ]),
+    service.completeTaskOutputs(requirementTask, [{ kind: "requirements", value: duplicateRequirements }]),
     /business:requirements-completeness/,
   );
   const requirementValues = requirements();
   const requirementHashes = await service.completeTaskOutputs(requirementTask, [
     { kind: "requirements", value: requirementValues },
-    { kind: "sku-manifest", value: skuManifest(sha256Json(requirementValues)) },
   ]);
 
   const requirementReviewTask = await task(service, "requirements-review");
@@ -469,16 +464,37 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
   const architectureTask = await task(service, "architecture");
   const untraceableArchitecture = architecture(runId);
   untraceableArchitecture.components[0]!.requirementIds = ["REQ-UNKNOWN"];
+  const untraceableCost = costEstimate(runId);
   await assert.rejects(
     service.completeTaskOutputs(architectureTask, [
       { kind: "architecture", value: untraceableArchitecture },
-      { kind: "cost-estimate", value: costEstimate(runId) },
+      { kind: "cost-estimate", value: untraceableCost },
+      {
+        kind: "workload-decision-manifest",
+        value: workloadDecisionManifest({
+          runId,
+          requirementsHash: requirementHashes.outputHashes.requirements!,
+          architectureHash: sha256Json(untraceableArchitecture),
+          costEstimateHash: sha256Json(untraceableCost),
+        }),
+      },
     ]),
     /business:requirements-traceability/,
   );
+  const architectureValue = architecture(runId);
+  const costValue = costEstimate(runId);
   const architectureHashes = await service.completeTaskOutputs(architectureTask, [
-    { kind: "architecture", value: architecture(runId) },
-    { kind: "cost-estimate", value: costEstimate(runId) },
+    { kind: "architecture", value: architectureValue },
+    { kind: "cost-estimate", value: costValue },
+    {
+      kind: "workload-decision-manifest",
+      value: workloadDecisionManifest({
+        runId,
+        requirementsHash: requirementHashes.outputHashes.requirements!,
+        architectureHash: sha256Json(architectureValue),
+        costEstimateHash: sha256Json(costValue),
+      }),
+    },
   ]);
   const architectureEvents = await new EventJournal(
     join(root, ".apex", "projects", "demo", "runs", runId, "journal"),
@@ -488,7 +504,9 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
   );
   assert.deepEqual((architectureCompleted?.payload as { validatorIds?: unknown }).validatorIds, [
     "schema:architecture-v1",
+    "schema:workload-decision-manifest-v1",
     "business:requirements-traceability",
+    "business:workload-decision-manifest-coverage",
     "business:cost-arithmetic",
     "business:availability-current",
   ]);
@@ -605,10 +623,7 @@ test("architecture requires current scope-bound availability evidence", async ()
   const service = new ApexService(root);
   const { runId } = await service.init({ projectId: "demo" });
   await service.nextTask();
-  const requirementHashes = await complete(service, "requirements", [
-    { kind: "requirements", value: requirements() },
-    { kind: "sku-manifest", value: skuManifest(sha256Json(requirements())) },
-  ]);
+  const requirementHashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
   await complete(service, "requirements-review", [
     {
       kind: "review-findings",
@@ -638,9 +653,20 @@ test("architecture requires current scope-bound availability evidence", async ()
     }),
     /source evidence is unavailable/,
   );
+  const architectureValue = architecture(runId);
+  const costValue = costEstimate(runId);
   const architectureOutputs: TaskOutput[] = [
-    { kind: "architecture", value: architecture(runId) },
-    { kind: "cost-estimate", value: costEstimate(runId) },
+    { kind: "architecture", value: architectureValue },
+    { kind: "cost-estimate", value: costValue },
+    {
+      kind: "workload-decision-manifest",
+      value: workloadDecisionManifest({
+        runId,
+        requirementsHash: requirementHashes.requirements!,
+        architectureHash: sha256Json(architectureValue),
+        costEstimateHash: sha256Json(costValue),
+      }),
+    },
   ];
   await assert.rejects(
     service.completeTaskOutputs(await task(service, "architecture"), architectureOutputs),
@@ -1171,10 +1197,7 @@ test("review blockers persist, resolve, and permit gate approval", async () => {
   const service = new ApexService(root);
   const { runId } = await service.init({ projectId: "demo" });
   await service.nextTask();
-  const hashes = await complete(service, "requirements", [
-    { kind: "requirements", value: requirements() },
-    { kind: "sku-manifest", value: skuManifest(sha256Json(requirements())) },
-  ]);
+  const hashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
   const reviewHashes = await complete(service, "requirements-review", [
     {
       kind: "review-findings",
@@ -1221,10 +1244,7 @@ test("expired accepted risk can be replaced without reopening an open gate", asy
   const service = new ApexService(await tempRoot(), { clock: () => new Date(now) });
   const { runId } = await service.init({ projectId: "demo" });
   await service.nextTask();
-  const hashes = await complete(service, "requirements", [
-    { kind: "requirements", value: requirements() },
-    { kind: "sku-manifest", value: skuManifest(sha256Json(requirements())) },
-  ]);
+  const hashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
   const reviewHashes = await complete(service, "requirements-review", [
     {
       kind: "review-findings",
@@ -1319,15 +1339,16 @@ test("invalid bundles are rejected before completion state changes", async () =>
   await service.nextTask();
   const requirementTask = await task(service, "requirements");
   const before = await service.status();
+  const invalidRequirements = structuredClone(requirements());
+  invalidRequirements.requirements.push({ ...invalidRequirements.requirements[0]! });
   await assert.rejects(
-    service.completeTaskOutputs(requirementTask, [{ kind: "requirements", value: requirements() }]),
-    /missing/i,
+    service.completeTaskOutputs(requirementTask, [{ kind: "requirements", value: invalidRequirements }]),
+    /requirements-completeness/i,
   );
   assert.equal((await service.status()).events, before.events);
 
   const accepted = await service.completeTaskOutputs(requirementTask, [
     { kind: "requirements", value: requirements() },
-    { kind: "sku-manifest", value: skuManifest(sha256Json(requirements())) },
   ]);
   const hashes = await complete(service, "requirements-review", [
     { kind: "review-findings", value: review(runId, "requirements", accepted.outputHashes.requirements!) },
@@ -1335,10 +1356,21 @@ test("invalid bundles are rejected before completion state changes", async () =>
   assert.ok(hashes["review-findings"]);
   await service.decideGateNumber(1, "approved", "tester");
   const architectureTask = await task(service, "architecture");
+  const invalidCostArchitecture = architecture(runId);
+  const invalidCostEstimate = costEstimate(runId, 2);
   await assert.rejects(
     service.completeTaskOutputs(architectureTask, [
-      { kind: "architecture", value: architecture(runId) },
-      { kind: "cost-estimate", value: costEstimate(runId, 2) },
+      { kind: "architecture", value: invalidCostArchitecture },
+      { kind: "cost-estimate", value: invalidCostEstimate },
+      {
+        kind: "workload-decision-manifest",
+        value: workloadDecisionManifest({
+          runId,
+          requirementsHash: accepted.outputHashes.requirements!,
+          architectureHash: sha256Json(invalidCostArchitecture),
+          costEstimateHash: sha256Json(invalidCostEstimate),
+        }),
+      },
     ]),
     /arithmetic/i,
   );
@@ -1389,10 +1421,7 @@ test("MCP completeTask accepts an output bundle", async () => {
     name: "completeTask",
     arguments: {
       taskId: issued.task.taskId,
-      outputs: [
-        { kind: "requirements", value: requirements() },
-        { kind: "sku-manifest", value: skuManifest(sha256Json(requirements())) },
-      ],
+      outputs: [{ kind: "requirements", value: requirements() }],
     },
   });
   assert.equal(response.isError, undefined);

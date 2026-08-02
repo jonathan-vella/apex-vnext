@@ -23,6 +23,7 @@ that client result.
 | `CLIENT-008` | Writer conflict and accepted transfer preserve owner epochs.             | Required              | Required                 |
 | `CLIENT-009` | Init, update, conflict, rollback, uninstall, and reinstall are atomic.   | Required              | Required                 |
 | `CLIENT-010` | Shared fake-provider workflow outcomes normalize equally.                | Required              | Required                 |
+| `CLIENT-011` | Bootstrap installs the exact local runtime and selected projection.      | Profile or CLI route  | CLI route                |
 
 Unavailable client mechanics remain unavailable; they are not inferred as passing. Copilot CLI autonomous workers are
 intentionally omitted under ADR-0006.
@@ -31,7 +32,8 @@ intentionally omitted under ADR-0006.
 
 1. Use clean independent consumer workspaces for each client.
 2. Install the same exact package candidate and one selected projection.
-3. Trust only the qualification workspace; do not mutate user-global configuration.
+3. Trust only the qualification workspace. A disposable, isolated profile root may be mutated solely for the managed
+   VS Code bootstrap agent scenario; do not mutate a real user profile or global MCP configuration.
 4. Use explicit tool grants. Broad allow-all or remote delegation modes are prohibited.
 5. Record structured outcomes and content-free provenance, not raw chat or secrets.
 6. Repeat both clients after any release-relevant runtime, contract, projection, MCP, skill, or toolchain change.

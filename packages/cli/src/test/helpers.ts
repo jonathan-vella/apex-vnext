@@ -56,13 +56,52 @@ export function intent(
   };
 }
 
-export function skuManifest(sourceHash = "a".repeat(64)) {
+export function workloadDecisionManifest(input: {
+  runId: string;
+  requirementsHash: string;
+  architectureHash: string;
+  costEstimateHash: string;
+  projectId?: string;
+  environment?: string;
+}) {
   return {
     schemaVersion: CONTRACT_VERSION,
-    projectId: "demo",
-    environments: ["dev"],
-    services: [],
-    revisions: [{ number: 1, createdAt: "2026-01-01T00:00:00.000Z", sourceHash, reason: "Initial" }],
+    projectId: input.projectId ?? "demo",
+    runId: input.runId,
+    environment: input.environment ?? "dev",
+    sourceRequirementsHash: input.requirementsHash,
+    architectureHash: input.architectureHash,
+    costEstimateHash: input.costEstimateHash,
+    environments: [input.environment ?? "dev"],
+    requirementTraceability: [{ requirementId: "REQ-1", skuDecisionIds: ["api-sku"], sloDecisionIds: ["api-slo"] }],
+    skuDecisions: [
+      {
+        id: "api-sku",
+        logicalId: "api",
+        service: "fake/service",
+        sku: "test",
+        quantity: 1,
+        rationale: "Confirmed availability requirement",
+        requirementIds: ["REQ-1"],
+        environmentOverrides: [],
+      },
+    ],
+    sloDecisions: [
+      {
+        id: "api-slo",
+        logicalId: "api",
+        availabilityPercent: 99.9,
+        rtoMinutes: 60,
+        rpoMinutes: 15,
+        supportWindow: "business-hours",
+        complianceScopes: ["gdpr"],
+        requirementIds: ["REQ-1"],
+        environmentOverrides: [],
+      },
+    ],
+    revisions: [
+      { number: 1, createdAt: "2026-01-01T00:00:00.000Z", sourceHash: input.requirementsHash, reason: "Initial" },
+    ],
   };
 }
 
@@ -362,18 +401,26 @@ export async function prepareValidatedRun(service: ApexService, runId: string, t
   };
   const complete = async (expected: string, outputs: TaskOutput[]) =>
     service.completeTaskOutputs(await nextTask(expected), outputs);
-  const requirementHashes = await complete("requirements", [
-    { kind: "requirements", value: requirements() },
-    { kind: "sku-manifest", value: skuManifest(sha256Json(requirements())) },
-  ]);
+  const requirementHashes = await complete("requirements", [{ kind: "requirements", value: requirements() }]);
   await complete("requirements-review", [
     { kind: "review-findings", value: review(runId, "requirements", requirementHashes.outputHashes.requirements!) },
   ]);
   await service.decideGateNumber(1, "approved", "tester");
   await acceptAvailabilityEvidence(service, runId);
+  const architectureValue = architecture(runId);
+  const costValue = costEstimate(runId);
   const architectureHashes = await complete("architecture", [
-    { kind: "architecture", value: architecture(runId) },
-    { kind: "cost-estimate", value: costEstimate(runId) },
+    { kind: "architecture", value: architectureValue },
+    { kind: "cost-estimate", value: costValue },
+    {
+      kind: "workload-decision-manifest",
+      value: workloadDecisionManifest({
+        runId,
+        requirementsHash: requirementHashes.outputHashes.requirements!,
+        architectureHash: sha256Json(architectureValue),
+        costEstimateHash: sha256Json(costValue),
+      }),
+    },
   ]);
   await complete("architecture-review", [
     { kind: "review-findings", value: review(runId, "architecture", architectureHashes.outputHashes.architecture!) },

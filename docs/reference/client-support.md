@@ -26,6 +26,10 @@ is not available there; the coordinator must not claim otherwise.
 The direct `apex` CLI is the runtime control surface. It is not a third Copilot client and does not perform creative
 requirements, architecture, or planning work by itself.
 
+Onboarding is shared: global CLI, one-shot `npx`, and Copilot CLI all invoke `apex bootstrap`. VS Code may additionally
+use the opt-in user-profile **APEX Bootstrap** agent to invoke that same command before the workspace projection exists.
+After reload, the workspace-selected VS Code projection remains the only active APEX client projection.
+
 ## Evidence Boundary
 
 Historical fixtures characterize behavior but cannot grant release authority. Current support requires evidence bound

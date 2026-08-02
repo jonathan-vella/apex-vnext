@@ -7,6 +7,7 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 ## Inventory
 
 - `approval show`
+- `bootstrap`
 - `cache clear`
 - `cache status`
 - `capability install`
@@ -28,6 +29,10 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 - `inventory`
 - `mcp serve`
 - `preview`
+- `profile install`
+- `profile status`
+- `profile uninstall`
+- `profile update`
 - `project create`
 - `project history`
 - `project list`

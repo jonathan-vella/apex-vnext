@@ -20,7 +20,7 @@
       "kind": "creative",
       "ownerRole": "requirements",
       "sourceDependencies": ["project-config", "run-config", "defaults"],
-      "outputs": ["requirements-v1", "sku-manifest-v1"],
+      "outputs": ["requirements-v1"],
       "validators": [
         "schema:requirements-v1",
         "business:requirements-completeness",
@@ -54,7 +54,7 @@
       "gateNumber": 1,
       "name": "Requirements",
       "ownerRole": "approver",
-      "sourceDependencies": ["requirements-v1", "sku-manifest-v1", "requirements-review", "accepted-risk-scopes"],
+      "sourceDependencies": ["requirements-v1", "requirements-review", "accepted-risk-scopes"],
       "validators": ["gate:requirements-ready"],
       "invalidates": []
     },
@@ -65,16 +65,17 @@
       "sourceDependencies": [
         "gate-1",
         "requirements-v1",
-        "sku-manifest-v1",
         "defaults",
         "pricing-evidence",
         "quota-evidence",
         "regional-availability-evidence"
       ],
-      "outputs": ["architecture-v1", "cost-estimate-v1"],
+      "outputs": ["architecture-v1", "cost-estimate-v1", "workload-decision-manifest-v1"],
       "validators": [
         "schema:architecture-v1",
+        "schema:workload-decision-manifest-v1",
         "business:requirements-traceability",
+        "business:workload-decision-manifest-coverage",
         "business:cost-arithmetic",
         "business:availability-current",
         "review:architecture-comprehensive"
@@ -162,6 +163,7 @@
       "sourceDependencies": [
         "architecture-v1",
         "cost-estimate-v1",
+        "workload-decision-manifest-v1",
         "governance-constraints-v1",
         "policy-property-map-v1",
         "architecture-review",

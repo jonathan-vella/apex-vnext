@@ -28,6 +28,7 @@ import {
   LogicalResourceManifestV1Schema,
   LiveQualificationV1Schema,
   LIVE_QUALIFICATION_SCENARIO_IDS,
+  OnboardingConfigV1Schema,
   PolicyPropertyMapV1Schema,
   PricingEvidenceV1Schema,
   PricingRequestV1Schema,
@@ -38,8 +39,8 @@ import {
   ReviewFindingsV1Schema,
   RuntimeBundleLockV1Schema,
   ScenarioV1Schema,
-  SkuManifestV1Schema,
   TelemetryV1Schema,
+  WorkloadDecisionManifestV1Schema,
   contractMetadata,
   contractSchemas,
   hasCompleteContractMetadata,
@@ -121,6 +122,19 @@ describe("Wave 1 contracts", () => {
     };
 
     assert.equal(Value.Check(RequirementsV1Schema, requirements), true);
+  });
+
+  it("validates strict onboarding configuration with optional defaults", () => {
+    const config = {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: "payments",
+      client: "github-copilot-vscode",
+      createRepository: true,
+    };
+
+    assert.equal(Value.Check(OnboardingConfigV1Schema, config), true);
+    assert.equal(Value.Check(OnboardingConfigV1Schema, { ...config, client: "unsupported" }), false);
+    assert.equal(Value.Check(OnboardingConfigV1Schema, { ...config, unexpected: true }), false);
   });
 
   it("binds live qualification evidence to an exact candidate", () => {
@@ -412,19 +426,42 @@ describe("persisted contract schemas", () => {
 describe("target family contracts", () => {
   const fixtures = [
     [
-      SkuManifestV1Schema,
+      WorkloadDecisionManifestV1Schema,
       {
         schemaVersion: CONTRACT_VERSION,
         projectId: "example-project",
+        runId: "run-1",
+        environment: "prod",
+        sourceRequirementsHash: hash,
+        architectureHash: otherHash,
+        costEstimateHash: "c".repeat(64),
         environments: ["dev", "prod"],
-        services: [
+        requirementTraceability: [
+          { requirementId: "REQ-001", skuDecisionIds: ["api-sku"], sloDecisionIds: ["api-slo"] },
+        ],
+        skuDecisions: [
           {
-            logicalId: "api",
+            id: "api-sku",
             service: "Azure App Service",
-            environment: "prod",
+            logicalId: "api",
             sku: "P1v3",
-            userPinned: true,
-            rationale: "User capacity requirement",
+            quantity: 1,
+            rationale: "Availability target",
+            requirementIds: ["REQ-001"],
+            environmentOverrides: [],
+          },
+        ],
+        sloDecisions: [
+          {
+            id: "api-slo",
+            logicalId: "api",
+            availabilityPercent: 99.9,
+            rtoMinutes: 60,
+            rpoMinutes: 15,
+            supportWindow: "business-hours",
+            complianceScopes: ["gdpr"],
+            requirementIds: ["REQ-001"],
+            environmentOverrides: [],
           },
         ],
         revisions: [{ number: 1, createdAt: timestamp, sourceHash: hash, reason: "Initial user pins" }],

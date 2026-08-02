@@ -10,7 +10,7 @@ App Gateway, Storage replication) from `04-implementation-plan.md`
 prose. Each Bicep resource maps to a `services[].iac_logical_names.bicep`
 entry; per-environment overrides come from
 `services[].environment_overrides.{env}`. See
-[`.github/instructions/sku-manifest.instructions.md`](../../.github/instructions/sku-manifest.instructions.md).
+[workload decision SSOT](../../docs/reference/sources-of-truth.md).
 
 ## Authentication Prerequisites
 

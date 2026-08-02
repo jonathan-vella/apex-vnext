@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { ApexService, SUPPORTED_ARTIFACT_KINDS } from "./service.js";
+import { APEX_VERSION } from "./version.js";
 
 const artifactKind = z.enum(
   SUPPORTED_ARTIFACT_KINDS as [
@@ -36,7 +37,7 @@ const normalizeOutputs = (outputs: z.infer<typeof taskOutput>[]) =>
   }));
 
 export function createMcpServer(service: ApexService): McpServer {
-  const server = new McpServer({ name: "apex", version: "0.10.0" });
+  const server = new McpServer({ name: "apex", version: APEX_VERSION });
   const result = (value: unknown) => ({
     content: [{ type: "text" as const, text: JSON.stringify(value) }],
     structuredContent: value as Record<string, unknown>,
