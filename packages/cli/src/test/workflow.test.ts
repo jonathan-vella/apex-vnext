@@ -2,10 +2,22 @@ import assert from "node:assert/strict";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { EventJournal } from "@apex/kernel";
+import { EventJournal, sha256Json } from "@apex/kernel";
 import { ApexError } from "../errors.js";
 import { ApexService } from "../service.js";
-import { nextTaskAfterInput, prepareValidatedRun, requirements, tempRoot } from "./helpers.js";
+import {
+  acceptAvailabilityEvidence,
+  architecture,
+  costEstimate,
+  governance,
+  nextTaskAfterInput,
+  policyMap,
+  prepareValidatedRun,
+  requirements,
+  review,
+  tempRoot,
+  workloadDecisionManifest,
+} from "./helpers.js";
 
 test("full requirements to fake deploy workflow survives restart", async () => {
   const root = await tempRoot();
@@ -80,6 +92,17 @@ test("requirements task remains blocked until pending input is recorded", async 
     service.taskContext("../requirements"),
     (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
   );
+});
+
+test("render requirements reads the accepted requirements artifact", async () => {
+  const service = new ApexService(await tempRoot());
+  await service.init({ projectId: "demo" });
+  const issued = await nextTaskAfterInput(service);
+  assert.equal(issued.status, "task");
+  if (issued.status !== "task") return;
+  await service.completeTaskOutputs(issued.task.taskId, [{ kind: "requirements", value: requirements() }]);
+
+  assert.match(await service.render("requirements"), /offline service/u);
 });
 
 test("an initialized workspace can create and select independent projects", async () => {
@@ -224,6 +247,83 @@ test("requirements task context includes recorded input and stageable output tem
   await service.stageArtifact(issued.task.taskId, {
     kind: "requirements",
     value: context.outputTemplates.requirements,
+  });
+});
+
+test("plan task context projects source hashes and valid output templates", async () => {
+  const service = new ApexService(await tempRoot());
+  const initialized = await service.init({ projectId: "demo" });
+  const complete = async (taskType: string, outputs: Parameters<typeof service.completeTaskOutputs>[1]) => {
+    const issued = await nextTaskAfterInput(service);
+    assert.equal(issued.status, "task");
+    if (issued.status !== "task") throw new Error("Expected a task");
+    assert.equal(issued.task.taskType, taskType);
+    return service.completeTaskOutputs(issued.task.taskId, outputs);
+  };
+
+  const requirementHashes = await complete("requirements", [{ kind: "requirements", value: requirements() }]);
+  await complete("requirements-review", [
+    { kind: "review-findings", value: review(initialized.runId, "requirements", requirementHashes.outputHashes.requirements!) },
+  ]);
+  await service.decideGateNumber(1, "approved", "tester");
+  await acceptAvailabilityEvidence(service, initialized.runId);
+  const architectureValue = architecture(initialized.runId);
+  const costValue = costEstimate(initialized.runId);
+  const architectureHashes = await complete("architecture", [
+    { kind: "architecture", value: architectureValue },
+    { kind: "cost-estimate", value: costValue },
+    {
+      kind: "workload-decision-manifest",
+      value: workloadDecisionManifest({
+        runId: initialized.runId,
+        requirementsHash: requirementHashes.outputHashes.requirements!,
+        architectureHash: sha256Json(architectureValue),
+        costEstimateHash: sha256Json(costValue),
+      }),
+    },
+  ]);
+  await complete("architecture-review", [
+    { kind: "review-findings", value: review(initialized.runId, "architecture", architectureHashes.outputHashes.architecture!) },
+  ]);
+  const governanceHashes = await complete("governance-discovery", [
+    { kind: "governance-constraints", value: governance(initialized.runId) },
+  ]);
+  const policyHashes = await complete("governance-reconciliation", [
+    {
+      kind: "policy-property-map",
+      value: policyMap(initialized.runId, governanceHashes.outputHashes["governance-constraints"]!),
+    },
+  ]);
+  await complete("governance-review", [
+    {
+      kind: "review-findings",
+      value: review(initialized.runId, "policy-property-map", policyHashes.outputHashes["policy-property-map"]!),
+    },
+  ]);
+  await service.decideGateNumber(2, "approved", "tester");
+
+  const issued = await service.nextTask();
+  assert.equal(issued.status, "task");
+  if (issued.status !== "task") return;
+  assert.equal(issued.task.taskType, "plan");
+  const context = await service.taskContext(issued.task.taskId);
+  for (const kind of ["requirements", "architecture", "governance-constraints", "policy-property-map"]) {
+    assert.match(context.artifactHashes[kind]!, /^[a-f0-9]{64}$/);
+  }
+  assert.deepEqual(Object.keys(context.outputTemplates).sort(), ["environment-inputs", "iac-binding", "implementation-intent"]);
+  assert.deepEqual(context.outputTemplates["environment-inputs"], {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    runId: initialized.runId,
+    environment: "dev",
+    inputs: {
+      location: { kind: "value", value: "REGION" },
+      credential: {
+        kind: "secret-reference",
+        provider: "azure-key-vault",
+        reference: "KEY_VAULT_SECRET_REFERENCE",
+      },
+    },
   });
 });
 
