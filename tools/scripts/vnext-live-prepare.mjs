@@ -563,9 +563,41 @@ async function acceptedEvidenceHash(service, kind, value) {
 }
 
 async function taskId(service, expected) {
-  const next = await service.nextTask();
-  if (next.status !== "task" || next.task.taskType !== expected) throw new Error(`Expected task ${expected}`);
+  let next = await service.nextTask();
+  while (next.status === "needs_input") {
+    await recordQualificationInput(service, next.request);
+    next = await service.nextTask();
+  }
+  if (next.task.taskType !== expected) throw new Error(`Expected task ${expected}`);
   return next.task.taskId;
+}
+
+async function recordQualificationInput(service, request) {
+  await service.recordInput({
+    schemaVersion: "1.0.0",
+    requestId: request.requestId,
+    expectedHead: request.expectedHead,
+    ownerEpoch: request.ownerEpoch,
+    answers: request.questions.map(({ id, multiSelect, options, valueType }) => ({
+      questionId: id,
+      value:
+        id === "workload"
+          ? "vnext qualification marker"
+          : valueType === "budget"
+            ? { kind: "budget", amount: 250, currency: "USD", cadence: "monthly" }
+            : valueType === "recovery"
+              ? { kind: "recovery", rtoMinutes: 60, rpoMinutes: 15 }
+              : valueType === "data-classification"
+                ? { kind: "data-classification", classification: "internal" }
+                : valueType === "compliance"
+                  ? { kind: "compliance", scopes: ["gdpr"] }
+                  : options === undefined
+                    ? `qualification-${id}`
+                    : multiSelect === true
+                      ? [options[0]]
+                      : options[0],
+    })),
+  });
 }
 
 async function complete(service, expected, outputs) {
