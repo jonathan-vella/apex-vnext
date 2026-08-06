@@ -1511,6 +1511,7 @@ export class ApexService {
     return {
       documentId: "requirements",
       templateHash,
+      // State transfer exports immutable objects as canonical JSON.
       outputHash: await this.objects.putJson({ contentType: "text/markdown", content: document }),
     };
   }
