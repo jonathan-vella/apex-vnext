@@ -2668,10 +2668,11 @@ export class ApexService {
   }
 
   private async issueRequirementsInput(run: RunConfigV1, round: RequirementsIntakeRound): Promise<InputRequestV1> {
-    if (!hasValidInputRequestQuestions(round.questions)) {
+    const events = await this.journal(run).replay();
+    const questions = this.requirementsIntakeQuestions(round, events);
+    if (!hasValidInputRequestQuestions(questions)) {
       throw new ApexError("APEX_INTERNAL", "Kernel input questions are invalid", EXIT_CODES.internal);
     }
-    const events = await this.journal(run).replay();
     const latest = [...events].reverse().find((event) => event.type === "requirements.input-requested");
     if (latest !== undefined) {
       const recorded = events.some(
@@ -2687,9 +2688,24 @@ export class ApexService {
     const event = await this.append(run, "requirements.input-requested", {
       requestId: this.idSource(),
       intake: { round: round.round, ordinal, total: 4 },
-      questions: round.questions,
+      questions,
     });
     return this.inputRequest(event, run.ownerEpoch);
+  }
+
+  private requirementsIntakeQuestions(
+    round: RequirementsIntakeRound,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+  ): InputRequestV1["questions"] {
+    if (round.round !== "workload-pattern") return round.questions;
+    const scenario = this.recordedRequirementsInput(events)?.["delivery-scenario"];
+    if (scenario !== "migration" && scenario !== "modernization") return round.questions;
+    return [
+      ...round.questions,
+      { id: "current-platform", prompt: "Describe the current platform and hosting model." },
+      { id: "migration-pain-points", prompt: "Describe the problems the migration or modernization must address." },
+      { id: "preserve-components", prompt: "List components, integrations, or data that must be preserved." },
+    ];
   }
 
   private async append(
@@ -2724,7 +2740,9 @@ export class ApexService {
   }
   private async run(selection: Selection): Promise<RunConfigV1> {
     const run = await this.runRepository(selection).read();
-    const retired = (await this.journal(run).replay()).some((event) => {
+    const events = await this.journal(run).replay();
+    this.assertRequirementsIntakeAdmitted(events, run.ownerEpoch);
+    const retired = events.some((event) => {
       if (event.type !== "task.completed") return false;
       const hashes = (event.payload as { artifactHashes?: Record<string, unknown> }).artifactHashes;
       return typeof hashes?.["sku-manifest"] === "string";
@@ -2742,6 +2760,37 @@ export class ApexService {
       );
     }
     return run;
+  }
+
+  private assertRequirementsIntakeAdmitted(
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+    ownerEpoch: number,
+  ): void {
+    for (const event of events) {
+      if (event.type !== "requirements.input-requested") continue;
+      let request: InputRequestV1;
+      try {
+        request = this.inputRequest(event, ownerEpoch);
+      } catch {
+        throw new ApexError(
+          "APEX_CONFLICT",
+          "Requirements intake is incompatible; start a new run",
+          EXIT_CODES.conflict,
+        );
+      }
+      const round = REQUIREMENTS_INTAKE[request.intake.ordinal - 1];
+      if (
+        round === undefined ||
+        round.round !== request.intake.round ||
+        request.intake.total !== REQUIREMENTS_INTAKE.length
+      ) {
+        throw new ApexError(
+          "APEX_CONFLICT",
+          "Requirements intake is incompatible; start a new run",
+          EXIT_CODES.conflict,
+        );
+      }
+    }
   }
 
   private runRepository(selection: Selection): RunRepository {
@@ -2870,30 +2919,12 @@ export class ApexService {
   ): unknown {
     if (kind === "requirements") {
       const input = this.recordedRequirementsInput(events);
-      const recordedRequirement = input?.requirements;
-      const requirementStatement =
-        typeof recordedRequirement === "string" ? recordedRequirement : "deferred: requirements owner";
-      const requirementStatus = /^deferred:/iu.test(requirementStatement.trim())
-        ? "deferred"
-        : /^unknown$/iu.test(requirementStatement.trim())
-          ? "unknown"
-          : "confirmed";
       return {
         schemaVersion: CONTRACT_VERSION,
         projectId: run.projectId,
         workload: input?.workload ?? "",
         environment: run.environment,
-        requirements: [
-          {
-            id: "REQ-001",
-            statement: requirementStatement,
-            priority: "must",
-            status: requirementStatus,
-            source: "recorded-input:requirements",
-          },
-        ],
-        assumptions: [],
-        unknowns: [],
+        ...this.requirementsTemplateFromIntake(input),
       };
     }
     if (kind === "implementation-intent") {
@@ -2953,6 +2984,79 @@ export class ApexService {
       };
     }
     return { schemaId: ARTIFACTS[kind][1].$id };
+  }
+
+  private requirementsTemplateFromIntake(input: Record<string, string | string[]> | null): {
+    requirements: Array<{
+      id: string;
+      statement: string;
+      priority: "must" | "should";
+      status: "confirmed" | "unknown" | "deferred";
+      source: string;
+    }>;
+    assumptions: string[];
+    unknowns: string[];
+  } {
+    const fields: Array<{ id: string; label: string; priority: "must" | "should" }> = [
+      { id: "availability-recovery", label: "Availability and recovery", priority: "must" },
+      { id: "security-controls", label: "Security controls", priority: "must" },
+      { id: "compliance", label: "Compliance", priority: "should" },
+      { id: "authentication", label: "Authentication", priority: "should" },
+      { id: "operations", label: "Operations", priority: "should" },
+      { id: "budget", label: "Budget", priority: "should" },
+      { id: "iac-preference", label: "IaC preference", priority: "should" },
+      { id: "service-preferences", label: "Service preferences", priority: "should" },
+      { id: "sku-preferences", label: "SKU and sizing preferences", priority: "should" },
+      { id: "environment-overrides", label: "Environment overrides", priority: "should" },
+      { id: "retained-services", label: "Retained services", priority: "should" },
+      { id: "prohibited-services", label: "Prohibited services", priority: "should" },
+      { id: "data-sensitivity", label: "Data sensitivity", priority: "should" },
+      { id: "scale", label: "Scale", priority: "should" },
+      { id: "workload-pattern", label: "Workload pattern", priority: "should" },
+      { id: "delivery-scenario", label: "Delivery scenario", priority: "should" },
+      { id: "region", label: "Region", priority: "should" },
+    ];
+    const requirements = fields.flatMap(({ id, label, priority }, index) => {
+      const value = input?.[id];
+      const text = Array.isArray(value) ? value.join(", ") : value;
+      if (typeof text !== "string" || text.length === 0) return [];
+      const status: "confirmed" | "unknown" | "deferred" = /^deferred:/iu.test(text.trim())
+        ? "deferred"
+        : /^unknown$/iu.test(text.trim())
+          ? "unknown"
+          : "confirmed";
+      return [
+        {
+          id: `REQ-${String(index + 1).padStart(3, "0")}`,
+          statement: `${label}: ${text}`,
+          priority,
+          status,
+          source: `intake:${id}`,
+        },
+      ];
+    });
+    const assumptions = ["industry", "target-environments"].flatMap((id) => {
+      const value = input?.[id];
+      const text = Array.isArray(value) ? value.join(", ") : value;
+      return typeof text === "string" && text.length > 0 ? [`${id}: ${text}`] : [];
+    });
+    const unknowns = requirements.filter(({ status }) => status !== "confirmed").map(({ statement }) => statement);
+    return {
+      requirements:
+        requirements.length > 0
+          ? requirements
+          : [
+              {
+                id: "REQ-001",
+                statement: "deferred: requirements owner",
+                priority: "must",
+                status: "deferred",
+                source: "intake:missing",
+              },
+            ],
+      assumptions,
+      unknowns,
+    };
   }
 
   private completedNodeIds(events: Awaited<ReturnType<EventJournal["replay"]>>): Set<string> {

@@ -19,7 +19,8 @@ Use this skill only for an active architecture task.
 3. Keep identity, networking, diagnostics, recovery, data, and lifecycle decisions explicit.
 4. Ask the user only about choices the kernel identifies as user-owned.
 5. Return missing or stale discovery as a blocker rather than inventing evidence.
-6. Submit the typed result only through `apex/stageArtifact` and `apex/completeTask`.
+6. Stage `architecture`, `cost-estimate`, and `workload-decision-manifest`, then call `apex/completeTask` once with
+   every required output in `outputs`. Do not submit a single-output completion.
 
 ## Output
 
