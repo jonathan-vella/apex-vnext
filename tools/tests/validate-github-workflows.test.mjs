@@ -106,11 +106,11 @@ test("rejects local composite action drift", () => {
   assert.ok(errors.includes(".github/actions/setup-node-repo/action.yml: local action content drift"));
 });
 
-test("rejects Node dependency registry weakening after action rebaselining", () => {
+test("rejects Node dependency registry drift after action rebaselining", () => {
   const actionPath = ".github/actions/setup-node-repo/action.yml";
   const mutations = [
-    (text) => text.replace("https://packagefeedproxy.microsoft.io/npm/", "https://registry.npmjs.org/"),
-    (text) => text.replace("https://packagefeedproxy.microsoft.io/npm/", ""),
+    (text) => text.replace("https://registry.npmjs.org/", "https://packagefeedproxy.microsoft.io/npm/"),
+    (text) => text.replace("https://registry.npmjs.org/", ""),
     (text) => text.replace('        LEFTHOOK: "0"\n', ""),
     (text) => `${text}\n    - name: Unbound install\n      shell: bash\n      run: npm install\n`,
   ];
