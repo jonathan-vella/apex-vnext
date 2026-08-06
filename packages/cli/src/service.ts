@@ -1065,12 +1065,7 @@ export class ApexService {
         outputTemplates[kind as ArtifactKind] = this.outputTemplate(kind as ArtifactKind, run, events);
       }
     }
-    const artifactHashes: Record<string, string> = {};
-    for (const event of events) {
-      if (event.type !== "task.completed") continue;
-      const hashes = (event.payload as { artifactHashes?: Record<string, unknown> }).artifactHashes ?? {};
-      for (const [kind, hash] of Object.entries(hashes)) if (typeof hash === "string") artifactHashes[kind] = hash;
-    }
+    const artifactHashes = this.acceptedArtifactHashes(events);
     return {
       task,
       inputs: await Promise.all(task.inputRefs.map((hash) => this.objects.getJson(hash))),
@@ -2688,6 +2683,26 @@ export class ApexService {
     return field === undefined ? undefined : this.latestPayloadHash(events, "task.completed", field);
   }
 
+  private acceptedArtifactHashes(events: Awaited<ReturnType<EventJournal["replay"]>>): Record<string, string> {
+    const hashes: Record<string, string> = {};
+    const legacyFields: Partial<Record<ArtifactKind, string>> = {
+      requirements: "requirementsHash",
+      "implementation-intent": "intentHash",
+    };
+    for (const event of events) {
+      if (event.type !== "task.completed") continue;
+      const payload = event.payload as Record<string, unknown>;
+      for (const [kind, hash] of Object.entries(payload.artifactHashes ?? {})) {
+        if (typeof hash === "string") hashes[kind] = hash;
+      }
+      for (const [kind, field] of Object.entries(legacyFields)) {
+        const hash = payload[field];
+        if (typeof hash === "string" && hashes[kind] === undefined) hashes[kind] = hash;
+      }
+    }
+    return hashes;
+  }
+
   private inputRefs(events: Awaited<ReturnType<EventJournal["replay"]>>, descriptor: WorkflowTaskDescriptor): string[] {
     const availabilityKinds = new Set([
       "architecture-availability-v1",
@@ -3222,12 +3237,7 @@ export class ApexService {
       const validatorBoundary = workflowValidatorOwnership(id)?.boundary;
       return validatorBoundary !== undefined && boundaries.has(validatorBoundary);
     });
-    const artifactHashes: Record<string, string> = {};
-    for (const event of events) {
-      if (event.type !== "task.completed") continue;
-      const hashes = (event.payload as { artifactHashes?: Record<string, unknown> }).artifactHashes ?? {};
-      for (const [kind, hash] of Object.entries(hashes)) if (typeof hash === "string") artifactHashes[kind] = hash;
-    }
+    const artifactHashes = this.acceptedArtifactHashes(events);
     const artifacts = Object.fromEntries(
       await Promise.all(
         Object.entries(artifactHashes).map(async ([kind, hash]) => [kind, await this.objects.getJson<unknown>(hash)]),

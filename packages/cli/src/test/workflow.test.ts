@@ -250,6 +250,30 @@ test("requirements task context includes recorded input and stageable output tem
   });
 });
 
+test("task context projects hashes from legacy task completions", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const initialized = await service.init({ projectId: "demo" });
+  const issued = await nextTaskAfterInput(service);
+  assert.equal(issued.status, "task");
+  if (issued.status !== "task") return;
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"));
+  const requirementsHash = "a".repeat(64);
+  await journal.append({
+    eventId: "legacy-requirements",
+    projectId: "demo",
+    runId: initialized.runId,
+    type: "task.completed",
+    timestamp: "2026-01-01T00:00:00.000Z",
+    ownerEpoch: 1,
+    expectedHead: await journal.head(),
+    payload: { nodeId: "requirements", requirementsHash, legacy: true },
+  });
+
+  const context = await service.taskContext(issued.task.taskId);
+  assert.equal(context.artifactHashes.requirements, requirementsHash);
+});
+
 test("plan task context projects source hashes and valid output templates", async () => {
   const service = new ApexService(await tempRoot());
   const initialized = await service.init({ projectId: "demo" });
