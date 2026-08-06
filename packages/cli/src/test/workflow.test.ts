@@ -180,7 +180,10 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
   assert.equal(reviewTask.status, "task");
   if (reviewTask.status !== "task") return;
   await service.completeTaskOutputs(reviewTask.task.taskId, [
-    { kind: "review-findings", value: review(initialized.runId, "requirements", requirementHashes.outputHashes.requirements!) },
+    {
+      kind: "review-findings",
+      value: review(initialized.runId, "requirements", requirementHashes.outputHashes.requirements!),
+    },
   ]);
   await service.decideGateNumber(1, "approved", "tester");
   await acceptAvailabilityEvidence(service, initialized.runId);
@@ -208,6 +211,38 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
       "network-exposure": "private-only",
     });
   }
+});
+
+test("architecture decision is reissued after its journal head becomes stale", async () => {
+  const service = new ApexService(await tempRoot());
+  const initialized = await service.init({ projectId: "demo" });
+  const requirementsTask = await nextTaskAfterInput(service);
+  assert.equal(requirementsTask.status, "task");
+  if (requirementsTask.status !== "task") return;
+  const requirementHashes = await service.completeTaskOutputs(requirementsTask.task.taskId, [
+    { kind: "requirements", value: requirements() },
+  ]);
+  const reviewTask = await service.nextTask();
+  assert.equal(reviewTask.status, "task");
+  if (reviewTask.status !== "task") return;
+  await service.completeTaskOutputs(reviewTask.task.taskId, [
+    {
+      kind: "review-findings",
+      value: review(initialized.runId, "requirements", requirementHashes.outputHashes.requirements!),
+    },
+  ]);
+  await service.decideGateNumber(1, "approved", "tester");
+  const firstEvidence = await acceptAvailabilityEvidence(service, initialized.runId);
+  const first = await service.nextTask();
+  assert.equal(first.status, "needs_input");
+  if (first.status !== "needs_input") return;
+  await acceptAvailabilityEvidence(service, initialized.runId);
+  const reissued = await service.nextTask();
+  assert.equal(reissued.status, "needs_input");
+  if (reissued.status !== "needs_input") return;
+  assert.notEqual(reissued.request.requestId, first.request.requestId);
+  assert.notEqual(reissued.request.expectedHead, first.request.expectedHead);
+  assert.notEqual(reissued.request.expectedHead, firstEvidence);
 });
 
 test("render requirements reads the accepted requirements artifact", async () => {

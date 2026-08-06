@@ -804,6 +804,16 @@ describe("target family contracts", () => {
     };
     assert.equal(Value.Check(InputRequestV1Schema, request), true);
     assert.equal(
+      Value.Check(InputRequestV1Schema, {
+        schemaVersion: CONTRACT_VERSION,
+        requestId: request.requestId,
+        expectedHead: request.expectedHead,
+        ownerEpoch: request.ownerEpoch,
+        questions: request.questions,
+      }),
+      false,
+    );
+    assert.equal(
       Value.Check(InputSubmissionV1Schema, {
         schemaVersion: CONTRACT_VERSION,
         requestId: request.requestId,
