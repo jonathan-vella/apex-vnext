@@ -66,12 +66,7 @@ export function validateInputAnswers(questions: QuestionV1[], submitted: InputAn
         }
         return { questionId: question.id, value };
       }
-      if (
-        typeof value !== "object" ||
-        value === null ||
-        Array.isArray(value) ||
-        value.kind !== question.valueType
-      ) {
+      if (typeof value !== "object" || value === null || Array.isArray(value) || value.kind !== question.valueType) {
         throw new Error(`Answer shape does not match question: ${question.id}`);
       }
       return { questionId: question.id, value };

@@ -20,10 +20,7 @@ import {
   workloadDecisionManifest,
 } from "./helpers.js";
 
-async function recordRequirementsRound(
-  service: ApexService,
-  answers: Record<string, InputValueV1>,
-): Promise<void> {
+async function recordRequirementsRound(service: ApexService, answers: Record<string, InputValueV1>): Promise<void> {
   const pending = await service.nextTask();
   assert.equal(pending.status, "needs_input");
   if (pending.status !== "needs_input") return;
