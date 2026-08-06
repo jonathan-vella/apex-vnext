@@ -3,6 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { EventJournal, sha256Json } from "@apex/kernel";
+import type { InputValueV1 } from "@apex/contracts";
 import { ApexError } from "../errors.js";
 import { ApexService } from "../service.js";
 import {
@@ -21,7 +22,7 @@ import {
 
 async function recordRequirementsRound(
   service: ApexService,
-  answers: Record<string, string | string[]>,
+  answers: Record<string, InputValueV1>,
 ): Promise<void> {
   const pending = await service.nextTask();
   assert.equal(pending.status, "needs_input");
@@ -125,9 +126,22 @@ test("requirements intake issues four rounds before the requirements task", asyn
       requestId: pending.request.requestId,
       expectedHead: pending.request.expectedHead,
       ownerEpoch: pending.request.ownerEpoch,
-      answers: pending.request.questions.map(({ id, multiSelect, options }) => ({
+      answers: pending.request.questions.map(({ id, multiSelect, options, valueType }) => ({
         questionId: id,
-        value: options === undefined ? `test-${id}` : multiSelect === true ? [options[0]!] : options[0]!,
+        value:
+          valueType === "budget"
+            ? { kind: "budget" as const, amount: 250, currency: "USD", cadence: "monthly" as const }
+            : valueType === "recovery"
+              ? { kind: "recovery" as const, rtoMinutes: 60, rpoMinutes: 15 }
+              : valueType === "data-classification"
+                ? { kind: "data-classification" as const, classification: "internal" as const }
+                : valueType === "compliance"
+                  ? { kind: "compliance" as const, scopes: ["gdpr"] }
+                  : options === undefined
+                    ? `test-${id}`
+                    : multiSelect === true
+                      ? [options[0]!]
+                      : options[0]!,
       })),
     });
     if (index < rounds.length - 1) assert.equal((await service.nextTask()).status, "needs_input");
@@ -290,8 +304,8 @@ test("requirements task context includes recorded input and stageable output tem
   await recordRequirementsRound(service, {
     "workload-pattern": "web-api",
     scale: "100 concurrent users",
-    budget: "500 USD monthly",
-    "data-sensitivity": "PCI DSS",
+    budget: { kind: "budget", amount: 500, currency: "USD", cadence: "monthly" },
+    "data-sensitivity": { kind: "data-classification", classification: "confidential" },
     "iac-preference": "bicep",
   });
   await recordRequirementsRound(service, {
@@ -302,11 +316,12 @@ test("requirements task context includes recorded input and stageable output tem
     "environment-overrides": "No environment-specific overrides",
   });
   await recordRequirementsRound(service, {
-    compliance: "PCI DSS",
+    compliance: { kind: "compliance", scopes: ["pci-dss"] },
     "security-controls": "managed identities",
     authentication: "Microsoft Entra ID",
     region: "swedencentral",
     "availability-recovery": "99.9% availability; RTO 60 minutes; RPO 15 minutes",
+    recovery: { kind: "recovery", rtoMinutes: 60, rpoMinutes: 15 },
     operations: "central monitoring",
   });
   const issued = await service.nextTask();
@@ -320,19 +335,20 @@ test("requirements task context includes recorded input and stageable output tem
     "target-environments": ["dev"],
     "workload-pattern": "web-api",
     scale: "100 concurrent users",
-    budget: "500 USD monthly",
-    "data-sensitivity": "PCI DSS",
+    budget: { kind: "budget", amount: 500, currency: "USD", cadence: "monthly" },
+    "data-sensitivity": { kind: "data-classification", classification: "confidential" },
     "iac-preference": "bicep",
     "retained-services": "No services must be retained",
     "prohibited-services": "No services are prohibited",
     "service-preferences": "managed services",
     "sku-preferences": "no preference",
     "environment-overrides": "No environment-specific overrides",
-    compliance: "PCI DSS",
+    compliance: { kind: "compliance", scopes: ["pci-dss"] },
     "security-controls": "managed identities",
     authentication: "Microsoft Entra ID",
     region: "swedencentral",
     "availability-recovery": "99.9% availability; RTO 60 minutes; RPO 15 minutes",
+    recovery: { kind: "recovery", rtoMinutes: 60, rpoMinutes: 15 },
     operations: "central monitoring",
   });
   assert.equal(context.inputs.length, 0);
@@ -489,8 +505,8 @@ test("requirements intake preserves explicit unresolved answers", async () => {
     await recordRequirementsRound(service, {
       "workload-pattern": "web-api",
       scale: "100 concurrent users",
-      budget: "500 USD monthly",
-      "data-sensitivity": "internal",
+      budget: { kind: "budget", amount: 500, currency: "USD", cadence: "monthly" },
+      "data-sensitivity": { kind: "data-classification", classification: "internal" },
       "iac-preference": "bicep",
     });
     await recordRequirementsRound(service, {
@@ -501,11 +517,12 @@ test("requirements intake preserves explicit unresolved answers", async () => {
       "environment-overrides": "No environment-specific overrides",
     });
     await recordRequirementsRound(service, {
-      compliance: "No compliance requirements identified",
+      compliance: { kind: "compliance", scopes: ["gdpr"] },
       "security-controls": "managed identities",
       authentication: "Microsoft Entra ID",
       region: "swedencentral",
       "availability-recovery": availabilityRecovery,
+      recovery: { kind: "recovery", rtoMinutes: 60, rpoMinutes: 15 },
       operations: "central monitoring",
     });
     const issued = await service.nextTask();

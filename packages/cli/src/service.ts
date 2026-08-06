@@ -13,6 +13,7 @@ import {
   IacBindingV1Schema,
   IacHandoffV1Schema,
   InputRequestV1Schema,
+  InputValueV1Schema,
   InputSubmissionV1Schema,
   ImplementationIntentV1Schema,
   LogicalResourceManifestV1Schema,
@@ -36,6 +37,7 @@ import {
   type EnvironmentInputsV1,
   type IacBindingV1,
   type InputRequestV1,
+  type InputValueV1,
   type RequirementsIntakeRoundV1,
   type InputSubmissionV1,
   type ImprovementCategory,
@@ -387,6 +389,7 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
         prompt: "Which environments are in scope?",
         options: ["dev", "test", "staging", "prod"],
         multiSelect: true,
+        valueType: "environment-set",
       },
     ],
   },
@@ -399,8 +402,8 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
         options: ["web-api", "event-driven", "data-analytics", "iot", "batch"],
       },
       { id: "scale", prompt: "Describe expected users, concurrency, throughput, or data volume." },
-      { id: "budget", prompt: "State the monthly budget or use 'deferred: <owner>'." },
-      { id: "data-sensitivity", prompt: "Describe data sensitivity and classification constraints." },
+      { id: "budget", prompt: "State the monthly budget or explicitly defer it.", valueType: "budget" },
+      { id: "data-sensitivity", prompt: "Choose the data classification or explicitly defer it.", valueType: "data-classification" },
       { id: "iac-preference", prompt: "Choose the preferred infrastructure tool.", options: ["bicep", "terraform"] },
     ],
   },
@@ -420,7 +423,7 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
   {
     round: "security-compliance",
     questions: [
-      { id: "compliance", prompt: "List compliance, regulatory, and data-residency requirements." },
+      { id: "compliance", prompt: "List compliance and regulatory scopes or explicitly defer them.", valueType: "compliance" },
       {
         id: "security-controls",
         prompt: "List required identity, network, encryption, and secret-management controls.",
@@ -428,6 +431,7 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
       { id: "authentication", prompt: "Describe authentication and authorization requirements." },
       { id: "region", prompt: "State the required Azure region or use 'deferred: <owner>'." },
       { id: "availability-recovery", prompt: "State availability, RTO, RPO, backup, and recovery requirements." },
+      { id: "recovery", prompt: "Provide RTO and RPO in whole minutes or explicitly defer them.", valueType: "recovery" },
       { id: "operations", prompt: "State monitoring, alerting, support, and operational requirements." },
     ],
   },
@@ -1080,7 +1084,7 @@ export class ApexService {
     task: TaskEnvelopeV1;
     inputs: unknown[];
     artifactHashes: Record<string, string>;
-    recordedInput: Record<string, string | string[]> | null;
+    recordedInput: Record<string, InputValueV1> | null;
     outputTemplates: Partial<Record<ArtifactKind, unknown>>;
     outputRoot: string;
     status: string;
@@ -2889,8 +2893,8 @@ export class ApexService {
 
   private recordedRequirementsInput(
     events: Awaited<ReturnType<EventJournal["replay"]>>,
-  ): Record<string, string | string[]> | null {
-    const result: Record<string, string | string[]> = {};
+  ): Record<string, InputValueV1> | null {
+    const result: Record<string, InputValueV1> = {};
     let recorded = false;
     for (const event of events) {
       if (event.type !== "requirements.input-recorded") continue;
@@ -2901,12 +2905,11 @@ export class ApexService {
         const value = answer as { questionId?: unknown; value?: unknown };
         if (
           typeof value.questionId !== "string" ||
-          (typeof value.value !== "string" &&
-            (!Array.isArray(value.value) || value.value.some((item) => typeof item !== "string")))
+          !Value.Check(InputValueV1Schema, value.value)
         ) {
           throw new ApexError("APEX_INTERNAL", "Recorded requirements input is invalid", EXIT_CODES.internal);
         }
-        result[value.questionId] = value.value as string | string[];
+        result[value.questionId] = value.value as InputValueV1;
       }
     }
     return recorded ? result : null;
@@ -2922,7 +2925,7 @@ export class ApexService {
       return {
         schemaVersion: CONTRACT_VERSION,
         projectId: run.projectId,
-        workload: input?.workload ?? "",
+        workload: typeof input?.workload === "string" ? input.workload : "",
         environment: run.environment,
         ...this.requirementsTemplateFromIntake(input),
       };
@@ -2986,7 +2989,7 @@ export class ApexService {
     return { schemaId: ARTIFACTS[kind][1].$id };
   }
 
-  private requirementsTemplateFromIntake(input: Record<string, string | string[]> | null): {
+  private requirementsTemplateFromIntake(input: Record<string, InputValueV1> | null): {
     requirements: Array<{
       id: string;
       statement: string;
@@ -3018,7 +3021,7 @@ export class ApexService {
     ];
     const requirements = fields.flatMap(({ id, label, priority }, index) => {
       const value = input?.[id];
-      const text = Array.isArray(value) ? value.join(", ") : value;
+      const text = this.renderInputValue(value);
       if (typeof text !== "string" || text.length === 0) return [];
       const status: "confirmed" | "unknown" | "deferred" = /^deferred:/iu.test(text.trim())
         ? "deferred"
@@ -3037,7 +3040,7 @@ export class ApexService {
     });
     const assumptions = ["industry", "target-environments"].flatMap((id) => {
       const value = input?.[id];
-      const text = Array.isArray(value) ? value.join(", ") : value;
+      const text = this.renderInputValue(value);
       return typeof text === "string" && text.length > 0 ? [`${id}: ${text}`] : [];
     });
     const unknowns = requirements.filter(({ status }) => status !== "confirmed").map(({ statement }) => statement);
@@ -3057,6 +3060,26 @@ export class ApexService {
       assumptions,
       unknowns,
     };
+  }
+
+  private renderInputValue(value: InputValueV1 | undefined): string | undefined {
+    if (typeof value === "string") return value;
+    if (Array.isArray(value)) return value.join(", ");
+    if (value === undefined) return undefined;
+    switch (value.kind) {
+      case "deferred":
+        return `deferred: ${value.owner}`;
+      case "unknown":
+        return "unknown";
+      case "budget":
+        return `${value.currency} ${value.amount} ${value.cadence}`;
+      case "recovery":
+        return `RTO ${value.rtoMinutes} minutes; RPO ${value.rpoMinutes} minutes`;
+      case "data-classification":
+        return value.classification;
+      case "compliance":
+        return value.scopes.join(", ");
+    }
   }
 
   private completedNodeIds(events: Awaited<ReturnType<EventJournal["replay"]>>): Set<string> {

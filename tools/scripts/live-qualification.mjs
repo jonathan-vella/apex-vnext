@@ -1402,9 +1402,7 @@ function inputRequestPayload(event) {
         question === null ||
         typeof question !== "object" ||
         Array.isArray(question) ||
-        !["id,prompt", "id,multiSelect,prompt", "id,multiSelect,options,prompt", "id,options,prompt"].includes(
-          Object.keys(question).sort().join(","),
-        ) ||
+        Object.keys(question).some((key) => !["id", "prompt", "options", "multiSelect", "valueType"].includes(key)) ||
         typeof question.id !== "string" ||
         question.id.length === 0 ||
         question.id.length > 128 ||
@@ -1418,7 +1416,9 @@ function inputRequestPayload(event) {
             question.options.some(
               (option) => typeof option !== "string" || option.length === 0 || option.length > 4096,
             ))) ||
-        (question.multiSelect !== undefined && typeof question.multiSelect !== "boolean"),
+        (question.multiSelect !== undefined && typeof question.multiSelect !== "boolean") ||
+        (question.valueType !== undefined &&
+          !["budget", "recovery", "environment-set", "data-classification", "compliance"].includes(question.valueType)),
     ) ||
     !hasValidInputRequestQuestions(payload.questions)
   ) {
@@ -1467,6 +1467,12 @@ function inputRecordedPayload(event, request) {
   }
   for (const question of request.questions) {
     const value = answers.get(question.id);
+    if (question.valueType !== undefined) {
+      if (!typedInputValueMatches(question.valueType, value)) {
+        throw new Error("Recognized input recorded event has invalid payload");
+      }
+      continue;
+    }
     const selected = Array.isArray(value) ? value : [value];
     if (
       value === undefined ||
@@ -1480,6 +1486,52 @@ function inputRecordedPayload(event, request) {
     }
   }
   return payload;
+}
+
+function typedInputValueMatches(valueType, value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value))
+    return valueType === "environment-set" && Array.isArray(value);
+  if (Object.keys(value).sort().join(",") === "kind,owner")
+    return value.kind === "deferred" && typeof value.owner === "string" && value.owner.length > 0;
+  if (Object.keys(value).sort().join(",") === "kind") return value.kind === "unknown";
+  if (valueType === "budget") {
+    return (
+      Object.keys(value).sort().join(",") === "amount,cadence,currency,kind" &&
+      value.kind === "budget" &&
+      typeof value.amount === "number" &&
+      value.amount >= 0 &&
+      typeof value.currency === "string" &&
+      /^[A-Z]{3}$/u.test(value.currency) &&
+      value.cadence === "monthly"
+    );
+  }
+  if (valueType === "recovery") {
+    return (
+      Object.keys(value).sort().join(",") === "kind,rpoMinutes,rtoMinutes" &&
+      value.kind === "recovery" &&
+      Number.isInteger(value.rtoMinutes) &&
+      value.rtoMinutes >= 0 &&
+      Number.isInteger(value.rpoMinutes) &&
+      value.rpoMinutes >= 0
+    );
+  }
+  if (valueType === "data-classification") {
+    return (
+      Object.keys(value).sort().join(",") === "classification,kind" &&
+      value.kind === "data-classification" &&
+      ["public", "internal", "confidential", "restricted"].includes(value.classification)
+    );
+  }
+  if (valueType === "compliance") {
+    return (
+      Object.keys(value).sort().join(",") === "kind,scopes" &&
+      value.kind === "compliance" &&
+      Array.isArray(value.scopes) &&
+      value.scopes.length > 0 &&
+      value.scopes.every((scope) => typeof scope === "string" && scope.length > 0)
+    );
+  }
+  return false;
 }
 
 export async function collectClientInputEvidence(
