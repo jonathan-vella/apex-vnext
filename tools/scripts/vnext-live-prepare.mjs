@@ -661,11 +661,27 @@ export async function prepareQualificationState(args, dependencies = {}) {
     } finally {
       await rm(emptyCustomizations, { recursive: true, force: true });
     }
-    await service.recordRequirementsInput({
-      workload: "vnext qualification marker",
-      requirements: "exact native lifecycle proof in the isolated sandbox",
-      candidateSha,
-    });
+    let intake = await service.nextTask();
+    while (intake.status === "needs_input") {
+      await service.recordInput({
+        schemaVersion: "1.0.0",
+        requestId: intake.request.requestId,
+        expectedHead: intake.request.expectedHead,
+        ownerEpoch: intake.request.ownerEpoch,
+        answers: intake.request.questions.map(({ id, multiSelect, options }) => ({
+          questionId: id,
+          value:
+            id === "workload"
+              ? "vnext qualification marker"
+              : options === undefined
+                ? `qualification-${id}`
+                : multiSelect === true
+                  ? [options[0]]
+                  : options[0],
+        })),
+      });
+      intake = await service.nextTask();
+    }
     const sourceRefs = {
       pricing: await acceptedEvidenceHash(service, "pricing-evidence", availability.pricing),
       quota: await acceptedEvidenceHash(service, "quota-evidence", availability.quota),
