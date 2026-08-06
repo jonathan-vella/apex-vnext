@@ -138,6 +138,24 @@ test("requirements intake issues four rounds before the requirements task", asyn
   if (issued.status === "task") assert.equal(issued.task.taskType, "requirements");
 });
 
+test("requirements intake adds migration questions only for migration scenarios", async () => {
+  const service = new ApexService(await tempRoot());
+  await service.init({ projectId: "demo" });
+  await recordRequirementsRound(service, {
+    workload: "ecommerce",
+    industry: "retail",
+    "delivery-scenario": "migration",
+    "target-environments": ["dev"],
+  });
+  const pending = await service.nextTask();
+  assert.equal(pending.status, "needs_input");
+  if (pending.status !== "needs_input") return;
+  assert.deepEqual(
+    pending.request.questions.slice(-3).map(({ id }) => id),
+    ["current-platform", "migration-pain-points", "preserve-components"],
+  );
+});
+
 test("render requirements reads the accepted requirements artifact", async () => {
   const service = new ApexService(await tempRoot());
   await service.init({ projectId: "demo" });
@@ -318,23 +336,29 @@ test("requirements task context includes recorded input and stageable output tem
     operations: "central monitoring",
   });
   assert.equal(context.inputs.length, 0);
-  assert.deepEqual(context.outputTemplates.requirements, {
-    schemaVersion: "1.0.0",
-    projectId: "demo",
-    workload: "ecommerce",
-    environment: "dev",
-    requirements: [
-      {
-        id: "REQ-001",
-        statement: "deferred: requirements owner",
-        priority: "must",
-        status: "deferred",
-        source: "recorded-input:requirements",
-      },
-    ],
-    assumptions: [],
-    unknowns: [],
-  });
+  const template = context.outputTemplates.requirements as {
+    requirements: Array<{ id: string; statement: string; priority: string; status: string; source: string }>;
+    assumptions: string[];
+    unknowns: string[];
+  };
+  assert.deepEqual(template.requirements.slice(0, 2), [
+    {
+      id: "REQ-001",
+      statement: "Availability and recovery: 99.9% availability; RTO 60 minutes; RPO 15 minutes",
+      priority: "must",
+      status: "confirmed",
+      source: "intake:availability-recovery",
+    },
+    {
+      id: "REQ-002",
+      statement: "Security controls: managed identities",
+      priority: "must",
+      status: "confirmed",
+      source: "intake:security-controls",
+    },
+  ]);
+  assert.deepEqual(template.assumptions, ["industry: retail", "target-environments: dev"]);
+  assert.deepEqual(template.unknowns, []);
   await service.stageArtifact(issued.task.taskId, {
     kind: "requirements",
     value: context.outputTemplates.requirements,
@@ -494,10 +518,10 @@ test("requirements intake preserves explicit unresolved answers", async () => {
     assert.equal((context.recordedInput as Record<string, string>)["availability-recovery"], availabilityRecovery);
     assert.deepEqual(template.requirements[0], {
       id: "REQ-001",
-      statement: "deferred: requirements owner",
+      statement: `Availability and recovery: ${availabilityRecovery}`,
       priority: "must",
-      status: "deferred",
-      source: "recorded-input:requirements",
+      status: availabilityRecovery === "unknown" ? "unknown" : "deferred",
+      source: "intake:availability-recovery",
     });
   }
 });
