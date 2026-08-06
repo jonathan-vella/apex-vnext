@@ -58,10 +58,32 @@ export function validateInputAnswers(questions: QuestionV1[], submitted: InputAn
   }
   return questions.map((question) => {
     const value = answers.get(question.id)!;
-    if (question.multiSelect === true ? !Array.isArray(value) : typeof value !== "string") {
+    if (question.valueType !== undefined) {
+      if (isDeferredOrUnknown(value)) return { questionId: question.id, value };
+      if (question.valueType === "environment-set") {
+        if (!Array.isArray(value) || value.some((item) => !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(item))) {
+          throw new Error(`Answer shape does not match question: ${question.id}`);
+        }
+        if (question.options !== undefined && value.some((item) => !question.options!.includes(item))) {
+          throw new Error(`Answer is not a declared option: ${question.id}`);
+        }
+        return {
+          questionId: question.id,
+          value: question.options === undefined ? value : question.options.filter((option) => value.includes(option)),
+        };
+      }
+      if (typeof value !== "object" || value === null || Array.isArray(value) || value.kind !== question.valueType) {
+        throw new Error(`Answer shape does not match question: ${question.id}`);
+      }
+      return { questionId: question.id, value };
+    }
+    if (
+      (question.multiSelect === true ? !Array.isArray(value) : typeof value !== "string") ||
+      (typeof value !== "string" && !Array.isArray(value))
+    ) {
       throw new Error(`Answer shape does not match question: ${question.id}`);
     }
-    const selected = Array.isArray(value) ? value : [value];
+    const selected: string[] = Array.isArray(value) ? value : [value];
     if (selected.some((item) => item.trim().length === 0 || /^(?:none|n\/a)$/iu.test(item.trim()))) {
       throw new Error(`Answer must be explicitly provided or deferred: ${question.id}`);
     }
@@ -78,6 +100,15 @@ export function validateInputAnswers(questions: QuestionV1[], submitted: InputAn
           : value,
     };
   });
+}
+
+function isDeferredOrUnknown(value: InputAnswerV1["value"]): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (value.kind === "deferred" || value.kind === "unknown")
+  );
 }
 
 export type { ProjectId, RunId };

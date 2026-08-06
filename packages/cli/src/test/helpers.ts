@@ -469,9 +469,22 @@ export async function nextTaskAfterInput(service: ApexService) {
       requestId: next.request.requestId,
       expectedHead: next.request.expectedHead,
       ownerEpoch: next.request.ownerEpoch,
-      answers: next.request.questions.map(({ id, multiSelect, options }) => ({
+      answers: next.request.questions.map(({ id, multiSelect, options, valueType }) => ({
         questionId: id,
-        value: options === undefined ? `test-${id}` : multiSelect === true ? [options[0]!] : options[0]!,
+        value:
+          valueType === "budget"
+            ? { kind: "budget" as const, amount: 250, currency: "USD", cadence: "monthly" as const }
+            : valueType === "recovery"
+              ? { kind: "recovery" as const, rtoMinutes: 60, rpoMinutes: 15 }
+              : valueType === "data-classification"
+                ? { kind: "data-classification" as const, classification: "internal" as const }
+                : valueType === "compliance"
+                  ? { kind: "compliance" as const, scopes: ["gdpr"] }
+                  : options === undefined
+                    ? `test-${id}`
+                    : multiSelect === true
+                      ? [options[0]!]
+                      : options[0]!,
       })),
     });
     next = await service.nextTask();

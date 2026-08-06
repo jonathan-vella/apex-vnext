@@ -815,6 +815,18 @@ describe("target family contracts", () => {
     );
     assert.equal(Value.Check(InputSubmissionV1Schema, { ...request, answers: [] }), false);
     assert.equal(
+      Value.Check(InputSubmissionV1Schema, {
+        schemaVersion: CONTRACT_VERSION,
+        requestId: request.requestId,
+        expectedHead: request.expectedHead,
+        ownerEpoch: request.ownerEpoch,
+        answers: [
+          { questionId: "budget", value: { kind: "budget", amount: 250, currency: "USD", cadence: "monthly" } },
+        ],
+      }),
+      true,
+    );
+    assert.equal(
       hasValidInputRequestQuestions([
         { id: "one", prompt: "One?" },
         { id: "two", prompt: "Two?", options: ["a", "b"], multiSelect: true },
