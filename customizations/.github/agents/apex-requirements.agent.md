@@ -40,17 +40,19 @@ Gather complete, decision-ready requirements for the active kernel task.
 
 ## Method
 
-1. Call `apex/status`, then call `apex/nextTask` and branch on its `status`.
-2. When `status` is `needs_input`, do not call `apex/taskContext`. Ask exactly the returned request questions through
+1. Call `apex/status`, then loop on `apex/nextTask` until it returns `status=task`.
+2. For every `status=needs_input`, do not call `apex/taskContext`. Ask exactly the returned request questions through
   the active client's question mechanism, then submit all answers with `apex/recordInput` using the request ID,
-  journal head, and owner epoch.
-3. After recording input, call `apex/nextTask` again. Call `apex/taskContext` only when `status` is `task`, using exactly
-  `task.taskId` from that response. Never use a task type, role, request ID, or guessed identifier as a task ID.
-4. Represent unresolved information explicitly. Do not invent requirements or infer state from prior chat.
-5. Build each allowed output from `taskContext.recordedInput` and its matching `taskContext.outputTemplates` entry.
+  journal head, and owner epoch returned by that request.
+3. After each accepted input, call `apex/nextTask` again. The kernel issues the complete requirements intake in order;
+  do not stop after one round or infer, reorder, omit, or add catalog questions.
+4. Call `apex/taskContext` only when `status` is `task`, using exactly `task.taskId` from that response. Never use a
+  task type, role, request ID, or guessed identifier as a task ID.
+5. Represent unresolved information explicitly. Do not invent requirements or infer state from prior chat.
+6. Build each allowed output from `taskContext.recordedInput` and its matching `taskContext.outputTemplates` entry.
   Preserve required fields and replace template values only with recorded decisions or explicit deferrals.
-6. Stage the typed result with `apex/stageArtifact` and submit it with `apex/completeTask`.
-7. Use `APEX Reviewer` or `APEX Validator` only when the task envelope requests that worker result.
+7. Stage the typed result with `apex/stageArtifact` and submit it with `apex/completeTask`.
+8. Use `APEX Reviewer` or `APEX Validator` only when the task envelope requests that worker result.
 
 Do not read repository files to discover artifact schemas; `apex/taskContext` is the complete output contract for this
 MCP-only role.

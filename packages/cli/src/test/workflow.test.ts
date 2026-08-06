@@ -19,6 +19,22 @@ import {
   workloadDecisionManifest,
 } from "./helpers.js";
 
+async function recordRequirementsRound(
+  service: ApexService,
+  answers: Record<string, string | string[]>,
+): Promise<void> {
+  const pending = await service.nextTask();
+  assert.equal(pending.status, "needs_input");
+  if (pending.status !== "needs_input") return;
+  await service.recordInput({
+    schemaVersion: "1.0.0",
+    requestId: pending.request.requestId,
+    expectedHead: pending.request.expectedHead,
+    ownerEpoch: pending.request.ownerEpoch,
+    answers: pending.request.questions.map(({ id }) => ({ questionId: id, value: answers[id]! })),
+  });
+}
+
 test("full requirements to fake deploy workflow survives restart", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
@@ -92,6 +108,34 @@ test("requirements task remains blocked until pending input is recorded", async 
     service.taskContext("../requirements"),
     (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
   );
+});
+
+test("requirements intake issues four rounds before the requirements task", async () => {
+  const service = new ApexService(await tempRoot());
+  await service.init({ projectId: "demo" });
+  const rounds = ["business-discovery", "workload-pattern", "service-preferences", "security-compliance"];
+
+  for (const [index, round] of rounds.entries()) {
+    const pending = await service.nextTask();
+    assert.equal(pending.status, "needs_input");
+    if (pending.status !== "needs_input") return;
+    assert.deepEqual(pending.request.intake, { round, ordinal: index + 1, total: 4 });
+    await service.recordInput({
+      schemaVersion: "1.0.0",
+      requestId: pending.request.requestId,
+      expectedHead: pending.request.expectedHead,
+      ownerEpoch: pending.request.ownerEpoch,
+      answers: pending.request.questions.map(({ id, multiSelect, options }) => ({
+        questionId: id,
+        value: options === undefined ? `test-${id}` : multiSelect === true ? [options[0]!] : options[0]!,
+      })),
+    });
+    if (index < rounds.length - 1) assert.equal((await service.nextTask()).status, "needs_input");
+  }
+
+  const issued = await service.nextTask();
+  assert.equal(issued.status, "task");
+  if (issued.status === "task") assert.equal(issued.task.taskType, "requirements");
 });
 
 test("render requirements reads the accepted requirements artifact", async () => {
@@ -172,7 +216,9 @@ test("typed input recording rejects premature, stale, malformed, duplicate, and 
     ownerEpoch: pending.request.ownerEpoch,
     answers: [
       { questionId: "workload", value: "demo" },
-      { questionId: "requirements", value: "secure and bounded" },
+      { questionId: "industry", value: "software" },
+      { questionId: "delivery-scenario", value: "greenfield" },
+      { questionId: "target-environments", value: ["dev"] },
     ],
   };
   await assert.rejects(
@@ -191,15 +237,15 @@ test("typed input recording rejects premature, stale, malformed, duplicate, and 
     service.recordInput({ ...valid, answers: [valid.answers[0]!, valid.answers[0]!] }),
     (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
   );
-  for (const value of ["", "none", "N/A"]) {
-    await assert.rejects(
-      service.recordInput({
-        ...valid,
-        answers: [valid.answers[0]!, { questionId: "requirements", value }],
-      }),
-      (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
-    );
-  }
+  await assert.rejects(
+    service.recordInput({
+      ...valid,
+      answers: valid.answers.map((answer) =>
+        answer.questionId === "delivery-scenario" ? { ...answer, value: "invalid-scenario" } : answer,
+      ),
+    }),
+    (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
+  );
   const recorded = await service.recordInput(valid);
   assert.deepEqual(recorded, { recorded: true, requestId: pending.request.requestId });
   await assert.rejects(
@@ -217,14 +263,59 @@ test("typed input recording rejects premature, stale, malformed, duplicate, and 
 test("requirements task context includes recorded input and stageable output templates", async () => {
   const service = new ApexService(await tempRoot());
   await service.init({ projectId: "demo" });
-  await service.recordRequirementsInput({ workload: "ecommerce", requirements: "99.9% availability; PCI DSS" });
+  await recordRequirementsRound(service, {
+    workload: "ecommerce",
+    industry: "retail",
+    "delivery-scenario": "greenfield",
+    "target-environments": ["dev"],
+  });
+  await recordRequirementsRound(service, {
+    "workload-pattern": "web-api",
+    scale: "100 concurrent users",
+    budget: "500 USD monthly",
+    "data-sensitivity": "PCI DSS",
+    "iac-preference": "bicep",
+  });
+  await recordRequirementsRound(service, {
+    "retained-services": "No services must be retained",
+    "prohibited-services": "No services are prohibited",
+    "service-preferences": "managed services",
+    "sku-preferences": "no preference",
+    "environment-overrides": "No environment-specific overrides",
+  });
+  await recordRequirementsRound(service, {
+    compliance: "PCI DSS",
+    "security-controls": "managed identities",
+    authentication: "Microsoft Entra ID",
+    region: "swedencentral",
+    "availability-recovery": "99.9% availability; RTO 60 minutes; RPO 15 minutes",
+    operations: "central monitoring",
+  });
   const issued = await service.nextTask();
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
   const context = await service.taskContext(issued.task.taskId);
   assert.deepEqual(context.recordedInput, {
     workload: "ecommerce",
-    requirements: "99.9% availability; PCI DSS",
+    industry: "retail",
+    "delivery-scenario": "greenfield",
+    "target-environments": ["dev"],
+    "workload-pattern": "web-api",
+    scale: "100 concurrent users",
+    budget: "500 USD monthly",
+    "data-sensitivity": "PCI DSS",
+    "iac-preference": "bicep",
+    "retained-services": "No services must be retained",
+    "prohibited-services": "No services are prohibited",
+    "service-preferences": "managed services",
+    "sku-preferences": "no preference",
+    "environment-overrides": "No environment-specific overrides",
+    compliance: "PCI DSS",
+    "security-controls": "managed identities",
+    authentication: "Microsoft Entra ID",
+    region: "swedencentral",
+    "availability-recovery": "99.9% availability; RTO 60 minutes; RPO 15 minutes",
+    operations: "central monitoring",
   });
   assert.equal(context.inputs.length, 0);
   assert.deepEqual(context.outputTemplates.requirements, {
@@ -235,9 +326,9 @@ test("requirements task context includes recorded input and stageable output tem
     requirements: [
       {
         id: "REQ-001",
-        statement: "99.9% availability; PCI DSS",
+        statement: "deferred: requirements owner",
         priority: "must",
-        status: "confirmed",
+        status: "deferred",
         source: "recorded-input:requirements",
       },
     ],
@@ -361,14 +452,38 @@ test("plan task context projects source hashes and valid output templates", asyn
   });
 });
 
-test("requirements template preserves explicit unresolved status", async () => {
-  for (const [requirements, status] of [
-    ["deferred: product owner", "deferred"],
-    ["unknown", "unknown"],
-  ] as const) {
+test("requirements intake preserves explicit unresolved answers", async () => {
+  for (const availabilityRecovery of ["deferred: product owner", "unknown"] as const) {
     const service = new ApexService(await tempRoot());
-    await service.init({ projectId: `demo-${status}` });
-    await service.recordRequirementsInput({ workload: "ecommerce", requirements });
+    await service.init({ projectId: "demo" });
+    await recordRequirementsRound(service, {
+      workload: "ecommerce",
+      industry: "retail",
+      "delivery-scenario": "greenfield",
+      "target-environments": ["dev"],
+    });
+    await recordRequirementsRound(service, {
+      "workload-pattern": "web-api",
+      scale: "100 concurrent users",
+      budget: "500 USD monthly",
+      "data-sensitivity": "internal",
+      "iac-preference": "bicep",
+    });
+    await recordRequirementsRound(service, {
+      "retained-services": "No services must be retained",
+      "prohibited-services": "No services are prohibited",
+      "service-preferences": "managed services",
+      "sku-preferences": "no preference",
+      "environment-overrides": "No environment-specific overrides",
+    });
+    await recordRequirementsRound(service, {
+      compliance: "No compliance requirements identified",
+      "security-controls": "managed identities",
+      authentication: "Microsoft Entra ID",
+      region: "swedencentral",
+      "availability-recovery": availabilityRecovery,
+      operations: "central monitoring",
+    });
     const issued = await service.nextTask();
     assert.equal(issued.status, "task");
     if (issued.status !== "task") continue;
@@ -376,11 +491,12 @@ test("requirements template preserves explicit unresolved status", async () => {
     const template = context.outputTemplates.requirements as {
       requirements: Array<{ statement: string; status: string }>;
     };
+    assert.equal((context.recordedInput as Record<string, string>)["availability-recovery"], availabilityRecovery);
     assert.deepEqual(template.requirements[0], {
       id: "REQ-001",
-      statement: requirements,
+      statement: "deferred: requirements owner",
       priority: "must",
-      status,
+      status: "deferred",
       source: "recorded-input:requirements",
     });
   }
@@ -414,12 +530,15 @@ test("pending input is reissued after writer transfer", async () => {
     requestId: after.request.requestId,
     expectedHead: after.request.expectedHead,
     ownerEpoch: after.request.ownerEpoch,
-    answers: after.request.questions.map(({ id }) => ({ questionId: id, value: id })),
+    answers: after.request.questions.map(({ id, multiSelect, options }) => ({
+      questionId: id,
+      value: options === undefined ? id : multiSelect === true ? [options[0]!] : options[0]!,
+    })),
   });
-  assert.equal((await service.nextTask()).status, "task");
+  assert.equal((await service.nextTask()).status, "needs_input");
 });
 
-test("compatibility input requires every declared field and journals no unrelated values", async () => {
+test("compatibility input rejects legacy answers without recording unrelated values", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
   await service.init({ projectId: "demo" });
@@ -427,16 +546,14 @@ test("compatibility input requires every declared field and journals no unrelate
     service.recordRequirementsInput({ workload: "demo", secretToken: "do-not-journal" }),
     (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
   );
-  await service.recordRequirementsInput({
-    workload: "demo",
-    requirements: "bounded",
-    secretToken: "do-not-journal",
-  });
+  await assert.rejects(
+    service.recordRequirementsInput({ workload: "demo", requirements: "bounded", secretToken: "do-not-journal" }),
+    (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
+  );
   const events = await new EventJournal(
     join(root, ".apex", "projects", "demo", "runs", (await service.status()).run.runId, "journal"),
   ).replay();
-  const recorded = events.find((event) => event.type === "requirements.input-recorded");
-  assert.equal(JSON.stringify(recorded?.payload).includes("do-not-journal"), false);
+  assert.equal(events.some((event) => event.type === "requirements.input-recorded"), false);
 });
 
 test("concurrent input submissions return only stable Apex errors", async () => {
@@ -450,7 +567,10 @@ test("concurrent input submissions return only stable Apex errors", async () => 
     requestId: pending.request.requestId,
     expectedHead: pending.request.expectedHead,
     ownerEpoch: pending.request.ownerEpoch,
-    answers: pending.request.questions.map(({ id }) => ({ questionId: id, value: id })),
+    answers: pending.request.questions.map(({ id, multiSelect, options }) => ({
+      questionId: id,
+      value: options === undefined ? id : multiSelect === true ? [options[0]!] : options[0]!,
+    })),
   };
   const results = await Promise.allSettled([service.recordInput(submission), service.recordInput(submission)]);
   assert.equal(results.filter(({ status }) => status === "fulfilled").length, 1);
@@ -478,7 +598,7 @@ test("malformed persisted input requests fail closed", async () => {
     expectedHead: await journal.head(),
     payload: { requestId: "", questions: [] },
   });
-  await assert.rejects(service.nextTask(), /Persisted input request is invalid/u);
+  await assert.rejects(service.nextTask(), /Requirements intake is incompatible/u);
 });
 
 test("a task remains current across stage then complete", async () => {
