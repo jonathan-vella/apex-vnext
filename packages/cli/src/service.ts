@@ -2651,9 +2651,18 @@ export class ApexService {
     );
     const latest = requests.at(-1);
     if (latest !== undefined && !recordedRequestIds.has((latest.payload as { requestId: string }).requestId)) {
-      const intake = (latest.payload as { intake: object }).intake;
-      const ordinal = (intake as { ordinal?: unknown }).ordinal;
-      return typeof ordinal === "number" ? REQUIREMENTS_INTAKE[ordinal - 1] : undefined;
+      const intake = (latest.payload as { intake: { ordinal?: unknown; round?: unknown; total?: unknown } }).intake;
+      const ordinal = intake.ordinal;
+      const round =
+        typeof ordinal === "number" && Number.isInteger(ordinal) ? REQUIREMENTS_INTAKE[ordinal - 1] : undefined;
+      if (round === undefined || intake.round !== round.round || intake.total !== REQUIREMENTS_INTAKE.length) {
+        throw new ApexError(
+          "APEX_CONFLICT",
+          "Requirements intake is incompatible; start a new run",
+          EXIT_CODES.conflict,
+        );
+      }
+      return round;
     }
     return REQUIREMENTS_INTAKE[recordedRequestIds.size];
   }
