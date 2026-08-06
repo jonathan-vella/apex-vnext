@@ -256,6 +256,32 @@ test("render requirements reads the accepted requirements artifact", async () =>
   assert.match(await service.render("requirements"), /offline service/u);
 });
 
+test("requirements acceptance records a bound rendered document", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const initialized = await service.init({ projectId: "demo" });
+  const issued = await nextTaskAfterInput(service);
+  assert.equal(issued.status, "task");
+  if (issued.status !== "task") return;
+  const accepted = await service.completeTaskOutputs(issued.task.taskId, [
+    { kind: "requirements", value: requirements() },
+  ]);
+  const events = await new EventJournal(
+    join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"),
+  ).replay();
+  const completed = events.find((event) => event.type === "task.completed");
+  const document = (
+    completed?.payload as {
+      renderedDocuments?: Array<{ documentId: string; templateHash: string; outputHash: string }>;
+    }
+  ).renderedDocuments?.[0];
+  assert.deepEqual(document?.documentId, "requirements");
+  assert.match(document?.templateHash ?? "", /^[a-f0-9]{64}$/);
+  assert.match(document?.outputHash ?? "", /^[a-f0-9]{64}$/);
+  assert.match(await service.render("requirements"), /offline service/u);
+  assert.notEqual(document?.outputHash, accepted.outputHashes.requirements);
+});
+
 test("an initialized workspace can create and select independent projects", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
