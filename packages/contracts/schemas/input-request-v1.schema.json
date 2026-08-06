@@ -1,131 +1,242 @@
 {
   "$id": "https://schemas.apexops.dev/input-request-v1.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
-  "properties": {
-    "expectedHead": {
-      "pattern": "^[0-9a-f]{64}$",
-      "type": "string"
-    },
-    "intake": {
+  "anyOf": [
+    {
       "additionalProperties": false,
       "properties": {
-        "ordinal": {
-          "maximum": 4,
+        "expectedHead": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "intake": {
+          "additionalProperties": false,
+          "properties": {
+            "ordinal": {
+              "maximum": 4,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "round": {
+              "anyOf": [
+                {
+                  "const": "business-discovery",
+                  "type": "string"
+                },
+                {
+                  "const": "workload-pattern",
+                  "type": "string"
+                },
+                {
+                  "const": "service-preferences",
+                  "type": "string"
+                },
+                {
+                  "const": "security-compliance",
+                  "type": "string"
+                }
+              ]
+            },
+            "total": {
+              "const": 4,
+              "type": "number"
+            }
+          },
+          "required": [
+            "round",
+            "ordinal",
+            "total"
+          ],
+          "type": "object"
+        },
+        "ownerEpoch": {
           "minimum": 1,
           "type": "integer"
         },
-        "round": {
-          "anyOf": [
-            {
-              "const": "business-discovery",
-              "type": "string"
+        "questions": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "multiSelect": {
+                "type": "boolean"
+              },
+              "options": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "prompt": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "valueType": {
+                "anyOf": [
+                  {
+                    "const": "budget",
+                    "type": "string"
+                  },
+                  {
+                    "const": "recovery",
+                    "type": "string"
+                  },
+                  {
+                    "const": "environment-set",
+                    "type": "string"
+                  },
+                  {
+                    "const": "data-classification",
+                    "type": "string"
+                  },
+                  {
+                    "const": "compliance",
+                    "type": "string"
+                  }
+                ]
+              }
             },
-            {
-              "const": "workload-pattern",
-              "type": "string"
-            },
-            {
-              "const": "service-preferences",
-              "type": "string"
-            },
-            {
-              "const": "security-compliance",
-              "type": "string"
-            }
-          ]
+            "required": [
+              "id",
+              "prompt"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
         },
-        "total": {
-          "const": 4,
-          "type": "number"
+        "requestId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "1.0.0",
+          "type": "string"
         }
       },
       "required": [
-        "round",
-        "ordinal",
-        "total"
+        "schemaVersion",
+        "requestId",
+        "expectedHead",
+        "ownerEpoch",
+        "questions",
+        "intake"
       ],
       "type": "object"
     },
-    "ownerEpoch": {
-      "minimum": 1,
-      "type": "integer"
-    },
-    "questions": {
-      "items": {
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "multiSelect": {
-            "type": "boolean"
-          },
-          "options": {
-            "items": {
+    {
+      "additionalProperties": false,
+      "properties": {
+        "decision": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
               "minLength": 1,
               "type": "string"
             },
-            "minItems": 1,
-            "type": "array",
-            "uniqueItems": true
+            "taskId": {
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+              "type": "string"
+            }
           },
-          "prompt": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "valueType": {
-            "anyOf": [
-              {
-                "const": "budget",
-                "type": "string"
-              },
-              {
-                "const": "recovery",
-                "type": "string"
-              },
-              {
-                "const": "environment-set",
-                "type": "string"
-              },
-              {
-                "const": "data-classification",
-                "type": "string"
-              },
-              {
-                "const": "compliance",
-                "type": "string"
-              }
-            ]
-          }
+          "required": [
+            "taskId",
+            "id"
+          ],
+          "type": "object"
         },
-        "required": [
-          "id",
-          "prompt"
-        ],
-        "type": "object"
+        "expectedHead": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "ownerEpoch": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "questions": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "multiSelect": {
+                "type": "boolean"
+              },
+              "options": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "prompt": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "valueType": {
+                "anyOf": [
+                  {
+                    "const": "budget",
+                    "type": "string"
+                  },
+                  {
+                    "const": "recovery",
+                    "type": "string"
+                  },
+                  {
+                    "const": "environment-set",
+                    "type": "string"
+                  },
+                  {
+                    "const": "data-classification",
+                    "type": "string"
+                  },
+                  {
+                    "const": "compliance",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "prompt"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "requestId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "1.0.0",
+          "type": "string"
+        }
       },
-      "minItems": 1,
-      "type": "array",
-      "uniqueItems": true
-    },
-    "requestId": {
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
-      "type": "string"
-    },
-    "schemaVersion": {
-      "const": "1.0.0",
-      "type": "string"
+      "required": [
+        "schemaVersion",
+        "requestId",
+        "expectedHead",
+        "ownerEpoch",
+        "questions",
+        "decision"
+      ],
+      "type": "object"
     }
-  },
-  "required": [
-    "schemaVersion",
-    "requestId",
-    "expectedHead",
-    "ownerEpoch",
-    "intake",
-    "questions"
-  ],
-  "type": "object"
+  ]
 }

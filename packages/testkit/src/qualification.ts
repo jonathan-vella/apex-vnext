@@ -361,33 +361,41 @@ function restart(context: TrackContext): void {
 async function completeRequirementsIntake(service: ApexService, workload: string): Promise<void> {
   let next = await service.nextTask();
   while (next.status === "needs_input") {
-    await service.recordInput({
-      schemaVersion: "1.0.0",
-      requestId: next.request.requestId,
-      expectedHead: next.request.expectedHead,
-      ownerEpoch: next.request.ownerEpoch,
-      answers: next.request.questions.map(({ id, multiSelect, options, valueType }) => ({
-        questionId: id,
-        value:
-          id === "workload"
-            ? workload
-            : valueType === "budget"
-              ? { kind: "budget" as const, amount: 250, currency: "USD", cadence: "monthly" as const }
-              : valueType === "recovery"
-                ? { kind: "recovery" as const, rtoMinutes: 60, rpoMinutes: 15 }
-                : valueType === "data-classification"
-                  ? { kind: "data-classification" as const, classification: "internal" as const }
-                  : valueType === "compliance"
-                    ? { kind: "compliance" as const, scopes: ["gdpr"] }
-                    : options === undefined
-                      ? `qualification-${id}`
-                      : multiSelect === true
-                        ? [options[0]!]
-                        : options[0]!,
-      })),
-    });
+    await recordQualificationInput(service, next.request, workload);
     next = await service.nextTask();
   }
+}
+
+async function recordQualificationInput(
+  service: ApexService,
+  request: Extract<Awaited<ReturnType<ApexService["nextTask"]>>, { status: "needs_input" }>["request"],
+  workload = "qualification-workload",
+): Promise<void> {
+  await service.recordInput({
+    schemaVersion: "1.0.0",
+    requestId: request.requestId,
+    expectedHead: request.expectedHead,
+    ownerEpoch: request.ownerEpoch,
+    answers: request.questions.map(({ id, multiSelect, options, valueType }) => ({
+      questionId: id,
+      value:
+        id === "workload"
+          ? workload
+          : valueType === "budget"
+            ? { kind: "budget" as const, amount: 250, currency: "USD", cadence: "monthly" as const }
+            : valueType === "recovery"
+              ? { kind: "recovery" as const, rtoMinutes: 60, rpoMinutes: 15 }
+              : valueType === "data-classification"
+                ? { kind: "data-classification" as const, classification: "internal" as const }
+                : valueType === "compliance"
+                  ? { kind: "compliance" as const, scopes: ["gdpr"] }
+                  : options === undefined
+                    ? `qualification-${id}`
+                    : multiSelect === true
+                      ? [options[0]!]
+                      : options[0]!,
+    })),
+  });
 }
 
 async function completeCreativeWorkflow(context: TrackContext): Promise<void> {
@@ -470,11 +478,12 @@ async function complete(
   expected: string,
   outputs: TaskOutput[],
 ): Promise<Partial<Record<TaskOutput["kind"], string>>> {
-  const issued = await context.service.nextTask();
-  if (issued.status !== "task" || issued.task.taskType !== expected)
-    throw new Error(
-      `Expected ${expected}, received ${issued.status === "task" ? issued.task.taskType : issued.status}`,
-    );
+  let issued = await context.service.nextTask();
+  while (issued.status === "needs_input") {
+    await recordQualificationInput(context.service, issued.request);
+    issued = await context.service.nextTask();
+  }
+  if (issued.task.taskType !== expected) throw new Error(`Expected ${expected}, received ${issued.task.taskType}`);
   const projection = await context.service.taskContext(issued.task.taskId);
   context.taskContextBytes.push(Buffer.byteLength(JSON.stringify(projection), "utf8"));
   return (await context.service.completeTaskOutputs(issued.task.taskId, outputs)).outputHashes;

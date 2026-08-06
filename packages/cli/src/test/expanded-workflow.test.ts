@@ -1236,7 +1236,8 @@ test("review blockers persist, resolve, and permit gate approval", async () => {
   });
   assert.equal((await restarted.status()).run.gates[0]?.state, "open");
   await restarted.decideGateNumber(1, "approved", "tester");
-  assert.equal((await restarted.nextTask()).status, "task");
+  await acceptAvailabilityEvidence(restarted, runId);
+  assert.equal((await nextTaskAfterInput(restarted)).status, "task");
 });
 
 test("expired accepted risk can be replaced without reopening an open gate", async () => {
