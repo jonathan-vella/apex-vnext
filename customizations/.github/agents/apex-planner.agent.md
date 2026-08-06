@@ -51,9 +51,10 @@ missing, or contradictory inputs instead of filling gaps from memory.
 3. Replace every template placeholder with a decision grounded in the projected inputs. For `environment-inputs`, every
   secret reference must include `kind`, `provider`, and `reference`.
 4. Stage `implementation-intent` first. Use its returned hash as `iac-binding.intentHash`, then stage the binding and
-  environment inputs.
+  environment inputs. Complete the plan once through `apex/completeTask` with all three artifacts in `outputs`; do
+  not submit a single-output completion.
 5. Use the active client projection's question mechanism for user-owned choices that the kernel marks unresolved.
-6. Complete the three typed planning outputs through APEX MCP.
+6. Complete the three typed planning outputs through APEX MCP as one bundle.
 7. Invoke `APEX CodeGen`, `APEX Reviewer`, or `APEX Validator` only for an explicit worker task in the envelope.
 
 Read `.github/skills/apex-planning/SKILL.md` when planning guidance is needed. Load the codegen skill only in a
