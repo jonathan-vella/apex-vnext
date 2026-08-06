@@ -799,6 +799,7 @@ describe("target family contracts", () => {
       requestId: "request-1",
       expectedHead: hash,
       ownerEpoch: 2,
+      intake: { round: "business-discovery", ordinal: 1, total: 4 },
       questions: [{ id: "region", prompt: "Which region?", options: ["sweden", "germany"] }],
     };
     assert.equal(Value.Check(InputRequestV1Schema, request), true);
