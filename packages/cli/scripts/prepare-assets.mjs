@@ -234,12 +234,16 @@ export function validateBundleDeclarations(customizationManifest, runtimeBundle)
 
 export function validateClientProjectionDeclarations(customizationManifest) {
   const sharedFiles = customizationManifest.sharedFiles;
+  const sharedDirectories = customizationManifest.sharedDirectories ?? [];
   const clientProjections = customizationManifest.clientProjections;
   const roles = customizationManifest.roles;
   if (
     !Array.isArray(sharedFiles) ||
     sharedFiles.some((path) => typeof path !== "string") ||
     sharedFiles.length !== new Set(sharedFiles).size ||
+    !Array.isArray(sharedDirectories) ||
+    sharedDirectories.some((path) => typeof path !== "string" || !safeRelativePath(path)) ||
+    sharedDirectories.length !== new Set(sharedDirectories).size ||
     !Array.isArray(clientProjections) ||
     clientProjections.some(
       (projection) =>
@@ -273,7 +277,7 @@ export function validateClientProjectionDeclarations(customizationManifest) {
   ) {
     throw new Error("Client projection declarations are invalid");
   }
-  return { sharedFiles, clientProjections, roles };
+  return { sharedFiles, sharedDirectories, clientProjections, roles };
 }
 
 export function roleSupportsClient(role, clientId) {
@@ -334,7 +338,8 @@ function validateCliToolInventory(value) {
 }
 
 async function prepareClientProjections(customizationManifest, pinnedCustomizations, inventory) {
-  const { sharedFiles, clientProjections, roles } = validateClientProjectionDeclarations(customizationManifest);
+  const { sharedFiles, sharedDirectories, clientProjections, roles } =
+    validateClientProjectionDeclarations(customizationManifest);
   const toolInventoryPath = join(repositoryRoot, "tools", "registry", "copilot-cli-agent-tools.json");
   const toolInventory = validateCliToolInventory(JSON.parse(await readFile(toolInventoryPath, "utf8")));
   const metadataDestination = join(assetsRoot, "client-projection-metadata", "copilot-cli-agent-tools.json");
@@ -352,10 +357,22 @@ async function prepareClientProjections(customizationManifest, pinnedCustomizati
     bytes: metadataBytes.byteLength,
   });
 
+  const sharedDirectoryFiles = [];
+  for (const directory of sharedDirectories) {
+    const sourceDirectory = join(repositoryRoot, "customizations", directory);
+    const metadata = await lstat(sourceDirectory, { bigint: true });
+    if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
+      throw new Error(`Shared client projection directory is invalid: ${directory}`);
+    }
+    for (const file of await walkFiles(sourceDirectory, sourceDirectory, { dev: metadata.dev, ino: metadata.ino })) {
+      sharedDirectoryFiles.push(portablePath(join(directory, relative(sourceDirectory, file.path))));
+    }
+  }
+
   for (const projection of clientProjections) {
     const generatedRoot = join(assetsRoot, projection.generatedRoot);
     assertContained(assetsRoot, generatedRoot);
-    const sources = [...sharedFiles, ...projection.files];
+    const sources = [...new Set([...sharedFiles, ...sharedDirectoryFiles, ...projection.files])];
     for (const relativePath of sources) {
       const bytes = await readSourceFile(
         pinnedCustomizations.resolvedRoot,
