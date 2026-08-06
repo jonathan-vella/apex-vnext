@@ -1469,12 +1469,13 @@ export class ApexService {
       "utf8",
     );
     const templateHash = sha256Bytes(Buffer.from(template, "utf8"));
+    const markdownCell = (text: string) => text.replaceAll("|", "\\|").replaceAll(/\r?\n/gu, "<br>");
     const requirementsTable = [
       "| ID | Priority | Status | Statement | Source |",
       "| --- | --- | --- | --- | --- |",
       ...requirements.requirements.map(
         ({ id, priority, status, statement, source }) =>
-          `| ${id} | ${priority} | ${status} | ${statement} | ${source} |`,
+          `| ${markdownCell(id)} | ${markdownCell(priority)} | ${markdownCell(status)} | ${markdownCell(statement)} | ${markdownCell(source)} |`,
       ),
     ].join("\n");
     const replace = (token: string, replacement: string) => template.replaceAll(`{${token}}`, replacement);
@@ -1494,7 +1495,17 @@ export class ApexService {
         "{unknowns-list}",
         requirements.unknowns.length === 0 ? "None." : requirements.unknowns.map((item) => `- ${item}`).join("\n"),
       );
-    if (/\{[a-z-]+\}/u.test(document)) {
+    const unresolvedSlots = [
+      "workload",
+      "artifact-hash",
+      "template-hash",
+      "environment",
+      "artifact-status",
+      "requirements-table",
+      "assumptions-list",
+      "unknowns-list",
+    ].filter((slot) => document.includes(`{${slot}}`));
+    if (unresolvedSlots.length > 0) {
       throw new ApexError("APEX_INTERNAL", "Requirements document template has unresolved slots", EXIT_CODES.internal);
     }
     return {
