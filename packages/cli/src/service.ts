@@ -1015,8 +1015,14 @@ export class ApexService {
     if (route.task === undefined)
       throw new ApexError("APEX_NOT_FOUND", "No task is currently available", EXIT_CODES.notFound);
     if (route.task.id === "architecture") {
-      const decision = this.architectureDecisionState(events);
+      const decision = this.architectureDecisionState(events, run.ownerEpoch);
       if (decision.pending !== undefined) return { status: "needs_input", request: decision.pending };
+      if (decision.staleTaskId !== undefined) {
+        return {
+          status: "needs_input",
+          request: await this.issueArchitectureDecision(run, await this.readTask(run, decision.staleTaskId)),
+        };
+      }
       if (decision.taskId !== undefined) {
         const task = await this.readTask(run, decision.taskId);
         if (task.expectedHead === events.at(-1)?.hash && task.ownerEpoch === run.ownerEpoch) {
@@ -1047,7 +1053,9 @@ export class ApexService {
     const events = await this.journal(run).replay();
     const requested = [...events]
       .reverse()
-      .find((event) => event.type === "requirements.input-requested" || event.type === "architecture.decision-requested");
+      .find(
+        (event) => event.type === "requirements.input-requested" || event.type === "architecture.decision-requested",
+      );
     if (requested === undefined) {
       throw new ApexError("APEX_CONFLICT", "No input request is pending", EXIT_CODES.conflict);
     }
@@ -1056,12 +1064,13 @@ export class ApexService {
         ? this.inputRequest(requested, run.ownerEpoch)
         : this.architectureDecisionRequest(requested, run.ownerEpoch);
     const recordedType =
-      requested.type === "requirements.input-requested" ? "requirements.input-recorded" : "architecture.decision-recorded";
+      requested.type === "requirements.input-requested"
+        ? "requirements.input-recorded"
+        : "architecture.decision-recorded";
     if (
       events.some(
         (event) =>
-          event.type === recordedType &&
-          (event.payload as { requestId?: unknown }).requestId === request.requestId,
+          event.type === recordedType && (event.payload as { requestId?: unknown }).requestId === request.requestId,
       )
     ) {
       throw new ApexError("APEX_CONFLICT", "Input request was already recorded", EXIT_CODES.conflict);
@@ -1091,13 +1100,13 @@ export class ApexService {
         recordedType,
         {
           requestId: request.requestId,
-          ...(request.intake === undefined ? {} : { intake: request.intake }),
-          ...(request.decision === undefined ? {} : { decision: request.decision }),
+          ...("intake" in request ? { intake: request.intake } : { decision: request.decision }),
           answers: normalizedAnswers,
         },
         request.expectedHead,
       );
-      if (request.decision !== undefined) await this.refreshTaskHead(run, await this.readTask(run, request.decision.taskId));
+      if (request.decision !== undefined)
+        await this.refreshTaskHead(run, await this.readTask(run, request.decision.taskId));
     } catch (error) {
       if (error instanceof Error && /stale journal head|mutation is already in progress/i.test(error.message)) {
         throw new ApexError("APEX_STALE", "Input request journal head is stale", EXIT_CODES.stale, undefined, error);
@@ -2715,9 +2724,13 @@ export class ApexService {
     return request;
   }
 
-  private architectureDecisionState(events: Awaited<ReturnType<EventJournal["replay"]>>): {
+  private architectureDecisionState(
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+    ownerEpoch: number,
+  ): {
     pending?: InputRequestV1;
     taskId?: string;
+    staleTaskId?: string;
   } {
     const requested = [...events].reverse().find((event) => event.type === "architecture.decision-requested");
     if (requested === undefined) return {};
@@ -2727,7 +2740,11 @@ export class ApexService {
         event.type === "architecture.decision-recorded" &&
         (event.payload as { requestId?: unknown }).requestId === request.requestId,
     );
-    return recorded ? { taskId: request.decision!.taskId } : { pending: request };
+    if (recorded) return { taskId: request.decision!.taskId };
+    if (request.expectedHead !== events.at(-1)?.hash || request.ownerEpoch !== ownerEpoch) {
+      return { staleTaskId: request.decision!.taskId };
+    }
+    return { pending: request };
   }
 
   private architectureDecisionValues(
@@ -2738,7 +2755,11 @@ export class ApexService {
     for (const event of events) {
       if (event.type !== "architecture.decision-recorded") continue;
       const payload = event.payload as { decision?: { taskId?: unknown; id?: unknown }; answers?: unknown };
-      if (payload.decision?.taskId !== taskId || typeof payload.decision.id !== "string" || !Array.isArray(payload.answers)) {
+      if (
+        payload.decision?.taskId !== taskId ||
+        typeof payload.decision.id !== "string" ||
+        !Array.isArray(payload.answers)
+      ) {
         continue;
       }
       for (const answer of payload.answers) {

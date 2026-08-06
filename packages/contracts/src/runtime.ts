@@ -205,17 +205,23 @@ export const ArchitectureDecisionV1Schema = Type.Object(
   { additionalProperties: false },
 );
 
-export const InputRequestV1Schema = Type.Object(
-  {
-    schemaVersion: ContractVersionSchema,
-    requestId: TaskIdSchema,
-    expectedHead: Sha256Schema,
-    ownerEpoch: Type.Integer({ minimum: 1 }),
-    intake: Type.Optional(RequirementsIntakeV1Schema),
-    decision: Type.Optional(ArchitectureDecisionV1Schema),
-    questions: Type.Array(QuestionV1Schema, { minItems: 1, uniqueItems: true }),
-  },
-  { $id: "https://schemas.apexops.dev/input-request-v1.json", additionalProperties: false },
+const InputRequestBaseV1Schema = {
+  schemaVersion: ContractVersionSchema,
+  requestId: TaskIdSchema,
+  expectedHead: Sha256Schema,
+  ownerEpoch: Type.Integer({ minimum: 1 }),
+  questions: Type.Array(QuestionV1Schema, { minItems: 1, uniqueItems: true }),
+};
+
+export const InputRequestV1Schema = Type.Union(
+  [
+    Type.Object({ ...InputRequestBaseV1Schema, intake: RequirementsIntakeV1Schema }, { additionalProperties: false }),
+    Type.Object(
+      { ...InputRequestBaseV1Schema, decision: ArchitectureDecisionV1Schema },
+      { additionalProperties: false },
+    ),
+  ],
+  { $id: "https://schemas.apexops.dev/input-request-v1.json" },
 );
 
 export const InputAnswerV1Schema = Type.Object(
@@ -300,7 +306,10 @@ export type InputValueV1 = Static<typeof InputValueV1Schema>;
 export type RequirementsIntakeRoundV1 = Static<typeof RequirementsIntakeRoundV1Schema>;
 export type RequirementsIntakeV1 = Static<typeof RequirementsIntakeV1Schema>;
 export type ArchitectureDecisionV1 = Static<typeof ArchitectureDecisionV1Schema>;
-export type InputRequestV1 = Static<typeof InputRequestV1Schema>;
+export type InputRequestV1 = Static<typeof InputRequestV1Schema> & {
+  intake?: RequirementsIntakeV1;
+  decision?: ArchitectureDecisionV1;
+};
 export type InputAnswerV1 = Static<typeof InputAnswerV1Schema>;
 export type InputSubmissionV1 = Static<typeof InputSubmissionV1Schema>;
 
