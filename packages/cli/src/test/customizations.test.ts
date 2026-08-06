@@ -47,6 +47,14 @@ test("init installs bundled customizations and runtime config by default", async
   assert.match(coordinatorAgent, /name: APEX/u);
   assert.match(coordinatorAgent, /target: vscode/u);
   assert.match(await readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"), /target: vscode/u);
+  assert.match(
+    await readFile(join(root, ".github", "skills", "apex-artifacts", "SKILL.md"), "utf8"),
+    /APEX Artifact Presentations/u,
+  );
+  assert.match(
+    await readFile(join(root, ".github", "skills", "apex-artifacts", "templates", "requirements.md"), "utf8"),
+    /Derived from accepted APEX requirements artifact/u,
+  );
   assert.deepEqual(JSON.parse(await readFile(join(root, ".vscode", "mcp.json"), "utf8")), {
     servers: {
       apex: {
@@ -123,6 +131,14 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(requirementsAgent, /- ask_user/u);
   assert.match(requirementsAgent, /- task/u);
   assert.doesNotMatch(requirementsAgent, /vscode\/askQuestions|handoffs:|agents:/u);
+  assert.match(
+    await readFile(join(root, ".github", "skills", "apex-artifacts", "SKILL.md"), "utf8"),
+    /APEX Artifact Presentations/u,
+  );
+  assert.match(
+    await readFile(join(root, ".github", "skills", "apex-artifacts", "templates", "requirements.md"), "utf8"),
+    /Derived from accepted APEX requirements artifact/u,
+  );
   for (const worker of ["apex-codegen.agent.md", "apex-reviewer.agent.md", "apex-validator.agent.md"]) {
     await assert.rejects(readFile(join(root, ".github", "agents", worker), "utf8"), /ENOENT/u);
   }

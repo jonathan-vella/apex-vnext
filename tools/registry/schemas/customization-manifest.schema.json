@@ -21,6 +21,7 @@
     },
     "managedFiles": { "$ref": "#/$defs/uniquePaths" },
     "sharedFiles": { "$ref": "#/$defs/uniquePaths" },
+    "sharedDirectories": { "$ref": "#/$defs/uniquePaths" },
     "clientProjections": {
       "type": "array",
       "minItems": 2,

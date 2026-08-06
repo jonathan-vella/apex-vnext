@@ -103,6 +103,7 @@ test("asset generator rejects inconsistent bundle declarations", () => {
 test("asset generator rejects malformed and duplicate client projection declarations", () => {
   const valid = {
     sharedFiles: [".github/copilot-instructions.md"],
+    sharedDirectories: [],
     clientProjections: [
       {
         id: "github-copilot-vscode",
@@ -157,6 +158,7 @@ test("asset generator rejects malformed and duplicate client projection declarat
 test("asset generator accepts a role supported by only one client target", () => {
   const manifest = {
     sharedFiles: [".github/copilot-instructions.md"],
+    sharedDirectories: [],
     clientProjections: [
       {
         id: "github-copilot-vscode",

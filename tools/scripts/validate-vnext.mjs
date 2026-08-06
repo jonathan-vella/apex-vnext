@@ -571,6 +571,8 @@ function validateCustomizations(model, findings) {
     ...customization.skills.map(({ path: file }) => file),
     ".github/copilot-instructions.md",
   ]);
+  const sharedDirectories = array(customization.manifest.sharedDirectories);
+  const skillCoveredByDirectory = (file) => sharedDirectories.some((directory) => file.startsWith(`${directory}/`));
   const expectedProjectionFiles = new Map([
     [
       "github-copilot-vscode",
@@ -587,8 +589,10 @@ function validateCustomizations(model, findings) {
   const managedFiles = array(customization.manifest.managedFiles);
   if (
     managedFiles.length !== new Set(managedFiles).size ||
-    managedFiles.some((file) => !expectedFiles.has(file)) ||
-    [...expectedFiles].some((file) => !managedFiles.includes(file))
+    managedFiles.some(
+      (file) => !expectedFiles.has(file) && !sharedDirectories.some((directory) => file.startsWith(`${directory}/`)),
+    ) ||
+    [...expectedFiles].some((file) => !managedFiles.includes(file) && !skillCoveredByDirectory(file))
   )
     finding(
       findings,
@@ -600,7 +604,7 @@ function validateCustomizations(model, findings) {
   if (
     sharedFiles.length !== new Set(sharedFiles).size ||
     sharedFiles.some((file) => !expectedSharedFiles.has(file)) ||
-    [...expectedSharedFiles].some((file) => !sharedFiles.includes(file))
+    [...expectedSharedFiles].some((file) => !sharedFiles.includes(file) && !skillCoveredByDirectory(file))
   )
     finding(
       findings,
