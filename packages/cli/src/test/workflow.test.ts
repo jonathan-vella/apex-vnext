@@ -599,7 +599,11 @@ test("malformed persisted input requests fail closed", async () => {
     timestamp: "2026-01-01T00:00:00.000Z",
     ownerEpoch: 1,
     expectedHead: await journal.head(),
-    payload: { requestId: "", questions: [] },
+    payload: {
+      requestId: "malformed-request",
+      intake: { round: "business-discovery", ordinal: 5, total: 4 },
+      questions: [{ id: "workload", prompt: "Describe the workload." }],
+    },
   });
   await assert.rejects(service.nextTask(), /Requirements intake is incompatible/u);
 });
