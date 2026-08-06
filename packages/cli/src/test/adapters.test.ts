@@ -220,7 +220,14 @@ test("MCP registers only narrow tools and calls the service", async () => {
   const pending = await client.callTool({ name: "nextTask", arguments: {} });
   const request = (
     pending.structuredContent as {
-      request: { schemaVersion: string; requestId: string; expectedHead: string; ownerEpoch: number };
+      request: {
+        schemaVersion: string;
+        requestId: string;
+        expectedHead: string;
+        ownerEpoch: number;
+        intake: { round: string; ordinal: number; total: number };
+        questions: Array<{ id: string; multiSelect?: boolean; options?: string[] }>;
+      };
     }
   ).request;
   const submission = {
@@ -228,20 +235,19 @@ test("MCP registers only narrow tools and calls the service", async () => {
     requestId: request.requestId,
     expectedHead: request.expectedHead,
     ownerEpoch: request.ownerEpoch,
-    answers: [
-      { questionId: "workload", value: "test workload" },
-      { questionId: "requirements", value: "test requirements" },
-    ],
+    answers: request.questions.map(({ id, multiSelect, options }) => ({
+      questionId: id,
+      value: options === undefined ? `test-${id}` : multiSelect === true ? [options[0]!] : options[0]!,
+    })),
   };
   const unknownFields = await client.callTool({
     name: "recordInput",
     arguments: {
       ...submission,
       unknownOuter: true,
-      answers: [
-        { questionId: "workload", value: "test workload", unknownAnswer: true },
-        { questionId: "requirements", value: "test requirements" },
-      ],
+      answers: submission.answers.map((answer, index) =>
+        index === 0 ? { ...answer, unknownAnswer: true } : answer,
+      ),
     },
   });
   assert.equal(unknownFields.isError, true);
@@ -251,7 +257,7 @@ test("MCP registers only narrow tools and calls the service", async () => {
   });
   assert.equal(recorded.isError, undefined, JSON.stringify(recorded));
   assert.equal((recorded.structuredContent as { recorded: boolean }).recorded, true);
-  assert.equal((await service.nextTask()).status, "task");
+  assert.equal((await nextTaskAfterInput(service)).status, "task");
   const improvement = await client.callTool({
     name: "improvementObserve",
     arguments: {

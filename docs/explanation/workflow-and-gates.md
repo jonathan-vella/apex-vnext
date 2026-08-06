@@ -34,7 +34,13 @@ longer match. The correct response is to regenerate and reapprove it, not to ove
 ## Tasks And Inputs
 
 `nextTask` can return an input request, a task, or terminal status. Input requests must be answered before task context
-is requested. Task IDs and owner epochs bind outputs to the current state and prevent stale completion.
+is requested. Requirements intake has four kernel-owned rounds: business discovery, workload pattern, service
+preferences, and security and compliance. Each accepted round causes the client to request the next task again; only
+after the final round does the kernel issue the requirements task.
+
+The third round is a preference boundary. It records retained, prohibited, and preferred services, SKU preferences, and
+environment overrides. It does not authorize an agent to make architecture, SKU, or implementation choices. Task IDs
+and owner epochs bind inputs and outputs to the current state and prevent stale completion.
 
 ## Bicep And Terraform
 
@@ -44,5 +50,6 @@ same operation, inventory, diagnosis, and quality contracts.
 ## Related
 
 - [Run the workflow](../how-to/run-workflow.md)
+- [Maintain requirements intake](../how-to/maintain-requirements-intake.md)
 - [Bicep and Terraform](../reference/iac-tracks.md)
 - [Security and authority](security-and-authority.md)

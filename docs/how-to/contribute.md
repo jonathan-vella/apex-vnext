@@ -41,6 +41,12 @@ and package output through owning commands. Never patch generated output as an i
 5. Update documentation when behavior, commands, support, or ownership changes.
 6. Run broader validation only after focused checks pass.
 
+## Change Requirements Intake
+
+Requirements intake is kernel-owned. When changing its catalog, input contract, replay behavior, or tests, follow
+[Maintain requirements intake](maintain-requirements-intake.md). Do not edit generated client projections or packaged
+assets as a substitute for their source.
+
 ## Validate
 
 ```bash
@@ -58,5 +64,6 @@ Publication, tags, releases, and production cutover remain explicit maintainer o
 ## Related
 
 - [Repository contribution summary](../../CONTRIBUTING.md)
+- [Maintain requirements intake](maintain-requirements-intake.md)
 - [Runtime architecture](../explanation/runtime-architecture.md)
 - [Qualification reference](../reference/qualification.md)
