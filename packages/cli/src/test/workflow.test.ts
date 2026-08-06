@@ -553,7 +553,10 @@ test("compatibility input rejects legacy answers without recording unrelated val
   const events = await new EventJournal(
     join(root, ".apex", "projects", "demo", "runs", (await service.status()).run.runId, "journal"),
   ).replay();
-  assert.equal(events.some((event) => event.type === "requirements.input-recorded"), false);
+  assert.equal(
+    events.some((event) => event.type === "requirements.input-recorded"),
+    false,
+  );
 });
 
 test("concurrent input submissions return only stable Apex errors", async () => {

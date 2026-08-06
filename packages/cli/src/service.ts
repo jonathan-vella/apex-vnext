@@ -409,7 +409,10 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
     questions: [
       { id: "retained-services", prompt: "List Azure services or integrations that must be retained, or 'none'." },
       { id: "prohibited-services", prompt: "List prohibited services or use 'none'." },
-      { id: "service-preferences", prompt: "State preferred compute, database, integration, and observability services." },
+      {
+        id: "service-preferences",
+        prompt: "State preferred compute, database, integration, and observability services.",
+      },
       { id: "sku-preferences", prompt: "State required SKUs, tier floors, reservations, or use 'no preference'." },
       { id: "environment-overrides", prompt: "State environment-specific service or sizing overrides, or 'none'." },
     ],
@@ -418,7 +421,10 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
     round: "security-compliance",
     questions: [
       { id: "compliance", prompt: "List compliance, regulatory, and data-residency requirements." },
-      { id: "security-controls", prompt: "List required identity, network, encryption, and secret-management controls." },
+      {
+        id: "security-controls",
+        prompt: "List required identity, network, encryption, and secret-management controls.",
+      },
       { id: "authentication", prompt: "Describe authentication and authorization requirements." },
       { id: "region", prompt: "State the required Azure region or use 'deferred: <owner>'." },
       { id: "availability-recovery", prompt: "State availability, RTO, RPO, backup, and recovery requirements." },
@@ -965,7 +971,8 @@ export class ApexService {
     const requirements = this.artifactHash(events, "requirements");
     if (requirements === undefined) {
       const pending = this.nextRequirementsIntakeRound(events);
-      if (pending !== undefined) return { status: "needs_input", request: await this.issueRequirementsInput(run, pending) };
+      if (pending !== undefined)
+        return { status: "needs_input", request: await this.issueRequirementsInput(run, pending) };
       return { status: "task", task: await this.issueTask(run, TASKS[0]!, []) };
     }
     const route = await this.route(run, events);
@@ -2651,10 +2658,7 @@ export class ApexService {
     return REQUIREMENTS_INTAKE[recordedRequestIds.size];
   }
 
-  private async issueRequirementsInput(
-    run: RunConfigV1,
-    round: RequirementsIntakeRound,
-  ): Promise<InputRequestV1> {
+  private async issueRequirementsInput(run: RunConfigV1, round: RequirementsIntakeRound): Promise<InputRequestV1> {
     if (!hasValidInputRequestQuestions(round.questions)) {
       throw new ApexError("APEX_INTERNAL", "Kernel input questions are invalid", EXIT_CODES.internal);
     }

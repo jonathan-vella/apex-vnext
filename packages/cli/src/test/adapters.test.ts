@@ -245,9 +245,7 @@ test("MCP registers only narrow tools and calls the service", async () => {
     arguments: {
       ...submission,
       unknownOuter: true,
-      answers: submission.answers.map((answer, index) =>
-        index === 0 ? { ...answer, unknownAnswer: true } : answer,
-      ),
+      answers: submission.answers.map((answer, index) => (index === 0 ? { ...answer, unknownAnswer: true } : answer)),
     },
   });
   assert.equal(unknownFields.isError, true);
