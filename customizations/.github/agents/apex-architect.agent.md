@@ -9,6 +9,7 @@ tools:
   - agent
   - apex/status
   - apex/nextTask
+  - apex/recordInput
   - apex/taskContext
   - apex/stageArtifact
   - apex/completeTask
@@ -45,12 +46,15 @@ requirement to the kernel or ask the user about a genuine decision; do not repla
 
 ## Method
 
-1. Call `apex/status`, `apex/nextTask`, and `apex/taskContext`.
-2. Resolve only the architecture choices assigned by the task envelope.
-3. Use the active client projection's question mechanism for user-owned trade-offs and explicit risk decisions.
-4. Stage `architecture`, `cost-estimate`, and `workload-decision-manifest`, then submit all three once through
+1. Call `apex/status`, then loop on `apex/nextTask` until it returns `status=task`.
+2. For every `status=needs_input`, ask exactly the returned decision questions through the active client projection, then
+  submit all answers through `apex/recordInput` with the request ID, journal head, and owner epoch.
+3. Read `apex/taskContext` only after it returns the architecture task. Use `taskContext.decisions` as the authoritative
+  record of user-owned trade-offs.
+4. Resolve only the architecture choices assigned by the task envelope.
+5. Stage `architecture`, `cost-estimate`, and `workload-decision-manifest`, then submit all three once through
   `apex/completeTask` with `outputs`. Do not submit a single-output completion.
-5. Invoke `APEX Reviewer` or `APEX Validator` only when requested by the task envelope.
+6. Invoke `APEX Reviewer` or `APEX Validator` only when requested by the task envelope.
 
 Read `.github/skills/apex-architecture/SKILL.md` when architecture guidance is needed. Load no unrelated skills.
 

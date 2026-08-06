@@ -373,6 +373,11 @@ interface RequirementsIntakeRound {
   questions: InputRequestV1["questions"];
 }
 
+interface ArchitectureDecision {
+  id: string;
+  questions: InputRequestV1["questions"];
+}
+
 const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
   {
     round: "business-discovery",
@@ -445,6 +450,19 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
         valueType: "recovery",
       },
       { id: "operations", prompt: "State monitoring, alerting, support, and operational requirements." },
+    ],
+  },
+];
+
+const ARCHITECTURE_DECISIONS: readonly ArchitectureDecision[] = [
+  {
+    id: "network-exposure",
+    questions: [
+      {
+        id: "network-exposure",
+        prompt: "Choose the architecture network exposure posture.",
+        options: ["private-only", "public-approved", "deferred"],
+      },
     ],
   },
 ];
@@ -996,6 +1014,25 @@ export class ApexService {
       throw new ApexError("APEX_AUTHORIZATION", route.blockers.join("; "), EXIT_CODES.authorization, route.blockers);
     if (route.task === undefined)
       throw new ApexError("APEX_NOT_FOUND", "No task is currently available", EXIT_CODES.notFound);
+    if (route.task.id === "architecture") {
+      const decision = this.architectureDecisionState(events, run.ownerEpoch);
+      if (decision.pending !== undefined) return { status: "needs_input", request: decision.pending };
+      if (decision.staleTaskId !== undefined) {
+        return {
+          status: "needs_input",
+          request: await this.issueArchitectureDecision(run, await this.readTask(run, decision.staleTaskId)),
+        };
+      }
+      if (decision.taskId !== undefined) {
+        const task = await this.readTask(run, decision.taskId);
+        if (task.expectedHead === events.at(-1)?.hash && task.ownerEpoch === run.ownerEpoch) {
+          return { status: "task", task };
+        }
+        return { status: "task", task: await this.issueTask(run, route.task, this.inputRefs(events, route.task)) };
+      }
+      const task = await this.issueTask(run, route.task, this.inputRefs(events, route.task));
+      return { status: "needs_input", request: await this.issueArchitectureDecision(run, task) };
+    }
     return { status: "task", task: await this.issueTask(run, route.task, this.inputRefs(events, route.task)) };
   }
 
@@ -1014,16 +1051,26 @@ export class ApexService {
       throw new ApexError("APEX_VALIDATION", "Input submission is malformed", EXIT_CODES.validation);
     }
     const events = await this.journal(run).replay();
-    const requested = [...events].reverse().find((event) => event.type === "requirements.input-requested");
+    const requested = [...events]
+      .reverse()
+      .find(
+        (event) => event.type === "requirements.input-requested" || event.type === "architecture.decision-requested",
+      );
     if (requested === undefined) {
       throw new ApexError("APEX_CONFLICT", "No input request is pending", EXIT_CODES.conflict);
     }
-    const request = this.inputRequest(requested, run.ownerEpoch);
+    const request =
+      requested.type === "requirements.input-requested"
+        ? this.inputRequest(requested, run.ownerEpoch)
+        : this.architectureDecisionRequest(requested, run.ownerEpoch);
+    const recordedType =
+      requested.type === "requirements.input-requested"
+        ? "requirements.input-recorded"
+        : "architecture.decision-recorded";
     if (
       events.some(
         (event) =>
-          event.type === "requirements.input-recorded" &&
-          (event.payload as { requestId?: unknown }).requestId === request.requestId,
+          event.type === recordedType && (event.payload as { requestId?: unknown }).requestId === request.requestId,
       )
     ) {
       throw new ApexError("APEX_CONFLICT", "Input request was already recorded", EXIT_CODES.conflict);
@@ -1050,10 +1097,16 @@ export class ApexService {
     try {
       await this.append(
         run,
-        "requirements.input-recorded",
-        { requestId: request.requestId, intake: request.intake, answers: normalizedAnswers },
+        recordedType,
+        {
+          requestId: request.requestId,
+          ...("intake" in request ? { intake: request.intake } : { decision: request.decision }),
+          answers: normalizedAnswers,
+        },
         request.expectedHead,
       );
+      if (request.decision !== undefined)
+        await this.refreshTaskHead(run, await this.readTask(run, request.decision.taskId));
     } catch (error) {
       if (error instanceof Error && /stale journal head|mutation is already in progress/i.test(error.message)) {
         throw new ApexError("APEX_STALE", "Input request journal head is stale", EXIT_CODES.stale, undefined, error);
@@ -1097,6 +1150,7 @@ export class ApexService {
     inputs: unknown[];
     artifactHashes: Record<string, string>;
     recordedInput: Record<string, InputValueV1> | null;
+    decisions: Record<string, InputValueV1>;
     outputTemplates: Partial<Record<ArtifactKind, unknown>>;
     outputRoot: string;
     status: string;
@@ -1121,6 +1175,7 @@ export class ApexService {
       inputs: await Promise.all(task.inputRefs.map((hash) => this.objects.getJson(hash))),
       artifactHashes,
       recordedInput: task.taskType === "requirements" ? this.recordedRequirementsInput(events) : null,
+      decisions: task.taskType === "architecture" ? this.architectureDecisionValues(events, task.taskId) : {},
       outputTemplates,
       outputRoot: join(this.root, ".apex", "work", run.runId, taskId),
       status: this.completedNodeIds(events).has(task.taskType) ? "completed" : "active",
@@ -2645,6 +2700,92 @@ export class ApexService {
     return request;
   }
 
+  private architectureDecisionRequest(event: EventV1, ownerEpoch: number): InputRequestV1 {
+    const payload = event.payload as {
+      requestId: string;
+      decision: { taskId: string; id: string };
+      questions: InputRequestV1["questions"];
+    };
+    const request = {
+      schemaVersion: CONTRACT_VERSION,
+      requestId: payload.requestId,
+      expectedHead: event.hash,
+      ownerEpoch,
+      decision: payload.decision,
+      questions: payload.questions,
+    };
+    if (
+      !Value.Check(InputRequestV1Schema, request) ||
+      request.decision === undefined ||
+      !hasValidInputRequestQuestions(request.questions)
+    ) {
+      throw new ApexError("APEX_INTERNAL", "Persisted architecture decision request is invalid", EXIT_CODES.internal);
+    }
+    return request;
+  }
+
+  private architectureDecisionState(
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+    ownerEpoch: number,
+  ): {
+    pending?: InputRequestV1;
+    taskId?: string;
+    staleTaskId?: string;
+  } {
+    const requested = [...events].reverse().find((event) => event.type === "architecture.decision-requested");
+    if (requested === undefined) return {};
+    const request = this.architectureDecisionRequest(requested, requested.ownerEpoch);
+    const recorded = events.some(
+      (event) =>
+        event.type === "architecture.decision-recorded" &&
+        (event.payload as { requestId?: unknown }).requestId === request.requestId,
+    );
+    if (recorded) return { taskId: request.decision!.taskId };
+    if (request.expectedHead !== events.at(-1)?.hash || request.ownerEpoch !== ownerEpoch) {
+      return { staleTaskId: request.decision!.taskId };
+    }
+    return { pending: request };
+  }
+
+  private architectureDecisionValues(
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+    taskId: string,
+  ): Record<string, InputValueV1> {
+    const result: Record<string, InputValueV1> = {};
+    for (const event of events) {
+      if (event.type !== "architecture.decision-recorded") continue;
+      const payload = event.payload as { decision?: { taskId?: unknown; id?: unknown }; answers?: unknown };
+      if (
+        payload.decision?.taskId !== taskId ||
+        typeof payload.decision.id !== "string" ||
+        !Array.isArray(payload.answers)
+      ) {
+        continue;
+      }
+      for (const answer of payload.answers) {
+        const value = answer as { questionId?: unknown; value?: unknown };
+        if (typeof value.questionId === "string" && Value.Check(InputValueV1Schema, value.value)) {
+          result[value.questionId] = value.value;
+        }
+      }
+    }
+    return result;
+  }
+
+  private async issueArchitectureDecision(run: RunConfigV1, task: TaskEnvelopeV1): Promise<InputRequestV1> {
+    const decision = ARCHITECTURE_DECISIONS[0]!;
+    if (!hasValidInputRequestQuestions(decision.questions)) {
+      throw new ApexError("APEX_INTERNAL", "Kernel architecture decision questions are invalid", EXIT_CODES.internal);
+    }
+    const event = await this.append(run, "architecture.decision-requested", {
+      requestId: this.idSource(),
+      decision: { taskId: task.taskId, id: decision.id },
+      questions: decision.questions,
+    });
+    await this.refreshTaskHead(run, task);
+    return this.architectureDecisionRequest(event, run.ownerEpoch);
+  }
+
   private nextRequirementsIntakeRound(
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): RequirementsIntakeRound | undefined {
@@ -2794,11 +2935,13 @@ export class ApexService {
           EXIT_CODES.conflict,
         );
       }
-      const round = REQUIREMENTS_INTAKE[request.intake.ordinal - 1];
+      const intake = request.intake;
+      const round = intake === undefined ? undefined : REQUIREMENTS_INTAKE[intake.ordinal - 1];
       if (
         round === undefined ||
-        round.round !== request.intake.round ||
-        request.intake.total !== REQUIREMENTS_INTAKE.length
+        intake === undefined ||
+        round.round !== intake.round ||
+        intake.total !== REQUIREMENTS_INTAKE.length
       ) {
         throw new ApexError(
           "APEX_CONFLICT",
