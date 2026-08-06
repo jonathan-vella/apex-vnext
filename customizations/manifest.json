@@ -22,19 +22,16 @@
     ".github/skills/apex-planning/SKILL.md",
     ".github/skills/apex-codegen/SKILL.md",
     ".github/skills/apex-operations/SKILL.md",
+    ".github/skills/apex-artifacts/SKILL.md",
+    ".github/skills/apex-artifacts/templates/requirements.md",
     ".github/copilot-instructions.md",
     ".github/mcp.json",
     ".vscode/mcp.json"
   ],
   "sharedFiles": [
-    ".github/skills/apex-workflow/SKILL.md",
-    ".github/skills/apex-requirements/SKILL.md",
-    ".github/skills/apex-architecture/SKILL.md",
-    ".github/skills/apex-planning/SKILL.md",
-    ".github/skills/apex-codegen/SKILL.md",
-    ".github/skills/apex-operations/SKILL.md",
     ".github/copilot-instructions.md"
   ],
+  "sharedDirectories": [".github/skills"],
   "clientProjections": [
     {
       "id": "github-copilot-vscode",

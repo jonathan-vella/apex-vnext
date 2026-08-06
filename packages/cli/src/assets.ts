@@ -375,6 +375,7 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
   ) as Record<string, unknown>;
   verifyBundleDeclarations(manifest, customizationManifest, runtimeBundle);
   const sharedFiles = customizationManifest.sharedFiles as string[];
+  const sharedDirectories = (customizationManifest.sharedDirectories ?? []) as string[];
   const roles = customizationManifest.roles as Array<{
     id: string;
     source: string;
@@ -389,6 +390,9 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
   if (
     !Array.isArray(sharedFiles) ||
     sharedFiles.length !== new Set(sharedFiles).size ||
+    !Array.isArray(sharedDirectories) ||
+    sharedDirectories.length !== new Set(sharedDirectories).size ||
+    sharedDirectories.some((path) => typeof path !== "string" || !safeRelativePath(path)) ||
     !Array.isArray(declarations) ||
     !Array.isArray(roles) ||
     declarations.length !== manifest.projections.length ||
@@ -412,6 +416,13 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
       throw new Error(`Generated client projection source binding mismatch: ${file.path}`);
     }
   }
+  const sharedDirectoryFiles = manifest.files
+    .filter(
+      ({ path, source }) =>
+        source.kind === "repository-file" &&
+        sharedDirectories.some((directory) => path.startsWith(`customizations/${directory}/`)),
+    )
+    .map(({ path }) => path.slice("customizations/".length));
   for (const declaration of declarations) {
     const target = projectionTarget(declaration.id);
     const projection = manifest.projections.find(({ id }) => id === declaration.id);
@@ -420,10 +431,11 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
     }
     const expectedTargets = [
       ...sharedFiles,
+      ...sharedDirectoryFiles,
       ...declaration.files,
       ...roles.filter(({ supportedTargets }) => supportedTargets.includes(target)).map(({ source }) => source),
     ];
-    const expected = expectedTargets.map((path) => `${declaration.generatedRoot}/${path}`).sort();
+    const expected = [...new Set(expectedTargets)].map((path) => `${declaration.generatedRoot}/${path}`).sort();
     if (
       !safeRelativePath(declaration.generatedRoot) ||
       projection === undefined ||
