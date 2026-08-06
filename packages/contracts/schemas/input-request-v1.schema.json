@@ -74,6 +74,30 @@
           "prompt": {
             "minLength": 1,
             "type": "string"
+          },
+          "valueType": {
+            "anyOf": [
+              {
+                "const": "budget",
+                "type": "string"
+              },
+              {
+                "const": "recovery",
+                "type": "string"
+              },
+              {
+                "const": "environment-set",
+                "type": "string"
+              },
+              {
+                "const": "data-classification",
+                "type": "string"
+              },
+              {
+                "const": "compliance",
+                "type": "string"
+              }
+            ]
           }
         },
         "required": [

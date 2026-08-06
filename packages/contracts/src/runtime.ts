@@ -110,9 +110,76 @@ export const QuestionV1Schema = Type.Object(
     prompt: NonEmptyStringSchema,
     options: Type.Optional(Type.Array(NonEmptyStringSchema, { minItems: 1, uniqueItems: true })),
     multiSelect: Type.Optional(Type.Boolean()),
+    valueType: Type.Optional(
+      Type.Union([
+        Type.Literal("budget"),
+        Type.Literal("recovery"),
+        Type.Literal("environment-set"),
+        Type.Literal("data-classification"),
+        Type.Literal("compliance"),
+      ]),
+    ),
   },
   { additionalProperties: false },
 );
+
+export const DeferredInputValueV1Schema = Type.Object(
+  { kind: Type.Literal("deferred"), owner: NonEmptyStringSchema },
+  { additionalProperties: false },
+);
+
+export const UnknownInputValueV1Schema = Type.Object(
+  { kind: Type.Literal("unknown") },
+  { additionalProperties: false },
+);
+
+export const BudgetInputValueV1Schema = Type.Object(
+  {
+    kind: Type.Literal("budget"),
+    amount: Type.Number({ minimum: 0 }),
+    currency: Type.String({ pattern: "^[A-Z]{3}$" }),
+    cadence: Type.Literal("monthly"),
+  },
+  { additionalProperties: false },
+);
+
+export const RecoveryInputValueV1Schema = Type.Object(
+  {
+    kind: Type.Literal("recovery"),
+    rtoMinutes: Type.Integer({ minimum: 0 }),
+    rpoMinutes: Type.Integer({ minimum: 0 }),
+  },
+  { additionalProperties: false },
+);
+
+export const ClassificationInputValueV1Schema = Type.Object(
+  {
+    kind: Type.Literal("data-classification"),
+    classification: Type.Union([
+      Type.Literal("public"),
+      Type.Literal("internal"),
+      Type.Literal("confidential"),
+      Type.Literal("restricted"),
+    ]),
+  },
+  { additionalProperties: false },
+);
+
+export const ComplianceInputValueV1Schema = Type.Object(
+  { kind: Type.Literal("compliance"), scopes: Type.Array(NonEmptyStringSchema, { minItems: 1, uniqueItems: true }) },
+  { additionalProperties: false },
+);
+
+export const InputValueV1Schema = Type.Union([
+  NonEmptyStringSchema,
+  Type.Array(NonEmptyStringSchema, { minItems: 1, uniqueItems: true }),
+  DeferredInputValueV1Schema,
+  UnknownInputValueV1Schema,
+  BudgetInputValueV1Schema,
+  RecoveryInputValueV1Schema,
+  ClassificationInputValueV1Schema,
+  ComplianceInputValueV1Schema,
+]);
 
 export const RequirementsIntakeRoundV1Schema = Type.Union([
   Type.Literal("business-discovery"),
@@ -145,7 +212,7 @@ export const InputRequestV1Schema = Type.Object(
 export const InputAnswerV1Schema = Type.Object(
   {
     questionId: NonEmptyStringSchema,
-    value: Type.Union([NonEmptyStringSchema, Type.Array(NonEmptyStringSchema, { minItems: 1, uniqueItems: true })]),
+    value: InputValueV1Schema,
   },
   { additionalProperties: false },
 );
@@ -220,6 +287,7 @@ export type TaskEnvelopeV1 = Static<typeof TaskEnvelopeV1Schema>;
 export type TaskResultV1 = Static<typeof TaskResultV1Schema>;
 export type EventV1 = Static<typeof EventV1Schema>;
 export type QuestionV1 = Static<typeof QuestionV1Schema>;
+export type InputValueV1 = Static<typeof InputValueV1Schema>;
 export type RequirementsIntakeRoundV1 = Static<typeof RequirementsIntakeRoundV1Schema>;
 export type RequirementsIntakeV1 = Static<typeof RequirementsIntakeV1Schema>;
 export type InputRequestV1 = Static<typeof InputRequestV1Schema>;

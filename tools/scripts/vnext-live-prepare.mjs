@@ -668,16 +668,24 @@ export async function prepareQualificationState(args, dependencies = {}) {
         requestId: intake.request.requestId,
         expectedHead: intake.request.expectedHead,
         ownerEpoch: intake.request.ownerEpoch,
-        answers: intake.request.questions.map(({ id, multiSelect, options }) => ({
+        answers: intake.request.questions.map(({ id, multiSelect, options, valueType }) => ({
           questionId: id,
           value:
             id === "workload"
               ? "vnext qualification marker"
-              : options === undefined
-                ? `qualification-${id}`
-                : multiSelect === true
-                  ? [options[0]]
-                  : options[0],
+              : valueType === "budget"
+                ? { kind: "budget", amount: 250, currency: "USD", cadence: "monthly" }
+                : valueType === "recovery"
+                  ? { kind: "recovery", rtoMinutes: 60, rpoMinutes: 15 }
+                  : valueType === "data-classification"
+                    ? { kind: "data-classification", classification: "internal" }
+                    : valueType === "compliance"
+                      ? { kind: "compliance", scopes: ["gdpr"] }
+                      : options === undefined
+                        ? `qualification-${id}`
+                        : multiSelect === true
+                          ? [options[0]]
+                          : options[0],
         })),
       });
       intake = await service.nextTask();
