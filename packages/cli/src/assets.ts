@@ -392,7 +392,7 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
     sharedFiles.length !== new Set(sharedFiles).size ||
     !Array.isArray(sharedDirectories) ||
     sharedDirectories.length !== new Set(sharedDirectories).size ||
-    sharedDirectories.some((path) => !safeRelativePath(path)) ||
+    sharedDirectories.some((path) => typeof path !== "string" || !safeRelativePath(path)) ||
     !Array.isArray(declarations) ||
     !Array.isArray(roles) ||
     declarations.length !== manifest.projections.length ||
@@ -435,7 +435,7 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
       ...declaration.files,
       ...roles.filter(({ supportedTargets }) => supportedTargets.includes(target)).map(({ source }) => source),
     ];
-    const expected = expectedTargets.map((path) => `${declaration.generatedRoot}/${path}`).sort();
+    const expected = [...new Set(expectedTargets)].map((path) => `${declaration.generatedRoot}/${path}`).sort();
     if (
       !safeRelativePath(declaration.generatedRoot) ||
       projection === undefined ||

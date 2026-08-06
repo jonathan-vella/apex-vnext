@@ -372,7 +372,12 @@ async function prepareClientProjections(customizationManifest, pinnedCustomizati
   for (const projection of clientProjections) {
     const generatedRoot = join(assetsRoot, projection.generatedRoot);
     assertContained(assetsRoot, generatedRoot);
-    const sources = [...new Set([...sharedFiles, ...sharedDirectoryFiles, ...projection.files])];
+    const roleSources = new Set(
+      roles.filter((role) => roleSupportsClient(role, projection.id)).map(({ source }) => source),
+    );
+    const sources = [...new Set([...sharedFiles, ...sharedDirectoryFiles, ...projection.files])].filter(
+      (path) => !roleSources.has(path),
+    );
     for (const relativePath of sources) {
       const bytes = await readSourceFile(
         pinnedCustomizations.resolvedRoot,
