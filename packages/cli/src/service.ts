@@ -1500,7 +1500,7 @@ export class ApexService {
     return {
       documentId: "requirements",
       templateHash,
-      outputHash: await this.objects.putBytes(Buffer.from(document, "utf8")),
+      outputHash: await this.objects.putJson({ contentType: "text/markdown", content: document }),
     };
   }
 
