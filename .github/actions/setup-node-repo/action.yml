@@ -46,5 +46,6 @@ runs:
       shell: bash
       env:
         LEFTHOOK: "0"
-        npm_config_registry: https://packagefeedproxy.microsoft.io/npm/
+        # The package proxy can lag security fixes; npmjs is the lockfile's authoritative source.
+        npm_config_registry: https://registry.npmjs.org/
       run: npm ci

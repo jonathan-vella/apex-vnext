@@ -72,7 +72,7 @@ concurrency:
 | `docs.yml` | Link and freshness validation; required CI owns Markdown lint | PR + push to main (Markdown) |
 | `weekly-maintenance.yml`        | AVM version audit + docs freshness + Azure deprecation tracking (folds the retired `azure-deprecation-tracker.yml`) | Weekly (Mon 06:00) + manual |
 
-The shared `setup-node-repo` action fixes Node.js 24, configures the package-feed proxy, disables repository Git hooks
+The shared `setup-node-repo` action fixes Node.js 24, configures the public npm registry, disables repository Git hooks
 for CI installs, and optionally runs `npm ci`. Do not repeat those settings in individual workflows.
 
 ## Validation Scripts
