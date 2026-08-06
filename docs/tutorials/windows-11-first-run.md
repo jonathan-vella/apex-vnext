@@ -5,35 +5,38 @@
 Complete [Prepare Windows 11](../how-to/prepare-windows-11.md) before starting. This tutorial creates local APEX state
 and prepares a selected Azure subscription; it does not deploy Azure resources.
 
+## Build The Preview Candidate
+
+APEX is not yet published to the public npm registry. Build matching package tarballs from the APEX source repository:
+
+```bash
+mkdir -p ~/src
+cd ~/src
+git clone https://github.com/jonathan-vella/apex-vnext.git
+cd apex-vnext
+npm ci
+npm run pack:vnext
+```
+
+The package set is written under `dist/vnext-packages/`. Do not mix tarballs from different builds.
+
 ## Create A Workspace
 
-In Ubuntu WSL, create a workspace inside your Linux home directory:
+In Ubuntu WSL, create a separate local workspace inside your Linux home directory:
 
 ```bash
 mkdir -p ~/src/apex-payments
 cd ~/src/apex-payments
+git init
+npm init --yes
+npm install --ignore-scripts --no-audit --no-fund \
+  ~/src/apex-vnext/dist/vnext-packages/*.tgz
+npx apex version --json
 ```
 
-Choose an installation route.
-
-### Global CLI
-
-Install APEX once for repeated use:
-
-```bash
-npm install -g @apex/cli
-apex version --json
-```
-
-### One-Shot npm Command
-
-Use this when you do not want a global APEX installation:
-
-```bash
-npx --yes @apex/cli version --json
-```
-
-For a private registry, complete the npm registry setup in [Prepare Windows 11](../how-to/prepare-windows-11.md) first.
+> [!NOTE]
+> The global `npm install -g @apex/cli`, one-shot `npx @apex/cli`, and VS Code profile bootstrap paths require a
+> published APEX package. They are not available for this local preview candidate.
 
 ## Choose A Client
 
@@ -44,13 +47,7 @@ Select one client projection for this workspace. Both clients use the same kerne
 | VS Code     | `github-copilot-vscode` | You want the VS Code agent picker and VS Code-only worker support. |
 | Copilot CLI | `github-copilot-cli`    | You want terminal-based Copilot interaction.                       |
 
-## Bootstrap With VS Code
-
-Install the optional profile bootstrap agent once:
-
-```bash
-apex profile install --client github-copilot-vscode --yes
-```
+## Initialize With VS Code
 
 Open the workspace from WSL:
 
@@ -61,32 +58,41 @@ code .
 In VS Code:
 
 1. Confirm the folder is trusted and that GitHub Copilot Chat is signed in.
-2. Open Copilot Chat and select **APEX Bootstrap** from the agent picker.
-3. Provide the project name, environment, Azure target, and either Bicep or Terraform when asked.
-4. Explicitly approve Git initialization if the folder is not already a repository.
-5. Reload the VS Code window when prompted.
-6. Select the workspace **APEX** agent and continue with requirements.
+2. In the integrated WSL terminal, initialize the workspace:
 
-The profile agent runs the same bootstrap command shown below. It does not manage `.apex`, workspace agents, or MCP
-configuration directly.
+   ```bash
+   npx apex init \
+     --project payments \
+     --name "Payments platform" \
+     --environment dev \
+     --target "resource-group:payments-dev" \
+     --iac bicep \
+     --client github-copilot-vscode \
+     --json
+   ```
+
+3. Reload the VS Code window.
+4. Select the workspace **APEX** agent and continue with requirements.
+
+The initialized workspace contains the VS Code projection and MCP configuration. Do not install the profile bootstrap
+agent for a local candidate because its version-pinned `npx` command requires a published package.
 
 ## Bootstrap With Copilot CLI
 
 From the workspace terminal, initialize the VS Code or Copilot CLI projection directly. This example selects Bicep:
 
 ```bash
-apex bootstrap \
+npx apex init \
   --project payments \
   --name "Payments platform" \
   --environment dev \
   --target "resource-group:payments-dev" \
   --iac bicep \
   --client github-copilot-cli \
-  --create-repo \
-  --yes
+  --json
 ```
 
-For Terraform, replace `--iac bicep` with `--iac terraform`. If a Git repository already exists, omit `--create-repo`.
+For Terraform, replace `--iac bicep` with `--iac terraform`.
 
 Start Copilot CLI in the same directory, select the APEX agent, and continue the project. Copilot CLI does not include
 VS Code-only autonomous workers.
@@ -96,14 +102,14 @@ VS Code-only autonomous workers.
 After either bootstrap route, run:
 
 ```bash
-apex setup --json
-apex doctor --json
-apex status --json
-apex task next --json
+npx apex setup --json
+npx apex doctor --json
+npx apex status --json
+npx apex task next --json
 ```
 
-The bootstrap command records the exact APEX runtime in workspace `devDependencies`, updates the npm lockfile, installs
-one client projection, and creates the first project/run. Do not edit `.apex` directly.
+The initialization command installs one client projection and creates the first project/run. Do not edit `.apex`
+directly.
 
 ## Confirm Azure Readiness
 

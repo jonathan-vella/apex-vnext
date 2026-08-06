@@ -20,8 +20,9 @@ Initialize exactly one client projection with `apex init --client github-copilot
 
 ## Bootstrap A Workspace
 
-For a published package, use either a global CLI or a one-shot command. Both routes install the exact APEX CLI as a
-workspace `devDependency`, update the npm lockfile, and create one selected client projection.
+For a published package, use either a global CLI or a one-shot command. These routes are unavailable until
+`@apex/cli` is published to your approved npm registry. Both routes install the exact APEX CLI as a workspace
+`devDependency`, update the npm lockfile, and create one selected client projection.
 
 ```bash
 npm install -g @apex/cli
