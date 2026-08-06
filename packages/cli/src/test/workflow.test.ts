@@ -282,6 +282,30 @@ test("requirements acceptance records a bound rendered document", async () => {
   assert.notEqual(document?.outputHash, accepted.outputHashes.requirements);
 });
 
+test("requirements document rendering escapes table cells without rejecting content braces", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo" });
+  const issued = await nextTaskAfterInput(service);
+  assert.equal(issued.status, "task");
+  if (issued.status !== "task") return;
+  const value = requirements();
+  value.requirements[0] = {
+    ...value.requirements[0]!,
+    statement: "Allow {custom-rule} | retain newline\nfor review",
+  };
+  await service.completeTaskOutputs(issued.task.taskId, [{ kind: "requirements", value }]);
+  const events = await new EventJournal(
+    join(root, ".apex", "projects", "demo", "runs", (await service.status()).run.runId, "journal"),
+  ).replay();
+  const documentHash = (
+    events.find((event) => event.type === "task.completed")?.payload as {
+      renderedDocuments?: Array<{ outputHash: string }>;
+    }
+  ).renderedDocuments?.[0]?.outputHash;
+  assert.match(documentHash ?? "", /^[a-f0-9]{64}$/);
+});
+
 test("an initialized workspace can create and select independent projects", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
