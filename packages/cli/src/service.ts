@@ -1409,12 +1409,20 @@ export class ApexService {
     assertTaskCurrent(task, completionHead, run.ownerEpoch, this.clock);
     const outputHashes: Partial<Record<ArtifactKind, string>> = {};
     for (const output of outputs) outputHashes[output.kind] = await this.objects.putJson(output.value);
+    const renderedDocument =
+      descriptor.id === "requirements"
+        ? await this.renderRequirementsDocument(
+            outputs.find(({ kind }) => kind === "requirements")!.value,
+            outputHashes.requirements!,
+          )
+        : undefined;
     const reviewBlockers = descriptor.reviewSubject === undefined ? [] : this.openReviewFindings(outputs[0]!.value);
     const dependencyHash = sha256Json(outputHashes);
     await this.append(run, "task.completed", {
       taskId,
       nodeId: descriptor.id,
       artifactHashes: outputHashes,
+      ...(renderedDocument === undefined ? {} : { renderedDocuments: [renderedDocument] }),
       validatorIds: validation.validatorIds,
       ...(Object.keys(validation.evidenceRefs).length === 0 ? {} : { validatorEvidenceRefs: validation.evidenceRefs }),
       ...(Object.keys(validation.evidenceModes).length === 0
@@ -1438,6 +1446,62 @@ export class ApexService {
       await this.openRunGate(await this.currentRun(), 1, sha256Json(outputHashes));
     }
     return { outputHashes, summary: outputs.map(({ kind }) => kind).join(", ") + " accepted" };
+  }
+
+  private async renderRequirementsDocument(
+    value: unknown,
+    artifactHash: string,
+  ): Promise<{
+    documentId: "requirements";
+    templateHash: string;
+    outputHash: string;
+  }> {
+    const requirements = value as {
+      workload: string;
+      environment: string;
+      requirements: Array<{ id: string; priority: string; status: string; statement: string; source: string }>;
+      assumptions: string[];
+      unknowns: string[];
+    };
+    const assets = await resolveBundledAssets();
+    const template = await readFile(
+      join(assets.customizations, ".github", "skills", "apex-artifacts", "templates", "requirements.md"),
+      "utf8",
+    );
+    const templateHash = sha256Bytes(Buffer.from(template, "utf8"));
+    const requirementsTable = [
+      "| ID | Priority | Status | Statement | Source |",
+      "| --- | --- | --- | --- | --- |",
+      ...requirements.requirements.map(
+        ({ id, priority, status, statement, source }) =>
+          `| ${id} | ${priority} | ${status} | ${statement} | ${source} |`,
+      ),
+    ].join("\n");
+    const replace = (token: string, replacement: string) => template.replaceAll(`{${token}}`, replacement);
+    const document = replace("workload", requirements.workload)
+      .replaceAll("{artifact-hash}", artifactHash)
+      .replaceAll("{template-hash}", templateHash)
+      .replaceAll("{environment}", requirements.environment)
+      .replaceAll("{artifact-status}", "accepted")
+      .replaceAll("{requirements-table}", requirementsTable)
+      .replaceAll(
+        "{assumptions-list}",
+        requirements.assumptions.length === 0
+          ? "None."
+          : requirements.assumptions.map((item) => `- ${item}`).join("\n"),
+      )
+      .replaceAll(
+        "{unknowns-list}",
+        requirements.unknowns.length === 0 ? "None." : requirements.unknowns.map((item) => `- ${item}`).join("\n"),
+      );
+    if (/\{[a-z-]+\}/u.test(document)) {
+      throw new ApexError("APEX_INTERNAL", "Requirements document template has unresolved slots", EXIT_CODES.internal);
+    }
+    return {
+      documentId: "requirements",
+      templateHash,
+      outputHash: await this.objects.putBytes(Buffer.from(document, "utf8")),
+    };
   }
 
   async cancelTask(taskId: string): Promise<void> {
