@@ -10,9 +10,9 @@ APEX server with independent state.
 | Tool            | Purpose                                                               |
 | --------------- | --------------------------------------------------------------------- |
 | `status`        | Read selected project and run status.                                 |
-| `nextTask`      | Get `needs_input`, `task`, or terminal workflow status.               |
+| `nextTask`      | Get the next requirements input round, a task, or terminal status.    |
 | `taskContext`   | Read context for the exact task ID returned by `nextTask`.            |
-| `recordInput`   | Submit answers for the exact pending input request.                   |
+| `recordInput`   | Submit answers for the exact pending requirements input request.      |
 | `stageArtifact` | Stage one or more typed outputs for a task.                           |
 | `stageFile`     | Stage a bounded file for a task, optionally with an expected SHA-256. |
 | `generateIac`   | Generate the selected task's Bicep or Terraform batch.                |
@@ -20,7 +20,9 @@ APEX server with independent state.
 | `completeTask`  | Validate and complete a task with typed outputs.                      |
 
 Handle `needs_input` before requesting task context. Only a `nextTask` result with `status=task` provides a valid task
-ID.
+ID. Requirements intake returns four ordered `needs_input` rounds before the requirements task: business discovery,
+workload pattern, service preferences, and security and compliance. After recording each round, call `nextTask` again.
+The returned request ID, expected head, and owner epoch are required for `recordInput`.
 
 ## Read And Operations Tools
 
@@ -51,4 +53,5 @@ The [generated tool inventory](mcp-tools.generated.md) detects source drift.
 
 - [CLI commands](cli.md)
 - [Run the workflow](../how-to/run-workflow.md)
+- [Maintain requirements intake](../how-to/maintain-requirements-intake.md)
 - [Security and authority](../explanation/security-and-authority.md)

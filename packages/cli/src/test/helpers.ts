@@ -462,14 +462,19 @@ export async function prepareValidatedRun(service: ApexService, runId: string, t
 }
 
 export async function nextTaskAfterInput(service: ApexService) {
-  const next = await service.nextTask();
-  if (next.status !== "needs_input") return next;
-  await service.recordInput({
-    schemaVersion: "1.0.0",
-    requestId: next.request.requestId,
-    expectedHead: next.request.expectedHead,
-    ownerEpoch: next.request.ownerEpoch,
-    answers: next.request.questions.map(({ id }) => ({ questionId: id, value: `test-${id}` })),
-  });
-  return await service.nextTask();
+  let next = await service.nextTask();
+  while (next.status === "needs_input") {
+    await service.recordInput({
+      schemaVersion: "1.0.0",
+      requestId: next.request.requestId,
+      expectedHead: next.request.expectedHead,
+      ownerEpoch: next.request.ownerEpoch,
+      answers: next.request.questions.map(({ id, multiSelect, options }) => ({
+        questionId: id,
+        value: options === undefined ? `test-${id}` : multiSelect === true ? [options[0]!] : options[0]!,
+      })),
+    });
+    next = await service.nextTask();
+  }
+  return next;
 }

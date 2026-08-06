@@ -114,12 +114,29 @@ export const QuestionV1Schema = Type.Object(
   { additionalProperties: false },
 );
 
+export const RequirementsIntakeRoundV1Schema = Type.Union([
+  Type.Literal("business-discovery"),
+  Type.Literal("workload-pattern"),
+  Type.Literal("service-preferences"),
+  Type.Literal("security-compliance"),
+]);
+
+export const RequirementsIntakeV1Schema = Type.Object(
+  {
+    round: RequirementsIntakeRoundV1Schema,
+    ordinal: Type.Integer({ minimum: 1, maximum: 4 }),
+    total: Type.Literal(4),
+  },
+  { additionalProperties: false },
+);
+
 export const InputRequestV1Schema = Type.Object(
   {
     schemaVersion: ContractVersionSchema,
     requestId: TaskIdSchema,
     expectedHead: Sha256Schema,
     ownerEpoch: Type.Integer({ minimum: 1 }),
+    intake: RequirementsIntakeV1Schema,
     questions: Type.Array(QuestionV1Schema, { minItems: 1, uniqueItems: true }),
   },
   { $id: "https://schemas.apexops.dev/input-request-v1.json", additionalProperties: false },
@@ -203,6 +220,8 @@ export type TaskEnvelopeV1 = Static<typeof TaskEnvelopeV1Schema>;
 export type TaskResultV1 = Static<typeof TaskResultV1Schema>;
 export type EventV1 = Static<typeof EventV1Schema>;
 export type QuestionV1 = Static<typeof QuestionV1Schema>;
+export type RequirementsIntakeRoundV1 = Static<typeof RequirementsIntakeRoundV1Schema>;
+export type RequirementsIntakeV1 = Static<typeof RequirementsIntakeV1Schema>;
 export type InputRequestV1 = Static<typeof InputRequestV1Schema>;
 export type InputAnswerV1 = Static<typeof InputAnswerV1Schema>;
 export type InputSubmissionV1 = Static<typeof InputSubmissionV1Schema>;

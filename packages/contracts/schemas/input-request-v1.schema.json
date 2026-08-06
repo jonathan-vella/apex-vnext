@@ -7,6 +7,46 @@
       "pattern": "^[0-9a-f]{64}$",
       "type": "string"
     },
+    "intake": {
+      "additionalProperties": false,
+      "properties": {
+        "ordinal": {
+          "maximum": 4,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "round": {
+          "anyOf": [
+            {
+              "const": "business-discovery",
+              "type": "string"
+            },
+            {
+              "const": "workload-pattern",
+              "type": "string"
+            },
+            {
+              "const": "service-preferences",
+              "type": "string"
+            },
+            {
+              "const": "security-compliance",
+              "type": "string"
+            }
+          ]
+        },
+        "total": {
+          "const": 4,
+          "type": "number"
+        }
+      },
+      "required": [
+        "round",
+        "ordinal",
+        "total"
+      ],
+      "type": "object"
+    },
     "ownerEpoch": {
       "minimum": 1,
       "type": "integer"
@@ -60,6 +100,7 @@
     "requestId",
     "expectedHead",
     "ownerEpoch",
+    "intake",
     "questions"
   ],
   "type": "object"
