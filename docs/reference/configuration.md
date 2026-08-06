@@ -24,6 +24,11 @@ shapes, stale evidence, unsafe paths, and unsupported contract versions.
 Important families include project/run state, task envelopes, requirements, architecture, governance, implementation
 intent, IaC binding, previews, approvals, operations, inventory, diagnosis, quality, and evidence manifests.
 
+Requirements intake contracts define the ordered input requests returned before a requirements task. The kernel question
+catalog supplies the round names and questions; the contracts bind their stable IDs, ordinal, total, request identity,
+journal head, owner epoch, and answer shape. See [Maintain requirements intake](../how-to/maintain-requirements-intake.md)
+for change and replay rules.
+
 ## Project State
 
 A consumer project stores runtime state under `.apex/`. Treat it as kernel-owned state:
@@ -42,4 +47,5 @@ A consumer project stores runtime state under `.apex/`. Treat it as kernel-owned
 
 - [Runtime architecture](../explanation/runtime-architecture.md)
 - [Workflow and gates](../explanation/workflow-and-gates.md)
+- [Maintain requirements intake](../how-to/maintain-requirements-intake.md)
 - [Qualification reference](qualification.md)

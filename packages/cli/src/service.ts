@@ -36,6 +36,7 @@ import {
   type EnvironmentInputsV1,
   type IacBindingV1,
   type InputRequestV1,
+  type RequirementsIntakeRoundV1,
   type InputSubmissionV1,
   type ImprovementCategory,
   type ImprovementDecisionV1,
@@ -364,6 +365,73 @@ const TASKS: readonly WorkflowTaskDescriptor[] = [
   { id: "diagnosis", role: "diagnostic-operator", outputs: ["diagnosis"] },
   { id: "quality", role: "quality-evaluator", outputs: ["quality-report"] },
 ] as const;
+
+interface RequirementsIntakeRound {
+  round: RequirementsIntakeRoundV1;
+  questions: InputRequestV1["questions"];
+}
+
+const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
+  {
+    round: "business-discovery",
+    questions: [
+      { id: "workload", prompt: "Briefly describe the workload and its users." },
+      { id: "industry", prompt: "Which industry or domain does this workload serve?" },
+      {
+        id: "delivery-scenario",
+        prompt: "Is this a greenfield build, migration, modernization, or extension?",
+        options: ["greenfield", "migration", "modernization", "extension"],
+      },
+      {
+        id: "target-environments",
+        prompt: "Which environments are in scope?",
+        options: ["dev", "test", "staging", "prod"],
+        multiSelect: true,
+      },
+    ],
+  },
+  {
+    round: "workload-pattern",
+    questions: [
+      {
+        id: "workload-pattern",
+        prompt: "Which workload pattern best fits the solution?",
+        options: ["web-api", "event-driven", "data-analytics", "iot", "batch"],
+      },
+      { id: "scale", prompt: "Describe expected users, concurrency, throughput, or data volume." },
+      { id: "budget", prompt: "State the monthly budget or use 'deferred: <owner>'." },
+      { id: "data-sensitivity", prompt: "Describe data sensitivity and classification constraints." },
+      { id: "iac-preference", prompt: "Choose the preferred infrastructure tool.", options: ["bicep", "terraform"] },
+    ],
+  },
+  {
+    round: "service-preferences",
+    questions: [
+      { id: "retained-services", prompt: "List Azure services or integrations that must be retained, or 'none'." },
+      { id: "prohibited-services", prompt: "List prohibited services or use 'none'." },
+      {
+        id: "service-preferences",
+        prompt: "State preferred compute, database, integration, and observability services.",
+      },
+      { id: "sku-preferences", prompt: "State required SKUs, tier floors, reservations, or use 'no preference'." },
+      { id: "environment-overrides", prompt: "State environment-specific service or sizing overrides, or 'none'." },
+    ],
+  },
+  {
+    round: "security-compliance",
+    questions: [
+      { id: "compliance", prompt: "List compliance, regulatory, and data-residency requirements." },
+      {
+        id: "security-controls",
+        prompt: "List required identity, network, encryption, and secret-management controls.",
+      },
+      { id: "authentication", prompt: "Describe authentication and authorization requirements." },
+      { id: "region", prompt: "State the required Azure region or use 'deferred: <owner>'." },
+      { id: "availability-recovery", prompt: "State availability, RTO, RPO, backup, and recovery requirements." },
+      { id: "operations", prompt: "State monitoring, alerting, support, and operational requirements." },
+    ],
+  },
+];
 
 export class ApexService {
   readonly root: string;
@@ -902,43 +970,9 @@ export class ApexService {
     const events = await this.journal(run).replay();
     const requirements = this.artifactHash(events, "requirements");
     if (requirements === undefined) {
-      const requested = [...events].reverse().find((event) => event.type === "requirements.input-requested");
-      const requestId = (requested?.payload as { requestId?: unknown } | undefined)?.requestId;
-      const recorded = events.some(
-        (event) =>
-          event.type === "requirements.input-recorded" &&
-          (event.payload as { requestId?: unknown }).requestId === requestId,
-      );
-      if (requested === undefined) {
-        const questions = [
-          { id: "workload", prompt: "Briefly describe the workload and its users." },
-          {
-            id: "requirements",
-            prompt:
-              "List required outcomes and constraints for environment, availability, security/compliance, budget, recovery, operations, and IaC preference. Use 'deferred: <owner>' for undecided items.",
-          },
-        ];
-        if (!hasValidInputRequestQuestions(questions)) {
-          throw new ApexError("APEX_INTERNAL", "Kernel input questions are invalid", EXIT_CODES.internal);
-        }
-        const event = await this.append(run, "requirements.input-requested", {
-          requestId: this.idSource(),
-          questions,
-        });
-        return { status: "needs_input", request: this.inputRequest(event, run.ownerEpoch) };
-      }
-      if (!recorded) {
-        if (requested.hash === events.at(-1)?.hash && requested.ownerEpoch === run.ownerEpoch) {
-          return { status: "needs_input", request: this.inputRequest(requested, run.ownerEpoch) };
-        }
-        const prior = this.inputRequest(requested, requested.ownerEpoch);
-        const event = await this.append(run, "requirements.input-requested", {
-          requestId: this.idSource(),
-          questions: prior.questions,
-          supersedesRequestId: prior.requestId,
-        });
-        return { status: "needs_input", request: this.inputRequest(event, run.ownerEpoch) };
-      }
+      const pending = this.nextRequirementsIntakeRound(events);
+      if (pending !== undefined)
+        return { status: "needs_input", request: await this.issueRequirementsInput(run, pending) };
       return { status: "task", task: await this.issueTask(run, TASKS[0]!, []) };
     }
     const route = await this.route(run, events);
@@ -1001,7 +1035,7 @@ export class ApexService {
       await this.append(
         run,
         "requirements.input-recorded",
-        { requestId: request.requestId, answers: normalizedAnswers },
+        { requestId: request.requestId, intake: request.intake, answers: normalizedAnswers },
         request.expectedHead,
       );
     } catch (error) {
@@ -2576,18 +2610,86 @@ export class ApexService {
   }
 
   private inputRequest(event: EventV1, ownerEpoch: number): InputRequestV1 {
-    const payload = event.payload as { requestId: string; questions: InputRequestV1["questions"] };
+    const payload = event.payload as {
+      requestId: string;
+      intake: InputRequestV1["intake"];
+      questions: InputRequestV1["questions"];
+    };
     const request = {
       schemaVersion: CONTRACT_VERSION,
       requestId: payload.requestId,
       expectedHead: event.hash,
       ownerEpoch,
+      intake: payload.intake,
       questions: payload.questions,
     };
     if (!Value.Check(InputRequestV1Schema, request) || !hasValidInputRequestQuestions(request.questions)) {
       throw new ApexError("APEX_INTERNAL", "Persisted input request is invalid", EXIT_CODES.internal);
     }
     return request;
+  }
+
+  private nextRequirementsIntakeRound(
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+  ): RequirementsIntakeRound | undefined {
+    const requests = events.filter((event) => event.type === "requirements.input-requested");
+    if (
+      requests.some((event) => {
+        const intake = (event.payload as { intake?: unknown }).intake;
+        return intake === null || typeof intake !== "object";
+      })
+    ) {
+      throw new ApexError("APEX_CONFLICT", "Requirements intake is incompatible; start a new run", EXIT_CODES.conflict);
+    }
+    const recordedRequestIds = new Set(
+      events.flatMap((event) =>
+        event.type === "requirements.input-recorded" &&
+        typeof (event.payload as { requestId?: unknown }).requestId === "string"
+          ? [(event.payload as { requestId: string }).requestId]
+          : [],
+      ),
+    );
+    const latest = requests.at(-1);
+    if (latest !== undefined && !recordedRequestIds.has((latest.payload as { requestId: string }).requestId)) {
+      const intake = (latest.payload as { intake: { ordinal?: unknown; round?: unknown; total?: unknown } }).intake;
+      const ordinal = intake.ordinal;
+      const round =
+        typeof ordinal === "number" && Number.isInteger(ordinal) ? REQUIREMENTS_INTAKE[ordinal - 1] : undefined;
+      if (round === undefined || intake.round !== round.round || intake.total !== REQUIREMENTS_INTAKE.length) {
+        throw new ApexError(
+          "APEX_CONFLICT",
+          "Requirements intake is incompatible; start a new run",
+          EXIT_CODES.conflict,
+        );
+      }
+      return round;
+    }
+    return REQUIREMENTS_INTAKE[recordedRequestIds.size];
+  }
+
+  private async issueRequirementsInput(run: RunConfigV1, round: RequirementsIntakeRound): Promise<InputRequestV1> {
+    if (!hasValidInputRequestQuestions(round.questions)) {
+      throw new ApexError("APEX_INTERNAL", "Kernel input questions are invalid", EXIT_CODES.internal);
+    }
+    const events = await this.journal(run).replay();
+    const latest = [...events].reverse().find((event) => event.type === "requirements.input-requested");
+    if (latest !== undefined) {
+      const recorded = events.some(
+        (event) =>
+          event.type === "requirements.input-recorded" &&
+          (event.payload as { requestId?: unknown }).requestId === (latest.payload as { requestId: string }).requestId,
+      );
+      if (!recorded && latest.hash === events.at(-1)?.hash && latest.ownerEpoch === run.ownerEpoch) {
+        return this.inputRequest(latest, run.ownerEpoch);
+      }
+    }
+    const ordinal = REQUIREMENTS_INTAKE.findIndex(({ round: id }) => id === round.round) + 1;
+    const event = await this.append(run, "requirements.input-requested", {
+      requestId: this.idSource(),
+      intake: { round: round.round, ordinal, total: 4 },
+      questions: round.questions,
+    });
+    return this.inputRequest(event, run.ownerEpoch);
   }
 
   private async append(
@@ -2739,22 +2841,26 @@ export class ApexService {
   private recordedRequirementsInput(
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): Record<string, string | string[]> | null {
-    const recorded = [...events].reverse().find((event) => event.type === "requirements.input-recorded");
-    const answers = (recorded?.payload as { answers?: unknown } | undefined)?.answers;
-    if (!Array.isArray(answers)) return null;
     const result: Record<string, string | string[]> = {};
-    for (const answer of answers) {
-      const value = answer as { questionId?: unknown; value?: unknown };
-      if (
-        typeof value.questionId !== "string" ||
-        (typeof value.value !== "string" &&
-          (!Array.isArray(value.value) || value.value.some((item) => typeof item !== "string")))
-      ) {
-        throw new ApexError("APEX_INTERNAL", "Recorded requirements input is invalid", EXIT_CODES.internal);
+    let recorded = false;
+    for (const event of events) {
+      if (event.type !== "requirements.input-recorded") continue;
+      const answers = (event.payload as { answers?: unknown }).answers;
+      if (!Array.isArray(answers)) continue;
+      recorded = true;
+      for (const answer of answers) {
+        const value = answer as { questionId?: unknown; value?: unknown };
+        if (
+          typeof value.questionId !== "string" ||
+          (typeof value.value !== "string" &&
+            (!Array.isArray(value.value) || value.value.some((item) => typeof item !== "string")))
+        ) {
+          throw new ApexError("APEX_INTERNAL", "Recorded requirements input is invalid", EXIT_CODES.internal);
+        }
+        result[value.questionId] = value.value as string | string[];
       }
-      result[value.questionId] = value.value as string | string[];
     }
-    return result;
+    return recorded ? result : null;
   }
 
   private outputTemplate(

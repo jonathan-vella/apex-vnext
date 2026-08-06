@@ -406,7 +406,10 @@ test("exports content-free pending and recorded input evidence from a real works
     requestId: pending.request.requestId,
     expectedHead: pending.request.expectedHead,
     ownerEpoch: pending.request.ownerEpoch,
-    answers: pending.request.questions.map(({ id }) => ({ questionId: id, value: `secret-${id}` })),
+    answers: pending.request.questions.map(({ id, multiSelect, options }) => ({
+      questionId: id,
+      value: options === undefined ? `secret-${id}` : multiSelect === true ? [options[0]] : options[0],
+    })),
   });
   const after = await collectClientInputEvidence({ workspace: "." }, { root });
   assert.equal(after.status, "recorded");
@@ -856,7 +859,10 @@ test("input evidence rejects malformed, replayed, and drifted source state", asy
     requestId: replayed.pending.request.requestId,
     expectedHead: replayed.pending.request.expectedHead,
     ownerEpoch: replayed.pending.request.ownerEpoch,
-    answers: replayed.pending.request.questions.map(({ id }) => ({ questionId: id, value: id })),
+    answers: replayed.pending.request.questions.map(({ id, multiSelect, options }) => ({
+      questionId: id,
+      value: options === undefined ? id : multiSelect === true ? [options[0]] : options[0],
+    })),
   };
   await replayed.service.recordInput(submission);
   await replayed.journal.append({
@@ -867,7 +873,7 @@ test("input evidence rejects malformed, replayed, and drifted source state", asy
     timestamp,
     ownerEpoch: replayed.pending.request.ownerEpoch,
     expectedHead: await replayed.journal.head(),
-    payload: { requestId: submission.requestId, answers: submission.answers },
+    payload: { requestId: submission.requestId, intake: replayed.pending.request.intake, answers: submission.answers },
   });
   await assert.rejects(
     collectClientInputEvidence({ workspace: "." }, { root: replayed.root }),

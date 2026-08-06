@@ -30,6 +30,7 @@ replace its authority.
 - [Prepare Windows 11](how-to/prepare-windows-11.md)
 - [Manage installation](how-to/manage-installation.md)
 - [Run the workflow](how-to/run-workflow.md)
+- [Maintain requirements intake](how-to/maintain-requirements-intake.md)
 - [Operate a project](how-to/operate-project.md)
 - [Qualify a candidate](how-to/qualify-candidate.md)
 - [Contribute to APEX vNext](how-to/contribute.md)

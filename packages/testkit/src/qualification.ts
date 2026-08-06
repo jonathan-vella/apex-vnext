@@ -358,13 +358,33 @@ function restart(context: TrackContext): void {
   context.service = new ApexService(context.root, context.options);
 }
 
+async function completeRequirementsIntake(service: ApexService, workload: string): Promise<void> {
+  let next = await service.nextTask();
+  while (next.status === "needs_input") {
+    await service.recordInput({
+      schemaVersion: "1.0.0",
+      requestId: next.request.requestId,
+      expectedHead: next.request.expectedHead,
+      ownerEpoch: next.request.ownerEpoch,
+      answers: next.request.questions.map(({ id, multiSelect, options }) => ({
+        questionId: id,
+        value:
+          id === "workload"
+            ? workload
+            : options === undefined
+              ? `qualification-${id}`
+              : multiSelect === true
+                ? [options[0]!]
+                : options[0]!,
+      })),
+    });
+    next = await service.nextTask();
+  }
+}
+
 async function completeCreativeWorkflow(context: TrackContext): Promise<void> {
   const { service, runId, track } = context;
-  await service.nextTask();
-  await service.recordRequirementsInput({
-    workload: `${track} qualification workload`,
-    requirements: "deterministic qualification requirements",
-  });
+  await completeRequirementsIntake(service, `${track} qualification workload`);
   const requirementValue = requirements(track);
   const requirementHashes = await complete(context, "requirements", [
     { kind: "requirements", value: requirementValue },
@@ -778,11 +798,7 @@ async function faultStaleTask(
 ): Promise<void> {
   const service = new ApexService(join(root, ".scenarios", "stale-task"), { clock: clock.now, idSource: ids.next });
   await service.init({ projectId: `stale-${track}`, iacTool: track });
-  await service.nextTask();
-  await service.recordRequirementsInput({
-    workload: `${track} stale task workload`,
-    requirements: "stale task fault injection",
-  });
+  await completeRequirementsIntake(service, `${track} stale task workload`);
   const issued = await service.nextTask();
   if (issued.status !== "task") throw new Error("Expected fault task");
   await service.cancelTask(issued.task.taskId);

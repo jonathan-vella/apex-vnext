@@ -1378,11 +1378,22 @@ function inputRequestPayload(event) {
   }
   const keys = Object.keys(payload).sort().join(",");
   if (
-    !["questions,requestId", "questions,requestId,supersedesRequestId"].includes(keys) ||
+    !["intake,questions,requestId", "intake,questions,requestId,supersedesRequestId"].includes(keys) ||
     typeof payload.requestId !== "string" ||
     !INPUT_ID_PATTERN.test(payload.requestId) ||
     (payload.supersedesRequestId !== undefined &&
       (typeof payload.supersedesRequestId !== "string" || !INPUT_ID_PATTERN.test(payload.supersedesRequestId))) ||
+    payload.intake === null ||
+    typeof payload.intake !== "object" ||
+    Array.isArray(payload.intake) ||
+    Object.keys(payload.intake).sort().join(",") !== "ordinal,round,total" ||
+    !["business-discovery", "workload-pattern", "service-preferences", "security-compliance"].includes(
+      payload.intake.round,
+    ) ||
+    !Number.isInteger(payload.intake.ordinal) ||
+    payload.intake.ordinal < 1 ||
+    payload.intake.ordinal > 4 ||
+    payload.intake.total !== 4 ||
     !Array.isArray(payload.questions) ||
     payload.questions.length === 0 ||
     payload.questions.length > 32 ||
@@ -1422,8 +1433,9 @@ function inputRecordedPayload(event, request) {
     payload === null ||
     typeof payload !== "object" ||
     Array.isArray(payload) ||
-    Object.keys(payload).sort().join(",") !== "answers,requestId" ||
+    Object.keys(payload).sort().join(",") !== "answers,intake,requestId" ||
     payload.requestId !== request.requestId ||
+    JSON.stringify(payload.intake) !== JSON.stringify(request.intake) ||
     !Array.isArray(payload.answers) ||
     payload.answers.length !== request.questions.length ||
     payload.answers.length === 0

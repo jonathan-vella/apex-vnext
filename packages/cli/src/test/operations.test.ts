@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ApexService } from "../service.js";
-import { tempRoot } from "./helpers.js";
+import { nextTaskAfterInput, tempRoot } from "./helpers.js";
 
 test("writer transfer binds the current head and advances ownership", async () => {
   const service = new ApexService(await tempRoot());
@@ -89,7 +89,7 @@ test("validation cache keys include journal head and cache clear is deterministi
   await service.init({ projectId: "demo" });
   const first = await service.validate();
   assert.equal((await service.cacheStatus()).entries, 1);
-  await service.recordRequirementsInput({ workload: "new", requirements: "cache invalidation" });
+  await nextTaskAfterInput(service);
   const second = await service.validate();
   assert.ok(second.events > first.events);
   assert.equal((await service.cacheStatus()).entries, 2);
@@ -100,10 +100,10 @@ test("validation cache keys include journal head and cache clear is deterministi
 test("project history and search include event payloads and artifact kinds", async () => {
   const service = new ApexService(await tempRoot());
   await service.init({ projectId: "demo" });
-  await service.recordRequirementsInput({ workload: "history", requirements: "needle-value" });
+  await nextTaskAfterInput(service);
   const history = await service.history(10);
   assert.ok(history.some(({ type }) => type === "requirements.input-recorded"));
-  const search = await service.search("needle-value");
+  const search = await service.search("test-workload");
   assert.equal(search[0]?.projectId, "demo");
   assert.ok(search[0]?.matches?.some(({ type }) => type === "requirements.input-recorded"));
 });
