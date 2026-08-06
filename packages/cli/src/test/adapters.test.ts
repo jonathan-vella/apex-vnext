@@ -286,6 +286,50 @@ test("MCP registers only narrow tools and calls the service", async () => {
   await server.close();
 });
 
+test("MCP requires an atomic bundle for multi-output tasks", async () => {
+  const completedBundles: unknown[] = [];
+  const service = {
+    taskContext: async () => ({
+      task: { allowedOutputKinds: ["implementation-intent", "iac-binding", "environment-inputs"] },
+    }),
+    completeTask: async () => {
+      throw new Error("single-output completion must not be called");
+    },
+    completeTaskOutputs: async (_taskId: string, outputs: unknown[]) => {
+      completedBundles.push(outputs);
+      return { outputHashes: {}, summary: "accepted" };
+    },
+  } as unknown as ApexService;
+  const server = createMcpServer(service);
+  const client = new Client({ name: "test", version: "1.0.0" });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+
+  const single = await client.callTool({
+    name: "completeTask",
+    arguments: { taskId: "plan-task", kind: "implementation-intent", value: {} },
+  });
+  assert.equal(single.isError, true);
+  assert.match(JSON.stringify(single.content), /outputs\[\]/u);
+
+  const bundle = await client.callTool({
+    name: "completeTask",
+    arguments: {
+      taskId: "plan-task",
+      outputs: [
+        { kind: "implementation-intent", value: {} },
+        { kind: "iac-binding", value: {} },
+        { kind: "environment-inputs", value: {} },
+      ],
+    },
+  });
+  assert.equal(bundle.isError, undefined);
+  assert.equal(completedBundles.length, 1);
+  await client.close();
+  await server.close();
+});
+
 test("CLI completes an artifact bundle from JSON", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);

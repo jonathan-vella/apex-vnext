@@ -159,6 +159,7 @@ export function createMcpServer(service: ApexService): McpServer {
   server.registerTool(
     "completeTask",
     {
+      description: "Complete a task atomically. Supply outputs[] for every task with multiple required output kinds.",
       inputSchema: {
         taskId: z.string(),
         kind: artifactKind.optional(),
@@ -170,6 +171,10 @@ export function createMcpServer(service: ApexService): McpServer {
     async ({ taskId, kind, value, summary, outputs }) => {
       if (outputs !== undefined) return result(await service.completeTaskOutputs(taskId, normalizeOutputs(outputs)));
       if (kind === undefined) throw new Error("completeTask requires kind/value or outputs[]");
+      const context = await service.taskContext(taskId);
+      if (context.task.allowedOutputKinds.length > 1) {
+        throw new Error("completeTask requires outputs[] when the task has multiple required output kinds");
+      }
       return result(await service.completeTask(taskId, { kind, value, ...(summary === undefined ? {} : { summary }) }));
     },
   );

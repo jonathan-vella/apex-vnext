@@ -1045,6 +1045,7 @@ export class ApexService {
   async taskContext(taskId: string): Promise<{
     task: TaskEnvelopeV1;
     inputs: unknown[];
+    artifactHashes: Record<string, string>;
     recordedInput: Record<string, string | string[]> | null;
     outputTemplates: Partial<Record<ArtifactKind, unknown>>;
     outputRoot: string;
@@ -1056,7 +1057,7 @@ export class ApexService {
     const events = await this.journal(run).replay();
     const route = await this.route(run, events);
     const outputTemplates: Partial<Record<ArtifactKind, unknown>> = {};
-    if (task.taskType === "requirements") {
+    if (task.taskType === "requirements" || task.taskType === "plan") {
       for (const kind of task.allowedOutputKinds) {
         if (!SUPPORTED_ARTIFACT_KINDS.includes(kind as ArtifactKind)) {
           throw new ApexError("APEX_INTERNAL", `Unsupported task output kind: ${kind}`, EXIT_CODES.internal);
@@ -1064,9 +1065,11 @@ export class ApexService {
         outputTemplates[kind as ArtifactKind] = this.outputTemplate(kind as ArtifactKind, run, events);
       }
     }
+    const artifactHashes = this.acceptedArtifactHashes(events);
     return {
       task,
       inputs: await Promise.all(task.inputRefs.map((hash) => this.objects.getJson(hash))),
+      artifactHashes,
       recordedInput: task.taskType === "requirements" ? this.recordedRequirementsInput(events) : null,
       outputTemplates,
       outputRoot: join(this.root, ".apex", "work", run.runId, taskId),
@@ -2390,8 +2393,13 @@ export class ApexService {
     const run = await this.currentRun();
     if (kind === "status") return renderRunStatus(run);
     const events = await this.journal(run).replay();
+    if (kind === "requirements") {
+      const hash = this.artifactHash(events, "requirements");
+      if (hash === undefined)
+        throw new ApexError("APEX_NOT_FOUND", "No requirements artifact exists", EXIT_CODES.notFound);
+      return renderRequirements((await this.objects.getJson(hash)) as never);
+    }
     const map = {
-      requirements: ["task.completed", "requirementsHash", renderRequirements],
       preview: ["preview.created", "previewObjectHash", renderDeploymentPreview],
       approval: ["gate.decided", "approvalHash", renderApprovalEvidence],
       inventory: ["deployment.completed", "inventoryHash", renderResourceInventory],
@@ -2675,6 +2683,26 @@ export class ApexService {
     return field === undefined ? undefined : this.latestPayloadHash(events, "task.completed", field);
   }
 
+  private acceptedArtifactHashes(events: Awaited<ReturnType<EventJournal["replay"]>>): Record<string, string> {
+    const hashes: Record<string, string> = {};
+    const legacyFields: Partial<Record<ArtifactKind, string>> = {
+      requirements: "requirementsHash",
+      "implementation-intent": "intentHash",
+    };
+    for (const event of events) {
+      if (event.type !== "task.completed") continue;
+      const payload = event.payload as Record<string, unknown>;
+      for (const [kind, hash] of Object.entries(payload.artifactHashes ?? {})) {
+        if (typeof hash === "string") hashes[kind] = hash;
+      }
+      for (const [kind, field] of Object.entries(legacyFields)) {
+        const hash = payload[field];
+        if (typeof hash === "string" && hashes[kind] === undefined) hashes[kind] = hash;
+      }
+    }
+    return hashes;
+  }
+
   private inputRefs(events: Awaited<ReturnType<EventJournal["replay"]>>, descriptor: WorkflowTaskDescriptor): string[] {
     const availabilityKinds = new Set([
       "architecture-availability-v1",
@@ -2760,6 +2788,62 @@ export class ApexService {
         ],
         assumptions: [],
         unknowns: [],
+      };
+    }
+    if (kind === "implementation-intent") {
+      const sourceHashes = Object.fromEntries(
+        ["requirements", "architecture", "governance-constraints", "policy-property-map"].flatMap((artifact) => {
+          const hash = this.artifactHash(events, artifact as ArtifactKind);
+          return hash === undefined ? [] : [[artifact, hash]];
+        }),
+      );
+      return {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: run.projectId,
+        runId: run.runId,
+        sourceHashes,
+        resources: [
+          {
+            id: "RESOURCE_ID",
+            type: "SERVICE_TYPE",
+            purpose: "Describe the resource purpose",
+            dependsOn: [],
+            controls: [],
+          },
+        ],
+        outputs: ["OUTPUT_NAME"],
+      };
+    }
+    if (kind === "iac-binding") {
+      return {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: run.projectId,
+        runId: run.runId,
+        track: run.iacTool,
+        intentHash: "0".repeat(64),
+        resourceBindings: {
+          RESOURCE_ID: {
+            implementation: "IMPLEMENTATION_ADDRESS",
+            version: "IMPLEMENTATION_VERSION",
+            parameters: {},
+          },
+        },
+      };
+    }
+    if (kind === "environment-inputs") {
+      return {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: run.projectId,
+        runId: run.runId,
+        environment: run.environment,
+        inputs: {
+          location: { kind: "value", value: "REGION" },
+          credential: {
+            kind: "secret-reference",
+            provider: "azure-key-vault",
+            reference: "KEY_VAULT_SECRET_REFERENCE",
+          },
+        },
       };
     }
     return { schemaId: ARTIFACTS[kind][1].$id };
@@ -3153,12 +3237,7 @@ export class ApexService {
       const validatorBoundary = workflowValidatorOwnership(id)?.boundary;
       return validatorBoundary !== undefined && boundaries.has(validatorBoundary);
     });
-    const artifactHashes: Record<string, string> = {};
-    for (const event of events) {
-      if (event.type !== "task.completed") continue;
-      const hashes = (event.payload as { artifactHashes?: Record<string, unknown> }).artifactHashes ?? {};
-      for (const [kind, hash] of Object.entries(hashes)) if (typeof hash === "string") artifactHashes[kind] = hash;
-    }
+    const artifactHashes = this.acceptedArtifactHashes(events);
     const artifacts = Object.fromEntries(
       await Promise.all(
         Object.entries(artifactHashes).map(async ([kind, hash]) => [kind, await this.objects.getJson<unknown>(hash)]),

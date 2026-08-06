@@ -20,7 +20,8 @@ Use this skill only for an active planning task.
 3. Put modules, providers, API versions, variables, parameters, phases, backend, and stack ownership in the selected
    binding rather than neutral intent.
 4. Trace every binding obligation to intent and projected policy requirements.
-5. Submit the typed result only through `apex/stageArtifact` and `apex/completeTask`.
+5. Stage each typed output through `apex/stageArtifact`, then call `apex/completeTask` once with every required
+   output in `outputs`. Do not submit a single-output completion for a multi-output task.
 
 ## Output
 
