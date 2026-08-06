@@ -64,7 +64,13 @@ export function validateInputAnswers(questions: QuestionV1[], submitted: InputAn
         if (!Array.isArray(value) || value.some((item) => !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(item))) {
           throw new Error(`Answer shape does not match question: ${question.id}`);
         }
-        return { questionId: question.id, value };
+        if (question.options !== undefined && value.some((item) => !question.options!.includes(item))) {
+          throw new Error(`Answer is not a declared option: ${question.id}`);
+        }
+        return {
+          questionId: question.id,
+          value: question.options === undefined ? value : question.options.filter((option) => value.includes(option)),
+        };
       }
       if (typeof value !== "object" || value === null || Array.isArray(value) || value.kind !== question.valueType) {
         throw new Error(`Answer shape does not match question: ${question.id}`);

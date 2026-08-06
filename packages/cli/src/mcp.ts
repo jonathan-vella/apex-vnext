@@ -11,9 +11,13 @@ const artifactKind = z.enum(
   ],
 );
 const taskOutput = z.object({ kind: artifactKind, value: z.unknown(), summary: z.string().optional() });
+const uniqueStrings = z
+  .array(z.string().min(1))
+  .min(1)
+  .refine((values) => new Set(values).size === values.length);
 const inputValue = z.union([
   z.string().min(1),
-  z.array(z.string().min(1)).min(1),
+  uniqueStrings,
   z.object({ kind: z.literal("deferred"), owner: z.string().min(1) }).strict(),
   z.object({ kind: z.literal("unknown") }).strict(),
   z
@@ -37,7 +41,7 @@ const inputValue = z.union([
       classification: z.enum(["public", "internal", "confidential", "restricted"]),
     })
     .strict(),
-  z.object({ kind: z.literal("compliance"), scopes: z.array(z.string().min(1)).min(1) }).strict(),
+  z.object({ kind: z.literal("compliance"), scopes: uniqueStrings }).strict(),
 ]);
 const inputSubmission = z
   .object({

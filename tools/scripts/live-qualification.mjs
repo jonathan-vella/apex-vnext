@@ -1453,7 +1453,7 @@ function inputRecordedPayload(event, request) {
       answer.questionId.length === 0 ||
       answer.questionId.length > 128 ||
       answers.has(answer.questionId) ||
-      (typeof answer.value !== "string" && !Array.isArray(answer.value)) ||
+      answer.value === null ||
       (typeof answer.value === "string" && (answer.value.length === 0 || answer.value.length > 4096)) ||
       (Array.isArray(answer.value) &&
         (answer.value.length === 0 ||
@@ -1468,7 +1468,7 @@ function inputRecordedPayload(event, request) {
   for (const question of request.questions) {
     const value = answers.get(question.id);
     if (question.valueType !== undefined) {
-      if (!typedInputValueMatches(question.valueType, value)) {
+      if (!typedInputValueMatches(question.valueType, value, question.options)) {
         throw new Error("Recognized input recorded event has invalid payload");
       }
       continue;
@@ -1488,9 +1488,18 @@ function inputRecordedPayload(event, request) {
   return payload;
 }
 
-function typedInputValueMatches(valueType, value) {
+function typedInputValueMatches(valueType, value, options) {
   if (value === null || typeof value !== "object" || Array.isArray(value))
-    return valueType === "environment-set" && Array.isArray(value);
+    return (
+      valueType === "environment-set" &&
+      Array.isArray(value) &&
+      value.length > 0 &&
+      new Set(value).size === value.length &&
+      value.every((item) => typeof item === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(item)) &&
+      (options === undefined ||
+        (value.every((item) => options.includes(item)) &&
+          JSON.stringify(value) === JSON.stringify(options.filter((option) => value.includes(option)))))
+    );
   if (Object.keys(value).sort().join(",") === "kind,owner")
     return value.kind === "deferred" && typeof value.owner === "string" && value.owner.length > 0;
   if (Object.keys(value).sort().join(",") === "kind") return value.kind === "unknown";
