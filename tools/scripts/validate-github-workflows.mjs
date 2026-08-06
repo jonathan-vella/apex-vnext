@@ -145,7 +145,7 @@ function validateNodeSetupAction(text) {
     install?.shell !== "bash" ||
     install?.run !== "npm ci" ||
     install?.env?.LEFTHOOK !== "0" ||
-    install?.env?.npm_config_registry !== "https://packagefeedproxy.microsoft.io/npm/" ||
+    install?.env?.npm_config_registry !== "https://registry.npmjs.org/" ||
     Object.keys(install?.env ?? {}).length !== 2
   ) {
     return ["Node setup action dependency registry contract drift"];
