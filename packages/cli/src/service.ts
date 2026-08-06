@@ -403,7 +403,11 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
       },
       { id: "scale", prompt: "Describe expected users, concurrency, throughput, or data volume." },
       { id: "budget", prompt: "State the monthly budget or explicitly defer it.", valueType: "budget" },
-      { id: "data-sensitivity", prompt: "Choose the data classification or explicitly defer it.", valueType: "data-classification" },
+      {
+        id: "data-sensitivity",
+        prompt: "Choose the data classification or explicitly defer it.",
+        valueType: "data-classification",
+      },
       { id: "iac-preference", prompt: "Choose the preferred infrastructure tool.", options: ["bicep", "terraform"] },
     ],
   },
@@ -423,7 +427,11 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
   {
     round: "security-compliance",
     questions: [
-      { id: "compliance", prompt: "List compliance and regulatory scopes or explicitly defer them.", valueType: "compliance" },
+      {
+        id: "compliance",
+        prompt: "List compliance and regulatory scopes or explicitly defer them.",
+        valueType: "compliance",
+      },
       {
         id: "security-controls",
         prompt: "List required identity, network, encryption, and secret-management controls.",
@@ -431,7 +439,11 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
       { id: "authentication", prompt: "Describe authentication and authorization requirements." },
       { id: "region", prompt: "State the required Azure region or use 'deferred: <owner>'." },
       { id: "availability-recovery", prompt: "State availability, RTO, RPO, backup, and recovery requirements." },
-      { id: "recovery", prompt: "Provide RTO and RPO in whole minutes or explicitly defer them.", valueType: "recovery" },
+      {
+        id: "recovery",
+        prompt: "Provide RTO and RPO in whole minutes or explicitly defer them.",
+        valueType: "recovery",
+      },
       { id: "operations", prompt: "State monitoring, alerting, support, and operational requirements." },
     ],
   },
@@ -2903,10 +2915,7 @@ export class ApexService {
       recorded = true;
       for (const answer of answers) {
         const value = answer as { questionId?: unknown; value?: unknown };
-        if (
-          typeof value.questionId !== "string" ||
-          !Value.Check(InputValueV1Schema, value.value)
-        ) {
+        if (typeof value.questionId !== "string" || !Value.Check(InputValueV1Schema, value.value)) {
           throw new ApexError("APEX_INTERNAL", "Recorded requirements input is invalid", EXIT_CODES.internal);
         }
         result[value.questionId] = value.value as InputValueV1;

@@ -16,9 +16,27 @@ const inputValue = z.union([
   z.array(z.string().min(1)).min(1),
   z.object({ kind: z.literal("deferred"), owner: z.string().min(1) }).strict(),
   z.object({ kind: z.literal("unknown") }).strict(),
-  z.object({ kind: z.literal("budget"), amount: z.number().nonnegative(), currency: z.string().regex(/^[A-Z]{3}$/), cadence: z.literal("monthly") }).strict(),
-  z.object({ kind: z.literal("recovery"), rtoMinutes: z.number().int().nonnegative(), rpoMinutes: z.number().int().nonnegative() }).strict(),
-  z.object({ kind: z.literal("data-classification"), classification: z.enum(["public", "internal", "confidential", "restricted"]) }).strict(),
+  z
+    .object({
+      kind: z.literal("budget"),
+      amount: z.number().nonnegative(),
+      currency: z.string().regex(/^[A-Z]{3}$/),
+      cadence: z.literal("monthly"),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("recovery"),
+      rtoMinutes: z.number().int().nonnegative(),
+      rpoMinutes: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("data-classification"),
+      classification: z.enum(["public", "internal", "confidential", "restricted"]),
+    })
+    .strict(),
   z.object({ kind: z.literal("compliance"), scopes: z.array(z.string().min(1)).min(1) }).strict(),
 ]);
 const inputSubmission = z

@@ -134,17 +134,34 @@ export const UnknownInputValueV1Schema = Type.Object(
 );
 
 export const BudgetInputValueV1Schema = Type.Object(
-  { kind: Type.Literal("budget"), amount: Type.Number({ minimum: 0 }), currency: Type.String({ pattern: "^[A-Z]{3}$" }), cadence: Type.Literal("monthly") },
+  {
+    kind: Type.Literal("budget"),
+    amount: Type.Number({ minimum: 0 }),
+    currency: Type.String({ pattern: "^[A-Z]{3}$" }),
+    cadence: Type.Literal("monthly"),
+  },
   { additionalProperties: false },
 );
 
 export const RecoveryInputValueV1Schema = Type.Object(
-  { kind: Type.Literal("recovery"), rtoMinutes: Type.Integer({ minimum: 0 }), rpoMinutes: Type.Integer({ minimum: 0 }) },
+  {
+    kind: Type.Literal("recovery"),
+    rtoMinutes: Type.Integer({ minimum: 0 }),
+    rpoMinutes: Type.Integer({ minimum: 0 }),
+  },
   { additionalProperties: false },
 );
 
 export const ClassificationInputValueV1Schema = Type.Object(
-  { kind: Type.Literal("data-classification"), classification: Type.Union([Type.Literal("public"), Type.Literal("internal"), Type.Literal("confidential"), Type.Literal("restricted")]) },
+  {
+    kind: Type.Literal("data-classification"),
+    classification: Type.Union([
+      Type.Literal("public"),
+      Type.Literal("internal"),
+      Type.Literal("confidential"),
+      Type.Literal("restricted"),
+    ]),
+  },
   { additionalProperties: false },
 );
 

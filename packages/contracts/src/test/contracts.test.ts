@@ -820,7 +820,9 @@ describe("target family contracts", () => {
         requestId: request.requestId,
         expectedHead: request.expectedHead,
         ownerEpoch: request.ownerEpoch,
-        answers: [{ questionId: "budget", value: { kind: "budget", amount: 250, currency: "USD", cadence: "monthly" } }],
+        answers: [
+          { questionId: "budget", value: { kind: "budget", amount: 250, currency: "USD", cadence: "monthly" } },
+        ],
       }),
       true,
     );

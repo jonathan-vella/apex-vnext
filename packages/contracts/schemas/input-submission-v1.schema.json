@@ -25,6 +25,145 @@
                 "minItems": 1,
                 "type": "array",
                 "uniqueItems": true
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "deferred",
+                    "type": "string"
+                  },
+                  "owner": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "owner"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "unknown",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "amount": {
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "cadence": {
+                    "const": "monthly",
+                    "type": "string"
+                  },
+                  "currency": {
+                    "pattern": "^[A-Z]{3}$",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "budget",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "amount",
+                  "currency",
+                  "cadence"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "recovery",
+                    "type": "string"
+                  },
+                  "rpoMinutes": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "rtoMinutes": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "rtoMinutes",
+                  "rpoMinutes"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "classification": {
+                    "anyOf": [
+                      {
+                        "const": "public",
+                        "type": "string"
+                      },
+                      {
+                        "const": "internal",
+                        "type": "string"
+                      },
+                      {
+                        "const": "confidential",
+                        "type": "string"
+                      },
+                      {
+                        "const": "restricted",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "const": "data-classification",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "classification"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "compliance",
+                    "type": "string"
+                  },
+                  "scopes": {
+                    "items": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "kind",
+                  "scopes"
+                ],
+                "type": "object"
               }
             ]
           }
