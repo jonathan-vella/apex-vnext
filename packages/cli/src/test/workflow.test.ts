@@ -263,7 +263,10 @@ test("plan task context projects source hashes and valid output templates", asyn
 
   const requirementHashes = await complete("requirements", [{ kind: "requirements", value: requirements() }]);
   await complete("requirements-review", [
-    { kind: "review-findings", value: review(initialized.runId, "requirements", requirementHashes.outputHashes.requirements!) },
+    {
+      kind: "review-findings",
+      value: review(initialized.runId, "requirements", requirementHashes.outputHashes.requirements!),
+    },
   ]);
   await service.decideGateNumber(1, "approved", "tester");
   await acceptAvailabilityEvidence(service, initialized.runId);
@@ -283,7 +286,10 @@ test("plan task context projects source hashes and valid output templates", asyn
     },
   ]);
   await complete("architecture-review", [
-    { kind: "review-findings", value: review(initialized.runId, "architecture", architectureHashes.outputHashes.architecture!) },
+    {
+      kind: "review-findings",
+      value: review(initialized.runId, "architecture", architectureHashes.outputHashes.architecture!),
+    },
   ]);
   const governanceHashes = await complete("governance-discovery", [
     { kind: "governance-constraints", value: governance(initialized.runId) },
@@ -310,7 +316,11 @@ test("plan task context projects source hashes and valid output templates", asyn
   for (const kind of ["requirements", "architecture", "governance-constraints", "policy-property-map"]) {
     assert.match(context.artifactHashes[kind]!, /^[a-f0-9]{64}$/);
   }
-  assert.deepEqual(Object.keys(context.outputTemplates).sort(), ["environment-inputs", "iac-binding", "implementation-intent"]);
+  assert.deepEqual(Object.keys(context.outputTemplates).sort(), [
+    "environment-inputs",
+    "iac-binding",
+    "implementation-intent",
+  ]);
   assert.deepEqual(context.outputTemplates["environment-inputs"], {
     schemaVersion: "1.0.0",
     projectId: "demo",
