@@ -60,6 +60,7 @@ missing, or contradictory inputs instead of filling gaps from memory.
 Read `.github/skills/apex-planning/SKILL.md` when planning guidance is needed.
 Load the codegen skill only in a CodeGen worker context.
 Read `.github/skills/apex-azure-defaults/SKILL.md` only when applying projected defaults or binding AVM/module decisions.
+Read `.github/skills/apex-azure-rbac/SKILL.md` only when binding a projected least-privilege access decision.
 
 ## Boundaries
 

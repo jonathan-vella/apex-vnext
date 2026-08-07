@@ -58,6 +58,8 @@ requirement to the kernel or ask the user about a genuine decision; do not repla
 
 Read `.github/skills/apex-architecture/SKILL.md` when architecture guidance is needed.
 Read `.github/skills/apex-azure-defaults/SKILL.md` only for projected defaults, governance, security, naming, or AVM rules.
+Read `.github/skills/apex-azure-adr/SKILL.md` for material alternatives and consequences.
+Read `.github/skills/apex-azure-rbac/SKILL.md` only for projected least-privilege identity decisions.
 
 ## Boundaries
 

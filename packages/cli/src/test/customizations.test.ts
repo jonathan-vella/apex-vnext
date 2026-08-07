@@ -52,6 +52,13 @@ test("init installs bundled customizations and runtime config by default", async
     /APEX Azure Defaults/u,
   );
   assert.match(
+    await readFile(
+      join(root, ".github", "skills", "apex-azure-defaults", "references", "security-baseline.md"),
+      "utf8",
+    ),
+    /Core Controls/u,
+  );
+  assert.match(
     await readFile(join(root, ".github", "skills", "apex-artifacts", "SKILL.md"), "utf8"),
     /APEX Artifact Presentations/u,
   );
@@ -138,6 +145,13 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(
     await readFile(join(root, ".github", "skills", "apex-azure-defaults", "SKILL.md"), "utf8"),
     /APEX Azure Defaults/u,
+  );
+  assert.match(
+    await readFile(
+      join(root, ".github", "skills", "apex-azure-defaults", "references", "security-baseline.md"),
+      "utf8",
+    ),
+    /Core Controls/u,
   );
   assert.match(
     await readFile(join(root, ".github", "skills", "apex-artifacts", "SKILL.md"), "utf8"),
