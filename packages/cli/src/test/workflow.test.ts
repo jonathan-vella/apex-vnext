@@ -292,8 +292,10 @@ test("requirements document rendering escapes table cells without rejecting cont
   const value = requirements();
   value.requirements[0] = {
     ...value.requirements[0]!,
-    statement: "Allow {custom-rule} | retain newline\nfor review",
+    statement: "Allow {workload} and {custom-rule} | retain newline\nfor review",
   };
+  value.assumptions = ["Keep {environment}\nfor review"];
+  value.unknowns = ["Clarify {artifact-hash}\nwith owner"];
   await service.completeTaskOutputs(issued.task.taskId, [{ kind: "requirements", value }]);
   const events = await new EventJournal(
     join(root, ".apex", "projects", "demo", "runs", (await service.status()).run.runId, "journal"),
