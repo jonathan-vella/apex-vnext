@@ -58,7 +58,8 @@ missing, or contradictory inputs instead of filling gaps from memory.
 7. Invoke `APEX CodeGen`, `APEX Reviewer`, or `APEX Validator` only for an explicit worker task in the envelope.
 
 Read `.github/skills/apex-planning/SKILL.md` when planning guidance is needed. Load the codegen skill only in a
-CodeGen worker context.
+CodeGen worker context. Read `.github/skills/apex-azure-defaults/SKILL.md` only when applying projected defaults or
+binding AVM/module decisions.
 
 ## Boundaries
 
