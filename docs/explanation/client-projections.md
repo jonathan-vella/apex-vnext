@@ -11,6 +11,14 @@ invocation edges.
 `packages/cli/scripts/prepare-assets.mjs` validates and renders client-specific projections. Packaged assets are derived
 output and must match canonical source.
 
+## Consumer Guidance
+
+Managed consumer skills retain Azure design, planning, validation, operations, identity, migration, Terraform, artifact,
+and inline-diagram guidance through progressive references. They use accepted task context and capability-produced
+evidence; direct cloud operations, repository mutation, approval, and deployment remain kernel- or CLI-owned. The
+versioned [guidance migration matrix](../../tools/registry/guidance-migration.v1.json) records the disposition of each
+root skill and instruction, including repository-only and deferred surfaces.
+
 ## VS Code
 
 The VS Code projection supports the coordinator and interactive requirements, architecture, planning, and operations
