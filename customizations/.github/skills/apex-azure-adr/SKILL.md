@@ -25,6 +25,13 @@ architecture decisions, requirements, and governance evidence are authoritative.
 Do not create ADR files, sequence document numbers, write Markdown, use shell or Git, query Azure directly, or alter
 architecture artifacts outside APEX MCP. A rendered document is derived output, not the decision authority.
 
+## References
+
+- [Decision record fields](references/decision-record-fields.md) - context, alternatives, consequences, WAF, and constraints.
+- [Decision quality](references/decision-quality.md) - pre-completion checklist.
+- [Decision guardrails](references/decision-guardrails.md) - anti-patterns and corrections.
+- [Decision examples](references/decision-examples.md) - bounded architecture trade-off examples.
+
 ## Output
 
 Return typed architecture or plan decisions with rationale, alternatives, consequences, requirement traceability, and

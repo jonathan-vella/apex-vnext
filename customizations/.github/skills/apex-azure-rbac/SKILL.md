@@ -26,6 +26,11 @@ Do not call Azure CLI, Microsoft Graph, ARM, or documentation tools; assign role
 assignment code; create custom roles; or expose principal IDs, credentials, or secrets. Approved role changes belong in
 the selected IaC/deployment capability and Gate 4 workflow.
 
+## References
+
+- [Least-privilege role selection](references/least-privilege-selection.md) - operation, built-in role, and scope rules.
+- [Assignment intent fields](references/assignment-intent.md) - typed design fields and approved delivery constraints.
+
 ## Output
 
 Return bounded least-privilege design decisions and unresolved access requirements through APEX MCP artifacts.

@@ -25,6 +25,15 @@ Azure operations.
 6. Treat cost, SKU, quota, regional availability, and policy evidence as task inputs. Do not query Azure, run shell
    commands, or generate direct deployment code from this skill.
 
+## References
+
+- [Naming and binding guidance](references/naming.md) - deterministic names and service constraints.
+- [Tag and governance precedence](references/tag-precedence.md) - accepted policy before fallback intent.
+- [Security baseline](references/security-baseline.md) - identity, transport, private access, and diagnostics decisions.
+- [AVM and module bindings](references/avm-binding-guidance.md) - module selection and exception intent.
+- [Service selection and WAF criteria](references/service-selection.md) - evidence-based candidate comparison.
+- [Governance effects](references/governance-effects.md) - map accepted policy effects to binding decisions.
+
 ## Output
 
 Return bounded architecture, plan, or binding decisions with their projected evidence references. Preserve unknown and
