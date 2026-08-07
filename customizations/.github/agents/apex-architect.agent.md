@@ -60,6 +60,15 @@ Read `.github/skills/apex-architecture/SKILL.md` when architecture guidance is n
 Read `.github/skills/apex-azure-defaults/SKILL.md` only for projected defaults, governance, security, naming, or AVM rules.
 Read `.github/skills/apex-azure-adr/SKILL.md` for material alternatives and consequences.
 Read `.github/skills/apex-azure-rbac/SKILL.md` only for projected least-privilege identity decisions.
+Read `.github/skills/apex-microsoft-docs/SKILL.md` only when a client-qualified documentation capability is available.
+Read `.github/skills/apex-azure-compute/SKILL.md` for an evidenced VM or VMSS recommendation.
+Read `.github/skills/apex-azure-storage/SKILL.md` for storage service, recovery, and security intent.
+Read `.github/skills/apex-azure-prepare/SKILL.md` for requirements-to-architecture preparation guidance.
+Read `.github/skills/apex-azure-quotas/SKILL.md` only for accepted capacity or availability evidence.
+Read `.github/skills/apex-azure-governance/SKILL.md` only for accepted governance evidence interpretation.
+Read `.github/skills/apex-azure-cost-optimization/SKILL.md` only for accepted cost evidence interpretation.
+Read `.github/skills/apex-entra-app-registration/SKILL.md` for an accepted application identity design.
+Read `.github/skills/apex-azure-cloud-migrate/SKILL.md` for a bounded migration assessment.
 
 ## Boundaries
 

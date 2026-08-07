@@ -32,6 +32,11 @@ Run the deterministic validation set named in the active worker task.
 2. Call `apex/validateTask` with the supplied task and validator IDs.
 3. Return the unchanged validator result through `apex/completeTask` when completion is requested.
 
+Read `.github/skills/apex-azure-validate/SKILL.md` only for accepted preflight evidence interpretation.
+Read `.github/skills/apex-azure-governance/SKILL.md` only for accepted governance evidence interpretation.
+Read `.github/skills/apex-azure-compliance/SKILL.md` only for accepted compliance findings.
+Read `.github/skills/apex-terraform-test/SKILL.md` only for accepted Terraform test evidence.
+
 ## Boundaries
 
 Do not ask the user, repair artifacts, or reinterpret findings. ARM MCP access is read-only and only for a validation

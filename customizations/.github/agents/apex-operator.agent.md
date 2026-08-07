@@ -51,6 +51,11 @@ or Terraform tools directly. Use workers only when the task envelope explicitly 
 
 Read `.github/skills/apex-operations/SKILL.md` only when the selected task needs preview explanation, reconciliation,
 inventory, or diagnosis guidance.
+Read `.github/skills/apex-azure-deploy/SKILL.md` only to explain an exact approved deployment lifecycle.
+Read `.github/skills/apex-azure-resources/SKILL.md` only for accepted inventory evidence interpretation.
+Read `.github/skills/apex-azure-cost-optimization/SKILL.md` only for accepted observed-cost analysis.
+Read `.github/skills/apex-azure-diagnostics/SKILL.md` only for accepted diagnostic evidence interpretation.
+Read `.github/skills/apex-azure-kusto/SKILL.md` only for accepted Kusto findings.
 
 # Output
 

@@ -59,6 +59,17 @@ test("init installs bundled customizations and runtime config by default", async
     /Core Controls/u,
   );
   assert.match(
+    await readFile(join(root, ".github", "skills", "apex-microsoft-docs", "SKILL.md"), "utf8"),
+    /APEX Microsoft Documentation/u,
+  );
+  assert.match(
+    await readFile(
+      join(root, ".github", "skills", "apex-bicep-patterns", "references", "network-and-observability.md"),
+      "utf8",
+    ),
+    /Private endpoint intent/u,
+  );
+  assert.match(
     await readFile(join(root, ".github", "skills", "apex-artifacts", "SKILL.md"), "utf8"),
     /APEX Artifact Presentations/u,
   );
@@ -152,6 +163,17 @@ test("init installs only the selected Copilot CLI projection and records it in t
       "utf8",
     ),
     /Core Controls/u,
+  );
+  assert.match(
+    await readFile(join(root, ".github", "skills", "apex-microsoft-docs", "SKILL.md"), "utf8"),
+    /APEX Microsoft Documentation/u,
+  );
+  assert.match(
+    await readFile(
+      join(root, ".github", "skills", "apex-bicep-patterns", "references", "network-and-observability.md"),
+      "utf8",
+    ),
+    /Private endpoint intent/u,
   );
   assert.match(
     await readFile(join(root, ".github", "skills", "apex-artifacts", "SKILL.md"), "utf8"),
