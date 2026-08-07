@@ -666,7 +666,7 @@
     {
       "id": "validate-node-ci",
       "script": "validate:_node-ci",
-      "prerequisites": [],
+      "prerequisites": ["build:vnext"],
       "members": ["validate:_node-core", "lint:js:ci"],
       "continueOnError": false,
       "epilogue": null
