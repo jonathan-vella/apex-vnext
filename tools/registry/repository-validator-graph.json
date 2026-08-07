@@ -272,8 +272,22 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "test-client-outcomes-prepared",
+      "script": "test:client-outcomes:prepared",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "test-pricing-parity",
       "script": "test:pricing-parity",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "test-pricing-parity-prepared",
+      "script": "test:pricing-parity:prepared",
       "profile": "node-test",
       "aliases": [],
       "retirement": { "status": "active", "replacementIds": [] }
@@ -440,6 +454,13 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "validate-pricing-parity-prepared",
+      "script": "validate:pricing-parity:prepared",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "validate-arm-mcp-cost-pricing",
       "script": "validate:arm-mcp-cost-pricing",
       "profile": "node-validation",
@@ -510,6 +531,13 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "validate-guidance-migration",
+      "script": "validate:guidance-migration",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "validate-terminology",
       "script": "validate:terminology",
       "profile": "node-validation",
@@ -563,11 +591,12 @@
     {
       "id": "validate-node-core",
       "script": "validate:_node-core",
-      "prerequisites": [],
+      "prerequisites": ["build:vnext"],
       "members": [
         "validate:artifacts",
         "validate:agents",
         "validate:skills",
+        "validate:guidance-migration",
         "lint:version-sync",
         "lint:deprecated-refs",
         "lint:mcp-config",
@@ -606,9 +635,9 @@
         "test:registry-validator-reporter",
         "test:client-context-samples",
         "validate:client-outcomes",
-        "test:client-outcomes",
-        "validate:pricing-parity",
-        "test:pricing-parity",
+        "test:client-outcomes:prepared",
+        "validate:pricing-parity:prepared",
+        "test:pricing-parity:prepared",
         "validate:arm-mcp-cost-pricing",
         "test:arm-mcp-cost-pricing",
         "validate:diagram-semantics",
@@ -637,7 +666,7 @@
     {
       "id": "validate-node-ci",
       "script": "validate:_node-ci",
-      "prerequisites": ["build:vnext"],
+      "prerequisites": [],
       "members": ["validate:_node-core", "lint:js:ci"],
       "continueOnError": false,
       "epilogue": null

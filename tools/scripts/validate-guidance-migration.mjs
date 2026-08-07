@@ -25,7 +25,12 @@ const sourceInstructions = readdirSync(sourceInstructionsDirectory)
   .sort();
 const matrix = JSON.parse(readFileSync(matrixPath, "utf8"));
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+const managedFiles = Array.isArray(manifest.managedFiles) ? manifest.managedFiles : null;
 const dispositions = new Map();
+
+if (managedFiles === null) {
+  reportError(`${manifestPath}: managedFiles must be an array`);
+}
 
 for (const entry of matrix.skillDispositions ?? []) {
   if (dispositions.has(entry.source)) {
@@ -40,13 +45,17 @@ for (const entry of matrix.skillDispositions ?? []) {
     reportError(`Missing owner for ${entry.source}`);
   }
   if (entry.disposition === "consumer") {
-    const skillPath = join(customizationsDirectory, entry.consumerSkill ?? "", "SKILL.md");
-    const manifestPath = `.github/skills/${entry.consumerSkill}/SKILL.md`;
+    if (typeof entry.consumerSkill !== "string" || entry.consumerSkill.length === 0) {
+      reportError(`Missing consumer skill for ${entry.source}`);
+      continue;
+    }
+    const skillPath = join(customizationsDirectory, entry.consumerSkill, "SKILL.md");
+    const managedSkillPath = `.github/skills/${entry.consumerSkill}/SKILL.md`;
     if (!existsSync(skillPath)) {
       reportError(`Missing consumer skill for ${entry.source}: ${skillPath}`);
     }
-    if (!manifest.managedFiles.includes(manifestPath)) {
-      reportError(`Consumer skill is not managed for ${entry.source}: ${manifestPath}`);
+    if (managedFiles !== null && !managedFiles.includes(managedSkillPath)) {
+      reportError(`Consumer skill is not managed for ${entry.source}: ${managedSkillPath}`);
     }
   }
 }
