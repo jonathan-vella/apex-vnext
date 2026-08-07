@@ -19,6 +19,9 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Added the managed `apex-azure-defaults` consumer skill with role-scoped guidance for projected governance, security,
+  naming, tagging, and AVM/module decisions without direct Azure operations.
+
 - Fixed clean devcontainer creation by normalizing named-volume ownership before cache use and removing generated
   Python package metadata after the local apex-recall install.
 - Rebuilt documentation as a vNext-only Diátaxis set, generated CLI and MCP inventories from source, simplified active

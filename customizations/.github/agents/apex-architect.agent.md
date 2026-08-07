@@ -56,7 +56,8 @@ requirement to the kernel or ask the user about a genuine decision; do not repla
   `apex/completeTask` with `outputs`. Do not submit a single-output completion.
 6. Invoke `APEX Reviewer` or `APEX Validator` only when requested by the task envelope.
 
-Read `.github/skills/apex-architecture/SKILL.md` when architecture guidance is needed. Load no unrelated skills.
+Read `.github/skills/apex-architecture/SKILL.md` when architecture guidance is needed.
+Read `.github/skills/apex-azure-defaults/SKILL.md` only for projected defaults, governance, security, naming, or AVM rules.
 
 ## Boundaries
 
