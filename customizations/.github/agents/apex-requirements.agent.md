@@ -55,7 +55,8 @@ Gather complete, decision-ready requirements for the active kernel task.
 8. Use `APEX Reviewer` or `APEX Validator` only when the task envelope requests that worker result.
 
 Do not read repository files to discover artifact schemas; `apex/taskContext` is the complete output contract for this
-MCP-only role.
+MCP-only role. Read `.github/skills/apex-azure-defaults/SKILL.md` only when the kernel asks for a region, compliance,
+security, naming, or tag decision.
 
 ## Boundaries
 
