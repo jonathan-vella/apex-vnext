@@ -23,6 +23,8 @@ prior qualification is retained as historical characterization. See
   naming, tagging, and AVM/module decisions without direct Azure operations.
 - Added managed `apex-azure-adr` and `apex-azure-rbac` consumer skills with role-scoped decision-record and
   least-privilege assignment guidance for projected architecture workflows.
+- Added managed consumer guidance for Azure design, validation, operations, identity, migration, Terraform, inline
+  diagrams, and derived artifact presentations, with direct cloud actions retained behind kernel-controlled capabilities.
 
 - Fixed clean devcontainer creation by normalizing named-volume ownership before cache use and removing generated
   Python package metadata after the local apex-recall install.

@@ -61,6 +61,15 @@ Read `.github/skills/apex-planning/SKILL.md` when planning guidance is needed.
 Load the codegen skill only in a CodeGen worker context.
 Read `.github/skills/apex-azure-defaults/SKILL.md` only when applying projected defaults or binding AVM/module decisions.
 Read `.github/skills/apex-azure-rbac/SKILL.md` only when binding a projected least-privilege access decision.
+Read `.github/skills/apex-microsoft-docs/SKILL.md` only when a client-qualified documentation capability is available.
+Read `.github/skills/apex-azure-storage/SKILL.md` for storage binding constraints.
+Read `.github/skills/apex-bicep-patterns/SKILL.md` only for an accepted Bicep binding.
+Read `.github/skills/apex-azure-prepare/SKILL.md` for requirements-to-plan lineage.
+Read `.github/skills/apex-azure-governance/SKILL.md` only for accepted governance evidence interpretation.
+Read `.github/skills/apex-entra-app-registration/SKILL.md` for application identity binding intent.
+Read `.github/skills/apex-azure-cloud-migrate/SKILL.md` for an accepted migration handoff.
+Read `.github/skills/apex-terraform-patterns/SKILL.md` only for an accepted Terraform binding.
+Read `.github/skills/apex-terraform-import/SKILL.md` only for accepted import assessment evidence.
 
 ## Boundaries
 

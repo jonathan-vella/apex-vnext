@@ -1,0 +1,38 @@
+---
+name: apex-terraform-test
+description: "Design receipt-gated Terraform test intent in APEX. Use for unit and integration coverage, assertions, mocks, negative cases, and test-evidence acceptance."
+user-invocable: false
+---
+
+# APEX Terraform Test Design
+
+Use this skill for an active Terraform test-design or validation task. It specifies coverage and assertion intent;
+authorized capabilities own test materialization, execution, environment access, and evidence production.
+
+## Prerequisites
+
+- `apex/taskContext` identifies the accepted Terraform binding, scoped target, test objective, and acceptance criteria.
+- The exact provider and module locks are accepted for the binding under test.
+- Required test or validation capability receipts are accepted and current for the same target.
+
+## Workflow
+
+1. Classify the requirement with [Test design](references/test-design.md): deterministic unit, negative validation,
+   mock-backed behavior, or integration behavior.
+2. Define observable assertions, expected failures, test inputs, and isolation boundaries without assuming unobserved
+   provider behavior.
+3. Apply [Evidence acceptance](references/evidence-acceptance.md) to distinguish test-design intent from accepted
+   execution evidence.
+4. Submit the test specification through an authorized capability. Return unavailable capabilities, absent environment
+   authorization, stale locks, or incomplete evidence as blockers.
+
+## Boundaries
+
+- Do not write or run test files, configure providers, access environments, or mutate files.
+- Do not invoke Terraform, inspect provider registries, query cloud state, or create infrastructure.
+- A mock-backed result does not establish live-service behavior; an integration result does not authorize deployment.
+
+## References
+
+- [Test design](references/test-design.md) - coverage classification, assertion quality, mocks, and negative cases.
+- [Evidence acceptance](references/evidence-acceptance.md) - receipt scope, result interpretation, and blocker routing.
