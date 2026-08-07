@@ -34,6 +34,8 @@ Generate only the IaC batch described by the active worker task.
 1. Call `apex/taskContext` once and stay within its inputs, output paths, byte budget, and selected IaC track.
 2. Read `.github/skills/apex-codegen/SKILL.md` when track-specific generation guidance is needed.
   Read `.github/skills/apex-azure-defaults/SKILL.md` only for projected security, naming, tag, or AVM/module rules.
+  Read `.github/skills/apex-bicep-patterns/SKILL.md` only for an assigned Bicep binding.
+  Read `.github/skills/apex-terraform-patterns/SKILL.md` only for an assigned Terraform binding.
 3. Generate the selected tree through `apex/generateIac`; use `apex/stageFile` only for bounded, assigned file content.
 4. Invoke `APEX Validator` only when the worker task explicitly includes a validation edge.
 
