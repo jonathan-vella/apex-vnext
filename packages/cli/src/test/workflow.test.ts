@@ -256,6 +256,58 @@ test("render requirements reads the accepted requirements artifact", async () =>
   assert.match(await service.render("requirements"), /offline service/u);
 });
 
+test("requirements acceptance records a bound rendered document", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const initialized = await service.init({ projectId: "demo" });
+  const issued = await nextTaskAfterInput(service);
+  assert.equal(issued.status, "task");
+  if (issued.status !== "task") return;
+  const accepted = await service.completeTaskOutputs(issued.task.taskId, [
+    { kind: "requirements", value: requirements() },
+  ]);
+  const events = await new EventJournal(
+    join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"),
+  ).replay();
+  const completed = events.find((event) => event.type === "task.completed");
+  const document = (
+    completed?.payload as {
+      renderedDocuments?: Array<{ documentId: string; templateHash: string; outputHash: string }>;
+    }
+  ).renderedDocuments?.[0];
+  assert.deepEqual(document?.documentId, "requirements");
+  assert.match(document?.templateHash ?? "", /^[a-f0-9]{64}$/);
+  assert.match(document?.outputHash ?? "", /^[a-f0-9]{64}$/);
+  assert.match(await service.render("requirements"), /offline service/u);
+  assert.notEqual(document?.outputHash, accepted.outputHashes.requirements);
+});
+
+test("requirements document rendering escapes table cells without rejecting content braces", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo" });
+  const issued = await nextTaskAfterInput(service);
+  assert.equal(issued.status, "task");
+  if (issued.status !== "task") return;
+  const value = requirements();
+  value.requirements[0] = {
+    ...value.requirements[0]!,
+    statement: "Allow {workload} and {custom-rule} | retain newline\nfor review",
+  };
+  value.assumptions = ["Keep {environment}\nfor review"];
+  value.unknowns = ["Clarify {artifact-hash}\nwith owner"];
+  await service.completeTaskOutputs(issued.task.taskId, [{ kind: "requirements", value }]);
+  const events = await new EventJournal(
+    join(root, ".apex", "projects", "demo", "runs", (await service.status()).run.runId, "journal"),
+  ).replay();
+  const documentHash = (
+    events.find((event) => event.type === "task.completed")?.payload as {
+      renderedDocuments?: Array<{ outputHash: string }>;
+    }
+  ).renderedDocuments?.[0]?.outputHash;
+  assert.match(documentHash ?? "", /^[a-f0-9]{64}$/);
+});
+
 test("an initialized workspace can create and select independent projects", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);

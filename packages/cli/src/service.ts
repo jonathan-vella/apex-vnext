@@ -484,6 +484,7 @@ export class ApexService {
   private readonly profileRoot: string;
   private readonly improvementPolicy: ImprovementPolicyV1 | undefined;
   private improvementRuntime?: ImprovementStore;
+  private requirementsDocumentTemplate?: Promise<{ content: string; hash: string }>;
 
   constructor(root: string, options: ServiceOptions = {}) {
     this.root = resolve(root);
@@ -1409,12 +1410,27 @@ export class ApexService {
     assertTaskCurrent(task, completionHead, run.ownerEpoch, this.clock);
     const outputHashes: Partial<Record<ArtifactKind, string>> = {};
     for (const output of outputs) outputHashes[output.kind] = await this.objects.putJson(output.value);
+    const requirementsOutput = outputs.find(({ kind }) => kind === "requirements");
+    const requirementsHash = outputHashes.requirements;
+    const renderedDocument =
+      descriptor.id === "requirements"
+        ? requirementsOutput === undefined || requirementsHash === undefined
+          ? (() => {
+              throw new ApexError(
+                "APEX_INTERNAL",
+                "Requirements completion is missing its accepted output",
+                EXIT_CODES.internal,
+              );
+            })()
+          : await this.renderRequirementsDocument(requirementsOutput.value, requirementsHash)
+        : undefined;
     const reviewBlockers = descriptor.reviewSubject === undefined ? [] : this.openReviewFindings(outputs[0]!.value);
     const dependencyHash = sha256Json(outputHashes);
     await this.append(run, "task.completed", {
       taskId,
       nodeId: descriptor.id,
       artifactHashes: outputHashes,
+      ...(renderedDocument === undefined ? {} : { renderedDocuments: [renderedDocument] }),
       validatorIds: validation.validatorIds,
       ...(Object.keys(validation.evidenceRefs).length === 0 ? {} : { validatorEvidenceRefs: validation.evidenceRefs }),
       ...(Object.keys(validation.evidenceModes).length === 0
@@ -1438,6 +1454,88 @@ export class ApexService {
       await this.openRunGate(await this.currentRun(), 1, sha256Json(outputHashes));
     }
     return { outputHashes, summary: outputs.map(({ kind }) => kind).join(", ") + " accepted" };
+  }
+
+  private async renderRequirementsDocument(
+    value: unknown,
+    artifactHash: string,
+  ): Promise<{
+    documentId: "requirements";
+    templateHash: string;
+    outputHash: string;
+  }> {
+    if (!Value.Check(RequirementsV1Schema, value)) {
+      throw new ApexError("APEX_INTERNAL", "Requirements document source is invalid", EXIT_CODES.internal);
+    }
+    const requirements = value as {
+      workload: string;
+      environment: string;
+      requirements: Array<{ id: string; priority: string; status: string; statement: string; source: string }>;
+      assumptions: string[];
+      unknowns: string[];
+    };
+    const { content: template, hash: templateHash } = await this.requirementsDocumentTemplateContent();
+    const markdownCell = (text: string) => text.replaceAll("|", "\\|").replaceAll(/\r?\n/gu, "<br>");
+    const markdownListItem = (text: string) => text.replaceAll(/\r?\n/gu, "<br>");
+    const requirementsTable = [
+      "| ID | Priority | Status | Statement | Source |",
+      "| --- | --- | --- | --- | --- |",
+      ...requirements.requirements.map(
+        ({ id, priority, status, statement, source }) =>
+          `| ${markdownCell(id)} | ${markdownCell(priority)} | ${markdownCell(status)} | ${markdownCell(statement)} | ${markdownCell(source)} |`,
+      ),
+    ].join("\n");
+    const replace = (token: string, replacement: string) => template.replaceAll(`{${token}}`, replacement);
+    const document = replace("workload", requirements.workload)
+      .replaceAll("{artifact-hash}", artifactHash)
+      .replaceAll("{template-hash}", templateHash)
+      .replaceAll("{environment}", requirements.environment)
+      .replaceAll("{artifact-status}", "accepted")
+      .replaceAll("{requirements-table}", requirementsTable)
+      .replaceAll(
+        "{assumptions-list}",
+        requirements.assumptions.length === 0
+          ? "None."
+          : requirements.assumptions.map((item) => `- ${markdownListItem(item)}`).join("\n"),
+      )
+      .replaceAll(
+        "{unknowns-list}",
+        requirements.unknowns.length === 0
+          ? "None."
+          : requirements.unknowns.map((item) => `- ${markdownListItem(item)}`).join("\n"),
+      );
+    return {
+      documentId: "requirements",
+      templateHash,
+      // State transfer exports immutable objects as canonical JSON.
+      outputHash: await this.objects.putJson({ contentType: "text/markdown", content: document }),
+    };
+  }
+
+  private async requirementsDocumentTemplateContent(): Promise<{ content: string; hash: string }> {
+    this.requirementsDocumentTemplate ??= (async () => {
+      const assets = await resolveBundledAssets();
+      const content = await readFile(
+        join(assets.customizations, ".github", "skills", "apex-artifacts", "templates", "requirements.md"),
+        "utf8",
+      );
+      const slots = [...content.matchAll(/\{([a-z][a-z-]*)\}/gu)].map((match) => match[1]!);
+      const expectedSlots = [
+        "workload",
+        "artifact-hash",
+        "template-hash",
+        "environment",
+        "artifact-status",
+        "requirements-table",
+        "assumptions-list",
+        "unknowns-list",
+      ];
+      if (new Set(slots).size !== expectedSlots.length || expectedSlots.some((slot) => !slots.includes(slot))) {
+        throw new ApexError("APEX_INTERNAL", "Requirements document template has invalid slots", EXIT_CODES.internal);
+      }
+      return { content, hash: sha256Bytes(Buffer.from(content, "utf8")) };
+    })();
+    return this.requirementsDocumentTemplate;
   }
 
   async cancelTask(taskId: string): Promise<void> {
