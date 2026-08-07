@@ -47,7 +47,10 @@ test("init installs bundled customizations and runtime config by default", async
   assert.match(coordinatorAgent, /name: APEX/u);
   assert.match(coordinatorAgent, /target: vscode/u);
   assert.match(await readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"), /target: vscode/u);
-  assert.match(await readFile(join(root, ".github", "skills", "apex-azure-defaults", "SKILL.md"), "utf8"), /APEX Azure Defaults/u);
+  assert.match(
+    await readFile(join(root, ".github", "skills", "apex-azure-defaults", "SKILL.md"), "utf8"),
+    /APEX Azure Defaults/u,
+  );
   assert.match(
     await readFile(join(root, ".github", "skills", "apex-artifacts", "SKILL.md"), "utf8"),
     /APEX Artifact Presentations/u,
@@ -132,7 +135,10 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(requirementsAgent, /- ask_user/u);
   assert.match(requirementsAgent, /- task/u);
   assert.doesNotMatch(requirementsAgent, /vscode\/askQuestions|handoffs:|agents:/u);
-  assert.match(await readFile(join(root, ".github", "skills", "apex-azure-defaults", "SKILL.md"), "utf8"), /APEX Azure Defaults/u);
+  assert.match(
+    await readFile(join(root, ".github", "skills", "apex-azure-defaults", "SKILL.md"), "utf8"),
+    /APEX Azure Defaults/u,
+  );
   assert.match(
     await readFile(join(root, ".github", "skills", "apex-artifacts", "SKILL.md"), "utf8"),
     /APEX Artifact Presentations/u,
