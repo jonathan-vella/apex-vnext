@@ -45,8 +45,8 @@ when an AVM default may be SKU-dependent. Reject premium-only networking, zone, 
 properties on a lower tier unless the exact provider contract supports them.
 
 For scheduled query rules, validate KQL against the target table schema. Bicep treats the query as an opaque string and
-preview does not run the service query parser. Ingestion-cap queries against `_LogOperation` must use that table's
-columns rather than fields copied from `AzureActivity`, `AzureDiagnostics`, or application tables.
+preview does not run the service query parser. Ingestion quota alert queries against `_LogOperation` must use that
+table's columns rather than fields copied from `AzureActivity`, `AzureDiagnostics`, or application tables.
 
 ## Service Topology Traps
 
