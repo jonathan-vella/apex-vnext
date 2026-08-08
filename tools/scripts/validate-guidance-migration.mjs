@@ -68,7 +68,19 @@ for (const entry of matrix.skillDispositions ?? []) {
       reportError(`Consumer skill is not managed for ${entry.source}: ${managedSkillPath}`);
     }
     const seenResources = new Set();
-    for (const resource of entry.resourceDispositions ?? []) {
+    let resources = [];
+    if (entry.resourceDispositions !== undefined) {
+      if (Array.isArray(entry.resourceDispositions)) {
+        resources = entry.resourceDispositions;
+      } else {
+        reportError(`Resource dispositions must be an array for ${entry.source}`);
+      }
+    }
+    for (const resource of resources) {
+      if (resource === null || typeof resource !== "object" || Array.isArray(resource)) {
+        reportError(`Resource disposition must be an object for ${entry.source}`);
+        continue;
+      }
       if (typeof resource.source !== "string" || resource.source.length === 0) {
         reportError(`Missing resource source for ${entry.source}`);
         continue;
