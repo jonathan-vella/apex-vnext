@@ -9,11 +9,21 @@ const sourceSkillsDirectory = join(root, ".github", "skills");
 const sourceInstructionsDirectory = join(root, ".github", "instructions");
 const customizationsDirectory = join(root, "customizations", ".github", "skills");
 const manifestPath = join(root, "customizations", "manifest.json");
+const resourceDispositions = new Set(["retain", "adapt", "already-owned", "exclude-unsafe", "defer-capability"]);
 let errors = 0;
 
 const reportError = (message) => {
   errors += 1;
   console.error(`❌ ${message}`);
+};
+
+const listResourceFiles = (directory, prefix = "") => {
+  if (!existsSync(directory)) return [];
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const resourcePath = join(directory, entry.name);
+    const relativePath = prefix.length === 0 ? entry.name : `${prefix}/${entry.name}`;
+    return entry.isDirectory() ? listResourceFiles(resourcePath, relativePath) : [relativePath];
+  });
 };
 
 const sourceSkills = readdirSync(sourceSkillsDirectory, { withFileTypes: true })
@@ -56,6 +66,59 @@ for (const entry of matrix.skillDispositions ?? []) {
     }
     if (managedFiles !== null && !managedFiles.includes(managedSkillPath)) {
       reportError(`Consumer skill is not managed for ${entry.source}: ${managedSkillPath}`);
+    }
+    const seenResources = new Set();
+    for (const resource of entry.resourceDispositions ?? []) {
+      if (typeof resource.source !== "string" || resource.source.length === 0) {
+        reportError(`Missing resource source for ${entry.source}`);
+        continue;
+      }
+      if (seenResources.has(resource.source)) {
+        reportError(`Duplicate resource disposition for ${entry.source}: ${resource.source}`);
+        continue;
+      }
+      seenResources.add(resource.source);
+      const sourceResourcePath = join(sourceSkillsDirectory, entry.source, resource.source);
+      if (!existsSync(sourceResourcePath)) {
+        reportError(`Missing source resource for ${entry.source}: ${sourceResourcePath}`);
+      }
+      if (!resourceDispositions.has(resource.disposition)) {
+        reportError(`Unsupported resource disposition for ${entry.source}/${resource.source}: ${resource.disposition}`);
+      }
+      if (typeof resource.reason !== "string" || resource.reason.length === 0) {
+        reportError(`Missing resource disposition reason for ${entry.source}/${resource.source}`);
+      }
+      if (!Array.isArray(resource.targets)) {
+        reportError(`Resource targets must be an array for ${entry.source}/${resource.source}`);
+        continue;
+      }
+      if (["retain", "adapt", "already-owned"].includes(resource.disposition) && resource.targets.length === 0) {
+        reportError(`Retained resource requires a target for ${entry.source}/${resource.source}`);
+      }
+      for (const target of resource.targets) {
+        if (typeof target !== "string" || target.length === 0) {
+          reportError(`Invalid resource target for ${entry.source}/${resource.source}`);
+          continue;
+        }
+        const targetPath = join(customizationsDirectory, entry.consumerSkill, target);
+        const managedTargetPath = `.github/skills/${entry.consumerSkill}/${target}`;
+        if (!existsSync(targetPath)) {
+          reportError(`Missing retained target for ${entry.source}/${resource.source}: ${targetPath}`);
+        }
+        if (managedFiles !== null && !managedFiles.includes(managedTargetPath)) {
+          reportError(`Retained target is not managed for ${entry.source}/${resource.source}: ${managedTargetPath}`);
+        }
+      }
+    }
+    if (entry.resourceDispositions !== undefined) {
+      const sourceResources = listResourceFiles(join(sourceSkillsDirectory, entry.source)).filter(
+        (resource) => resource !== "SKILL.md" && resource !== "LICENSE.txt",
+      );
+      for (const sourceResource of sourceResources) {
+        if (!seenResources.has(sourceResource)) {
+          reportError(`Missing resource disposition for ${entry.source}: ${sourceResource}`);
+        }
+      }
     }
   }
 }

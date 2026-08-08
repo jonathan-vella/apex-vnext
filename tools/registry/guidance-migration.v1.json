@@ -12,7 +12,61 @@
       "source": "azure-bicep-patterns",
       "disposition": "consumer",
       "consumerSkill": "apex-bicep-patterns",
-      "owner": "APEX CodeGen"
+      "owner": "APEX CodeGen",
+      "resourceDispositions": [
+        {
+          "source": "references/avm-pitfalls.md",
+          "disposition": "adapt",
+          "targets": ["references/avm-and-codegen-acceptance.md", "references/compiler-and-provider-gotchas.md"],
+          "reason": "Retain exact-schema, language, identity, SKU, query, and provider failure rules without commands or mutable version claims."
+        },
+        {
+          "source": "references/bicepparam-pattern.md",
+          "disposition": "adapt",
+          "targets": ["references/module-interfaces-and-parameters.md"],
+          "reason": "Retain environment-neutral parameter binding and remove legacy agent and deployment mechanics."
+        },
+        {
+          "source": "references/budget-pattern.md",
+          "disposition": "defer-capability",
+          "targets": [],
+          "reason": "The source delegates this content to Azure defaults; restore it with the defaults cost-monitoring slice."
+        },
+        {
+          "source": "references/codegen-validation-checklist.md",
+          "disposition": "adapt",
+          "targets": ["references/codegen-acceptance-checklist.md"],
+          "reason": "Retain portable acceptance checks and remove retired artifact names and agent choreography."
+        },
+        {
+          "source": "references/common-patterns.md",
+          "disposition": "adapt",
+          "targets": [
+            "references/network-and-observability.md",
+            "references/module-interfaces-and-parameters.md",
+            "references/compiler-and-provider-gotchas.md"
+          ],
+          "reason": "Split network, composition, identity, dependency, and provider rules by when they are needed."
+        },
+        {
+          "source": "references/hub-spoke-pattern.md",
+          "disposition": "adapt",
+          "targets": ["references/network-and-observability.md"],
+          "reason": "Retain topology and module-composition rules without embedding one project address plan."
+        },
+        {
+          "source": "references/module-interface.md",
+          "disposition": "adapt",
+          "targets": ["references/module-interfaces-and-parameters.md"],
+          "reason": "Retain the stable module contract while allowing typed exceptions for resources without identities or diagnostics."
+        },
+        {
+          "source": "references/private-endpoint-pattern.md",
+          "disposition": "adapt",
+          "targets": ["references/network-and-observability.md"],
+          "reason": "Retain endpoint, DNS ownership, zone-group, and common subresource guidance without direct generation commands."
+        }
+      ]
     },
     {
       "source": "azure-cloud-migrate",
