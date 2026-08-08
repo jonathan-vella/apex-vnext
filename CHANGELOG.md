@@ -25,6 +25,8 @@ prior qualification is retained as historical characterization. See
   least-privilege assignment guidance for projected architecture workflows.
 - Added managed consumer guidance for Azure design, validation, operations, identity, migration, Terraform, inline
   diagrams, and derived artifact presentations, with direct cloud actions retained behind kernel-controlled capabilities.
+- Deepened managed Bicep guidance with source-reviewed module interfaces, environment input rules, private endpoint and
+  DNS composition, compiler/provider gotchas, and a CodeGen acceptance checklist.
 
 - Fixed clean devcontainer creation by normalizing named-volume ownership before cache use and removing generated
   Python package metadata after the local apex-recall install.
