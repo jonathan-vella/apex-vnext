@@ -17,8 +17,12 @@ CodeGen and validators own generated files and command execution.
 
 1. Select only patterns supported by the accepted architecture and track binding.
 2. Apply [Network and observability](references/network-and-observability.md) to private connectivity and diagnostics.
-3. Apply [AVM and CodeGen acceptance](references/avm-and-codegen-acceptance.md) to module decisions and validation intent.
-4. Stage only typed intent through APEX MCP; return unavailable modules or stale evidence as blockers.
+3. Read [Module interfaces and parameters](references/module-interfaces-and-parameters.md) when creating reusable
+   modules or binding environment-specific inputs.
+4. Read [Compiler and provider gotchas](references/compiler-and-provider-gotchas.md) before accepting module bindings.
+5. Apply [AVM and CodeGen acceptance](references/avm-and-codegen-acceptance.md) to module decisions and validation intent.
+6. Verify the generated intent against the [CodeGen acceptance checklist](references/codegen-acceptance-checklist.md).
+7. Stage only typed intent through APEX MCP; return unavailable modules or stale evidence as blockers.
 
 ## Boundaries
 
@@ -29,4 +33,9 @@ CodeGen and validators own generated files and command execution.
 ## References
 
 - [Network and observability](references/network-and-observability.md) - hub-spoke, private endpoints, and diagnostics.
+- [Module interfaces and parameters](references/module-interfaces-and-parameters.md) - stable composition contracts and
+  environment-neutral input binding.
+- [Compiler and provider gotchas](references/compiler-and-provider-gotchas.md) - exact-schema, language, identity, SKU,
+  query, and service-topology failure rules.
+- [CodeGen acceptance checklist](references/codegen-acceptance-checklist.md) - final intent and evidence review loop.
 - [AVM and CodeGen acceptance](references/avm-and-codegen-acceptance.md) - module binding and validation intent.
