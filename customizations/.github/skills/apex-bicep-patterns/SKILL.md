@@ -19,8 +19,7 @@ CodeGen and validators own generated files and command execution.
 2. Apply [Network and observability](references/network-and-observability.md) to private connectivity and diagnostics.
 3. Read [Module interfaces and parameters](references/module-interfaces-and-parameters.md) when creating reusable
    modules or binding environment-specific inputs.
-4. Check [Compiler and provider gotchas](references/compiler-and-provider-gotchas.md) before accepting module bindings
-  or repairing a build/preview/apply mismatch.
+4. Read [Compiler and provider gotchas](references/compiler-and-provider-gotchas.md) before accepting module bindings.
 5. Apply [AVM and CodeGen acceptance](references/avm-and-codegen-acceptance.md) to module decisions and validation intent.
 6. Verify the generated intent against the [CodeGen acceptance checklist](references/codegen-acceptance-checklist.md).
 7. Stage only typed intent through APEX MCP; return unavailable modules or stale evidence as blockers.
