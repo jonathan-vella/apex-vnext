@@ -65,7 +65,7 @@
       "disposition": "consumer",
       "consumerSkill": "apex-artifacts",
       "owner": "kernel renderer",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "references/01-requirements-template.md",
@@ -813,7 +813,7 @@
       "disposition": "consumer",
       "consumerSkill": "apex-azure-cost-optimization",
       "owner": "APEX Architect and Operator",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "references/auth-best-practices.md",
@@ -1201,7 +1201,7 @@
       "disposition": "consumer",
       "consumerSkill": "apex-azure-deploy",
       "owner": "APEX Operator",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "references/auth-best-practices.md",
@@ -1639,7 +1639,7 @@
       "disposition": "consumer",
       "consumerSkill": "apex-azure-governance",
       "owner": "governance capability pack",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "references/baseline-check.md",
@@ -4408,7 +4408,7 @@
       "disposition": "consumer",
       "consumerSkill": "apex-azure-deploy",
       "owner": "APEX Operator and Validator",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "references/avm-module-index.md",
@@ -4617,7 +4617,7 @@
       "disposition": "consumer",
       "consumerSkill": "apex-mermaid",
       "owner": "kernel renderer",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "references/styling.md",
