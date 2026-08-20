@@ -1,8 +1,5 @@
 import assert from "node:assert/strict";
-<<<<<<< HEAD
 import { execFile as execFileCallback } from "node:child_process";
-=======
->>>>>>> 0c931b7 (feat(skills): deepen operational guidance)
 import { mkdir, mkdtemp, readFile, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
