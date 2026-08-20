@@ -94,6 +94,13 @@ test("registry rejects implemented capabilities until they are qualified", async
   await assert.rejects(registry.execute("test.run", envelope(), "x"), errorCode("CAPABILITY_UNQUALIFIED"));
 });
 
+test("registry permits trusted external capabilities through their envelope controls", async () => {
+  const registry = new CapabilityRegistry({ now: () => new Date("2026-07-13T01:00:00.000Z") });
+  registry.register({ ...capability, lifecycle: "external-trusted" });
+
+  assert.deepEqual(await registry.execute("test.run", envelope(), "x"), { value: "x" });
+});
+
 function errorCode(code: string): (error: unknown) => boolean {
   return (error) => error instanceof CapabilityError && error.code === code;
 }

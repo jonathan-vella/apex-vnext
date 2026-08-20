@@ -69,6 +69,36 @@ test("accepts a planned target that has not been created", () => {
   assert.deepEqual(validateGuidanceMigration(inputs({ matrix: candidate })), []);
 });
 
+test("accepts a target owned by a consumer mapping declared later", () => {
+  const candidate = matrix();
+  candidate.skillDispositions[0].lifecycle = "planned";
+  candidate.skillDispositions[0].resourceDispositions = [
+    resource({ targets: ["owner:later-consumer/references/future-rule.md"] }),
+  ];
+  candidate.skillDispositions.push({
+    source: "later-source",
+    disposition: "consumer",
+    consumerSkill: "later-consumer",
+    owner: "APEX Planner",
+    lifecycle: "planned",
+    resourceDispositions: [],
+  });
+  const resources = new Map([...sourceResources, ["later-source", new Set()]]);
+  const consumers = new Map([...consumerResources, ["later-consumer", new Set(["SKILL.md"])]]);
+
+  assert.deepEqual(
+    validateGuidanceMigration(
+      inputs({
+        matrix: candidate,
+        sourceSkills: [...sourceSkills, "later-source"],
+        sourceResources: resources,
+        consumerResources: consumers,
+      }),
+    ),
+    [],
+  );
+});
+
 test("rejects a missing complete target and duplicate source row", () => {
   const candidate = matrix();
   candidate.skillDispositions[0].resourceDispositions = [
