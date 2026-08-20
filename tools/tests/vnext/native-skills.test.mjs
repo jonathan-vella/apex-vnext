@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
+import { execFile as execFileCallback } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 const root = resolve(import.meta.dirname, "../../..");
+const execFile = promisify(execFileCallback);
 const skills = [
   ["apex-workflow", "apex.agent.md"],
   ["apex-requirements", "apex-requirements.agent.md"],
@@ -38,6 +41,7 @@ test("native skills are internal, packaged, structured, and wired to their prima
 });
 
 test("native skills are copied to the bundle and both client projections", async () => {
+  await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
   const assetRoots = [
     resolve(root, "packages", "cli", "assets", "customizations"),
     resolve(root, "packages", "cli", "assets", "client-projections", "github-copilot-vscode"),
