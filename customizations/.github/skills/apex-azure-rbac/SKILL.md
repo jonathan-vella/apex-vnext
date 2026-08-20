@@ -1,6 +1,6 @@
 ---
 name: apex-azure-rbac
-description: "Design least-privilege Azure access in APEX decisions. Use for managed identity, role scope, and permission trade-offs."
+description: "Designs least-privilege Azure access in APEX decisions. Use for managed identities, built-in or custom role requirements, control-plane versus data-plane permissions, assignment scope, prerequisites, and idempotent binding intent."
 user-invocable: false
 ---
 
@@ -9,28 +9,37 @@ user-invocable: false
 Use this skill only for an active architecture or planning task. Accepted requirements, governance constraints, and
 recorded identity decisions are authoritative.
 
-## Decision Rules
+## Prerequisites
 
-1. Prefer managed identities and built-in Azure roles over credentials and custom roles.
-2. Select the narrowest resource, resource-group, or subscription scope that satisfies the projected operation.
-3. Record the principal purpose, role name or role requirement, scope rationale, and requirement IDs in the typed
-   architecture or binding decision.
-4. Treat unresolved permissions as a kernel-owned blocker or deferred decision. Do not grant broad access because a
-   role name is uncertain.
-5. Bind role design to accepted identity, data-access, and governance evidence. Do not use this skill to discover live
-   assignments or role definitions.
+- The principal purpose, target resource, required operations, and environment are present in `apex/taskContext`.
+- Accepted role-catalog, identity, governance, and scope evidence is available.
+- A selected IaC/deployment capability owns any future assignment or custom-role change.
+
+## Decision Workflow
+
+1. Describe the exact operation and classify it as control-plane, data-plane, or both.
+2. Resolve the logical principal and require its object/principal identity from accepted identity evidence.
+3. Compare current built-in role definitions and select the narrowest role that covers the operation.
+4. Choose the smallest viable target scope and document why a narrower scope fails.
+5. Use a custom role requirement only when accepted evidence shows no built-in role fits.
+6. Record deterministic assignment intent, caller authorization prerequisites, ordering, and validation expectations.
+7. Check for wildcard permissions, excess scope, credential use, separation-of-duties conflicts, and unresolved evidence.
+
+If a role definition, principal, target scope, or authorized delivery path is unresolved, return a blocker. Never widen
+access to compensate for missing evidence.
 
 ## Boundaries
 
 Do not call Azure CLI, Microsoft Graph, ARM, or documentation tools; assign roles; generate direct Bicep/Terraform role
 assignment code; create custom roles; or expose principal IDs, credentials, or secrets. Approved role changes belong in
-the selected IaC/deployment capability and Gate 4 workflow.
+the selected IaC/deployment capability and kernel authorization flow.
 
 ## References
 
-- [Least-privilege role selection](references/least-privilege-selection.md) - operation, built-in role, and scope rules.
-- [Assignment intent fields](references/assignment-intent.md) - typed design fields and approved delivery constraints.
+- Read [least-privilege role selection](references/least-privilege-selection.md) when choosing a built-in or custom role.
+- Read [assignment intent fields](references/assignment-intent.md) when recording a future assignment binding.
 
 ## Output
 
-Return bounded least-privilege design decisions and unresolved access requirements through APEX MCP artifacts.
+Return bounded role requirements and assignment intents with evidence, scope rationale, prerequisites, risks, and
+unresolved access blockers.

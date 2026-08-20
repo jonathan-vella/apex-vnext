@@ -1,40 +1,58 @@
 ---
 name: apex-azure-defaults
-description: "Apply projected Azure defaults safely in APEX artifacts. Use for region, naming, tags, security baseline, and AVM-first decisions."
+description: "Applies projected Azure defaults safely in APEX decisions. Use for region fallback, CAF naming, tags, security, service lifecycle, AVM bindings, network planning, governance effects, and cost monitoring."
 user-invocable: false
 ---
 
 # APEX Azure Defaults
 
-Use this skill only for an active APEX task. The kernel-projected task context, accepted governance constraints, and
-runtime configuration are authoritative. This skill does not define customer policy, discover Azure state, or execute
-Azure operations.
+Use this skill only for an active APEX task. Accepted governance constraints and runtime configuration are
+authoritative. Task context supplies only the values actually provided for the active task. This skill does not define
+customer policy, discover Azure state, or execute Azure operations.
 
-## Decision Rules
+## Prerequisites
 
-1. Use the selected run environment and target from `apex/taskContext`; do not infer a region, subscription, tag, or
-   policy requirement from chat history.
-2. Treat accepted governance constraints as stronger than baseline defaults. When a required value is absent, return an
-   explicit blocker or record a kernel-owned deferred decision.
-3. Prefer managed identity, HTTPS-only endpoints, TLS 1.2 or stronger, private access for production data services,
-   and secret references over literal credentials.
-4. Keep resource names deterministic, within service limits, and traceable to the active run. Do not invent a global
-   naming authority or persist suffixes outside kernel artifacts.
-5. Prefer Azure Verified Modules or track-approved provider modules in bindings. Record a non-AVM exception with its
-   reason and requirement traceability.
-6. Treat cost, SKU, quota, regional availability, and policy evidence as task inputs. Do not query Azure, run shell
-   commands, or generate direct deployment code from this skill.
+- `apex/taskContext` identifies the active workload, environment, target, and IaC track.
+- Governance, availability, pricing, quota, and module evidence required by the decision is accepted and current.
+- A kernel capability owns any lookup, validation, or state change the decision requires.
+
+## Precedence
+
+Apply accepted governance first, then explicit requirements and decisions, then runtime configuration. Use a baseline
+fallback only when accepted evidence establishes that no stronger contract applies. Incomplete discovery is not the
+same as an empty policy result.
+
+## Decision Workflow
+
+1. Use the environment and target only when the active task context provides them; otherwise return a blocker. Do not
+  infer a region, subscription, tag, or policy requirement from chat history.
+2. Resolve conflicts through the precedence rule and preserve the governing evidence identifier.
+3. Select service, region, network, identity, module, monitoring, and naming intent from accepted inputs.
+4. Record every fallback, exception, unknown, and deferred decision with requirement and evidence traceability.
+5. Check the bounded decision for policy coverage, lifecycle support, region/SKU fit, security, repeatability, and cost.
+6. If the check exposes a gap, revise the decision and repeat. If evidence or capability is absent, return a blocker.
 
 ## References
 
-- [Naming and binding guidance](references/naming.md) - deterministic names and service constraints.
-- [Tag and governance precedence](references/tag-precedence.md) - accepted policy before fallback intent.
-- [Security baseline](references/security-baseline.md) - identity, transport, private access, and diagnostics decisions.
-- [AVM and module bindings](references/avm-binding-guidance.md) - module selection and exception intent.
-- [Service selection and WAF criteria](references/service-selection.md) - evidence-based candidate comparison.
-- [Governance effects](references/governance-effects.md) - map accepted policy effects to binding decisions.
+- Read [baseline fallbacks](references/baseline-fallbacks.md) only when accepted evidence permits fallback behavior.
+- Read [naming guidance](references/naming.md) when binding resource names or uniqueness inputs.
+- Read [tag precedence](references/tag-precedence.md) when policy, inheritance, casing, or fallback tags are relevant.
+- Read [security baseline](references/security-baseline.md) for identity, exposure, encryption, lifecycle, and diagnostics.
+- Read [AVM binding guidance](references/avm-binding-guidance.md) when choosing or excepting a module.
+- Read [service selection](references/service-selection.md) when comparing Azure service classes or WAF trade-offs.
+- Read [governance effects](references/governance-effects.md) when translating accepted policy into decisions.
+- Read [network planning](references/network-planning.md) when a workload requires VNet attachment or private access.
+- Read [cost monitoring](references/cost-monitoring.md) when planning budgets, alert routing, anomaly detection, or cost
+  evidence.
+
+## Capability Boundaries
+
+- Do not query Azure, registries, documentation, prices, quotas, identities, or repositories from this skill.
+- Do not select a mutable version, SKU, region, price, retirement date, or provider limit from memory.
+- Do not emit Bicep, Terraform, shell commands, policy exemptions, role assignments, or deployment actions.
+- Treat missing discovery, resolver, pricing, networking, or validation capability as a blocker, not permission to guess.
 
 ## Output
 
-Return bounded architecture, plan, or binding decisions with their projected evidence references. Preserve unknown and
-deferred values; do not turn absent policy evidence into a default.
+Return bounded architecture, plan, or binding decisions with requirement IDs, evidence identifiers, source precedence,
+exceptions, unknowns, deferrals, and blockers. Never turn absent evidence into a default or a successful validation.

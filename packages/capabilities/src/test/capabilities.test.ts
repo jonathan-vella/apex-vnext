@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { TaskEnvelopeV1 } from "@apex/contracts";
 import { CapabilityError, CapabilityRegistry, type Capability } from "../capability.js";
+import { designCapabilityIds, registerUnavailableDesignCapabilities } from "../design-capabilities.js";
 
 const hash = "a".repeat(64);
 
@@ -99,6 +100,25 @@ test("registry permits trusted external capabilities through their envelope cont
   registry.register({ ...capability, lifecycle: "external-trusted" });
 
   assert.deepEqual(await registry.execute("test.run", envelope(), "x"), { value: "x" });
+});
+
+test("unqualified design capabilities return only the stable unavailable error", async () => {
+  const registry = new CapabilityRegistry({ now: () => new Date("2026-07-13T01:00:00.000Z") });
+  registerUnavailableDesignCapabilities(registry);
+
+  for (const id of Object.values(designCapabilityIds)) {
+    await assert.rejects(
+      registry.execute(
+        id,
+        envelope({
+          role: "architect",
+          capabilityGrants: [{ capability: id, sideEffect: "none", expiresAt: "2026-07-13T02:00:00.000Z" }],
+        }),
+        { request: "test" },
+      ),
+      errorCode("CAPABILITY_UNAVAILABLE"),
+    );
+  }
 });
 
 function errorCode(code: string): (error: unknown) => boolean {

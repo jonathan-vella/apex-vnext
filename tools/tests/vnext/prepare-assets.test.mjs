@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
+import { execFile as execFileCallback } from "node:child_process";
+import { mkdir, mkdtemp, readFile, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import test from "node:test";
 import {
   canonicalJson,
@@ -13,6 +15,9 @@ import {
   validateBundleDeclarations,
   validateClientProjectionDeclarations,
 } from "../../../packages/cli/scripts/prepare-assets.mjs";
+
+const execFile = promisify(execFileCallback);
+const root = join(import.meta.dirname, "../../..");
 
 test("asset generator canonical JSON ignores object insertion order", () => {
   assert.equal(
@@ -331,4 +336,20 @@ Coordinate.
     { delegates: true },
   );
   assert.match(rendered, /\n\s+- task/u);
+});
+
+test("asset lifecycle carries restored managed skills to both clients", async () => {
+  await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
+  const restoredSkills = ["apex-azure-adr", "apex-azure-defaults", "apex-azure-rbac", "apex-microsoft-docs"];
+  const clients = ["github-copilot-cli", "github-copilot-vscode"];
+
+  for (const skill of restoredSkills) {
+    const source = await readFile(join("customizations", ".github", "skills", skill, "SKILL.md"));
+    for (const client of clients) {
+      const projection = await readFile(
+        join("packages", "cli", "assets", "client-projections", client, ".github", "skills", skill, "SKILL.md"),
+      );
+      assert.deepEqual(projection, source, `${skill} should be available to ${client}`);
+    }
+  }
 });
