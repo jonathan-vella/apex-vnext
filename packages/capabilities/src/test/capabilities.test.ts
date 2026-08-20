@@ -87,6 +87,13 @@ test("registry rejects duplicate capabilities, timeouts, and oversized output", 
   );
 });
 
+test("registry rejects implemented capabilities until they are qualified", async () => {
+  const registry = new CapabilityRegistry({ now: () => new Date("2026-07-13T01:00:00.000Z") });
+  registry.register({ ...capability, lifecycle: "implemented-unqualified" });
+
+  await assert.rejects(registry.execute("test.run", envelope(), "x"), errorCode("CAPABILITY_UNQUALIFIED"));
+});
+
 function errorCode(code: string): (error: unknown) => boolean {
   return (error) => error instanceof CapabilityError && error.code === code;
 }
