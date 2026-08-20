@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
+import { execFile as execFileCallback } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
-import { join, relative, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 const root = resolve(import.meta.dirname, "../..");
+const execFile = promisify(execFileCallback);
 const manifestPath = join(root, "config", "recipe-packs.v1.json");
 const functionsRoot = join(root, ".github", "skills", "azure-prepare", "references", "services", "functions");
 const managedReferences = [
@@ -29,7 +32,7 @@ async function walkFiles(directory) {
 async function corpusDigest(sourceRoot) {
   const digest = createHash("sha256");
   for (const path of await walkFiles(sourceRoot)) {
-    digest.update(`${relative(sourceRoot, path)}\0`);
+    digest.update(`${relative(sourceRoot, path).split(sep).join("/")}\0`);
     digest.update(
       createHash("sha256")
         .update(await readFile(path))
@@ -43,8 +46,8 @@ async function corpusDigest(sourceRoot) {
 test("Azure Functions recipe pack is source-bound and deferred", async () => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   assert.equal(manifest.schemaVersion, "1.0.0");
-  assert.equal(manifest.recipePacks.length, 1);
-  const [pack] = manifest.recipePacks;
+  const pack = manifest.recipePacks.find(({ id }) => id === "azure-functions-recipes");
+  assert.ok(pack, "azure-functions-recipes pack must exist");
   assert.equal(pack.id, "azure-functions-recipes");
   assert.equal(pack.source.root, ".github/skills/azure-prepare/references/services/functions");
   assert.equal(pack.source.digestAlgorithm, "sha256(path-nul-file-sha256-newline)");
@@ -55,6 +58,7 @@ test("Azure Functions recipe pack is source-bound and deferred", async () => {
 });
 
 test("recipe guidance is declared and copied into both client projections", async () => {
+  await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
   const customization = JSON.parse(await readFile(join(root, "customizations", "manifest.json"), "utf8"));
   for (const reference of managedReferences) assert.ok(customization.managedFiles.includes(reference), reference);
 

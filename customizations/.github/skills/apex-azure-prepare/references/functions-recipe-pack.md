@@ -1,7 +1,7 @@
 # Azure Functions Recipe Pack
 
 The Azure Functions recipe corpus is source-bound in
-[`config/recipe-packs.v1.json`](../../../../../../config/recipe-packs.v1.json). It contains service guidance, base
+[`config/recipe-packs.v1.json`](../../../../../config/recipe-packs.v1.json). It contains service guidance, base
 specifications, recipe templates, and evaluation fixtures, but it is not an active capability.
 
 ## Availability
