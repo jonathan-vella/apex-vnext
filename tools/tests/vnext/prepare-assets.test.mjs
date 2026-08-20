@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -331,4 +331,19 @@ Coordinate.
     { delegates: true },
   );
   assert.match(rendered, /\n\s+- task/u);
+});
+
+test("asset lifecycle carries restored managed skills to both clients", async () => {
+  const restoredSkills = ["apex-azure-adr", "apex-azure-defaults", "apex-azure-rbac", "apex-microsoft-docs"];
+  const clients = ["github-copilot-cli", "github-copilot-vscode"];
+
+  for (const skill of restoredSkills) {
+    const source = await readFile(join("customizations", ".github", "skills", skill, "SKILL.md"));
+    for (const client of clients) {
+      const projection = await readFile(
+        join("packages", "cli", "assets", "client-projections", client, ".github", "skills", skill, "SKILL.md"),
+      );
+      assert.deepEqual(projection, source, `${skill} should be available to ${client}`);
+    }
+  }
 });
