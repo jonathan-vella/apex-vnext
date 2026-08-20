@@ -101,9 +101,10 @@ import {
   type JsonValue,
 } from "@apex/kernel";
 import {
+  DOCUMENT_REGISTRY,
   renderApprovalEvidence,
   renderDeploymentPreview,
-  renderRequirements,
+  renderRequirementsDocument,
   renderResourceInventory,
   renderRunStatus,
 } from "@apex/renderers";
@@ -1464,75 +1465,47 @@ export class ApexService {
     templateHash: string;
     outputHash: string;
   }> {
-    if (!Value.Check(RequirementsV1Schema, value)) {
-      throw new ApexError("APEX_INTERNAL", "Requirements document source is invalid", EXIT_CODES.internal);
-    }
-    const requirements = value as {
-      workload: string;
-      environment: string;
-      requirements: Array<{ id: string; priority: string; status: string; statement: string; source: string }>;
-      assumptions: string[];
-      unknowns: string[];
-    };
-    const { content: template, hash: templateHash } = await this.requirementsDocumentTemplateContent();
-    const markdownCell = (text: string) => text.replaceAll("|", "\\|").replaceAll(/\r?\n/gu, "<br>");
-    const markdownListItem = (text: string) => text.replaceAll(/\r?\n/gu, "<br>");
-    const requirementsTable = [
-      "| ID | Priority | Status | Statement | Source |",
-      "| --- | --- | --- | --- | --- |",
-      ...requirements.requirements.map(
-        ({ id, priority, status, statement, source }) =>
-          `| ${markdownCell(id)} | ${markdownCell(priority)} | ${markdownCell(status)} | ${markdownCell(statement)} | ${markdownCell(source)} |`,
-      ),
-    ].join("\n");
-    const replace = (token: string, replacement: string) => template.replaceAll(`{${token}}`, replacement);
-    const document = replace("workload", requirements.workload)
-      .replaceAll("{artifact-hash}", artifactHash)
-      .replaceAll("{template-hash}", templateHash)
-      .replaceAll("{environment}", requirements.environment)
-      .replaceAll("{artifact-status}", "accepted")
-      .replaceAll("{requirements-table}", requirementsTable)
-      .replaceAll(
-        "{assumptions-list}",
-        requirements.assumptions.length === 0
-          ? "None."
-          : requirements.assumptions.map((item) => `- ${markdownListItem(item)}`).join("\n"),
-      )
-      .replaceAll(
-        "{unknowns-list}",
-        requirements.unknowns.length === 0
-          ? "None."
-          : requirements.unknowns.map((item) => `- ${markdownListItem(item)}`).join("\n"),
-      );
+    const { content, templateHash } = await this.requirementsDocumentMarkdown(value, artifactHash);
     return {
       documentId: "requirements",
       templateHash,
       // State transfer exports immutable objects as canonical JSON.
-      outputHash: await this.objects.putJson({ contentType: "text/markdown", content: document }),
+      outputHash: await this.objects.putJson({ contentType: "text/markdown", content }),
+    };
+  }
+
+  private async requirementsDocumentMarkdown(
+    value: unknown,
+    artifactHash: string,
+  ): Promise<{ content: string; templateHash: string }> {
+    if (!Value.Check(RequirementsV1Schema, value)) {
+      throw new ApexError("APEX_INTERNAL", "Requirements document source is invalid", EXIT_CODES.internal);
+    }
+    const { content: template, hash: templateHash } = await this.requirementsDocumentTemplateContent();
+    let document: string;
+    try {
+      document = renderRequirementsDocument(value, template, artifactHash, templateHash);
+    } catch (error) {
+      throw new ApexError(
+        "APEX_INTERNAL",
+        error instanceof Error ? error.message : "Requirements document renderer failed",
+        EXIT_CODES.internal,
+      );
+    }
+    return {
+      content: document,
+      templateHash,
     };
   }
 
   private async requirementsDocumentTemplateContent(): Promise<{ content: string; hash: string }> {
     this.requirementsDocumentTemplate ??= (async () => {
       const assets = await resolveBundledAssets();
-      const content = await readFile(
-        join(assets.customizations, ".github", "skills", "apex-artifacts", "templates", "requirements.md"),
-        "utf8",
-      );
-      const slots = [...content.matchAll(/\{([a-z][a-z-]*)\}/gu)].map((match) => match[1]!);
-      const expectedSlots = [
-        "workload",
-        "artifact-hash",
-        "template-hash",
-        "environment",
-        "artifact-status",
-        "requirements-table",
-        "assumptions-list",
-        "unknowns-list",
-      ];
-      if (new Set(slots).size !== expectedSlots.length || expectedSlots.some((slot) => !slots.includes(slot))) {
-        throw new ApexError("APEX_INTERNAL", "Requirements document template has invalid slots", EXIT_CODES.internal);
+      const templateDefinition = DOCUMENT_REGISTRY.requirements?.template;
+      if (templateDefinition === undefined) {
+        throw new ApexError("APEX_INTERNAL", "Requirements template is unregistered", EXIT_CODES.internal);
       }
+      const content = await readFile(join(assets.customizations, templateDefinition.assetPath), "utf8");
       return { content, hash: sha256Bytes(Buffer.from(content, "utf8")) };
     })();
     return this.requirementsDocumentTemplate;
@@ -2600,7 +2573,7 @@ export class ApexService {
       const hash = this.artifactHash(events, "requirements");
       if (hash === undefined)
         throw new ApexError("APEX_NOT_FOUND", "No requirements artifact exists", EXIT_CODES.notFound);
-      return renderRequirements((await this.objects.getJson(hash)) as never);
+      return (await this.requirementsDocumentMarkdown(await this.objects.getJson(hash), hash)).content;
     }
     const map = {
       preview: ["preview.created", "previewObjectHash", renderDeploymentPreview],

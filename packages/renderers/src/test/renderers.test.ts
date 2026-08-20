@@ -8,14 +8,59 @@ import type {
   RunConfigV1,
 } from "@apex/contracts";
 import {
+  DOCUMENT_REGISTRY,
+  REQUIREMENTS_TEMPLATE_SLOTS,
   renderApprovalEvidence,
   renderDeploymentPreview,
+  renderRequirementsDocument,
   renderRequirements,
   renderResourceInventory,
   renderRunStatus,
 } from "../index.js";
 
 const hash = (character: string): string => character.repeat(64);
+
+test("document registry limits template bindings to supported sources", () => {
+  assert.equal(DOCUMENT_REGISTRY.requirements?.sourceAvailability, "available");
+  assert.equal(DOCUMENT_REGISTRY.requirements?.templateAvailability, "available");
+  assert.equal(DOCUMENT_REGISTRY.inventory?.sourceAvailability, "available");
+  assert.equal(DOCUMENT_REGISTRY["resource-inventory-template"]?.templateAvailability, "reference-only");
+  for (const documentId of [
+    "architecture-assessment",
+    "cost-estimate",
+    "governance-constraints",
+    "implementation-plan",
+    "deployment-summary",
+    "operations-runbook",
+  ]) {
+    assert.equal(DOCUMENT_REGISTRY[documentId]?.sourceAvailability, "unavailable");
+    assert.equal(DOCUMENT_REGISTRY[documentId]?.templateAvailability, "reference-only");
+  }
+});
+
+test("requirements document rendering fills exact template slots with typed or unavailable values", () => {
+  const input: RequirementsV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "sample-project",
+    workload: "API",
+    environment: "prod",
+    requirements: [
+      { id: "REQ-1", statement: "Serve requests", priority: "must", status: "confirmed", source: "brief" },
+    ],
+    assumptions: [],
+    unknowns: [],
+  };
+  const template = REQUIREMENTS_TEMPLATE_SLOTS.map((slot) => `{${slot}}`).join("\n");
+  const rendered = renderRequirementsDocument(input, template, hash("a"), hash("b"));
+
+  assert.doesNotMatch(rendered, /\{[a-z][a-z-]*\}/u);
+  assert.match(rendered, /Unavailable: RequirementsV1 does not represent business context\./u);
+  assert.match(rendered, /Unavailable: no architecture handoff artifact is produced by the current workflow\./u);
+  assert.throws(
+    () => renderRequirementsDocument(input, `${template}\n{unexpected-slot}`, hash("a"), hash("b")),
+    /invalid slots/u,
+  );
+});
 
 test("requirements rendering is deterministic, sorted, and escaped", () => {
   const input: RequirementsV1 = {
