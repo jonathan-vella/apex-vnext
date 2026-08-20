@@ -2,17 +2,21 @@
 
 > Presentation receipt: artifact `{artifact-identifier}`; template `{template-identifier}`.
 
-## Service Summary
+## Quick Reference
 
-{service-summary}
+{quick-reference}
 
-## Operating Procedures
+## Health And Routine Operations
 
-{operating-procedures}
+{health-and-routine-operations}
 
-## Monitoring And Response
+## Monitoring And Incident Response
 
-{monitoring-and-response}
+{monitoring-and-incident-response}
+
+## Common Procedures
+
+{common-procedures}
 
 ## Maintenance And Recovery
 
@@ -21,6 +25,10 @@
 ## Escalation And Ownership
 
 {escalation-and-ownership}
+
+## Change Evidence
+
+{change-evidence}
 
 ## References
 

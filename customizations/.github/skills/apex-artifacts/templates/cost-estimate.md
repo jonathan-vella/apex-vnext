@@ -2,9 +2,21 @@
 
 > Presentation receipt: artifact `{artifact-identifier}`; template `{template-identifier}`.
 
-## Estimate Summary
+## Cost At A Glance
 
-{estimate-summary}
+{cost-at-a-glance}
+
+## Decision Summary
+
+{decision-summary}
+
+## Requirements To Cost Mapping
+
+{requirements-cost-mapping}
+
+## Cost Drivers And Sensitivities
+
+{cost-drivers-and-sensitivities}
 
 ## Assumptions
 
@@ -14,13 +26,21 @@
 
 {cost-breakdown}
 
-## Drivers And Sensitivities
+## Savings Opportunities
 
-{drivers-and-sensitivities}
+{savings-state-and-opportunities}
+
+## Guardrails And Change Triggers
+
+{guardrails-and-change-triggers}
 
 ## Risks And Deferrals
 
 {risks-and-deferrals}
+
+## Pricing Evidence
+
+{pricing-evidence}
 
 ## References
 

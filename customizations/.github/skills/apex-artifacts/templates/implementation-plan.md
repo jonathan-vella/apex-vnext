@@ -6,17 +6,33 @@
 
 {plan-summary}
 
-## Scope And Dependencies
+## Resource Inventory
 
-{scope-and-dependencies}
+{resource-inventory}
+
+## Governance Coverage
+
+{governance-coverage}
+
+## Module And Interface Structure
+
+{module-and-interface-structure}
 
 ## Planned Work
 
 {planned-work}
 
-## Controls And Decisions
+## Code Generation Contract
 
-{controls-and-decisions}
+{code-generation-contract}
+
+## Dependencies And Delivery Sequence
+
+{dependencies-and-delivery-sequence}
+
+## Naming And Security Decisions
+
+{naming-and-security-decisions}
 
 ## Risks And Deferrals
 
