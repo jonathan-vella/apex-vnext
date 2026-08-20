@@ -19,6 +19,10 @@ prior qualification is retained as historical characterization. See
 
 ### Re-baselined
 
+- Added unqualified, no-I/O design capability placeholders for documentation research, RBAC catalog, compute-region
+  evidence, and Entra application intent. They return a stable unavailable result until lifecycle qualification exists.
+- Refined managed Azure defaults, ADR, RBAC, and Microsoft Docs guidance to block on unavailable evidence and avoid
+  unsupported task-context, contract, or rendering claims.
 - Added the managed `apex-azure-defaults` consumer skill with role-scoped guidance for projected governance, security,
   naming, tagging, and AVM/module decisions without direct Azure operations.
 - Added managed `apex-azure-adr` and `apex-azure-rbac` consumer skills with role-scoped decision-record and
