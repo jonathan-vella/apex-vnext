@@ -244,6 +244,13 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "test-guidance-migration",
+      "script": "test:guidance-migration",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "profile-copilot-cli-otel",
       "script": "profile:copilot-cli-otel",
       "profile": "node-validation",
@@ -633,6 +640,7 @@
         "validate:github-workflows",
         "test:github-workflows",
         "test:registry-validator-reporter",
+        "test:guidance-migration",
         "test:client-context-samples",
         "validate:client-outcomes",
         "test:client-outcomes:prepared",

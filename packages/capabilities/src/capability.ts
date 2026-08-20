@@ -2,6 +2,7 @@ import type { TaskEnvelopeV1 } from "@apex/contracts";
 
 export type CapabilitySideEffect = "none" | "local" | "remote";
 export type CapabilityIdempotency = "none" | "supported" | "required";
+export type CapabilityLifecycle = "active" | "implemented-unqualified" | "external-trusted";
 
 export interface CapabilityContext {
   readonly envelope: TaskEnvelopeV1;
@@ -11,6 +12,7 @@ export interface CapabilityContext {
 
 export interface Capability<TInput = unknown, TOutput = unknown> {
   readonly id: string;
+  readonly lifecycle?: CapabilityLifecycle;
   readonly sideEffect: CapabilitySideEffect;
   readonly requiredRole: string;
   readonly timeoutMs: number;
@@ -29,6 +31,7 @@ export type CapabilityErrorCode =
   | "CAPABILITY_SIDE_EFFECT_DENIED"
   | "CAPABILITY_TIMEOUT"
   | "CAPABILITY_UNAVAILABLE"
+  | "CAPABILITY_UNQUALIFIED"
   | "CAPABILITY_UNKNOWN";
 
 export class CapabilityError extends Error {
@@ -107,6 +110,9 @@ export class CapabilityRegistry {
     const capability = this.#capabilities.get(id);
     if (capability === undefined) {
       throw new CapabilityError("CAPABILITY_UNKNOWN", `Capability '${id}' is not registered`);
+    }
+    if (capability.lifecycle === "implemented-unqualified") {
+      throw new CapabilityError("CAPABILITY_UNQUALIFIED", `Capability '${id}' is not qualified for execution`);
     }
     const now = this.#now().getTime();
     if (new Date(envelope.expiresAt).getTime() <= now) {
