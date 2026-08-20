@@ -93,6 +93,7 @@
     ".github/skills/apex-mermaid/references/syntax.md",
     ".github/skills/apex-mermaid/references/styling.md",
     ".github/skills/apex-artifacts/references/presentation-conventions.md",
+    ".github/skills/apex-artifacts/references/reference-only-outlines.md",
     ".github/skills/apex-artifacts/templates/requirements.md",
     ".github/skills/apex-artifacts/templates/architecture-assessment.md",
     ".github/skills/apex-artifacts/templates/cost-estimate.md",
@@ -100,6 +101,7 @@
     ".github/skills/apex-artifacts/templates/implementation-plan.md",
     ".github/skills/apex-artifacts/templates/deployment-summary.md",
     ".github/skills/apex-artifacts/templates/operations-runbook.md",
+    ".github/skills/apex-artifacts/templates/resource-inventory.md",
     ".github/copilot-instructions.md",
     ".github/mcp.json",
     ".vscode/mcp.json"

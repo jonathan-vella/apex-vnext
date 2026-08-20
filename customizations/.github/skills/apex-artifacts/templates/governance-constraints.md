@@ -2,21 +2,29 @@
 
 > Presentation receipt: artifact `{artifact-identifier}`; template `{template-identifier}`.
 
+## Discovery And Attestation
+
+{discovery-and-attestation}
+
 ## Constraint Summary
 
 {constraint-summary}
 
-## Sources And Scope
+## Policy And Control Mapping
 
-{sources-and-scope}
-
-## Required Controls
-
-{required-controls}
+{policy-and-control-mapping}
 
 ## Adaptations And Exceptions
 
 {adaptations-and-exceptions}
+
+## Required Tags And Security Controls
+
+{tags-and-security-controls}
+
+## Cost And Network Constraints
+
+{cost-and-network-constraints}
 
 ## Blockers And Deferrals
 
