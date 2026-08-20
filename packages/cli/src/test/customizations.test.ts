@@ -84,6 +84,13 @@ test("init installs bundled customizations and runtime config by default", async
     await readFile(join(root, ".github", "skills", "apex-artifacts", "templates", "requirements.md"), "utf8"),
     /Derived from accepted APEX requirements artifact/u,
   );
+  assert.match(
+    await readFile(
+      join(root, ".github", "skills", "apex-artifacts", "references", "reference-only-outlines.md"),
+      "utf8",
+    ),
+    /Reference-Only Document Outlines/u,
+  );
   assert.deepEqual(JSON.parse(await readFile(join(root, ".vscode", "mcp.json"), "utf8")), {
     servers: {
       apex: {
@@ -196,6 +203,13 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(
     await readFile(join(root, ".github", "skills", "apex-artifacts", "templates", "requirements.md"), "utf8"),
     /Derived from accepted APEX requirements artifact/u,
+  );
+  assert.match(
+    await readFile(
+      join(root, ".github", "skills", "apex-artifacts", "references", "reference-only-outlines.md"),
+      "utf8",
+    ),
+    /Reference-Only Document Outlines/u,
   );
   for (const worker of ["apex-codegen.agent.md", "apex-reviewer.agent.md", "apex-validator.agent.md"]) {
     await assert.rejects(readFile(join(root, ".github", "agents", worker), "utf8"), /ENOENT/u);

@@ -1,15 +1,33 @@
 # Styling Guidance
 
-Use a neutral, renderer-compatible theme directive and only limited classes.
+Use a renderer-compatible neutral theme and limited semantic classes. Meaning must remain clear without color.
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#ffffff', 'primaryTextColor': '#333333', 'lineColor': '#475569'}}}%%
+%%{init: {'theme': 'neutral'}}%%
 graph LR
-    classDef gate fill:#ffffff,stroke:#3b82f6,stroke-width:2px,color:#1f2937;
+    classDef gate stroke:#2563eb,stroke-width:2px;
     INPUT["Accepted data"] --> GATE{"Supported slot"}:::gate
     GATE --> OUTPUT["Rendered inline view"]
 ```
 
-- Prefer a single layout direction and no more than one optional `classDef`.
-- Keep colors readable in Markdown renderers and avoid service icons or custom SVG.
-- Let the renderer capability decide whether the target slot accepts Mermaid and whether the fence validates.
+## Styling Rules
+
+- Prefer one layout direction, consistent node shapes, and a small semantic class set.
+- Use shape, border, and text labels together; never encode status or severity by color alone.
+- Keep contrast readable in light and dark Markdown renderers. Use renderer-projected colors when available.
+- Use subgraphs only for accepted ownership, trust, lifecycle, or resource boundaries.
+- Keep edge labels short and place detail in surrounding prose when the slot permits it.
+- Avoid service icons, custom SVG, background images, animations, click actions, and external CSS.
+- Do not use emoji as the only identifier; assistive text must carry the meaning.
+
+## Complexity Limits
+
+When labels overlap, crossings obscure meaning, or the renderer cannot fit the slot, reduce the diagram to its primary
+accepted relationship. Split independent concerns into supported slots or use a standalone diagram capability. Do not
+hide nodes or drop material edges merely to make the view attractive.
+
+## Renderer Validation
+
+The renderer decides whether the slot accepts Mermaid, the theme directive is supported, syntax parses, and the result
+fits the document. Inspect the renderer receipt for validation errors. Model inspection, Markdown source appearance, or
+a successful document request is not visual-validation evidence.

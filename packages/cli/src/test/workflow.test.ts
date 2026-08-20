@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { EventJournal, sha256Json } from "@apex/kernel";
+import { EventJournal, ObjectStore, sha256Json } from "@apex/kernel";
 import type { InputValueV1 } from "@apex/contracts";
 import { ApexError } from "../errors.js";
 import { ApexService } from "../service.js";
@@ -278,7 +278,10 @@ test("requirements acceptance records a bound rendered document", async () => {
   assert.deepEqual(document?.documentId, "requirements");
   assert.match(document?.templateHash ?? "", /^[a-f0-9]{64}$/);
   assert.match(document?.outputHash ?? "", /^[a-f0-9]{64}$/);
-  assert.match(await service.render("requirements"), /offline service/u);
+  const persisted = await new ObjectStore(root).getJson<{ contentType: string; content: string }>(document!.outputHash);
+  assert.equal(persisted.contentType, "text/markdown");
+  assert.equal(await service.render("requirements"), persisted.content);
+  assert.match(persisted.content, /Unavailable: RequirementsV1 does not represent business context\./u);
   assert.notEqual(document?.outputHash, accepted.outputHashes.requirements);
 });
 
