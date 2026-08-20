@@ -4,6 +4,7 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import process from "node:process";
+import { format } from "prettier";
 
 const root = resolve(process.cwd());
 const matrixPath = "tools/registry/guidance-migration.v1.json";
@@ -93,7 +94,7 @@ function render(matrix) {
 }
 
 const matrix = JSON.parse(readFileSync(join(root, matrixPath), "utf8"));
-const content = render(matrix);
+const content = await format(render(matrix), { parser: "markdown" });
 const destination = join(root, outputPath);
 if (check) {
   if (!existsSync(destination) || readFileSync(destination, "utf8") !== content) {

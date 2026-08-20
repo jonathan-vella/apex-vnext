@@ -29,3 +29,14 @@ test("catalog review scenarios reject duplicate identifiers, missing coverage, a
   claimedClientQualification.scenarios[0].authority.clientQualification = "qualified";
   assert.ok(validateSkillCatalogReviewScenarios(claimedClientQualification, schema).length > 0);
 });
+
+test("catalog review category coverage follows the schema", () => {
+  const expandedSchema = structuredClone(schema);
+  expandedSchema.properties.scenarios.items.properties.category.enum.push("new-required-category");
+
+  assert.ok(
+    validateSkillCatalogReviewScenarios(corpus, expandedSchema).includes(
+      "required coverage category is missing: new-required-category",
+    ),
+  );
+});

@@ -7,14 +7,11 @@ import Ajv2020 from "ajv/dist/2020.js";
 
 const CORPUS_PATH = "tools/registry/skill-catalog-review-scenarios.v1.json";
 const SCHEMA_PATH = "tools/registry/schemas/skill-catalog-review-scenarios.schema.json";
-const REQUIRED_CATEGORIES = new Set([
-  "discovery-positive",
-  "discovery-near-miss",
-  "unavailable-capability",
-  "direct-operation-denial",
-  "requirements-native-workflow",
-  "bicep-complete-reference",
-]);
+
+function requiredCategories(schema) {
+  const categories = schema.properties?.scenarios?.items?.properties?.category?.enum;
+  return new Set(Array.isArray(categories) ? categories : []);
+}
 
 export function validateSkillCatalogReviewScenarios(corpus, schema) {
   const errors = [];
@@ -27,7 +24,7 @@ export function validateSkillCatalogReviewScenarios(corpus, schema) {
   if (new Set(ids).size !== ids.length) errors.push("scenario IDs must be unique");
 
   const categories = new Set(corpus.scenarios.map(({ category }) => category));
-  for (const category of REQUIRED_CATEGORIES) {
+  for (const category of requiredCategories(schema)) {
     if (!categories.has(category)) errors.push(`required coverage category is missing: ${category}`);
   }
 
