@@ -1,0 +1,101 @@
+{
+  "$schema": "schemas/skill-catalog-review-scenarios.schema.json",
+  "schemaVersion": "1.0.0",
+  "qualification": {
+    "mode": "deterministic-fixture-only",
+    "live": "not-run",
+    "clients": "not-run"
+  },
+  "scenarios": [
+    {
+      "id": "defaults-discovery",
+      "category": "discovery-positive",
+      "intent": "Find Azure naming, tag, and security guidance for a planned workload.",
+      "expected": {
+        "outcome": "discoverable guidance is routed to the defaults consumer skill",
+        "evidence": "managed skill and migration matrix entry",
+        "skill": "apex-azure-defaults"
+      },
+      "authority": {
+        "liveQualification": "not-run",
+        "clientQualification": "not-run",
+        "directOperation": "not-requested"
+      }
+    },
+    {
+      "id": "defaults-near-miss",
+      "category": "discovery-near-miss",
+      "intent": "Request a production Azure deployment while searching for defaults guidance.",
+      "expected": {
+        "outcome": "guidance discovery does not authorize deployment",
+        "evidence": "direct operation boundary in the skill catalog",
+        "skill": "apex-azure-defaults"
+      },
+      "authority": {
+        "liveQualification": "not-run",
+        "clientQualification": "not-run",
+        "directOperation": "denied"
+      }
+    },
+    {
+      "id": "microsoft-docs-unavailable",
+      "category": "unavailable-capability",
+      "intent": "Fetch current Microsoft documentation through a provider capability.",
+      "expected": {
+        "outcome": "provider-backed retrieval remains unavailable until lifecycle evidence exists",
+        "evidence": "matrix owner and deferred qualification statement",
+        "skill": "apex-microsoft-docs"
+      },
+      "authority": {
+        "liveQualification": "not-run",
+        "clientQualification": "not-run",
+        "directOperation": "denied"
+      }
+    },
+    {
+      "id": "deployment-denial",
+      "category": "direct-operation-denial",
+      "intent": "Apply a deployment directly from catalog guidance.",
+      "expected": {
+        "outcome": "direct deployment is denied outside trusted workflow authority",
+        "evidence": "deployment consumer ownership and authority boundary",
+        "skill": "apex-azure-deploy"
+      },
+      "authority": {
+        "liveQualification": "not-run",
+        "clientQualification": "not-run",
+        "directOperation": "denied"
+      }
+    },
+    {
+      "id": "requirements-native-workflow",
+      "category": "requirements-native-workflow",
+      "intent": "Capture requirements through the native workflow before implementation planning.",
+      "expected": {
+        "outcome": "native requirements workflow is selected before implementation work",
+        "evidence": "managed native skill projection",
+        "skill": "apex-requirements"
+      },
+      "authority": {
+        "liveQualification": "not-run",
+        "clientQualification": "not-run",
+        "directOperation": "not-requested"
+      }
+    },
+    {
+      "id": "bicep-reference-complete",
+      "category": "bicep-complete-reference",
+      "intent": "Read complete Bicep private endpoint and module interface guidance.",
+      "expected": {
+        "outcome": "source-reviewed references resolve to managed Bicep reference material",
+        "evidence": "matrix resource disposition targets",
+        "skill": "apex-bicep-patterns"
+      },
+      "authority": {
+        "liveQualification": "not-run",
+        "clientQualification": "not-run",
+        "directOperation": "not-requested"
+      }
+    }
+  ]
+}
