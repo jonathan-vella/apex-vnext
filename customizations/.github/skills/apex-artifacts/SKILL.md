@@ -1,25 +1,41 @@
 ---
 name: apex-artifacts
-description: "Present accepted APEX typed artifacts as bounded Markdown documents. Use for artifact templates, document slots, and derived views."
+description: "Presents accepted APEX typed artifacts as bounded Markdown views. Use for renderer templates, document slots, provenance receipts, resource inventories, cost views, runbooks, and reference-only document outlines."
 user-invocable: false
 ---
 
 # APEX Artifact Presentations
 
-Use this skill only after the kernel has accepted the typed artifact. The artifact schema and accepted object hash remain
-canonical; a Markdown document is a derived presentation.
+Present accepted typed artifacts without creating a second source of truth. The artifact schema, accepted values,
+kernel decisions, and accepted object hash remain canonical; Markdown is a derived view.
+
+## Prerequisites
+
+- An accepted typed artifact and `apex/taskContext` are available.
+- The kernel exposes the matching renderer capability and all required slots.
+- Any referenced evidence is accepted, immutable, and safe to disclose.
 
 ## Rules
 
-1. Select the document template that matches the accepted artifact kind.
-2. Preserve the template's heading order and section slots.
-3. Fill slots only from `apex/taskContext`, accepted artifact values, or explicit kernel decisions.
-4. Treat an unavailable required renderer slot as a blocker. Preserve unknown and deferred values; do not replace them
-   with assumptions.
-5. Return the presentation through the kernel-rendered document capability when it is available.
-6. Do not treat rendered Markdown as gate evidence or alter typed artifact values to fit a template.
+1. Select an active template only when the renderer binds it to the accepted artifact kind.
+2. Preserve the selected template's heading order, slot meaning, and provenance receipt.
+3. Fill slots only from `apex/taskContext`, accepted artifact values, accepted evidence, or explicit kernel decisions.
+4. Preserve accepted unknown, unavailable, not-applicable, and deferred states exactly; never turn them into facts.
+5. Stop when a required slot, source identifier, template identifier, or renderer capability is unavailable.
+6. Return the bounded document request or kernel-rendered receipt. Never write workflow files or mutate artifact state.
+7. Do not use Markdown as gate evidence, claim validation or deployment occurred, or alter values to fit an outline.
 
-## Templates
+## Workflow
+
+1. Confirm artifact acceptance, kind, disclosure boundary, and renderer support.
+2. Choose an active binding below. Use an advisory outline only to shape a supported custom presentation.
+3. Map every required slot to an accepted source and retain source identifiers for traceability.
+4. Render once, then check heading order, unresolved slots, status language, links, and provenance.
+5. Correct the bounded request and re-render until the renderer accepts it; otherwise return the blocker.
+
+Read [presentation conventions](references/presentation-conventions.md) before preparing any document request.
+
+## Active Renderer Bindings
 
 - [Requirements document](templates/requirements.md) - present an accepted `requirements` artifact.
 - [Architecture assessment](templates/architecture-assessment.md) - present an accepted `architecture` artifact.
@@ -29,10 +45,18 @@ canonical; a Markdown document is a derived presentation.
 - [Deployment summary](templates/deployment-summary.md) - present an accepted `deployment-summary` artifact.
 - [Operations runbook](templates/operations-runbook.md) - present an accepted `operations-runbook` artifact.
 
-Read [presentation conventions](references/presentation-conventions.md) before presenting any accepted artifact.
-Read `.github/skills/apex-mermaid/SKILL.md` only when a renderer-supported inline diagram slot is available.
+## Reference-Only Outlines
+
+- [Resource inventory](templates/resource-inventory.md) is advisory until a renderer binding supplies its slots.
+- [Additional document outlines](references/reference-only-outlines.md) preserve useful source-document semantics without
+   claiming an artifact kind, capability, package binding, or workflow phase.
+
+Reference-only outlines never authorize rendering, file creation, cloud queries, repository reads, or state changes.
+If a caller needs one, require a supported custom-document capability or clearly report that the capability is absent.
+
+Load `.github/skills/apex-mermaid/SKILL.md` only when a renderer-supported inline-diagram slot is present.
 
 ## Output
 
-Return a bounded document request or the kernel-rendered Markdown receipt. Include source artifact and template hashes
-when the capability projects them.
+Return a bounded document request or kernel-rendered Markdown receipt. Include projected source and template identifiers,
+unknowns, deferrals, evidence references, and capability blockers.

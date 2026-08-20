@@ -2,17 +2,25 @@
 
 > Presentation receipt: artifact `{artifact-identifier}`; template `{template-identifier}`.
 
-## Summary
+## Preflight Evidence
 
-{summary}
+{preflight-evidence}
 
 ## Execution Context
 
 {execution-context}
 
-## Results
+## Change Summary
 
-{results}
+{change-summary}
+
+## Resource Results
+
+{resource-results}
+
+## Outputs
+
+{outputs}
 
 ## Outputs And Follow-Up
 

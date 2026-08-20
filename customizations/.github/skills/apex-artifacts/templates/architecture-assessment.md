@@ -2,21 +2,29 @@
 
 > Presentation receipt: artifact `{artifact-identifier}`; template `{template-identifier}`.
 
-## Summary
+## Requirements Validation
 
-{summary}
+{requirements-validation}
 
-## Context And Scope
+## Executive Summary
 
-{context-and-scope}
+{executive-summary}
 
-## Assessment
+## Well-Architected Assessment
 
-{assessment}
+{waf-assessment}
 
-## Decisions
+## Resource And SKU Recommendations
 
-{decisions}
+{resource-recommendations}
+
+## Architecture Decisions
+
+{architecture-decisions}
+
+## Implementation Handoff
+
+{implementation-handoff}
 
 ## Risks And Deferrals
 
