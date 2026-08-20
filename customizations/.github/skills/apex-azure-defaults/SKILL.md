@@ -44,6 +44,7 @@ same as an empty policy result.
 - Read [network planning](references/network-planning.md) when a workload requires VNet attachment or private access.
 - Read [cost monitoring](references/cost-monitoring.md) when planning budgets, alert routing, anomaly detection, or cost
   evidence.
+- [Decision boundaries](references/decision-boundaries.md) - fallback order, matrix use, and deferred evidence.
 
 ## Capability Boundaries
 
