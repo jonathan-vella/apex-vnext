@@ -22,10 +22,12 @@ acceptance criteria; authorized capabilities own source inspection, generation, 
    and diagnostics intent.
 3. Apply [Module locks and CodeGen acceptance](references/module-locks-and-codegen-acceptance.md) for AVM selection,
    exact locks, and evidence requirements.
-4. Submit typed intent only through an authorized capability. Treat unavailable capabilities, missing locks, stale
+4. Apply [Module composition and state boundaries](references/module-composition-and-state-boundaries.md) to define
+   stable interfaces and record refactoring migration intent.
+5. Apply [Plan and change assessment](references/plan-and-change-assessment.md) to classify proposed actions and
+   surface replacement, deletion, or stateful-resource risk.
+6. Submit typed intent only through an authorized capability. Treat unavailable capabilities, missing locks, stale
    receipts, or unaccepted evidence as blockers.
-5. Apply [Module composition and refactor intent](references/module-composition-and-refactor.md) when module
-  boundaries or state-preserving refactors are part of the accepted binding.
 
 ## Boundaries
 
@@ -41,3 +43,7 @@ acceptance criteria; authorized capabilities own source inspection, generation, 
   locks, and receipt-based acceptance.
 - [Module composition and refactor intent](references/module-composition-and-refactor.md) - boundary, interface, and
   state-transition review criteria.
+- [Module composition and state boundaries](references/module-composition-and-state-boundaries.md) - output-to-input
+  interfaces and refactoring migration intent.
+- [Plan and change assessment](references/plan-and-change-assessment.md) - receipt-gated action classification and
+  stateful-resource risk review.
