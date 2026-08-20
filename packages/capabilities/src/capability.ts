@@ -28,6 +28,7 @@ export type CapabilityErrorCode =
   | "CAPABILITY_ROLE_DENIED"
   | "CAPABILITY_SIDE_EFFECT_DENIED"
   | "CAPABILITY_TIMEOUT"
+  | "CAPABILITY_UNAVAILABLE"
   | "CAPABILITY_UNKNOWN";
 
 export class CapabilityError extends Error {
