@@ -34,7 +34,7 @@ function unavailableCapability<TInput>(id: DesignCapabilityId): Capability<TInpu
     retries: 0,
     idempotency: "supported",
     async execute() {
-      throw new CapabilityError("CAPABILITY_UNAVAILABLE", `Capability '${id}' is implemented but not qualified`);
+      throw new CapabilityError("CAPABILITY_UNAVAILABLE", `Capability '${id}' is unavailable until qualified`);
     },
   };
 }
