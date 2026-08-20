@@ -55,6 +55,29 @@ test("accepts a complete mapping with packaged targets", () => {
   assert.deepEqual(validateGuidanceMigration(inputs()), []);
 });
 
+test("scoped parity mappings are complete with explicit source dispositions and managed consumer skills", () => {
+  const scopedSources = [
+    "azure-artifacts",
+    "azure-deploy",
+    "iac-common",
+    "azure-cost-optimization",
+    "azure-governance-discovery",
+    "mermaid",
+  ];
+  const repositoryInputs = collectGuidanceMigrationInputs();
+
+  for (const source of scopedSources) {
+    const mapping = repositoryInputs.matrix.skillDispositions.find((entry) => entry.source === source);
+    assert.equal(mapping?.lifecycle, "complete", `${source} must be complete`);
+    assert.equal(
+      mapping?.resourceDispositions.length,
+      repositoryInputs.sourceResources.get(source)?.size,
+      `${source} must disposition every source resource`,
+    );
+    assert.ok(repositoryInputs.managedFiles.has(`.github/skills/${mapping.consumerSkill}/SKILL.md`));
+  }
+});
+
 test("rejects a missing lifecycle and source resource disposition", () => {
   const candidate = matrix();
   delete candidate.skillDispositions[0].lifecycle;
