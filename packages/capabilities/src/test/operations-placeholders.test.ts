@@ -33,6 +33,10 @@ test("operations placeholders are unregistered by default and fail stably when t
     capabilities.map((capability) => capability.id),
     operationsCapabilityCategories.map((category) => `operations.${category}`),
   );
+  await assert.rejects(
+    registry.execute(capabilities[0]!.id, envelope(capabilities[0]!.id), undefined),
+    (error: unknown) => error instanceof CapabilityError && error.code === "CAPABILITY_UNKNOWN",
+  );
   for (const capability of capabilities) {
     registry.register(capability);
     await assert.rejects(
