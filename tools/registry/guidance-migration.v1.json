@@ -490,16 +490,15 @@
       "disposition": "consumer",
       "consumerSkill": "apex-azure-cloud-migrate",
       "owner": "APEX Architect and Planner",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "references/services/functions/assessment.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/migration-readiness.md"],
+          "reason": "Preserves source workload assessment, risk, and compatibility concepts without source inspection.",
+          "replacementProof": "Managed readiness guidance requires accepted evidence and defers runtime inspection.",
+          "rollbackGate": "Restore planned status if the managed assessment stops preserving evidence boundaries.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -514,22 +513,20 @@
         },
         {
           "source": "references/services/functions/global-rules.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/staged-validation-handoff.md"],
+          "reason": "Preserves staged gates and non-claiming handoff rules without direct operational authority.",
+          "replacementProof": "Managed handoff guidance records receipts and blocks skipped stages.",
+          "rollbackGate": "Restore planned status if stage receipt requirements are removed.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/functions/lambda-to-functions.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/workload-mapping.md"],
+          "reason": "Preserves Lambda trigger, contract, runtime, and dependency mapping as assessment intent.",
+          "replacementProof": "Managed mapping guidance explicitly defers conversion and runtime verification.",
+          "rollbackGate": "Restore planned status if source conversion becomes implied by mapping guidance.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -594,12 +591,11 @@
         },
         {
           "source": "references/workflow-details.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/staged-validation-handoff.md"],
+          "reason": "Preserves assessment-to-readiness handoff sequencing with receipt gates.",
+          "replacementProof": "Managed handoff guidance identifies evidence, blockers, and the authorized next task.",
+          "rollbackGate": "Restore planned status if handoff receipt tracking is no longer available.",
           "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
@@ -609,26 +605,24 @@
       "disposition": "consumer",
       "consumerSkill": "apex-azure-compliance",
       "owner": "APEX Validator",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "references/auth-best-practices.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/compliance-finding-criteria.md"],
+          "reason": "Preserves identity posture and least-privilege recommendation criteria without credential access.",
+          "replacementProof": "Managed finding criteria separates authentication signals from direct identity actions.",
+          "rollbackGate": "Restore planned status if guidance prescribes identity mutation or secret access.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azqr-recommendations.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/compliance-finding-criteria.md"],
+          "reason": "Preserves recommendation category and evidence-backed severity interpretation.",
+          "replacementProof": "Managed finding criteria classifies category, severity, scope, and confidence.",
+          "rollbackGate": "Restore planned status if recommendation evidence loses scope or confidence limits.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -643,12 +637,11 @@
         },
         {
           "source": "references/azure-keyvault-expiration-audit.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/compliance-finding-criteria.md"],
+          "reason": "Preserves redacted expiration interpretation without Key Vault enumeration or content access.",
+          "replacementProof": "Managed finding criteria retains expiry, coverage, and indeterminate semantics.",
+          "rollbackGate": "Restore planned status if sensitive values or direct vault access are introduced.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -1818,7 +1811,7 @@
       "disposition": "consumer",
       "consumerSkill": "apex-azure-kusto",
       "owner": "APEX Operator",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "references/fallback-strategy.md",
@@ -1832,12 +1825,11 @@
         },
         {
           "source": "references/query-patterns.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/kql-evidence-interpretation.md"],
+          "reason": "Preserves bounded KQL retrieval, aggregation, time-series, correlation, and schema interpretation.",
+          "replacementProof": "Managed KQL guidance retains query limits and defers execution to a qualified capability.",
+          "rollbackGate": "Restore planned status if the reference implies query execution or inferred data.",
           "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
@@ -3816,7 +3808,7 @@
       "disposition": "consumer",
       "consumerSkill": "apex-azure-quotas",
       "owner": "APEX Architect",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "references/advanced-commands.md",
@@ -3850,22 +3842,20 @@
         },
         {
           "source": "references/resource-name-mapping.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/capacity-decision-rules.md"],
+          "reason": "Preserves provider-specific resource-to-quota mapping and unit checks.",
+          "replacementProof": "Managed capacity guidance rejects inferred mappings and ambiguous units.",
+          "rollbackGate": "Restore planned status if a universal ARM-to-quota mapping is implied.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/troubleshooting.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/capacity-decision-rules.md"],
+          "reason": "Preserves unsupported-provider, invalid-scope, and hard-limit blocker semantics.",
+          "replacementProof": "Managed capacity guidance routes operational failures to deferred provider capabilities.",
+          "rollbackGate": "Restore planned status if troubleshooting becomes executable command guidance.",
           "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
@@ -3883,7 +3873,7 @@
       "disposition": "consumer",
       "consumerSkill": "apex-azure-resources",
       "owner": "APEX Operator",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "assets/example-diagram.md",
@@ -3907,22 +3897,20 @@
         },
         {
           "source": "references/azure-resource-graph.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/inventory-query-patterns.md"],
+          "reason": "Preserves bounded Resource Graph scope, type, tag, and orphan-candidate query patterns.",
+          "replacementProof": "Managed inventory guidance captures query boundaries and defers ARG execution.",
+          "rollbackGate": "Restore planned status if the reference allows direct query execution.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/lookup-workflow.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/inventory-query-patterns.md"],
+          "reason": "Preserves lookup pattern selection, pagination, freshness, and result-shaping limits.",
+          "replacementProof": "Managed inventory guidance distinguishes complete evidence from partial pages.",
+          "rollbackGate": "Restore planned status if lookup results can be represented as complete without coverage.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -4068,26 +4056,24 @@
       "disposition": "consumer",
       "consumerSkill": "apex-azure-validate",
       "owner": "APEX Validator",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "references/global-rules.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/preflight-evidence.md"],
+          "reason": "Preserves safe stop, proof, and non-advancement semantics as evidence interpretation.",
+          "replacementProof": "Managed preflight guidance preserves distinct pass, fail, blocked, stale, and indeterminate results.",
+          "rollbackGate": "Restore planned status if global validation rules become direct execution instructions.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/infraops-preflight.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/preflight-evidence.md"],
+          "reason": "Preserves preflight prerequisite, governance, and error classification without command execution.",
+          "replacementProof": "Managed preflight guidance routes provider and policy observations to trusted capabilities.",
+          "rollbackGate": "Restore planned status if the reference starts invoking CLI, previews, or remediation.",
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
@@ -4202,12 +4188,11 @@
         },
         {
           "source": "references/region-availability.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
+          "disposition": "adapt",
+          "targets": ["references/preflight-evidence.md"],
+          "reason": "Preserves target-bound region availability evidence and unavailable-result semantics.",
+          "replacementProof": "Managed preflight guidance requires target, binding, freshness, and producing authority.",
+          "rollbackGate": "Restore planned status if static availability tables are treated as live evidence.",
           "scenarioIds": ["guidance-migration-ledger"]
         }
       ]

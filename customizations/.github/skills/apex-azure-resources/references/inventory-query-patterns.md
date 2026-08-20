@@ -40,3 +40,10 @@ rather than widening the claim.
 - Treat index latency, pagination, and field redaction as result limitations.
 - Do not turn a lookup result into a diagram, remediation plan, or compliance
   conclusion without the separate accepted evidence required for that task.
+
+## Resource Graph Boundary
+
+Azure Resource Graph lookup and provider-specific resource discovery are deferred capabilities. Request a bounded query
+pattern and result shape, but do not execute KQL, invoke CLI or SDK tools, or infer omitted pages. Architecture diagram
+templates and visualization assets are excluded from inventory guidance; visual output requires separately accepted
+inventory evidence and an authorized presentation path.
