@@ -1,6 +1,7 @@
 ---
 name: apex-requirements
-description: "Structure a bounded APEX requirements task. Use for constraints, NFRs, compliance, budget, and scope."
+description: "Provides internal APEX requirements guidance for typed intake, scope, constraints, NFRs, compliance, and budget."
+user-invocable: false
 ---
 
 ## APEX Requirements
@@ -15,18 +16,25 @@ Use this skill only for an active requirements task.
 
 ## Workflow
 
-1. Call `apex/nextTask`. When it returns `needs_input`, use its `intake` metadata and `questions` exactly as returned;
-   do not maintain a separate client-side question list.
-2. Ask the returned questions through the active client projection's question mechanism and record every answer as
-   supplied, unknown, or explicitly deferred with its owner.
-3. Submit that request only through `apex/recordInput`, preserving its request ID, expected journal head, and owner epoch.
-4. Call `apex/nextTask` again and repeat until it returns a requirements `task`; only then read `apex/taskContext`.
-5. Treat the service-preferences round as a preference boundary. Capture retained, prohibited, and preferred services,
+1. Call `apex/nextTask`. Validate that a returned `task` is owned by the requirements role before reading its context.
+2. When it returns `needs_input`, use its `intake` metadata and `questions` exactly as returned; do not maintain a
+   separate client-side question list.
+3. Ask the returned questions through the active client projection's question mechanism. Record each response as a
+   supplied value, typed unknown, or explicit deferral with its owner; never replace an unknown with an inferred value.
+4. Submit that request only through `apex/recordInput`, preserving its request ID, expected journal head, and owner epoch.
+5. Call `apex/nextTask` again and repeat until it returns a requirements `task`; only then read `apex/taskContext`.
+6. Treat the service-preferences round as a preference boundary. Capture retained, prohibited, and preferred services,
    SKU preferences, and environment overrides without selecting architecture, SKUs, or implementation details.
-6. Submit the typed result only through `apex/stageArtifact` and `apex/completeTask`.
+7. Stage the task-context-defined requirements output, complete the requirements task, and wait for the required review
+   result before reporting that Gate 1 is ready. Only the kernel opens or evaluates Gate 1.
 
 The kernel catalog and its versioned input contracts are authoritative. Do not choose architecture, SKUs, or
 implementation details while gathering requirements.
+
+## Boundaries
+
+Do not read task context for `needs_input`, a task owned by another role, or a stale task ID. Treat `APEX_STALE` as a
+fresh-status requirement, and return kernel validation or authorization errors without fabricating a requirements result.
 
 ## Output
 

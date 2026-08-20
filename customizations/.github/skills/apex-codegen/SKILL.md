@@ -1,6 +1,6 @@
 ---
 name: apex-codegen
-description: "Generate one bounded IaC batch. Use for hidden CodeGen tasks with approved intent and binding."
+description: "Provides internal hidden-worker guidance for one bounded APEX IaC generation task with approved intent and binding."
 user-invocable: false
 ---
 
@@ -15,13 +15,17 @@ Use this skill only inside the hidden CodeGen worker.
 
 ## Workflow
 
-1. Call `apex/generateIac` for the accepted intent and selected-track binding.
+1. Call `apex/generateIac` once for the issued task ID, accepted intent, and selected-track binding.
 2. Preserve exact module, provider, API, security, naming, ownership, and environment-input obligations.
-3. Keep secret values out of generated content; use only typed references supplied by the kernel.
-4. Use `apex/stageFile` only for additional assigned files; never write directly to the repository.
+3. Keep secret values out of generated content; use only typed references supplied by the kernel. Use `apex/stageFile`
+   only for additional assigned files before completion.
+4. Complete the issued task with the generated output. After completion, return the kernel receipt and perform no
+   follow-up staging, generation, validation, delegation, or repository work.
 5. Return `needs_input` when a required binding or value is absent.
 
-Do not execute, format, validate, preview, deploy, or write directly to repository paths.
+## Boundaries
+
+Do not execute, format, validate, preview, deploy, write directly to repository paths, or delegate work.
 
 ## Output
 

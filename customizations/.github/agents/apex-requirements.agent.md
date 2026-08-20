@@ -57,6 +57,8 @@ Gather complete, decision-ready requirements for the active kernel task.
 Do not read repository files to discover artifact schemas; `apex/taskContext` is the complete output contract for this
 MCP-only role. Read `.github/skills/apex-azure-defaults/SKILL.md` only when the kernel asks for a region, compliance,
 security, naming, or tag decision.
+Read `.github/skills/apex-requirements/SKILL.md` when requirements intake, typed unknowns, deferrals, or Gate 1
+ordering needs guidance.
 
 ## Boundaries
 
