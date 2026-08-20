@@ -23,6 +23,12 @@ prior qualification is retained as historical characterization. See
   evidence, and Entra application intent. They return a stable unavailable result until lifecycle qualification exists.
 - Refined managed Azure defaults, ADR, RBAC, and Microsoft Docs guidance to block on unavailable evidence and avoid
   unsupported task-context, contract, or rendering claims.
+- Added evidence-scoped operational checklists for governance, compliance,
+  capacity, inventory, diagnostics, Kusto, cost, validation, and deployment.
+  The deployment checklist preserves circuit-breaker and governance-drift
+  routing while retaining trusted provider execution boundaries.
+- Added test-only unavailable operational capability placeholders for governance
+  discovery, inventory, capacity, diagnostics/Kusto, compliance, and cost.
 - Added the managed `apex-azure-defaults` consumer skill with role-scoped guidance for projected governance, security,
   naming, tagging, and AVM/module decisions without direct Azure operations.
 - Added managed `apex-azure-adr` and `apex-azure-rbac` consumer skills with role-scoped decision-record and

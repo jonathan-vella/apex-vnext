@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+<<<<<<< HEAD
 import { execFile as execFileCallback } from "node:child_process";
+=======
+>>>>>>> 0c931b7 (feat(skills): deepen operational guidance)
 import { mkdir, mkdtemp, readFile, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -350,6 +353,22 @@ test("asset lifecycle carries restored managed skills to both clients", async ()
         join("packages", "cli", "assets", "client-projections", client, ".github", "skills", skill, "SKILL.md"),
       );
       assert.deepEqual(projection, source, `${skill} should be available to ${client}`);
+    }
+  }
+});
+
+test("asset preparation includes operational skill references for both clients", async () => {
+  const relativePaths = [
+    ".github/skills/apex-azure-governance/references/operational-checklist.md",
+    ".github/skills/apex-azure-deploy/references/operational-checklist.md",
+  ];
+  for (const client of ["github-copilot-vscode", "github-copilot-cli"]) {
+    for (const relativePath of relativePaths) {
+      const content = await readFile(
+        join(process.cwd(), "packages", "cli", "assets", "client-projections", client, relativePath),
+        "utf8",
+      );
+      assert.match(content, /Operational Checklist/u);
     }
   }
 });
