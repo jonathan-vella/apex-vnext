@@ -52,3 +52,10 @@ or availability needs as `high risk`.
 When data is stale, truncated, redacted beyond the needed fields, or missing a
 hash, return `indeterminate` and request refreshed scoped evidence through the
 authorized capability.
+
+## Capability Boundary
+
+Live pricing, Resource Graph inventory, billing exports, and source report rendering require separately qualified
+typed producers. Their absence is a blocker, not permission to substitute a browser lookup, terminal command, or a
+reference-only report outline. Keep any requested report as an assessment finding until a registered producer and
+renderer return a receipt.

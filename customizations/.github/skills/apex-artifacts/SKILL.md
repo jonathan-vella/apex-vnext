@@ -54,6 +54,9 @@ resource inventory. They are read-only views of their accepted typed sources.
 Reference-only outlines never authorize rendering, file creation, cloud queries, repository reads, or state changes.
 If a caller needs one, require a supported custom-document capability or clearly report that the capability is absent.
 
+Source template structure may inform an outline, but it is not a producer or renderer registration. A template becomes
+renderable only when a typed producer, registry binding, and document receipt are all available.
+
 The current registry declares no Mermaid-capable slots. Do not request inline diagrams for these documents.
 
 ## Output
