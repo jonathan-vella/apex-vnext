@@ -1,6 +1,6 @@
 ---
 name: apex-operations
-description: "Provides internal APEX operations guidance for run status, preview explanation, inventory, reconciliation, and bounded diagnosis."
+description: "Provides internal APEX operations guidance for status, preview, inventory, reconciliation, and diagnosis."
 user-invocable: false
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: apex-requirements
-description: "Provides internal APEX requirements guidance for typed intake, scope, constraints, NFRs, compliance, and budget."
+description: "Provides internal APEX requirements guidance for typed intake, scope, constraints, and budget."
 user-invocable: false
 ---
 
@@ -21,7 +21,8 @@ Use this skill only for an active requirements task.
    separate client-side question list.
 3. Ask the returned questions through the active client projection's question mechanism. Record each response as a
    supplied value, typed unknown, or explicit deferral with its owner; never replace an unknown with an inferred value.
-4. Submit that request only through `apex/recordInput`, preserving its request ID, expected journal head, and owner epoch.
+4. Submit that request only through `apex/recordInput`, preserving its request ID, expected journal head, and owner
+   epoch.
 5. Call `apex/nextTask` again and repeat until it returns a requirements `task`; only then read `apex/taskContext`.
 6. Treat the service-preferences round as a preference boundary. Capture retained, prohibited, and preferred services,
    SKU preferences, and environment overrides without selecting architecture, SKUs, or implementation details.
@@ -34,7 +35,8 @@ implementation details while gathering requirements.
 ## Boundaries
 
 Do not read task context for `needs_input`, a task owned by another role, or a stale task ID. Treat `APEX_STALE` as a
-fresh-status requirement, and return kernel validation or authorization errors without fabricating a requirements result.
+fresh-status requirement, and return kernel validation or authorization errors without fabricating a requirements
+result.
 
 ## Output
 

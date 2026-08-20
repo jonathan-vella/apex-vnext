@@ -1,6 +1,6 @@
 ---
 name: apex-planning
-description: "Provides internal APEX planning guidance for implementation intent, controls, dependencies, ownership, tracks, and bindings."
+description: "Provides internal APEX planning guidance for implementation intent, controls, dependencies, and bindings."
 user-invocable: false
 ---
 

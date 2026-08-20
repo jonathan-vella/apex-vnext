@@ -1,6 +1,6 @@
 ---
 name: apex-codegen
-description: "Provides internal hidden-worker guidance for one bounded APEX IaC generation task with approved intent and binding."
+description: "Provides hidden-worker guidance for one bounded APEX IaC generation task with approved intent and binding."
 user-invocable: false
 ---
 

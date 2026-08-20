@@ -1,6 +1,6 @@
 ---
 name: apex-workflow
-description: "Provides internal APEX workflow routing for status, resume, project selection, blocked runs, and next tasks."
+description: "Provides internal APEX workflow routing for status, resume, project selection, and next tasks."
 user-invocable: false
 ---
 

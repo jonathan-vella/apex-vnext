@@ -1,6 +1,6 @@
 ---
 name: apex-architecture
-description: "Provides internal APEX architecture guidance for traceable resource, WAF, identity, network, recovery, and cost decisions."
+description: "Provides internal APEX architecture guidance for traceable WAF, identity, network, recovery, and cost decisions."
 user-invocable: false
 ---
 
