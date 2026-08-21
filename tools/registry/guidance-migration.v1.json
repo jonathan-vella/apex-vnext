@@ -1553,7 +1553,7 @@
       "disposition": "consumer",
       "consumerSkill": "apex-azure-diagnostics",
       "owner": "APEX Operator",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "references/azure-resource-graph.md",
@@ -1839,7 +1839,7 @@
       "disposition": "consumer",
       "consumerSkill": "apex-azure-prepare",
       "owner": "APEX Architect and Planner",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "references/analyze.md",
