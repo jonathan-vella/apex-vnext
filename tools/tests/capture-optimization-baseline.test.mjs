@@ -40,3 +40,16 @@ test("baseline capture requires an explicit output path", () => {
   assert.throws(() => parseOutputPath(["--output", "baseline.json", "extra"]), /only --output/);
   assert.equal(parseOutputPath(["--output", "baseline.json"]), "baseline.json");
 });
+
+test("baseline capture rejects unowned paths and normalizes inventory ordering", () => {
+  const build = (paths) =>
+    buildOptimizationBaseline({
+      manifest,
+      observedAt: "2026-08-21T00:00:00.000Z",
+      trackedPaths: paths,
+      stat: (path) => stats.get(path),
+      runGit: (_command, args) => (args[1] === "HEAD" ? `${"a".repeat(40)}\n` : `${"b".repeat(40)}\n`),
+    });
+  assert.equal(build(trackedPaths).inventory.sha256, build([...trackedPaths].reverse()).inventory.sha256);
+  assert.throws(() => build([...trackedPaths, "unknown/file.txt"]), /unowned tracked path: unknown\/file.txt/);
+});

@@ -39,10 +39,13 @@ export function parseOutputPath(args) {
 }
 
 export function buildOptimizationBaseline({ manifest, observedAt, trackedPaths, stat = statSync, runGit }) {
-  const inventory = buildOptimizationGateInventory({ manifest, trackedPaths });
+  const inventory = buildOptimizationGateInventory({ manifest, trackedPaths }).sort(({ path: left }, { path: right }) =>
+    left.localeCompare(right),
+  );
   const grouped = new Map(manifest.surfaces.map(({ id }) => [id, { id, trackedPathCount: 0, byteCount: 0 }]));
   for (const entry of inventory) {
     const surface = grouped.get(entry.surface);
+    if (surface === undefined) throw new Error(`unowned tracked path: ${entry.path}`);
     surface.trackedPathCount += 1;
     surface.byteCount += stat(entry.path).size;
   }
