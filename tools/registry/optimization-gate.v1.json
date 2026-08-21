@@ -15,6 +15,7 @@
     "allowedCommands": [
       "npm run capture:optimization-audit",
       "npm run capture:optimization-baseline",
+      "npm run preflight:optimization-client-measurement",
       "npm run validate:all",
       "npm run qualify:vnext"
     ],

@@ -21,6 +21,8 @@ prior qualification is retained as historical characterization. See
 
 - Added unqualified, no-I/O design capability placeholders for documentation research, RBAC catalog, compute-region
   evidence, and Entra application intent. They return a stable unavailable result until lifecycle qualification exists.
+- Added a candidate-bound client measurement preflight that fails closed on client availability, selected-version,
+  Copilot Chat extension, worktree, and gate-command-scope drift without installing or interacting with clients.
 - Refined managed Azure defaults, ADR, RBAC, and Microsoft Docs guidance to block on unavailable evidence and avoid
   unsupported task-context, contract, or rendering claims.
 - Added evidence-scoped operational checklists for governance, compliance,
