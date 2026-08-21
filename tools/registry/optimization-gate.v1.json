@@ -4,13 +4,13 @@
   "state": "authorized",
   "candidate": {
     "status": "bound",
-    "commit": "9910fd06a1d6ad40074148bdc3677bae7d5a7ab5",
-    "tree": "4d2033cc41fb968a287fd454e062e1d5cf8dd754"
+    "commit": "7214b0e2ea720d45cbf12db15b1b249f8af23f43",
+    "tree": "57f2ade95cb116ef96b1f8c6fd7fdce224f3aa7f"
   },
   "authorization": {
     "status": "approved",
     "approver": "jonathan-vella delegated autonomous read-only audit",
-    "expiresAt": "2026-08-22T23:59:59Z",
+    "expiresAt": "2026-08-23T23:59:59Z",
     "allowedPaths": ["**"],
     "allowedCommands": ["npm run capture:optimization-baseline", "npm run validate:all", "npm run qualify:vnext"],
     "stopConditions": [
