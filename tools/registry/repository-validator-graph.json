@@ -559,6 +559,20 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "validate-optimization-gate",
+      "script": "validate:optimization-gate",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "test-optimization-gate",
+      "script": "test:optimization-gate",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "validate-terminology",
       "script": "validate:terminology",
       "profile": "node-validation",
@@ -618,6 +632,7 @@
         "validate:agents",
         "validate:skills",
         "validate:guidance-migration",
+        "validate:optimization-gate",
         "validate:skill-catalog-review",
         "test:skill-catalog-review",
         "lint:version-sync",
@@ -657,6 +672,7 @@
         "test:github-workflows",
         "test:registry-validator-reporter",
         "test:guidance-migration",
+        "test:optimization-gate",
         "test:client-context-samples",
         "validate:client-outcomes",
         "test:client-outcomes:prepared",
