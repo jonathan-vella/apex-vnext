@@ -29,6 +29,8 @@ task state, evidence freshness, authorization, artifact acceptance, and all stat
    Preserve its receipt or blocker in the architecture, plan, or binding artifact.
 5. Handoff approved identity intent to the authorized implementation, validation, or operations capability.
    Do not claim that registration, permissions, credentials, or consent exist without an accepted receipt.
+6. Classify observed identity failures with [Identity design and diagnostic rules](references/design-and-diagnostics.md).
+   Return the responsible owner and evidence gap without attempting remediation.
 
 ## Boundaries
 
@@ -42,6 +44,8 @@ into bounded intent and an authorized capability handoff.
 - [OAuth and registration model](references/oauth-registration-model.md) - client, audience, flow, and redirect-URI decisions.
 - [Permissions and credential posture](references/permissions-and-credentials.md) - least privilege and credential trade-offs.
 - [Capability receipt and handoff](references/capability-receipts.md) - required evidence, blockers, and next-task rules.
+- [Identity design and diagnostic rules](references/design-and-diagnostics.md) - source-derived flow, permission, and
+   troubleshooting rules without configuration or protocol operations.
 
 ## Output
 

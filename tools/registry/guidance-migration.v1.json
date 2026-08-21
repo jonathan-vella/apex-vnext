@@ -768,47 +768,43 @@
       "disposition": "consumer",
       "consumerSkill": "apex-azure-compute",
       "owner": "APEX Architect",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "references/recommendation-workflow.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "disposition": "adapt",
+          "targets": ["references/recommendation-and-scale-rules.md"],
+          "reason": "The managed reference retains requirement gathering, VM versus VMSS, option comparison, and evidence blockers without source fetch commands.",
+          "replacementProof": "The managed reference records model, family, capacity, evidence, alternatives, and unresolved-risk rules.",
+          "rollbackGate": "Remove only after a source comparison confirms the consumer reference no longer carries these advisory rules.",
+          "scenarioIds": ["compute-guidance-parity"]
         },
         {
           "source": "references/retail-prices-api.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "disposition": "adapt",
+          "targets": ["references/recommendation-and-scale-rules.md"],
+          "reason": "The managed reference retains pricing comparison inputs, VMSS range accounting, and stale-evidence handling without API calls or query syntax.",
+          "replacementProof": "The managed reference identifies retail price lookup as capability evidence and records the required comparison fields.",
+          "rollbackGate": "Remove only after a source comparison confirms price-evidence intent remains covered by a managed target.",
+          "scenarioIds": ["compute-guidance-parity"]
         },
         {
           "source": "references/vm-families.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "disposition": "adapt",
+          "targets": ["references/recommendation-and-scale-rules.md"],
+          "reason": "The managed reference retains workload-to-family trade-offs and evidence constraints without asserting time-sensitive SKU facts.",
+          "replacementProof": "The managed reference defines compatible family categories, burstable and Spot cautions, and current-evidence requirements.",
+          "rollbackGate": "Remove only after a source comparison confirms family-selection rules are managed elsewhere.",
+          "scenarioIds": ["compute-guidance-parity"]
         },
         {
           "source": "references/vmss-guide.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "disposition": "adapt",
+          "targets": ["references/recommendation-and-scale-rules.md"],
+          "reason": "The managed reference retains scale-set suitability, orchestration, capacity, and autoscale decision rules without configuration instructions.",
+          "replacementProof": "The managed reference records VMSS signals, Flexible guidance, scale inputs, and availability caveats.",
+          "rollbackGate": "Remove only after a source comparison confirms VMSS decision rules are managed elsewhere.",
+          "scenarioIds": ["compute-guidance-parity"]
         }
       ]
     },
@@ -3946,137 +3942,124 @@
       "disposition": "consumer",
       "consumerSkill": "apex-azure-storage",
       "owner": "APEX Architect and Planner",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "references/auth-best-practices.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "disposition": "adapt",
+          "targets": ["references/service-auth-and-sdk-boundary.md"],
+          "reason": "The managed reference retains managed-identity, least-privilege, and production credential-posture rules without credential setup or SDK code.",
+          "replacementProof": "The managed reference records identity owner, role scope, network posture, and prohibited secret material.",
+          "rollbackGate": "Remove only after a source comparison confirms storage authentication posture is managed elsewhere.",
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-data-tables-java.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "Java Table SDK installation and data-operation samples are implementation work that can access or mutate data.",
+          "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
+          "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-data-tables-py.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "Python Table SDK installation and data-operation samples are implementation work that can access or mutate data.",
+          "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
+          "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-storage-blob-java.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "Java Blob SDK installation and blob data-operation samples are implementation work that can access or mutate data.",
+          "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
+          "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-storage-blob-py.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "Python Blob SDK installation and blob data-operation samples are implementation work that can access or mutate data.",
+          "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
+          "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-storage-blob-rust.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "Rust Blob SDK installation and blob data-operation samples are implementation work that can access or mutate data.",
+          "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
+          "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-storage-blob-ts.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "TypeScript Blob SDK installation and blob data-operation samples are implementation work that can access or mutate data.",
+          "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
+          "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-storage-file-datalake-py.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "Python Data Lake SDK installation and file-operation samples are implementation work that can access or mutate data.",
+          "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
+          "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-storage-file-share-py.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "Python File Share SDK installation and file-operation samples are implementation work that can access or mutate data.",
+          "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
+          "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-storage-file-share-ts.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "TypeScript File Share SDK installation and file-operation samples are implementation work that can access or mutate data.",
+          "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
+          "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-storage-queue-py.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "Python Queue SDK installation and message-operation samples are implementation work that can access or mutate data.",
+          "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
+          "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-storage-queue-ts.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "TypeScript Queue SDK installation and message-operation samples are implementation work that can access or mutate data.",
+          "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
+          "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk-usage.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "SDK package installation, client construction, and upload samples are direct data operations outside advisory guidance.",
+          "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
+          "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
+          "scenarioIds": ["storage-guidance-parity"]
         }
       ]
     },
@@ -4244,187 +4227,169 @@
       "disposition": "consumer",
       "consumerSkill": "apex-entra-app-registration",
       "owner": "APEX Architect and Planner",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "references/BICEP-EXAMPLE.bicep",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "Bicep registration configuration is state-changing IaC outside advisory identity design guidance.",
+          "replacementProof": "The consumer skill prohibits IaC and hands approved intent to an authorized implementation capability.",
+          "rollbackGate": "Restore only with a kernel-authorized implementation path and configuration validation.",
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/api-permissions.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "disposition": "adapt",
+          "targets": ["references/design-and-diagnostics.md"],
+          "reason": "The managed reference retains delegated versus application selection, least-privilege mapping, and consent blockers without granting permissions.",
+          "replacementProof": "The managed reference records operation-to-permission intent, consent ownership, and evidence constraints.",
+          "rollbackGate": "Remove only after a source comparison confirms permission intent is managed elsewhere.",
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/auth-best-practices.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "disposition": "adapt",
+          "targets": ["references/design-and-diagnostics.md"],
+          "reason": "The managed reference retains managed-identity, federation, certificate, and no-secret posture decisions without credential code or setup.",
+          "replacementProof": "The managed reference records credential posture, owners, lifecycle requirements, and prohibited material.",
+          "rollbackGate": "Remove only after a source comparison confirms credential-posture guidance is managed elsewhere.",
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/cli-commands.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "Entra CLI commands inspect or mutate registrations, permissions, credentials, and consent outside the consumer boundary.",
+          "replacementProof": "The consumer skill prohibits CLI actions and returns authorized capability handoffs instead.",
+          "rollbackGate": "Restore only with a kernel-authorized operation capability and reviewed scope controls.",
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/common-patterns.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "disposition": "adapt",
+          "targets": ["references/design-and-diagnostics.md"],
+          "reason": "The managed reference retains client-class, user-interaction, and service-to-service design distinctions without walkthroughs or implementation examples.",
+          "replacementProof": "The managed reference maps client classes to flow intent and identity boundaries.",
+          "rollbackGate": "Remove only after a source comparison confirms client-class design rules are managed elsewhere.",
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/console-app-example.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "Console authentication code and SDK setup can initiate protocol operations and handle tokens.",
+          "replacementProof": "The consumer skill prohibits SDK, protocol, and authentication-testing actions.",
+          "rollbackGate": "Restore only with a bounded implementation capability that redacts tokens and controls protocol operations.",
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/core-workflow.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "disposition": "adapt",
+          "targets": ["references/design-and-diagnostics.md"],
+          "reason": "The managed reference retains registration inputs, flow, permission, and credential design ordering without portal, CLI, or secret actions.",
+          "replacementProof": "The managed reference requires identity inputs and returns only typed design intent and handoffs.",
+          "rollbackGate": "Remove only after a source comparison confirms identity design workflow is managed elsewhere.",
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/first-app-registration.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "Portal registration, consent, secret creation, and authentication testing are direct identity operations.",
+          "replacementProof": "The consumer skill prohibits registration, consent, credential, portal, and authentication-test actions.",
+          "rollbackGate": "Restore only with a kernel-authorized implementation path and explicit secret-handling controls.",
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/oauth-flows.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "disposition": "adapt",
+          "targets": ["references/design-and-diagnostics.md"],
+          "reason": "The managed reference retains client-class flow selection, PKCE posture, tenant, audience, and redirect-URI constraints without token requests.",
+          "replacementProof": "The managed reference models flow selection as traceable intent and prohibits protocol operations.",
+          "rollbackGate": "Remove only after a source comparison confirms OAuth design rules are managed elsewhere.",
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-identity-dotnet.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": ".NET identity SDK setup and authentication samples can initiate protocol operations and handle tokens.",
+          "replacementProof": "The consumer skill prohibits SDK, protocol, and authentication-testing actions.",
+          "rollbackGate": "Restore only with a bounded implementation capability that redacts tokens and controls protocol operations.",
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-identity-java.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "Java identity SDK setup and authentication samples can initiate protocol operations and handle tokens.",
+          "replacementProof": "The consumer skill prohibits SDK, protocol, and authentication-testing actions.",
+          "rollbackGate": "Restore only with a bounded implementation capability that redacts tokens and controls protocol operations.",
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-identity-py.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "Python identity SDK setup and authentication samples can initiate protocol operations and handle tokens.",
+          "replacementProof": "The consumer skill prohibits SDK, protocol, and authentication-testing actions.",
+          "rollbackGate": "Restore only with a bounded implementation capability that redacts tokens and controls protocol operations.",
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-identity-rust.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "Rust identity SDK setup and authentication samples can initiate protocol operations and handle tokens.",
+          "replacementProof": "The consumer skill prohibits SDK, protocol, and authentication-testing actions.",
+          "rollbackGate": "Restore only with a bounded implementation capability that redacts tokens and controls protocol operations.",
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-identity-ts.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "TypeScript identity SDK setup and authentication samples can initiate protocol operations and handle tokens.",
+          "replacementProof": "The consumer skill prohibits SDK, protocol, and authentication-testing actions.",
+          "rollbackGate": "Restore only with a bounded implementation capability that redacts tokens and controls protocol operations.",
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-keyvault-py.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "Python Key Vault SDK samples access secret material and are outside the advisory identity boundary.",
+          "replacementProof": "The consumer skill prohibits credential material handling and SDK actions.",
+          "rollbackGate": "Restore only with a bounded implementation capability that protects secret material.",
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-keyvault-secrets-ts.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": "TypeScript Key Vault SDK samples access secret material and are outside the advisory identity boundary.",
+          "replacementProof": "The consumer skill prohibits credential material handling and SDK actions.",
+          "rollbackGate": "Restore only with a bounded implementation capability that protects secret material.",
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/sdk/microsoft-azure-webjobs-extensions-authentication-events-dotnet.md",
-          "disposition": "defer-capability",
+          "disposition": "exclude-unsafe",
           "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "reason": ".NET authentication-event integration code can receive identity events and is outside advisory guidance.",
+          "replacementProof": "The consumer skill prohibits SDK and direct identity operations.",
+          "rollbackGate": "Restore only with a bounded implementation capability and reviewed event-data controls.",
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/troubleshooting.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
+          "disposition": "adapt",
+          "targets": ["references/design-and-diagnostics.md"],
+          "reason": "The managed reference retains redirect, consent, permission, credential, tenant, and application-boundary failure classification without remediation commands.",
+          "replacementProof": "The managed reference returns only evidence gaps, owners, and authorized next tasks.",
+          "rollbackGate": "Remove only after a source comparison confirms diagnostic classification is managed elsewhere.",
+          "scenarioIds": ["entra-guidance-parity"]
         }
       ]
     },
