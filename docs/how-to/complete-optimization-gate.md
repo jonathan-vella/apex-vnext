@@ -15,6 +15,18 @@ npm run validate:optimization-gate
 npm run test:optimization-gate
 ```
 
+## Capture A Read-Only Baseline
+
+Capture a candidate inventory before authorization to prepare the review. The receipt binds the observed commit, tree,
+tracked-path inventory, surface counts, and file sizes, but it records `authorization: not-granted` and cannot advance
+the gate.
+
+```bash
+npm run capture:optimization-baseline -- --output dist/optimization-baseline.json
+```
+
+Treat a baseline as stale when the candidate changes. A maintainer must bind the authorized candidate separately.
+
 ## Bind Authorization
 
 > [!IMPORTANT]
