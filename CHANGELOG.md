@@ -41,6 +41,9 @@ prior qualification is retained as historical characterization. See
 - Restored managed Azure Compute, Storage, and Entra identity decision guidance with source-reviewed family, VMSS,
   price-evidence, storage authentication and lifecycle, OAuth, permission, and diagnostic rules. Direct SDK, CLI,
   IaC, credential, data, consent, and cloud operations remain outside the consumer skills.
+- Completed the managed artifact, deployment, cost, governance, and Mermaid guidance parity ledger entries. Adapted
+  guidance remains bounded to accepted evidence and trusted lifecycles; unqualified producers, renderers, discovery
+  packs, live pricing, direct commands, recipes, SDK examples, and CI definitions remain unavailable.
 - Completed managed assessment guidance parity for cloud migration, compliance, Kusto, quotas, resources, and
   preflight validation. Source-derived readiness and evidence interpretation are packaged for both clients; provider
   queries, discovery, SDK actions, remediation, code conversion, and command execution remain explicitly deferred.

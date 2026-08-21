@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import test from "node:test";
 import { collectGuidanceMigrationInputs, validateGuidanceMigration } from "../scripts/validate-guidance-migration.mjs";
 
+const root = resolve(import.meta.dirname, "../..");
 const sourceSkills = ["source-skill"];
 const sourceResources = new Map([["source-skill", new Set(["references/rule.md"])]]);
 const consumerResources = new Map([["consumer-skill", new Set(["SKILL.md", "references/rule.md"])]]);
@@ -53,6 +54,36 @@ const inputs = (overrides = {}) => ({
 
 test("accepts a complete mapping with packaged targets", () => {
   assert.deepEqual(validateGuidanceMigration(inputs()), []);
+});
+
+test("scoped parity mappings are complete with explicit source dispositions and managed consumer skills", () => {
+  const scopedSources = [
+    "azure-artifacts",
+    "azure-deploy",
+    "iac-common",
+    "azure-cost-optimization",
+    "azure-governance-discovery",
+    "mermaid",
+  ];
+  const repositoryInputs = collectGuidanceMigrationInputs(root);
+  assert.ok(repositoryInputs.managedFiles, "managed consumer files must be collected");
+  assert.ok(repositoryInputs.sourceResources, "source resources must be collected");
+  assert.ok(repositoryInputs.matrix?.skillDispositions, "guidance migration mappings must be collected");
+
+  for (const source of scopedSources) {
+    const mapping = repositoryInputs.matrix.skillDispositions.find((entry) => entry.source === source);
+    assert.ok(mapping, `${source} must have a guidance migration mapping`);
+    assert.ok(Array.isArray(mapping.resourceDispositions), `${source} must collect resource dispositions`);
+    const collectedResources = repositoryInputs.sourceResources.get(source);
+    assert.ok(collectedResources, `${source} source resources must be collected`);
+    assert.equal(mapping?.lifecycle, "complete", `${source} must be complete`);
+    assert.equal(
+      mapping?.resourceDispositions.length,
+      collectedResources.size,
+      `${source} must disposition every source resource`,
+    );
+    assert.ok(repositoryInputs.managedFiles.has(`.github/skills/${mapping.consumerSkill}/SKILL.md`));
+  }
 });
 
 test("rejects a missing lifecycle and source resource disposition", () => {
@@ -139,7 +170,6 @@ test("rejects unknown source resources and target owners", () => {
 });
 
 test("completed design guidance mappings retain only packaged or deferred ownership", async () => {
-  const root = resolve(import.meta.dirname, "../..");
   const { matrix, sourceResources } = collectGuidanceMigrationInputs(root);
   const completed = new Map(
     matrix.skillDispositions
