@@ -32,6 +32,9 @@ prior qualification is retained as historical characterization. See
 - Added a source-hashed, deferred Azure Functions recipe-pack manifest and managed preparation, migration, Terraform
   pattern, test, and import guidance. Materialization, cloud reads, apply-mode tests, publishing, and cutover remain
   unavailable pending authorized capabilities.
+- Refined the internal native workflow, requirements, architecture, planning, CodeGen, and operations skills to match
+  current kernel and MCP behavior, including typed intake, task ownership, evidence, binding, and taskless-operation
+  boundaries. No capabilities, workflow grants, deployment behavior, or live provider integration changed.
 - Added the managed `apex-azure-defaults` consumer skill with role-scoped guidance for projected governance, security,
   naming, tagging, and AVM/module decisions without direct Azure operations.
 - Added managed `apex-azure-adr` and `apex-azure-rbac` consumer skills with role-scoped decision-record and
