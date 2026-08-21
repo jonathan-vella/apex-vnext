@@ -12,7 +12,12 @@
     "approver": "jonathan-vella delegated autonomous read-only audit",
     "expiresAt": "2026-08-23T23:59:59Z",
     "allowedPaths": ["**"],
-    "allowedCommands": ["npm run capture:optimization-baseline", "npm run validate:all", "npm run qualify:vnext"],
+    "allowedCommands": [
+      "npm run capture:optimization-audit",
+      "npm run capture:optimization-baseline",
+      "npm run validate:all",
+      "npm run qualify:vnext"
+    ],
     "stopConditions": [
       "The candidate commit or tree changes.",
       "Any command requires cloud, client, publication, release, or deployment authority.",
@@ -151,5 +156,36 @@
       "releaseImpact": "blocking"
     }
   ],
-  "findings": []
+  "findings": [
+    {
+      "id": "OPT-001",
+      "status": "resolved",
+      "owner": "Repository validation engineering",
+      "rationale": "The candidate audit confirms every tracked path has exactly one declared optimization surface owner."
+    },
+    {
+      "id": "OPT-002",
+      "status": "deferred",
+      "owner": "Governance discovery maintainers",
+      "rationale": "The governance policy baseline is a large active input with workflow, instruction, and discovery consumers; size alone is not removal evidence.",
+      "expiry": "2026-12-31T23:59:59Z",
+      "releaseImpact": "accepted"
+    },
+    {
+      "id": "OPT-003",
+      "status": "deferred",
+      "owner": "Vendor prompting maintainers",
+      "rationale": "The vendor guidance snapshot is an active referenced source; its freshness contract must be evaluated before any consolidation or retirement.",
+      "expiry": "2026-12-31T23:59:59Z",
+      "releaseImpact": "accepted"
+    },
+    {
+      "id": "OPT-004",
+      "status": "deferred",
+      "owner": "Managed customization maintainers",
+      "rationale": "The audit records prompt and managed-guidance footprint, but candidate-bound context and cache measurements remain required before optimization claims.",
+      "expiry": "2026-12-31T23:59:59Z",
+      "releaseImpact": "blocking"
+    }
+  ]
 }
