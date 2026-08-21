@@ -49,6 +49,15 @@ npm run build:optimization-context-receipt -- --output dist/optimization-context
 This environment cannot install or interact with a client under the optimization audit scope. Run the command only from
 an explicitly authorized supported-client qualification workspace.
 
+## Verify Client Availability
+
+Before collecting samples, run a non-interactive preflight. It records candidate drift, version mismatches, and an
+interactive install prompt as blocked evidence; it never installs a client.
+
+```bash
+npm run preflight:optimization-client-measurement -- --output dist/optimization-client-preflight.json
+```
+
 ## Bind Authorization
 
 > [!IMPORTANT]
