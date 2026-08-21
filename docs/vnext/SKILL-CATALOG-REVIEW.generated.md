@@ -15,16 +15,16 @@ Live provider and paired-client qualification are not run by this artifact or it
 | Source skill               | Matrix disposition | Consumer target              | Canonical owner                           | Lifecycle    | Capability | Renderer   | Live qualification |
 | -------------------------- | ------------------ | ---------------------------- | ----------------------------------------- | ------------ | ---------- | ---------- | ------------------ |
 | azure-adr                  | consumer           | apex-azure-adr               | APEX Architect                            | complete     | not-proven | not-proven | not-run            |
-| azure-artifacts            | consumer           | apex-artifacts               | kernel renderer                           | planned      | not-proven | not-proven | not-run            |
+| azure-artifacts            | consumer           | apex-artifacts               | kernel renderer                           | complete     | not-proven | not-proven | not-run            |
 | azure-bicep-patterns       | consumer           | apex-bicep-patterns          | APEX CodeGen                              | complete     | not-proven | not-proven | not-run            |
 | azure-cloud-migrate        | consumer           | apex-azure-cloud-migrate     | APEX Architect and Planner                | complete     | not-proven | not-proven | not-run            |
 | azure-compliance           | consumer           | apex-azure-compliance        | APEX Validator                            | complete     | not-proven | not-proven | not-run            |
 | azure-compute              | consumer           | apex-azure-compute           | APEX Architect                            | complete     | not-proven | not-proven | not-run            |
-| azure-cost-optimization    | consumer           | apex-azure-cost-optimization | APEX Architect and Operator               | planned      | not-proven | not-proven | not-run            |
+| azure-cost-optimization    | consumer           | apex-azure-cost-optimization | APEX Architect and Operator               | complete     | not-proven | not-proven | not-run            |
 | azure-defaults             | consumer           | apex-azure-defaults          | APEX Architect and Planner                | complete     | not-proven | not-proven | not-run            |
-| azure-deploy               | consumer           | apex-azure-deploy            | APEX Operator                             | planned      | not-proven | not-proven | not-run            |
+| azure-deploy               | consumer           | apex-azure-deploy            | APEX Operator                             | complete     | not-proven | not-proven | not-run            |
 | azure-diagnostics          | consumer           | apex-azure-diagnostics       | APEX Operator                             | planned      | not-proven | not-proven | not-run            |
-| azure-governance-discovery | consumer           | apex-azure-governance        | governance capability pack                | planned      | not-proven | not-proven | not-run            |
+| azure-governance-discovery | consumer           | apex-azure-governance        | governance capability pack                | complete     | not-proven | not-proven | not-run            |
 | azure-kusto                | consumer           | apex-azure-kusto             | APEX Operator                             | complete     | not-proven | not-proven | not-run            |
 | azure-prepare              | consumer           | apex-azure-prepare           | APEX Architect and Planner                | planned      | not-proven | not-proven | not-run            |
 | azure-quotas               | consumer           | apex-azure-quotas            | APEX Architect                            | complete     | not-proven | not-proven | not-run            |
@@ -37,8 +37,8 @@ Live provider and paired-client qualification are not run by this artifact or it
 | entra-app-registration     | consumer           | apex-entra-app-registration  | APEX Architect and Planner                | complete     | not-proven | not-proven | not-run            |
 | github-operations          | repository-only    | not-declared                 | repository maintainers                    | not-declared | not-proven | not-proven | not-run            |
 | golden-principles          | repository-only    | not-declared                 | kernel contracts and policy               | not-declared | not-proven | not-proven | not-run            |
-| iac-common                 | consumer           | apex-azure-deploy            | APEX Operator and Validator               | planned      | not-proven | not-proven | not-run            |
-| mermaid                    | consumer           | apex-mermaid                 | kernel renderer                           | planned      | not-proven | not-proven | not-run            |
+| iac-common                 | consumer           | apex-azure-deploy            | APEX Operator and Validator               | complete     | not-proven | not-proven | not-run            |
+| mermaid                    | consumer           | apex-mermaid                 | kernel renderer                           | complete     | not-proven | not-proven | not-run            |
 | microsoft-docs             | consumer           | apex-microsoft-docs          | client-qualified documentation capability | complete     | not-proven | not-proven | not-run            |
 | python-diagrams            | deferred           | not-declared                 | future typed diagram renderer capability  | not-declared | not-proven | not-proven | not-run            |
 | terraform-patterns         | consumer           | apex-terraform-patterns      | APEX CodeGen                              | complete     | not-proven | not-proven | not-run            |
