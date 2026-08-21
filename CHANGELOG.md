@@ -38,6 +38,9 @@ prior qualification is retained as historical characterization. See
 - Completed the managed Azure ADR, Azure Defaults, Azure RBAC, and Microsoft Docs guidance migration ledger entries.
   Safe decision knowledge is packaged in consumer references; direct operations and mutable discovery remain excluded
   or capability-deferred.
+- Restored managed Azure Compute, Storage, and Entra identity decision guidance with source-reviewed family, VMSS,
+  price-evidence, storage authentication and lifecycle, OAuth, permission, and diagnostic rules. Direct SDK, CLI,
+  IaC, credential, data, consent, and cloud operations remain outside the consumer skills.
 - Added the managed `apex-azure-defaults` consumer skill with role-scoped guidance for projected governance, security,
   naming, tagging, and AVM/module decisions without direct Azure operations.
 - Added managed `apex-azure-adr` and `apex-azure-rbac` consumer skills with role-scoped decision-record and

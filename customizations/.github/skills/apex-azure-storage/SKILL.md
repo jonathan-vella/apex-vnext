@@ -17,7 +17,8 @@ not list, read, upload, or modify data.
 
 1. Select Blob, Files, Queue, Table, or Data Lake with [Storage selection](references/storage-selection.md).
 2. Bind redundancy, tier, lifecycle, identity, and network choices to requirements and governance.
-3. Apply [Security and governance](references/security-and-governance.md) to the typed architecture or plan intent.
+3. Apply [Security and governance](references/security-and-governance.md) and
+   [Service, authentication, and SDK boundary](references/service-auth-and-sdk-boundary.md) to typed intent.
 4. Return missing classification, RPO/RTO, policy, or network evidence as a blocker.
 
 ## Boundaries
@@ -30,3 +31,5 @@ not list, read, upload, or modify data.
 
 - [Storage selection](references/storage-selection.md) - service, tier, redundancy, and lifecycle choices.
 - [Security and governance](references/security-and-governance.md) - identity, private access, and policy mapping.
+- [Service, authentication, and SDK boundary](references/service-auth-and-sdk-boundary.md) - source-derived service,
+  authentication, lifecycle, and implementation-boundary rules.
