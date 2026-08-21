@@ -31,6 +31,9 @@ kernel owns task state, evidence freshness, authorization, artifact acceptance, 
    Preserve the returned receipt or blocker in the active artifact.
 5. Handoff accepted intent to the authorized preparation, implementation, validation, or operations capability. Do not
    state that a workload is migrated, tested, or deployed without accepted receipts for that stage.
+6. For Lambda-to-Functions requests, apply
+   [Lambda to Functions assessment](references/lambda-to-functions-assessment.md) to the accepted evidence. Return a
+   blocker when the task needs source inspection, code conversion, publishing, or cutover.
 
 ## Boundaries
 
@@ -43,6 +46,8 @@ deploy, or handle secrets. Convert direct operational requests into bounded inte
 - [Migration readiness assessment](references/migration-readiness.md) - evidence, risk, and blocker criteria.
 - [Workload mapping intent](references/workload-mapping.md) - logical service, identity, data, and observability mapping.
 - [Staged validation and handoff](references/staged-validation-handoff.md) - receipt gates and next-task routing.
+- [Lambda to Functions assessment](references/lambda-to-functions-assessment.md) - workload mapping, runtime review,
+  and blocked-operation boundary.
 
 ## Output
 
