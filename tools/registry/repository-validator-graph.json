@@ -587,6 +587,13 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "test-optimization-context-receipt",
+      "script": "test:optimization-context-receipt",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "validate-terminology",
       "script": "validate:terminology",
       "profile": "node-validation",
@@ -689,6 +696,7 @@
         "test:optimization-gate",
         "test:optimization-baseline",
         "test:optimization-audit",
+        "test:optimization-context-receipt",
         "test:client-context-samples",
         "validate:client-outcomes",
         "test:client-outcomes:prepared",
