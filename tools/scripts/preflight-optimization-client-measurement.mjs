@@ -2,7 +2,8 @@
 /** Detect supported-client measurement readiness without installing or interacting with either client. */
 
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import process from "node:process";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
@@ -27,28 +28,64 @@ function candidate(run = execFileSync) {
   return {
     commit: run("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
     tree: run("git", ["rev-parse", "HEAD^{tree}"], { encoding: "utf8" }).trim(),
+    worktreeClean: run("git", ["status", "--porcelain", "--untracked-files=no"], { encoding: "utf8" }).trim() === "",
   };
 }
 
+function extensionVersion(output) {
+  return output
+    .split("\n")
+    .map((line) => line.match(/^github\.copilot-chat@(\S+)$/u)?.[1])
+    .find(Boolean);
+}
+
+export function parsePreflightArgs(args) {
+  if (args.length !== 2 || args[0] !== "--output" || !args[1] || args[1].startsWith("--")) {
+    throw new Error("only --output <path> is supported");
+  }
+  return { output: args[1] };
+}
+
 export function buildOptimizationClientPreflight({ gate, toolchain, run = execFileSync }) {
+  if (
+    gate.state !== "authorized" ||
+    gate.authorization.status !== "approved" ||
+    gate.authorization.budget.maxTrackedMutations !== 0 ||
+    !gate.authorization.allowedCommands.includes("npm run preflight:optimization-client-measurement")
+  ) {
+    throw new Error("authorized zero-mutation gate with client preflight command scope is required");
+  }
   const observedCandidate = candidate(run);
   const vscode = commandOutput("code", ["--version"], run);
+  const vscodeExtensions = commandOutput("code", ["--list-extensions", "--show-versions"], run);
   const cli = commandOutput("copilot", ["--version"], run);
   const vscodeVersion = firstVersion(vscode.output);
+  const copilotChatVersion = extensionVersion(vscodeExtensions.output);
   const cliVersion = firstVersion(cli.output);
   const expectedVscode = toolchain.core.vscode.selectedExactVersion;
+  const expectedCopilotChat = toolchain.core.vscode.selectedExactCopilotChatVersion;
   const expectedCli = toolchain.core.copilotCli.selectedExactVersion;
   const clients = [
     {
       id: "github-copilot-vscode",
       expectedVersion: expectedVscode,
+      expectedExtensionVersion: expectedCopilotChat,
       ...(vscodeVersion ? { observedVersion: vscodeVersion } : {}),
-      status: !vscode.ok ? "missing" : vscodeVersion !== expectedVscode ? "version-mismatch" : "ready",
+      ...(copilotChatVersion ? { observedExtensionVersion: copilotChatVersion } : {}),
+      status: !vscode.ok
+        ? "missing"
+        : vscodeVersion !== expectedVscode
+          ? "version-mismatch"
+          : !vscodeExtensions.ok || copilotChatVersion !== expectedCopilotChat
+            ? "extension-version-mismatch"
+            : "ready",
       ...(!vscode.ok
         ? { reason: "VS Code executable is unavailable." }
         : vscodeVersion !== expectedVscode
           ? { reason: "Observed VS Code version differs from the selected qualification version." }
-          : {}),
+          : !vscodeExtensions.ok || copilotChatVersion !== expectedCopilotChat
+            ? { reason: "Observed Copilot Chat extension version differs from the selected qualification version." }
+            : {}),
     },
     {
       id: "github-copilot-cli",
@@ -76,7 +113,10 @@ export function buildOptimizationClientPreflight({ gate, toolchain, run = execFi
     schemaVersion: "1.0.0",
     candidate: observedCandidate,
     gateCandidate: { commit: gate.candidate.commit, tree: gate.candidate.tree },
-    status: candidateMatches && clients.every(({ status }) => status === "ready") ? "ready" : "blocked",
+    status:
+      candidateMatches && observedCandidate.worktreeClean && clients.every(({ status }) => status === "ready")
+        ? "ready"
+        : "blocked",
     clients,
   };
 }
@@ -90,16 +130,16 @@ export function validateOptimizationClientPreflight(receipt, schema) {
 
 function main() {
   try {
-    const outputIndex = process.argv.indexOf("--output");
-    if (outputIndex === -1 || process.argv[outputIndex + 1] === undefined)
-      throw new Error("--output <path> is required");
+    const { output } = parsePreflightArgs(process.argv.slice(2));
     const gate = JSON.parse(readFileSync(GATE_PATH, "utf8"));
     const toolchain = JSON.parse(readFileSync(TOOLCHAIN_PATH, "utf8"));
     const schema = JSON.parse(readFileSync(SCHEMA_PATH, "utf8"));
     const receipt = buildOptimizationClientPreflight({ gate, toolchain });
     const errors = validateOptimizationClientPreflight(receipt, schema);
     if (errors.length > 0) throw new Error(errors.join("; "));
-    writeFileSync(process.argv[outputIndex + 1], `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
+    const outputPath = resolve(output);
+    mkdirSync(dirname(outputPath), { recursive: true });
+    writeFileSync(outputPath, `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
     console.log(`✅ Client measurement preflight is ${receipt.status}`);
     return receipt.status === "ready" ? 0 : 2;
   } catch (error) {

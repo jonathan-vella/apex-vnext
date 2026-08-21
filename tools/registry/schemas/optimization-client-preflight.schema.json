@@ -10,10 +10,11 @@
     "candidate": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["commit", "tree"],
+      "required": ["commit", "tree", "worktreeClean"],
       "properties": {
         "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-        "tree": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+        "tree": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "worktreeClean": { "type": "boolean" }
       }
     },
     "gateCandidate": {
@@ -28,19 +29,56 @@
     "status": { "enum": ["ready", "blocked"] },
     "clients": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 2,
+      "maxItems": 2,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["id", "status", "expectedVersion"],
         "properties": {
           "id": { "enum": ["github-copilot-vscode", "github-copilot-cli"] },
-          "status": { "enum": ["ready", "missing", "version-mismatch", "interactive-install-required"] },
+          "status": {
+            "enum": [
+              "ready",
+              "missing",
+              "version-mismatch",
+              "extension-version-mismatch",
+              "interactive-install-required"
+            ]
+          },
           "expectedVersion": { "type": "string", "minLength": 1 },
           "observedVersion": { "type": "string", "minLength": 1 },
+          "expectedExtensionVersion": { "type": "string", "minLength": 1 },
+          "observedExtensionVersion": { "type": "string", "minLength": 1 },
           "reason": { "type": "string", "minLength": 1 }
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "properties": {
+        "clients": {
+          "type": "array",
+          "contains": {
+            "type": "object",
+            "properties": { "id": { "const": "github-copilot-vscode" } },
+            "required": ["id"]
+          }
+        }
+      }
+    },
+    {
+      "properties": {
+        "clients": {
+          "type": "array",
+          "contains": {
+            "type": "object",
+            "properties": { "id": { "const": "github-copilot-cli" } },
+            "required": ["id"]
+          }
+        }
+      }
+    }
+  ]
 }
