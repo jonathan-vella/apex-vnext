@@ -29,6 +29,9 @@ prior qualification is retained as historical characterization. See
   routing while retaining trusted provider execution boundaries.
 - Added test-only unavailable operational capability placeholders for governance
   discovery, inventory, capacity, diagnostics/Kusto, compliance, and cost.
+- Added a source-hashed, deferred Azure Functions recipe-pack manifest and managed preparation, migration, Terraform
+  pattern, test, and import guidance. Materialization, cloud reads, apply-mode tests, publishing, and cutover remain
+  unavailable pending authorized capabilities.
 - Added the managed `apex-azure-defaults` consumer skill with role-scoped guidance for projected governance, security,
   naming, tagging, and AVM/module decisions without direct Azure operations.
 - Added managed `apex-azure-adr` and `apex-azure-rbac` consumer skills with role-scoped decision-record and

@@ -24,6 +24,8 @@ acceptance criteria; authorized capabilities own source inspection, generation, 
    exact locks, and evidence requirements.
 4. Submit typed intent only through an authorized capability. Treat unavailable capabilities, missing locks, stale
    receipts, or unaccepted evidence as blockers.
+5. Apply [Module composition and refactor intent](references/module-composition-and-refactor.md) when module
+  boundaries or state-preserving refactors are part of the accepted binding.
 
 ## Boundaries
 
@@ -37,3 +39,5 @@ acceptance criteria; authorized capabilities own source inspection, generation, 
 - [Network and observability](references/network-and-observability.md) - hub-spoke, private endpoints, and diagnostics.
 - [Module locks and CodeGen acceptance](references/module-locks-and-codegen-acceptance.md) - AVM binding, exact
   locks, and receipt-based acceptance.
+- [Module composition and refactor intent](references/module-composition-and-refactor.md) - boundary, interface, and
+  state-transition review criteria.

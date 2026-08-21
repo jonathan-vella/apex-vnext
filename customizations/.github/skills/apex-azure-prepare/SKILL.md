@@ -28,6 +28,8 @@ artifact acceptance, and every repository mutation.
    ownership details in that binding, while preserving the trace back to planned intent and accepted policy.
 5. Use only the kernel-authorized artifact and generation capabilities named by the task envelope. Return their typed
    result, or a blocker when an output, evidence item, or approval is missing.
+6. For Azure Functions intent, use [Azure Functions recipe pack](references/functions-recipe-pack.md). The pack is
+   deferred: record its unavailable materialization dependency rather than reading or composing its source templates.
 
 ## Boundaries
 
@@ -41,6 +43,8 @@ artifact acceptance, and every repository mutation.
 
 - [Preparation lineage and binding](references/preparation-lineage.md) - evidence flow, artifact distinctions, and
   handoff criteria.
+- [Azure Functions recipe pack](references/functions-recipe-pack.md) - deferred corpus status and safe design
+   checklist.
 
 ## Output
 

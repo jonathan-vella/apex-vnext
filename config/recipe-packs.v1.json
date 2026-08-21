@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1.0.0",
+  "recipePacks": [
+    {
+      "id": "azure-functions-recipes",
+      "version": "1.0.0",
+      "source": {
+        "root": ".github/skills/azure-prepare/references/services/functions",
+        "digestAlgorithm": "sha256(path-nul-file-sha256-newline)",
+        "treeSha256": "e05b0efab3d3d9e7ad85601fd89f7d17140d7b6361b136cc9a36e1b67dca42a9"
+      },
+      "inventory": {
+        "includes": ["service guidance", "base specifications", "recipe templates", "evaluation fixtures"],
+        "recipeRoots": [
+          "templates/base",
+          "templates/recipes/blob-eventgrid",
+          "templates/recipes/cosmosdb",
+          "templates/recipes/durable"
+        ]
+      },
+      "availability": {
+        "status": "deferred",
+        "reason": "No authorized recipe materializer capability is available in this release line.",
+        "requiredCapability": "recipe-materializer",
+        "behavior": "Return unavailable; do not read, compose, stage, or publish a recipe."
+      }
+    }
+  ]
+}

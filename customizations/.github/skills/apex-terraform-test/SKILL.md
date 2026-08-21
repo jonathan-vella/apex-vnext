@@ -25,6 +25,8 @@ authorized capabilities own test materialization, execution, environment access,
    execution evidence.
 4. Submit the test specification through an authorized capability. Return unavailable capabilities, absent environment
    authorization, stale locks, or incomplete evidence as blockers.
+5. Apply [Plan-mode test design](references/plan-mode-test-design.md) for deterministic coverage. Apply-mode and
+   real-provider work remain blocked until separately authorized.
 
 ## Boundaries
 
@@ -36,3 +38,5 @@ authorized capabilities own test materialization, execution, environment access,
 
 - [Test design](references/test-design.md) - coverage classification, assertion quality, mocks, and negative cases.
 - [Evidence acceptance](references/evidence-acceptance.md) - receipt scope, result interpretation, and blocker routing.
+- [Plan-mode test design](references/plan-mode-test-design.md) - mock boundary, assertions, and blocked apply-mode
+   work.

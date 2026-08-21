@@ -25,6 +25,8 @@ stateful operations, validation, and lifecycle changes.
 3. Apply [Adoption attestation](references/adoption-attestation.md) to evaluate authorized outcomes and remaining drift.
 4. Route missing inventory, mapping, stateful-operation, or validation capabilities to the kernel as blockers. Never
    replace a missing receipt with inferred configuration or model memory.
+5. Apply [Import mapping and reconciliation](references/import-mapping.md) to preserve candidate boundaries and
+   expected reconciliation without generating import blocks or executing a stateful operation.
 
 ## Boundaries
 
@@ -37,3 +39,5 @@ stateful operations, validation, and lifecycle changes.
 
 - [Import assessment](references/import-assessment.md) - scoped inventory, mappings, locks, and adoption intent.
 - [Adoption attestation](references/adoption-attestation.md) - receipt requirements, reconciliation, and handoff.
+- [Import mapping and reconciliation](references/import-mapping.md) - candidate records, drift review, and blocked
+   operations.
