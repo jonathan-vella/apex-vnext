@@ -8,7 +8,7 @@ const schema = JSON.parse(readFileSync("tools/registry/schemas/optimization-gate
 const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts;
 const trackedPaths = ["package.json", ".github/workflows/ci.yml", "packages/kernel/package.json", "docs/vnext/PRD.md"];
 
-test("draft optimization gate has an exhaustive non-overlapping owned scope", () => {
+test("authorized optimization gate has an exhaustive non-overlapping owned scope", () => {
   assert.deepEqual(validateOptimizationGate({ manifest, schema, scripts, trackedPaths }), []);
 });
 
@@ -39,7 +39,7 @@ test("optimization gate rejects unowned, multiply owned, and unknown proof paths
   );
 });
 
-test("inventory assigns canonical owner and consumers without inventing authorization", () => {
+test("inventory assigns canonical owner and consumers under the bounded audit authorization", () => {
   const inventory = buildOptimizationGateInventory({ manifest, trackedPaths });
   assert.deepEqual(inventory[0], {
     path: "package.json",
@@ -47,7 +47,8 @@ test("inventory assigns canonical owner and consumers without inventing authoriz
     owner: "Repository maintainers",
     consumers: ["contributors", "release controls"],
   });
-  assert.equal(manifest.authorization.status, "pending");
+  assert.equal(manifest.authorization.status, "approved");
+  assert.equal(manifest.authorization.budget.maxTrackedMutations, 0);
 });
 
 test("resolved findings do not require deferred-only expiry metadata", () => {
