@@ -402,11 +402,9 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     "apex-azure-storage/references/service-auth-and-sdk-boundary.md",
     "apex-entra-app-registration/references/design-and-diagnostics.md",
   ];
-  for (const clientId of ["github-copilot-vscode", "github-copilot-cli"]) {
-    for (const reference of sharedSkillReferences) {
-      const contents = await readFile(join(project, ".github", "skills", reference), "utf8");
-      assert.ok(contents.length > 0, `${clientId} package projection is missing ${reference}`);
-    }
+  for (const reference of sharedSkillReferences) {
+    const contents = await readFile(join(project, ".github", "skills", reference), "utf8");
+    assert.ok(contents.length > 0, `consumer package is missing ${reference}`);
   }
   const mcpConfig = JSON.parse(await readFile(join(project, ".vscode", "mcp.json"), "utf8")).servers.apex;
   const workspaceValue = (value) => value.replaceAll("${workspaceFolder}", project);
