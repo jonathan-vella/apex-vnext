@@ -23,10 +23,10 @@ Live provider and paired-client qualification are not run by this artifact or it
 | azure-cost-optimization    | consumer           | apex-azure-cost-optimization | APEX Architect and Operator               | complete     | not-proven | not-proven | not-run            |
 | azure-defaults             | consumer           | apex-azure-defaults          | APEX Architect and Planner                | complete     | not-proven | not-proven | not-run            |
 | azure-deploy               | consumer           | apex-azure-deploy            | APEX Operator                             | complete     | not-proven | not-proven | not-run            |
-| azure-diagnostics          | consumer           | apex-azure-diagnostics       | APEX Operator                             | planned      | not-proven | not-proven | not-run            |
+| azure-diagnostics          | consumer           | apex-azure-diagnostics       | APEX Operator                             | complete     | not-proven | not-proven | not-run            |
 | azure-governance-discovery | consumer           | apex-azure-governance        | governance capability pack                | complete     | not-proven | not-proven | not-run            |
 | azure-kusto                | consumer           | apex-azure-kusto             | APEX Operator                             | complete     | not-proven | not-proven | not-run            |
-| azure-prepare              | consumer           | apex-azure-prepare           | APEX Architect and Planner                | planned      | not-proven | not-proven | not-run            |
+| azure-prepare              | consumer           | apex-azure-prepare           | APEX Architect and Planner                | complete     | not-proven | not-proven | not-run            |
 | azure-quotas               | consumer           | apex-azure-quotas            | APEX Architect                            | complete     | not-proven | not-proven | not-run            |
 | azure-rbac                 | consumer           | apex-azure-rbac              | APEX Architect and Planner                | complete     | not-proven | not-proven | not-run            |
 | azure-resources            | consumer           | apex-azure-resources         | APEX Operator                             | complete     | not-proven | not-proven | not-run            |
