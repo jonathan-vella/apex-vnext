@@ -314,6 +314,13 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "test-skill-catalog-review",
+      "script": "test:skill-catalog-review",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "test-retired-automation",
       "script": "test:retired-automation",
       "profile": "node-test",
@@ -531,6 +538,13 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "validate-skill-catalog-review",
+      "script": "validate:skill-catalog-review",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "validate-skills",
       "script": "validate:skills",
       "profile": "node-validation",
@@ -604,6 +618,8 @@
         "validate:agents",
         "validate:skills",
         "validate:guidance-migration",
+        "validate:skill-catalog-review",
+        "test:skill-catalog-review",
         "lint:version-sync",
         "lint:deprecated-refs",
         "lint:mcp-config",

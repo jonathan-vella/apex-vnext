@@ -21,10 +21,11 @@ export function parseAggregate(command) {
   const epilogueIndex = normalized.lastIndexOf(" && echo ");
   const epilogue = epilogueIndex === -1 ? null : normalized.slice(epilogueIndex + 4);
   const pipeline = epilogueIndex === -1 ? normalized : normalized.slice(0, epilogueIndex);
-  const runParallelIndex = pipeline.indexOf("run-p ");
-  if (runParallelIndex === -1) return null;
-  const prerequisiteText = pipeline.slice(0, runParallelIndex).replace(/ && $/, "").trim();
-  const tokens = pipeline.slice(runParallelIndex).split(" ");
+  const runnerMatch = /\brun-([ps])\s/.exec(pipeline);
+  if (runnerMatch === null) return null;
+  const runnerIndex = runnerMatch.index;
+  const prerequisiteText = pipeline.slice(0, runnerIndex).replace(/ && $/, "").trim();
+  const tokens = pipeline.slice(runnerIndex).split(" ");
   const prerequisites = [];
   if (prerequisiteText.length > 0) {
     for (const prerequisite of prerequisiteText.split(" && ")) {
@@ -163,7 +164,11 @@ export function validateRepositoryValidatorGraph({ graph, schema, scripts, consu
       if (command?.retirement.status === "retired")
         errors.push(`${aggregate.script}: depends on retired command ${script}`);
       const profile = command === undefined ? null : profiles.get(command.profile);
-      if (aggregate.members.includes(script) && profile?.parallelSafety === "serial-only") {
+      if (
+        packageCommand.includes("run-p ") &&
+        aggregate.members.includes(script) &&
+        profile?.parallelSafety === "serial-only"
+      ) {
         errors.push(`${aggregate.script}: parallel member is serial-only: ${script}`);
       }
     }
