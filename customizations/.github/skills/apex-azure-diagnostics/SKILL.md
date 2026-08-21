@@ -56,3 +56,5 @@ boundary, and kernel-provided next action.
 
 - [Diagnostic interpretation](references/diagnostic-interpretation.md) -
   evidence sequence, KQL result meaning, service signals, and uncertainty.
+- [Operational checklist](references/operational-checklist.md) -
+  symptom framing, signal correlation, and escalation boundaries.

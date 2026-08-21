@@ -48,3 +48,5 @@ infer policy state from model memory, templates, or a prior task.
 
 - [Evidence interpretation](references/evidence-interpretation.md) -
   envelope checks, classification, exemptions, and blocker routing.
+- [Operational checklist](references/operational-checklist.md) -
+   resume conditions, effect handling, and evidence handoff.
