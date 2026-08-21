@@ -27,18 +27,13 @@ const assessmentSkills = [
   "apex-azure-validate",
 ];
 
-test("assessment skill mappings ship to both client projections", async () => {
+test("assessment skill mappings ship to managed client projections", async () => {
   await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
   const manifest = JSON.parse(await readFile(join(root, "customizations", "manifest.json"), "utf8"));
+  assert.ok(manifest.sharedDirectories.includes(".github/skills"), "managed skills must ship as a shared directory");
   for (const skill of assessmentSkills) {
     const skillPath = `.github/skills/${skill}/SKILL.md`;
     assert.ok(manifest.managedFiles.includes(skillPath), `${skillPath} must be manifest-owned`);
-    for (const client of manifest.clientProjections) {
-      assert.ok(
-        manifest.sharedDirectories.includes(".github/skills"),
-        `${client.id} must receive shared managed skills`,
-      );
-    }
   }
 });
 
