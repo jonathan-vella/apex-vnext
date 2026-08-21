@@ -45,6 +45,15 @@
           "minItems": 1,
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
+        },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maxTrackedMutations", "maxMinutes"],
+          "properties": {
+            "maxTrackedMutations": { "type": "integer", "minimum": 0 },
+            "maxMinutes": { "type": "integer", "minimum": 1 }
+          }
         }
       }
     },
@@ -142,9 +151,25 @@
               "expiresAt": { "type": "string", "format": "date-time" },
               "allowedPaths": { "type": "array", "minItems": 1 },
               "allowedCommands": { "type": "array", "minItems": 1 },
-              "stopConditions": { "type": "array", "minItems": 1 }
+              "stopConditions": { "type": "array", "minItems": 1 },
+              "budget": {
+                "type": "object",
+                "properties": {
+                  "maxTrackedMutations": { "type": "integer", "minimum": 0 },
+                  "maxMinutes": { "type": "integer", "minimum": 1 }
+                },
+                "required": ["maxTrackedMutations", "maxMinutes"]
+              }
             },
-            "required": ["status", "approver", "expiresAt", "allowedPaths", "allowedCommands", "stopConditions"]
+            "required": [
+              "status",
+              "approver",
+              "expiresAt",
+              "allowedPaths",
+              "allowedCommands",
+              "stopConditions",
+              "budget"
+            ]
           }
         }
       }
