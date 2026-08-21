@@ -59,6 +59,13 @@ test("init installs bundled customizations and runtime config by default", async
     /Core Controls/u,
   );
   assert.match(
+    await readFile(
+      join(root, ".github", "skills", "apex-azure-defaults", "references", "decision-boundaries.md"),
+      "utf8",
+    ),
+    /Decision Boundaries And Fallbacks/u,
+  );
+  assert.match(
     await readFile(join(root, ".github", "skills", "apex-microsoft-docs", "SKILL.md"), "utf8"),
     /APEX Microsoft Documentation/u,
   );
@@ -177,6 +184,13 @@ test("init installs only the selected Copilot CLI projection and records it in t
       "utf8",
     ),
     /Core Controls/u,
+  );
+  assert.match(
+    await readFile(
+      join(root, ".github", "skills", "apex-azure-defaults", "references", "decision-boundaries.md"),
+      "utf8",
+    ),
+    /Decision Boundaries And Fallbacks/u,
   );
   assert.match(
     await readFile(join(root, ".github", "skills", "apex-microsoft-docs", "SKILL.md"), "utf8"),
