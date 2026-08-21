@@ -35,6 +35,9 @@ prior qualification is retained as historical characterization. See
 - Refined the internal native workflow, requirements, architecture, planning, CodeGen, and operations skills to match
   current kernel and MCP behavior, including typed intake, task ownership, evidence, binding, and taskless-operation
   boundaries. No capabilities, workflow grants, deployment behavior, or live provider integration changed.
+- Completed the managed Azure ADR, Azure Defaults, Azure RBAC, and Microsoft Docs guidance migration ledger entries.
+  Safe decision knowledge is packaged in consumer references; direct operations and mutable discovery remain excluded
+  or capability-deferred.
 - Added the managed `apex-azure-defaults` consumer skill with role-scoped guidance for projected governance, security,
   naming, tagging, and AVM/module decisions without direct Azure operations.
 - Added managed `apex-azure-adr` and `apex-azure-rbac` consumer skills with role-scoped decision-record and

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import test from "node:test";
-import { validateGuidanceMigration } from "../scripts/validate-guidance-migration.mjs";
+import { collectGuidanceMigrationInputs, validateGuidanceMigration } from "../scripts/validate-guidance-migration.mjs";
 
 const sourceSkills = ["source-skill"];
 const sourceResources = new Map([["source-skill", new Set(["references/rule.md"])]]);
@@ -134,4 +136,39 @@ test("rejects unknown source resources and target owners", () => {
   ];
   errors = validateGuidanceMigration(inputs({ matrix: candidate }));
   assert.ok(errors.some((error) => error.includes("Unknown target owner")));
+});
+
+test("completed design guidance mappings retain only packaged or deferred ownership", async () => {
+  const root = resolve(import.meta.dirname, "../..");
+  const { matrix, sourceResources } = collectGuidanceMigrationInputs(root);
+  const completed = new Map(
+    matrix.skillDispositions
+      .filter(({ source }) => ["azure-adr", "azure-defaults", "azure-rbac", "microsoft-docs"].includes(source))
+      .map((entry) => [entry.source, entry]),
+  );
+
+  assert.deepEqual([...completed.keys()].sort(), ["azure-adr", "azure-defaults", "azure-rbac", "microsoft-docs"]);
+  for (const entry of completed.values()) assert.equal(entry.lifecycle, "complete");
+  assert.deepEqual(completed.get("azure-rbac").resourceDispositions, []);
+  assert.deepEqual(completed.get("microsoft-docs").resourceDispositions, []);
+  assert.deepEqual(
+    new Set(completed.get("azure-adr").resourceDispositions.map(({ source }) => source)),
+    sourceResources.get("azure-adr"),
+  );
+  assert.deepEqual(
+    new Set(completed.get("azure-defaults").resourceDispositions.map(({ source }) => source)),
+    sourceResources.get("azure-defaults"),
+  );
+  assert.ok(
+    completed
+      .get("azure-defaults")
+      .resourceDispositions.some(
+        ({ source, disposition, targets }) =>
+          source === "references/service-matrices.md" &&
+          disposition === "adapt" &&
+          targets.includes("references/decision-boundaries.md"),
+      ),
+  );
+  const manifest = JSON.parse(await readFile(resolve(root, "customizations/manifest.json"), "utf8"));
+  assert.ok(manifest.managedFiles.includes(".github/skills/apex-azure-defaults/references/decision-boundaries.md"));
 });
