@@ -95,7 +95,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "status", "owner", "rationale", "expiry", "releaseImpact"],
+        "required": ["id", "status", "owner", "rationale"],
         "properties": {
           "id": { "type": "string", "pattern": "^[A-Z]+-[0-9]{3}$" },
           "status": { "enum": ["resolved", "deferred"] },

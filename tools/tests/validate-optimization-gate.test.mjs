@@ -49,3 +49,9 @@ test("inventory assigns canonical owner and consumers without inventing authoriz
   });
   assert.equal(manifest.authorization.status, "pending");
 });
+
+test("resolved findings do not require deferred-only expiry metadata", () => {
+  const resolved = structuredClone(manifest);
+  resolved.findings.push({ id: "OPT-001", status: "resolved", owner: "Repository maintainers", rationale: "Fixed." });
+  assert.deepEqual(validateOptimizationGate({ manifest: resolved, schema, scripts, trackedPaths }), []);
+});
