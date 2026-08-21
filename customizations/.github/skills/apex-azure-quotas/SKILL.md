@@ -49,3 +49,5 @@ assume a quota value or infer a quota resource name from an ARM resource type.
 
 - [Capacity decision rules](references/capacity-decision-rules.md) - scope,
   resource-name mapping, calculation, and outcomes.
+- [Operational checklist](references/operational-checklist.md) -
+   mapping, capacity comparison, and unavailable-surface handling.

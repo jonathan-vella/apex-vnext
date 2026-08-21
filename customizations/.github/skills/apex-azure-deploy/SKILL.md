@@ -41,6 +41,8 @@ ceremonies and kernel authorization.
 
 - [Preview, recovery, and verification](references/preview-recovery-verification.md) - explanation rules and outcome
   semantics.
+- [Operational checklist](references/operational-checklist.md) -
+   preconditions, circuit-breaker routing, drift, and verification limits.
 
 ## Output
 

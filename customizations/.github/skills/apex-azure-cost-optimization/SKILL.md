@@ -57,3 +57,5 @@ the conclusion.
 
 - [Cost assessment criteria](references/cost-assessment-criteria.md) - evidence
   rules, heuristics, Redis assessment, classification, and uncertainty.
+- [Operational checklist](references/operational-checklist.md) -
+  normalization, candidate safety, and savings traceability.

@@ -353,3 +353,19 @@ test("asset lifecycle carries restored managed skills to both clients", async ()
     }
   }
 });
+
+test("asset preparation includes operational skill references for both clients", async () => {
+  const relativePaths = [
+    ".github/skills/apex-azure-governance/references/operational-checklist.md",
+    ".github/skills/apex-azure-deploy/references/operational-checklist.md",
+  ];
+  for (const client of ["github-copilot-vscode", "github-copilot-cli"]) {
+    for (const relativePath of relativePaths) {
+      const content = await readFile(
+        join(process.cwd(), "packages", "cli", "assets", "client-projections", client, relativePath),
+        "utf8",
+      );
+      assert.match(content, /Operational Checklist/u);
+    }
+  }
+});

@@ -54,3 +54,5 @@ kernel-provided next action. Use `indeterminate` for incomplete support.
 
 - [KQL evidence interpretation](references/kql-evidence-interpretation.md) -
   query pattern meaning, quality checks, and analytic limits.
+- [Operational checklist](references/operational-checklist.md) -
+  schema, query-shape, result-limit, and redaction checks.

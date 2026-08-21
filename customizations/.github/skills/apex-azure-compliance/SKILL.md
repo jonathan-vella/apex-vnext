@@ -54,3 +54,5 @@ and kernel-provided next action.
 
 - [Compliance finding criteria](references/compliance-finding-criteria.md) -
   control categories, severity, expiration interpretation, and escalation.
+- [Operational checklist](references/operational-checklist.md) -
+   assessment coverage, finding correlation, and redaction limits.

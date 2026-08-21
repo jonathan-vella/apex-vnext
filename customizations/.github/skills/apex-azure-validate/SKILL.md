@@ -40,6 +40,8 @@ against acceptance criteria; it does not execute checks independently or change 
 
 - [Preflight evidence model](references/preflight-evidence.md) - freshness, acceptance outcomes, and remediation
   routing.
+- [Operational checklist](references/operational-checklist.md) -
+  generated-tree validation, acceptance coverage, and failed-check routing.
 
 ## Output
 

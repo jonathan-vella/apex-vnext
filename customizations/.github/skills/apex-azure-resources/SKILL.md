@@ -50,3 +50,5 @@ inventory, and do not infer resource state from names or model memory.
 
 - [Inventory and query patterns](references/inventory-query-patterns.md) -
   scope rules, pattern selection, and interpretation limits.
+- [Operational checklist](references/operational-checklist.md) -
+   inventory intent, bounded results, and candidate handling.
