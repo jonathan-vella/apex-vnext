@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.apexops.dev/optimization-audit-receipt-v1.json",
+  "title": "APEX optimization audit receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "observedAt", "candidate", "authorization", "inventory", "scripts"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "observedAt": { "type": "string", "format": "date-time" },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "tree"],
+      "properties": {
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "tree": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "maxTrackedMutations"],
+      "properties": {
+        "status": { "const": "read-only-audit" },
+        "maxTrackedMutations": { "const": 0 }
+      }
+    },
+    "inventory": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "surface", "owner", "consumers", "byteCount"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "surface": { "type": "string", "minLength": 1 },
+          "owner": { "type": "string", "minLength": 1 },
+          "consumers": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+          "byteCount": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "scripts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "command"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "command": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

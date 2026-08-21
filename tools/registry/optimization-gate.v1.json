@@ -1,13 +1,28 @@
 {
   "$schema": "schemas/optimization-gate.schema.json",
   "schemaVersion": "1.0.0",
-  "state": "draft",
+  "state": "authorized",
   "candidate": {
-    "status": "pending"
+    "status": "bound",
+    "commit": "9910fd06a1d6ad40074148bdc3677bae7d5a7ab5",
+    "tree": "4d2033cc41fb968a287fd454e062e1d5cf8dd754"
   },
   "authorization": {
-    "status": "pending",
-    "pendingReason": "A maintainer must bind an exact candidate and authorize the optimization review scope."
+    "status": "approved",
+    "approver": "jonathan-vella delegated autonomous read-only audit",
+    "expiresAt": "2026-08-22T23:59:59Z",
+    "allowedPaths": ["**"],
+    "allowedCommands": ["npm run capture:optimization-baseline", "npm run validate:all", "npm run qualify:vnext"],
+    "stopConditions": [
+      "The candidate commit or tree changes.",
+      "Any command requires cloud, client, publication, release, or deployment authority.",
+      "A proposed action would modify a tracked file.",
+      "A critical or high security finding is detected."
+    ],
+    "budget": {
+      "maxTrackedMutations": 0,
+      "maxMinutes": 60
+    }
   },
   "surfaces": [
     {
