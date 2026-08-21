@@ -54,6 +54,8 @@ prior qualification is retained as historical characterization. See
   diagrams, and derived artifact presentations, with direct cloud actions retained behind kernel-controlled capabilities.
 - Deepened managed Bicep guidance with source-reviewed module interfaces, environment input rules, private endpoint and
   DNS composition, compiler/provider gotchas, and a CodeGen acceptance checklist.
+- Completed managed Terraform guidance parity with receipt-gated plan and state-boundary assessment, test mock and
+  plan-mode design, and import mapping and adoption attestation; operational Terraform actions remain capability-owned.
 
 - Fixed clean devcontainer creation by normalizing named-volume ownership before cache use and removing generated
   Python package metadata after the local apex-recall install.
