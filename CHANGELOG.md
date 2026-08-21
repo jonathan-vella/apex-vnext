@@ -40,6 +40,9 @@ prior qualification is retained as historical characterization. See
   or capability-deferred.
 - Added a matrix-derived skill catalog review and deterministic intent fixture that retain explicit gaps until lifecycle,
   live-provider, and paired-client evidence is available; this does not close issue #219.
+- Restored managed Azure Compute, Storage, and Entra identity decision guidance with source-reviewed family, VMSS,
+  price-evidence, storage authentication and lifecycle, OAuth, permission, and diagnostic rules. Direct SDK, CLI,
+  IaC, credential, data, consent, and cloud operations remain outside the consumer skills.
 - Added the managed `apex-azure-defaults` consumer skill with role-scoped guidance for projected governance, security,
   naming, tagging, and AVM/module decisions without direct Azure operations.
 - Added managed `apex-azure-adr` and `apex-azure-rbac` consumer skills with role-scoped decision-record and
