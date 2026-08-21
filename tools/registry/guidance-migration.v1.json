@@ -1553,7 +1553,7 @@
       "disposition": "consumer",
       "consumerSkill": "apex-azure-diagnostics",
       "owner": "APEX Operator",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "references/azure-resource-graph.md",
@@ -1569,6 +1569,7 @@
           "source": "references/container-apps/README.md",
           "disposition": "defer-capability",
           "targets": [],
+          "lifecycle": "complete",
           "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
@@ -1839,7 +1840,7 @@
       "disposition": "consumer",
       "consumerSkill": "apex-azure-prepare",
       "owner": "APEX Architect and Planner",
-      "lifecycle": "planned",
+      "lifecycle": "complete",
       "resourceDispositions": [
         {
           "source": "references/analyze.md",
