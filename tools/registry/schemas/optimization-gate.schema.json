@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.apexops.dev/optimization-gate-v1.json",
+  "title": "APEX pre-agent repository optimization gate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "state", "candidate", "authorization", "surfaces", "baselines", "findings"],
+  "properties": {
+    "$schema": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "const": "1.0.0" },
+    "state": { "enum": ["draft", "authorized", "complete"] },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["pending", "bound"] },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "tree": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["pending", "approved"] },
+        "pendingReason": { "type": "string", "minLength": 1 },
+        "approver": { "type": "string", "minLength": 1 },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "allowedPaths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "allowedCommands": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "stopConditions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "surfaces": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "owner", "consumers", "paths", "prefixes", "proofCommands"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$" },
+          "owner": { "type": "string", "minLength": 1 },
+          "consumers": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "paths": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "prefixes": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "proofCommands": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^npm run [a-z0-9:_-]+$" }
+          }
+        }
+      }
+    },
+    "baselines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "owner", "releaseImpact"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$" },
+          "status": { "enum": ["pending", "captured"] },
+          "owner": { "type": "string", "minLength": 1 },
+          "releaseImpact": { "enum": ["blocking", "report-only"] }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "owner", "rationale", "expiry", "releaseImpact"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Z]+-[0-9]{3}$" },
+          "status": { "enum": ["resolved", "deferred"] },
+          "owner": { "type": "string", "minLength": 1 },
+          "rationale": { "type": "string", "minLength": 1 },
+          "expiry": { "type": "string", "format": "date-time" },
+          "releaseImpact": { "enum": ["blocking", "accepted"] }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "state": { "const": "draft" } } },
+      "then": {
+        "properties": {
+          "candidate": { "type": "object", "properties": { "status": { "const": "pending" } }, "required": ["status"] },
+          "authorization": {
+            "type": "object",
+            "properties": { "status": { "const": "pending" }, "pendingReason": { "type": "string", "minLength": 1 } },
+            "required": ["status", "pendingReason"]
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "enum": ["authorized", "complete"] } } },
+      "then": {
+        "properties": {
+          "candidate": {
+            "type": "object",
+            "properties": {
+              "status": { "const": "bound" },
+              "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+              "tree": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+            },
+            "required": ["status", "commit", "tree"]
+          },
+          "authorization": {
+            "type": "object",
+            "properties": {
+              "status": { "const": "approved" },
+              "approver": { "type": "string", "minLength": 1 },
+              "expiresAt": { "type": "string", "format": "date-time" },
+              "allowedPaths": { "type": "array", "minItems": 1 },
+              "allowedCommands": { "type": "array", "minItems": 1 },
+              "stopConditions": { "type": "array", "minItems": 1 }
+            },
+            "required": ["status", "approver", "expiresAt", "allowedPaths", "allowedCommands", "stopConditions"]
+          }
+        }
+      }
+    }
+  ]
+}
