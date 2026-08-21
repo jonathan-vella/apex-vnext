@@ -40,3 +40,9 @@ typed planning decision so later validation can repeat the interpretation.
 Do not compare regions using different demand assumptions, units, or freshness
 windows. A regional comparison is a decision aid, not an authorization to
 change the target region.
+
+## Provider And Troubleshooting Boundary
+
+Record provider support, extension or command failure, invalid scope, unavailable quota surface, and service hard-limit
+signals as evidence gaps or blockers. CLI discovery, command execution, monitoring configuration, and quota-increase
+workflows are deferred provider capabilities. A troubleshooting note must not turn into a command or a request action.
