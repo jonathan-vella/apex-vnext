@@ -61,6 +61,16 @@ test("complete gates reject deferred release-blocking findings", () => {
   const complete = structuredClone(manifest);
   complete.state = "complete";
   for (const baseline of complete.baselines) baseline.status = "captured";
+  complete.findings = [
+    {
+      id: "OPT-999",
+      status: "deferred",
+      owner: "Test owner",
+      rationale: "Deliberate release blocker.",
+      expiry: "2026-12-31T23:59:59Z",
+      releaseImpact: "blocking",
+    },
+  ];
   assert.ok(
     validateOptimizationGate({ manifest: complete, schema, scripts, trackedPaths }).includes(
       "complete gate cannot retain deferred release-blocking findings",
