@@ -1569,7 +1569,6 @@
           "source": "references/container-apps/README.md",
           "disposition": "defer-capability",
           "targets": [],
-          "lifecycle": "complete",
           "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
