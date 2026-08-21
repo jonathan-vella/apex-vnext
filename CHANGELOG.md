@@ -41,6 +41,9 @@ prior qualification is retained as historical characterization. See
 - Restored managed Azure Compute, Storage, and Entra identity decision guidance with source-reviewed family, VMSS,
   price-evidence, storage authentication and lifecycle, OAuth, permission, and diagnostic rules. Direct SDK, CLI,
   IaC, credential, data, consent, and cloud operations remain outside the consumer skills.
+- Completed managed assessment guidance parity for cloud migration, compliance, Kusto, quotas, resources, and
+  preflight validation. Source-derived readiness and evidence interpretation are packaged for both clients; provider
+  queries, discovery, SDK actions, remediation, code conversion, and command execution remain explicitly deferred.
 - Added the managed `apex-azure-defaults` consumer skill with role-scoped guidance for projected governance, security,
   naming, tagging, and AVM/module decisions without direct Azure operations.
 - Added managed `apex-azure-adr` and `apex-azure-rbac` consumer skills with role-scoped decision-record and

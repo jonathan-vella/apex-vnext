@@ -18,6 +18,24 @@ import {
 
 const execFile = promisify(execFileCallback);
 const root = join(import.meta.dirname, "../../..");
+const assessmentSkills = [
+  "apex-azure-cloud-migrate",
+  "apex-azure-compliance",
+  "apex-azure-kusto",
+  "apex-azure-quotas",
+  "apex-azure-resources",
+  "apex-azure-validate",
+];
+
+test("assessment skill mappings ship to managed client projections", async () => {
+  await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
+  const manifest = JSON.parse(await readFile(join(root, "customizations", "manifest.json"), "utf8"));
+  assert.ok(manifest.sharedDirectories.includes(".github/skills"), "managed skills must ship as a shared directory");
+  for (const skill of assessmentSkills) {
+    const skillPath = `.github/skills/${skill}/SKILL.md`;
+    assert.ok(manifest.managedFiles.includes(skillPath), `${skillPath} must be manifest-owned`);
+  }
+});
 
 test("asset generator canonical JSON ignores object insertion order", () => {
   assert.equal(
