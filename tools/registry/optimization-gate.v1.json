@@ -1,0 +1,140 @@
+{
+  "$schema": "schemas/optimization-gate.schema.json",
+  "schemaVersion": "1.0.0",
+  "state": "draft",
+  "candidate": {
+    "status": "pending"
+  },
+  "authorization": {
+    "status": "pending",
+    "pendingReason": "A maintainer must bind an exact candidate and authorize the optimization review scope."
+  },
+  "surfaces": [
+    {
+      "id": "repository-root",
+      "owner": "Repository maintainers",
+      "consumers": ["contributors", "release controls"],
+      "paths": [
+        ".gitattributes",
+        ".gitignore",
+        ".gitleaksignore",
+        ".gitleaks.toml",
+        ".markdown-link-check.json",
+        ".markdownlint-cli2.jsonc",
+        ".prettierignore",
+        ".prettierrc.json",
+        ".vale.ini",
+        "AGENTS.md",
+        "CHANGELOG.md",
+        "commitlint.config.js",
+        "CONTRIBUTING.md",
+        "CONTRIBUTORS.md",
+        "eslint.config.mjs",
+        "lefthook.yml",
+        "LICENSE",
+        "package.json",
+        "package-lock.json",
+        "pyproject.toml",
+        "README.md",
+        "SECURITY.md",
+        "SOURCE_PROVENANCE.json",
+        "tsconfig.base.json",
+        "tsconfig.vnext.json",
+        "VERSION.md"
+      ],
+      "prefixes": [],
+      "proofCommands": ["npm run validate:all"]
+    },
+    {
+      "id": "repository-controls",
+      "owner": "Repository validation engineering",
+      "consumers": ["CI", "contributors"],
+      "paths": [],
+      "prefixes": [".github/", ".devcontainer/", ".vscode/"],
+      "proofCommands": ["npm run validate:github-workflows"]
+    },
+    {
+      "id": "runtime-packages",
+      "owner": "Package build engineering",
+      "consumers": ["APEX runtime", "CLI consumers"],
+      "paths": [],
+      "prefixes": ["packages/"],
+      "proofCommands": ["npm run build:vnext"]
+    },
+    {
+      "id": "runtime-configuration",
+      "owner": "Kernel configuration maintainers",
+      "consumers": ["kernel", "CLI", "managed projections"],
+      "paths": [],
+      "prefixes": ["config/"],
+      "proofCommands": ["npm run validate:vnext"]
+    },
+    {
+      "id": "managed-customizations",
+      "owner": "Managed customization maintainers",
+      "consumers": ["VS Code", "Copilot CLI"],
+      "paths": [],
+      "prefixes": ["customizations/"],
+      "proofCommands": ["npm run validate:agents"]
+    },
+    {
+      "id": "validation-tooling",
+      "owner": "Repository validation engineering",
+      "consumers": ["CI", "release qualification"],
+      "paths": [],
+      "prefixes": ["tools/", "tests/"],
+      "proofCommands": ["npm run validate:all"]
+    },
+    {
+      "id": "product-documentation",
+      "owner": "Documentation maintainers",
+      "consumers": ["users", "contributors", "release reviewers"],
+      "paths": [],
+      "prefixes": ["docs/"],
+      "proofCommands": ["npm run validate:docs"]
+    },
+    {
+      "id": "infrastructure",
+      "owner": "Infrastructure maintainers",
+      "consumers": ["Bicep", "Terraform", "release qualification"],
+      "paths": [],
+      "prefixes": ["infra/"],
+      "proofCommands": ["npm run validate:terraform"]
+    },
+    {
+      "id": "generated-and-historical",
+      "owner": "Repository maintainers",
+      "consumers": ["provenance validators", "release reviewers"],
+      "paths": [],
+      "prefixes": ["agent-output/", ".apex/", ".archive/", ".vale/"],
+      "proofCommands": ["npm run test:retired-automation"]
+    }
+  ],
+  "baselines": [
+    {
+      "id": "repository-inventory",
+      "status": "pending",
+      "owner": "Repository maintainers",
+      "releaseImpact": "blocking"
+    },
+    {
+      "id": "validation-duration",
+      "status": "pending",
+      "owner": "Repository validation engineering",
+      "releaseImpact": "blocking"
+    },
+    {
+      "id": "package-installation",
+      "status": "pending",
+      "owner": "Package build engineering",
+      "releaseImpact": "blocking"
+    },
+    {
+      "id": "context-footprint",
+      "status": "pending",
+      "owner": "Managed customization maintainers",
+      "releaseImpact": "blocking"
+    }
+  ],
+  "findings": []
+}
