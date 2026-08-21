@@ -573,6 +573,13 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "test-optimization-baseline",
+      "script": "test:optimization-baseline",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "validate-terminology",
       "script": "validate:terminology",
       "profile": "node-validation",
@@ -673,6 +680,7 @@
         "test:registry-validator-reporter",
         "test:guidance-migration",
         "test:optimization-gate",
+        "test:optimization-baseline",
         "test:client-context-samples",
         "validate:client-outcomes",
         "test:client-outcomes:prepared",
