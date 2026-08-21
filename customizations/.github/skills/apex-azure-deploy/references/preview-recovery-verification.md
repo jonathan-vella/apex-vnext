@@ -25,6 +25,22 @@ Recovery is an authorized lifecycle transition, not a guessed rollback. Preserve
 including partial state. The trusted lifecycle determines whether reconciliation, a new preview, a controlled retry, or
 another recovery action is appropriate.
 
+## Delivery Safeguards
+
+Explain only safeguards present in the accepted preview and evidence:
+
+- A deployment strategy is a risk-control decision, not permission to select a target, run a command, or change a
+  rollout.
+- Stop and route to the trusted lifecycle when a circuit-breaker condition, policy precheck failure, validation
+  blocker, or drift signal is reported.
+- Treat drift as a reconciliation input. Do not overwrite observed state, infer a baseline, or propose a corrective
+  action without a new kernel-authorized preview.
+- Keep policy effects, region availability, and known provider limitations visible as blockers or uncertainty. They do
+  not become resolved because a deployment reached a terminal state.
+
+Direct commands, recipes, SDK examples, CI definitions, and provider-specific recovery steps remain outside this
+guidance. The trusted CLI and provider lifecycle own those executable paths.
+
 ## Verification Evidence
 
 Verification confirms the expected post-operation state against the active operation. Explain only observations returned

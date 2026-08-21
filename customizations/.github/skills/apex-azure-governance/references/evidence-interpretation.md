@@ -45,3 +45,14 @@ Project only applicable constraints into the typed decision:
 Leave an unresolved property path explicit rather than inventing an IaC
 mapping. Authorized planning and delivery capabilities own any later
 translation or remediation.
+
+## Resume And Reconciliation
+
+On resume, repeat the acceptance checks against the current task scope and freshness limit. A prior `COMPLETE` result
+does not survive a changed subscription, management-group ancestry, evidence signature, or expiry window. When
+delivery reports policy drift or an indeterminate provider outcome, preserve the observed result and route it to the
+authorized reconciliation lifecycle. Do not rerun discovery, apply an override, or synthesize a corrected policy
+baseline from this guidance.
+
+Discovery scripts, pack execution, and terminal commands remain outside this skill until a separately qualified typed
+capability owns them.

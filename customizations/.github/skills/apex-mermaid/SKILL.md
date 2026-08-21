@@ -21,6 +21,9 @@ When a renderer-supported slot exists, select the simplest diagram type that pre
 [syntax guidance](references/syntax.md) and [styling guidance](references/styling.md), then submit only the bounded
 fence to that renderer. The renderer, rather than this skill, must validate syntax and return the document receipt.
 
+Syntax and styling references are guidance targets, not active renderer slots. They do not make Mermaid output
+available until a typed source, renderer registration, and receipt exist.
+
 ## Boundaries
 
 - Do not create standalone architecture, network, runtime, as-built, WAF, cost, or compliance diagrams.
