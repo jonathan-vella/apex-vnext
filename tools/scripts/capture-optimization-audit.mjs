@@ -39,8 +39,8 @@ function matchesSurface(path, surface) {
 }
 
 export function buildOptimizationAudit({ manifest, observedAt, runGit = execFileSync }) {
-  if (manifest.state !== "authorized" || manifest.authorization.budget.maxTrackedMutations !== 0) {
-    throw new Error("authorized read-only gate with zero tracked mutations is required");
+  if (manifest.state !== "authorized" || manifest.authorization.status !== "approved") {
+    throw new Error("authorized optimization gate is required");
   }
   const actualTree = gitValue(["rev-parse", `${manifest.candidate.commit}^{tree}`], runGit);
   if (actualTree !== manifest.candidate.tree) throw new Error("candidate tree does not match the bound commit");
