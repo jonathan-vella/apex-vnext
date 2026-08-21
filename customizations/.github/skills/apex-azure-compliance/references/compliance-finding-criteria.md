@@ -51,3 +51,13 @@ Report aggregate counts and redacted identifiers only as the task permits. Keep
 the target scope, control mapping, evidence hash, freshness, and uncertainty
 alongside every summary. Handoff asks for owner review; it does not contain
 mutation instructions or claim that a finding has been resolved.
+
+## Recommendation And Authentication Signals
+
+Classify recommendation evidence by security, reliability, operational, or cost concern before assigning severity.
+Authentication evidence should distinguish identity posture, least-privilege scope, and credential-management risk from
+proof of access. Managed identity and narrow RBAC are recommendation criteria, not instructions to create identities,
+assign roles, inspect secrets, or remediate a resource.
+
+AzQR, Resource Graph, Key Vault metadata collection, and all SDK operations are deferred provider capabilities. They
+may supply redacted evidence to this assessment only after separate qualification; this guidance never invokes them.

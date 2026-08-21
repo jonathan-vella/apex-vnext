@@ -18,3 +18,9 @@ stage may be skipped because a plan exists.
 Preserve the producing capability, receipt identifier, status, evidence reference, blockers, and next task. Route work
 only to the capability named by the active task envelope. Do not execute, simulate, or claim a handoff, validation, or
 deployment.
+
+## Deferred Implementation Boundary
+
+Code migration, source-runtime inspection, local testing, and deployment are provider- or workspace-backed operations.
+Until a capability for that operation is separately qualified, record `defer-capability` with the required scope and
+acceptance evidence rather than using a CLI, SDK, repository scan, or generated migration output.

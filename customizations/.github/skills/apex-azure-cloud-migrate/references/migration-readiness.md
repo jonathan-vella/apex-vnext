@@ -19,3 +19,9 @@ result or a completed migration. Missing evidence is a blocker, not permission t
 Use `ready_for_planning` only when required evidence and ownership are accepted. Use `needs_input` for missing workload
 facts. Use a blocker for unsupported requirements, unresolved policy constraints, unsafe data movement, or a missing
 owner. Record risk mitigation as planned intent, never as completed control evidence.
+
+## Runtime Compatibility
+
+Capture the source trigger, runtime family, supported target runtime, dependency model, state assumptions, and
+unsupported feature risk. A runtime compatibility statement is an assessment input, not code conversion evidence.
+When conversion, source inspection, or runtime verification is needed, defer it to a separately authorized capability.
