@@ -29,8 +29,9 @@ Treat a baseline as stale when the candidate changes. A maintainer must bind the
 
 ## Capture The Candidate Audit
 
-The authorized read-only audit inventories every path and package script from the bound candidate tree. It cannot write
-tracked files, execute cloud or client operations, or complete the gate.
+The audit requires an `authorized` gate with an exact bound commit and matching tree. It inventories every path and
+package script from that candidate tree. It cannot write tracked files, execute cloud or client operations, or complete
+the gate.
 
 ```bash
 npm run capture:optimization-audit -- --output dist/optimization-audit.json --collected-at TIMESTAMP

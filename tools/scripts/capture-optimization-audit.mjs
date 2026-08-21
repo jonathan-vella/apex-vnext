@@ -7,7 +7,6 @@ import { dirname, resolve } from "node:path";
 import process from "node:process";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
-import { buildOptimizationGateInventory } from "./validate-optimization-gate.mjs";
 
 const MANIFEST_PATH = "tools/registry/optimization-gate.v1.json";
 const SCHEMA_PATH = "tools/registry/schemas/optimization-audit-receipt.schema.json";
@@ -35,17 +34,28 @@ function candidatePaths(commit, runGit) {
   return gitValue(["ls-tree", "-r", "--name-only", commit], runGit).split("\n").filter(Boolean).sort();
 }
 
+function matchesSurface(path, surface) {
+  return surface.paths.includes(path) || surface.prefixes.some((prefix) => path.startsWith(prefix));
+}
+
 export function buildOptimizationAudit({ manifest, observedAt, runGit = execFileSync }) {
   if (manifest.state !== "authorized" || manifest.authorization.budget.maxTrackedMutations !== 0) {
     throw new Error("authorized read-only gate with zero tracked mutations is required");
   }
+  const actualTree = gitValue(["rev-parse", `${manifest.candidate.commit}^{tree}`], runGit);
+  if (actualTree !== manifest.candidate.tree) throw new Error("candidate tree does not match the bound commit");
   const paths = candidatePaths(manifest.candidate.commit, runGit);
-  const inventory = buildOptimizationGateInventory({ manifest, trackedPaths: paths });
-  const entries = inventory.map((entry) => {
-    if (entry.surface === null) throw new Error(`unowned candidate path: ${entry.path}`);
+  const entries = paths.map((path) => {
+    const owners = manifest.surfaces.filter((surface) => matchesSurface(path, surface));
+    if (owners.length === 0) throw new Error(`unowned candidate path: ${path}`);
+    if (owners.length > 1) throw new Error(`multiply owned candidate path: ${path}`);
+    const [surface] = owners;
     return {
-      ...entry,
-      byteCount: Number(gitValue(["cat-file", "-s", `${manifest.candidate.commit}:${entry.path}`], runGit)),
+      path,
+      surface: surface.id,
+      owner: surface.owner,
+      consumers: surface.consumers,
+      byteCount: Number(gitValue(["cat-file", "-s", `${manifest.candidate.commit}:${path}`], runGit)),
     };
   });
   const packageJson = JSON.parse(gitValue(["show", `${manifest.candidate.commit}:package.json`], runGit));

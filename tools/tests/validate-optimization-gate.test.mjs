@@ -39,7 +39,7 @@ test("optimization gate rejects unowned, multiply owned, and unknown proof paths
   );
 });
 
-test("inventory assigns canonical owner and consumers under the bounded audit authorization", () => {
+test("inventory assigns canonical owner and consumers independently from authorization state", () => {
   const inventory = buildOptimizationGateInventory({ manifest, trackedPaths });
   assert.deepEqual(inventory[0], {
     path: "package.json",
