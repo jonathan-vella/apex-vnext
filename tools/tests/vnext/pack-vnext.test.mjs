@@ -397,6 +397,15 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
   await runInTest("git", ["init", "--initial-branch", "qualification"], project);
   await runInTest(apexBin, ["init", "--project", "demo", "--json"], project);
   await readFile(join(project, ".github", "agents", "apex.agent.md"));
+  const sharedSkillReferences = [
+    "apex-azure-compute/references/recommendation-and-scale-rules.md",
+    "apex-azure-storage/references/service-auth-and-sdk-boundary.md",
+    "apex-entra-app-registration/references/design-and-diagnostics.md",
+  ];
+  for (const reference of sharedSkillReferences) {
+    const contents = await readFile(join(project, ".github", "skills", reference), "utf8");
+    assert.ok(contents.length > 0, `consumer package is missing ${reference}`);
+  }
   const mcpConfig = JSON.parse(await readFile(join(project, ".vscode", "mcp.json"), "utf8")).servers.apex;
   const workspaceValue = (value) => value.replaceAll("${workspaceFolder}", project);
   const sdkRoot = join(project, "node_modules", "@modelcontextprotocol", "sdk", "dist", "esm", "client");
