@@ -84,6 +84,27 @@ test("init installs bundled customizations and runtime config by default", async
     /Exact Module Schema Wins/u,
   );
   assert.match(
+    await readFile(
+      join(root, ".github", "skills", "apex-terraform-patterns", "references", "plan-and-change-assessment.md"),
+      "utf8",
+    ),
+    /Stateful and Drift Signals/u,
+  );
+  assert.match(
+    await readFile(
+      join(root, ".github", "skills", "apex-terraform-test", "references", "plan-mode-and-mock-design.md"),
+      "utf8",
+    ),
+    /Plan-Mode and Mock Design/u,
+  );
+  assert.match(
+    await readFile(
+      join(root, ".github", "skills", "apex-terraform-import", "references", "mapping-and-adoption-attestation.md"),
+      "utf8",
+    ),
+    /Mapping and Adoption Attestation/u,
+  );
+  assert.match(
     await readFile(join(root, ".github", "skills", "apex-artifacts", "SKILL.md"), "utf8"),
     /APEX Artifact Presentations/u,
   );
@@ -209,6 +230,27 @@ test("init installs only the selected Copilot CLI projection and records it in t
       "utf8",
     ),
     /Exact Module Schema Wins/u,
+  );
+  assert.match(
+    await readFile(
+      join(root, ".github", "skills", "apex-terraform-patterns", "references", "plan-and-change-assessment.md"),
+      "utf8",
+    ),
+    /Stateful and Drift Signals/u,
+  );
+  assert.match(
+    await readFile(
+      join(root, ".github", "skills", "apex-terraform-test", "references", "plan-mode-and-mock-design.md"),
+      "utf8",
+    ),
+    /Plan-Mode and Mock Design/u,
+  );
+  assert.match(
+    await readFile(
+      join(root, ".github", "skills", "apex-terraform-import", "references", "mapping-and-adoption-attestation.md"),
+      "utf8",
+    ),
+    /Mapping and Adoption Attestation/u,
   );
   assert.match(
     await readFile(join(root, ".github", "skills", "apex-artifacts", "SKILL.md"), "utf8"),

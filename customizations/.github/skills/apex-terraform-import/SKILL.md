@@ -20,13 +20,15 @@ stateful operations, validation, and lifecycle changes.
 
 1. Apply [Import assessment](references/import-assessment.md) to match accepted inventory facts to resource mappings
    and ownership boundaries.
-2. Record a typed adoption proposal with scoped identifiers, exact provider/module locks, expected managed identities,
+2. Apply [Mapping and adoption attestation](references/mapping-and-adoption-attestation.md) to bind each candidate to
+   its intended address and accepted outcome evidence.
+3. Record a typed adoption proposal with scoped identifiers, exact provider/module locks, expected managed identities,
    and reconciliation criteria.
-3. Apply [Adoption attestation](references/adoption-attestation.md) to evaluate authorized outcomes and remaining drift.
-4. Route missing inventory, mapping, stateful-operation, or validation capabilities to the kernel as blockers. Never
-   replace a missing receipt with inferred configuration or model memory.
+4. Apply [Adoption attestation](references/adoption-attestation.md) to evaluate authorized outcomes and remaining drift.
 5. Apply [Import mapping and reconciliation](references/import-mapping.md) to preserve candidate boundaries and
    expected reconciliation without generating import blocks or executing a stateful operation.
+6. Route missing inventory, mapping, stateful-operation, or validation capabilities to the kernel as blockers. Never
+   replace a missing receipt with inferred configuration or model memory.
 
 ## Boundaries
 
@@ -38,6 +40,8 @@ stateful operations, validation, and lifecycle changes.
 ## References
 
 - [Import assessment](references/import-assessment.md) - scoped inventory, mappings, locks, and adoption intent.
+- [Mapping and adoption attestation](references/mapping-and-adoption-attestation.md) - candidate-to-address evidence
+   and outcome review.
 - [Adoption attestation](references/adoption-attestation.md) - receipt requirements, reconciliation, and handoff.
 - [Import mapping and reconciliation](references/import-mapping.md) - candidate records, drift review, and blocked
    operations.
