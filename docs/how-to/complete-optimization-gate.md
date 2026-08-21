@@ -37,6 +37,18 @@ the gate.
 npm run capture:optimization-audit -- --output dist/optimization-audit.json --collected-at TIMESTAMP
 ```
 
+## Bind Client Measurements
+
+The optimization gate requires content-free `live` samples from both supported clients before a context/cache claim can
+be accepted. Fixture samples and incomplete matrix coverage are rejected.
+
+```bash
+npm run build:optimization-context-receipt -- --output dist/optimization-context.json --collected-at TIMESTAMP SAMPLE...
+```
+
+This environment cannot install or interact with a client under the optimization audit scope. Run the command only from
+an explicitly authorized supported-client qualification workspace.
+
 ## Bind Authorization
 
 > [!IMPORTANT]
