@@ -68,6 +68,7 @@ test("scoped parity mappings are complete with explicit source dispositions and 
 
   for (const source of scopedSources) {
     const mapping = repositoryInputs.matrix.skillDispositions.find((entry) => entry.source === source);
+    assert.ok(mapping, `${source} must have a guidance migration mapping`);
     assert.equal(mapping?.lifecycle, "complete", `${source} must be complete`);
     assert.equal(
       mapping?.resourceDispositions.length,
