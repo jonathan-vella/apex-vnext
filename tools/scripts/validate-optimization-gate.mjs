@@ -50,6 +50,9 @@ export function validateOptimizationGate({ manifest, schema, scripts, trackedPat
     ) {
       errors.push("complete gate requires deferred findings to have expiry and release impact");
     }
+    if (manifest.findings.some(({ status, releaseImpact }) => status === "deferred" && releaseImpact === "blocking")) {
+      errors.push("complete gate cannot retain deferred release-blocking findings");
+    }
   }
   return errors.sort();
 }

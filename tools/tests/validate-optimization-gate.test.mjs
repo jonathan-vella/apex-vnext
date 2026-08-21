@@ -56,3 +56,14 @@ test("resolved findings do not require deferred-only expiry metadata", () => {
   resolved.findings.push({ id: "OPT-001", status: "resolved", owner: "Repository maintainers", rationale: "Fixed." });
   assert.deepEqual(validateOptimizationGate({ manifest: resolved, schema, scripts, trackedPaths }), []);
 });
+
+test("complete gates reject deferred release-blocking findings", () => {
+  const complete = structuredClone(manifest);
+  complete.state = "complete";
+  for (const baseline of complete.baselines) baseline.status = "captured";
+  assert.ok(
+    validateOptimizationGate({ manifest: complete, schema, scripts, trackedPaths }).includes(
+      "complete gate cannot retain deferred release-blocking findings",
+    ),
+  );
+});
