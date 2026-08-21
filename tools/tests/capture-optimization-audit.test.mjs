@@ -57,6 +57,18 @@ test("audit receipt rejects unowned or ambiguous paths, tree drift, and incomple
       }),
     /candidate tree does not match the bound commit/,
   );
+  assert.throws(
+    () =>
+      buildOptimizationAudit({
+        manifest: {
+          ...manifest,
+          authorization: { ...manifest.authorization, allowedCommands: ["npm run validate:all"] },
+        },
+        observedAt: "2026-08-21T00:00:00.000Z",
+        runGit,
+      }),
+    /audit command scope/,
+  );
   assert.throws(() => parseAuditArguments(["--output", "audit.json"]), /required/);
   assert.deepEqual(parseAuditArguments(["--output", "audit.json", "--collected-at", "2026-08-21T00:00:00.000Z"]), {
     output: "audit.json",
