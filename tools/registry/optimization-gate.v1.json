@@ -9,22 +9,23 @@
   },
   "authorization": {
     "status": "approved",
-    "approver": "jonathan-vella delegated autonomous audit report",
+    "approver": "jonathan-vella delegated autonomous read-only audit",
     "expiresAt": "2026-08-23T23:59:59Z",
-    "allowedPaths": ["docs/vnext/OPTIMIZATION-AUDIT.md", "tools/registry/optimization-gate.v1.json"],
+    "allowedPaths": ["**"],
     "allowedCommands": [
       "npm run capture:optimization-audit",
-      "npm run validate:optimization-gate",
-      "npm run validate:docs"
+      "npm run capture:optimization-baseline",
+      "npm run validate:all",
+      "npm run qualify:vnext"
     ],
     "stopConditions": [
       "The candidate commit or tree changes.",
       "Any command requires cloud, client, publication, release, or deployment authority.",
-      "A proposed action targets a path outside allowedPaths.",
+      "A proposed action would modify a tracked file.",
       "A critical or high security finding is detected."
     ],
     "budget": {
-      "maxTrackedMutations": 2,
+      "maxTrackedMutations": 0,
       "maxMinutes": 60
     }
   },

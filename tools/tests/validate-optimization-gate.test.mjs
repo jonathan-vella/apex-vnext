@@ -48,7 +48,7 @@ test("inventory assigns canonical owner and consumers independently from authori
     consumers: ["contributors", "release controls"],
   });
   assert.equal(manifest.authorization.status, "approved");
-  assert.equal(manifest.authorization.budget.maxTrackedMutations, 2);
+  assert.equal(manifest.authorization.budget.maxTrackedMutations, 0);
 });
 
 test("resolved findings do not require deferred-only expiry metadata", () => {
