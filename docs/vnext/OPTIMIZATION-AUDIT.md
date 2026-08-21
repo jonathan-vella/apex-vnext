@@ -18,12 +18,12 @@ review surface, owner, consumer set, file size, and package-script declaration.
 
 ## Measurements
 
-| Surface | Role |
-| --- | --- |
-| Repository controls | Largest audited surface; primarily governance, AVM, prompt-reference, and workflow inputs. |
-| Generated and historical | Provenance and retained qualification inputs. |
-| Validation tooling | Deterministic validators, registries, fixtures, and live-qualification harnesses. |
-| Runtime packages | Kernel, CLI, capabilities, renderers, and their tests. |
+| Surface                  | Role                                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------ |
+| Repository controls      | Largest audited surface; primarily governance, AVM, prompt-reference, and workflow inputs. |
+| Generated and historical | Provenance and retained qualification inputs.                                              |
+| Validation tooling       | Deterministic validators, registries, fixtures, and live-qualification harnesses.          |
+| Runtime packages         | Kernel, CLI, capabilities, renderers, and their tests.                                     |
 
 The audit found no exact duplicate package-script commands. Large files remain associated with active consumer and
 provenance contracts; the audit does not authorize deletion or source rewrites.
