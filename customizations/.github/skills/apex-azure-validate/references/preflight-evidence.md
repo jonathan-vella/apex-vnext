@@ -34,3 +34,10 @@ verification obligations. A pass for one criterion does not silently satisfy ano
 Return each non-pass outcome to its owner: requirements for an unresolved desired outcome, architecture for a decision,
 planning or binding for implementation intent, CodeGen for an authorized generation batch, or a trusted validation
 capability for refreshed observations. Validation never rewrites evidence it is evaluating.
+
+## Region, Global, And Error Semantics
+
+Evaluate a region or global prerequisite only from evidence bound to the selected target, service, binding revision, and
+freshness policy. Preserve authorization, environment, compiler, provider, and policy failures as distinct outcomes;
+an unavailable check is not a failed check. Policy discovery, CLI authentication, previews, and recipe command execution
+remain deferred trusted capabilities, so this skill records their evidence and routes errors without executing them.

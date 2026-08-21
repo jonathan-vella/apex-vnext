@@ -18,3 +18,10 @@ an authorized implementation and validation capability produces accepted receipt
 
 For each material mapping, record evidence source, confidence, rejected alternative, and decision owner. When no direct
 Azure analogue satisfies the accepted requirements, return a blocker or user decision rather than inventing equivalence.
+
+## Lambda-To-Functions Assessment
+
+For a Lambda-to-Functions proposal, preserve trigger semantics, event payload contracts, retry and dead-letter behavior,
+timeout and concurrency needs, runtime support, dependency packaging, configuration references, and identity boundary.
+These are mapping dimensions only. Source discovery, code conversion, local execution, and runtime deployment require a
+qualified capability and remain outside this guidance.

@@ -33,3 +33,9 @@ State these limits with the evidence hash and freshness rather than compensating
 with assumptions. When a conclusion needs wider scope, unredacted data, a
 different time window, or causal service evidence, return `indeterminate` and
 ask the kernel to obtain the needed scoped capability evidence.
+
+## Query Capability Boundary
+
+Schema discovery, KQL execution, CLI or REST fallback, and data export are provider-backed operations. Preserve their
+query intent, scope, limits, and failure state in an evidence request, but defer execution until a qualified capability
+exists. Do not replace an unavailable query result with model-generated records or inferred schema.
