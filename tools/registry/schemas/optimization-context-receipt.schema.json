@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.apexops.dev/optimization-context-receipt-v1.json",
+  "title": "APEX optimization context measurement receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "collectedAt", "candidate", "authorization", "matrixId", "aggregate", "evidence"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "collectedAt": { "type": "string", "format": "date-time" },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "tree"],
+      "properties": {
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "tree": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": { "status": { "const": "live-client-measurement-required" } }
+    },
+    "matrixId": { "const": "milestone-o-stratified-v1" },
+    "aggregate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "sampleCount", "coverageComplete"],
+      "properties": {
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "sampleCount": { "type": "integer", "minimum": 1 },
+        "coverageComplete": { "const": true }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "contentCapture"],
+      "properties": {
+        "kind": { "const": "live" },
+        "contentCapture": { "const": false }
+      }
+    }
+  }
+}
