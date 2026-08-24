@@ -18,6 +18,9 @@ npx apex version --json
 Initialize exactly one client projection with `apex init --client github-copilot-vscode` or
 `--client github-copilot-cli`.
 
+For an approved registry release, follow [Publish npm Packages](publish-npm.md) before using the published bootstrap
+route.
+
 ## Bootstrap A Workspace
 
 For a published package, use either a global CLI or a one-shot command. These routes are unavailable until
