@@ -7,7 +7,7 @@
 For every existing publishable `@apexops/*` package, configure a trusted publisher in npmjs.com for this repository and
 the
 `.github/workflows/publish-npm.yml` workflow. Protect the GitHub `npm-publish` environment and require the release
-approval required by your organization.
+approval set by your organization.
 
 The workflow uses GitHub Actions OIDC. Do not add an npm token to repository secrets when trusted publishing is
 available.

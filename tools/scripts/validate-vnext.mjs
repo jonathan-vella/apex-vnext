@@ -344,7 +344,7 @@ function validatePackages(model, findings) {
       name,
       Object.keys(model.packages[name]?.manifest.dependencies ?? {})
         .filter((dep) => dep.startsWith("@apexops/"))
-        .map((dep) => dep.slice(6)),
+        .map((dep) => dep.slice("@apexops/".length)),
     ]),
   );
   const visiting = new Set();
