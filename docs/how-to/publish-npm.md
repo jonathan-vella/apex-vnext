@@ -42,6 +42,9 @@ The workflow repeats repository qualification, verifies no package version has a
 packages in dependency order with npm provenance. To install the current preview, use `@apexops/cli@next` or the
 exact prerelease version.
 
+npm assigns `latest` to the first published version of a new package even when publication requests `next`. Until a
+stable release replaces it, consumers should select the preview explicitly with `@next` or its exact prerelease version.
+
 ## Verify As A Consumer
 
 Use a clean workspace and the public npm registry:
