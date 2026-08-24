@@ -17,6 +17,11 @@ original APEX repository. The release contract was subsequently re-baselined;
 prior qualification is retained as historical characterization. See
 [docs/MIGRATION.md](docs/MIGRATION.md) for provenance.
 
+### Changed
+
+- The VS Code projection launches Azure MCP through an APEX-local shim. The managed MCP configuration remains
+  version-free while the CLI package pins the Azure MCP dependency for reproducible consumer installs.
+
 ### Re-baselined
 
 - Added unqualified, no-I/O design capability placeholders for documentation research, RBAC catalog, compute-region
