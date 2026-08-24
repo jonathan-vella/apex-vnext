@@ -66,11 +66,12 @@ npm --version
 
 ## Create The Workspace
 
-Create a workspace in Ubuntu and open it in the WSL-connected VS Code window:
+Create one consumer repository in Ubuntu and open it in the WSL-connected VS Code window. This repository can hold
+multiple APEX workloads; choose a name for the consumer or business entity, not the first workload:
 
 ```bash
-mkdir -p ~/src/apex-payments
-cd ~/src/apex-payments
+mkdir -p ~/src/contoso-platform
+cd ~/src/contoso-platform
 code .
 ```
 
@@ -87,6 +88,29 @@ npx --yes @apexops/cli@next bootstrap \
 
 The command installs the exact APEX CLI as a workspace dependency, creates `.apex` state, and writes the VS Code
 projection. Do not edit `.apex` directly.
+
+## Add Workloads To The Consumer
+
+The `payments` value above creates the first workload project in this consumer repository. Add later workloads without
+creating another consumer repository or reinstalling the VS Code projection:
+
+```bash
+apex project create \
+  --project data-platform \
+  --name "Data platform" \
+  --environment dev \
+  --target local \
+  --iac terraform \
+  --json
+
+apex project list --json
+apex project use --project payments --json
+```
+
+APEX stores workload state and artifacts by project and run under `.apex/projects/<project>/runs/<run>/`. Code
+generation is staged in a run-bound `.apex/work/<run>/<task>/code/` directory and accepted artifacts are content-bound
+to that run. The current preview does not materialize the legacy `agent-output/<workload>/`,
+`infra/bicep/<workload>/`, or `infra/terraform/<workload>/` directory convention automatically.
 
 ## Start APEX In VS Code
 
