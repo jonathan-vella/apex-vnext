@@ -126,9 +126,15 @@ test("rejects ARM and Azure MCP launch drift", () => {
   assert.ok(hasRule(allowlistResult, "mcp.cli-arm-launch"));
 
   const azureMcpResult = mutate((model) => {
-    model.customization.vscodeMcp.servers["azure-mcp-server"].args[1] = "@azure/mcp@latest";
+    model.customization.vscodeMcp.servers["azure-mcp-server"].args[0] =
+      "${workspaceFolder}/node_modules/@azure/mcp/index.js";
   });
   assert.ok(hasRule(azureMcpResult, "mcp.azure-launch"));
+
+  const azureMcpPackageResult = mutate((model) => {
+    model.packages.cli.manifest.dependencies["@azure/mcp"] = "3.0.0-beta.38";
+  });
+  assert.ok(hasRule(azureMcpPackageResult, "mcp.azure-package"));
 
   const serverSetResult = mutate((model) => {
     model.customization.vscodeMcp.servers.extra = { type: "stdio" };
