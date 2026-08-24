@@ -91,11 +91,11 @@ projection. Do not edit `.apex` directly.
 
 ## Add Workloads To The Consumer
 
-The `payments` value above creates the first workload project in this consumer repository. Add later workloads without
-creating another consumer repository or reinstalling the VS Code projection:
+The `payments` value above creates the first workload project in this consumer repository. Add later workloads
+without creating another consumer repository or reinstalling the VS Code projection:
 
 ```bash
-apex project create \
+npx apex project create \
   --project data-platform \
   --name "Data platform" \
   --environment dev \
@@ -103,13 +103,13 @@ apex project create \
   --iac terraform \
   --json
 
-apex project list --json
-apex project use --project payments --json
+npx apex project list --json
+npx apex project use --project payments --json
 ```
 
-APEX stores workload state and artifacts by project and run under `.apex/projects/<project>/runs/<run>/`. Code
-generation is staged in a run-bound `.apex/work/<run>/<task>/code/` directory and accepted artifacts are content-bound
-to that run. The current preview does not materialize the legacy `agent-output/<workload>/`,
+APEX stores workload state and artifacts by project and run under `.apex/projects/<project>/runs/<run>/`.
+Code generation is staged in a run-bound `.apex/work/<run>/<task>/code/` directory, and accepted artifacts are
+content-bound to that run. The current preview does not materialize the legacy `agent-output/<workload>/`,
 `infra/bicep/<workload>/`, or `infra/terraform/<workload>/` directory convention automatically.
 
 ## Start APEX In VS Code
