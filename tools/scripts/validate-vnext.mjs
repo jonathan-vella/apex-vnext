@@ -82,7 +82,7 @@ const SECRET_KEY = /(secret|password|passwd|token|privateKey|clientSecret|connec
 const SOURCE_IMPORT = /(?:from\s+|import\s*\()["']([^"']+)["']/g;
 const ARM_MCP_ENDPOINT = "https://mcp.management.azure.com";
 const ARM_MCP_TOOLSET = "CostManagement,Pricing";
-const AZURE_MCP_PACKAGE = "@azure/mcp";
+const AZURE_MCP_PACKAGE_VERSION = "3.0.0-beta.37";
 const ARM_MCP_READ_TOOLS = [
   "get_retail_prices",
   "query_costs",
@@ -951,16 +951,24 @@ function validateMcp(model, findings) {
   if (
     !azureMcp ||
     azureMcp.type !== "stdio" ||
-    azureMcp.command !== "npx" ||
-    JSON.stringify(azureMcp.args) !== JSON.stringify(["--yes", AZURE_MCP_PACKAGE, "server", "start"]) ||
+    azureMcp.command !== "node" ||
+    JSON.stringify(azureMcp.args) !==
+      JSON.stringify(["${workspaceFolder}/node_modules/@apexops/cli/dist/azure-mcp.js"]) ||
     azureMcp.cwd !== "${workspaceFolder}" ||
     (azureMcp.env && Object.keys(azureMcp.env).length > 0)
   )
     finding(
       findings,
       "mcp.azure-launch",
-      "Managed VS Code config must launch the Azure MCP server through npx without environment secrets",
+      "Managed VS Code config must launch the workspace-local Azure MCP shim without environment secrets",
       "customizations/.vscode/mcp.json",
+    );
+  if (model.packages.cli.manifest.dependencies?.["@azure/mcp"] !== AZURE_MCP_PACKAGE_VERSION)
+    finding(
+      findings,
+      "mcp.azure-package",
+      "CLI package must pin the Azure MCP dependency used by the VS Code MCP shim",
+      "packages/cli/package.json",
     );
   const cliServers = model.customization.cliMcp.mcpServers;
   const cliApex = cliServers && Object.keys(cliServers).length === 2 ? cliServers.apex : undefined;

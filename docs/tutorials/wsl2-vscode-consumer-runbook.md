@@ -135,10 +135,12 @@ The initial local workflow does not require Azure credentials. Before an Azure-r
 Authenticate only to the intended subscription and confirm the required role before requesting a real deployment
 preview.
 
-The VS Code projection also includes a local Azure MCP Server. After signing in with `az login`, reload the VS Code
-window and refresh the Copilot tool list to start it. Its tools use your Azure RBAC permissions and can include mutating
-operations, so approve tool calls deliberately. APEX agents retain their explicit, read-only ARM pricing and cost tool
-grants; the broader Azure MCP Server is not implicitly granted to them.
+The VS Code projection also includes a local Azure MCP Server. APEX supplies its exact package dependency through the
+installed CLI, while the MCP configuration launches a workspace-local shim without embedding a package version. After
+signing in with `az login`, reload the VS Code window and refresh the Copilot tool list to start it. Its tools use your
+Azure RBAC permissions and can include mutating operations, so approve tool calls deliberately. APEX agents retain
+their explicit, read-only ARM pricing and cost tool grants; the broader Azure MCP Server is not implicitly granted to
+them.
 
 ## Update Or Remove APEX
 
