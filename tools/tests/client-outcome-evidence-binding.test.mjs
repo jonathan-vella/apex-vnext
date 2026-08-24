@@ -97,7 +97,6 @@ function liveOutcomeFixture(scenarioId, clientId) {
   });
   const evidenceRef = runtimePayload("client-evidence-ref", { clientId, scenarioId, type: "evidence-ref" });
   payloads.push(source, semantic, attestation, evidenceRef);
-  const vscode = CLIENT_OUTCOME_TOOLCHAIN.core.vscode;
   const cli = CLIENT_OUTCOME_TOOLCHAIN.core.copilotCli;
   const input = {
     schemaVersion: "1.0.0",
@@ -116,9 +115,9 @@ function liveOutcomeFixture(scenarioId, clientId) {
     },
     client: {
       id: clientId,
-      version: clientId === "github-copilot-cli" ? cli.selectedExactVersion : vscode.selectedExactVersion,
+      version: clientId === "github-copilot-cli" ? cli.selectedExactVersion : "1.134.0",
       binarySha256: clientId === "github-copilot-cli" ? hash("8") : hash("9"),
-      ...(clientId === "github-copilot-vscode" ? { extensionVersion: vscode.selectedExactCopilotChatVersion } : {}),
+      ...(clientId === "github-copilot-vscode" ? { extensionVersion: "0.60.0" } : {}),
       os: "linux",
       architecture: "x64",
     },

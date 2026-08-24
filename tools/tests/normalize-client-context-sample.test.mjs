@@ -635,16 +635,13 @@ test("reports deterministic coverage for the approved stratified matrix", () => 
   assert.deepEqual(aggregate.coverage.missing, []);
 });
 
-test("binds matrix client versions to observed and selected toolchain owners", () => {
+test("binds matrix client versions to immutable historical fixture toolchain owners", () => {
   const vscode = matrix.clients.find(({ id }) => id === "github-copilot-vscode");
   const cli = matrix.clients.find(({ id }) => id === "github-copilot-cli");
   assert.equal(vscode.version, toolchain.core.vscode.postCutoffObservation.version);
   assert.equal(vscode.extensionVersion, toolchain.core.vscode.postCutoffObservation.copilotChatVersion);
-  assert.equal(toolchain.core.vscode.installedVersion, vscode.version);
-  assert.equal(toolchain.core.vscode.installedCopilotChatVersion, vscode.extensionVersion);
-  assert.equal(toolchain.core.vscode.newestObservedVersion, vscode.version);
-  assert.equal(toolchain.core.vscode.selectedExactVersion, vscode.version);
-  assert.equal(toolchain.core.vscode.selectedExactCopilotChatVersion, vscode.extensionVersion);
+  assert.equal(toolchain.core.vscode.historicalFixtureVersion, vscode.version);
+  assert.equal(toolchain.core.vscode.historicalFixtureCopilotChatVersion, vscode.extensionVersion);
   assert.equal(toolchain.core.vscode.selectionStatus, "selected-qualification-required");
   assert.equal(toolchain.core.vscode.postCutoffObservation.disposition, "selected-next-candidate-input");
   assert.equal(toolchain.core.vscode.selectionEvidence.receipt, "tools/registry/client-context-baseline-receipt.json");
