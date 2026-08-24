@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import type { ImprovementPolicyV1 } from "@apex/contracts";
+import type { ImprovementPolicyV1 } from "@apexops/contracts";
 import { ImprovementStore } from "../index.js";
 
 const evidence = "a".repeat(64);

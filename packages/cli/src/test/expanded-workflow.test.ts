@@ -10,9 +10,9 @@ import type {
   IacBindingV1,
   ImplementationIntentV1,
   LogicalResourceManifestV1,
-} from "@apex/contracts";
-import type { IacProvider, PreviewRequest } from "@apex/capabilities";
-import { EventJournal, ValidatorRegistry, sha256Json } from "@apex/kernel";
+} from "@apexops/contracts";
+import type { IacProvider, PreviewRequest } from "@apexops/capabilities";
+import { EventJournal, ValidatorRegistry, sha256Json } from "@apexops/kernel";
 import { ApexError } from "../errors.js";
 import { createMcpServer } from "../mcp.js";
 import { ApexService, type TaskOutput } from "../service.js";

@@ -58,7 +58,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ inputs.version }}
         run: |
-          for package in @apex/contracts @apex/kernel @apex/capabilities @apex/renderers @apex/cli @apex/testkit; do
+          for package in @apexops/contracts @apexops/kernel @apexops/capabilities @apexops/renderers @apexops/cli @apexops/testkit; do
             if npm view "$package@$RELEASE_VERSION" version --registry https://registry.npmjs.org/ >/dev/null 2>&1; then
               printf 'Refusing to republish %s@%s\n' "$package" "$RELEASE_VERSION" >&2
               exit 1

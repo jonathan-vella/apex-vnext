@@ -11,7 +11,7 @@ test("optional absent capability packs are reported without import", async () =>
       return undefined;
     },
   });
-  const status = await loader.check({ packageName: "@apex/optional-azure", version: "1.2.3", optional: true });
+  const status = await loader.check({ packageName: "@apexops/optional-azure", version: "1.2.3", optional: true });
   assert.equal(resolutions, 1);
   assert.equal(status.available, false);
   assert.equal(status.compatible, false);

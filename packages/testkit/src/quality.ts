@@ -1,5 +1,5 @@
-import type { ScorecardMeasurement } from "@apex/renderers";
-import { sha256Json } from "@apex/kernel";
+import type { ScorecardMeasurement } from "@apexops/renderers";
+import { sha256Json } from "@apexops/kernel";
 import type { QualificationBenchmarkReport, QualificationReport, QualificationTrackReport } from "./qualification.js";
 
 export interface QualificationMutationResult {

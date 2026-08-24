@@ -1,7 +1,7 @@
 import { chmod, lstat, mkdir, readFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
-import { BoundEnvelopeTransport, type BoundEnvelope, type EnvelopeBindings } from "@apex/capabilities";
-import { atomicWriteBytes, canonicalJsonBytes, sha256Bytes, sha256Json, type JsonValue } from "@apex/kernel";
+import { BoundEnvelopeTransport, type BoundEnvelope, type EnvelopeBindings } from "@apexops/capabilities";
+import { atomicWriteBytes, canonicalJsonBytes, sha256Bytes, sha256Json, type JsonValue } from "@apexops/kernel";
 
 export const PROVIDER_TRANSFER_KIND = "apex-provider-authority";
 export const PROVIDER_TRANSFER_MAX_BUNDLE_BYTES = 8 * 1024 * 1024;

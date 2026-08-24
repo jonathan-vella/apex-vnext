@@ -156,7 +156,7 @@ test("rejects Gate 4 inheritance", () => {
 
 test("rejects an internal package cycle", () => {
   const result = mutate((model) => {
-    model.packages.contracts.manifest.dependencies["@apex/kernel"] = "0.1.0";
+    model.packages.contracts.manifest.dependencies["@apexops/kernel"] = "0.1.0";
     model.packages.contracts.tsconfig.references = [{ path: "../kernel" }];
   });
   assert.ok(hasRule(result, "package.cycle"));

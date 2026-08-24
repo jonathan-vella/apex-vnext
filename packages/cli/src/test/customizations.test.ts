@@ -124,7 +124,7 @@ test("init installs bundled customizations and runtime config by default", async
       apex: {
         type: "stdio",
         command: "node",
-        args: ["${workspaceFolder}/node_modules/@apex/cli/dist/cli.js", "mcp", "serve"],
+        args: ["${workspaceFolder}/node_modules/@apexops/cli/dist/cli.js", "mcp", "serve"],
         cwd: "${workspaceFolder}",
       },
       "azure-resource-manager-mcp": {

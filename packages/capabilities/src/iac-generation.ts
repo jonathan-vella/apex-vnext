@@ -1,6 +1,6 @@
 import { lstat, mkdir, open, realpath, rename, rm } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import type { IacBindingV1, ImplementationIntentV1, LogicalResourceManifestV1 } from "@apex/contracts";
+import type { IacBindingV1, ImplementationIntentV1, LogicalResourceManifestV1 } from "@apexops/contracts";
 import type { CommandPlan } from "./command-plans.js";
 import type { ProcessResult, ProcessRunnerLike } from "./process-runner.js";
 import { sha256 } from "./iac.js";

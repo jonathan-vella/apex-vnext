@@ -1,4 +1,4 @@
-import { canonicalJsonBytes, sha256Bytes } from "@apex/kernel";
+import { canonicalJsonBytes, sha256Bytes } from "@apexops/kernel";
 import { constants } from "node:fs";
 import { lstat, open, readFile, readdir, realpath } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -42,7 +42,7 @@ export interface BundledAssetManifest {
   version: 1;
   sources: { customizations: string; config: string };
   composition: {
-    authority: "npm:@apex/cli";
+    authority: "npm:@apexops/cli";
     generator: "packages/cli/scripts/prepare-assets.mjs";
     formatVersion: 1;
     mappings: BundledAssetMapping[];
@@ -165,8 +165,8 @@ export function verifyBundleDeclarations(
     runtimeBundle.bundleVersion !== manifest.sources.customizations ||
     runtimeBundle.schemaVersion !== manifest.sources.config ||
     component.version !== manifest.sources.customizations ||
-    component.manifest !== "@apex/cli/assets/customizations/manifest.json" ||
-    component.assetManifest !== "@apex/cli/assets/manifest.json" ||
+    component.manifest !== "@apexops/cli/assets/customizations/manifest.json" ||
+    component.assetManifest !== "@apexops/cli/assets/manifest.json" ||
     component.compositionId !== bundle.id
   ) {
     throw new Error("Bundle composition declarations are inconsistent");
@@ -244,7 +244,7 @@ async function bundledPayloadFiles(
 export async function verifyBundledAssetManifest(root: string, manifest: BundledAssetManifest): Promise<void> {
   if (
     manifest.version !== 1 ||
-    manifest.composition?.authority !== "npm:@apex/cli" ||
+    manifest.composition?.authority !== "npm:@apexops/cli" ||
     manifest.composition.generator !== "packages/cli/scripts/prepare-assets.mjs" ||
     manifest.composition.formatVersion !== 1 ||
     manifest.lock?.algorithm !== "sha256" ||

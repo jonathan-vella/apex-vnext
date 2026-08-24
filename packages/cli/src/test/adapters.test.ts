@@ -5,8 +5,8 @@ import { once } from "node:events";
 import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { CONTRACT_VERSION } from "@apex/contracts";
-import type { ProcessRequest } from "@apex/capabilities";
+import { CONTRACT_VERSION } from "@apexops/contracts";
+import type { ProcessRequest } from "@apexops/capabilities";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createMcpServer } from "../mcp.js";
@@ -76,7 +76,7 @@ test("CLI bootstrap validates onboarding files before initializing a selected cl
         "--ignore-scripts",
         "--no-audit",
         "--no-fund",
-        "@apex/cli@0.10.0",
+        "@apexops/cli@0.10.0",
       ],
       cwd: root,
       timeoutMs: 120_000,
@@ -113,8 +113,8 @@ test("CLI bootstrap validates onboarding files before initializing a selected cl
 test("bootstrap reuses an exact local runtime and rejects a conflicting version", async () => {
   const root = await tempRoot();
   await mkdir(join(root, ".git"));
-  await mkdir(join(root, "node_modules", "@apex", "cli"), { recursive: true });
-  await writeFile(join(root, "node_modules", "@apex", "cli", "package.json"), '{"version":"0.10.0"}\n');
+  await mkdir(join(root, "node_modules", "@apexops", "cli"), { recursive: true });
+  await writeFile(join(root, "node_modules", "@apexops", "cli", "package.json"), '{"version":"0.10.0"}\n');
   const service = new ApexService(root, {
     processRunner: {
       run: async () => {
@@ -126,11 +126,11 @@ test("bootstrap reuses an exact local runtime and rejects a conflicting version"
 
   const conflictingRoot = await tempRoot();
   await mkdir(join(conflictingRoot, ".git"));
-  await mkdir(join(conflictingRoot, "node_modules", "@apex", "cli"), { recursive: true });
-  await writeFile(join(conflictingRoot, "node_modules", "@apex", "cli", "package.json"), '{"version":"0.9.0"}\n');
+  await mkdir(join(conflictingRoot, "node_modules", "@apexops", "cli"), { recursive: true });
+  await writeFile(join(conflictingRoot, "node_modules", "@apexops", "cli", "package.json"), '{"version":"0.9.0"}\n');
   await assert.rejects(
     new ApexService(conflictingRoot).bootstrap({ projectId: "conflicting" }),
-    /Workspace has @apex\/cli@0\.9\.0/u,
+    /Workspace has @apexops\/cli@0\.9\.0/u,
   );
 });
 

@@ -32,9 +32,14 @@ import {
   type ResourceInventoryV1,
   type RunConfigV1,
   type DeploymentPreviewV1,
-} from "@apex/contracts";
-import { WORKFLOW_VALIDATOR_OWNERSHIP, sha256Json, type ValidationIssue, type ValidatorRegistry } from "@apex/kernel";
-import { evaluateQualityScorecard } from "@apex/renderers";
+} from "@apexops/contracts";
+import {
+  WORKFLOW_VALIDATOR_OWNERSHIP,
+  sha256Json,
+  type ValidationIssue,
+  type ValidatorRegistry,
+} from "@apexops/kernel";
+import { evaluateQualityScorecard } from "@apexops/renderers";
 
 export interface WorkflowTaskValidatorContext {
   readonly nodeId: string;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { ApprovalEvidenceV1, DeploymentPreviewV1, IacTool } from "@apex/contracts";
+import type { ApprovalEvidenceV1, DeploymentPreviewV1, IacTool } from "@apexops/contracts";
 import {
   FakeIaCProvider,
   IacProviderError,

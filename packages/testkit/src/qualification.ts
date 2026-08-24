@@ -1,8 +1,8 @@
-import { CapabilityPackLoader } from "@apex/capabilities";
-import { ApexError, ApexService, type ServiceOptions, type TaskOutput } from "@apex/cli";
-import { CONTRACT_VERSION, type QualityScorecardV1, type ResourceInventoryV1 } from "@apex/contracts";
-import { ContentCache, EventJournal, ObjectStore, benchmarkKernel, contentCacheKey, sha256Json } from "@apex/kernel";
-import { evaluateQualityScorecard, renderResourceInventory } from "@apex/renderers";
+import { CapabilityPackLoader } from "@apexops/capabilities";
+import { ApexError, ApexService, type ServiceOptions, type TaskOutput } from "@apexops/cli";
+import { CONTRACT_VERSION, type QualityScorecardV1, type ResourceInventoryV1 } from "@apexops/contracts";
+import { ContentCache, EventJournal, ObjectStore, benchmarkKernel, contentCacheKey, sha256Json } from "@apexops/kernel";
+import { evaluateQualityScorecard, renderResourceInventory } from "@apexops/renderers";
 import { cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { FakeClock, SequenceIds } from "./determinism.js";
@@ -921,7 +921,7 @@ async function faultCacheInvalidation(root: string): Promise<void> {
 
 async function faultMissingCapabilityPack(): Promise<void> {
   const loader = new CapabilityPackLoader({ resolvePackageJson: async () => undefined });
-  const status = await loader.check({ packageName: "@apex/missing-qualification-pack", version: "1.0.0" });
+  const status = await loader.check({ packageName: "@apexops/missing-qualification-pack", version: "1.0.0" });
   if (status.available || status.compatible || !status.actionableMessage.includes("missing"))
     throw new Error("Missing pack was not actionable");
 }

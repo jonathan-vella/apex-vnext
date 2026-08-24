@@ -6,7 +6,7 @@ import type {
   RequirementsV1,
   ResourceInventoryV1,
   RunConfigV1,
-} from "@apex/contracts";
+} from "@apexops/contracts";
 import {
   DOCUMENT_REGISTRY,
   REQUIREMENTS_TEMPLATE_SLOTS,

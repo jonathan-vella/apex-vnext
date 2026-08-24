@@ -1,7 +1,7 @@
 import { lstat, readFile, readdir } from "node:fs/promises";
 import { isAbsolute, join, posix, relative, resolve, sep } from "node:path";
-import { BoundEnvelopeTransport, type BoundEnvelope, type EnvelopeBindings } from "@apex/capabilities";
-import { SECRET_FIELD_PATTERN, SECRET_VALUE_PATTERN } from "@apex/contracts";
+import { BoundEnvelopeTransport, type BoundEnvelope, type EnvelopeBindings } from "@apexops/capabilities";
+import { SECRET_FIELD_PATTERN, SECRET_VALUE_PATTERN } from "@apexops/contracts";
 import {
   EventJournal,
   atomicWriteBytes,
@@ -9,8 +9,8 @@ import {
   sha256Bytes,
   sha256Json,
   type JsonValue,
-} from "@apex/kernel";
-import type { WriterTransferClaim } from "@apex/kernel";
+} from "@apexops/kernel";
+import type { WriterTransferClaim } from "@apexops/kernel";
 
 export const STATE_TRANSFER_KIND = "apex-repository-state";
 export const STATE_TRANSFER_MAX_BUNDLE_BYTES = 16 * 1024 * 1024;

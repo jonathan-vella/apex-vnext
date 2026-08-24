@@ -15,7 +15,7 @@ import {
   RunConfigV1Schema,
   RuntimeBundleLockV1Schema,
   TaskEnvelopeV1Schema,
-} from "@apex/contracts";
+} from "@apexops/contracts";
 import { FormatRegistry } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import {

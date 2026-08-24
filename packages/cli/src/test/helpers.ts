@@ -3,9 +3,9 @@ import {
   type ImplementationIntentV1,
   type QualityScorecardV1,
   type RequirementsV1,
-} from "@apex/contracts";
-import { sha256Json } from "@apex/kernel";
-import { evaluateQualityScorecard } from "@apex/renderers";
+} from "@apexops/contracts";
+import { sha256Json } from "@apexops/kernel";
+import { evaluateQualityScorecard } from "@apexops/renderers";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

@@ -151,7 +151,7 @@ version = "<EXACT_SEMVER>"
 | Virtual Network | `Azure/avm-res-network-virtualnetwork/azurerm` |
 | App Service     | `Azure/avm-res-web-site/azurerm`               |
 
-Resolve the exact stable version through `TerraformRegistryClient` in `@apex/capabilities`, record it in the IaC
+Resolve the exact stable version through `TerraformRegistryClient` in `@apexops/capabilities`, record it in the IaC
 contract, and enforce it with `npm run validate:avm-versions:freeze`. Do not use a range constraint.
 
 ## Variables
