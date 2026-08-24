@@ -2,7 +2,7 @@
 name: "APEX npm feed setup"
 description: "Configure, authenticate, and validate an Azure Artifacts npm feed without exposing credentials to chat or Git."
 agent: agent
-model: "MAI-Code-1-Flash"
+model: "MAI-Code-1.1-Flash"
 argument-hint: "Optional credential-free registry URL or npmrc snippet. Never include a token or auth block."
 tools: [vscode/askQuestions, execute/runInTerminal, read, edit]
 ---
