@@ -601,6 +601,20 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "validate-vscode-installation-lifecycle",
+      "script": "validate:vscode-installation-lifecycle",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
+      "id": "test-vscode-installation-lifecycle",
+      "script": "test:vscode-installation-lifecycle",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "validate-terminology",
       "script": "validate:terminology",
       "profile": "node-validation",
@@ -661,6 +675,7 @@
         "validate:skills",
         "validate:guidance-migration",
         "validate:optimization-gate",
+        "validate:vscode-installation-lifecycle",
         "validate:skill-catalog-review",
         "test:skill-catalog-review",
         "lint:version-sync",
@@ -705,6 +720,7 @@
         "test:optimization-audit",
         "test:optimization-context-receipt",
         "test:optimization-client-measurement",
+        "test:vscode-installation-lifecycle",
         "test:client-context-samples",
         "validate:client-outcomes",
         "test:client-outcomes:prepared",
