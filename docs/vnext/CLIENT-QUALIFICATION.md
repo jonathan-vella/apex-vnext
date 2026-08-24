@@ -42,3 +42,9 @@ intentionally omitted under ADR-0006.
 
 A client passes only when every applicable blocking scenario has current evidence and all normalized comparisons verify.
 The aggregate cannot grant release authority; it becomes one input to the final release receipt.
+
+## VS Code Installation Lifecycle
+
+The [VS Code installation lifecycle matrix](../../tools/registry/vscode-installation-lifecycle.v1.json) defines the
+bootstrap, reload, update, rollback, uninstall, and reinstall scenarios required for end-user lifecycle qualification.
+Its deterministic evidence is committed; live scenarios remain `not-run` until executed in a clean supported profile.

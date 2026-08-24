@@ -1,0 +1,45 @@
+{
+  "$schema": "schemas/vscode-installation-lifecycle.schema.json",
+  "schemaVersion": "1.0.0",
+  "client": {
+    "id": "github-copilot-vscode",
+    "minimumVersionSource": "config/toolchain.v1.json#/core/vscode/minimumSupportedVersion",
+    "observedVersionBinding": "candidate-bound"
+  },
+  "evidencePolicy": {
+    "deterministic": "required",
+    "live": "required"
+  },
+  "scenarios": [
+    {
+      "id": "VSCODE-LIFECYCLE-001",
+      "purpose": "Install and protect the opt-in VS Code profile bootstrap agent.",
+      "deterministicEvidence": ["packages/cli/src/test/adapters.test.ts"],
+      "liveStatus": "not-run"
+    },
+    {
+      "id": "VSCODE-LIFECYCLE-002",
+      "purpose": "Bootstrap a clean workspace through the selected VS Code projection.",
+      "deterministicEvidence": ["packages/cli/src/test/adapters.test.ts"],
+      "liveStatus": "not-run"
+    },
+    {
+      "id": "VSCODE-LIFECYCLE-003",
+      "purpose": "Reload and resume the initialized workspace without replacing managed state.",
+      "deterministicEvidence": ["packages/cli/src/test/expanded-workflow.test.ts"],
+      "liveStatus": "not-run"
+    },
+    {
+      "id": "VSCODE-LIFECYCLE-004",
+      "purpose": "Update and roll back selected managed customizations while preserving unrelated files.",
+      "deterministicEvidence": ["packages/cli/src/test/customizations.test.ts"],
+      "liveStatus": "not-run"
+    },
+    {
+      "id": "VSCODE-LIFECYCLE-005",
+      "purpose": "Uninstall and reinstall the selected projection while preserving modified files and project history.",
+      "deterministicEvidence": ["packages/cli/src/test/customizations.test.ts"],
+      "liveStatus": "not-run"
+    }
+  ]
+}
