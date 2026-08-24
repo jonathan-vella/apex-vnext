@@ -2378,7 +2378,7 @@ export class ApexService {
     const input = {
       dependencies: { journalHead: head ?? ZERO_HASH },
       config: { runtimeLockHash: run.runtimeLockHash },
-      toolchain: { cliVersion: "0.10.0" },
+      toolchain: { cliVersion: APEX_VERSION },
     };
     const cached = await this.cache.get<{ valid: boolean; events: number }>(input);
     if (cached !== null) return cached;
@@ -4312,7 +4312,7 @@ export class ApexService {
       : join(runtimeRoot, "toolchain.v1.json");
     const lock: RuntimeBundleLockV1 = {
       schemaVersion: CONTRACT_VERSION,
-      cliVersion: "0.10.0",
+      cliVersion: APEX_VERSION,
       customizationVersion: assets.manifest.sources.customizations,
       workflowHash: sha256Bytes(await readFile(join(runtimeRoot, "workflow.v1.json"))),
       defaultsHash: sha256Bytes(await readFile(join(runtimeRoot, "defaults.v1.json"))),

@@ -11,9 +11,10 @@ import { Reporter } from "./_lib/reporter.mjs";
 
 const ROOT = process.cwd();
 const VERSION_FILE = "VERSION.md";
+const SEMVER_PATTERN = "[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?";
 const FILES_TO_CHECK = [
-  { path: "package.json", pattern: /"version":\s*"(\d+\.\d+\.\d+)"/ },
-  { path: "CHANGELOG.md", pattern: /##\s*\[?v?(\d+\.\d+\.\d+)\]?/i },
+  { path: "package.json", pattern: new RegExp(`"version":\\s*"(${SEMVER_PATTERN})"`) },
+  { path: "CHANGELOG.md", pattern: new RegExp(`##\\s*\\[?v?(${SEMVER_PATTERN})\\]?`, "i") },
 ];
 
 const r = new Reporter("Version Sync Validator");
@@ -32,7 +33,7 @@ if (!versionContent) {
   r.exitOnError();
 }
 
-const sourceVersion = versionContent.match(/(\d+\.\d+\.\d+)/)?.[1];
+const sourceVersion = versionContent.match(new RegExp(`(${SEMVER_PATTERN})`))?.[1];
 if (!sourceVersion) {
   r.error(`Could not extract version from ${VERSION_FILE}`);
   r.summary();
