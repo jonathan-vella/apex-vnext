@@ -135,7 +135,7 @@ test("init installs bundled customizations and runtime config by default", async
       "azure-mcp-server": {
         type: "stdio",
         command: "npx",
-        args: ["--yes", "@azure/mcp@3.0.0-beta.37", "server", "start"],
+        args: ["--yes", "@azure/mcp", "server", "start"],
         cwd: "${workspaceFolder}",
       },
     },

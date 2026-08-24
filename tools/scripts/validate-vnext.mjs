@@ -82,7 +82,7 @@ const SECRET_KEY = /(secret|password|passwd|token|privateKey|clientSecret|connec
 const SOURCE_IMPORT = /(?:from\s+|import\s*\()["']([^"']+)["']/g;
 const ARM_MCP_ENDPOINT = "https://mcp.management.azure.com";
 const ARM_MCP_TOOLSET = "CostManagement,Pricing";
-const AZURE_MCP_PACKAGE = "@azure/mcp@3.0.0-beta.37";
+const AZURE_MCP_PACKAGE = "@azure/mcp";
 const ARM_MCP_READ_TOOLS = [
   "get_retail_prices",
   "query_costs",
@@ -959,7 +959,7 @@ function validateMcp(model, findings) {
     finding(
       findings,
       "mcp.azure-launch",
-      "Managed VS Code config must launch the pinned Azure MCP server through npx without environment secrets",
+      "Managed VS Code config must launch the Azure MCP server through npx without environment secrets",
       "customizations/.vscode/mcp.json",
     );
   const cliServers = model.customization.cliMcp.mcpServers;

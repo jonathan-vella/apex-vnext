@@ -126,7 +126,7 @@ test("rejects ARM and Azure MCP launch drift", () => {
   assert.ok(hasRule(allowlistResult, "mcp.cli-arm-launch"));
 
   const azureMcpResult = mutate((model) => {
-    model.customization.vscodeMcp.servers["azure-mcp-server"].args[1] = "@azure/mcp@latest";
+    model.customization.vscodeMcp.servers["azure-mcp-server"].args[1] = "@azure/mcp@3.0.0-beta.37";
   });
   assert.ok(hasRule(azureMcpResult, "mcp.azure-launch"));
 
