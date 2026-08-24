@@ -1,6 +1,6 @@
-import { CapabilityPackLoader } from "@apex/capabilities";
-import { CONTRACT_VERSION, TaskEnvelopeV1Schema, registerContractFormats } from "@apex/contracts";
-import { ContentCache, ValidatorRegistry, contentCacheKey, type ContentCacheInput } from "@apex/kernel";
+import { CapabilityPackLoader } from "@apexops/capabilities";
+import { CONTRACT_VERSION, TaskEnvelopeV1Schema, registerContractFormats } from "@apexops/contracts";
+import { ContentCache, ValidatorRegistry, contentCacheKey, type ContentCacheInput } from "@apexops/kernel";
 import { readFile } from "node:fs/promises";
 import type { QualificationMutationResult, QualificationOutcome } from "./quality.js";
 
@@ -75,7 +75,7 @@ export async function collectCapabilityResults(
   const installedVersion = manifest.version;
   const loader = new CapabilityPackLoader({
     resolvePackageJson: async (packageName) =>
-      packageName.startsWith("@apex/qualification-present-") ? packageJsonPath : undefined,
+      packageName.startsWith("@apexops/qualification-present-") ? packageJsonPath : undefined,
   });
   return await Promise.all(
     Array.from({ length: samples }, async (_, index) => {
@@ -84,7 +84,7 @@ export async function collectCapabilityResults(
       const compatible = mode === 0;
       const optional = mode === 3;
       const requirement = {
-        packageName: `@apex/qualification-${present ? "present" : "missing"}-${index}`,
+        packageName: `@apexops/qualification-${present ? "present" : "missing"}-${index}`,
         version: compatible ? installedVersion : `${installedVersion}-mismatch-${index}`,
         optional,
       };

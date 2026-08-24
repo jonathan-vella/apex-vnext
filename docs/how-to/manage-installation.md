@@ -24,16 +24,16 @@ route.
 ## Bootstrap A Workspace
 
 For a published package, use either a global CLI or a one-shot command. These routes are unavailable until
-`@apex/cli` is published to your approved npm registry. Both routes install the exact APEX CLI as a workspace
+`@apexops/cli` is published to your approved npm registry. Both routes install the exact APEX CLI as a workspace
 `devDependency`, update the npm lockfile, and create one selected client projection.
 
 ```bash
-npm install -g @apex/cli
+npm install -g @apexops/cli
 apex bootstrap --project payments --client github-copilot-vscode --create-repo --yes
 ```
 
 ```bash
-npx --yes @apex/cli bootstrap --project payments --client github-copilot-cli --create-repo --yes
+npx --yes @apexops/cli bootstrap --project payments --client github-copilot-cli --create-repo --yes
 ```
 
 Omit `--create-repo` only when the workspace already has a `.git` boundary. When `--project` is omitted, APEX derives a

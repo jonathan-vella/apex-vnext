@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { sha256Bytes } from "@apex/kernel";
+import { sha256Bytes } from "@apexops/kernel";
 import {
   bundleLockDigest,
   clientProjectionDigest,
@@ -33,7 +33,7 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
       version: "0.10.0",
       bundle: {
         id: "apex-managed-workspace",
-        authority: "npm:@apex/cli",
+        authority: "npm:@apexops/cli",
         composition: "copy-tree",
         sourceRoot: "customizations",
         generatedRoot: "customizations",
@@ -68,8 +68,8 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
       components: {
         customizationBundle: {
           version: "0.10.0",
-          manifest: "@apex/cli/assets/customizations/manifest.json",
-          assetManifest: "@apex/cli/assets/manifest.json",
+          manifest: "@apexops/cli/assets/customizations/manifest.json",
+          assetManifest: "@apexops/cli/assets/manifest.json",
           compositionId: "apex-managed-workspace",
         },
       },
@@ -91,7 +91,7 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
   await writeFile(join(root, "config", "runtime-bundle.v1.json"), runtimeBytes);
   const sources = { customizations: "0.10.0", config: "1.0.0" };
   const composition = {
-    authority: "npm:@apex/cli" as const,
+    authority: "npm:@apexops/cli" as const,
     generator: "packages/cli/scripts/prepare-assets.mjs" as const,
     formatVersion: 1 as const,
     mappings: [

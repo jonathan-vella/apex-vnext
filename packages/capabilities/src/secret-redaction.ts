@@ -1,4 +1,4 @@
-import { SECRET_FIELD_PATTERN } from "@apex/contracts";
+import { SECRET_FIELD_PATTERN } from "@apexops/contracts";
 
 const REDACTED = "[REDACTED]";
 const SECRET_LITERAL =

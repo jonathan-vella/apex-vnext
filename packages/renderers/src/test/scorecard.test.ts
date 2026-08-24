@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { QualityScorecardV1 } from "@apex/contracts";
+import type { QualityScorecardV1 } from "@apexops/contracts";
 import { evaluateQualityScorecard, renderQualityScorecardEvaluation } from "../index.js";
 
 const scorecard: QualityScorecardV1 = {

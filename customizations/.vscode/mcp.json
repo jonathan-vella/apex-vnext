@@ -4,7 +4,7 @@
       "type": "stdio",
       "command": "node",
       "args": [
-        "${workspaceFolder}/node_modules/@apex/cli/dist/cli.js",
+        "${workspaceFolder}/node_modules/@apexops/cli/dist/cli.js",
         "mcp",
         "serve"
       ],

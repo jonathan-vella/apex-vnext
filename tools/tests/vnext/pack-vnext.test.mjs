@@ -291,7 +291,7 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
   const release = JSON.parse(await readFile(join(outputDirectory, "release-manifest.json"), "utf8"));
   assert.deepEqual(
     release.packages.map(({ package: name }) => name),
-    ["@apex/contracts", "@apex/kernel", "@apex/capabilities", "@apex/renderers", "@apex/cli"],
+    ["@apexops/contracts", "@apexops/kernel", "@apexops/capabilities", "@apexops/renderers", "@apexops/cli"],
   );
   for (const entry of release.packages) {
     const tarball = join(outputDirectory, entry.file);
@@ -319,11 +319,14 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
   const sbom = JSON.parse(await readFile(join(outputDirectory, release.security.sbom.file), "utf8"));
   const sbomReleaseRefs = sbom.components
     .map((component) => component["bom-ref"])
-    .filter((reference) => reference.startsWith("@apex/"))
+    .filter((reference) => reference.startsWith("@apexops/"))
     .sort();
   assert.deepEqual(sbomReleaseRefs, releaseRefs);
   const rootDependency = sbom.dependencies.find(({ ref }) => ref === sbom.metadata.component["bom-ref"]);
-  assert.deepEqual(rootDependency.dependsOn.filter((reference) => reference.startsWith("@apex/")).sort(), releaseRefs);
+  assert.deepEqual(
+    rootDependency.dependsOn.filter((reference) => reference.startsWith("@apexops/")).sort(),
+    releaseRefs,
+  );
   const provenance = JSON.parse(await readFile(join(outputDirectory, release.security.provenance.file), "utf8"));
   assert.deepEqual(
     provenance.subject.map(({ name, digest }) => ({ name, sha256: digest.sha256 })),
@@ -339,15 +342,15 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
   const testkitOutput = join(temporaryRoot, "packages-with-testkit");
   await runInTest(process.execPath, [packScript, "--output-dir", testkitOutput, "--include-testkit"]);
   const testkitRelease = JSON.parse(await readFile(join(testkitOutput, "release-manifest.json"), "utf8"));
-  assert.ok(testkitRelease.packages.some(({ package: name }) => name === "@apex/testkit"));
+  assert.ok(testkitRelease.packages.some(({ package: name }) => name === "@apexops/testkit"));
   const testkitSbom = JSON.parse(await readFile(join(testkitOutput, testkitRelease.security.sbom.file), "utf8"));
-  assert.ok(testkitSbom.components.some((component) => component["bom-ref"] === "@apex/testkit@0.10.0"));
+  assert.ok(testkitSbom.components.some((component) => component["bom-ref"] === "@apexops/testkit@0.10.0"));
   const testkitProvenance = JSON.parse(
     await readFile(join(testkitOutput, testkitRelease.security.provenance.file), "utf8"),
   );
   assert.equal(testkitProvenance.predicate.buildDefinition.externalParameters.includeTestkit, true);
 
-  const cliEntry = release.packages.find(({ package: name }) => name === "@apex/cli");
+  const cliEntry = release.packages.find(({ package: name }) => name === "@apexops/cli");
   const cliTarball = join(outputDirectory, cliEntry.file);
   const listing = (await runInTest("tar", ["-tzf", cliTarball])).stdout.split("\n").filter(Boolean);
   assert.ok(listing.includes("package/assets/customizations/.github/agents/apex.agent.md"));

@@ -1,4 +1,4 @@
-import type { QualityScorecardV1 } from "@apex/contracts";
+import type { QualityScorecardV1 } from "@apexops/contracts";
 import { markdownTable, optional } from "./markdown.js";
 
 export interface ScorecardMeasurement {

@@ -217,14 +217,14 @@ export function validateBundleDeclarations(customizationManifest, runtimeBundle)
     typeof component?.version !== "string" ||
     component.version.length === 0 ||
     bundle?.id !== "apex-managed-workspace" ||
-    bundle.authority !== "npm:@apex/cli" ||
+    bundle.authority !== "npm:@apexops/cli" ||
     bundle.composition !== "copy-tree" ||
     bundle.sourceRoot !== "customizations" ||
     bundle.generatedRoot !== "customizations" ||
     customizationManifest.version !== runtimeBundle.bundleVersion ||
     component?.version !== customizationManifest.version ||
-    component?.manifest !== "@apex/cli/assets/customizations/manifest.json" ||
-    component.assetManifest !== "@apex/cli/assets/manifest.json" ||
+    component?.manifest !== "@apexops/cli/assets/customizations/manifest.json" ||
+    component.assetManifest !== "@apexops/cli/assets/manifest.json" ||
     component.compositionId !== bundle.id
   ) {
     throw new Error("Bundle composition declarations are inconsistent");
@@ -651,7 +651,7 @@ async function prepareAssets() {
     config: runtimeBundle.schemaVersion,
   };
   const composition = {
-    authority: "npm:@apex/cli",
+    authority: "npm:@apexops/cli",
     generator: "packages/cli/scripts/prepare-assets.mjs",
     formatVersion: 1,
     mappings: [

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
-import { NativeBicepProvider, NativeTerraformProvider, ProcessRunner, type IacProvider } from "@apex/capabilities";
+import { NativeBicepProvider, NativeTerraformProvider, ProcessRunner, type IacProvider } from "@apexops/capabilities";
 import {
   CONTRACT_VERSION,
   OnboardingConfigV1Schema,
@@ -8,10 +8,14 @@ import {
   type OnboardingConfigV1,
   type QualityMeasurementsV1,
   type QualityScorecardV1,
-} from "@apex/contracts";
+} from "@apexops/contracts";
 import { Value } from "@sinclair/typebox/value";
-import { EventJournal, ValidatorRegistry, WriterTransferStore, atomicWriteJson, sha256Json } from "@apex/kernel";
-import { evaluateQualityScorecard, renderQualityScorecardEvaluation, type ScorecardMeasurement } from "@apex/renderers";
+import { EventJournal, ValidatorRegistry, WriterTransferStore, atomicWriteJson, sha256Json } from "@apexops/kernel";
+import {
+  evaluateQualityScorecard,
+  renderQualityScorecardEvaluation,
+  type ScorecardMeasurement,
+} from "@apexops/renderers";
 import { basename, join, resolve } from "node:path";
 import { ApexError, EXIT_CODES, normalizeError } from "./errors.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";

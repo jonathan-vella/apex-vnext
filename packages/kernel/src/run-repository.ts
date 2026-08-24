@@ -1,4 +1,4 @@
-import type { RunConfigV1 } from "@apex/contracts";
+import type { RunConfigV1 } from "@apexops/contracts";
 import { constants } from "node:fs";
 import { mkdir, open, readFile, rm } from "node:fs/promises";
 import { hostname } from "node:os";

@@ -70,7 +70,7 @@ See `terraform-patterns` skill `references/refactor-module.md` for guidance.
 - Run `terraform providers schema -json` against the initialized root to confirm installed resource and list-resource
    schemas.
 - Read import syntax and provider behavior from the exact installed provider version's official Registry documentation.
-- Resolve public AVM module search, details, and versions through `TerraformRegistryClient` in `@apex/capabilities`.
+- Resolve public AVM module search, details, and versions through `TerraformRegistryClient` in `@apexops/capabilities`.
 - Validate the exact post-import AVM pins with
    `npm run validate:avm-versions:freeze -- agent-output/{project}/04-iac-contract.json`.
 

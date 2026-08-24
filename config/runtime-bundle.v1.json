@@ -26,8 +26,8 @@
     "customizationBundle": {
       "source": "local",
       "version": "0.10.0",
-      "manifest": "@apex/cli/assets/customizations/manifest.json",
-      "assetManifest": "@apex/cli/assets/manifest.json",
+      "manifest": "@apexops/cli/assets/customizations/manifest.json",
+      "assetManifest": "@apexops/cli/assets/manifest.json",
       "compositionId": "apex-managed-workspace"
     }
   },

@@ -8,7 +8,7 @@
 > - **Bicep:** `curl -sf https://mcr.microsoft.com/v2/bicep/avm/res/{path}/tags/list`
 >   → highest non-prerelease semver in `tags[]`.
 > - **Terraform:** public Registry search, details, and versions are owned by `TerraformRegistryClient` in
->   `@apex/capabilities`. Agent workflows consume the exact contract pin and validate it with the freeze gate below.
+>   `@apexops/capabilities`. Agent workflows consume the exact contract pin and validate it with the freeze gate below.
 > - **Bicep MCP:** the microsoft-foundry toolset may surface Bicep module metadata; it does not own Terraform resolution.
 > - **Validator:** `npm run validate:avm-versions:freeze` (planner agents
 >   MUST call this before `apex-recall complete-step 4`).

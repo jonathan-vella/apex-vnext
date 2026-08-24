@@ -4,7 +4,7 @@ import type {
   RequirementsV1,
   ResourceInventoryV1,
   RunConfigV1,
-} from "@apex/contracts";
+} from "@apexops/contracts";
 import { escapeMarkdown, markdownTable, optional, stableJson } from "./markdown.js";
 
 const compareText = (left: string, right: string): number => left.localeCompare(right);

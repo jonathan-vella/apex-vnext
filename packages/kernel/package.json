@@ -1,5 +1,5 @@
 {
-  "name": "@apex/kernel",
+  "name": "@apexops/kernel",
   "version": "0.10.0",
   "description": "Deterministic local runtime kernel for APEX vNext",
   "license": "MIT",
@@ -25,7 +25,7 @@
     "dist"
   ],
   "dependencies": {
-    "@apex/contracts": "0.10.0",
+    "@apexops/contracts": "0.10.0",
     "@sinclair/typebox": "0.34.52"
   },
   "scripts": {

@@ -137,8 +137,8 @@ If your organization publishes APEX through a private npm registry, obtain the r
 token from your administrator. Store the token outside the project repository:
 
 ```bash
-npm config set @apex:registry "https://NPM_REGISTRY_URL/"
-npm login --scope=@apex --registry="https://NPM_REGISTRY_URL/"
+npm config set @apexops:registry "https://NPM_REGISTRY_URL/"
+npm login --scope=@apexops --registry="https://NPM_REGISTRY_URL/"
 npm whoami --registry="https://NPM_REGISTRY_URL/"
 ```
 

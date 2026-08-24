@@ -7,7 +7,7 @@ import type {
   ExecutionPlanAttestationV1,
   OperationRecordV1,
   ResourceInventoryV1,
-} from "@apex/contracts";
+} from "@apexops/contracts";
 import {
   BicepCommandAdapter,
   TerraformCommandAdapter,

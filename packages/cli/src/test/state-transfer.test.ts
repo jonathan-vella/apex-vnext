@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { BoundEnvelopeTransport, type BoundEnvelope } from "@apex/capabilities";
-import { ObjectStore, canonicalJsonBytes } from "@apex/kernel";
+import { BoundEnvelopeTransport, type BoundEnvelope } from "@apexops/capabilities";
+import { ObjectStore, canonicalJsonBytes } from "@apexops/kernel";
 import { execute } from "../cli.js";
 import { ApexService } from "../service.js";
 import {

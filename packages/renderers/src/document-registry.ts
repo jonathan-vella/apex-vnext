@@ -1,4 +1,4 @@
-import type { RequirementsV1 } from "@apex/contracts";
+import type { RequirementsV1 } from "@apexops/contracts";
 import { escapeMarkdown, markdownTable } from "./markdown.js";
 
 export const REQUIREMENTS_TEMPLATE_SLOTS = [

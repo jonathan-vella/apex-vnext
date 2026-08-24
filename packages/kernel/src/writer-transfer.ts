@@ -1,4 +1,4 @@
-import type { ProjectId, RunId } from "@apex/contracts";
+import type { ProjectId, RunId } from "@apexops/contracts";
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { sha256Json, type JsonValue } from "./canonical.js";

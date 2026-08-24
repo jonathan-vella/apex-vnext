@@ -1,6 +1,6 @@
-import { FakeIaCProvider } from "@apex/capabilities";
-import type { ProjectConfigV1, RunConfigV1 } from "@apex/contracts";
-import { EventJournal, ObjectStore, ProjectStore } from "@apex/kernel";
+import { FakeIaCProvider } from "@apexops/capabilities";
+import type { ProjectConfigV1, RunConfigV1 } from "@apexops/contracts";
+import { EventJournal, ObjectStore, ProjectStore } from "@apexops/kernel";
 import { FakeClock, SequenceIds } from "./determinism.js";
 import { fixtureHash } from "./fixtures.js";
 

@@ -1,5 +1,5 @@
 {
-  "name": "@apex/capabilities",
+  "name": "@apexops/capabilities",
   "version": "0.10.0",
   "description": "Authorized capability execution and IaC adapters for APEX vNext",
   "license": "MIT",
@@ -25,7 +25,7 @@
     "dist"
   ],
   "dependencies": {
-    "@apex/contracts": "0.10.0"
+    "@apexops/contracts": "0.10.0"
   },
   "devDependencies": {
     "@sinclair/typebox": "0.34.52"

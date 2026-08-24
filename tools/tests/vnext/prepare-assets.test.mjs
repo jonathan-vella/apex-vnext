@@ -97,7 +97,7 @@ test("asset generator rejects inconsistent bundle declarations", () => {
     version: "0.10.0",
     bundle: {
       id: "apex-managed-workspace",
-      authority: "npm:@apex/cli",
+      authority: "npm:@apexops/cli",
       composition: "copy-tree",
       sourceRoot: "customizations",
       generatedRoot: "customizations",
@@ -109,13 +109,13 @@ test("asset generator rejects inconsistent bundle declarations", () => {
     components: {
       customizationBundle: {
         version: "0.10.0",
-        manifest: "@apex/cli/assets/customizations/manifest.json",
-        assetManifest: "@apex/cli/assets/manifest.json",
+        manifest: "@apexops/cli/assets/customizations/manifest.json",
+        assetManifest: "@apexops/cli/assets/manifest.json",
         compositionId: "apex-managed-workspace",
       },
     },
   };
-  assert.equal(validateBundleDeclarations(customization, runtime).authority, "npm:@apex/cli");
+  assert.equal(validateBundleDeclarations(customization, runtime).authority, "npm:@apexops/cli");
   const missingVersions = structuredClone(runtime);
   delete missingVersions.schemaVersion;
   assert.throws(() => validateBundleDeclarations(customization, missingVersions), /declarations are inconsistent/);

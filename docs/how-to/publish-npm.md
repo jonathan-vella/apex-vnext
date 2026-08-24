@@ -4,12 +4,18 @@
 
 ## Configure npm Trusted Publishing
 
-In npmjs.com, configure each publishable `@apex` package with a trusted publisher for this repository and the
+For every existing publishable `@apexops/*` package, configure a trusted publisher in npmjs.com for this repository and
+the
 `.github/workflows/publish-npm.yml` workflow. Protect the GitHub `npm-publish` environment and require the release
-approval required by your organization.
+approval set by your organization.
 
 The workflow uses GitHub Actions OIDC. Do not add an npm token to repository secrets when trusted publishing is
 available.
+
+For the first publication of each package, npm has no package settings in which to configure a trusted publisher. An
+organization owner must bootstrap that first publish with a short-lived granular npm token, configured outside this
+repository and used only in an approved release run. Configure the trusted publisher immediately afterward and revoke
+the token. Subsequent releases use this workflow's OIDC identity and require no npm token.
 
 ## Prepare The Candidate
 
@@ -41,7 +47,7 @@ Use a clean workspace and the public npm registry:
 ```bash
 mkdir -p ~/repos/apex-consumer
 cd ~/repos/apex-consumer
-npm install --save-dev @apex/cli@RELEASE_VERSION
+npm install --save-dev @apexops/cli@RELEASE_VERSION
 npx apex version --json
 ```
 

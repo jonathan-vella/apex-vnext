@@ -1,5 +1,5 @@
 {
-  "name": "@apex/renderers",
+  "name": "@apexops/renderers",
   "version": "0.10.0",
   "description": "Deterministic Markdown renderers for APEX vNext contracts",
   "license": "MIT",
@@ -25,7 +25,7 @@
     "dist"
   ],
   "dependencies": {
-    "@apex/contracts": "0.10.0"
+    "@apexops/contracts": "0.10.0"
   },
   "scripts": {
     "build": "tsc -b",

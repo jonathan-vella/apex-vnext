@@ -1,4 +1,4 @@
-import type { TaskEnvelopeV1 } from "@apex/contracts";
+import type { TaskEnvelopeV1 } from "@apexops/contracts";
 
 export type CapabilitySideEffect = "none" | "local" | "remote";
 export type CapabilityIdempotency = "none" | "supported" | "required";

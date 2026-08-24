@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import type { ResourceInventoryV1 } from "@apex/contracts";
+import type { ResourceInventoryV1 } from "@apexops/contracts";
 
 interface LogicalResource {
   logicalId: string;

@@ -1,5 +1,5 @@
-import type { EventV1, ProjectId, RunId } from "@apex/contracts";
-import { CONTRACT_VERSION } from "@apex/contracts";
+import type { EventV1, ProjectId, RunId } from "@apexops/contracts";
+import { CONTRACT_VERSION } from "@apexops/contracts";
 import { constants } from "node:fs";
 import { lstat, open, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";

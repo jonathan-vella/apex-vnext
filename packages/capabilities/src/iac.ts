@@ -6,7 +6,7 @@ import type {
   Operation,
   OperationRecordV1,
   ResourceInventoryV1,
-} from "@apex/contracts";
+} from "@apexops/contracts";
 
 export type IacProviderErrorCode =
   | "APPROVAL_EXPIRED"

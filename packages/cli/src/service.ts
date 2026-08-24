@@ -62,7 +62,7 @@ import {
   type TaskEnvelopeV1,
   type EventV1,
   type ExecutionPlanAttestationV1,
-} from "@apex/contracts";
+} from "@apexops/contracts";
 import { Value } from "@sinclair/typebox/value";
 import {
   CapabilityPackManager,
@@ -74,7 +74,7 @@ import {
   type IacProvider,
   type ProviderExecutionEvidence,
   type ProcessRunnerLike,
-} from "@apex/capabilities";
+} from "@apexops/capabilities";
 import {
   ContentCache,
   EvidencePolicy,
@@ -99,7 +99,7 @@ import {
   validateInputAnswers,
   workflowValidatorOwnership,
   type JsonValue,
-} from "@apex/kernel";
+} from "@apexops/kernel";
 import {
   DOCUMENT_REGISTRY,
   renderApprovalEvidence,
@@ -107,7 +107,7 @@ import {
   renderRequirementsDocument,
   renderResourceInventory,
   renderRunStatus,
-} from "@apex/renderers";
+} from "@apexops/renderers";
 import { constants } from "node:fs";
 import { access, cp, lstat, mkdir, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -210,7 +210,7 @@ name, environment, target scope, IaC track, and whether Git may be initialized.
 
 1. Confirm the open folder is the intended workspace and is trusted.
 2. Collect the onboarding values with \`vscode/askQuestions\`.
-3. Run \`npx --yes @apex/cli@${APEX_VERSION} bootstrap --project PROJECT_ID --name "DISPLAY_NAME" --environment ENVIRONMENT --target TARGET_SCOPE --iac IAC_TOOL --client github-copilot-vscode --yes\`.
+3. Run \`npx --yes @apexops/cli@${APEX_VERSION} bootstrap --project PROJECT_ID --name "DISPLAY_NAME" --environment ENVIRONMENT --target TARGET_SCOPE --iac IAC_TOOL --client github-copilot-vscode --yes\`.
   Include \`--create-repo\` only after the user explicitly approves Git initialization.
 4. Run \`apex setup --json\` and \`apex doctor --json\` from the workspace.
 5. Ask the user to reload the VS Code window, then select the workspace APEX agent.
@@ -3933,7 +3933,7 @@ export class ApexService {
     const nodeId = `deploy-${run.iacTool}`;
     const node = workflow.manifest.nodes.find(({ id }) => id === nodeId);
     if (node === undefined) throw new Error(`Workflow deployment ${nodeId} has no manifest node`);
-    const owner = phase === "pre" ? "@apex/cli" : "@apex/capabilities";
+    const owner = phase === "pre" ? "@apexops/cli" : "@apexops/capabilities";
     const validatorIds = node.validators.filter((id) => {
       const ownership = workflowValidatorOwnership(id);
       return ownership?.boundary === "deploy" && ownership.owner === owner;
@@ -4060,7 +4060,7 @@ export class ApexService {
       const allowedOmissions = new Set(
         workflow.manifest.nodes
           .find(({ id }) => id === omissionNodeId)
-          ?.validators.filter((id) => workflowValidatorOwnership(id)?.owner === "@apex/capabilities") ?? [],
+          ?.validators.filter((id) => workflowValidatorOwnership(id)?.owner === "@apexops/capabilities") ?? [],
       );
       if (Array.isArray(payload.omittedValidatorIds)) {
         for (const id of payload.omittedValidatorIds) {
@@ -4409,14 +4409,14 @@ export class ApexService {
   }
 
   private async ensureWorkspaceRuntime(): Promise<boolean> {
-    const packagePath = join(this.root, "node_modules", "@apex", "cli", "package.json");
+    const packagePath = join(this.root, "node_modules", "@apexops", "cli", "package.json");
     try {
       const installed = JSON.parse(await readFile(packagePath, "utf8")) as { version?: unknown };
       if (installed.version === APEX_VERSION) return false;
       if (typeof installed.version === "string") {
         throw new ApexError(
           "APEX_CONFLICT",
-          `Workspace has @apex/cli@${installed.version}; expected ${APEX_VERSION}`,
+          `Workspace has @apexops/cli@${installed.version}; expected ${APEX_VERSION}`,
           EXIT_CODES.conflict,
         );
       }
@@ -4434,7 +4434,7 @@ export class ApexService {
           "--ignore-scripts",
           "--no-audit",
           "--no-fund",
-          `@apex/cli@${APEX_VERSION}`,
+          `@apexops/cli@${APEX_VERSION}`,
         ],
         cwd: this.root,
         timeoutMs: 120_000,
@@ -4443,7 +4443,7 @@ export class ApexService {
     } catch (error) {
       throw new ApexError(
         "APEX_INTERNAL",
-        `Unable to install @apex/cli@${APEX_VERSION} in the workspace`,
+        `Unable to install @apexops/cli@${APEX_VERSION} in the workspace`,
         EXIT_CODES.internal,
         undefined,
         { cause: error },

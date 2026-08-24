@@ -35,7 +35,7 @@ npx apex version --json
 ```
 
 > [!NOTE]
-> The global `npm install -g @apex/cli`, one-shot `npx @apex/cli`, and VS Code profile bootstrap paths require a
+> The global `npm install -g @apexops/cli`, one-shot `npx @apexops/cli`, and VS Code profile bootstrap paths require a
 > published APEX package. They are not available for this local preview candidate.
 
 ## Choose A Client

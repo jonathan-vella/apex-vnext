@@ -52,7 +52,7 @@ CAF abbreviations (see `AGENTS.md` for the full table).
 
 Use `Azure/avm-res-{service}-{resource}/azurerm` for all resources.
 Raw `azurerm_*` only with approval. Resolve the exact stable version through `TerraformRegistryClient` in
-`@apex/capabilities` and enforce the contract pin with `validate:avm-versions:freeze`.
+`@apexops/capabilities` and enforce the contract pin with `validate:avm-versions:freeze`.
 
 **Pin AVM-TF modules to exact semver** (`version = "X.Y.Z"`), resolved at
 plan time. Range constraints (`~> X.Y`, `>= X.Y.Z`) are NOT allowed in

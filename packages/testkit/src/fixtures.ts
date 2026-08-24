@@ -10,10 +10,10 @@ import type {
   RunConfigV1,
   RuntimeBundleLockV1,
   TaskEnvelopeV1,
-} from "@apex/contracts";
-import { CONTRACT_VERSION } from "@apex/contracts";
-import { sha256 } from "@apex/capabilities";
-import { sha256Text } from "@apex/kernel";
+} from "@apexops/contracts";
+import { CONTRACT_VERSION } from "@apexops/contracts";
+import { sha256 } from "@apexops/capabilities";
+import { sha256Text } from "@apexops/kernel";
 
 export const FIXTURE_TIME = "2026-01-01T00:00:00.000Z";
 export const FIXTURE_EXPIRY = "2026-01-01T01:00:00.000Z";
