@@ -111,6 +111,7 @@ optional pack is absent; workflows that require the missing pack block explicitl
 ## Related
 
 - [Prepare Windows 11](prepare-windows-11.md) - install WSL2, Azure, and Copilot prerequisites.
+- [WSL2 and VS Code consumer runbook](../tutorials/wsl2-vscode-consumer-runbook.md) - install the published preview.
 - [Windows 11 first run](../tutorials/windows-11-first-run.md) - bootstrap an Azure-ready workspace.
 - [Complete the first local run](../tutorials/first-run.md)
 - [Client support](../reference/client-support.md)
