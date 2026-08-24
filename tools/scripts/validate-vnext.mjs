@@ -910,7 +910,15 @@ function validateCustomizations(model, findings) {
 
 function validateMcp(model, findings) {
   const servers = model.customization.vscodeMcp.servers;
-  const apex = servers && Object.keys(servers).length === 3 ? servers.apex : undefined;
+  const expectedVscodeServers = ["apex", "azure-resource-manager-mcp", "azure-mcp-server"];
+  if (JSON.stringify(Object.keys(servers ?? {}).sort()) !== JSON.stringify(expectedVscodeServers.sort()))
+    finding(
+      findings,
+      "mcp.vscode-server-set",
+      "Managed VS Code MCP config must declare exactly the APEX, ARM, and Azure MCP servers",
+      "customizations/.vscode/mcp.json",
+    );
+  const apex = servers?.apex;
   const armMcp = servers?.["azure-resource-manager-mcp"];
   const azureMcp = servers?.["azure-mcp-server"];
   if (
@@ -944,7 +952,7 @@ function validateMcp(model, findings) {
     !azureMcp ||
     azureMcp.type !== "stdio" ||
     azureMcp.command !== "npx" ||
-    JSON.stringify(azureMcp.args) !== JSON.stringify(["-y", AZURE_MCP_PACKAGE, "server", "start"]) ||
+    JSON.stringify(azureMcp.args) !== JSON.stringify(["--yes", AZURE_MCP_PACKAGE, "server", "start"]) ||
     azureMcp.cwd !== "${workspaceFolder}" ||
     (azureMcp.env && Object.keys(azureMcp.env).length > 0)
   )

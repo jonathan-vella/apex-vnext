@@ -21,7 +21,7 @@
       "type": "stdio",
       "command": "npx",
       "args": [
-        "-y",
+        "--yes",
         "@azure/mcp@3.0.0-beta.37",
         "server",
         "start"

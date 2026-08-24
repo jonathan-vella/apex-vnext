@@ -109,7 +109,7 @@ test("rejects a PATH-dependent MCP launch", () => {
   assert.ok(hasRule(result, "mcp.launch"));
 });
 
-test("rejects ARM MCP endpoint, toolset, and read allowlist drift", () => {
+test("rejects ARM and Azure MCP launch drift", () => {
   const endpointResult = mutate((model) => {
     model.customization.vscodeMcp.servers["azure-resource-manager-mcp"].url = "https://example.invalid";
   });
@@ -129,6 +129,11 @@ test("rejects ARM MCP endpoint, toolset, and read allowlist drift", () => {
     model.customization.vscodeMcp.servers["azure-mcp-server"].args[1] = "@azure/mcp@latest";
   });
   assert.ok(hasRule(azureMcpResult, "mcp.azure-launch"));
+
+  const serverSetResult = mutate((model) => {
+    model.customization.vscodeMcp.servers.extra = { type: "stdio" };
+  });
+  assert.ok(hasRule(serverSetResult, "mcp.vscode-server-set"));
 });
 
 test("rejects client projection declaration and CLI allowlist drift", () => {
