@@ -43,7 +43,8 @@ packages in dependency order with npm provenance. To install the current preview
 exact prerelease version.
 
 npm assigns `latest` to the first published version of a new package even when publication requests `next`. Until a
-stable release replaces it, consumers should select the preview explicitly with `@next` or its exact prerelease version.
+stable release replaces it, consumers should select the preview explicitly with `@apexops/cli@next` or its exact
+prerelease version.
 
 ## Verify As A Consumer
 
