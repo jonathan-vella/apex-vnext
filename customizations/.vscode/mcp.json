@@ -16,6 +16,17 @@
       "headers": {
         "x-mcp-toolset": "CostManagement,Pricing"
       }
+    },
+    "azure-mcp-server": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "--yes",
+        "@azure/mcp@3.0.0-beta.37",
+        "server",
+        "start"
+      ],
+      "cwd": "${workspaceFolder}"
     }
   }
 }
