@@ -124,6 +124,11 @@ test("rejects ARM MCP endpoint, toolset, and read allowlist drift", () => {
     model.customization.cliMcp.mcpServers["azure-resource-manager-mcp"].tools.push("create_budget");
   });
   assert.ok(hasRule(allowlistResult, "mcp.cli-arm-launch"));
+
+  const azureMcpResult = mutate((model) => {
+    model.customization.vscodeMcp.servers["azure-mcp-server"].args[1] = "@azure/mcp@latest";
+  });
+  assert.ok(hasRule(azureMcpResult, "mcp.azure-launch"));
 });
 
 test("rejects client projection declaration and CLI allowlist drift", () => {

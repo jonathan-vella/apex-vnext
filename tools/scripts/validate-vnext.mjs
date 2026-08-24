@@ -82,6 +82,7 @@ const SECRET_KEY = /(secret|password|passwd|token|privateKey|clientSecret|connec
 const SOURCE_IMPORT = /(?:from\s+|import\s*\()["']([^"']+)["']/g;
 const ARM_MCP_ENDPOINT = "https://mcp.management.azure.com";
 const ARM_MCP_TOOLSET = "CostManagement,Pricing";
+const AZURE_MCP_PACKAGE = "@azure/mcp@3.0.0-beta.37";
 const ARM_MCP_READ_TOOLS = [
   "get_retail_prices",
   "query_costs",
@@ -909,8 +910,9 @@ function validateCustomizations(model, findings) {
 
 function validateMcp(model, findings) {
   const servers = model.customization.vscodeMcp.servers;
-  const apex = servers && Object.keys(servers).length === 2 ? servers.apex : undefined;
+  const apex = servers && Object.keys(servers).length === 3 ? servers.apex : undefined;
   const armMcp = servers?.["azure-resource-manager-mcp"];
+  const azureMcp = servers?.["azure-mcp-server"];
   if (
     !apex ||
     apex.type !== "stdio" ||
@@ -936,6 +938,20 @@ function validateMcp(model, findings) {
       findings,
       "mcp.arm-launch",
       "Managed MCP config must connect directly to Microsoft ARM MCP with the exact toolset header",
+      "customizations/.vscode/mcp.json",
+    );
+  if (
+    !azureMcp ||
+    azureMcp.type !== "stdio" ||
+    azureMcp.command !== "npx" ||
+    JSON.stringify(azureMcp.args) !== JSON.stringify(["-y", AZURE_MCP_PACKAGE, "server", "start"]) ||
+    azureMcp.cwd !== "${workspaceFolder}" ||
+    (azureMcp.env && Object.keys(azureMcp.env).length > 0)
+  )
+    finding(
+      findings,
+      "mcp.azure-launch",
+      "Managed VS Code config must launch the pinned Azure MCP server through npx without environment secrets",
       "customizations/.vscode/mcp.json",
     );
   const cliServers = model.customization.cliMcp.mcpServers;
