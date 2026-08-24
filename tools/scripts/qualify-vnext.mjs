@@ -135,6 +135,9 @@ async function main() {
   const runtime = JSON.parse(
     await readFile(join(ROOT, "packages", "cli", "assets", "config", "runtime-bundle.v1.json"), "utf8"),
   );
+  const testkitPackage = JSON.parse(await readFile(join(ROOT, "packages", "testkit", "package.json"), "utf8"));
+  if (typeof testkitPackage.version !== "string")
+    throw new Error("packages/testkit/package.json must declare a version");
   const defaults = JSON.parse(
     await readFile(join(ROOT, "packages", "cli", "assets", "config", "defaults.v1.json"), "utf8"),
   );
@@ -152,7 +155,7 @@ async function main() {
     commandVersions: {
       cli: runtime.components.cli.version,
       kernel: runtime.components.kernel.version,
-      testkit: "0.10.0-next.0",
+      testkit: testkitPackage.version,
     },
     toolVersions: { node: process.version },
   });
