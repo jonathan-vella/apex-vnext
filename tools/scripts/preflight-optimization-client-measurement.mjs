@@ -24,6 +24,21 @@ function firstVersion(output) {
   return output.match(/\b\d+\.\d+(?:\.\d+)?\b/u)?.[0];
 }
 
+function meetsMinimumVersion(observed, minimum) {
+  if (typeof observed !== "string" || typeof minimum !== "string") return false;
+  const observedParts = observed.split(".").map(Number);
+  const minimumParts = minimum.split(".").map(Number);
+  if (observedParts.some((part) => !Number.isInteger(part)) || minimumParts.some((part) => !Number.isInteger(part))) {
+    return false;
+  }
+  for (let index = 0; index < Math.max(observedParts.length, minimumParts.length); index += 1) {
+    const observedPart = observedParts[index] ?? 0;
+    const minimumPart = minimumParts[index] ?? 0;
+    if (observedPart !== minimumPart) return observedPart > minimumPart;
+  }
+  return true;
+}
+
 function candidate(run = execFileSync) {
   return {
     commit: run("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
@@ -62,29 +77,27 @@ export function buildOptimizationClientPreflight({ gate, toolchain, run = execFi
   const vscodeVersion = firstVersion(vscode.output);
   const copilotChatVersion = extensionVersion(vscodeExtensions.output);
   const cliVersion = firstVersion(cli.output);
-  const expectedVscode = toolchain.core.vscode.selectedExactVersion;
-  const expectedCopilotChat = toolchain.core.vscode.selectedExactCopilotChatVersion;
+  const expectedVscode = toolchain.core.vscode.minimumSupportedVersion;
   const expectedCli = toolchain.core.copilotCli.selectedExactVersion;
   const clients = [
     {
       id: "github-copilot-vscode",
-      expectedVersion: expectedVscode,
-      expectedExtensionVersion: expectedCopilotChat,
+      minimumVersion: expectedVscode,
       ...(vscodeVersion ? { observedVersion: vscodeVersion } : {}),
       ...(copilotChatVersion ? { observedExtensionVersion: copilotChatVersion } : {}),
       status: !vscode.ok
         ? "missing"
-        : vscodeVersion !== expectedVscode
+        : !meetsMinimumVersion(vscodeVersion, expectedVscode)
           ? "version-mismatch"
-          : !vscodeExtensions.ok || copilotChatVersion !== expectedCopilotChat
-            ? "extension-version-mismatch"
+          : !vscodeExtensions.ok || copilotChatVersion === undefined
+            ? "extension-unavailable"
             : "ready",
       ...(!vscode.ok
         ? { reason: "VS Code executable is unavailable." }
-        : vscodeVersion !== expectedVscode
-          ? { reason: "Observed VS Code version differs from the selected qualification version." }
-          : !vscodeExtensions.ok || copilotChatVersion !== expectedCopilotChat
-            ? { reason: "Observed Copilot Chat extension version differs from the selected qualification version." }
+        : !meetsMinimumVersion(vscodeVersion, expectedVscode)
+          ? { reason: "Observed VS Code version is below the minimum supported version." }
+          : !vscodeExtensions.ok || copilotChatVersion === undefined
+            ? { reason: "Copilot Chat extension version is unavailable from the host." }
             : {}),
     },
     {

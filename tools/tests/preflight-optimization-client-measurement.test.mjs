@@ -20,13 +20,13 @@ function commandRun(outputs) {
   };
 }
 
-test("preflight reports ready only for exact candidate and selected client versions", () => {
+test("preflight reports ready for the bound candidate and minimum supported client versions", () => {
   const run = commandRun({
     "git rev-parse HEAD": `${gate.candidate.commit}\n`,
     "git rev-parse HEAD^{tree}": `${gate.candidate.tree}\n`,
     "git status --porcelain --untracked-files=no": "",
-    "code --version": `${toolchain.core.vscode.selectedExactVersion}\n`,
-    "code --list-extensions --show-versions": `github.copilot-chat@${toolchain.core.vscode.selectedExactCopilotChatVersion}\n`,
+    "code --version": `${toolchain.core.vscode.minimumSupportedVersion}\n`,
+    "code --list-extensions --show-versions": "github.copilot-chat@0.58.0\n",
     "copilot --version": `${toolchain.core.copilotCli.selectedExactVersion}\n`,
   });
   const receipt = buildOptimizationClientPreflight({ gate, toolchain, run });
@@ -39,7 +39,7 @@ test("preflight blocks drift and interactive client installation without install
     "git rev-parse HEAD": `${"a".repeat(40)}\n`,
     "git rev-parse HEAD^{tree}": `${"b".repeat(40)}\n`,
     "git status --porcelain --untracked-files=no": " M package.json\n",
-    "code --version": "1.134.0\n",
+    "code --version": "1.129.0\n",
     "code --list-extensions --show-versions": "github.copilot-chat@0.58.0\n",
     "copilot --version": "Install GitHub Copilot CLI? ['y/N']\n",
   });
@@ -51,18 +51,30 @@ test("preflight blocks drift and interactive client installation without install
   assert.throws(() => parsePreflightArgs(["--output", "first.json", "--output", "second.json"]), /only --output/);
 });
 
-test("preflight schema rejects incomplete client coverage and reports extension drift", () => {
+test("preflight schema rejects incomplete client coverage and reports unavailable extensions", () => {
   const run = commandRun({
     "git rev-parse HEAD": `${gate.candidate.commit}\n`,
     "git rev-parse HEAD^{tree}": `${gate.candidate.tree}\n`,
     "git status --porcelain --untracked-files=no": "",
-    "code --version": `${toolchain.core.vscode.selectedExactVersion}\n`,
-    "code --list-extensions --show-versions": "github.copilot-chat@0.57.0\n",
+    "code --version": `${toolchain.core.vscode.minimumSupportedVersion}\n`,
+    "code --list-extensions --show-versions": "example.other@0.57.0\n",
     "copilot --version": `${toolchain.core.copilotCli.selectedExactVersion}\n`,
   });
   const receipt = buildOptimizationClientPreflight({ gate, toolchain, run });
-  assert.equal(receipt.clients[0].status, "extension-version-mismatch");
+  assert.equal(receipt.clients[0].status, "extension-unavailable");
   const incomplete = structuredClone(receipt);
   incomplete.clients = [incomplete.clients[0]];
   assert.ok(validateOptimizationClientPreflight(incomplete, schema).length > 0);
+});
+
+test("preflight accepts newer VS Code and records the observed Copilot Chat version", () => {
+  const run = commandRun({
+    "git rev-parse HEAD": `${gate.candidate.commit}\n`,
+    "git rev-parse HEAD^{tree}": `${gate.candidate.tree}\n`,
+    "git status --porcelain --untracked-files=no": "",
+    "code --version": "1.134.0\n",
+    "code --list-extensions --show-versions": "github.copilot-chat@0.60.0\n",
+    "copilot --version": `${toolchain.core.copilotCli.selectedExactVersion}\n`,
+  });
+  assert.equal(buildOptimizationClientPreflight({ gate, toolchain, run }).status, "ready");
 });

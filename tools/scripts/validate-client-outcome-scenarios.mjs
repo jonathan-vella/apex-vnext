@@ -101,8 +101,8 @@ export function validateClientOutcomeScenarios(corpus, toolchain, receipt, recei
   const vscode = toolchain?.core?.vscode;
   const cli = toolchain?.core?.copilotCli;
   const livePolicy = toolchain?.clientQualificationPolicy;
-  const expectedVscodeVersion = vscode?.selectedExactVersion;
-  const expectedExtensionVersion = vscode?.selectedExactCopilotChatVersion;
+  const expectedVscodeVersion = vscode?.historicalFixtureVersion;
+  const expectedExtensionVersion = vscode?.historicalFixtureCopilotChatVersion;
   if (
     corpus.fixtureClients?.vscodeVersion !== expectedVscodeVersion ||
     corpus.fixtureClients?.vscodeExtensionVersion !== expectedExtensionVersion ||
@@ -126,10 +126,8 @@ export function validateClientOutcomeScenarios(corpus, toolchain, receipt, recei
   const receiptCli = receipt?.clients?.find(({ id }) => id === "github-copilot-cli");
   if (
     vscode?.selectionStatus !== "selected-qualification-required" ||
-    vscode?.installedVersion !== expectedVscodeVersion ||
-    vscode?.installedCopilotChatVersion !== expectedExtensionVersion ||
-    vscode?.newestObservedVersion !== expectedVscodeVersion ||
-    toolchain?.compatibilitySet?.vscode !== expectedVscodeVersion ||
+    vscode?.historicalFixtureVersion !== expectedVscodeVersion ||
+    vscode?.historicalFixtureCopilotChatVersion !== expectedExtensionVersion ||
     vscode?.selectionEvidence?.receipt !== CONTEXT_RECEIPT_PATH ||
     vscode?.selectionEvidence?.sha256 !== receiptHash ||
     receipt?.coverageComplete !== true ||
