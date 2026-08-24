@@ -2,7 +2,7 @@
 name: APEX
 description: Fast coordinator for APEX status, resume, and direct specialist handoff.
 argument-hint: Start or resume an APEX project
-model: ["MAI-Code-1-Flash"]
+model: ["MAI-Code-1.1-Flash"]
 user-invocable: true
 disable-model-invocation: true
 tools:

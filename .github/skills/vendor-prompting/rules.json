@@ -111,6 +111,7 @@
       "family": "mai-code",
       "status": "reviewer-only",
       "label_examples": [
+        "MAI-Code-1.1-Flash",
         "MAI-Code-1-Flash"
       ],
       "rule_subset_note": "Microsoft coding model; no MAI-specific automated prompting rules yet. Used for handoff-only orchestration routing."
