@@ -5,20 +5,17 @@
 Complete [Prepare Windows 11](../how-to/prepare-windows-11.md) before starting. This tutorial creates local APEX state
 and prepares a selected Azure subscription; it does not deploy Azure resources.
 
-## Build The Preview Candidate
+## Install The Published Preview
 
-APEX is not yet published to the public npm registry. Build matching package tarballs from the APEX source repository:
+Install the published preview from npm. Use the explicit `next` dist-tag rather than an unqualified package version:
 
 ```bash
-mkdir -p ~/src
-cd ~/src
-git clone https://github.com/jonathan-vella/apex-vnext.git
-cd apex-vnext
-npm ci
-npm run pack:vnext
+npm install --global @apexops/cli@next
+apex version --json
 ```
 
-The package set is written under `dist/vnext-packages/`. Do not mix tarballs from different builds.
+For the complete WSL2 and VS Code consumer route, follow the
+[WSL2 and VS Code consumer runbook](wsl2-vscode-consumer-runbook.md).
 
 ## Create A Workspace
 
@@ -27,16 +24,8 @@ In Ubuntu WSL, create a separate local workspace inside your Linux home director
 ```bash
 mkdir -p ~/src/apex-payments
 cd ~/src/apex-payments
-git init
-npm init --yes
-npm install --ignore-scripts --no-audit --no-fund \
-  ~/src/apex-vnext/dist/vnext-packages/*.tgz
-npx apex version --json
+apex bootstrap --project payments --client github-copilot-vscode --create-repo --yes
 ```
-
-> [!NOTE]
-> The global `npm install -g @apexops/cli`, one-shot `npx @apexops/cli`, and VS Code profile bootstrap paths require a
-> published APEX package. They are not available for this local preview candidate.
 
 ## Choose A Client
 
