@@ -13,7 +13,7 @@
       "additionalProperties": false,
       "properties": {
         "id": { "const": "apex-managed-workspace" },
-        "authority": { "const": "npm:@apex/cli" },
+        "authority": { "const": "npm:@apexops/cli" },
         "composition": { "const": "copy-tree" },
         "sourceRoot": { "const": "customizations" },
         "generatedRoot": { "const": "customizations" }

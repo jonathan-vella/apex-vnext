@@ -1,5 +1,5 @@
-import type { IacTool, ProjectConfigV1, ProjectId, RunConfigV1, RunId } from "@apex/contracts";
-import { CONTRACT_VERSION } from "@apex/contracts";
+import type { IacTool, ProjectConfigV1, ProjectId, RunConfigV1, RunId } from "@apexops/contracts";
+import { CONTRACT_VERSION } from "@apexops/contracts";
 import { mkdir, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { atomicWriteJson } from "./files.js";

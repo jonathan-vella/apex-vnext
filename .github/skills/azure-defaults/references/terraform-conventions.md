@@ -10,7 +10,7 @@ Use the exact source and version recorded in `04-iac-contract.json`, then valida
 npm run validate:avm-versions:freeze -- agent-output/{project}/04-iac-contract.json
 ```
 
-Public search, details, and versions are owned by `TerraformRegistryClient` in `@apex/capabilities`. Read module inputs
+Public search, details, and versions are owned by `TerraformRegistryClient` in `@apexops/capabilities`. Read module inputs
 and outputs on the exact-version official page:
 `https://registry.terraform.io/modules/Azure/{module}/azurerm/{version}`.
 

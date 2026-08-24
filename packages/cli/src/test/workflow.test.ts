@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { EventJournal, ObjectStore, sha256Json } from "@apex/kernel";
-import type { InputValueV1 } from "@apex/contracts";
+import { EventJournal, ObjectStore, sha256Json } from "@apexops/kernel";
+import type { InputValueV1 } from "@apexops/contracts";
 import { ApexError } from "../errors.js";
 import { ApexService } from "../service.js";
 import {

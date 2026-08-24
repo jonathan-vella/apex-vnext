@@ -5,7 +5,11 @@ import { join } from "node:path";
 import test from "node:test";
 import { Value } from "@sinclair/typebox/value";
 import { FormatRegistry } from "@sinclair/typebox";
-import { ExecutionPlanAttestationV1Schema, type ApprovalEvidenceV1, type DeploymentPreviewV1 } from "@apex/contracts";
+import {
+  ExecutionPlanAttestationV1Schema,
+  type ApprovalEvidenceV1,
+  type DeploymentPreviewV1,
+} from "@apexops/contracts";
 import {
   IacOutputParseError,
   IacProviderError,

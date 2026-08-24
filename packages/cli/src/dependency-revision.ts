@@ -1,5 +1,5 @@
-import type { EventV1, RunConfigV1 } from "@apex/contracts";
-import { sha256Json } from "@apex/kernel";
+import type { EventV1, RunConfigV1 } from "@apexops/contracts";
+import { sha256Json } from "@apexops/kernel";
 
 type DependencyRevisionRun = Pick<RunConfigV1, "projectId" | "runId" | "targetScope" | "iacTool" | "runtimeLockHash">;
 

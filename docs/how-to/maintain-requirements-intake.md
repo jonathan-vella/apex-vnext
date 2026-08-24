@@ -44,7 +44,7 @@ services plus SKU preferences, without choosing an architecture, SKU, or impleme
 Run the focused CLI workflow tests first, then validate the managed and documentation surfaces:
 
 ```bash
-npm run build --workspace @apex/cli
+npm run build --workspace @apexops/cli
 node --test --test-name-pattern='four intake rounds|malformed persisted input requests|legacy' \
    packages/cli/dist/test/workflow.test.js
 npm run validate:agents

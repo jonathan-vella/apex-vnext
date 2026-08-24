@@ -116,11 +116,11 @@ async function pathExists(path) {
   }
 }
 
-const QUALIFICATION_RUNTIME_LAUNCHER_PATH = "node_modules/@apex/cli/dist/cli.js";
+const QUALIFICATION_RUNTIME_LAUNCHER_PATH = "node_modules/@apexops/cli/dist/cli.js";
 const QUALIFICATION_RUNTIME_LAUNCHER =
   'const { spawn } = require("node:child_process");\n' +
   'const { join } = require("node:path");\n' +
-  'const child = spawn(process.execPath, [join(__dirname, "../../../../.apex/runtime-packages/node_modules/@apex/cli/dist/cli.js"), ...process.argv.slice(2)], { stdio: "inherit" });\n' +
+  'const child = spawn(process.execPath, [join(__dirname, "../../../../.apex/runtime-packages/node_modules/@apexops/cli/dist/cli.js"), ...process.argv.slice(2)], { stdio: "inherit" });\n' +
   'for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal));\n' +
   'child.once("error", (error) => { console.error(error.message); process.exit(1); });\n' +
   'child.once("exit", (code, signal) => process.exit(code ?? { SIGINT: 130, SIGTERM: 143 }[signal] ?? 1));\n';

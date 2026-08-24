@@ -6,8 +6,8 @@ import type {
   LocalEncryptedPlan,
   PersistedPreviewBinding,
   PreviewBindingStore,
-} from "@apex/capabilities";
-import { atomicWriteBytes, atomicWriteJson, sha256Bytes, sha256Json } from "@apex/kernel";
+} from "@apexops/capabilities";
+import { atomicWriteBytes, atomicWriteJson, sha256Bytes, sha256Json } from "@apexops/kernel";
 
 const HASH_PATTERN = /^[0-9a-f]{64}$/;
 

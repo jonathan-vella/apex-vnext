@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import test from "node:test";
-import type { IacBindingV1, ImplementationIntentV1 } from "@apex/contracts";
+import type { IacBindingV1, ImplementationIntentV1 } from "@apexops/contracts";
 import {
   compareLogicalParity,
   generateBicepTree,

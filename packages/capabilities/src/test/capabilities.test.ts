@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { TaskEnvelopeV1 } from "@apex/contracts";
+import type { TaskEnvelopeV1 } from "@apexops/contracts";
 import { CapabilityError, CapabilityRegistry, type Capability } from "../capability.js";
 import { designCapabilityIds, registerUnavailableDesignCapabilities } from "../design-capabilities.js";
 

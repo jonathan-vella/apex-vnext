@@ -1,4 +1,4 @@
-import type { DeploymentPreviewV1 } from "@apex/contracts";
+import type { DeploymentPreviewV1 } from "@apexops/contracts";
 
 export type NormalizedPreview = Pick<DeploymentPreviewV1, "changes" | "blockers"> & {
   readonly stateLineage?: string;

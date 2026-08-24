@@ -103,13 +103,15 @@ function normalizeSbom(sbom, releaseManifest) {
   const releaseRefs = new Set(releaseManifest.packages.map((entry) => `${entry.package}@${entry.version}`));
   const workspaceRef = (component) => {
     const reference = component?.["bom-ref"];
-    if (typeof reference === "string" && reference.startsWith("@apex/")) return reference;
+    if (typeof reference === "string" && reference.startsWith("@apexops/")) return reference;
     if (typeof component?.purl === "string") {
-      const match = /^pkg:npm\/@apex\/([^@]+)@(.+)$/.exec(decodeURIComponent(component.purl));
-      if (match !== null) return `@apex/${match[1]}@${match[2]}`;
+      const match = /^pkg:npm\/@apexops\/([^@]+)@(.+)$/.exec(decodeURIComponent(component.purl));
+      if (match !== null) return `@apexops/${match[1]}@${match[2]}`;
     }
-    return component?.group === "@apex" && typeof component.name === "string" && typeof component.version === "string"
-      ? `@apex/${component.name}@${component.version}`
+    return component?.group === "@apexops" &&
+      typeof component.name === "string" &&
+      typeof component.version === "string"
+      ? `@apexops/${component.name}@${component.version}`
       : undefined;
   };
   const unreleasedRefs = new Set(
@@ -183,7 +185,7 @@ async function writeReleaseSecurityArtifacts(outputDirectory, releaseManifest) {
       buildDefinition: {
         buildType: "https://apexops.dev/build-types/npm-workspaces/v1",
         externalParameters: {
-          includeTestkit: releaseManifest.packages.some((entry) => entry.package === "@apex/testkit"),
+          includeTestkit: releaseManifest.packages.some((entry) => entry.package === "@apexops/testkit"),
         },
         internalParameters: releaseManifest.toolchain,
         resolvedDependencies: [
@@ -213,7 +215,7 @@ async function packWorkspace(packageName, stagingDirectory) {
   const { stdout } = await run("npm", [
     "pack",
     "--workspace",
-    `@apex/${packageName}`,
+    `@apexops/${packageName}`,
     "--json",
     "--pack-destination",
     stagingDirectory,
@@ -222,16 +224,16 @@ async function packWorkspace(packageName, stagingDirectory) {
   try {
     result = JSON.parse(stdout);
   } catch (error) {
-    throw new Error(`npm pack returned invalid JSON for @apex/${packageName}: ${stdout}`, { cause: error });
+    throw new Error(`npm pack returned invalid JSON for @apexops/${packageName}: ${stdout}`, { cause: error });
   }
   const filename = result[0]?.filename;
-  if (typeof filename !== "string") throw new Error(`npm pack did not return a filename for @apex/${packageName}`);
+  if (typeof filename !== "string") throw new Error(`npm pack did not return a filename for @apexops/${packageName}`);
   return resolve(stagingDirectory, basename(filename));
 }
 
 export async function packVnext({ outputDirectory, includeTestkit = false }) {
   await run("npm", ["run", "build:vnext"]);
-  await run("npm", ["run", "schemas:check", "--workspace", "@apex/contracts"]);
+  await run("npm", ["run", "schemas:check", "--workspace", "@apexops/contracts"]);
 
   const stagingDirectory = await mkdtemp(join(tmpdir(), "apex-vnext-pack-"));
   const packageNames = includeTestkit ? [...runtimePackages, "testkit"] : runtimePackages;

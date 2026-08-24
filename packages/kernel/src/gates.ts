@@ -1,4 +1,4 @@
-import type { GateRecordV1, RunId } from "@apex/contracts";
+import type { GateRecordV1, RunId } from "@apexops/contracts";
 
 export function openGate(gate: GateRecordV1, dependencyHash: string): GateRecordV1 {
   if (gate.state !== "closed" && gate.state !== "invalidated") {

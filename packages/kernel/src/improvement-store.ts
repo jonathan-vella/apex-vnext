@@ -14,7 +14,7 @@ import {
   type ImprovementSource,
   type ImprovementTarget,
   registerContractFormats,
-} from "@apex/contracts";
+} from "@apexops/contracts";
 import { Value } from "@sinclair/typebox/value";
 import { sha256Json } from "./canonical.js";
 import { atomicWriteJson } from "./files.js";

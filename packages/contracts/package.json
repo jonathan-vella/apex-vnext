@@ -1,5 +1,5 @@
 {
-  "name": "@apex/contracts",
+  "name": "@apexops/contracts",
   "version": "0.10.0",
   "description": "Versioned persisted and published contracts for APEX vNext",
   "license": "MIT",

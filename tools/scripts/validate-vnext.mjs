@@ -289,7 +289,7 @@ function validatePackages(model, findings) {
     }
     const { manifest, tsconfig } = entry;
     const file = `packages/${packageName}/package.json`;
-    if (manifest.name !== `@apex/${packageName}`)
+    if (manifest.name !== `@apexops/${packageName}`)
       finding(findings, "package.name", `${file} has an unexpected package name`, file);
     for (const key of ["version", "type", "exports", "scripts", "engines"])
       if (!(key in manifest)) finding(findings, "package.shape", `${file} is missing ${key}`, file);
@@ -303,9 +303,9 @@ function validatePackages(model, findings) {
       finding(findings, "package.shape", `${file} does not expose the required ESM/build/test/engine surface`, file);
     const dependencies = Object.keys(manifest.dependencies ?? {})
       .filter((name) => names.has(name))
-      .map((name) => name.slice("@apex/".length));
+      .map((name) => name.slice("@apexops/".length));
     for (const dependency of dependencies)
-      if (manifest.dependencies[`@apex/${dependency}`] !== model.packages[dependency]?.manifest.version)
+      if (manifest.dependencies[`@apexops/${dependency}`] !== model.packages[dependency]?.manifest.version)
         finding(
           findings,
           "package.version",
@@ -343,8 +343,8 @@ function validatePackages(model, findings) {
     REQUIRED_PACKAGES.map((name) => [
       name,
       Object.keys(model.packages[name]?.manifest.dependencies ?? {})
-        .filter((dep) => dep.startsWith("@apex/"))
-        .map((dep) => dep.slice(6)),
+        .filter((dep) => dep.startsWith("@apexops/"))
+        .map((dep) => dep.slice("@apexops/".length)),
     ]),
   );
   const visiting = new Set();
@@ -916,7 +916,7 @@ function validateMcp(model, findings) {
     apex.type !== "stdio" ||
     apex.command !== "node" ||
     JSON.stringify(apex.args) !==
-      JSON.stringify(["${workspaceFolder}/node_modules/@apex/cli/dist/cli.js", "mcp", "serve"]) ||
+      JSON.stringify(["${workspaceFolder}/node_modules/@apexops/cli/dist/cli.js", "mcp", "serve"]) ||
     apex.cwd !== "${workspaceFolder}" ||
     (apex.env && Object.keys(apex.env).length > 0)
   )
@@ -945,7 +945,7 @@ function validateMcp(model, findings) {
     !cliApex ||
     cliApex.type !== "local" ||
     cliApex.command !== "node" ||
-    JSON.stringify(cliApex.args) !== JSON.stringify(["node_modules/@apex/cli/dist/cli.js", "mcp", "serve"]) ||
+    JSON.stringify(cliApex.args) !== JSON.stringify(["node_modules/@apexops/cli/dist/cli.js", "mcp", "serve"]) ||
     Object.keys(cliApex.env ?? {}).length > 0 ||
     JSON.stringify(cliApex.tools) !== JSON.stringify(model.mcpTools)
   )
@@ -1037,7 +1037,7 @@ export function validateRepositoryModel(model) {
 }
 
 export function runSchemaCheck(root, quiet = false) {
-  execFileSync("npm", ["run", "schemas:check", "--workspace", "@apex/contracts"], {
+  execFileSync("npm", ["run", "schemas:check", "--workspace", "@apexops/contracts"], {
     cwd: root,
     stdio: quiet ? "pipe" : "inherit",
   });

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import test from "node:test";
-import type { ImprovementPolicyV1 } from "@apex/contracts";
-import { ImprovementStore } from "@apex/kernel";
+import type { ImprovementPolicyV1 } from "@apexops/contracts";
+import { ImprovementStore } from "@apexops/kernel";
 import { execute } from "../cli.js";
 import { ApexService } from "../service.js";
 import { tempRoot, writeJson } from "./helpers.js";
