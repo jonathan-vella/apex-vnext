@@ -34,24 +34,43 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "status", "expectedVersion"],
+        "required": ["id", "status"],
         "properties": {
           "id": { "enum": ["github-copilot-vscode", "github-copilot-cli"] },
           "status": {
             "enum": [
               "ready",
               "missing",
+              "version-unavailable",
               "version-mismatch",
-              "extension-version-mismatch",
+              "extension-unavailable",
               "interactive-install-required"
             ]
           },
           "expectedVersion": { "type": "string", "minLength": 1 },
           "observedVersion": { "type": "string", "minLength": 1 },
-          "expectedExtensionVersion": { "type": "string", "minLength": 1 },
+          "minimumVersion": { "type": "string", "minLength": 1 },
           "observedExtensionVersion": { "type": "string", "minLength": 1 },
           "reason": { "type": "string", "minLength": 1 }
-        }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "id": { "const": "github-copilot-vscode" } }, "required": ["id"] },
+            "then": {
+              "properties": {
+                "minimumVersion": { "type": "string", "minLength": 1 }
+              },
+              "required": ["minimumVersion"]
+            }
+          },
+          {
+            "if": { "properties": { "id": { "const": "github-copilot-cli" } }, "required": ["id"] },
+            "then": {
+              "properties": { "expectedVersion": { "type": "string", "minLength": 1 } },
+              "required": ["expectedVersion"]
+            }
+          }
+        ]
       }
     }
   },

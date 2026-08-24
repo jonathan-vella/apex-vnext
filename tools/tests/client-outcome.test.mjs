@@ -220,8 +220,8 @@ test("historical client fixtures remain bound to the complete context receipt", 
     [],
   );
   for (const toolchain of [
-    merge(canonicalToolchain, { core: { vscode: { selectedExactVersion: "1.129.0" } } }),
-    merge(canonicalToolchain, { core: { vscode: { selectedExactCopilotChatVersion: "0.57.0" } } }),
+    merge(canonicalToolchain, { core: { vscode: { historicalFixtureVersion: "1.129.0" } } }),
+    merge(canonicalToolchain, { core: { vscode: { historicalFixtureCopilotChatVersion: "0.57.0" } } }),
     merge(canonicalToolchain, { core: { vscode: { selectionEvidence: { sha256: hash("f") } } } }),
   ]) {
     assert.ok(

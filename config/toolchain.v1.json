@@ -40,10 +40,11 @@
       "authoritativeSource": "https://code.visualstudio.com/updates",
       "releaseChannel": "stable",
       "newestObservedVersion": "1.130.0",
-      "selectedExactVersion": "1.130.0",
+      "minimumSupportedVersion": "1.130.0",
       "installedVersion": "1.130.0",
-      "selectedExactCopilotChatVersion": "0.58.0",
       "installedCopilotChatVersion": "0.58.0",
+      "historicalFixtureVersion": "1.130.0",
+      "historicalFixtureCopilotChatVersion": "0.58.0",
       "observedAt": "2026-07-28",
       "selectionStatus": "selected-qualification-required",
       "selectionEvidence": {
@@ -101,7 +102,7 @@
     "node": "24.18.0",
     "npm": "11.16.0",
     "typescript": "7.0.2",
-    "vscode": "1.130.0",
+    "minimumVscode": "1.130.0",
     "copilotCli": "1.0.73"
   },
   "clientQualificationPolicy": {
