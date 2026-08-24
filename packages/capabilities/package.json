@@ -1,6 +1,6 @@
 {
   "name": "@apexops/capabilities",
-  "version": "0.10.0",
+  "version": "0.10.0-next.0",
   "description": "Authorized capability execution and IaC adapters for APEX vNext",
   "license": "MIT",
   "repository": {
@@ -10,7 +10,8 @@
   },
   "publishConfig": {
     "access": "public",
-    "provenance": true
+    "provenance": true,
+    "tag": "next"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -25,7 +26,7 @@
     "dist"
   ],
   "dependencies": {
-    "@apexops/contracts": "0.10.0"
+    "@apexops/contracts": "0.10.0-next.0"
   },
   "devDependencies": {
     "@sinclair/typebox": "0.34.52"

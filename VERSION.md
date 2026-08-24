@@ -2,11 +2,11 @@
 
 # Version Information
 
-**Current Version:** 0.10.0 (pre-release)
+**Current Version:** 0.10.0-next.0 (preview)
 
-**Status:** Unreleased - re-baseline and characterization in progress on `main`; no release candidate selected
+**Status:** Preview - non-production npm distribution published under the `next` dist-tag
 
-**Last Content Update:** 2026-08-01
+**Last Content Update:** 2026-08-24
 
 **Build:** standalone-vnext
 

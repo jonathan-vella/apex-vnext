@@ -152,7 +152,7 @@ async function main() {
     commandVersions: {
       cli: runtime.components.cli.version,
       kernel: runtime.components.kernel.version,
-      testkit: "0.10.0",
+      testkit: "0.10.0-next.0",
     },
     toolVersions: { node: process.version },
   });
