@@ -10,7 +10,7 @@ replace its authority.
 
 | Goal | Start here |
 | --- | --- |
-| Start on Windows 11 with WSL2 | [Windows 11 first run](tutorials/windows-11-first-run.md) |
+| Start on Windows 11 with WSL2 | [WSL2 consumer runbook](tutorials/wsl2-vscode-consumer-runbook.md) |
 | Evaluate APEX locally | [Complete the first local run](tutorials/first-run.md) |
 | Install or update APEX | [Manage installation](how-to/manage-installation.md) |
 | Run a governed workflow | [Run the workflow](how-to/run-workflow.md) |
@@ -23,7 +23,8 @@ replace its authority.
 
 - [Complete the first local run](tutorials/first-run.md) introduces initialization, readiness, and deterministic local
   state without making cloud changes.
-- [Windows 11 first run](tutorials/windows-11-first-run.md) prepares WSL2, Azure, and a selected Copilot client.
+- [WSL2 and VS Code consumer runbook](tutorials/wsl2-vscode-consumer-runbook.md) installs the published preview and
+  creates a VS Code workspace in Ubuntu on WSL2.
 
 ## How-To Guides
 
