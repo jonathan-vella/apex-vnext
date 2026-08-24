@@ -132,6 +132,12 @@ test("init installs bundled customizations and runtime config by default", async
         url: "https://mcp.management.azure.com",
         headers: { "x-mcp-toolset": "CostManagement,Pricing" },
       },
+      "azure-mcp-server": {
+        type: "stdio",
+        command: "npx",
+        args: ["--yes", "@azure/mcp@3.0.0-beta.37", "server", "start"],
+        cwd: "${workspaceFolder}",
+      },
     },
   });
   await assert.rejects(readFile(join(root, ".github", "mcp.json"), "utf8"), /ENOENT/u);
