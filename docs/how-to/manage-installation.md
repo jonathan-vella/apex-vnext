@@ -55,6 +55,10 @@ apex profile update --client github-copilot-vscode --yes
 apex profile uninstall --client github-copilot-vscode --yes
 ```
 
+The release-blocking end-user lifecycle scenarios are listed in the
+[VS Code installation lifecycle matrix](../vnext/CLIENT-QUALIFICATION.md#vs-code-installation-lifecycle). Run them in
+a clean supported profile before claiming live VS Code support.
+
 ## Update Managed Files
 
 ```bash
