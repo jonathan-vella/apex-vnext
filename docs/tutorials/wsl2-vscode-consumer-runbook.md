@@ -49,7 +49,14 @@ from the Command Palette before retrying.
 Install Node.js 24 or later in Ubuntu. The Linux runtime is separate from any Node.js installation on Windows:
 
 ```bash
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash
+NVM_VERSION=v0.40.1
+NVM_INSTALL_SHA256=abdb525ee9f5b48b34d8ed9fc67c6013fb0f659712e401ecd88ab989b3af8f53
+curl --fail --silent --show-error --location \
+  "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh" \
+  --output /tmp/nvm-install.sh
+printf '%s  %s\n' "$NVM_INSTALL_SHA256" /tmp/nvm-install.sh | sha256sum --check --status
+bash /tmp/nvm-install.sh
+rm /tmp/nvm-install.sh
 source ~/.bashrc
 nvm install 24
 nvm use 24
