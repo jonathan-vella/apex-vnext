@@ -56,6 +56,11 @@ test("classifyModel: MAI-Code-1.1-Flash → mai-code", () => {
   assert.equal(classifyModel(["MAI-Code-1.1-Flash"]), "mai-code");
 });
 
+test("classifyModel: MAI-Code-1-Flash → mai-code (deprecated label)", () => {
+  assert.equal(classifyModel("MAI-Code-1-Flash"), "mai-code");
+  assert.equal(classifyModel(["MAI-Code-1-Flash"]), "mai-code");
+});
+
 test("classifyModel: unknown / missing → unknown", () => {
   assert.equal(classifyModel(undefined), "unknown");
   assert.equal(classifyModel(null), "unknown");
