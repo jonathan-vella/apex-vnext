@@ -1,6 +1,6 @@
 {
   "name": "apex-vnext",
-  "version": "0.10.0",
+  "version": "0.10.0-next.0",
   "description": "Standalone APEX vNext runtime for governed Azure platform engineering workflows.",
   "private": true,
   "workspaces": [

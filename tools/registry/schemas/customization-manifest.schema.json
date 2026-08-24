@@ -6,7 +6,7 @@
   "required": ["version", "bundle", "managedFiles", "sharedFiles", "clientProjections", "roles", "invocationEdges"],
   "additionalProperties": false,
   "properties": {
-    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?$" },
     "bundle": {
       "type": "object",
       "required": ["id", "authority", "composition", "sourceRoot", "generatedRoot"],

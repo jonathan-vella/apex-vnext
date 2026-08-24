@@ -21,7 +21,8 @@ the token. Subsequent releases use this workflow's OIDC identity and require no 
 
 Before dispatching publication, merge the intended release candidate to protected `main`. The workflow refuses to
 publish unless the requested version matches `VERSION.md` and every publishable package manifest. It also refuses an
-unreleased or pre-release repository status.
+unreleased repository status. A version with a SemVer prerelease suffix, such as `0.10.0-next.0`, is published with
+the `next` dist-tag. A stable version is published with the `latest` dist-tag.
 
 Run the deterministic gates locally before requesting release approval:
 
@@ -38,7 +39,8 @@ without a `v` prefix, and enter `publish` as the confirmation value. Approve the
 prompted.
 
 The workflow repeats repository qualification, verifies no package version has already been published, and publishes
-packages in dependency order with npm provenance.
+packages in dependency order with npm provenance. To install the current preview, use `@apexops/cli@next` or the
+exact prerelease version.
 
 ## Verify As A Consumer
 

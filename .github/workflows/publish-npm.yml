@@ -40,19 +40,24 @@ jobs:
         uses: ./.github/actions/setup-node-repo
 
       - name: Verify release intent
+        id: release
         env:
           REQUESTED_VERSION: ${{ inputs.version }}
           CONFIRMATION: ${{ inputs.confirmation }}
         run: |
           test "${{ github.ref }}" = "refs/heads/main"
           test "$CONFIRMATION" = "publish"
-          version="$(sed -nE 's/^\*\*Current Version:\*\* ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' VERSION.md)"
+          version="$(sed -nE 's/^\*\*Current Version:\*\* ([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?).*/\1/p' VERSION.md)"
           test -n "$version"
           test "$version" = "$REQUESTED_VERSION"
-          ! grep -qiE '^\*\*Status:\*\* .*unreleased|pre-release' VERSION.md
+          ! grep -qiE '^\*\*Status:\*\* .*unreleased' VERSION.md
           for package in packages/contracts packages/kernel packages/capabilities packages/renderers packages/cli packages/testkit; do
             test "$(jq -r .version "$package/package.json")" = "$REQUESTED_VERSION"
           done
+          case "$REQUESTED_VERSION" in
+            *-*) printf 'dist_tag=next\n' >> "$GITHUB_OUTPUT" ;;
+            *) printf 'dist_tag=latest\n' >> "$GITHUB_OUTPUT" ;;
+          esac
 
       - name: Verify packages are unpublished
         env:
@@ -72,27 +77,27 @@ jobs:
 
       - name: Publish contracts
         working-directory: packages/contracts
-        run: npm publish --access public --provenance --registry https://registry.npmjs.org/
+        run: npm publish --access public --provenance --tag "${{ steps.release.outputs.dist_tag }}" --registry https://registry.npmjs.org/
 
       - name: Publish kernel
         working-directory: packages/kernel
-        run: npm publish --access public --provenance --registry https://registry.npmjs.org/
+        run: npm publish --access public --provenance --tag "${{ steps.release.outputs.dist_tag }}" --registry https://registry.npmjs.org/
 
       - name: Publish capabilities
         working-directory: packages/capabilities
-        run: npm publish --access public --provenance --registry https://registry.npmjs.org/
+        run: npm publish --access public --provenance --tag "${{ steps.release.outputs.dist_tag }}" --registry https://registry.npmjs.org/
 
       - name: Publish renderers
         working-directory: packages/renderers
-        run: npm publish --access public --provenance --registry https://registry.npmjs.org/
+        run: npm publish --access public --provenance --tag "${{ steps.release.outputs.dist_tag }}" --registry https://registry.npmjs.org/
 
       - name: Publish CLI
         working-directory: packages/cli
-        run: npm publish --access public --provenance --registry https://registry.npmjs.org/
+        run: npm publish --access public --provenance --tag "${{ steps.release.outputs.dist_tag }}" --registry https://registry.npmjs.org/
 
       - name: Publish testkit
         working-directory: packages/testkit
-        run: npm publish --access public --provenance --registry https://registry.npmjs.org/
+        run: npm publish --access public --provenance --tag "${{ steps.release.outputs.dist_tag }}" --registry https://registry.npmjs.org/
 
       - name: Summarize publication
         env:
@@ -101,6 +106,7 @@ jobs:
           {
             printf '## npm publication\n\n'
             printf -- '- Version: `%s`\n' "$RELEASE_VERSION"
+            printf -- '- Dist-tag: `%s`\n' "${{ steps.release.outputs.dist_tag }}"
             printf -- '- Registry: `https://registry.npmjs.org/`\n'
             printf -- '- Authentication: npm trusted publishing via GitHub Actions OIDC\n'
           } >> "$GITHUB_STEP_SUMMARY"
