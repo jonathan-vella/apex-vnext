@@ -19,11 +19,12 @@ For the complete WSL2 and VS Code consumer route, follow the
 
 ## Create A Workspace
 
-In Ubuntu WSL, create a separate local workspace inside your Linux home directory:
+In Ubuntu WSL, create one consumer repository inside your Linux home directory. The repository can hold multiple
+workloads; its folder name identifies the consumer, not a single workload:
 
 ```bash
-mkdir -p ~/src/apex-payments
-cd ~/src/apex-payments
+mkdir -p ~/src/contoso-platform
+cd ~/src/contoso-platform
 apex bootstrap --project payments --client github-copilot-vscode --create-repo --yes
 ```
 
