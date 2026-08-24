@@ -1,0 +1,106 @@
+# Publishes a manually authorized, fully qualified APEX release through npm trusted publishing.
+# Trigger only from protected main after npmjs.com trusts this repository and workflow path.
+name: Publish npm packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without a v prefix
+        required: true
+        type: string
+      confirmation:
+        description: Type publish to confirm registry publication
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish trusted npm release
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    environment: npm-publish
+    steps:
+      - name: Checkout protected main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node repository
+        uses: ./.github/actions/setup-node-repo
+
+      - name: Verify release intent
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          test "${{ github.ref }}" = "refs/heads/main"
+          test "$CONFIRMATION" = "publish"
+          version="$(sed -nE 's/^\*\*Current Version:\*\* ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' VERSION.md)"
+          test -n "$version"
+          test "$version" = "$REQUESTED_VERSION"
+          ! grep -qiE '^\*\*Status:\*\* .*unreleased|pre-release' VERSION.md
+          for package in packages/contracts packages/kernel packages/capabilities packages/renderers packages/cli packages/testkit; do
+            test "$(jq -r .version "$package/package.json")" = "$REQUESTED_VERSION"
+          done
+
+      - name: Verify packages are unpublished
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          for package in @apex/contracts @apex/kernel @apex/capabilities @apex/renderers @apex/cli @apex/testkit; do
+            if npm view "$package@$RELEASE_VERSION" version --registry https://registry.npmjs.org/ >/dev/null 2>&1; then
+              printf 'Refusing to republish %s@%s\n' "$package" "$RELEASE_VERSION" >&2
+              exit 1
+            fi
+          done
+
+      - name: Qualify exact release candidate
+        run: |
+          npm run validate:all
+          npm run qualify:vnext
+
+      - name: Publish contracts
+        working-directory: packages/contracts
+        run: npm publish --access public --provenance --registry https://registry.npmjs.org/
+
+      - name: Publish kernel
+        working-directory: packages/kernel
+        run: npm publish --access public --provenance --registry https://registry.npmjs.org/
+
+      - name: Publish capabilities
+        working-directory: packages/capabilities
+        run: npm publish --access public --provenance --registry https://registry.npmjs.org/
+
+      - name: Publish renderers
+        working-directory: packages/renderers
+        run: npm publish --access public --provenance --registry https://registry.npmjs.org/
+
+      - name: Publish CLI
+        working-directory: packages/cli
+        run: npm publish --access public --provenance --registry https://registry.npmjs.org/
+
+      - name: Publish testkit
+        working-directory: packages/testkit
+        run: npm publish --access public --provenance --registry https://registry.npmjs.org/
+
+      - name: Summarize publication
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          {
+            printf '## npm publication\n\n'
+            printf -- '- Version: `%s`\n' "$RELEASE_VERSION"
+            printf -- '- Registry: `https://registry.npmjs.org/`\n'
+            printf -- '- Authentication: npm trusted publishing via GitHub Actions OIDC\n'
+          } >> "$GITHUB_STEP_SUMMARY"

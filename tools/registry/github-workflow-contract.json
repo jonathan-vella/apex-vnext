@@ -82,6 +82,16 @@
       "jobs": { "qualify": "Exact-head release qualification" }
     },
     {
+      "id": "publish-npm",
+      "path": ".github/workflows/publish-npm.yml",
+      "name": "Publish npm packages",
+      "triggerDigest": "cfaeb942288dcbcc4c8631ac5b901b073dc1acbbe285c3c40baaec41bc425f57",
+      "permissionsDigest": "d57abeeb8232850a40cc2fd3e29e491dd077df7b2a7988ae52899fba4527b761",
+      "concurrencyDigest": "1cf197bb4117f498288d0df9e90c8d763fe22f45c6b50310ae61aa8bca8a4178",
+      "jobsDigest": "2fe95065b484cbc6d10065a70754793e685b21a2b1679f57c1a1fe7d9e5ce483",
+      "jobs": { "publish": "Publish trusted npm release" }
+    },
+    {
       "id": "sensei-branch-maintenance",
       "path": ".github/workflows/sensei-branch-maintenance.yml",
       "name": "Sensei Branch Maintenance",
