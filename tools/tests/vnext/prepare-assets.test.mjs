@@ -332,7 +332,7 @@ test("CLI coordinator receives task delegation from semantic invocation edges", 
   const source = `---
 name: APEX
 description: Coordinate workflow.
-model: ["MAI-Code-1-Flash"]
+model: ["MAI-Code-1.1-Flash"]
 user-invocable: true
 tools:
   - vscode/askQuestions
