@@ -87,18 +87,22 @@ export function buildOptimizationClientPreflight({ gate, toolchain, run = execFi
       ...(copilotChatVersion ? { observedExtensionVersion: copilotChatVersion } : {}),
       status: !vscode.ok
         ? "missing"
-        : !meetsMinimumVersion(vscodeVersion, expectedVscode)
-          ? "version-mismatch"
-          : !vscodeExtensions.ok || copilotChatVersion === undefined
-            ? "extension-unavailable"
-            : "ready",
+        : vscodeVersion === undefined
+          ? "version-unavailable"
+          : !meetsMinimumVersion(vscodeVersion, expectedVscode)
+            ? "version-mismatch"
+            : !vscodeExtensions.ok || copilotChatVersion === undefined
+              ? "extension-unavailable"
+              : "ready",
       ...(!vscode.ok
         ? { reason: "VS Code executable is unavailable." }
-        : !meetsMinimumVersion(vscodeVersion, expectedVscode)
-          ? { reason: "Observed VS Code version is below the minimum supported version." }
-          : !vscodeExtensions.ok || copilotChatVersion === undefined
-            ? { reason: "Copilot Chat extension version is unavailable from the host." }
-            : {}),
+        : vscodeVersion === undefined
+          ? { reason: "VS Code version is unavailable from the host output." }
+          : !meetsMinimumVersion(vscodeVersion, expectedVscode)
+            ? { reason: "Observed VS Code version is below the minimum supported version." }
+            : !vscodeExtensions.ok || copilotChatVersion === undefined
+              ? { reason: "Copilot Chat extension version is unavailable from the host." }
+              : {}),
     },
     {
       id: "github-copilot-cli",

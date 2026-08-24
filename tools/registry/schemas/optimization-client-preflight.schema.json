@@ -38,7 +38,14 @@
         "properties": {
           "id": { "enum": ["github-copilot-vscode", "github-copilot-cli"] },
           "status": {
-            "enum": ["ready", "missing", "version-mismatch", "extension-unavailable", "interactive-install-required"]
+            "enum": [
+              "ready",
+              "missing",
+              "version-unavailable",
+              "version-mismatch",
+              "extension-unavailable",
+              "interactive-install-required"
+            ]
           },
           "expectedVersion": { "type": "string", "minLength": 1 },
           "observedVersion": { "type": "string", "minLength": 1 },

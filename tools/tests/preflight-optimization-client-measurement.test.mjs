@@ -78,3 +78,17 @@ test("preflight accepts newer VS Code and records the observed Copilot Chat vers
   });
   assert.equal(buildOptimizationClientPreflight({ gate, toolchain, run }).status, "ready");
 });
+
+test("preflight reports unparseable VS Code version output without claiming it is below minimum", () => {
+  const run = commandRun({
+    "git rev-parse HEAD": `${gate.candidate.commit}\n`,
+    "git rev-parse HEAD^{tree}": `${gate.candidate.tree}\n`,
+    "git status --porcelain --untracked-files=no": "",
+    "code --version": "unparseable\n",
+    "code --list-extensions --show-versions": "github.copilot-chat@0.60.0\n",
+    "copilot --version": `${toolchain.core.copilotCli.selectedExactVersion}\n`,
+  });
+  const receipt = buildOptimizationClientPreflight({ gate, toolchain, run });
+  assert.equal(receipt.clients[0].status, "version-unavailable");
+  assert.match(receipt.clients[0].reason, /unavailable/);
+});
