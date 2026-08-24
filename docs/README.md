@@ -10,7 +10,7 @@ replace its authority.
 
 | Goal | Start here |
 | --- | --- |
-| Start on Windows 11 with WSL2 and VS Code | [WSL2 and VS Code consumer runbook](tutorials/wsl2-vscode-consumer-runbook.md) |
+| Start on Windows 11 with WSL2 | [WSL2 consumer runbook](tutorials/wsl2-vscode-consumer-runbook.md) |
 | Evaluate APEX locally | [Complete the first local run](tutorials/first-run.md) |
 | Install or update APEX | [Manage installation](how-to/manage-installation.md) |
 | Run a governed workflow | [Run the workflow](how-to/run-workflow.md) |

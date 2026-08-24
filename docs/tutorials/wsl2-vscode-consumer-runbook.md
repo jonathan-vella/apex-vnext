@@ -1,6 +1,7 @@
 # WSL2 And VS Code Consumer Runbook
 
-> [Current Version](../../VERSION.md) | Install the published APEX preview in Ubuntu on WSL2 and start a VS Code workspace.
+> [Current Version](../../VERSION.md) | Install the published APEX preview in Ubuntu on WSL2
+> and start a VS Code workspace.
 
 This runbook installs the published preview from npm and creates one APEX workspace with the VS Code projection. It
 creates local project state only; it does not deploy Azure resources.
