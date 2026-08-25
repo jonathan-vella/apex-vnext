@@ -5,7 +5,7 @@
  * Documentation-aid linter that catches forbidden interactive-shell
  * patterns committed to agent, prompt, instruction, skill, AGENTS.md,
  * and README files. The primary control is
- * `.github/instructions/no-interactive-shell.instructions.md`; this
+ * `customizations/.github/instructions/apex-safe-shell.instructions.md`; this
  * script enforces the same rules in committed snippets so they don't
  * drift back in via copy-paste.
  *
@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(new URL("../..", import.meta.url).pathname);
 
 // Files to scan. We mirror the applyTo glob from
-// .github/instructions/no-interactive-shell.instructions.md so the linter
+// customizations/.github/instructions/apex-safe-shell.instructions.md so the linter
 // stays in sync with the instruction file. Notably, skill `references/`
 // folders are excluded — they hold longer-form templates (often standalone
 // deploy scripts) that are not part of the auto-loaded chat context.
@@ -428,7 +428,7 @@ function main() {
     process.exit(0);
   }
   console.error(`\n❌ safe-shell: ${totalViolations} violation(s) across ${files.length} files`);
-  console.error("   See .github/instructions/no-interactive-shell.instructions.md for the full ruleset.");
+  console.error("   See customizations/.github/instructions/apex-safe-shell.instructions.md for the full ruleset.");
   process.exit(1);
 }
 

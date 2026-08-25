@@ -66,6 +66,7 @@ if (check) {
     "docs/how-to/run-workflow.md",
     "docs/explanation/runtime-architecture.md",
     "docs/reference/README.md",
+    "docs/vnext/INSTRUCTION-CATALOG-REVIEW.generated.md",
     "docs/vnext/documentation-inventory.v1.json",
   ]) {
     if (!existsSync(join(root, required))) {

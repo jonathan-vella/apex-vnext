@@ -17,6 +17,7 @@
 import fs, { globSync } from "node:fs";
 import path from "node:path";
 import { getInstructions } from "./_lib/workspace-index.mjs";
+import { INSTRUCTIONS_DIR } from "./_lib/paths.mjs";
 import { findAllMatches } from "./_lib/regex-helpers.mjs";
 import { Reporter } from "./_lib/reporter.mjs";
 
@@ -145,7 +146,7 @@ for (const [_fileName, instr] of instructions) {
 console.log(`\n${"─".repeat(60)}`);
 console.log("📄 Part 2: Instruction file references exist\n");
 
-const scanDirs = [".github/agents", ".github/skills", ".github/instructions", "tools/apex-prompts"];
+const scanDirs = ["customizations/.github/agents", "customizations/.github/skills", INSTRUCTIONS_DIR];
 const scanExts = [".md"];
 const allMdFiles = collectFiles(scanDirs, scanExts);
 
@@ -179,7 +180,7 @@ if (foundInstructionRefs.size === 0) {
 console.log(`\n${"─".repeat(60)}`);
 console.log("📄 Part 3: applyTo glob patterns have matching files\n");
 
-const instructionFiles = collectFiles([".github/instructions"], [".instructions.md"]);
+const instructionFiles = collectFiles([INSTRUCTIONS_DIR], [".instructions.md"]);
 
 for (const filePath of instructionFiles) {
   const content = fs.readFileSync(filePath, "utf-8");
@@ -231,7 +232,7 @@ for (const filePath of allMdFiles) {
 
   for (const match of findAllMatches(skillRefPattern, content)) {
     if (match[1].includes("{") || match[1].includes("}")) continue;
-    const skillFile = `.github/skills/${match[1]}/SKILL.md`;
+    const skillFile = `customizations/.github/skills/${match[1]}/SKILL.md`;
     if (!foundSkillRefs.has(skillFile)) {
       foundSkillRefs.set(skillFile, []);
     }
@@ -265,7 +266,7 @@ for (const filePath of allMdFiles) {
   for (const match of findAllMatches(crossRefPattern, content)) {
     const refName = match[1];
     if (EXAMPLE_PATTERNS.includes(refName)) continue;
-    const refPath = `.github/instructions/${refName}`;
+    const refPath = `${INSTRUCTIONS_DIR}/${refName}`;
     if (relFile.endsWith(refName)) continue;
     if (!crossRefs.has(refPath)) {
       crossRefs.set(refPath, new Set());

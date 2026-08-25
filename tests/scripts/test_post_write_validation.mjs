@@ -6,8 +6,8 @@
  * The actual validation runs inside agent execution (one-liner shape
  * checks after each artifact write), so the executable invariant is
  * documentary: the table must exist in azure-artifacts SKILL.md with
- * rows for every artifact type, and the shared operating frame must
- * link to it so all main step agents inherit the rule.
+ * rows for every artifact type, and the managed artifact instruction
+ * must preserve the accepted-output boundary.
  *
  * Run via:
  *   node --test tests/scripts/test_post_write_validation.mjs
@@ -22,7 +22,10 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "../..");
 
 const SKILL = path.join(ROOT, ".github/skills/azure-artifacts/SKILL.md");
-const OPFRAME = path.join(ROOT, ".github/instructions/agent-operating-frame.instructions.md");
+const ARTIFACT_INSTRUCTION = path.join(
+  ROOT,
+  "customizations/.github/instructions/apex-artifact-contracts.instructions.md",
+);
 
 test("azure-artifacts SKILL.md declares the Post-write validation section", () => {
   const body = fs.readFileSync(SKILL, "utf8");
@@ -51,14 +54,8 @@ test("Post-write validation table covers every artifact type", () => {
   }
 });
 
-test("Operating frame links to the Post-write validation section", () => {
-  const body = fs.readFileSync(OPFRAME, "utf8");
-  assert.match(body, /## Validate every artifact after writing/, "missing H2 in operating frame");
-  // Anchor-bearing link to the SKILL section so every step agent
-  // inherits the rule via the shared frame.
-  assert.match(
-    body,
-    /azure-artifacts\/SKILL\.md#post-write-validation/,
-    "missing anchored link to azure-artifacts post-write-validation",
-  );
+test("Managed artifact instruction preserves the accepted-output boundary", () => {
+  const body = fs.readFileSync(ARTIFACT_INSTRUCTION, "utf8");
+  assert.match(body, /# APEX Artifact Contracts/, "missing managed artifact instruction title");
+  assert.match(body, /owning APEX MCP completion operation/, "missing APEX completion boundary");
 });

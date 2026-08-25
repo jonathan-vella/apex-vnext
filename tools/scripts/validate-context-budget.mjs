@@ -3,7 +3,7 @@
  * Context Budget Validator
  *
  * Structural floor for the per-step file re-read budget defined in
- * `.github/instructions/agent-skills.instructions.md` → "Per-Step File
+ * `customizations/.github/instructions/apex-skill-authoring.instructions.md`
  * Re-Read Budget (HARD LIMIT)".
  *
  * Rule: any agent whose body references one of the FROZEN_ARTIFACTS as a
@@ -116,7 +116,7 @@ for (const [file, agent] of agents) {
     }
     r.error(
       file,
-      `references frozen artifact(s) but ${reasons.join(" and ")}. See .github/instructions/agent-skills.instructions.md → Per-Step File Re-Read Budget.`,
+      `references frozen artifact(s) but ${reasons.join(" and ")}. See customizations/.github/instructions/apex-skill-authoring.instructions.md.`,
     );
   }
 }

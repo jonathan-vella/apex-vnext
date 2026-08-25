@@ -74,9 +74,9 @@ For deeper guidance, agents read these on demand:
 
 - Bicep conventions: `infra/bicep/AGENTS.md`
 - Terraform conventions: `infra/terraform/AGENTS.md`
-- azd multi-project rules: `.github/instructions/azure-yaml.instructions.md` (auto-loaded for `azure.yaml`)
-- Terminal hygiene (no `mv -i`/`rm -i`/`read -p`, pipe long output to file):
-  `.github/instructions/no-interactive-shell.instructions.md` (enforced by `lint:safe-shell`)
+- Consumer azd co-location guidance: `customizations/.github/instructions/apex-azure-yaml.instructions.md`
+- Terminal hygiene: avoid interactive `mv`/`rm`/`read` prompts and keep command output bounded; `lint:safe-shell`
+  enforces committed consumer guidance.
 - Azure defaults: `.github/skills/azure-defaults/SKILL.md`
 - vNext product contracts: `packages/contracts/schemas/`
 - Managed customization manifest: `customizations/manifest.json`

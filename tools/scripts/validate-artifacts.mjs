@@ -44,7 +44,7 @@ function extractH2Headings(text) {
 
 const SKILL_PATH = ".github/skills/azure-artifacts/SKILL.md";
 const SKILL_REFS_DIR = ".github/skills/azure-artifacts/references";
-const H2_REF_PATH = ".github/instructions/azure-artifacts.instructions.md";
+const H2_REF_PATH = null;
 
 const ARTIFACT_NAMES = [
   "01-requirements.md",
@@ -103,9 +103,9 @@ function runH2Sync() {
     return 1;
   }
 
-  const h2RefExists = exists(H2_REF_PATH);
+  const h2RefExists = H2_REF_PATH !== null && exists(H2_REF_PATH);
   if (!h2RefExists) {
-    console.log(`  ⚠️  ${H2_REF_PATH} not found — skipping instruction-file comparison`);
+    console.log("  ℹ️  Retired instruction-file comparison is intentionally omitted");
   }
 
   const skillHeadings = parseMarkdownH2Blocks(readText(SKILL_PATH));
@@ -248,7 +248,7 @@ const AGENTS = {
 
 const TEMPLATES = ARTIFACT_TEMPLATE_PATHS;
 
-const STANDARD_DOC = ".github/instructions/markdown.instructions.md";
+const STANDARD_DOC = "customizations/.github/instructions/apex-markdown.instructions.md";
 
 const COST_ESTIMATE_ARTIFACTS = ["03-des-cost-estimate.md", "07-ab-cost-estimate.md"];
 

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const resourceDispositionTypes = new Set(["retain", "adapt", "already-owned", "exclude-unsafe", "defer-capability"]);
+const instructionDispositionTypes = new Set(["adapt", "exclude-unsafe"]);
 const lifecycleTypes = new Set(["planned", "complete"]);
 
 const listResourceFiles = (directory, prefix = "") => {
@@ -32,7 +33,15 @@ const resolveTarget = (target, consumerSkill) => {
   return { owner: consumerSkill, path: target };
 };
 
-export function validateGuidanceMigration({ matrix, sourceSkills, sourceResources, consumerResources, managedFiles }) {
+export function validateGuidanceMigration({
+  matrix,
+  sourceSkills,
+  sourceResources,
+  consumerResources,
+  managedFiles,
+  sourceInstructions = [],
+  consumerInstructions = new Set(),
+}) {
   const errors = [];
   const reportError = (message) => errors.push(message);
   const dispositions = new Map();
@@ -158,13 +167,59 @@ export function validateGuidanceMigration({ matrix, sourceSkills, sourceResource
     if (!sourceSkills.includes(source)) reportError(`Disposition references an unknown root skill: ${source}`);
   }
 
-  const instructionDisposition = matrix.instructionDisposition;
-  if (
-    instructionDisposition?.sourceGlob !== ".github/instructions/*.instructions.md" ||
-    instructionDisposition?.disposition !== "repository-only" ||
-    !isNonEmptyString(instructionDisposition.owner)
-  ) {
-    reportError("Instructions require a repository-only disposition with an owner");
+  const instructionDispositions = matrix.instructionDispositions;
+  if (!Array.isArray(instructionDispositions)) {
+    reportError("Instructions require an instructionDispositions array");
+  } else {
+    const seenInstructions = new Set();
+    const managedInstructions = consumerInstructions ?? new Set();
+    for (const entry of instructionDispositions) {
+      if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+        reportError("Instruction disposition must be an object");
+        continue;
+      }
+      if (!isNonEmptyString(entry.source)) {
+        reportError("Instruction disposition requires a source");
+        continue;
+      }
+      if (seenInstructions.has(entry.source)) {
+        reportError(`Duplicate instruction disposition: ${entry.source}`);
+        continue;
+      }
+      seenInstructions.add(entry.source);
+      if (!sourceInstructions.includes(entry.source)) reportError(`Unknown source instruction: ${entry.source}`);
+      if (!instructionDispositionTypes.has(entry.disposition)) {
+        reportError(`Unsupported instruction disposition for ${entry.source}: ${entry.disposition}`);
+      }
+      for (const field of ["reason", "replacementProof", "rollbackGate"]) {
+        if (!isNonEmptyString(entry[field])) reportError(`Missing instruction ${field} for ${entry.source}`);
+      }
+      if (!Array.isArray(entry.targets)) {
+        reportError(`Instruction targets must be an array for ${entry.source}`);
+        continue;
+      }
+      if (entry.disposition === "adapt" && entry.targets.length !== 1) {
+        reportError(`Adapted instruction requires exactly one target for ${entry.source}`);
+      }
+      if (entry.disposition === "exclude-unsafe" && entry.targets.length !== 0) {
+        reportError(`Excluded instruction must not have targets for ${entry.source}`);
+      }
+      for (const target of entry.targets) {
+        if (!isNonEmptyString(target) || !target.startsWith("apex-") || !target.endsWith(".instructions.md")) {
+          reportError(`Invalid consumer instruction target for ${entry.source}: ${target}`);
+          continue;
+        }
+        if (!managedInstructions.has(target))
+          reportError(`Missing consumer instruction target for ${entry.source}: ${target}`);
+        const managedPath = `.github/instructions/${target}`;
+        if (managedFiles instanceof Set && !managedFiles.has(managedPath)) {
+          reportError(`Consumer instruction target is not managed for ${entry.source}: ${managedPath}`);
+        }
+      }
+    }
+    for (const source of sourceInstructions) {
+      if (!seenInstructions.has(source)) reportError(`Missing instruction disposition: ${source}`);
+    }
   }
   return errors;
 }
@@ -172,8 +227,9 @@ export function validateGuidanceMigration({ matrix, sourceSkills, sourceResource
 export function collectGuidanceMigrationInputs(root = process.cwd()) {
   const matrixPath = join(root, "tools", "registry", "guidance-migration.v1.json");
   const sourceSkillsDirectory = join(root, ".github", "skills");
-  const sourceInstructionsDirectory = join(root, ".github", "instructions");
+  const sourceInstructionsDirectory = join(root, ".archive", "retired-instructions-v1");
   const customizationsDirectory = join(root, "customizations", ".github", "skills");
+  const consumerInstructionsDirectory = join(root, "customizations", ".github", "instructions");
   const manifestPath = join(root, "customizations", "manifest.json");
   const sourceSkills = readdirSync(sourceSkillsDirectory, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && existsSync(join(sourceSkillsDirectory, entry.name, "SKILL.md")))
@@ -193,10 +249,21 @@ export function collectGuidanceMigrationInputs(root = process.cwd()) {
   const matrix = JSON.parse(readFileSync(matrixPath, "utf8"));
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const managedFiles = Array.isArray(manifest.managedFiles) ? new Set(manifest.managedFiles) : null;
-  const sourceInstructions = readdirSync(sourceInstructionsDirectory).filter((name) =>
-    name.endsWith(".instructions.md"),
-  );
-  return { matrix, sourceSkills, sourceResources, consumerResources, managedFiles, sourceInstructions };
+  const sourceInstructions = existsSync(sourceInstructionsDirectory)
+    ? readdirSync(sourceInstructionsDirectory).filter((name) => name.endsWith(".instructions.md"))
+    : [];
+  const consumerInstructions = existsSync(consumerInstructionsDirectory)
+    ? new Set(readdirSync(consumerInstructionsDirectory).filter((name) => name.endsWith(".instructions.md")))
+    : new Set();
+  return {
+    matrix,
+    sourceSkills,
+    sourceResources,
+    consumerResources,
+    managedFiles,
+    sourceInstructions,
+    consumerInstructions,
+  };
 }
 
 function main() {
@@ -208,7 +275,7 @@ function main() {
     process.exit(1);
   }
   const errors = validateGuidanceMigration(inputs);
-  if (inputs.sourceInstructions.length === 0) errors.push("No root instruction files were found");
+  if (inputs.sourceInstructions.length === 0) errors.push("No retired source instruction files were found");
   for (const error of errors) console.error(`❌ ${error}`);
   if (errors.length > 0) process.exit(1);
   console.log(
