@@ -202,6 +202,9 @@ test("MCP registers only narrow tools and calls the service", async () => {
     "nextTask",
     "preview",
     "projectCreate",
+    "projectDelete",
+    "projectList",
+    "projectUse",
     "promote",
     "reconcile",
     "recordInput",
@@ -231,6 +234,16 @@ test("MCP registers only narrow tools and calls the service", async () => {
   assert.equal(createdProject.isError, undefined, JSON.stringify(createdProject));
   assert.equal((createdProject.structuredContent as { projectId: string }).projectId, "data-platform");
   assert.equal((await service.status()).run.projectId, "data-platform");
+  const listedProjects = await client.callTool({ name: "projectList", arguments: {} });
+  assert.deepEqual(listedProjects.structuredContent, {
+    projects: [
+      { projectId: "data-platform", displayName: "Data platform" },
+      { projectId: "demo", displayName: "demo" },
+    ],
+  });
+  const selectedProject = await client.callTool({ name: "projectUse", arguments: { projectId: "demo" } });
+  assert.equal(selectedProject.isError, undefined, JSON.stringify(selectedProject));
+  assert.equal((await service.status()).run.projectId, "demo");
   const invalidProject = await client.callTool({
     name: "projectCreate",
     arguments: {
@@ -242,7 +255,23 @@ test("MCP registers only narrow tools and calls the service", async () => {
     },
   });
   assert.equal(invalidProject.isError, true);
-  await service.use("demo");
+  await client.callTool({ name: "projectUse", arguments: { projectId: "data-platform" } });
+  const unconfirmedDelete = await client.callTool({
+    name: "projectDelete",
+    arguments: { projectId: "data-platform", confirm: false },
+  });
+  assert.equal(unconfirmedDelete.isError, true);
+  const deletedProject = await client.callTool({
+    name: "projectDelete",
+    arguments: { projectId: "data-platform", confirm: true },
+  });
+  assert.equal(deletedProject.isError, undefined, JSON.stringify(deletedProject));
+  assert.equal((await service.status()).run.projectId, "demo");
+  const finalProjectDelete = await client.callTool({
+    name: "projectDelete",
+    arguments: { projectId: "demo", confirm: true },
+  });
+  assert.equal(finalProjectDelete.isError, true);
   const pending = await client.callTool({ name: "nextTask", arguments: {} });
   const request = (
     pending.structuredContent as {

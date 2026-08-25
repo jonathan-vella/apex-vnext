@@ -21,6 +21,8 @@ prior qualification is retained as historical characterization. See
 
 - The VS Code projection launches Azure MCP through an APEX-local shim. The managed MCP configuration remains
   version-free while the CLI package pins the Azure MCP dependency for reproducible consumer installs.
+- The APEX coordinator now handles project CRUD through native client questions and narrow MCP operations: create,
+  list, resume, and confirmation-required deletion.
 
 ### Re-baselined
 

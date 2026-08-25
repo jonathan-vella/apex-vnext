@@ -548,6 +548,9 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
         ...(typeof flags.target === "string" ? { targetScope: flags.target } : {}),
         iacTool: flags.iac === "terraform" ? "terraform" : "bicep",
       });
+    case "project delete":
+      confirmed(flags, "project delete");
+      return service.deleteProject(required(flags, "project") as never, true);
     case "project use":
       return service.use(
         required(flags, "project") as never,
