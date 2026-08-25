@@ -109,9 +109,9 @@ Resume the payments project.
 Delete the data-platform project.
 ```
 
-APEX lists projects without questions. It asks you to select a project only when a resume or delete request does not
-name one, and it asks for explicit confirmation before deleting. It refuses to delete the only remaining project in a
-consumer workspace.
+APEX lists projects without questions. It asks you to select a project only when a resume or delete request does
+not name one, and it asks for explicit confirmation before deleting. It refuses to delete the only remaining
+project in a consumer workspace.
 
 The equivalent deterministic CLI fallback is:
 

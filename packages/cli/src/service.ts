@@ -895,7 +895,8 @@ export class ApexService {
   }
 
   async deleteProject(projectId: ProjectId, confirmed: boolean): Promise<{ deleted: ProjectId; selected?: Selection }> {
-    if (!confirmed) throw new ApexError("APEX_USAGE", "project deletion requires explicit confirmation", EXIT_CODES.usage);
+    if (!confirmed)
+      throw new ApexError("APEX_USAGE", "project deletion requires explicit confirmation", EXIT_CODES.usage);
     const projects = await this.listProjects();
     if (!projects.some((project) => project.projectId === projectId)) {
       throw new ApexError("APEX_NOT_FOUND", `Project not found: ${projectId}`, EXIT_CODES.notFound);
@@ -904,6 +905,16 @@ export class ApexService {
       throw new ApexError("APEX_CONFLICT", "Cannot delete the only project in a workspace", EXIT_CODES.conflict);
     }
     const selection = await this.selection();
+    const nextSelection =
+      selection.projectId !== projectId
+        ? undefined
+        : await (async () => {
+            const replacement = projects.find((project) => project.projectId !== projectId)!;
+            const replacementProjectId = replacement.projectId as ProjectId;
+            const runId = await this.latestRun(replacementProjectId);
+            await this.projects.getRun(replacementProjectId, runId);
+            return { projectId: replacementProjectId, runId };
+          })();
     const projectDirectory = this.projects.projectDirectory(projectId);
     await this.assertSafeExistingPath(join(this.root, ".apex"), projectDirectory);
     const runDirectory = join(projectDirectory, "runs");
@@ -917,12 +928,7 @@ export class ApexService {
       }
     }
     await rm(projectDirectory, { recursive: true, force: true });
-    if (selection.projectId !== projectId) return { deleted: projectId };
-    const replacement = projects.find((project) => project.projectId !== projectId)!;
-    const nextSelection = {
-      projectId: replacement.projectId as ProjectId,
-      runId: await this.latestRun(replacement.projectId as ProjectId),
-    };
+    if (nextSelection === undefined) return { deleted: projectId };
     await this.writeSelection(nextSelection);
     await this.append(await this.run(nextSelection), "selection.changed", nextSelection);
     return { deleted: projectId, selected: nextSelection };

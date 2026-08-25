@@ -235,10 +235,12 @@ test("MCP registers only narrow tools and calls the service", async () => {
   assert.equal((createdProject.structuredContent as { projectId: string }).projectId, "data-platform");
   assert.equal((await service.status()).run.projectId, "data-platform");
   const listedProjects = await client.callTool({ name: "projectList", arguments: {} });
-  assert.deepEqual(listedProjects.structuredContent, [
-    { projectId: "data-platform", displayName: "Data platform" },
-    { projectId: "demo", displayName: "demo" },
-  ]);
+  assert.deepEqual(listedProjects.structuredContent, {
+    projects: [
+      { projectId: "data-platform", displayName: "Data platform" },
+      { projectId: "demo", displayName: "demo" },
+    ],
+  });
   const selectedProject = await client.callTool({ name: "projectUse", arguments: { projectId: "demo" } });
   assert.equal(selectedProject.isError, undefined, JSON.stringify(selectedProject));
   assert.equal((await service.status()).run.projectId, "demo");

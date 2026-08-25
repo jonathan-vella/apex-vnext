@@ -70,7 +70,7 @@ const projectCreateInput = z
     iacTool: z.enum(["bicep", "terraform"]),
   })
   .strict();
-const projectIdInput = z.object({ projectId: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/) }).strict();
+const projectIdInput = z.object({ projectId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/) }).strict();
 const projectUseInput = projectIdInput.extend({ runId: z.string().min(1).optional() });
 const projectDeleteInput = projectIdInput.extend({ confirm: z.literal(true) });
 const normalizeOutputs = (outputs: z.infer<typeof taskOutput>[]) =>
@@ -127,17 +127,22 @@ export function createMcpServer(service: ApexService): McpServer {
     async (input) => result(await service.createProject(input as Parameters<typeof service.createProject>[0])),
   );
   server.registerTool("projectList", { description: "List projects in the current workspace" }, async () =>
-    result(await service.listProjects()),
+    result({ projects: await service.listProjects() }),
   );
   server.registerTool(
     "projectUse",
     { description: "Select an existing project and optionally one of its runs", inputSchema: projectUseInput },
     async ({ projectId, runId }) =>
-      result(await service.use(projectId as Parameters<typeof service.use>[0], runId as Parameters<typeof service.use>[1])),
+      result(
+        await service.use(projectId as Parameters<typeof service.use>[0], runId as Parameters<typeof service.use>[1]),
+      ),
   );
   server.registerTool(
     "projectDelete",
-    { description: "Delete a project and all of its run-bound state after explicit confirmation", inputSchema: projectDeleteInput },
+    {
+      description: "Delete a project and all of its run-bound state after explicit confirmation",
+      inputSchema: projectDeleteInput,
+    },
     async ({ projectId, confirm }) =>
       result(await service.deleteProject(projectId as Parameters<typeof service.deleteProject>[0], confirm)),
   );
