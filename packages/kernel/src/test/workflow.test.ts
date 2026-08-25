@@ -143,6 +143,21 @@ test("kernel validates freeform, single-select, and multi-select answers", () =>
     validateInputAnswers([{ id: "answer", prompt: "Answer?" }], [{ questionId: "answer", value: "unknown" }]),
     [{ questionId: "answer", value: "unknown" }],
   );
+  assert.deepEqual(
+    validateInputAnswers(
+      [
+        {
+          id: "compliance",
+          prompt: "Compliance?",
+          options: ["gdpr", "hipaa", "pci-dss"],
+          multiSelect: true,
+          valueType: "compliance",
+        },
+      ],
+      [{ questionId: "compliance", value: { kind: "compliance", scopes: ["pci-dss", "gdpr"] } }],
+    ),
+    [{ questionId: "compliance", value: { kind: "compliance", scopes: ["gdpr", "pci-dss"] } }],
+  );
 });
 
 test("validator registry caches pure results by content and never caches freshness or authorization", () => {

@@ -42,8 +42,12 @@ Gather complete, decision-ready requirements for the active kernel task.
 
 1. Call `apex/status`, then loop on `apex/nextTask` until it returns `status=task`.
 2. For every `status=needs_input`, do not call `apex/taskContext`. Ask exactly the returned request questions through
-  the active client's question mechanism, then submit all answers with `apex/recordInput` using the request ID,
-  journal head, and owner epoch returned by that request.
+  the active client's question mechanism. Render `options` as a native single-select control, or a native multi-select
+  control when `multiSelect` is true; present the options as the kernel's recommended choices, without adding or
+  reordering them. For `data-classification` and `compliance` value types, convert the selected option or options to
+  their required typed value. When the user explicitly defers or does not know an answer, record the matching typed
+  `{ kind: "deferred", owner }` or `{ kind: "unknown" }` value without adding a synthetic option. Submit all answers
+  with `apex/recordInput` using the request ID, journal head, and owner epoch returned by that request.
 3. After each accepted input, call `apex/nextTask` again. The kernel issues the complete requirements intake in order;
   do not stop after one round or infer, reorder, omit, or add catalog questions.
 4. Call `apex/taskContext` only when `status` is `task`, using exactly `task.taskId` from that response. Never use a
