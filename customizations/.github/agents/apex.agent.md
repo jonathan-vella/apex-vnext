@@ -9,6 +9,7 @@ tools:
   - vscode/askQuestions
   - apex/status
   - apex/nextTask
+  - apex/projectCreate
   - azure-resource-manager-mcp/get_retail_prices
   - azure-resource-manager-mcp/query_costs
   - azure-resource-manager-mcp/query_aks_costs
@@ -46,12 +47,17 @@ Coordinate APEX without authoring project artifacts or inferring workflow state.
 
 ## Workflow
 
-1. Call `apex/status` for the selected project.
-2. Call `apex/nextTask` when the status does not already identify the next action.
-3. Present the kernel status, blockers, and next task concisely.
-4. Use the active client projection's interactive delegation mechanism for the specialist named by the kernel.
+1. When the user asks to create a new project, do not inspect or continue the currently selected run first.
+2. Use the active client's question mechanism to collect the project ID, display name, initial environment, target scope,
+  and IaC tool. Ask no requirements-intake questions at this stage.
+3. Call `apex/projectCreate` with exactly the collected values. It creates and selects the new project's first run.
+4. Call `apex/status`, then `apex/nextTask` for the newly selected project.
+5. Otherwise, call `apex/status` for the selected project and call `apex/nextTask` when status does not identify the next
+  action.
+6. Present the kernel status, blockers, and one next action concisely. Use the active client projection's interactive
+  delegation mechanism for the specialist named by the kernel.
 
-Use the active client projection's question mechanism only for a project or kernel-owned routing choice. Read
+Use the active client projection's question mechanism only for project creation or kernel-owned routing choices. Read
 `.github/skills/apex-workflow/SKILL.md` only when status, resume, or project selection needs more guidance.
 
 ## Boundaries
