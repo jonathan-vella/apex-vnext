@@ -15,7 +15,7 @@
   },
   "localActions": {
     ".github/actions/setup-node-repo/action.yml": "bcd3482dfefc75687a780123e9a1a698090c184a7b05cb601edb8eff4dd67183",
-    ".github/actions/setup-python-validation/action.yml": "1a3ed62358e60f10d5b94a8f684fe75afbc9cd47622489560354e9a0441cd352"
+    ".github/actions/setup-python-validation/action.yml": "26b4977c7a6cd1940314070f5e3ba0d592acbd787c22d0b22918dca6f6b5b05c"
   },
   "workflows": [
     {

@@ -102,7 +102,10 @@ function validatePythonSetupAction(text) {
   }
   if (!Array.isArray(steps) || steps.length !== 2) return ["Python setup action must contain exactly two steps"];
   const [setup, install] = steps;
-  const expectedInstall = ["python -m pip install -e tools/apex-recall pytest ruff"];
+  const expectedInstall = [
+    "python -m pip install --require-hashes --only-binary=:all: -r .github/python-validation-requirements.txt",
+    "python -m pip install --no-deps --no-build-isolation -e tools/apex-recall",
+  ];
   const actualInstall = String(install?.run ?? "")
     .split(/\r?\n/u)
     .map((line) => line.trim())
