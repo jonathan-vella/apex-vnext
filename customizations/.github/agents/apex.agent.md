@@ -62,8 +62,11 @@ Coordinate APEX without authoring project artifacts or inferring workflow state.
   client's question mechanism to select one and confirm deletion, then call `apex/projectDelete` only with
   `confirm: true`.
 5. Otherwise, call `apex/status` for the selected project and call `apex/nextTask` when status does not identify
-  the next action. Present the kernel status, blockers, and one next action concisely. Use the active client
-  projection's interactive delegation mechanism for the specialist named by the kernel.
+  the next action. When `nextTask` returns `status=needs_input` with `request.intake`, immediately use the active
+  client's interactive delegation mechanism to hand off to `APEX Requirements`; do not ask, answer, summarize, or
+  record any intake question in the coordinator. For other results, present the kernel status, blockers, and one next
+  action concisely, then use the active client projection's interactive delegation mechanism for the specialist named
+  by the kernel.
 
 Use the active client projection's question mechanism only for project creation or kernel-owned routing choices. Read
 `.github/skills/apex-workflow/SKILL.md` only when status, resume, or project selection needs more guidance.
