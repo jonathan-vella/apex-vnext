@@ -61,5 +61,27 @@ for (const { path: filePath, pattern } of FILES_TO_CHECK) {
   }
 }
 
+r.tick();
+const lockContent = readFile("package-lock.json");
+if (!lockContent) {
+  r.error("package-lock.json not found");
+} else {
+  try {
+    const lock = JSON.parse(lockContent);
+    const nestedInternalPackages = Object.keys(lock.packages ?? {}).filter((entry) =>
+      /^packages\/[^/]+\/node_modules\/@apexops\//u.test(entry),
+    );
+    if (nestedInternalPackages.length > 0) {
+      r.error(
+        `package-lock.json resolves internal packages outside the workspace: ${nestedInternalPackages.join(", ")}`,
+      );
+    } else {
+      r.ok("package-lock.json: internal packages resolve through root workspace links");
+    }
+  } catch {
+    r.error("package-lock.json is not valid JSON");
+  }
+}
+
 r.summary();
 r.exitOnError("All versions in sync", "Version sync FAILED");
