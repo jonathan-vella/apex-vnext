@@ -39,6 +39,9 @@ jobs:
       - name: Setup Node repository
         uses: ./.github/actions/setup-node-repo
 
+      - name: Setup Python validation
+        uses: ./.github/actions/setup-python-validation
+
       - name: Install Bicep CLI
         run: |
           az bicep install
