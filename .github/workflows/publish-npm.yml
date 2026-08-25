@@ -39,6 +39,14 @@ jobs:
       - name: Setup Node repository
         uses: ./.github/actions/setup-node-repo
 
+      - name: Install Bicep CLI
+        run: az bicep install
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+
       - name: Verify release intent
         id: release
         env:
