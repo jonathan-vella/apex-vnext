@@ -101,6 +101,18 @@ Create a Terraform project named data-platform for dev, targeting local.
 The agent uses the VS Code question control or Copilot CLI `ask_user` to collect the project ID, display name,
 environment, target scope, and IaC tool. It then creates and selects the project through the APEX MCP server.
 
+For the remaining project lifecycle actions, use direct prompts:
+
+```text
+List my projects.
+Resume the payments project.
+Delete the data-platform project.
+```
+
+APEX lists projects without questions. It asks you to select a project only when a resume or delete request does not
+name one, and it asks for explicit confirmation before deleting. It refuses to delete the only remaining project in a
+consumer workspace.
+
 The equivalent deterministic CLI fallback is:
 
 ```bash

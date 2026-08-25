@@ -894,6 +894,40 @@ export class ApexService {
     return projects.map(({ projectId, displayName }) => ({ projectId, displayName }));
   }
 
+  async deleteProject(projectId: ProjectId, confirmed: boolean): Promise<{ deleted: ProjectId; selected?: Selection }> {
+    if (!confirmed) throw new ApexError("APEX_USAGE", "project deletion requires explicit confirmation", EXIT_CODES.usage);
+    const projects = await this.listProjects();
+    if (!projects.some((project) => project.projectId === projectId)) {
+      throw new ApexError("APEX_NOT_FOUND", `Project not found: ${projectId}`, EXIT_CODES.notFound);
+    }
+    if (projects.length <= 1) {
+      throw new ApexError("APEX_CONFLICT", "Cannot delete the only project in a workspace", EXIT_CODES.conflict);
+    }
+    const selection = await this.selection();
+    const projectDirectory = this.projects.projectDirectory(projectId);
+    await this.assertSafeExistingPath(join(this.root, ".apex"), projectDirectory);
+    const runDirectory = join(projectDirectory, "runs");
+    await this.assertSafeExistingPath(projectDirectory, runDirectory);
+    const runIds = await readdir(runDirectory);
+    for (const runId of runIds) {
+      const workDirectory = join(this.root, ".apex", "work", runId);
+      if (await this.pathExistsLstat(workDirectory)) {
+        await this.assertSafeExistingPath(join(this.root, ".apex"), workDirectory);
+        await rm(workDirectory, { recursive: true, force: true });
+      }
+    }
+    await rm(projectDirectory, { recursive: true, force: true });
+    if (selection.projectId !== projectId) return { deleted: projectId };
+    const replacement = projects.find((project) => project.projectId !== projectId)!;
+    const nextSelection = {
+      projectId: replacement.projectId as ProjectId,
+      runId: await this.latestRun(replacement.projectId as ProjectId),
+    };
+    await this.writeSelection(nextSelection);
+    await this.append(await this.run(nextSelection), "selection.changed", nextSelection);
+    return { deleted: projectId, selected: nextSelection };
+  }
+
   async use(projectId: ProjectId, runId?: RunId): Promise<Selection> {
     await this.projects.getProject(projectId);
     const selectedRun = runId ?? (await this.latestRun(projectId));
