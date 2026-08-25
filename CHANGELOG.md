@@ -10,6 +10,14 @@ current repository version is recorded in [VERSION.md](VERSION.md).
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0-next.1] — Preview
+
+### Fixed
+
+- Packaged the APEX Azure MCP launcher as a release-tarball contract and defaulted its .NET child process to invariant
+  globalization when ICU is unavailable. Consumers can override `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT` when their
+  environment provides ICU.
+
 ## [0.10.0-next.0] — Preview
 
 This release line was extracted from a qualified vNext integration head in the
