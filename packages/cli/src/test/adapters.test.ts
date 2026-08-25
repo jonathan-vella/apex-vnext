@@ -227,13 +227,13 @@ test("MCP registers only narrow tools and calls the service", async () => {
       projectId: "data-platform",
       displayName: "Data platform",
       environment: "dev",
-      targetScope: "local",
       iacTool: "terraform",
     },
   });
   assert.equal(createdProject.isError, undefined, JSON.stringify(createdProject));
   assert.equal((createdProject.structuredContent as { projectId: string }).projectId, "data-platform");
   assert.equal((await service.status()).run.projectId, "data-platform");
+  assert.equal((await service.status()).run.targetScope, "local");
   const listedProjects = await client.callTool({ name: "projectList", arguments: {} });
   assert.deepEqual(listedProjects.structuredContent, {
     projects: [
