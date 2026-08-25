@@ -40,11 +40,14 @@ jobs:
         uses: ./.github/actions/setup-node-repo
 
       - name: Install Bicep CLI
-        run: az bicep install
+        run: |
+          az bicep install
+          printf '%s\n' "$HOME/.azure/bin" >> "$GITHUB_PATH"
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
         with:
+          terraform_version: 1.15.8
           terraform_wrapper: false
 
       - name: Verify release intent

@@ -88,7 +88,7 @@
       "triggerDigest": "cfaeb942288dcbcc4c8631ac5b901b073dc1acbbe285c3c40baaec41bc425f57",
       "permissionsDigest": "d57abeeb8232850a40cc2fd3e29e491dd077df7b2a7988ae52899fba4527b761",
       "concurrencyDigest": "1cf197bb4117f498288d0df9e90c8d763fe22f45c6b50310ae61aa8bca8a4178",
-      "jobsDigest": "bd424b350d1fd4164cd4ce57b6b2c28949568b2fa15f24a5d0c2aa23b06140fe",
+      "jobsDigest": "64c318b06a117702975cababadb23dc76ded07dc3f95174ba1995cf82986da9e",
       "jobs": { "publish": "Publish trusted npm release" }
     },
     {
