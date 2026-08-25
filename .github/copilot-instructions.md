@@ -114,9 +114,7 @@ See `AGENTS.md` for all conventions, project structure, key file paths,
 and build/validation commands.
 
 **Terminal hygiene**: Never use `mv -i`, `rm -i`, `cp -i`, `read -p`, or any
-prompt-driven shell builtin (incl. inside `bash -c '...'`). Pipe >50-line
-output to a file. See `.github/instructions/no-interactive-shell.instructions.md`
-for the full ruleset; `npm run lint:safe-shell` enforces it on committed
-agent/skill/instruction snippets.
+prompt-driven shell builtin (incl. inside `bash -c '...'`). Keep command output
+bounded. `npm run lint:safe-shell` enforces this on committed managed guidance.
 
 For vNext implementation, prefer package-level tests and typed contract validation before broad repository checks.

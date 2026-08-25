@@ -559,6 +559,13 @@
       "retirement": { "status": "active", "replacementIds": [] }
     },
     {
+      "id": "validate-instruction-catalog-review",
+      "script": "validate:instruction-catalog-review",
+      "profile": "node-validation",
+      "aliases": [],
+      "retirement": { "status": "active", "replacementIds": [] }
+    },
+    {
       "id": "validate-optimization-gate",
       "script": "validate:optimization-gate",
       "profile": "node-validation",
@@ -674,6 +681,7 @@
         "validate:agents",
         "validate:skills",
         "validate:guidance-migration",
+        "validate:instruction-catalog-review",
         "validate:optimization-gate",
         "validate:vscode-installation-lifecycle",
         "validate:skill-catalog-review",

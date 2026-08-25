@@ -11,6 +11,7 @@ const consumerResources = new Map([["consumer-skill", new Set(["SKILL.md", "refe
 const managedFiles = new Set([
   ".github/skills/consumer-skill/SKILL.md",
   ".github/skills/consumer-skill/references/rule.md",
+  ".github/instructions/apex-source.instructions.md",
 ]);
 
 const resource = (overrides = {}) => ({
@@ -35,11 +36,16 @@ const matrix = (overrides = {}) => ({
       resourceDispositions: [resource()],
     },
   ],
-  instructionDisposition: {
-    sourceGlob: ".github/instructions/*.instructions.md",
-    disposition: "repository-only",
-    owner: "source authoring validators",
-  },
+  instructionDispositions: [
+    {
+      source: "source.instructions.md",
+      disposition: "adapt",
+      targets: ["apex-source.instructions.md"],
+      reason: "Preserves consumer-safe guidance in the managed projection.",
+      replacementProof: "Packaging validation verifies the managed instruction target.",
+      rollbackGate: "Restore the source mapping only after consumer validation fails.",
+    },
+  ],
   ...overrides,
 });
 
@@ -49,6 +55,8 @@ const inputs = (overrides = {}) => ({
   sourceResources,
   consumerResources,
   managedFiles,
+  sourceInstructions: ["source.instructions.md"],
+  consumerInstructions: new Set(["apex-source.instructions.md"]),
   ...overrides,
 });
 
@@ -93,6 +101,23 @@ test("rejects a missing lifecycle and source resource disposition", () => {
   const errors = validateGuidanceMigration(inputs({ matrix: candidate }));
   assert.ok(errors.some((error) => error.includes("Unsupported or missing lifecycle")));
   assert.ok(errors.some((error) => error.includes("Missing resource disposition")));
+});
+
+test("rejects missing instruction dispositions and managed instruction targets", () => {
+  const candidate = matrix({ instructionDispositions: [] });
+  let errors = validateGuidanceMigration(inputs({ matrix: candidate }));
+  assert.ok(errors.some((error) => error.includes("Missing instruction disposition")));
+
+  const missingTarget = matrix({
+    instructionDispositions: [
+      {
+        ...matrix().instructionDispositions[0],
+        targets: ["apex-missing.instructions.md"],
+      },
+    ],
+  });
+  errors = validateGuidanceMigration(inputs({ matrix: missingTarget }));
+  assert.ok(errors.some((error) => error.includes("Missing consumer instruction target")));
 });
 
 test("accepts a planned target that has not been created", () => {

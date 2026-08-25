@@ -48,6 +48,14 @@ test("init installs bundled customizations and runtime config by default", async
   assert.match(coordinatorAgent, /target: vscode/u);
   assert.match(await readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"), /target: vscode/u);
   assert.match(
+    await readFile(join(root, ".github", "instructions", "apex-agent-authoring.instructions.md"), "utf8"),
+    /APEX Agent Boundaries/u,
+  );
+  assert.match(
+    await readFile(join(root, ".github", "instructions", "apex-terraform.instructions.md"), "utf8"),
+    /APEX Terraform Rules/u,
+  );
+  assert.match(
     await readFile(join(root, ".github", "skills", "apex-azure-defaults", "SKILL.md"), "utf8"),
     /APEX Azure Defaults/u,
   );
@@ -201,6 +209,10 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(requirementsAgent, /- ask_user/u);
   assert.match(requirementsAgent, /- task/u);
   assert.doesNotMatch(requirementsAgent, /vscode\/askQuestions|handoffs:|agents:/u);
+  assert.match(
+    await readFile(join(root, ".github", "instructions", "apex-agent-authoring.instructions.md"), "utf8"),
+    /APEX Agent Boundaries/u,
+  );
   const coordinatorAgent = await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8");
   assert.match(coordinatorAgent, /- apex\/projectCreate/u);
   assert.match(coordinatorAgent, /Use `ask_user` for kernel-owned input requests/u);

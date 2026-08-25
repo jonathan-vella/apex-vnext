@@ -12,7 +12,7 @@
         "architecture",
         "iac-planning"
       ],
-      "notes": "Anthropic's most capable model. Drop-in upgrade from Opus 4.7 (no API-breaking changes): same tools/features, adaptive thinking only, sampling params unsupported. Improves long-horizon agentic coding, reasoning-effort calibration, tool triggering, and compaction recovery; effort defaults to `high` on all surfaces. Authorized 2026-05 for Architecture (03) and IaC Planning (05). Reasoning-effort policy (high vs default) is a per-agent / per-call concern, NOT a separate model label — see `.github/instructions/agent-authoring.instructions.md`."
+      "notes": "Anthropic's most capable model. Drop-in upgrade from Opus 4.7 (no API-breaking changes): same tools/features, adaptive thinking only, sampling params unsupported. Improves long-horizon agentic coding, reasoning-effort calibration, tool triggering, and compaction recovery; effort defaults to `high` on all surfaces. Authorized 2026-05 for Architecture (03) and IaC Planning (05). Reasoning-effort policy is a per-agent or per-call concern, not a separate model label."
     },
     "Claude Opus 4.7": {
       "vendor": "Anthropic",
@@ -25,7 +25,7 @@
         "iac-planning",
         "context-optimization"
       ],
-      "notes": "Active Opus 4.7 SKU. Reasoning-effort policy (high vs default) is a per-agent / per-call concern, NOT a separate model label. See `.github/instructions/agent-authoring.instructions.md` (\"Reasoning-effort policy\" section) for guidance on which agents run at high effort."
+      "notes": "Active Opus 4.7 SKU. Reasoning-effort policy is a per-agent or per-call concern, not a separate model label."
     },
     "Claude Opus 4.6": {
       "vendor": "Anthropic",

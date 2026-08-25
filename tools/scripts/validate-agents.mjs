@@ -71,7 +71,7 @@ const SUBAGENT_REQUIRED = ["name", "description", "user-invocable", "tools"];
 const RECOMMENDED_FIELDS = ["agents", "model"];
 const BLOCK_SCALAR_PATTERN = /^description:\s*[>|][-\s]*$/m;
 // Description length cap: enforces concise routing-keyword-only descriptions.
-// See .github/instructions/agent-authoring.instructions.md#frontmatter-description-length.
+// See customizations/.github/instructions/apex-agent-authoring.instructions.md.
 // Anti-scope language belongs in the body, not in the description field —
 // every char here ships with every model call (~10x compounding cost).
 const DESCRIPTION_MAX_LEN = 350;
@@ -637,7 +637,7 @@ const VENDOR_RULES = [
     severity: "error",
     appliesTo: "both",
     sourceUrl:
-      "https://github.com/jonathan-vella/apex-vnext/blob/main/.github/instructions/agent-authoring.instructions.md",
+      "https://github.com/jonathan-vella/apex-vnext/blob/main/customizations/.github/instructions/apex-agent-authoring.instructions.md",
   },
   {
     id: "claude-output-contract-001",
@@ -651,7 +651,7 @@ const VENDOR_RULES = [
     severity: "warn",
     appliesTo: "agent",
     sourceUrl:
-      "https://github.com/jonathan-vella/apex-vnext/blob/main/.github/instructions/agent-authoring.instructions.md",
+      "https://github.com/jonathan-vella/apex-vnext/blob/main/customizations/.github/instructions/apex-agent-authoring.instructions.md",
   },
   {
     id: "personality-scoping-001",
@@ -665,7 +665,7 @@ const VENDOR_RULES = [
     severity: "error",
     appliesTo: "prompt",
     sourceUrl:
-      "https://github.com/jonathan-vella/apex-vnext/blob/main/.github/instructions/vendor-prompting.instructions.md#prompt-model-source",
+      "https://github.com/jonathan-vella/apex-vnext/blob/main/customizations/.github/instructions/apex-prompt-authoring.instructions.md",
   },
 ];
 

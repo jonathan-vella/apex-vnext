@@ -15,8 +15,8 @@
       "description": "GA agent skills with SKILL.md entry points"
     },
     "instructions": {
-      "computed_from": ".github/instructions/*.instructions.md",
-      "description": "Instruction files with glob-based auto-application"
+      "computed_from": "customizations/.github/instructions/*.instructions.md",
+      "description": "Managed consumer instruction files with glob-based auto-application"
     },
     "validators": {
       "computed_from": "tools/registry/repository-validator-graph.json active lint and validation commands",

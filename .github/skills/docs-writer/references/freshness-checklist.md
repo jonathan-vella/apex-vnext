@@ -24,7 +24,7 @@
 | File                                        | What to look for                   |
 | ------------------------------------------- | ---------------------------------- |
 | `docs/*.md`                                 | `> Version X.Y.Z` in header line   |
-| `.github/instructions/docs.instructions.md` | Version in header template example |
+| `customizations/.github/instructions/apex-documentation.instructions.md` | Version in header template example |
 
 **Auto-fix**: Replace old version string with current from `VERSION.md`.
 
@@ -40,7 +40,7 @@
 
 | File                                        | What to verify                   |
 | ------------------------------------------- | -------------------------------- |
-| `.github/instructions/docs.instructions.md` | `### Agents (N total)` and table |
+| `customizations/.github/instructions/apex-documentation.instructions.md` | Managed agent inventory and table |
 
 **Auto-fix**: Update count in heading. Add missing agents to table
 matching the existing column format. Remove entries for agents that
@@ -58,7 +58,7 @@ no longer exist.
 
 | File                                        | What to verify                   |
 | ------------------------------------------- | -------------------------------- |
-| `.github/instructions/docs.instructions.md` | `### Skills (N total)` and table |
+| `customizations/.github/instructions/apex-documentation.instructions.md` | Managed skill inventory and table |
 
 **Auto-fix**: Update count in heading. Add missing skills to the
 appropriate category table. Remove entries for deleted skills.
@@ -103,7 +103,7 @@ appropriate category table. Remove entries for deleted skills.
 
 ### 7. Instruction File Table Sync
 
-**Source of truth**: List `.github/instructions/*.instructions.md` files.
+**Source of truth**: List `customizations/.github/instructions/*.instructions.md` files.
 
 **Expected count** (as of 2026-02-26): computed dynamically from `tools/registry/count-manifest.json`
 (run `validate:no-hardcoded-counts` to verify)

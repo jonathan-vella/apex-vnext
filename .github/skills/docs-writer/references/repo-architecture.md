@@ -244,6 +244,6 @@ references them:
 
 ### Instruction Files (Separate Mechanism)
 
-Instruction files (`.github/instructions/*.instructions.md`) load automatically
+Managed consumer instruction files (`customizations/.github/instructions/*.instructions.md`) load automatically
 via `.gitattributes` `applyTo` globs — this is a distinct mechanism from skill
 discovery. Instructions are file-type-scoped rules, not invokable skills.

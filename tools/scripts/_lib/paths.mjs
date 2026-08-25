@@ -10,7 +10,7 @@ export const SUBAGENTS_DIR = "customizations/.github/agents/_subagents";
 export const LEGACY_AGENTS_DIR = ".archive/legacy-agents-v0.10/.github/agents";
 export const LEGACY_SUBAGENTS_DIR = ".archive/legacy-agents-v0.10/.github/agents/_subagents";
 export const SKILLS_DIR = ".github/skills";
-export const INSTRUCTIONS_DIR = ".github/instructions";
+export const INSTRUCTIONS_DIR = "customizations/.github/instructions";
 export const AGENT_OUTPUT_DIR = "agent-output";
 // NOTE: APEX prompt files live under `tools/apex-prompts/` (not `.github/prompts/`)
 // so they are never auto-loaded by VS Code Copilot's prompt-file discovery.
