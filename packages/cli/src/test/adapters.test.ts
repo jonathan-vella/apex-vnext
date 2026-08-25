@@ -201,6 +201,7 @@ test("MCP registers only narrow tools and calls the service", async () => {
     "inventory",
     "nextTask",
     "preview",
+    "projectCreate",
     "promote",
     "reconcile",
     "recordInput",
@@ -217,6 +218,20 @@ test("MCP registers only narrow tools and calls the service", async () => {
   const response = await client.callTool({ name: "status", arguments: {} });
   assert.equal(response.isError, undefined);
   assert.equal((response.structuredContent as { run: { projectId: string } }).run.projectId, "demo");
+  const createdProject = await client.callTool({
+    name: "projectCreate",
+    arguments: {
+      projectId: "data-platform",
+      displayName: "Data platform",
+      environment: "dev",
+      targetScope: "local",
+      iacTool: "terraform",
+    },
+  });
+  assert.equal(createdProject.isError, undefined, JSON.stringify(createdProject));
+  assert.equal((createdProject.structuredContent as { projectId: string }).projectId, "data-platform");
+  assert.equal((await service.status()).run.projectId, "data-platform");
+  await service.use("demo");
   const pending = await client.callTool({ name: "nextTask", arguments: {} });
   const request = (
     pending.structuredContent as {

@@ -61,6 +61,15 @@ const inputSubmission = z
       .min(1),
   })
   .strict();
+const projectCreateInput = z
+  .object({
+    projectId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/),
+    displayName: z.string().min(1).max(256),
+    environment: z.string().min(1).max(128),
+    targetScope: z.string().min(1).max(1024),
+    iacTool: z.enum(["bicep", "terraform"]),
+  })
+  .strict();
 const normalizeOutputs = (outputs: z.infer<typeof taskOutput>[]) =>
   outputs.map(({ kind, value, summary }) => ({
     kind,
@@ -105,6 +114,14 @@ export function createMcpServer(service: ApexService): McpServer {
     "recordInput",
     { description: "Record answers for the exact pending kernel input request", inputSchema: inputSubmission },
     async (input) => result(await service.recordInput(input)),
+  );
+  server.registerTool(
+    "projectCreate",
+    {
+      description: "Create and select a new project with its initial environment run",
+      inputSchema: projectCreateInput,
+    },
+    async (input) => result(await service.createProject(input as Parameters<typeof service.createProject>[0])),
   );
   server.registerTool(
     "stageArtifact",

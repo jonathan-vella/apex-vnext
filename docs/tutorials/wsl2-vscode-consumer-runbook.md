@@ -91,8 +91,17 @@ projection. Do not edit `.apex` directly.
 
 ## Add Workloads To The Consumer
 
-The `payments` value above creates the first workload project in this consumer repository. Add later workloads
-without creating another consumer repository or reinstalling the VS Code projection:
+The `payments` value above creates the first workload project in this consumer repository. To add a workload, ask the
+workspace **APEX** agent to create it. For example:
+
+```text
+Create a Terraform project named data-platform for dev, targeting local.
+```
+
+The agent uses the VS Code question control or Copilot CLI `ask_user` to collect the project ID, display name,
+environment, target scope, and IaC tool. It then creates and selects the project through the APEX MCP server.
+
+The equivalent deterministic CLI fallback is:
 
 ```bash
 npx apex project create \

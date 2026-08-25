@@ -12,6 +12,7 @@
         "nextTask",
         "taskContext",
         "recordInput",
+        "projectCreate",
         "stageArtifact",
         "stageFile",
         "generateIac",
