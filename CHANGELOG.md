@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Changed
 
+- The APEX coordinator now delegates kernel requirements-intake questions to APEX Requirements instead of asking them
+  directly.
 - Managed agent assignments now use GPT-5.6 Sol for architecture, planning, and requirements; GPT-5.6 Terra for
   code generation, operations, review, and validation.
 - The VS Code projection launches Azure MCP through an APEX-local shim. The managed MCP configuration remains

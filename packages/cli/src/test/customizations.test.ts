@@ -216,6 +216,7 @@ test("init installs only the selected Copilot CLI projection and records it in t
   const coordinatorAgent = await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8");
   assert.match(coordinatorAgent, /- apex\/projectCreate/u);
   assert.match(coordinatorAgent, /Use `ask_user` for kernel-owned input requests/u);
+  assert.match(coordinatorAgent, /request\.intake.*hand off to `APEX Requirements`/su);
   assert.match(
     await readFile(join(root, ".github", "skills", "apex-azure-defaults", "SKILL.md"), "utf8"),
     /APEX Azure Defaults/u,
