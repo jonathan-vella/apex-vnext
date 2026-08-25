@@ -98,7 +98,13 @@ export function validateInputAnswers(questions: QuestionV1[], submitted: InputAn
       ) {
         throw new Error(`Answer is not a declared option: ${question.id}`);
       }
-      return { questionId: question.id, value };
+      return {
+        questionId: question.id,
+        value:
+          question.valueType === "compliance" && question.options !== undefined && value.kind === "compliance"
+            ? { ...value, scopes: question.options.filter((option) => value.scopes.includes(option)) }
+            : value,
+      };
     }
     if (
       (question.multiSelect === true ? !Array.isArray(value) : typeof value !== "string") ||
