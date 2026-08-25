@@ -4,6 +4,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { format } from "prettier";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const check = process.argv.includes("--check");
@@ -21,32 +22,35 @@ const entries = [...(ledger.instructionDispositions ?? [])].sort((left, right) =
 const rows = entries.map(
   ({ source, disposition, targets, reason }) => `| ${source} | ${disposition} | ${renderTarget(targets)} | ${reason} |`,
 );
-const content = [
-  "# Instruction Catalog Review",
-  "",
-  "> [Current Version](../../VERSION.md) | Generated retired-source to managed-consumer instruction mapping.",
-  "",
-  "This file is generated from",
-  "[`guidance-migration.v1.json`](../../tools/registry/guidance-migration.v1.json). Do not edit it manually.",
-  "",
-  "## Evidence Boundary",
-  "",
-  "The catalog proves only the declared instruction disposition and managed target inventory.",
-  "It does not prove live client discovery or workflow behavior.",
-  "",
-  "## Source Dispositions",
-  "",
-  "| Retired source instruction | Disposition | Managed consumer target | Rationale |",
-  "| --- | --- | --- | --- |",
-  ...rows,
-  "",
-  "## Related",
-  "",
-  "- [Instruction migration ledger](../../tools/registry/guidance-migration.v1.json)",
-  "- [Skill catalog review](SKILL-CATALOG-REVIEW.generated.md)",
-  "- [Client qualification](CLIENT-QUALIFICATION.md)",
-  "",
-].join("\n");
+const content = await format(
+  [
+    "# Instruction Catalog Review",
+    "",
+    "> [Current Version](../../VERSION.md) | Generated retired-source to managed-consumer instruction mapping.",
+    "",
+    "This file is generated from",
+    "[`guidance-migration.v1.json`](../../tools/registry/guidance-migration.v1.json). Do not edit it manually.",
+    "",
+    "## Evidence Boundary",
+    "",
+    "The catalog proves only the declared instruction disposition and managed target inventory.",
+    "It does not prove live client discovery or workflow behavior.",
+    "",
+    "## Source Dispositions",
+    "",
+    "| Retired source instruction | Disposition | Managed consumer target | Rationale |",
+    "| --- | --- | --- | --- |",
+    ...rows,
+    "",
+    "## Related",
+    "",
+    "- [Instruction migration ledger](../../tools/registry/guidance-migration.v1.json)",
+    "- [Skill catalog review](SKILL-CATALOG-REVIEW.generated.md)",
+    "- [Client qualification](CLIENT-QUALIFICATION.md)",
+    "",
+  ].join("\n"),
+  { parser: "markdown" },
+);
 
 if (check) {
   if (!existsSync(outputPath) || readFileSync(outputPath, "utf8") !== content) {

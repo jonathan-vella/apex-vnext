@@ -34,6 +34,7 @@ const SCAN_GLOBS = [
   { dir: ".github/agents", suffix: ".md" },
   { dir: "customizations/.github/agents", suffix: ".md" },
   { dir: ".github/instructions", suffix: ".md" },
+  { dir: "customizations/.github/instructions", suffix: ".md" },
   { dir: ".github/prompts", suffix: ".md" },
   { dir: "tools/apex-prompts", suffix: ".md" },
 ];

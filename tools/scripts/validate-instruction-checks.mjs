@@ -159,7 +159,7 @@ for (const filePath of allMdFiles) {
   const relFile = path.relative(ROOT, filePath);
 
   for (const match of findAllMatches(instructionRefPattern, content)) {
-    const refFile = `.github/instructions/${match[1]}`;
+    const refFile = `${INSTRUCTIONS_DIR}/${match[1]}`;
     if (!foundInstructionRefs.has(refFile)) {
       foundInstructionRefs.set(refFile, []);
     }
