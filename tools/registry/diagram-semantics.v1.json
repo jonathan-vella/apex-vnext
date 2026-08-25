@@ -41,7 +41,7 @@
     },
     {
       "id": "markdown-routing-instruction",
-      "path": ".github/instructions/markdown.instructions.md",
+      "path": "customizations/.github/instructions/apex-markdown.instructions.md",
       "outputClass": "documentation",
       "requiredMarkers": ["python-diagrams", "mermaid", ".py", ".png", ".svg"]
     },

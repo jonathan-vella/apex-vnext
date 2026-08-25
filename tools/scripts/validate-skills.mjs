@@ -103,7 +103,7 @@ function runFormatValidation() {
     }
 
     // Description length cap — see
-    // .github/instructions/agent-authoring.instructions.md#frontmatter-description-length
+    // customizations/.github/instructions/apex-agent-authoring.instructions.md
     // The Copilot router only needs the WHEN: trigger keywords. Long
     // USE FOR / INVOKES lines belong in the SKILL.md body.
     if (frontmatter.description) {

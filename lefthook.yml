@@ -65,7 +65,7 @@ pre-commit:
             echo "❌ Artifact template validation failed!"
             echo ""
             echo "🔧 To fix:"
-            echo "   1. Check .github/instructions/azure-artifacts.instructions.md"
+            echo "   1. Check customizations/.github/instructions/apex-artifact-contracts.instructions.md"
             echo "   2. Use EXACT H2 headings from that file"
             echo "   3. Run: npm run fix:artifact-h2 -- <file> --apply"
             echo "   4. Re-stage and commit"
@@ -92,7 +92,7 @@ pre-commit:
         ❌ Artifact H2 structure or challenger-review presence check failed!
 
         📚 References:
-        - .github/instructions/azure-artifacts.instructions.md
+        - customizations/.github/instructions/apex-artifact-contracts.instructions.md
         - AGENTS.md "Agent Workflow" (mandatory challenger reviews)
         🔧 Auto-fix H2: npm run fix:artifact-h2 -- <file> --apply
         🔧 Challenger:  re-run challenger-review-subagent or 10-Challenger
@@ -118,7 +118,7 @@ pre-commit:
         Checks: frontmatter syntax, model-prompt alignment, body size (<500 lines),
         language density (<5 absolute terms per 100 lines), classifier unit tests,
         managed role and hidden-worker contracts
-        📚 Reference: .github/instructions/agent-authoring.instructions.md
+        📚 Reference: customizations/.github/instructions/apex-agent-authoring.instructions.md
 
     instructions:
       glob: "**/*.instructions.md,{.github/skills/**,.github/instructions/**}"

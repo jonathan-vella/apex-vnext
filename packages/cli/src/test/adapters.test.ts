@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, symlink, writeFile } from "node:fs/promises";
+import { mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { CONTRACT_VERSION } from "@apexops/contracts";
@@ -343,6 +343,23 @@ test("MCP registers only narrow tools and calls the service", async () => {
   );
   await client.close();
   await server.close();
+});
+
+test("project deletion validates a replacement run before mutating selection", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "payments" });
+  await service.createProject({
+    projectId: "data-platform",
+    displayName: "Data platform",
+    environment: "dev",
+    targetScope: "local",
+    iacTool: "terraform",
+  });
+  await rm(join(root, ".apex", "projects", "payments", "runs"), { recursive: true, force: true });
+  await mkdir(join(root, ".apex", "projects", "payments", "runs"));
+  await assert.rejects(service.deleteProject("data-platform", true), /Project has no runs/u);
+  assert.equal((await service.status()).run.projectId, "data-platform");
 });
 
 test("MCP requires an atomic bundle for multi-output tasks", async () => {

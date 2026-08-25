@@ -41,7 +41,7 @@ to capture verbose tool-call data.
 The audit mode contains **no project-specific logic**. To use in another project:
 
 1. Copy `.github/skills/context-management/` to the target repo
-2. Copy `.github/instructions/context-optimization.instructions.md`
+2. Copy `customizations/.github/instructions/apex-context.instructions.md`
 3. Copy `tools/scripts/snapshot-agent-context.sh` and
    `tools/scripts/diff-context-baseline.sh`
 4. The log parser auto-discovers VS Code log directories

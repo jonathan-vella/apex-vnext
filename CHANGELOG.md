@@ -23,6 +23,8 @@ prior qualification is retained as historical characterization. See
   version-free while the CLI package pins the Azure MCP dependency for reproducible consumer installs.
 - The APEX coordinator now handles project CRUD through native client questions and narrow MCP operations: create,
   list, resume, and confirmation-required deletion.
+- Retired repository-source instruction files now map through a complete ledger into managed `apex-*` consumer
+  instructions packaged for both supported client projections.
 
 ### Re-baselined
 

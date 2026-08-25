@@ -42,7 +42,7 @@ All markdown documentation **except** `agent-output/**/*.md`:
 - `README.md` — repo root README
 - `CONTRIBUTING.md` — contribution guidelines
 - `CHANGELOG.md` — release history
-- `.github/instructions/docs.instructions.md` — user-guide standards
+- `customizations/.github/instructions/apex-documentation.instructions.md` — consumer user-guide standards
 
 ### Out of Scope (Has Own Validators)
 

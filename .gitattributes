@@ -57,8 +57,8 @@ docs/vnext/phase-0a/evidence/*.log binary
 .gitattributes text eol=lf
 .gitignore text eol=lf
 
-# Copilot instructions (file-type specific guidance)
-.github/instructions/*.instructions.md linguist-documentation
+# Managed consumer instructions (file-type specific guidance)
+customizations/.github/instructions/*.instructions.md linguist-documentation
 docs/**/*.md linguist-documentation
 
 # Docker files

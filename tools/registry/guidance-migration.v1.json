@@ -4877,11 +4877,224 @@
       "owner": "kernel workflow manifest"
     }
   ],
-  "instructionDisposition": {
-    "sourceGlob": ".github/instructions/*.instructions.md",
-    "disposition": "repository-only",
-    "owner": "source authoring validators and project instructions"
-  },
+  "instructionDispositions": [
+    {
+      "source": "agent-authoring.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-agent-authoring.instructions.md"],
+      "reason": "Preserves managed-agent tool, state, and interaction boundaries for consumers.",
+      "replacementProof": "Managed projection packaging and agent validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer projection validation fails."
+    },
+    {
+      "source": "agent-skills.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-skill-authoring.instructions.md"],
+      "reason": "Preserves concise skill structure and progressive disclosure guidance.",
+      "replacementProof": "Managed projection packaging and skill validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer projection validation fails."
+    },
+    {
+      "source": "azure-artifacts.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-artifact-contracts.instructions.md"],
+      "reason": "Preserves typed artifact identity and evidence boundaries without source template workflows.",
+      "replacementProof": "Managed projection packaging and artifact contract tests prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer artifact validation fails."
+    },
+    {
+      "source": "azure-yaml.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-azure-yaml.instructions.md"],
+      "reason": "Preserves consumer azd co-location and environment naming rules.",
+      "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer instruction validation fails."
+    },
+    {
+      "source": "code-quality.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-code-quality.instructions.md"],
+      "reason": "Preserves consumer code quality and secret-safe review boundaries.",
+      "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer instruction validation fails."
+    },
+    {
+      "source": "context-optimization.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-context.instructions.md"],
+      "reason": "Preserves narrow consumer guidance and progressive loading rules.",
+      "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer instruction validation fails."
+    },
+    {
+      "source": "docs.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-documentation.instructions.md"],
+      "reason": "Preserves consumer documentation structure and evidence-aware language.",
+      "replacementProof": "Managed projection packaging and documentation validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer documentation validation fails."
+    },
+    {
+      "source": "docs-trigger.instructions.md",
+      "disposition": "exclude-unsafe",
+      "targets": [],
+      "reason": "Repository change-trigger and maintenance rules do not belong in consumer workspaces.",
+      "replacementProof": "Ledger validation proves the explicit exclusion is recorded.",
+      "rollbackGate": "Restore only with a consumer-owned documentation trigger capability."
+    },
+    {
+      "source": "github-actions.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-automation.instructions.md"],
+      "reason": "Preserves consumer workflow safety without repository CI ownership rules.",
+      "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer automation validation fails."
+    },
+    {
+      "source": "governance-discovery.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-governance.instructions.md"],
+      "reason": "Preserves evidence-bound governance and planning boundaries without direct discovery operations.",
+      "replacementProof": "Managed projection packaging and governance contract tests prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer governance validation fails."
+    },
+    {
+      "source": "iac-bicep-best-practices.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-bicep.instructions.md"],
+      "reason": "Preserves consumer Bicep security, AVM, naming, and validation guidance.",
+      "replacementProof": "Managed projection packaging and IaC validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer IaC validation fails."
+    },
+    {
+      "source": "iac-plan-best-practices.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-governance.instructions.md"],
+      "reason": "Preserves track-neutral planning and policy evidence boundaries.",
+      "replacementProof": "Managed projection packaging and governance contract tests prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer planning validation fails."
+    },
+    {
+      "source": "iac-terraform-best-practices.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-terraform.instructions.md"],
+      "reason": "Preserves consumer Terraform security, provider, and validation guidance.",
+      "replacementProof": "Managed projection packaging and IaC validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer IaC validation fails."
+    },
+    {
+      "source": "instructions.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-instruction-authoring.instructions.md"],
+      "reason": "Preserves consumer instruction scope and authoring rules.",
+      "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer instruction validation fails."
+    },
+    {
+      "source": "javascript.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-javascript.instructions.md"],
+      "reason": "Preserves safe consumer JavaScript and Node.js implementation rules.",
+      "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer instruction validation fails."
+    },
+    {
+      "source": "json.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-json.instructions.md"],
+      "reason": "Preserves consumer configuration formatting and secret boundaries.",
+      "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer instruction validation fails."
+    },
+    {
+      "source": "lesson-collection.instructions.md",
+      "disposition": "exclude-unsafe",
+      "targets": [],
+      "reason": "Repository retrospective and orchestration records are not consumer workflow authority.",
+      "replacementProof": "Ledger validation proves the explicit exclusion is recorded.",
+      "rollbackGate": "Restore only with a consumer-owned lessons capability."
+    },
+    {
+      "source": "markdown-docs.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-documentation.instructions.md"],
+      "reason": "Preserves consumer documentation audience and evidence guidance.",
+      "replacementProof": "Managed projection packaging and documentation validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer documentation validation fails."
+    },
+    {
+      "source": "markdown.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-markdown.instructions.md"],
+      "reason": "Preserves portable Markdown structure and formatting rules.",
+      "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer instruction validation fails."
+    },
+    {
+      "source": "no-hardcoded-counts.instructions.md",
+      "disposition": "exclude-unsafe",
+      "targets": [],
+      "reason": "Repository entity-count governance has no consumer workflow role.",
+      "replacementProof": "Ledger validation proves the explicit exclusion is recorded.",
+      "rollbackGate": "Restore only with a consumer count manifest contract."
+    },
+    {
+      "source": "no-heredoc.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-safe-file-edits.instructions.md"],
+      "reason": "Preserves safe consumer file editing and generated artifact boundaries.",
+      "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer instruction validation fails."
+    },
+    {
+      "source": "no-interactive-shell.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-safe-shell.instructions.md"],
+      "reason": "Preserves non-interactive command and secret-safe consumer guidance.",
+      "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer instruction validation fails."
+    },
+    {
+      "source": "powershell.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-powershell.instructions.md"],
+      "reason": "Preserves non-interactive consumer PowerShell rules.",
+      "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer instruction validation fails."
+    },
+    {
+      "source": "prompt.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-prompt-authoring.instructions.md"],
+      "reason": "Preserves consumer prompt scope, tools, and outcome guidance.",
+      "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer prompt validation fails."
+    },
+    {
+      "source": "python.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-python.instructions.md"],
+      "reason": "Preserves safe consumer Python implementation rules.",
+      "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer instruction validation fails."
+    },
+    {
+      "source": "shell.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-shell.instructions.md"],
+      "reason": "Preserves safe consumer shell structure and parsing rules.",
+      "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer instruction validation fails."
+    },
+    {
+      "source": "vendor-prompting.instructions.md",
+      "disposition": "adapt",
+      "targets": ["apex-prompt-authoring.instructions.md"],
+      "reason": "Preserves consumer model, tool, and prompt authority boundaries.",
+      "replacementProof": "Managed projection packaging and agent validation prove the consumer instruction is present.",
+      "rollbackGate": "Restore only after consumer prompt validation fails."
+    }
+  ],
   "rollbackRule": "Remove or change a disposition only with consumer evidence, an explicit replacement owner, and a negative discovery check.",
   "scenarioRule": "Consumer skills require packaging, lifecycle, semantic, and supported-client qualification evidence before release."
 }
