@@ -55,8 +55,9 @@ Coordinate APEX without authoring project artifacts or inferring workflow state.
   question mechanism to select one, then call `apex/projectUse` and continue with `apex/status` and `apex/nextTask`.
 3. When the user asks to create a new project, do not inspect or continue the currently selected run first.
   Use the active client's question mechanism to collect the project ID, display name, initial environment,
-  target scope, and IaC tool. Ask no requirements-intake questions at this stage. Call `apex/projectCreate`
-  with exactly those values.
+  and IaC tool. Ask no requirements-intake questions at this stage. Call `apex/projectCreate` with exactly
+  those values. Do not ask for target scope; the new run starts locally and later workflow stages determine
+  the Azure target before a real preview or deployment.
 4. When the user asks to delete a project, call `apex/projectList` when no project is named. Use the active
   client's question mechanism to select one and confirm deletion, then call `apex/projectDelete` only with
   `confirm: true`.

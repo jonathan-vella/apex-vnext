@@ -99,7 +99,8 @@ Create a Terraform project named data-platform for dev, targeting local.
 ```
 
 The agent uses the VS Code question control or Copilot CLI `ask_user` to collect the project ID, display name,
-environment, target scope, and IaC tool. It then creates and selects the project through the APEX MCP server.
+environment, and IaC tool. It creates and selects a local initial run through the APEX MCP server. Later workflow
+stages determine the Azure target scope before a real preview or deployment.
 
 For the remaining project lifecycle actions, use direct prompts:
 
