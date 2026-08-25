@@ -167,6 +167,94 @@ test("requirements intake adds migration questions only for migration scenarios"
   );
 });
 
+test("requirements intake provides selectable Azure service and security recommendations", async () => {
+  const service = new ApexService(await tempRoot());
+  await service.init({ projectId: "demo" });
+  await recordRequirementsRound(service, {
+    workload: "ecommerce",
+    industry: "retail",
+    "delivery-scenario": "greenfield",
+    "target-environments": ["dev"],
+  });
+  await recordRequirementsRound(service, {
+    "workload-pattern": "web-api",
+    scale: "100 concurrent users",
+    budget: { kind: "budget", amount: 250, currency: "USD", cadence: "monthly" },
+    "data-sensitivity": { kind: "data-classification", classification: "internal" },
+    "iac-preference": "bicep",
+  });
+
+  const services = await service.nextTask();
+  assert.equal(services.status, "needs_input");
+  if (services.status !== "needs_input") return;
+  assert.deepEqual(
+    services.request.questions.find(({ id }) => id === "service-preferences"),
+    {
+      id: "service-preferences",
+      prompt: "Select preferred Azure services. Select all that apply; architecture chooses the exact combination.",
+      options: [
+        "app-service",
+        "container-apps",
+        "azure-functions",
+        "aks",
+        "azure-sql",
+        "azure-cosmos-db",
+        "storage",
+        "service-bus",
+        "event-hubs",
+        "api-management",
+        "azure-monitor",
+        "application-insights",
+      ],
+      multiSelect: true,
+    },
+  );
+  await service.recordInput({
+    schemaVersion: "1.0.0",
+    requestId: services.request.requestId,
+    expectedHead: services.request.expectedHead,
+    ownerEpoch: services.request.ownerEpoch,
+    answers: services.request.questions.map(({ id }) => ({
+      questionId: id,
+      value:
+        id === "service-preferences" ? ["container-apps", "azure-cosmos-db", "application-insights"] : `test-${id}`,
+    })),
+  });
+
+  const security = await service.nextTask();
+  assert.equal(security.status, "needs_input");
+  if (security.status !== "needs_input") return;
+  assert.deepEqual(
+    security.request.questions.find(({ id }) => id === "security-controls"),
+    {
+      id: "security-controls",
+      prompt:
+        "Select required security controls. The Azure baseline recommends managed identity, private access, Key Vault, and diagnostic logging.",
+      options: [
+        "managed-identity",
+        "private-endpoints",
+        "private-dns",
+        "disable-public-network-access",
+        "key-vault",
+        "platform-managed-encryption",
+        "customer-managed-keys",
+        "diagnostic-logging",
+      ],
+      multiSelect: true,
+    },
+  );
+  assert.deepEqual(security.request.questions.find(({ id }) => id === "compliance")?.options, [
+    "gdpr",
+    "hipaa",
+    "pci-dss",
+    "iso-27001",
+    "soc-2",
+    "other",
+  ]);
+  assert.equal(security.request.questions.find(({ id }) => id === "authentication")?.multiSelect, true);
+  assert.equal(security.request.questions.find(({ id }) => id === "operations")?.multiSelect, true);
+});
+
 test("architecture task waits for a kernel-owned decision and resumes the issued task", async () => {
   const service = new ApexService(await tempRoot());
   const initialized = await service.init({ projectId: "demo" });
@@ -378,7 +466,7 @@ test("typed input recording rejects premature, stale, malformed, duplicate, and 
     ownerEpoch: pending.request.ownerEpoch,
     answers: [
       { questionId: "workload", value: "demo" },
-      { questionId: "industry", value: "software" },
+      { questionId: "industry", value: "technology" },
       { questionId: "delivery-scenario", value: "greenfield" },
       { questionId: "target-environments", value: ["dev"] },
     ],
@@ -441,18 +529,18 @@ test("requirements task context includes recorded input and stageable output tem
   await recordRequirementsRound(service, {
     "retained-services": "No services must be retained",
     "prohibited-services": "No services are prohibited",
-    "service-preferences": "managed services",
+    "service-preferences": ["container-apps", "azure-cosmos-db", "application-insights"],
     "sku-preferences": "no preference",
     "environment-overrides": "No environment-specific overrides",
   });
   await recordRequirementsRound(service, {
     compliance: { kind: "compliance", scopes: ["pci-dss"] },
-    "security-controls": "managed identities",
-    authentication: "Microsoft Entra ID",
+    "security-controls": ["managed-identity", "private-endpoints", "key-vault", "diagnostic-logging"],
+    authentication: ["microsoft-entra-id", "managed-identity"],
     region: "swedencentral",
     "availability-recovery": "99.9% availability; RTO 60 minutes; RPO 15 minutes",
     recovery: { kind: "recovery", rtoMinutes: 60, rpoMinutes: 15 },
-    operations: "central monitoring",
+    operations: ["azure-monitor", "application-insights", "managed-alerts"],
   });
   const issued = await service.nextTask();
   assert.equal(issued.status, "task");
@@ -470,16 +558,16 @@ test("requirements task context includes recorded input and stageable output tem
     "iac-preference": "bicep",
     "retained-services": "No services must be retained",
     "prohibited-services": "No services are prohibited",
-    "service-preferences": "managed services",
+    "service-preferences": ["container-apps", "azure-cosmos-db", "application-insights"],
     "sku-preferences": "no preference",
     "environment-overrides": "No environment-specific overrides",
     compliance: { kind: "compliance", scopes: ["pci-dss"] },
-    "security-controls": "managed identities",
-    authentication: "Microsoft Entra ID",
+    "security-controls": ["managed-identity", "private-endpoints", "key-vault", "diagnostic-logging"],
+    authentication: ["microsoft-entra-id", "managed-identity"],
     region: "swedencentral",
     "availability-recovery": "99.9% availability; RTO 60 minutes; RPO 15 minutes",
     recovery: { kind: "recovery", rtoMinutes: 60, rpoMinutes: 15 },
-    operations: "central monitoring",
+    operations: ["azure-monitor", "application-insights", "managed-alerts"],
   });
   assert.equal(context.inputs.length, 0);
   const template = context.outputTemplates.requirements as {
@@ -497,7 +585,7 @@ test("requirements task context includes recorded input and stageable output tem
     },
     {
       id: "REQ-002",
-      statement: "Security controls: managed identities",
+      statement: "Security controls: managed-identity, private-endpoints, key-vault, diagnostic-logging",
       priority: "must",
       status: "confirmed",
       source: "intake:security-controls",
@@ -642,18 +730,18 @@ test("requirements intake preserves explicit unresolved answers", async () => {
     await recordRequirementsRound(service, {
       "retained-services": "No services must be retained",
       "prohibited-services": "No services are prohibited",
-      "service-preferences": "managed services",
+      "service-preferences": ["container-apps", "azure-cosmos-db", "application-insights"],
       "sku-preferences": "no preference",
       "environment-overrides": "No environment-specific overrides",
     });
     await recordRequirementsRound(service, {
       compliance: { kind: "compliance", scopes: ["gdpr"] },
-      "security-controls": "managed identities",
-      authentication: "Microsoft Entra ID",
+      "security-controls": ["managed-identity", "private-endpoints", "key-vault", "diagnostic-logging"],
+      authentication: ["microsoft-entra-id", "managed-identity"],
       region: "swedencentral",
       "availability-recovery": availabilityRecovery,
       recovery: { kind: "recovery", rtoMinutes: 60, rpoMinutes: 15 },
-      operations: "central monitoring",
+      operations: ["azure-monitor", "application-insights", "managed-alerts"],
     });
     const issued = await service.nextTask();
     assert.equal(issued.status, "task");
