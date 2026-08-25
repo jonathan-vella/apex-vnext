@@ -18,6 +18,7 @@ This file is generated from [packages/cli/src/mcp.ts](../../packages/cli/src/mcp
 - `inventory`
 - `nextTask`
 - `preview`
+- `projectCreate`
 - `promote`
 - `reconcile`
 - `recordInput`

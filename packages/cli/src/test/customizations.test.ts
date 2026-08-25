@@ -201,6 +201,9 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(requirementsAgent, /- ask_user/u);
   assert.match(requirementsAgent, /- task/u);
   assert.doesNotMatch(requirementsAgent, /vscode\/askQuestions|handoffs:|agents:/u);
+  const coordinatorAgent = await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8");
+  assert.match(coordinatorAgent, /- apex\/projectCreate/u);
+  assert.match(coordinatorAgent, /Use `ask_user` for kernel-owned input requests/u);
   assert.match(
     await readFile(join(root, ".github", "skills", "apex-azure-defaults", "SKILL.md"), "utf8"),
     /APEX Azure Defaults/u,
