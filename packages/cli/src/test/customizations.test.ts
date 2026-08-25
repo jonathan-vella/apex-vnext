@@ -205,7 +205,7 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(await readFile(join(root, ".github", "mcp.json"), "utf8"), /"recordInput"/u);
   const requirementsAgent = await readFile(join(root, ".github", "agents", "apex-requirements.agent.md"), "utf8");
   assert.match(requirementsAgent, /target: github-copilot/u);
-  assert.match(requirementsAgent, /model: Claude Sonnet 5/u);
+  assert.match(requirementsAgent, /model: GPT-5\.6 Sol/u);
   assert.match(requirementsAgent, /- ask_user/u);
   assert.match(requirementsAgent, /- task/u);
   assert.doesNotMatch(requirementsAgent, /vscode\/askQuestions|handoffs:|agents:/u);

@@ -186,7 +186,7 @@
       "role": "requirements",
       "supportedTargets": ["vscode", "github-copilot"],
       "interactionType": "interactive-handoff",
-      "model": "Claude Sonnet 5",
+      "model": "GPT-5.6 Sol",
       "costTier": "standard"
     },
     {
@@ -196,7 +196,7 @@
       "role": "architecture",
       "supportedTargets": ["vscode", "github-copilot"],
       "interactionType": "interactive-handoff",
-      "model": "Claude Opus 4.8",
+      "model": "GPT-5.6 Sol",
       "costTier": "premium"
     },
     {
@@ -206,7 +206,7 @@
       "role": "planning",
       "supportedTargets": ["vscode", "github-copilot"],
       "interactionType": "interactive-handoff",
-      "model": "Claude Opus 4.8",
+      "model": "GPT-5.6 Sol",
       "costTier": "premium"
     },
     {
@@ -216,7 +216,7 @@
       "role": "operations",
       "supportedTargets": ["vscode", "github-copilot"],
       "interactionType": "interactive-handoff",
-      "model": "GPT-5.5",
+      "model": "GPT-5.6 Terra",
       "costTier": "premium"
     },
     {
@@ -226,7 +226,7 @@
       "role": "code-generation",
       "supportedTargets": ["vscode"],
       "interactionType": "autonomous-subagent",
-      "model": "Claude Sonnet 5",
+      "model": "GPT-5.6 Terra",
       "costTier": "standard"
     },
     {
@@ -236,7 +236,7 @@
       "role": "review",
       "supportedTargets": ["vscode"],
       "interactionType": "autonomous-subagent",
-      "model": "Claude Sonnet 5",
+      "model": "GPT-5.6 Terra",
       "costTier": "standard"
     },
     {
@@ -246,7 +246,7 @@
       "role": "validation",
       "supportedTargets": ["vscode"],
       "interactionType": "autonomous-subagent",
-      "model": "Claude Sonnet 5",
+      "model": "GPT-5.6 Terra",
       "costTier": "standard"
     }
   ],
