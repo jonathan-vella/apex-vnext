@@ -82,7 +82,29 @@ export function validateInputAnswers(questions: QuestionV1[], submitted: InputAn
       if (typeof value !== "object" || value === null || Array.isArray(value) || value.kind !== question.valueType) {
         throw new Error(`Answer shape does not match question: ${question.id}`);
       }
-      return { questionId: question.id, value };
+      if (
+        question.valueType === "data-classification" &&
+        question.options !== undefined &&
+        value.kind === "data-classification" &&
+        !question.options.includes(value.classification)
+      ) {
+        throw new Error(`Answer is not a declared option: ${question.id}`);
+      }
+      if (
+        question.valueType === "compliance" &&
+        question.options !== undefined &&
+        value.kind === "compliance" &&
+        value.scopes.some((scope) => !question.options!.includes(scope))
+      ) {
+        throw new Error(`Answer is not a declared option: ${question.id}`);
+      }
+      return {
+        questionId: question.id,
+        value:
+          question.valueType === "compliance" && question.options !== undefined && value.kind === "compliance"
+            ? { ...value, scopes: question.options.filter((option) => value.scopes.includes(option)) }
+            : value,
+      };
     }
     if (
       (question.multiSelect === true ? !Array.isArray(value) : typeof value !== "string") ||
