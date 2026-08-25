@@ -182,16 +182,16 @@
     "generated_by": "tools/scripts/generate-model-catalog.mjs",
     "description": "Auto-generated inventory of agent → model assignments derived from frontmatter (canonical source). Do not edit by hand; run `npm run generate:model-catalog` and commit the result.",
     "agents": {
-      "apex-architect.agent.md": "Claude Opus 4.8",
-      "apex-operator.agent.md": "GPT-5.5",
-      "apex-planner.agent.md": "Claude Opus 4.8",
-      "apex-requirements.agent.md": "Claude Sonnet 5",
+      "apex-architect.agent.md": "GPT-5.6 Sol",
+      "apex-operator.agent.md": "GPT-5.6 Terra",
+      "apex-planner.agent.md": "GPT-5.6 Sol",
+      "apex-requirements.agent.md": "GPT-5.6 Sol",
       "apex.agent.md": "MAI-Code-1.1-Flash"
     },
     "subagents": {
-      "apex-codegen.agent.md": "Claude Sonnet 5",
-      "apex-reviewer.agent.md": "Claude Sonnet 5",
-      "apex-validator.agent.md": "Claude Sonnet 5"
+      "apex-codegen.agent.md": "GPT-5.6 Terra",
+      "apex-reviewer.agent.md": "GPT-5.6 Terra",
+      "apex-validator.agent.md": "GPT-5.6 Terra"
     }
   }
 }

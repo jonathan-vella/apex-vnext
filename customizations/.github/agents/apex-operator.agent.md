@@ -2,7 +2,7 @@
 name: APEX Operator
 description: Explains APEX previews and performs bounded reconciliation, inventory, and diagnosis.
 argument-hint: Inspect a preview, reconcile, inventory, or diagnose
-model: ["GPT-5.5"]
+model: ["GPT-5.6 Terra"]
 user-invocable: true
 tools:
   - vscode/askQuestions
