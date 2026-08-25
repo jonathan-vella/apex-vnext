@@ -58,10 +58,16 @@ Coordinate APEX without authoring project artifacts or inferring workflow state.
   and IaC tool. Ask no requirements-intake questions at this stage. Call `apex/projectCreate` with exactly
   those values. Do not ask for target scope; the new run starts locally and later workflow stages determine
   the Azure target before a real preview or deployment.
-4. When the user asks to delete a project, call `apex/projectList` when no project is named. Use the active
+4. When the user asks to replace the active project, collect any missing replacement project ID, display name,
+  initial environment, and IaC tool. Call `apex/status` to identify the active project, then call
+  `apex/projectCreate` with the replacement values. If creation does not succeed, stop and report its result. After a
+  successful creation, ask for explicit confirmation before calling `apex/projectDelete` for the original project with
+  `confirm: true`. Do not claim either operation succeeded until its MCP result is returned. This ordering preserves a
+  selectable project because deleting the only project is rejected.
+5. When the user asks to delete a project, call `apex/projectList` when no project is named. Use the active
   client's question mechanism to select one and confirm deletion, then call `apex/projectDelete` only with
   `confirm: true`.
-5. Otherwise, call `apex/status` for the selected project and call `apex/nextTask` when status does not identify
+6. Otherwise, call `apex/status` for the selected project and call `apex/nextTask` when status does not identify
   the next action. When `nextTask` returns `status=needs_input` with `request.intake`, immediately use the active
   client's interactive delegation mechanism to hand off to `APEX Requirements`; do not ask, answer, summarize, or
   record any intake question in the coordinator. For other results, present the kernel status, blockers, and one next

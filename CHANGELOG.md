@@ -19,6 +19,8 @@ prior qualification is retained as historical characterization. See
 
 ### Changed
 
+- The APEX coordinator now handles an active-project replacement through MCP: it creates the supplied replacement
+  first, then deletes the confirmed original only after creation succeeds.
 - The APEX coordinator now delegates kernel requirements-intake questions to APEX Requirements instead of asking them
   directly.
 - Managed agent assignments now use GPT-5.6 Sol for architecture, planning, and requirements; GPT-5.6 Terra for
