@@ -63,9 +63,9 @@ const inputSubmission = z
   .strict();
 const projectCreateInput = z
   .object({
-    projectId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/),
+    projectId: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
     displayName: z.string().min(1).max(256),
-    environment: z.string().min(1).max(128),
+    environment: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
     targetScope: z.string().min(1).max(1024),
     iacTool: z.enum(["bicep", "terraform"]),
   })
