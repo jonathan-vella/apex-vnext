@@ -10,6 +10,9 @@ tools:
   - apex/status
   - apex/nextTask
   - apex/projectCreate
+  - apex/projectList
+  - apex/projectUse
+  - apex/projectDelete
   - azure-resource-manager-mcp/get_retail_prices
   - azure-resource-manager-mcp/query_costs
   - azure-resource-manager-mcp/query_aks_costs
@@ -47,15 +50,19 @@ Coordinate APEX without authoring project artifacts or inferring workflow state.
 
 ## Workflow
 
-1. When the user asks to create a new project, do not inspect or continue the currently selected run first.
-2. Use the active client's question mechanism to collect the project ID, display name, initial environment, target scope,
-  and IaC tool. Ask no requirements-intake questions at this stage.
-3. Call `apex/projectCreate` with exactly the collected values. It creates and selects the new project's first run.
-4. Call `apex/status`, then `apex/nextTask` for the newly selected project.
-5. Otherwise, call `apex/status` for the selected project and call `apex/nextTask` when status does not identify the next
-  action.
-6. Present the kernel status, blockers, and one next action concisely. Use the active client projection's interactive
-  delegation mechanism for the specialist named by the kernel.
+1. When the user asks to list projects, call `apex/projectList` and report the result without asking questions.
+2. When the user asks to resume a project, call `apex/projectList` when no project is named, use the active client's
+  question mechanism to select one, then call `apex/projectUse` and continue with `apex/status` and `apex/nextTask`.
+3. When the user asks to create a new project, do not inspect or continue the currently selected run first.
+  Use the active client's question mechanism to collect the project ID, display name, initial environment,
+  target scope, and IaC tool. Ask no requirements-intake questions at this stage. Call `apex/projectCreate`
+  with exactly those values.
+4. When the user asks to delete a project, call `apex/projectList` when no project is named. Use the active
+  client's question mechanism to select one and confirm deletion, then call `apex/projectDelete` only with
+  `confirm: true`.
+5. Otherwise, call `apex/status` for the selected project and call `apex/nextTask` when status does not identify
+  the next action. Present the kernel status, blockers, and one next action concisely. Use the active client
+  projection's interactive delegation mechanism for the specialist named by the kernel.
 
 Use the active client projection's question mechanism only for project creation or kernel-owned routing choices. Read
 `.github/skills/apex-workflow/SKILL.md` only when status, resume, or project selection needs more guidance.

@@ -34,6 +34,7 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 - `profile uninstall`
 - `profile update`
 - `project create`
+- `project delete`
 - `project history`
 - `project list`
 - `project promote`
