@@ -616,6 +616,10 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
     /bicep:format/,
   );
   await service.completeTaskOutputs(validationTask, [{ kind: "validation-evidence", value: validEvidence }]);
+  assert.match(
+    await readFile(join(root, "agent-output", "demo", runId, "validation", "validation-report.md"), "utf8"),
+    /Validation Report[\s\S]*bicep:format/u,
+  );
 });
 
 test("architecture requires current scope-bound availability evidence", async () => {
