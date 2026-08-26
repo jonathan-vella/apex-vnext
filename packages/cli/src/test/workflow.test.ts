@@ -172,6 +172,87 @@ test("requirements intake adds migration questions only for migration scenarios"
     pending.request.questions.slice(-3).map(({ id }) => id),
     ["current-platform", "migration-pain-points", "preserve-components"],
   );
+  await service.recordInput({
+    schemaVersion: "1.0.0",
+    requestId: pending.request.requestId,
+    expectedHead: pending.request.expectedHead,
+    ownerEpoch: pending.request.ownerEpoch,
+    answers: pending.request.questions.map(({ id, multiSelect, options, valueType }) => ({
+      questionId: id,
+      value:
+        valueType === "budget"
+          ? { kind: "budget" as const, amount: 250, currency: "USD", cadence: "monthly" as const }
+          : valueType === "data-classification"
+            ? { kind: "data-classification" as const, classification: "internal" as const }
+            : options === undefined
+              ? `test-${id}`
+              : multiSelect === true
+                ? [options[0]!]
+                : options[0]!,
+    })),
+  });
+  const services = await service.nextTask();
+  assert.equal(services.status, "needs_input");
+  if (services.status !== "needs_input") return;
+  assert.equal(services.request.questions[0]?.id, "retained-services");
+});
+
+test("greenfield service intake skips retained services and uses selectable recovery capabilities", async () => {
+  const service = new ApexService(await tempRoot());
+  await service.init({ projectId: "demo" });
+  await recordRequirementsRound(service, {
+    workload: "ecommerce",
+    industry: "retail",
+    "delivery-scenario": "greenfield",
+    "target-environments": ["dev"],
+  });
+  await recordRequirementsRound(service, {
+    "workload-pattern": "web-api",
+    scale: "100 concurrent users",
+    budget: { kind: "budget", amount: 250, currency: "USD", cadence: "monthly" },
+    "data-sensitivity": { kind: "data-classification", classification: "internal" },
+    "iac-preference": "bicep",
+  });
+  const services = await service.nextTask();
+  assert.equal(services.status, "needs_input");
+  if (services.status !== "needs_input") return;
+  assert.equal(
+    services.request.questions.some(({ id }) => id === "retained-services"),
+    false,
+  );
+  assert.equal(
+    services.request.questions.find(({ id }) => id === "prohibited-services")?.prompt,
+    "List prohibited services, or explicitly defer the constraint.",
+  );
+  await service.recordInput({
+    schemaVersion: "1.0.0",
+    requestId: services.request.requestId,
+    expectedHead: services.request.expectedHead,
+    ownerEpoch: services.request.ownerEpoch,
+    answers: services.request.questions.map(({ id, multiSelect, options }) => ({
+      questionId: id,
+      value: options === undefined ? `test-${id}` : multiSelect === true ? [options[0]!] : options[0]!,
+    })),
+  });
+  const security = await service.nextTask();
+  assert.equal(security.status, "needs_input");
+  if (security.status !== "needs_input") return;
+  assert.deepEqual(
+    security.request.questions.find(({ id }) => id === "availability-recovery"),
+    {
+      id: "availability-recovery",
+      prompt: "Select required availability, backup, and recovery capabilities.",
+      options: [
+        "single-region-availability",
+        "availability-zones",
+        "automated-backups",
+        "point-in-time-restore",
+        "immutable-backups",
+        "cross-region-disaster-recovery",
+      ],
+      multiSelect: true,
+    },
+  );
 });
 
 test("requirements intake provides selectable Azure service and security recommendations", async () => {
@@ -557,7 +638,6 @@ test("requirements task context includes recorded input and stageable output tem
     "iac-preference": "bicep",
   });
   await recordRequirementsRound(service, {
-    "retained-services": "No services must be retained",
     "prohibited-services": "No services are prohibited",
     "service-preferences": ["container-apps", "azure-cosmos-db", "application-insights"],
     "sku-preferences": "no preference",
@@ -568,7 +648,7 @@ test("requirements task context includes recorded input and stageable output tem
     "security-controls": ["managed-identity", "private-endpoints", "key-vault", "diagnostic-logging"],
     authentication: ["microsoft-entra-id", "managed-identity"],
     region: "swedencentral",
-    "availability-recovery": "99.9% availability; RTO 60 minutes; RPO 15 minutes",
+    "availability-recovery": ["availability-zones", "automated-backups", "point-in-time-restore"],
     recovery: { kind: "recovery", rtoMinutes: 60, rpoMinutes: 15 },
     operations: ["azure-monitor", "application-insights", "managed-alerts"],
   });
@@ -586,7 +666,6 @@ test("requirements task context includes recorded input and stageable output tem
     budget: { kind: "budget", amount: 500, currency: "USD", cadence: "monthly" },
     "data-sensitivity": { kind: "data-classification", classification: "confidential" },
     "iac-preference": "bicep",
-    "retained-services": "No services must be retained",
     "prohibited-services": "No services are prohibited",
     "service-preferences": ["container-apps", "azure-cosmos-db", "application-insights"],
     "sku-preferences": "no preference",
@@ -595,7 +674,7 @@ test("requirements task context includes recorded input and stageable output tem
     "security-controls": ["managed-identity", "private-endpoints", "key-vault", "diagnostic-logging"],
     authentication: ["microsoft-entra-id", "managed-identity"],
     region: "swedencentral",
-    "availability-recovery": "99.9% availability; RTO 60 minutes; RPO 15 minutes",
+    "availability-recovery": ["availability-zones", "automated-backups", "point-in-time-restore"],
     recovery: { kind: "recovery", rtoMinutes: 60, rpoMinutes: 15 },
     operations: ["azure-monitor", "application-insights", "managed-alerts"],
   });
@@ -615,7 +694,7 @@ test("requirements task context includes recorded input and stageable output tem
   assert.deepEqual(template.requirements.slice(0, 2), [
     {
       id: "REQ-001",
-      statement: "Availability and recovery: 99.9% availability; RTO 60 minutes; RPO 15 minutes",
+      statement: "Availability and recovery: availability-zones, automated-backups, point-in-time-restore",
       priority: "must",
       status: "confirmed",
       source: "intake:availability-recovery",
@@ -632,7 +711,7 @@ test("requirements task context includes recorded input and stageable output tem
   assert.deepEqual(template.unknowns, []);
   assert.equal(template.businessContext, "retail; greenfield; web-api");
   assert.equal(template.successCriteria, "100 concurrent users");
-  assert.equal(template.nonFunctionalRequirements, "99.9% availability; RTO 60 minutes; RPO 15 minutes");
+  assert.equal(template.nonFunctionalRequirements, "availability-zones, automated-backups, point-in-time-restore");
   assert.equal(
     template.securityAndCompliance,
     "managed-identity, private-endpoints, key-vault, diagnostic-logging; pci-dss; microsoft-entra-id, managed-identity; confidential",
@@ -844,7 +923,6 @@ test("requirements intake preserves explicit unresolved answers", async () => {
       "iac-preference": "bicep",
     });
     await recordRequirementsRound(service, {
-      "retained-services": "No services must be retained",
       "prohibited-services": "No services are prohibited",
       "service-preferences": ["container-apps", "azure-cosmos-db", "application-insights"],
       "sku-preferences": "no preference",
@@ -855,7 +933,8 @@ test("requirements intake preserves explicit unresolved answers", async () => {
       "security-controls": ["managed-identity", "private-endpoints", "key-vault", "diagnostic-logging"],
       authentication: ["microsoft-entra-id", "managed-identity"],
       region: "swedencentral",
-      "availability-recovery": availabilityRecovery,
+      "availability-recovery":
+        availabilityRecovery === "unknown" ? { kind: "unknown" } : { kind: "deferred", owner: "product owner" },
       recovery: { kind: "recovery", rtoMinutes: 60, rpoMinutes: 15 },
       operations: ["azure-monitor", "application-insights", "managed-alerts"],
     });
@@ -866,7 +945,10 @@ test("requirements intake preserves explicit unresolved answers", async () => {
     const template = context.outputTemplates.requirements as {
       requirements: Array<{ statement: string; status: string }>;
     };
-    assert.equal((context.recordedInput as Record<string, string>)["availability-recovery"], availabilityRecovery);
+    assert.deepEqual(
+      (context.recordedInput as Record<string, unknown>)["availability-recovery"],
+      availabilityRecovery === "unknown" ? { kind: "unknown" } : { kind: "deferred", owner: "product owner" },
+    );
     assert.deepEqual(template.requirements[0], {
       id: "REQ-001",
       statement: `Availability and recovery: ${availabilityRecovery}`,

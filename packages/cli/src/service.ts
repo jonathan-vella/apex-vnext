@@ -437,8 +437,7 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
   {
     round: "service-preferences",
     questions: [
-      { id: "retained-services", prompt: "List Azure services or integrations that must be retained, or 'none'." },
-      { id: "prohibited-services", prompt: "List prohibited services or use 'none'." },
+      { id: "prohibited-services", prompt: "List prohibited services, or explicitly defer the constraint." },
       {
         id: "service-preferences",
         prompt: "Select preferred Azure services. Select all that apply; architecture chooses the exact combination.",
@@ -499,7 +498,19 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
         prompt: "Choose the Azure region, or explicitly defer the decision.",
         options: ["swedencentral", "westeurope", "germanywestcentral"],
       },
-      { id: "availability-recovery", prompt: "State availability, RTO, RPO, backup, and recovery requirements." },
+      {
+        id: "availability-recovery",
+        prompt: "Select required availability, backup, and recovery capabilities.",
+        options: [
+          "single-region-availability",
+          "availability-zones",
+          "automated-backups",
+          "point-in-time-restore",
+          "immutable-backups",
+          "cross-region-disaster-recovery",
+        ],
+        multiSelect: true,
+      },
       {
         id: "recovery",
         prompt: "Provide RTO and RPO in whole minutes or explicitly defer them.",
@@ -3485,6 +3496,14 @@ export class ApexService {
     round: RequirementsIntakeRound,
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): InputRequestV1["questions"] {
+    if (round.round === "service-preferences") {
+      const scenario = this.recordedRequirementsInput(events)?.["delivery-scenario"];
+      if (scenario !== "migration" && scenario !== "modernization" && scenario !== "extension") return round.questions;
+      return [
+        { id: "retained-services", prompt: "List Azure services or integrations that must be retained." },
+        ...round.questions,
+      ];
+    }
     if (round.round !== "workload-pattern") return round.questions;
     const scenario = this.recordedRequirementsInput(events)?.["delivery-scenario"];
     if (scenario !== "migration" && scenario !== "modernization") return round.questions;

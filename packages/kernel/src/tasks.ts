@@ -65,8 +65,8 @@ export function validateInputAnswers(questions: QuestionV1[], submitted: InputAn
   }
   return questions.map((question) => {
     const value = answers.get(question.id)!;
+    if (isDeferredOrUnknown(value)) return { questionId: question.id, value };
     if (question.valueType !== undefined) {
-      if (isDeferredOrUnknown(value)) return { questionId: question.id, value };
       if (question.valueType === "environment-set") {
         if (!Array.isArray(value) || value.some((item) => !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(item))) {
           throw new Error(`Answer shape does not match question: ${question.id}`);
