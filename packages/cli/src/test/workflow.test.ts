@@ -38,8 +38,15 @@ test("full requirements to fake deploy workflow survives restart", async () => {
   const service = new ApexService(root);
   const initialized = await service.init({ projectId: "demo" });
   await prepareValidatedRun(service, initialized.runId, "bicep");
+  const planReviewDirectory = join(root, "agent-output", "demo", initialized.runId, "plan");
+  assert.match(await readFile(join(planReviewDirectory, "implementation-plan.md"), "utf8"), /Logical Resources/u);
+  assert.match(await readFile(join(planReviewDirectory, "iac-binding.md"), "utf8"), /IaC Binding/u);
+  assert.match(await readFile(join(planReviewDirectory, "environment-inputs.md"), "utf8"), /Environment Inputs/u);
   const preview = await service.preview({ operation: "apply", provider: "fake" });
+  const operationsDirectory = join(root, "agent-output", "demo", initialized.runId, "operations");
+  assert.match(await readFile(join(operationsDirectory, "deployment-preview.md"), "utf8"), /Deployment Preview/u);
   await service.decideGateNumber(4, "approved", "tester");
+  assert.match(await readFile(join(operationsDirectory, "approval.md"), "utf8"), /Gate 4 Approval/u);
   const events = await new EventJournal(
     join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"),
   ).replay();
@@ -703,6 +710,18 @@ test("plan task context projects source hashes and valid output templates", asyn
       }),
     },
   ]);
+  const architectureReviewDirectory = join(root, "agent-output", "demo", initialized.runId, "architecture");
+  assert.match(await readFile(join(architectureReviewDirectory, "README.md"), "utf8"), /Architecture hash/u);
+  assert.match(
+    await readFile(join(architectureReviewDirectory, "architecture-assessment.md"), "utf8"),
+    /Five WAF Pillars/u,
+  );
+  assert.match(await readFile(join(architectureReviewDirectory, "cost-estimate.md"), "utf8"), /Evidence Appendix/u);
+  assert.match(await readFile(join(architectureReviewDirectory, "sku-comparison.md"), "utf8"), /SKU Comparison/u);
+  assert.match(
+    await readFile(join(architectureReviewDirectory, "challenger-findings.md"), "utf8"),
+    /review is pending/u,
+  );
   await complete("architecture-review", [
     {
       kind: "review-findings",
