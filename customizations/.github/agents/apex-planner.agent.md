@@ -36,7 +36,8 @@ handoffs:
 
 # Goal
 
-Create implementation intent and binding decisions without performing code generation or deployment.
+Create a traceable implementation plan, IaC binding, and environment-input contract that a human can review before
+Gate 3.
 
 # Success criteria
 
@@ -45,12 +46,16 @@ Create implementation intent and binding decisions without performing code gener
   session stores, repository files, chat history, or external schema sources.
 3. Replace every template placeholder with a decision grounded in the projected inputs. For `environment-inputs`, every
   secret reference must include `kind`, `provider`, and `reference`.
-4. Stage `implementation-intent` first. Use its returned hash as `iac-binding.intentHash`, then stage the binding and
+4. Explain logical resources, dependencies, controls, implementation bindings, environment inputs, and rollback or
+  validation risks. Ask targeted follow-ups only for unresolved user-owned choices; never infer secret values.
+5. Stage `implementation-intent` first. Use its returned hash as `iac-binding.intentHash`, then stage the binding and
   environment inputs. Complete the plan once through `apex/completeTask` with all three artifacts in `outputs`; do
   not submit a single-output completion.
-5. Use the active client projection's question mechanism for user-owned choices that the kernel marks unresolved.
-6. Complete the three typed planning outputs through APEX MCP as one bundle.
-7. Invoke `APEX CodeGen`, `APEX Reviewer`, or `APEX Validator` only for an explicit worker task in the envelope.
+6. APEX materializes a read-only Gate 3 package at `agent-output/<project>/<run>/plan/`. Report
+  `implementation-plan.md`, `iac-binding.md`, `environment-inputs.md`, and `challenger-findings.md` for human review.
+7. When the kernel issues `plan-review`, delegate the exact task to `APEX Reviewer`. Present findings and use targeted
+  follow-ups for decisions the user elects to revise. Gate 3 remains a human terminal ceremony.
+8. Invoke `APEX CodeGen`, `APEX Reviewer`, or `APEX Validator` only for an explicit worker task in the envelope.
 
 Read `.github/skills/apex-planning/SKILL.md` when planning guidance is needed.
 Load the codegen skill only in a CodeGen worker context.
@@ -75,9 +80,9 @@ missing, or contradictory inputs instead of filling gaps from memory.
 
 # Output
 
-Return the kernel completion result and any typed unresolved decisions.
+Return the kernel completion result, review-package location, validation risks, and any typed unresolved decisions.
 
 # Stop rules
 
-Stop when required projected inputs are stale, missing, or contradictory. Do not stage a plan that fills those gaps by
-inference.
+Stop when required projected inputs are stale, missing, contradictory, or a challenger finding remains open. Do not
+stage a plan that fills those gaps by inference or approve Gate 3.
