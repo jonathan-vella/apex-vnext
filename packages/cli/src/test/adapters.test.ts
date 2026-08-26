@@ -26,7 +26,7 @@ test("CLI emits a stable JSON envelope", async () => {
   assert.equal(code, 0);
   assert.deepEqual(JSON.parse(stdout), {
     ok: true,
-    result: { version: "0.10.0-next.2", bundleVersion: "0.10.0-next.2", configVersion: "1.0.0" },
+    result: { version: "0.10.0-next.3", bundleVersion: "0.10.0-next.3", configVersion: "1.0.0" },
   });
 });
 
@@ -76,7 +76,7 @@ test("CLI bootstrap validates onboarding files before initializing a selected cl
         "--ignore-scripts",
         "--no-audit",
         "--no-fund",
-        "@apexops/cli@0.10.0-next.2",
+        "@apexops/cli@0.10.0-next.3",
       ],
       cwd: root,
       timeoutMs: 120_000,
@@ -114,7 +114,7 @@ test("bootstrap reuses an exact local runtime and rejects a conflicting version"
   const root = await tempRoot();
   await mkdir(join(root, ".git"));
   await mkdir(join(root, "node_modules", "@apexops", "cli"), { recursive: true });
-  await writeFile(join(root, "node_modules", "@apexops", "cli", "package.json"), '{"version":"0.10.0-next.2"}\n');
+  await writeFile(join(root, "node_modules", "@apexops", "cli", "package.json"), '{"version":"0.10.0-next.3"}\n');
   const service = new ApexService(root, {
     processRunner: {
       run: async () => {
@@ -153,12 +153,12 @@ test("CLI manages only its own VS Code profile bootstrap agent", async () => {
   assert.deepEqual(await execute(["profile", "status"], root, { profileRoot }), { installed: false, modified: false });
   assert.deepEqual(await execute(["profile", "install", "--yes"], root, { profileRoot }), {
     installed: true,
-    version: "0.10.0-next.2",
+    version: "0.10.0-next.3",
   });
   assert.deepEqual(await execute(["profile", "status"], root, { profileRoot }), {
     installed: true,
     modified: false,
-    version: "0.10.0-next.2",
+    version: "0.10.0-next.3",
   });
   await assert.rejects(
     execute(["profile", "install", "--client", "github-copilot-cli", "--yes"], root, { profileRoot }),
@@ -464,8 +464,8 @@ test("CLI requires explicit Bicep stack cleanup ownership", async () => {
 
   await writeJson(path, { bicep: { ...bicep, ownershipAuthorizesDeleteResources: true } });
   assert.deepEqual(await execute(["version", "--provider-config", path], root), {
-    version: "0.10.0-next.2",
-    bundleVersion: "0.10.0-next.2",
+    version: "0.10.0-next.3",
+    bundleVersion: "0.10.0-next.3",
     configVersion: "1.0.0",
   });
 });
@@ -482,8 +482,8 @@ test("CLI defaults Bicep stack cleanup to detachAll", async () => {
     },
   });
   assert.deepEqual(await execute(["version", "--provider-config", path], root), {
-    version: "0.10.0-next.2",
-    bundleVersion: "0.10.0-next.2",
+    version: "0.10.0-next.3",
+    bundleVersion: "0.10.0-next.3",
     configVersion: "1.0.0",
   });
 });
@@ -520,7 +520,7 @@ test("CLI rejects a stale Terraform lock hash", async () => {
 
   await writeJson(path, { terraform });
   const configured = await execute(["version", "--provider-config", path], root);
-  assert.deepEqual(configured, { version: "0.10.0-next.2", bundleVersion: "0.10.0-next.2", configVersion: "1.0.0" });
+  assert.deepEqual(configured, { version: "0.10.0-next.3", bundleVersion: "0.10.0-next.3", configVersion: "1.0.0" });
 });
 
 test("CLI capability commands report retained packs and require confirmation for mutation", async () => {
