@@ -10,6 +10,14 @@ current repository version is recorded in [VERSION.md](VERSION.md).
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0-next.2] — Preview
+
+### Changed
+
+- Restored reviewable, kernel-derived workflow packages across Requirements, Architecture, Planner, Operations,
+  Reviewer, Validator, and the coordinator dashboard. Generated documents preserve human review without becoming a
+  second authority source; all gate decisions remain explicit terminal ceremonies.
+
 ## [0.10.0-next.1] — Preview
 
 ### Fixed
