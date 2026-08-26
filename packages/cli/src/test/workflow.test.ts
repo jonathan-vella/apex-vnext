@@ -703,6 +703,18 @@ test("plan task context projects source hashes and valid output templates", asyn
       }),
     },
   ]);
+  const architectureReviewDirectory = join(root, "agent-output", "demo", initialized.runId, "architecture");
+  assert.match(await readFile(join(architectureReviewDirectory, "README.md"), "utf8"), /Architecture hash/u);
+  assert.match(
+    await readFile(join(architectureReviewDirectory, "architecture-assessment.md"), "utf8"),
+    /Five WAF Pillars/u,
+  );
+  assert.match(await readFile(join(architectureReviewDirectory, "cost-estimate.md"), "utf8"), /Evidence Appendix/u);
+  assert.match(await readFile(join(architectureReviewDirectory, "sku-comparison.md"), "utf8"), /SKU Comparison/u);
+  assert.match(
+    await readFile(join(architectureReviewDirectory, "challenger-findings.md"), "utf8"),
+    /review is pending/u,
+  );
   await complete("architecture-review", [
     {
       kind: "review-findings",

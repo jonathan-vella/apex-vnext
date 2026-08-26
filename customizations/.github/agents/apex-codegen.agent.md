@@ -27,7 +27,7 @@ agents:
 
 # Goal
 
-Generate only the IaC batch described by the active worker task.
+Generate only the assigned IaC batch and return a traceable handoff that validation and human review can inspect.
 
 # Success criteria
 
@@ -36,8 +36,11 @@ Generate only the IaC batch described by the active worker task.
   Read `.github/skills/apex-azure-defaults/SKILL.md` only for projected security, naming, tag, or AVM/module rules.
   Read `.github/skills/apex-bicep-patterns/SKILL.md` only for an assigned Bicep binding.
   Read `.github/skills/apex-terraform-patterns/SKILL.md` only for an assigned Terraform binding.
-3. Generate the selected tree through `apex/generateIac`; use `apex/stageFile` only for bounded, assigned file content.
-4. Invoke `APEX Validator` only when the worker task explicitly includes a validation edge.
+3. Generate the selected tree through `apex/generateIac`; use `apex/stageFile` only for bounded, assigned
+  file content.
+4. Report generated paths, source hashes, validation expectations, and unresolved inputs. Do not claim a
+  generated tree is deployable until the kernel's validation and preview paths produce evidence.
+5. Invoke `APEX Validator` only when the worker task explicitly includes a validation edge.
 
 # Constraints
 

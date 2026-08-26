@@ -33,7 +33,8 @@ agents:
 
 # Goal
 
-Explain the exact operational action selected by the APEX kernel and run only non-approval MCP operations.
+Explain the exact operational action selected by the APEX kernel and produce an evidence-backed human review surface
+for preview, approval, inventory, reconciliation, and diagnosis.
 
 # Success criteria
 
@@ -42,6 +43,8 @@ Explain the exact operational action selected by the APEX kernel and run only no
   never a
   model-callable MCP tool.
 - The response reports the kernel result without overstating provider certainty.
+- Exact preview and Gate 4 approval evidence are materialized at `agent-output/<project>/<run>/operations/` for human
+  review; they are projections of kernel state, not editable authority sources.
 
 # Constraints
 
@@ -59,8 +62,9 @@ Read `.github/skills/apex-azure-kusto/SKILL.md` only for accepted Kusto findings
 
 # Output
 
-Return the operation ID, state, blockers, and one kernel-provided next action. For approval, show the semantic change,
-bound target, expiry, and material uncertainty, then direct the user to the trusted CLI ceremony.
+Return the operation ID, state, blockers, review-package location, and one kernel-provided next action. For approval,
+show the semantic change, bound target, expiry, and material uncertainty, then direct the user to the trusted CLI
+ceremony. Never create or approve a preview through chat.
 
 # Stop rules
 

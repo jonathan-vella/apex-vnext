@@ -32,6 +32,7 @@ import {
   hasValidLogicalResourceReferences,
   type ApprovalEvidenceV1,
   type ArchitectureAvailabilityV1,
+  type ArchitectureV1,
   type CostEstimateV1,
   type DeploymentPreviewV1,
   type EnvironmentInputsV1,
@@ -1556,6 +1557,50 @@ export class ApexService {
     if (descriptor.id === "requirements-review") {
       await this.materializeRequirementsChallengeFindings(run, outputs[0]!.value as ReviewFindingsV1);
     }
+    if (descriptor.id === "architecture") {
+      const architectureOutput = outputs.find(({ kind }) => kind === "architecture");
+      const costOutput = outputs.find(({ kind }) => kind === "cost-estimate");
+      const decisionsOutput = outputs.find(({ kind }) => kind === "workload-decision-manifest");
+      if (architectureOutput === undefined || costOutput === undefined || decisionsOutput === undefined) {
+        throw new ApexError(
+          "APEX_INTERNAL",
+          "Architecture review package is missing an accepted output",
+          EXIT_CODES.internal,
+        );
+      }
+      await this.materializeArchitectureReviewPackage(
+        run,
+        architectureOutput.value as ArchitectureV1,
+        costOutput.value as CostEstimateV1,
+        decisionsOutput.value as WorkloadDecisionManifestV1,
+        outputHashes,
+      );
+    }
+    if (descriptor.id === "architecture-review") {
+      await this.materializeArchitectureChallengeFindings(run, outputs[0]!.value as ReviewFindingsV1);
+    }
+    if (descriptor.id === "plan") {
+      const intentOutput = outputs.find(({ kind }) => kind === "implementation-intent");
+      const bindingOutput = outputs.find(({ kind }) => kind === "iac-binding");
+      const inputsOutput = outputs.find(({ kind }) => kind === "environment-inputs");
+      if (intentOutput === undefined || bindingOutput === undefined || inputsOutput === undefined) {
+        throw new ApexError(
+          "APEX_INTERNAL",
+          "Planner review package is missing an accepted output",
+          EXIT_CODES.internal,
+        );
+      }
+      await this.materializePlanReviewPackage(
+        run,
+        intentOutput.value as ImplementationIntentV1,
+        bindingOutput.value as IacBindingV1,
+        inputsOutput.value as EnvironmentInputsV1,
+        outputHashes,
+      );
+    }
+    if (descriptor.id === "plan-review") {
+      await this.materializePlanChallengeFindings(run, outputs[0]!.value as ReviewFindingsV1);
+    }
     if (descriptor.reviewSubject !== undefined) {
       if (reviewBlockers.length === 0 && descriptor.gate !== undefined) {
         await this.openRunGate(await this.currentRun(), descriptor.gate, dependencyHash);
@@ -1663,6 +1708,200 @@ export class ApexService {
             .join("\n\n");
     await atomicWriteBytes(
       join(this.requirementsReviewDirectory(run), "challenger-findings.md"),
+      Buffer.from(`# Challenger Findings\n\n${findings}\n`, "utf8"),
+    );
+  }
+
+  private architectureReviewDirectory(run: RunConfigV1): string {
+    return join(this.root, "agent-output", run.projectId, run.runId, "architecture");
+  }
+
+  private async materializeArchitectureReviewPackage(
+    run: RunConfigV1,
+    architecture: ArchitectureV1,
+    cost: CostEstimateV1,
+    decisions: WorkloadDecisionManifestV1,
+    hashes: Partial<Record<ArtifactKind, string>>,
+  ): Promise<void> {
+    const directory = this.architectureReviewDirectory(run);
+    const list = (items: readonly string[]): string =>
+      items.length === 0 ? "- None." : items.map((item) => `- ${this.reviewMarkdownText(item)}`).join("\n");
+    const table = (headers: string[], rows: string[][]): string =>
+      [
+        `| ${headers.join(" | ")} |`,
+        `| ${headers.map(() => "---").join(" | ")} |`,
+        ...rows.map((row) => `| ${row.join(" | ")} |`),
+      ].join("\n");
+    const costRows = cost.lineItems.map((item) => [
+      this.reviewMarkdownText(item.service),
+      this.reviewMarkdownText(item.sku),
+      String(item.quantity),
+      `${item.monthlyCost.toFixed(2)} ${this.reviewMarkdownText(cost.currency)}`,
+      this.reviewMarkdownText(item.uncertainty.confidence),
+    ]);
+    const skuRows = decisions.skuDecisions.map((decision) => [
+      this.reviewMarkdownText(decision.logicalId),
+      this.reviewMarkdownText(decision.service),
+      this.reviewMarkdownText(decision.sku),
+      String(decision.quantity),
+      this.reviewMarkdownText(decision.rationale),
+    ]);
+    await mkdir(directory, { recursive: true });
+    await Promise.all([
+      atomicWriteBytes(
+        join(directory, "README.md"),
+        Buffer.from(
+          `# ${this.reviewMarkdownText(architecture.title)}\n\nGenerated Gate 2 review package for run \`${this.reviewMarkdownText(run.runId)}\`. The APEX kernel state remains authoritative.\n\n- Architecture hash: ${hashes.architecture}\n- Cost estimate hash: ${hashes["cost-estimate"]}\n- Decision manifest hash: ${hashes["workload-decision-manifest"]}\n- Review status: challenger findings pending\n`,
+          "utf8",
+        ),
+      ),
+      atomicWriteBytes(
+        join(directory, "architecture-assessment.md"),
+        Buffer.from(
+          `# Architecture Assessment\n\n## Summary\n\n${this.reviewMarkdownText(architecture.summary)}\n\n## Components\n\n${table(
+            ["ID", "Service", "Purpose", "Requirements"],
+            architecture.components.map((component) => [
+              this.reviewMarkdownText(component.id),
+              this.reviewMarkdownText(component.service),
+              this.reviewMarkdownText(component.purpose),
+              component.requirementIds.map((id) => this.reviewMarkdownText(id)).join(", "),
+            ]),
+          )}\n\n## Five WAF Pillars\n\n- Security: ${list(architecture.decisions)}\n- Reliability: ${list(decisions.sloDecisions.map((decision) => `${decision.logicalId}: ${decision.availabilityPercent}% availability, RTO ${decision.rtoMinutes}m, RPO ${decision.rpoMinutes}m`))}\n- Performance efficiency: review component capacity and scale decisions in the SKU comparison.\n- Cost optimization: review the current evidence-backed cost estimate.\n- Operational excellence: ${list(architecture.risks)}\n\n## Alternatives And Trade-offs\n\nUser-confirmed decisions:\n${list(architecture.decisions)}\n\n## Risks\n\n${list(architecture.risks)}\n`,
+          "utf8",
+        ),
+      ),
+      atomicWriteBytes(
+        join(directory, "cost-estimate.md"),
+        Buffer.from(
+          `# Cost Estimate\n\n- Pricing date: ${this.reviewMarkdownText(cost.pricingDate)}\n- Monthly total: ${cost.totalMonthlyCost.toFixed(2)} ${this.reviewMarkdownText(cost.currency)}\n\n## Line Items\n\n${table(["Service", "SKU", "Quantity", "Monthly", "Confidence"], costRows)}\n\n## Evidence Appendix\n\n${cost.lineItems.map((item) => `- ${this.reviewMarkdownText(item.service)} / ${this.reviewMarkdownText(item.sku)}: ${this.reviewMarkdownText(item.source.provider)} — ${this.reviewMarkdownText(item.source.uri)} — retrieved ${this.reviewMarkdownText(item.source.retrievedAt)}; uncertainty ${this.reviewMarkdownText(item.uncertainty.basis)}`).join("\n")}\n\n## Assumptions\n\n${list(cost.assumptions)}\n`,
+          "utf8",
+        ),
+      ),
+      atomicWriteBytes(
+        join(directory, "sku-comparison.md"),
+        Buffer.from(
+          `# SKU Comparison\n\n${table(["Logical ID", "Service", "Selected SKU", "Quantity", "Rationale"], skuRows)}\n\nThese are user-confirmed Architecture decisions. Alternatives and rejected options must be recorded in the architecture assessment before Gate 2 approval.\n`,
+          "utf8",
+        ),
+      ),
+      atomicWriteBytes(
+        join(directory, "challenger-findings.md"),
+        Buffer.from(
+          "# Challenger Findings\n\nArchitecture challenger review is pending. Gate 2 cannot be approved until the reviewer completes this document.\n",
+          "utf8",
+        ),
+      ),
+    ]);
+  }
+
+  private async materializeArchitectureChallengeFindings(run: RunConfigV1, review: ReviewFindingsV1): Promise<void> {
+    const findings =
+      review.findings.length === 0
+        ? "No challenger findings remain open."
+        : review.findings
+            .map(
+              ({ id, severity, title, detail, resolution }) =>
+                `## ${this.reviewMarkdownText(id)}: ${this.reviewMarkdownText(title)}\n\n- Severity: ${this.reviewMarkdownText(severity)}\n- Finding: ${this.reviewMarkdownText(detail)}${resolution === undefined ? "" : `\n- Resolution: ${this.reviewMarkdownText(resolution)}`}`,
+            )
+            .join("\n\n");
+    await atomicWriteBytes(
+      join(this.architectureReviewDirectory(run), "challenger-findings.md"),
+      Buffer.from(`# Challenger Findings\n\n${findings}\n`, "utf8"),
+    );
+  }
+
+  private planReviewDirectory(run: RunConfigV1): string {
+    return join(this.root, "agent-output", run.projectId, run.runId, "plan");
+  }
+
+  private async materializePlanReviewPackage(
+    run: RunConfigV1,
+    intent: ImplementationIntentV1,
+    binding: IacBindingV1,
+    inputs: EnvironmentInputsV1,
+    hashes: Partial<Record<ArtifactKind, string>>,
+  ): Promise<void> {
+    const directory = this.planReviewDirectory(run);
+    const table = (headers: string[], rows: string[][]): string =>
+      [
+        `| ${headers.join(" | ")} |`,
+        `| ${headers.map(() => "---").join(" | ")} |`,
+        ...rows.map((row) => `| ${row.join(" | ")} |`),
+      ].join("\n");
+    const resourceRows = intent.resources.map((resource) => [
+      this.reviewMarkdownText(resource.id),
+      this.reviewMarkdownText(resource.type),
+      this.reviewMarkdownText(resource.purpose),
+      resource.dependsOn.map((dependency) => this.reviewMarkdownText(dependency)).join(", "),
+      resource.controls.map((control) => this.reviewMarkdownText(control)).join(", "),
+    ]);
+    const bindingRows = Object.entries(binding.resourceBindings).map(([id, value]) => [
+      this.reviewMarkdownText(id),
+      this.reviewMarkdownText(value.implementation),
+      this.reviewMarkdownText(value.version),
+      this.reviewMarkdownText(JSON.stringify(value.parameters)),
+    ]);
+    const inputRows = Object.entries(inputs.inputs).map(([name, value]) => [
+      this.reviewMarkdownText(name),
+      value.kind === "value" ? "value" : "secret-reference",
+      this.reviewMarkdownText(value.kind === "value" ? String(value.value) : `${value.provider}:${value.reference}`),
+    ]);
+    await mkdir(directory, { recursive: true });
+    await Promise.all([
+      atomicWriteBytes(
+        join(directory, "README.md"),
+        Buffer.from(
+          `# Implementation Plan\n\nGenerated Gate 3 review package for run \`${this.reviewMarkdownText(run.runId)}\`. The APEX kernel state remains authoritative.\n\n- Intent hash: ${hashes["implementation-intent"]}\n- Binding hash: ${hashes["iac-binding"]}\n- Environment input hash: ${hashes["environment-inputs"]}\n- Review status: challenger findings pending\n`,
+          "utf8",
+        ),
+      ),
+      atomicWriteBytes(
+        join(directory, "implementation-plan.md"),
+        Buffer.from(
+          `# Implementation Plan\n\n## Logical Resources\n\n${table(["ID", "Type", "Purpose", "Depends On", "Controls"], resourceRows)}\n\n## Outputs\n\n${intent.outputs.map((output) => `- ${this.reviewMarkdownText(output)}`).join("\n")}\n\n## Source Artifacts\n\n${Object.entries(
+            intent.sourceHashes,
+          )
+            .map(([kind, hash]) => `- ${this.reviewMarkdownText(kind)}: ${hash}`)
+            .join("\n")}\n`,
+          "utf8",
+        ),
+      ),
+      atomicWriteBytes(
+        join(directory, "iac-binding.md"),
+        Buffer.from(
+          `# IaC Binding\n\n- Track: ${this.reviewMarkdownText(binding.track)}\n- Intent hash: ${binding.intentHash}\n\n${table(["Logical ID", "Implementation", "Version", "Parameters"], bindingRows)}\n`,
+          "utf8",
+        ),
+      ),
+      atomicWriteBytes(
+        join(directory, "environment-inputs.md"),
+        Buffer.from(
+          `# Environment Inputs\n\n- Environment: ${this.reviewMarkdownText(inputs.environment)}\n\n${table(["Name", "Kind", "Reference or Value"], inputRows)}\n`,
+          "utf8",
+        ),
+      ),
+      atomicWriteBytes(
+        join(directory, "challenger-findings.md"),
+        Buffer.from(
+          "# Challenger Findings\n\nImplementation-plan challenger review is pending. Gate 3 cannot be approved until the reviewer completes this document.\n",
+          "utf8",
+        ),
+      ),
+    ]);
+  }
+
+  private async materializePlanChallengeFindings(run: RunConfigV1, review: ReviewFindingsV1): Promise<void> {
+    const findings =
+      review.findings.length === 0
+        ? "No challenger findings remain open."
+        : review.findings
+            .map(
+              ({ id, severity, title, detail, resolution }) =>
+                `## ${this.reviewMarkdownText(id)}: ${this.reviewMarkdownText(title)}\n\n- Severity: ${this.reviewMarkdownText(severity)}\n- Finding: ${this.reviewMarkdownText(detail)}${resolution === undefined ? "" : `\n- Resolution: ${this.reviewMarkdownText(resolution)}`}`,
+            )
+            .join("\n\n");
+    await atomicWriteBytes(
+      join(this.planReviewDirectory(run), "challenger-findings.md"),
       Buffer.from(`# Challenger Findings\n\n${findings}\n`, "utf8"),
     );
   }
@@ -1898,6 +2137,7 @@ export class ApexService {
       },
       gateNumber === 4 ? (events.at(-1)?.hash ?? null) : undefined,
     );
+    if (gateNumber === 4) await this.materializeOperationsApprovalPackage(run, approval, approvalHash);
     return approval;
   }
 
@@ -1992,6 +2232,7 @@ export class ApexService {
         ...(validation.omittedValidatorIds.length === 0 ? {} : { omittedValidatorIds: validation.omittedValidatorIds }),
         ...(attestationHash === undefined ? {} : { attestationHash }),
       });
+      await this.materializeOperationsPreviewPackage(run, preview, previewObjectHash);
       await this.openRunGate(await this.currentRun(), 4, preview.previewHash);
       return preview;
     }
@@ -2048,8 +2289,81 @@ export class ApexService {
       evidenceMode: validation.evidenceMode,
       ...(validation.omittedValidatorIds.length === 0 ? {} : { omittedValidatorIds: validation.omittedValidatorIds }),
     });
+    await this.materializeOperationsPreviewPackage(run, preview, previewObjectHash);
     await this.openRunGate(await this.currentRun(), 4, preview.previewHash);
     return preview;
+  }
+
+  private operationsReviewDirectory(run: RunConfigV1): string {
+    return join(this.root, "agent-output", run.projectId, run.runId, "operations");
+  }
+
+  private async materializeOperationsPreviewPackage(
+    run: RunConfigV1,
+    preview: DeploymentPreviewV1,
+    previewObjectHash: string,
+  ): Promise<void> {
+    const directory = this.operationsReviewDirectory(run);
+    const changes =
+      preview.changes.length === 0
+        ? "- No changes."
+        : preview.changes
+            .map(({ resourceId, action, material, details }) => {
+              const detail = details === undefined ? "" : `: ${this.reviewMarkdownText(details)}`;
+              return `- ${this.reviewMarkdownText(action)} ${this.reviewMarkdownText(resourceId)}${material ? " (material)" : ""}${detail}`;
+            })
+            .join("\n");
+    const previewContent = [
+      "# Deployment Preview",
+      "",
+      `- Operation: ${this.reviewMarkdownText(preview.operation)}`,
+      `- Target: ${this.reviewMarkdownText(preview.target)}`,
+      `- Expires: ${this.reviewMarkdownText(preview.expiresAt)}`,
+      "- Recipient: bound by the Gate 4 approval evidence",
+      "",
+      "## Changes",
+      "",
+      changes,
+      "",
+      "## Blockers",
+      "",
+      preview.blockers.length === 0
+        ? "- None."
+        : preview.blockers.map((blocker) => `- ${this.reviewMarkdownText(blocker)}`).join("\n"),
+      "",
+    ].join("\n");
+    await mkdir(directory, { recursive: true });
+    await Promise.all([
+      atomicWriteBytes(
+        join(directory, "README.md"),
+        Buffer.from(
+          `# Operations Review\n\nGenerated from exact kernel evidence for run \`${this.reviewMarkdownText(run.runId)}\`. The APEX kernel state remains authoritative.\n\n- Preview hash: ${preview.previewHash}\n- Preview object hash: ${previewObjectHash}\n- Gate 4 status: pending human terminal approval\n`,
+          "utf8",
+        ),
+      ),
+      atomicWriteBytes(join(directory, "deployment-preview.md"), Buffer.from(previewContent, "utf8")),
+    ]);
+  }
+
+  private async materializeOperationsApprovalPackage(
+    run: RunConfigV1,
+    approval: ApprovalEvidenceV1,
+    approvalHash: string,
+  ): Promise<void> {
+    const content = [
+      "# Gate 4 Approval",
+      "",
+      `- Decision: ${this.reviewMarkdownText(approval.decision)}`,
+      `- Actor: ${this.reviewMarkdownText(approval.actor)}`,
+      `- Recipient: ${this.reviewMarkdownText(approval.recipientIdentity ?? "Unavailable")}`,
+      `- Preview hash: ${approval.previewHash ?? "Unavailable"}`,
+      `- Approval hash: ${approvalHash}`,
+      `- Expires: ${approval.expiresAt === undefined ? "Unavailable" : this.reviewMarkdownText(approval.expiresAt)}`,
+      "",
+      "This approval authorizes only the exact preview above.",
+      "",
+    ].join("\n");
+    await atomicWriteBytes(join(this.operationsReviewDirectory(run), "approval.md"), Buffer.from(content, "utf8"));
   }
 
   async currentPreview(): Promise<string> {
