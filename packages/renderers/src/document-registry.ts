@@ -151,16 +151,26 @@ export function renderRequirementsDocument(
     "template-hash": templateHash,
     environment: escapeMarkdown(requirements.environment),
     "artifact-status": "accepted",
-    "business-context": unavailable("business context"),
-    "success-criteria": unavailable("success criteria"),
+    "business-context": escapeMarkdown(requirements.businessContext ?? unavailable("business context")),
+    "success-criteria": escapeMarkdown(requirements.successCriteria ?? unavailable("success criteria")),
     "requirements-table": markdownTable(["ID", "Priority", "Status", "Statement", "Source"], requirementsRows),
-    "nfr-table": unavailable("non-functional requirement classifications"),
-    "security-and-compliance-table": unavailable("security or compliance classifications"),
-    "budget-and-operations": unavailable("budget or operations data"),
-    "regional-constraints": unavailable("regional or residency constraints"),
+    "nfr-table": escapeMarkdown(
+      requirements.nonFunctionalRequirements ?? unavailable("non-functional requirement classifications"),
+    ),
+    "security-and-compliance-table": escapeMarkdown(
+      requirements.securityAndCompliance ?? unavailable("security or compliance classifications"),
+    ),
+    "budget-and-operations": escapeMarkdown(
+      requirements.budgetAndOperations ?? unavailable("budget or operations data"),
+    ),
+    "regional-constraints": escapeMarkdown(
+      requirements.regionalConstraints ?? unavailable("regional or residency constraints"),
+    ),
     "assumptions-list": list(requirements.assumptions),
     "unknowns-list": list(requirements.unknowns),
-    "architecture-handoff": "Unavailable: no architecture handoff artifact is produced by the current workflow.",
+    "architecture-handoff": escapeMarkdown(
+      requirements.architectureHandoff ?? "Architecture must validate candidate services against current evidence.",
+    ),
   };
   return REQUIREMENTS_TEMPLATE_SLOTS.reduce(
     (document, slot) => document.replaceAll(`{${slot}}`, () => replacements[slot]),
