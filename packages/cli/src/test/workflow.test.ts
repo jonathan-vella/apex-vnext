@@ -690,6 +690,13 @@ test("plan task context projects source hashes and valid output templates", asyn
     },
   ]);
   assert.match(
+    await readFile(
+      join(root, "agent-output", "demo", initialized.runId, "reviews", "requirements-findings.md"),
+      "utf8",
+    ),
+    /No findings remain open\./u,
+  );
+  assert.match(
     await readFile(join(root, "agent-output", "demo", initialized.runId, "challenger-findings.md"), "utf8"),
     /No challenger findings remain open\./u,
   );
