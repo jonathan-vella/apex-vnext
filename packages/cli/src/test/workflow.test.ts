@@ -220,6 +220,10 @@ test("greenfield service intake skips retained services and uses selectable reco
     services.request.questions.some(({ id }) => id === "retained-services"),
     false,
   );
+  assert.equal(
+    services.request.questions.find(({ id }) => id === "prohibited-services")?.prompt,
+    "List prohibited services, or explicitly defer the constraint.",
+  );
   await service.recordInput({
     schemaVersion: "1.0.0",
     requestId: services.request.requestId,

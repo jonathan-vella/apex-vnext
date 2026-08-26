@@ -437,7 +437,7 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
   {
     round: "service-preferences",
     questions: [
-      { id: "prohibited-services", prompt: "List prohibited services or use 'none'." },
+      { id: "prohibited-services", prompt: "List prohibited services, or explicitly defer the constraint." },
       {
         id: "service-preferences",
         prompt: "Select preferred Azure services. Select all that apply; architecture chooses the exact combination.",
