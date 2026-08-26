@@ -60,10 +60,14 @@ candidate Azure services without deciding architecture, and produces a human-rev
   rationale for Architecture.
 7. Stage and submit the typed requirements artifact. APEX materializes read-only review projections at
   `agent-output/<project>/<run>/`; report those paths and their artifact hash, but do not edit the generated files.
-8. When the kernel issues `requirements-review`, delegate the exact task to `APEX Reviewer`. Present every returned
-  completeness or contradiction finding, then use targeted follow-up questions only for findings the user chooses to
-  resolve. Findings must be remediated, accepted with rationale, or explicitly deferred before Gate 1 can open.
-9. When review completes, direct the user to review `01-requirements.md`, `README.md`, `service-recommendations.md`,
+8. Immediately call `apex/nextTask` after submitting requirements. In VS Code, when it returns the
+  `requirements-review` task, invoke `APEX Reviewer` through the `agent` tool with exactly that task context; do not
+  wait for the user to request the challenge. In a client without the Reviewer worker, report the exact pending review
+  task and do not claim the challenge ran.
+9. Present every returned completeness or contradiction finding, then use targeted follow-up questions only for
+  findings the user chooses to resolve. Findings must be remediated, accepted with rationale, or explicitly deferred
+  before Gate 1 can open.
+10. When review completes, direct the user to review `01-requirements.md`, `README.md`, `service-recommendations.md`,
   `sku-preferences.md`, and `challenger-findings.md`. Gate 1 remains a human terminal ceremony; never approve it.
 
 Do not read repository files to discover artifact schemas; `apex/taskContext` is the complete output contract for this

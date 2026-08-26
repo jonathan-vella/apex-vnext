@@ -47,6 +47,9 @@ test("init installs bundled customizations and runtime config by default", async
   assert.match(coordinatorAgent, /name: APEX/u);
   assert.match(coordinatorAgent, /target: vscode/u);
   assert.match(await readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"), /target: vscode/u);
+  const requirementsAgent = await readFile(join(root, ".github", "agents", "apex-requirements.agent.md"), "utf8");
+  assert.match(requirementsAgent, /Immediately call `apex\/nextTask` after submitting requirements/u);
+  assert.match(requirementsAgent, /invoke `APEX Reviewer` through the `agent` tool/u);
   assert.match(
     await readFile(join(root, ".github", "instructions", "apex-agent-authoring.instructions.md"), "utf8"),
     /APEX Agent Boundaries/u,
