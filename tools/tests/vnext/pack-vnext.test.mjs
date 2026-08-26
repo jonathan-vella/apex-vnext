@@ -399,7 +399,7 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
   const version = JSON.parse((await runInTest(apexBin, ["version", "--json"], project)).stdout);
   assert.deepEqual(version, {
     ok: true,
-    result: { version: "0.10.0-next.1", bundleVersion: "0.10.0-next.1", configVersion: "1.0.0" },
+    result: { version: "0.10.0-next.2", bundleVersion: "0.10.0-next.2", configVersion: "1.0.0" },
   });
   await runInTest("git", ["init", "--initial-branch", "qualification"], project);
   await runInTest(apexBin, ["init", "--project", "demo", "--json"], project);
