@@ -10,6 +10,14 @@ current repository version is recorded in [VERSION.md](VERSION.md).
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0-next.3] — Preview
+
+### Changed
+
+- Requirements intake now asks retained-service constraints only for migration, modernization, and extension scenarios.
+  Availability, backup, and disaster-recovery capabilities use selectable options, while exact RTO/RPO targets remain a
+  distinct numeric decision.
+
 ## [0.10.0-next.2] — Preview
 
 ### Changed
