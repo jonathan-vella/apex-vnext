@@ -371,6 +371,12 @@ test("requirements acceptance records a bound rendered document", async () => {
   assert.equal(await service.render("requirements"), persisted.content);
   assert.match(persisted.content, /Unavailable: RequirementsV1 does not represent business context\./u);
   assert.notEqual(document?.outputHash, accepted.outputHashes.requirements);
+  const reviewDirectory = join(root, "agent-output", "demo", initialized.runId);
+  assert.equal(await readFile(join(reviewDirectory, "01-requirements.md"), "utf8"), persisted.content);
+  assert.match(await readFile(join(reviewDirectory, "README.md"), "utf8"), /APEX kernel state remains authoritative/u);
+  assert.match(await readFile(join(reviewDirectory, "service-recommendations.md"), "utf8"), /Candidate Services/u);
+  assert.match(await readFile(join(reviewDirectory, "sku-preferences.md"), "utf8"), /SKU Preferences/u);
+  assert.match(await readFile(join(reviewDirectory, "challenger-findings.md"), "utf8"), /review is pending/u);
 });
 
 test("requirements document rendering escapes table cells without rejecting content braces", async () => {
@@ -574,6 +580,13 @@ test("requirements task context includes recorded input and stageable output tem
     requirements: Array<{ id: string; statement: string; priority: string; status: string; source: string }>;
     assumptions: string[];
     unknowns: string[];
+    businessContext?: string;
+    successCriteria?: string;
+    nonFunctionalRequirements?: string;
+    securityAndCompliance?: string;
+    budgetAndOperations?: string;
+    regionalConstraints?: string;
+    architectureHandoff?: string;
   };
   assert.deepEqual(template.requirements.slice(0, 2), [
     {
@@ -593,6 +606,19 @@ test("requirements task context includes recorded input and stageable output tem
   ]);
   assert.deepEqual(template.assumptions, ["industry: retail", "target-environments: dev"]);
   assert.deepEqual(template.unknowns, []);
+  assert.equal(template.businessContext, "retail; greenfield; web-api");
+  assert.equal(template.successCriteria, "100 concurrent users");
+  assert.equal(
+    template.nonFunctionalRequirements,
+    "99.9% availability; RTO 60 minutes; RPO 15 minutes; RTO 60 minutes; RPO 15 minutes",
+  );
+  assert.equal(
+    template.securityAndCompliance,
+    "managed-identity, private-endpoints, key-vault, diagnostic-logging; pci-dss; microsoft-entra-id, managed-identity; confidential",
+  );
+  assert.equal(template.budgetAndOperations, "USD 500 monthly; azure-monitor, application-insights, managed-alerts");
+  assert.equal(template.regionalConstraints, "swedencentral");
+  assert.equal(template.architectureHandoff, "container-apps, azure-cosmos-db, application-insights");
   await service.stageArtifact(issued.task.taskId, {
     kind: "requirements",
     value: context.outputTemplates.requirements,
@@ -624,7 +650,8 @@ test("task context projects hashes from legacy task completions", async () => {
 });
 
 test("plan task context projects source hashes and valid output templates", async () => {
-  const service = new ApexService(await tempRoot());
+  const root = await tempRoot();
+  const service = new ApexService(root);
   const initialized = await service.init({ projectId: "demo" });
   const complete = async (taskType: string, outputs: Parameters<typeof service.completeTaskOutputs>[1]) => {
     const issued = await nextTaskAfterInput(service);
@@ -641,6 +668,10 @@ test("plan task context projects source hashes and valid output templates", asyn
       value: review(initialized.runId, "requirements", requirementHashes.outputHashes.requirements!),
     },
   ]);
+  assert.match(
+    await readFile(join(root, "agent-output", "demo", initialized.runId, "challenger-findings.md"), "utf8"),
+    /No challenger findings remain open\./u,
+  );
   await service.decideGateNumber(1, "approved", "tester");
   await acceptAvailabilityEvidence(service, initialized.runId);
   const architectureValue = architecture(initialized.runId);

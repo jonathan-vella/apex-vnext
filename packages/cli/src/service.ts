@@ -55,6 +55,7 @@ import {
   type ReviewFindingsV1,
   type QualityScorecardV1,
   type QualityMeasurementsV1,
+  type RequirementsV1,
   type RunConfigV1,
   type RunId,
   type RuntimeBundleLockV1,
@@ -1544,6 +1545,17 @@ export class ApexService {
           }),
       legacy,
     });
+    if (descriptor.id === "requirements" && renderedDocument !== undefined) {
+      await this.materializeRequirementsReviewPackage(
+        run,
+        requirementsOutput!.value as RequirementsV1,
+        renderedDocument.outputHash,
+        events,
+      );
+    }
+    if (descriptor.id === "requirements-review") {
+      await this.materializeRequirementsChallengeFindings(run, outputs[0]!.value as ReviewFindingsV1);
+    }
     if (descriptor.reviewSubject !== undefined) {
       if (reviewBlockers.length === 0 && descriptor.gate !== undefined) {
         await this.openRunGate(await this.currentRun(), descriptor.gate, dependencyHash);
@@ -1569,6 +1581,86 @@ export class ApexService {
       // State transfer exports immutable objects as canonical JSON.
       outputHash: await this.objects.putJson({ contentType: "text/markdown", content }),
     };
+  }
+
+  private requirementsReviewDirectory(run: RunConfigV1): string {
+    return join(this.root, "agent-output", run.projectId, run.runId);
+  }
+
+  private async materializeRequirementsReviewPackage(
+    run: RunConfigV1,
+    requirements: RequirementsV1,
+    requirementsDocumentHash: string,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+  ): Promise<void> {
+    const directory = this.requirementsReviewDirectory(run);
+    const document = await this.objects.getJson<{ contentType: string; content: string }>(requirementsDocumentHash);
+    if (document.contentType !== "text/markdown") {
+      throw new ApexError("APEX_INTERNAL", "Requirements review document is invalid", EXIT_CODES.internal);
+    }
+    const input = this.recordedRequirementsInput(events) ?? {};
+    const text = (value: InputValueV1 | undefined): string => {
+      if (value === undefined) return "Deferred";
+      if (typeof value === "string") return value;
+      if (Array.isArray(value)) return value.join(", ");
+      if (value.kind === "budget") return `${value.amount} ${value.currency} monthly`;
+      if (value.kind === "recovery") return `RTO ${value.rtoMinutes} minutes; RPO ${value.rpoMinutes} minutes`;
+      if (value.kind === "data-classification") return value.classification;
+      if (value.kind === "compliance") return value.scopes.join(", ");
+      return value.kind === "deferred" ? `Deferred to ${value.owner}` : "Unknown";
+    };
+    const list = (value: InputValueV1 | undefined): string => {
+      if (!Array.isArray(value) || value.length === 0) return "- None recorded.";
+      return value.map((item) => `- ${item}`).join("\n");
+    };
+    await mkdir(directory, { recursive: true });
+    await Promise.all([
+      atomicWriteBytes(join(directory, "01-requirements.md"), Buffer.from(document.content, "utf8")),
+      atomicWriteBytes(
+        join(directory, "README.md"),
+        Buffer.from(
+          `# ${run.projectId}\n\nGenerated Gate 1 review package for run \`${run.runId}\`. The APEX kernel state remains authoritative.\n\n- Environment: ${run.environment}\n- Business context: ${requirements.businessContext ?? "Deferred"}\n- Requirements document hash: ${requirementsDocumentHash}\n- Review status: challenger findings pending\n`,
+          "utf8",
+        ),
+      ),
+      atomicWriteBytes(
+        join(directory, "service-recommendations.md"),
+        Buffer.from(
+          `# Service Recommendations\n\nThese are user-reviewed candidate services, not Architecture decisions.\n\n## Candidate Services\n${list(input["service-preferences"])}\n\n## Recommendation Rationale\n${requirements.architectureHandoff ?? "Architecture must evaluate the candidate services against approved requirements and current evidence."}\n\n## Constraints\n- Retained services: ${text(input["retained-services"])}\n- Prohibited services: ${text(input["prohibited-services"])}\n- Environment overrides: ${text(input["environment-overrides"])}\n\nArchitecture must validate candidates against approved requirements, governance, and current evidence.\n`,
+          "utf8",
+        ),
+      ),
+      atomicWriteBytes(
+        join(directory, "sku-preferences.md"),
+        Buffer.from(
+          `# SKU Preferences\n\nUser constraints only. Architecture owns SKU selection.\n\n- Preference: ${text(input["sku-preferences"])}\n- Budget posture: ${text(input.budget)}\n- Scale: ${text(input.scale)}\n`,
+          "utf8",
+        ),
+      ),
+      atomicWriteBytes(
+        join(directory, "challenger-findings.md"),
+        Buffer.from(
+          "# Challenger Findings\n\nRequirements challenger review is pending. Gate 1 cannot be approved until the reviewer completes this document.\n",
+          "utf8",
+        ),
+      ),
+    ]);
+  }
+
+  private async materializeRequirementsChallengeFindings(run: RunConfigV1, review: ReviewFindingsV1): Promise<void> {
+    const findings =
+      review.findings.length === 0
+        ? "No challenger findings remain open."
+        : review.findings
+            .map(
+              ({ id, severity, title, detail, resolution }) =>
+                `## ${id}: ${title}\n\n- Severity: ${severity}\n- Finding: ${detail}${resolution === undefined ? "" : `\n- Resolution: ${resolution}`}`,
+            )
+            .join("\n\n");
+    await atomicWriteBytes(
+      join(this.requirementsReviewDirectory(run), "challenger-findings.md"),
+      Buffer.from(`# Challenger Findings\n\n${findings}\n`, "utf8"),
+    );
   }
 
   private async requirementsDocumentMarkdown(
@@ -3319,6 +3411,13 @@ export class ApexService {
     }>;
     assumptions: string[];
     unknowns: string[];
+    businessContext?: string;
+    successCriteria?: string;
+    nonFunctionalRequirements?: string;
+    securityAndCompliance?: string;
+    budgetAndOperations?: string;
+    regionalConstraints?: string;
+    architectureHandoff?: string;
   } {
     const fields: Array<{ id: string; label: string; priority: "must" | "should" }> = [
       { id: "availability-recovery", label: "Availability and recovery", priority: "must" },
@@ -3364,6 +3463,23 @@ export class ApexService {
       return typeof text === "string" && text.length > 0 ? [`${id}: ${text}`] : [];
     });
     const unknowns = requirements.filter(({ status }) => status !== "confirmed").map(({ statement }) => statement);
+    const text = (id: string): string | undefined => {
+      const value = this.renderInputValue(input?.[id]);
+      return typeof value === "string" && value.length > 0 ? value : undefined;
+    };
+    const joinValues = (...ids: string[]): string | undefined => {
+      const values = ids.map(text).filter((value): value is string => value !== undefined);
+      return values.length === 0 ? undefined : values.join("; ");
+    };
+    const reviewFields = {
+      businessContext: joinValues("industry", "delivery-scenario", "workload-pattern"),
+      successCriteria: text("scale"),
+      nonFunctionalRequirements: joinValues("availability-recovery", "recovery"),
+      securityAndCompliance: joinValues("security-controls", "compliance", "authentication", "data-sensitivity"),
+      budgetAndOperations: joinValues("budget", "operations"),
+      regionalConstraints: text("region"),
+      architectureHandoff: text("service-preferences"),
+    };
     return {
       requirements:
         requirements.length > 0
@@ -3379,6 +3495,7 @@ export class ApexService {
             ],
       assumptions,
       unknowns,
+      ...Object.fromEntries(Object.entries(reviewFields).filter(([, value]) => value !== undefined)),
     };
   }
 

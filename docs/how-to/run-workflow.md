@@ -79,6 +79,12 @@ apex render --kind requirements
 apex gate decide --gate 1 --decision approved --actor USER_ID --json
 ```
 
+Requirements acceptance also materializes a read-only Gate 1 review package at
+`agent-output/<project>/<run>/`. Review `01-requirements.md`, `README.md`,
+`service-recommendations.md`, `sku-preferences.md`, and `challenger-findings.md`
+before approving Gate 1. These documents are derived from accepted APEX state;
+regeneration overwrites local edits.
+
 Repeat the inspection and decision ceremony for architecture/cost and implementation plan. Gate 4 is decided only after
 an exact provider preview exists. Rejection or upstream changes reopen the earliest affected work.
 

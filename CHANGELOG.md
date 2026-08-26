@@ -27,6 +27,11 @@ prior qualification is retained as historical characterization. See
 
 ### Changed
 
+- Requirements now preserve structured business, non-functional, security, budget, regional, and candidate-service
+  context in the accepted artifact. Acceptance materializes a reviewer-backed Gate 1 package under
+  `agent-output/<project>/<run>/` with requirements, service rationale, SKU preferences, and challenger findings.
+- APEX Requirements now runs an adaptive discovery workshop, offers candidate Azure services with rationale without
+  making Architecture decisions, and directs the existing reviewer task through the human Gate 1 review ceremony.
 - The APEX coordinator now handles an active-project replacement through MCP: it creates the supplied replacement
   first, then deletes the confirmed original only after creation succeeds.
 - The APEX coordinator now delegates kernel requirements-intake questions to APEX Requirements instead of asking them
