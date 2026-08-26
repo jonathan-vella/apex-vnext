@@ -241,7 +241,7 @@ test("greenfield service intake skips retained services and uses selectable reco
     security.request.questions.find(({ id }) => id === "availability-recovery"),
     {
       id: "availability-recovery",
-      prompt: "Select required availability, backup, and recovery capabilities.",
+      prompt: "Select required availability and backup capabilities.",
       options: [
         "single-region-availability",
         "availability-zones",

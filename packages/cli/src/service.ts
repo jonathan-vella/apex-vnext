@@ -500,7 +500,7 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
       },
       {
         id: "availability-recovery",
-        prompt: "Select required availability, backup, and recovery capabilities.",
+        prompt: "Select required availability and backup capabilities.",
         options: [
           "single-region-availability",
           "availability-zones",
@@ -513,7 +513,7 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
       },
       {
         id: "recovery",
-        prompt: "Provide RTO and RPO in whole minutes or explicitly defer them.",
+        prompt: "Set exact recovery targets: provide RTO and RPO in whole minutes, or explicitly defer them.",
         valueType: "recovery",
       },
       {
