@@ -379,6 +379,23 @@ test("requirements acceptance records a bound rendered document", async () => {
   assert.match(await readFile(join(reviewDirectory, "challenger-findings.md"), "utf8"), /review is pending/u);
 });
 
+test("requirements review package escapes user-provided Markdown", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const initialized = await service.init({ projectId: "demo" });
+  const issued = await nextTaskAfterInput(service);
+  assert.equal(issued.status, "task");
+  if (issued.status !== "task") return;
+  const value = requirements();
+  value.architectureHandoff = "Candidate | rationale\nsecond line";
+  await service.completeTaskOutputs(issued.task.taskId, [{ kind: "requirements", value }]);
+  const serviceRecommendations = await readFile(
+    join(root, "agent-output", "demo", initialized.runId, "service-recommendations.md"),
+    "utf8",
+  );
+  assert.match(serviceRecommendations, /Candidate \\| rationale<br>second line/u);
+});
+
 test("requirements document rendering escapes table cells without rejecting content braces", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
@@ -608,10 +625,7 @@ test("requirements task context includes recorded input and stageable output tem
   assert.deepEqual(template.unknowns, []);
   assert.equal(template.businessContext, "retail; greenfield; web-api");
   assert.equal(template.successCriteria, "100 concurrent users");
-  assert.equal(
-    template.nonFunctionalRequirements,
-    "99.9% availability; RTO 60 minutes; RPO 15 minutes; RTO 60 minutes; RPO 15 minutes",
-  );
+  assert.equal(template.nonFunctionalRequirements, "99.9% availability; RTO 60 minutes; RPO 15 minutes");
   assert.equal(
     template.securityAndCompliance,
     "managed-identity, private-endpoints, key-vault, diagnostic-logging; pci-dss; microsoft-entra-id, managed-identity; confidential",

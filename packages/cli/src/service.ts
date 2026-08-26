@@ -1587,6 +1587,10 @@ export class ApexService {
     return join(this.root, "agent-output", run.projectId, run.runId);
   }
 
+  private reviewMarkdownText(value: string): string {
+    return value.replaceAll("\\", "\\\\").replaceAll("|", "\\|").replaceAll("\r\n", "\n").replaceAll("\n", "<br>");
+  }
+
   private async materializeRequirementsReviewPackage(
     run: RunConfigV1,
     requirements: RequirementsV1,
@@ -1601,17 +1605,17 @@ export class ApexService {
     const input = this.recordedRequirementsInput(events) ?? {};
     const text = (value: InputValueV1 | undefined): string => {
       if (value === undefined) return "Deferred";
-      if (typeof value === "string") return value;
-      if (Array.isArray(value)) return value.join(", ");
-      if (value.kind === "budget") return `${value.amount} ${value.currency} monthly`;
+      if (typeof value === "string") return this.reviewMarkdownText(value);
+      if (Array.isArray(value)) return value.map((item) => this.reviewMarkdownText(item)).join(", ");
+      if (value.kind === "budget") return `${value.amount} ${this.reviewMarkdownText(value.currency)} monthly`;
       if (value.kind === "recovery") return `RTO ${value.rtoMinutes} minutes; RPO ${value.rpoMinutes} minutes`;
-      if (value.kind === "data-classification") return value.classification;
-      if (value.kind === "compliance") return value.scopes.join(", ");
-      return value.kind === "deferred" ? `Deferred to ${value.owner}` : "Unknown";
+      if (value.kind === "data-classification") return this.reviewMarkdownText(value.classification);
+      if (value.kind === "compliance") return value.scopes.map((scope) => this.reviewMarkdownText(scope)).join(", ");
+      return value.kind === "deferred" ? `Deferred to ${this.reviewMarkdownText(value.owner)}` : "Unknown";
     };
     const list = (value: InputValueV1 | undefined): string => {
       if (!Array.isArray(value) || value.length === 0) return "- None recorded.";
-      return value.map((item) => `- ${item}`).join("\n");
+      return value.map((item) => `- ${this.reviewMarkdownText(item)}`).join("\n");
     };
     await mkdir(directory, { recursive: true });
     await Promise.all([
@@ -1619,14 +1623,14 @@ export class ApexService {
       atomicWriteBytes(
         join(directory, "README.md"),
         Buffer.from(
-          `# ${run.projectId}\n\nGenerated Gate 1 review package for run \`${run.runId}\`. The APEX kernel state remains authoritative.\n\n- Environment: ${run.environment}\n- Business context: ${requirements.businessContext ?? "Deferred"}\n- Requirements document hash: ${requirementsDocumentHash}\n- Review status: challenger findings pending\n`,
+          `# ${this.reviewMarkdownText(run.projectId)}\n\nGenerated Gate 1 review package for run \`${this.reviewMarkdownText(run.runId)}\`. The APEX kernel state remains authoritative.\n\n- Environment: ${this.reviewMarkdownText(run.environment)}\n- Business context: ${this.reviewMarkdownText(requirements.businessContext ?? "Deferred")}\n- Requirements document hash: ${requirementsDocumentHash}\n- Review status: challenger findings pending\n`,
           "utf8",
         ),
       ),
       atomicWriteBytes(
         join(directory, "service-recommendations.md"),
         Buffer.from(
-          `# Service Recommendations\n\nThese are user-reviewed candidate services, not Architecture decisions.\n\n## Candidate Services\n${list(input["service-preferences"])}\n\n## Recommendation Rationale\n${requirements.architectureHandoff ?? "Architecture must evaluate the candidate services against approved requirements and current evidence."}\n\n## Constraints\n- Retained services: ${text(input["retained-services"])}\n- Prohibited services: ${text(input["prohibited-services"])}\n- Environment overrides: ${text(input["environment-overrides"])}\n\nArchitecture must validate candidates against approved requirements, governance, and current evidence.\n`,
+          `# Service Recommendations\n\nThese are user-reviewed candidate services, not Architecture decisions.\n\n## Candidate Services\n${list(input["service-preferences"])}\n\n## Recommendation Rationale\n${this.reviewMarkdownText(requirements.architectureHandoff ?? "Architecture must evaluate the candidate services against approved requirements and current evidence.")}\n\n## Constraints\n- Retained services: ${text(input["retained-services"])}\n- Prohibited services: ${text(input["prohibited-services"])}\n- Environment overrides: ${text(input["environment-overrides"])}\n\nArchitecture must validate candidates against approved requirements, governance, and current evidence.\n`,
           "utf8",
         ),
       ),
@@ -1654,7 +1658,7 @@ export class ApexService {
         : review.findings
             .map(
               ({ id, severity, title, detail, resolution }) =>
-                `## ${id}: ${title}\n\n- Severity: ${severity}\n- Finding: ${detail}${resolution === undefined ? "" : `\n- Resolution: ${resolution}`}`,
+                `## ${this.reviewMarkdownText(id)}: ${this.reviewMarkdownText(title)}\n\n- Severity: ${this.reviewMarkdownText(severity)}\n- Finding: ${this.reviewMarkdownText(detail)}${resolution === undefined ? "" : `\n- Resolution: ${this.reviewMarkdownText(resolution)}`}`,
             )
             .join("\n\n");
     await atomicWriteBytes(
@@ -3474,7 +3478,7 @@ export class ApexService {
     const reviewFields = {
       businessContext: joinValues("industry", "delivery-scenario", "workload-pattern"),
       successCriteria: text("scale"),
-      nonFunctionalRequirements: joinValues("availability-recovery", "recovery"),
+      nonFunctionalRequirements: text("availability-recovery") ?? text("recovery"),
       securityAndCompliance: joinValues("security-controls", "compliance", "authentication", "data-sensitivity"),
       budgetAndOperations: joinValues("budget", "operations"),
       regionalConstraints: text("region"),
