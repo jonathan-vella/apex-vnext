@@ -73,6 +73,13 @@ const projectCreateInput = z
 const projectIdInput = z.object({ projectId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/) }).strict();
 const projectUseInput = projectIdInput.extend({ runId: z.string().min(1).optional() });
 const projectDeleteInput = projectIdInput.extend({ confirm: z.literal(true) });
+const gateDecisionInput = z
+  .object({
+    gate: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+    decision: z.enum(["approved", "rejected"]),
+    confirm: z.literal(true),
+  })
+  .strict();
 const normalizeOutputs = (outputs: z.infer<typeof taskOutput>[]) =>
   outputs.map(({ kind, value, summary }) => ({
     kind,
@@ -145,6 +152,15 @@ export function createMcpServer(service: ApexService): McpServer {
     },
     async ({ projectId, confirm }) =>
       result(await service.deleteProject(projectId as Parameters<typeof service.deleteProject>[0], confirm)),
+  );
+  server.registerTool(
+    "gateDecide",
+    {
+      description:
+        "Record an explicitly confirmed human decision for Gate 1, 2, or 3 using the local OS username as actor. Gate 4 remains CLI-only.",
+      inputSchema: gateDecisionInput,
+    },
+    async ({ gate, decision }) => result(await service.decideInteractiveGate(gate, decision)),
   );
   server.registerTool(
     "stageArtifact",

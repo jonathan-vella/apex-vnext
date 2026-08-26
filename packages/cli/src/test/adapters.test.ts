@@ -194,6 +194,7 @@ test("MCP registers only narrow tools and calls the service", async () => {
     "completeTask",
     "diagnose",
     "doctor",
+    "gateDecide",
     "generateIac",
     "improvementObservations",
     "improvementObserve",
@@ -311,7 +312,45 @@ test("MCP registers only narrow tools and calls the service", async () => {
   });
   assert.equal(recorded.isError, undefined, JSON.stringify(recorded));
   assert.equal((recorded.structuredContent as { recorded: boolean }).recorded, true);
-  assert.equal((await nextTaskAfterInput(service)).status, "task");
+  const requirementsTask = await nextTaskAfterInput(service);
+  assert.equal(requirementsTask.status, "task");
+  if (requirementsTask.status !== "task") return;
+  const requirementHashes = await service.completeTaskOutputs(requirementsTask.task.taskId, [
+    { kind: "requirements", value: requirements() },
+  ]);
+  const reviewTask = await service.nextTask();
+  assert.equal(reviewTask.status, "task");
+  if (reviewTask.status !== "task") return;
+  await service.completeTaskOutputs(reviewTask.task.taskId, [
+    {
+      kind: "review-findings",
+      value: {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: "demo",
+        runId: (await service.status()).run.runId,
+        subjectKind: "requirements",
+        subjectHash: requirementHashes.outputHashes.requirements!,
+        reviewedAt: "2026-01-01T00:00:00.000Z",
+        findings: [],
+      },
+    },
+  ]);
+  const unconfirmedGate = await client.callTool({
+    name: "gateDecide",
+    arguments: { gate: 1, decision: "approved", confirm: false },
+  });
+  assert.equal(unconfirmedGate.isError, true);
+  const approvedGate = await client.callTool({
+    name: "gateDecide",
+    arguments: { gate: 1, decision: "approved", confirm: true },
+  });
+  assert.equal(approvedGate.isError, undefined, JSON.stringify(approvedGate));
+  assert.equal((approvedGate.structuredContent as { gate: number }).gate, 1);
+  const gateFour = await client.callTool({
+    name: "gateDecide",
+    arguments: { gate: 4, decision: "approved", confirm: true },
+  });
+  assert.equal(gateFour.isError, true);
   const improvement = await client.callTool({
     name: "improvementObserve",
     arguments: {
@@ -331,7 +370,6 @@ test("MCP registers only narrow tools and calls the service", async () => {
     "improvementScan",
     "improvementDecide",
     "improvementApply",
-    "gateDecide",
     "deploy",
     "publish",
     "createIssue",
