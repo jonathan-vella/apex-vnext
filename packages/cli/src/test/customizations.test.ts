@@ -221,6 +221,9 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(coordinatorAgent, /If creation does not succeed, stop and report its result/u);
   assert.match(coordinatorAgent, /After a\s+successful creation, ask for explicit confirmation/u);
   assert.match(coordinatorAgent, /deleting the only project is rejected/u);
+  assert.match(coordinatorAgent, /compact workflow dashboard/u);
+  assert.match(coordinatorAgent, /agent-output\/<project>\/<run>\//u);
+  assert.match(coordinatorAgent, /Never auto-invoke a specialist, author artifacts, approve a gate, or deploy/u);
   assert.match(
     await readFile(join(root, ".github", "skills", "apex-azure-defaults", "SKILL.md"), "utf8"),
     /APEX Azure Defaults/u,
