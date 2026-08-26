@@ -28,6 +28,13 @@ export const RequirementsV1Schema = Type.Object(
     requirements: Type.Array(RequirementV1Schema, { minItems: 1 }),
     assumptions: Type.Array(NonEmptyStringSchema),
     unknowns: Type.Array(NonEmptyStringSchema),
+    businessContext: Type.Optional(NonEmptyStringSchema),
+    successCriteria: Type.Optional(NonEmptyStringSchema),
+    nonFunctionalRequirements: Type.Optional(NonEmptyStringSchema),
+    securityAndCompliance: Type.Optional(NonEmptyStringSchema),
+    budgetAndOperations: Type.Optional(NonEmptyStringSchema),
+    regionalConstraints: Type.Optional(NonEmptyStringSchema),
+    architectureHandoff: Type.Optional(NonEmptyStringSchema),
   },
   { $id: "https://schemas.apexops.dev/requirements-v1.json", additionalProperties: false },
 );

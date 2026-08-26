@@ -49,13 +49,20 @@ test("requirements document rendering fills exact template slots with typed or u
     ],
     assumptions: [],
     unknowns: [],
+    businessContext: "Retail greenfield web API",
+    successCriteria: "100 concurrent users",
+    nonFunctionalRequirements: "RTO 60 minutes; RPO 15 minutes",
+    securityAndCompliance: "Managed identity; GDPR",
+    budgetAndOperations: "500 USD monthly; Azure Monitor",
+    regionalConstraints: "swedencentral",
+    architectureHandoff: "Candidate services: Container Apps and Azure SQL",
   };
   const template = REQUIREMENTS_TEMPLATE_SLOTS.map((slot) => `{${slot}}`).join("\n");
   const rendered = renderRequirementsDocument(input, template, hash("a"), hash("b"));
 
   assert.doesNotMatch(rendered, /\{[a-z][a-z-]*\}/u);
-  assert.match(rendered, /Unavailable: RequirementsV1 does not represent business context\./u);
-  assert.match(rendered, /Unavailable: no architecture handoff artifact is produced by the current workflow\./u);
+  assert.match(rendered, /Retail greenfield web API/u);
+  assert.match(rendered, /Candidate services: Container Apps and Azure SQL/u);
   assert.throws(
     () => renderRequirementsDocument(input, `${template}\n{unexpected-slot}`, hash("a"), hash("b")),
     /invalid slots/u,
