@@ -113,7 +113,7 @@ import {
 } from "@apexops/renderers";
 import { constants } from "node:fs";
 import { access, cp, lstat, mkdir, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
-import { homedir } from "node:os";
+import { homedir, userInfo } from "node:os";
 import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { resolveBundledAssets, type BundledClientProjection } from "./assets.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
@@ -2203,6 +2203,11 @@ export class ApexService {
     );
     if (gateNumber === 4) await this.materializeOperationsApprovalPackage(run, approval, approvalHash);
     return approval;
+  }
+
+  async decideInteractiveGate(gateNumber: 1 | 2 | 3, decision: "approved" | "rejected"): Promise<ApprovalEvidenceV1> {
+    const actor = userInfo().username.trim() || "local-user";
+    return this.decideGateNumber(gateNumber, decision, actor);
   }
 
   async preview(options: PreviewOptions): Promise<DeploymentPreviewV1> {

@@ -13,6 +13,7 @@ tools:
   - apex/projectList
   - apex/projectUse
   - apex/projectDelete
+  - apex/gateDecide
   - azure-resource-manager-mcp/get_retail_prices
   - azure-resource-manager-mcp/query_costs
   - azure-resource-manager-mcp/query_aks_costs
@@ -81,6 +82,9 @@ Coordinate APEX without authoring project artifacts or inferring workflow state.
   `apex gate decide --gate <N> --decision <approved|rejected> --actor <USER_ID> --json`. At Gate 4, also require
   review of the exact preview, target, expiry, and approval recipient before directing
   `apex gate decide --gate 4 --decision <approved|rejected> --actor <USER_ID> --recipient <RECIPIENT_ID> --json`.
+9. When the user explicitly says `approve Gate 1`, `approve Gate 2`, `approve Gate 3`, or the equivalent rejection,
+  call `apex/gateDecide` with that gate, decision, and `confirm: true`. The operation derives the actor from the local
+  OS username. Do not use it for Gate 4, and do not infer confirmation from an ambiguous message.
 
 Use the active client projection's question mechanism only for project creation or kernel-owned routing choices. Read
 `.github/skills/apex-workflow/SKILL.md` only when status, resume, or project selection needs more guidance.
