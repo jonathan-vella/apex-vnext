@@ -1915,8 +1915,8 @@ export class ApexService {
         ? "No findings remain open."
         : review.findings
             .map(
-              ({ id, severity, disposition, title, detail, resolution }) =>
-                `## ${this.reviewMarkdownText(id)}: ${this.reviewMarkdownText(title)}\n\n- Severity: ${this.reviewMarkdownText(severity)}\n- Disposition: ${this.reviewMarkdownText(disposition)}\n- Finding: ${this.reviewMarkdownText(detail)}${resolution === undefined ? "" : `\n- Resolution: ${this.reviewMarkdownText(resolution)}`}`,
+              ({ id, severity, disposition, title, detail, evidenceRefs, resolution }) =>
+                `## ${this.reviewMarkdownText(id)}: ${this.reviewMarkdownText(title)}\n\n- Severity: ${this.reviewMarkdownText(severity)}\n- Disposition: ${this.reviewMarkdownText(disposition)}\n- Finding: ${this.reviewMarkdownText(detail)}\n- Evidence: ${evidenceRefs.map((reference) => this.reviewMarkdownText(reference)).join(", ") || "None"}${resolution === undefined ? "" : `\n- Resolution: ${this.reviewMarkdownText(resolution)}`}`,
             )
             .join("\n\n");
     const directory = join(this.root, "agent-output", run.projectId, run.runId, "reviews");
@@ -1924,7 +1924,7 @@ export class ApexService {
     await atomicWriteBytes(
       join(directory, `${subject}-findings.md`),
       Buffer.from(
-        `# ${this.reviewMarkdownText(subject)} Challenger Findings\n\n- Review subject hash: ${review.subjectHash}\n- Reviewed at: ${this.reviewMarkdownText(review.reviewedAt)}\n\n${findings}\n`,
+        `# ${this.reviewMarkdownText(subject)} Challenger Findings\n\n- Reviewed artifact kind: ${this.reviewMarkdownText(review.subjectKind)}\n- Review subject hash: ${review.subjectHash}\n- Reviewed at: ${this.reviewMarkdownText(review.reviewedAt)}\n\n${findings}\n`,
         "utf8",
       ),
     );

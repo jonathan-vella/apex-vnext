@@ -735,6 +735,11 @@ test("plan task context projects source hashes and valid output templates", asyn
       value: review(initialized.runId, "architecture", architectureHashes.outputHashes.architecture!),
     },
   ]);
+  const reviewsDirectory = join(root, "agent-output", "demo", initialized.runId, "reviews");
+  assert.match(
+    await readFile(join(reviewsDirectory, "architecture-findings.md"), "utf8"),
+    /Reviewed artifact kind: architecture/u,
+  );
   const governanceHashes = await complete("governance-discovery", [
     { kind: "governance-constraints", value: governance(initialized.runId) },
   ]);
@@ -750,6 +755,10 @@ test("plan task context projects source hashes and valid output templates", asyn
       value: review(initialized.runId, "policy-property-map", policyHashes.outputHashes["policy-property-map"]!),
     },
   ]);
+  assert.match(
+    await readFile(join(reviewsDirectory, "governance-reconciliation-findings.md"), "utf8"),
+    /Reviewed artifact kind: policy-property-map/u,
+  );
   await service.decideGateNumber(2, "approved", "tester");
 
   const issued = await service.nextTask();
@@ -779,6 +788,42 @@ test("plan task context projects source hashes and valid output templates", asyn
       },
     },
   });
+});
+
+test("reviewer summary preserves non-empty findings and evidence references", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const initialized = await service.init({ projectId: "demo" });
+  const requirementsTask = await nextTaskAfterInput(service);
+  assert.equal(requirementsTask.status, "task");
+  if (requirementsTask.status !== "task") return;
+  const accepted = await service.completeTaskOutputs(requirementsTask.task.taskId, [
+    { kind: "requirements", value: requirements() },
+  ]);
+  const reviewerTask = await service.nextTask();
+  assert.equal(reviewerTask.status, "task");
+  if (reviewerTask.status !== "task") return;
+  await service.completeTaskOutputs(reviewerTask.task.taskId, [
+    {
+      kind: "review-findings",
+      value: review(initialized.runId, "requirements", accepted.outputHashes.requirements!, [
+        {
+          id: "FIND-001",
+          severity: "high",
+          disposition: "open",
+          title: "Missing owner",
+          detail: "Recovery ownership is not assigned.",
+          evidenceRefs: ["a".repeat(64)],
+        },
+      ]),
+    },
+  ]);
+  const summary = await readFile(
+    join(root, "agent-output", "demo", initialized.runId, "reviews", "requirements-findings.md"),
+    "utf8",
+  );
+  assert.match(summary, /FIND-001: Missing owner/u);
+  assert.match(summary, /Evidence: a{64}/u);
 });
 
 test("requirements intake preserves explicit unresolved answers", async () => {
