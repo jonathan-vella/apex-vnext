@@ -500,7 +500,7 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
       },
       {
         id: "availability-recovery",
-        prompt: "Select required availability and backup capabilities.",
+        prompt: "Select required availability, backup, and disaster-recovery capabilities.",
         options: [
           "single-region-availability",
           "availability-zones",
