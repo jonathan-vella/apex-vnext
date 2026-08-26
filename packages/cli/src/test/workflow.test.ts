@@ -241,7 +241,7 @@ test("greenfield service intake skips retained services and uses selectable reco
     security.request.questions.find(({ id }) => id === "availability-recovery"),
     {
       id: "availability-recovery",
-      prompt: "Select required availability, backup, and recovery capabilities.",
+      prompt: "Select required availability, backup, and disaster-recovery capabilities.",
       options: [
         "single-region-availability",
         "availability-zones",
@@ -251,6 +251,14 @@ test("greenfield service intake skips retained services and uses selectable reco
         "cross-region-disaster-recovery",
       ],
       multiSelect: true,
+    },
+  );
+  assert.deepEqual(
+    security.request.questions.find(({ id }) => id === "recovery"),
+    {
+      id: "recovery",
+      prompt: "Set exact recovery targets: provide RTO and RPO in whole minutes, or explicitly defer them.",
+      valueType: "recovery",
     },
   );
 });
