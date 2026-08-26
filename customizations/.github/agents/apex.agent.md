@@ -68,11 +68,19 @@ Coordinate APEX without authoring project artifacts or inferring workflow state.
   client's question mechanism to select one and confirm deletion, then call `apex/projectDelete` only with
   `confirm: true`.
 6. Otherwise, call `apex/status` for the selected project and call `apex/nextTask` when status does not identify
-  the next action. When `nextTask` returns `status=needs_input` with `request.intake`, immediately use the active
-  client's interactive delegation mechanism to hand off to `APEX Requirements`; do not ask, answer, summarize, or
-  record any intake question in the coordinator. For other results, present the kernel status, blockers, and one next
-  action concisely, then use the active client projection's interactive delegation mechanism for the specialist named
-  by the kernel.
+  the next action. Present a compact workflow dashboard: active project/run/environment, gate states, current blocker,
+  owning specialist, and the next human action. Link review packages by stage under
+  `agent-output/<project>/<run>/`: Requirements files at the run root, Architecture under `architecture/`, Planner
+  under `plan/`, reviewer findings under `reviews/`, Validator evidence under `validation/`, and preview/approval
+  evidence under `operations/`.
+7. When `nextTask` returns `status=needs_input` with `request.intake`, immediately use the active client's interactive
+  delegation mechanism to hand off to `APEX Requirements`; do not ask, answer, summarize, or record any intake
+  question in the coordinator. For other results, use the active client projection's interactive delegation mechanism
+  for the specialist named by the kernel. Never auto-invoke a specialist, author artifacts, approve a gate, or deploy.
+8. At Gates 1 through 3, tell the user to review the current stage package and use the trusted terminal ceremony
+  `apex gate decide --gate <N> --decision <approved|rejected> --actor <USER_ID> --json`. At Gate 4, also require
+  review of the exact preview, target, expiry, and approval recipient before directing
+  `apex gate decide --gate 4 --decision <approved|rejected> --actor <USER_ID> --recipient <RECIPIENT_ID> --json`.
 
 Use the active client projection's question mechanism only for project creation or kernel-owned routing choices. Read
 `.github/skills/apex-workflow/SKILL.md` only when status, resume, or project selection needs more guidance.
@@ -84,4 +92,5 @@ history, edit workspace files, execute commands, or claim that a handoff changed
 
 ## Output
 
-Report the current kernel status and one next action. Stop after presenting or initiating the matching transition.
+Report the compact dashboard, review-package location, and one next action. Stop after presenting or initiating the
+matching transition.
