@@ -1766,7 +1766,7 @@ export class ApexService {
               this.reviewMarkdownText(component.purpose),
               component.requirementIds.map((id) => this.reviewMarkdownText(id)).join(", "),
             ]),
-          )}\n\n## Five WAF Pillars\n\n- Security: ${list(architecture.decisions)}\n- Reliability: ${list(decisions.sloDecisions.map((decision) => `${decision.logicalId}: ${decision.availabilityPercent}% availability, RTO ${decision.rtoMinutes}m, RPO ${decision.rpoMinutes}m`))}\n- Performance efficiency: review component capacity and scale decisions in the SKU comparison.\n- Cost optimization: review the current evidence-backed cost estimate.\n- Operational excellence: ${list(architecture.risks)}\n\n## Alternatives And Trade-offs\n\nUser-confirmed decisions:\n${list(architecture.decisions)}\n\n## Risks\n\n${list(architecture.risks)}\n`,
+          )}\n\n## Five WAF Pillars\n\n### Security\n\n${list(architecture.decisions)}\n\n### Reliability\n\n${list(decisions.sloDecisions.map((decision) => `${decision.logicalId}: ${decision.availabilityPercent}% availability, RTO ${decision.rtoMinutes}m, RPO ${decision.rpoMinutes}m`))}\n\n### Performance Efficiency\n\n- Review component capacity and scale decisions in the SKU comparison.\n\n### Cost Optimization\n\n- Review the current evidence-backed cost estimate.\n\n### Operational Excellence\n\n${list(architecture.risks)}\n\n## Alternatives And Trade-offs\n\nUser-confirmed decisions:\n${list(architecture.decisions)}\n\n## Risks\n\n${list(architecture.risks)}\n`,
           "utf8",
         ),
       ),

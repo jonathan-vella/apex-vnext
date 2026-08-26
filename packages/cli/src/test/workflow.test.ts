@@ -38,8 +38,15 @@ test("full requirements to fake deploy workflow survives restart", async () => {
   const service = new ApexService(root);
   const initialized = await service.init({ projectId: "demo" });
   await prepareValidatedRun(service, initialized.runId, "bicep");
+  const planReviewDirectory = join(root, "agent-output", "demo", initialized.runId, "plan");
+  assert.match(await readFile(join(planReviewDirectory, "implementation-plan.md"), "utf8"), /Logical Resources/u);
+  assert.match(await readFile(join(planReviewDirectory, "iac-binding.md"), "utf8"), /IaC Binding/u);
+  assert.match(await readFile(join(planReviewDirectory, "environment-inputs.md"), "utf8"), /Environment Inputs/u);
   const preview = await service.preview({ operation: "apply", provider: "fake" });
+  const operationsDirectory = join(root, "agent-output", "demo", initialized.runId, "operations");
+  assert.match(await readFile(join(operationsDirectory, "deployment-preview.md"), "utf8"), /Deployment Preview/u);
   await service.decideGateNumber(4, "approved", "tester");
+  assert.match(await readFile(join(operationsDirectory, "approval.md"), "utf8"), /Gate 4 Approval/u);
   const events = await new EventJournal(
     join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"),
   ).replay();
