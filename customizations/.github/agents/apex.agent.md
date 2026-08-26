@@ -78,9 +78,9 @@ Coordinate APEX without authoring project artifacts or inferring workflow state.
   question in the coordinator. For other results, use the active client projection's interactive delegation mechanism
   for the specialist named by the kernel. Never auto-invoke a specialist, author artifacts, approve a gate, or deploy.
 8. At Gates 1 through 3, tell the user to review the current stage package and use the trusted terminal ceremony
-  `apex gate decide --gate <N> --decision approved --actor <USER_ID> --json`. At Gate 4, also require review of the
-  exact preview, target, expiry, and approval recipient before directing the same terminal ceremony with its required
-  recipient identity.
+  `apex gate decide --gate <N> --decision <approved|rejected> --actor <USER_ID> --json`. At Gate 4, also require
+  review of the exact preview, target, expiry, and approval recipient before directing
+  `apex gate decide --gate 4 --decision <approved|rejected> --actor <USER_ID> --recipient <RECIPIENT_ID> --json`.
 
 Use the active client projection's question mechanism only for project creation or kernel-owned routing choices. Read
 `.github/skills/apex-workflow/SKILL.md` only when status, resume, or project selection needs more guidance.
