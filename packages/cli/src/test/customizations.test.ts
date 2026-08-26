@@ -212,6 +212,9 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(requirementsAgent, /- ask_user/u);
   assert.match(requirementsAgent, /- task/u);
   assert.doesNotMatch(requirementsAgent, /vscode\/askQuestions|handoffs:|agents:/u);
+  const plannerAgent = await readFile(join(root, ".github", "agents", "apex-planner.agent.md"), "utf8");
+  assert.match(plannerAgent, /- apex\/planComplete/u);
+  assert.match(plannerAgent, /kernel derives the canonical intent hash/u);
   assert.match(
     await readFile(join(root, ".github", "instructions", "apex-agent-authoring.instructions.md"), "utf8"),
     /APEX Agent Boundaries/u,

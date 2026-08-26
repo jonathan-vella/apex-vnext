@@ -201,6 +201,7 @@ test("MCP registers only narrow tools and calls the service", async () => {
     "improvementProposals",
     "inventory",
     "nextTask",
+    "planComplete",
     "preview",
     "projectCreate",
     "projectDelete",
@@ -441,6 +442,34 @@ test("MCP requires an atomic bundle for multi-output tasks", async () => {
   });
   assert.equal(bundle.isError, undefined);
   assert.equal(completedBundles.length, 1);
+  await client.close();
+  await server.close();
+});
+
+test("MCP planComplete derives the canonical binding intent hash", async () => {
+  const completedPlans: unknown[] = [];
+  const service = {
+    completePlan: async (_taskId: string, intent: unknown, binding: unknown, environmentInputs: unknown) => {
+      completedPlans.push({ intent, binding, environmentInputs });
+      return { outputHashes: {}, summary: "accepted" };
+    },
+  } as unknown as ApexService;
+  const server = createMcpServer(service);
+  const client = new Client({ name: "test", version: "1.0.0" });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+  const result = await client.callTool({
+    name: "planComplete",
+    arguments: {
+      taskId: "plan-task",
+      implementationIntent: { schemaVersion: "1.0.0", projectId: "demo", runId: "run", resources: [], outputs: [] },
+      iacBinding: { schemaVersion: "1.0.0", projectId: "demo", runId: "run", track: "bicep", resourceBindings: {} },
+      environmentInputs: { schemaVersion: "1.0.0", projectId: "demo", runId: "run", environment: "dev", inputs: {} },
+    },
+  });
+  assert.equal(result.isError, undefined, JSON.stringify(result));
+  assert.equal(completedPlans.length, 1);
   await client.close();
   await server.close();
 });

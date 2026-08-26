@@ -1480,6 +1480,19 @@ export class ApexService {
     return this.acceptTaskOutputs(taskId, outputs, false);
   }
 
+  async completePlan(
+    taskId: string,
+    intent: ImplementationIntentV1,
+    binding: Omit<IacBindingV1, "intentHash">,
+    environmentInputs: EnvironmentInputsV1,
+  ): Promise<{ outputHashes: Partial<Record<ArtifactKind, string>>; summary: string }> {
+    return this.completeTaskOutputs(taskId, [
+      { kind: "implementation-intent", value: intent },
+      { kind: "iac-binding", value: { ...binding, intentHash: sha256Json(intent) } },
+      { kind: "environment-inputs", value: environmentInputs },
+    ]);
+  }
+
   private async acceptTaskOutputs(
     taskId: string,
     outputs: TaskOutput[],
