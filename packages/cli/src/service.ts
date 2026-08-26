@@ -36,6 +36,7 @@ import {
   type CostEstimateV1,
   type DeploymentPreviewV1,
   type EnvironmentInputsV1,
+  type EvidenceManifestV1,
   type IacBindingV1,
   type InputRequestV1,
   type InputValueV1,
@@ -1604,6 +1605,9 @@ export class ApexService {
     if (descriptor.reviewSubject !== undefined) {
       await this.materializeReviewerSummary(run, descriptor.reviewSubject, outputs[0]!.value as ReviewFindingsV1);
     }
+    if (descriptor.id === "validation-bicep" || descriptor.id === "validation-terraform") {
+      await this.materializeValidationReport(run, outputs[0]!.value as EvidenceManifestV1, descriptor.id);
+    }
     if (descriptor.reviewSubject !== undefined) {
       if (reviewBlockers.length === 0 && descriptor.gate !== undefined) {
         await this.openRunGate(await this.currentRun(), descriptor.gate, dependencyHash);
@@ -1925,6 +1929,31 @@ export class ApexService {
       join(directory, `${subject}-findings.md`),
       Buffer.from(
         `# ${this.reviewMarkdownText(subject)} Challenger Findings\n\n- Reviewed artifact kind: ${this.reviewMarkdownText(review.subjectKind)}\n- Review subject hash: ${review.subjectHash}\n- Reviewed at: ${this.reviewMarkdownText(review.reviewedAt)}\n\n${findings}\n`,
+        "utf8",
+      ),
+    );
+  }
+
+  private async materializeValidationReport(
+    run: RunConfigV1,
+    evidence: EvidenceManifestV1,
+    taskType: "validation-bicep" | "validation-terraform",
+  ): Promise<void> {
+    const directory = join(this.root, "agent-output", run.projectId, run.runId, "validation");
+    const entries =
+      evidence.entries.length === 0
+        ? "- No validation evidence entries were produced."
+        : evidence.entries
+            .map(
+              ({ kind, hash, bytes, required, retention }) =>
+                `- ${this.reviewMarkdownText(kind)}: ${hash} (${bytes} bytes; ${required ? "required" : "optional"}; ${this.reviewMarkdownText(retention)})`,
+            )
+            .join("\n");
+    await mkdir(directory, { recursive: true });
+    await atomicWriteBytes(
+      join(directory, "validation-report.md"),
+      Buffer.from(
+        `# Validation Report\n\n- Task: ${this.reviewMarkdownText(taskType)}\n- Track: ${this.reviewMarkdownText(run.iacTool)}\n- Created: ${this.reviewMarkdownText(evidence.createdAt)}\n- Verdict: accepted deterministic validation evidence\n\n## Validator Evidence\n\n${entries}\n\nThe Validator reports evidence only. Artifact repair, risk acceptance, and gate decisions remain with their authorized owners.\n`,
         "utf8",
       ),
     );
