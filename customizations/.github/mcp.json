@@ -16,6 +16,7 @@
         "projectList",
         "projectUse",
         "projectDelete",
+        "gateDecide",
         "stageArtifact",
         "stageFile",
         "generateIac",
