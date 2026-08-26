@@ -1,31 +1,31 @@
 {
   "schemaVersion": "1.0.0",
-  "bundleVersion": "0.10.0-next.1",
+  "bundleVersion": "0.10.0-next.2",
   "capabilityProtocolVersion": "1.0.0",
   "components": {
     "cli": {
       "source": "local",
-      "version": "0.10.0-next.1"
+      "version": "0.10.0-next.2"
     },
     "contracts": {
       "source": "local",
-      "version": "0.10.0-next.1"
+      "version": "0.10.0-next.2"
     },
     "kernel": {
       "source": "local",
-      "version": "0.10.0-next.1"
+      "version": "0.10.0-next.2"
     },
     "capabilities": {
       "source": "local",
-      "version": "0.10.0-next.1"
+      "version": "0.10.0-next.2"
     },
     "renderers": {
       "source": "local",
-      "version": "0.10.0-next.1"
+      "version": "0.10.0-next.2"
     },
     "customizationBundle": {
       "source": "local",
-      "version": "0.10.0-next.1",
+      "version": "0.10.0-next.2",
       "manifest": "@apexops/cli/assets/customizations/manifest.json",
       "assetManifest": "@apexops/cli/assets/manifest.json",
       "compositionId": "apex-managed-workspace"
