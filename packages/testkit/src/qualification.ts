@@ -483,6 +483,7 @@ async function complete(
     await recordQualificationInput(context.service, issued.request);
     issued = await context.service.nextTask();
   }
+  if (issued.status !== "task") throw new Error(`Expected ${expected}, received ${issued.status}`);
   if (issued.task.taskType !== expected) throw new Error(`Expected ${expected}, received ${issued.task.taskType}`);
   const projection = await context.service.taskContext(issued.task.taskId);
   context.taskContextBytes.push(Buffer.byteLength(JSON.stringify(projection), "utf8"));

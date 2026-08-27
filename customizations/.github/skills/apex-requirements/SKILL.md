@@ -24,10 +24,13 @@ Use this skill only for an active requirements task.
 4. Submit that request only through `apex/recordInput`, preserving its request ID, expected journal head, and owner
    epoch.
 5. Call `apex/nextTask` again and repeat until it returns a requirements `task`; only then read `apex/taskContext`.
-6. Treat the service-preferences round as a preference boundary. Capture retained, prohibited, and preferred services,
-   SKU preferences, and environment overrides without selecting architecture, SKUs, or implementation details.
-7. Stage the task-context-defined requirements output, complete the requirements task, and wait for the required review
-   result before reporting that Gate 1 is ready. Only the kernel opens or evaluates Gate 1.
+6. Treat service questions in the workload panel as a preference boundary. Present the kernel recommendation, then
+   capture retained, prohibited, and preferred services, SKU preferences, and environment overrides without selecting
+   architecture, SKUs, or implementation details.
+7. Submit the task-context-defined output through `apex/requirementsComplete`, invoke the required Reviewer, and handle
+   `needs_review` through one native findings panel and `apex/reviewDecide`.
+8. After a clean or fully dispositioned review, ask for explicit Gate 1 approval. Call `apex/gateDecide` only after the
+   user chooses Proceed, then continue to Architecture in the same turn.
 
 The kernel catalog and its versioned input contracts are authoritative. Do not choose architecture, SKUs, or
 implementation details while gathering requirements.

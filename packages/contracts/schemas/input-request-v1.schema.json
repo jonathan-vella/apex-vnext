@@ -38,8 +38,16 @@
               ]
             },
             "total": {
-              "const": 4,
-              "type": "number"
+              "anyOf": [
+                {
+                  "const": 3,
+                  "type": "number"
+                },
+                {
+                  "const": 4,
+                  "type": "number"
+                }
+              ]
             }
           },
           "required": [
@@ -76,6 +84,54 @@
               "prompt": {
                 "minLength": 1,
                 "type": "string"
+              },
+              "recommendation": {
+                "additionalProperties": false,
+                "properties": {
+                  "rationale": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "const": "default",
+                        "type": "string"
+                      },
+                      {
+                        "const": "derived",
+                        "type": "string"
+                      },
+                      {
+                        "const": "prior-answer",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "value": {
+                    "anyOf": [
+                      {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      {
+                        "items": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "minItems": 1,
+                        "type": "array",
+                        "uniqueItems": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "source",
+                  "rationale"
+                ],
+                "type": "object"
               },
               "valueType": {
                 "anyOf": [
@@ -183,6 +239,54 @@
               "prompt": {
                 "minLength": 1,
                 "type": "string"
+              },
+              "recommendation": {
+                "additionalProperties": false,
+                "properties": {
+                  "rationale": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "const": "default",
+                        "type": "string"
+                      },
+                      {
+                        "const": "derived",
+                        "type": "string"
+                      },
+                      {
+                        "const": "prior-answer",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "value": {
+                    "anyOf": [
+                      {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      {
+                        "items": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "minItems": 1,
+                        "type": "array",
+                        "uniqueItems": true
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "source",
+                  "rationale"
+                ],
+                "type": "object"
               },
               "valueType": {
                 "anyOf": [

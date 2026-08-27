@@ -1392,8 +1392,8 @@ function inputRequestPayload(event) {
     ) ||
     !Number.isInteger(payload.intake.ordinal) ||
     payload.intake.ordinal < 1 ||
-    payload.intake.ordinal > 4 ||
-    payload.intake.total !== 4 ||
+    ![3, 4].includes(payload.intake.total) ||
+    payload.intake.ordinal > payload.intake.total ||
     !Array.isArray(payload.questions) ||
     payload.questions.length === 0 ||
     payload.questions.length > 32 ||
@@ -1402,7 +1402,9 @@ function inputRequestPayload(event) {
         question === null ||
         typeof question !== "object" ||
         Array.isArray(question) ||
-        Object.keys(question).some((key) => !["id", "prompt", "options", "multiSelect", "valueType"].includes(key)) ||
+        Object.keys(question).some(
+          (key) => !["id", "prompt", "options", "multiSelect", "recommendation", "valueType"].includes(key),
+        ) ||
         typeof question.id !== "string" ||
         question.id.length === 0 ||
         question.id.length > 128 ||

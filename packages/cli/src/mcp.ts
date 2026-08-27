@@ -11,6 +11,14 @@ const artifactKind = z.enum(
   ],
 );
 const taskOutput = z.object({ kind: artifactKind, value: z.unknown(), summary: z.string().optional() });
+const reviewFinding = z
+  .object({
+    id: z.string().min(1),
+    severity: z.enum(["critical", "high", "medium", "low", "info"]),
+    title: z.string().min(1),
+    detail: z.string().min(1),
+  })
+  .strict();
 const uniqueStrings = z
   .array(z.string().min(1))
   .min(1)
@@ -96,6 +104,23 @@ const gateDecisionInput = z
     confirm: z.literal(true),
   })
   .strict();
+const reviewDecisionInput = z
+  .object({
+    reviewHash: z.string().regex(/^[0-9a-f]{64}$/),
+    decisions: z
+      .array(
+        z
+          .object({
+            findingId: z.string().min(1),
+            action: z.enum(["revise", "accept-risk"]),
+            rationale: z.string().min(1),
+            expiresAt: z.string().datetime().optional(),
+          })
+          .strict(),
+      )
+      .min(1),
+  })
+  .strict();
 const normalizeOutputs = (outputs: z.infer<typeof taskOutput>[]) =>
   outputs.map(({ kind, value, summary }) => ({
     kind,
@@ -135,6 +160,18 @@ export function createMcpServer(service: ApexService): McpServer {
       inputSchema: { taskId: z.string() },
     },
     async ({ taskId }) => result(await service.taskContext(taskId)),
+  );
+  server.registerTool(
+    "readTaskInput",
+    {
+      description: "Read a bounded chunk of the accepted source artifact for an active review task.",
+      inputSchema: {
+        taskId: z.string(),
+        offset: z.number().int().nonnegative().optional(),
+        limit: z.number().int().min(1).max(6_000).optional(),
+      },
+    },
+    async ({ taskId, offset, limit }) => result(await service.readTaskInput(taskId, offset, limit)),
   );
   server.registerTool(
     "recordInput",
@@ -177,6 +214,24 @@ export function createMcpServer(service: ApexService): McpServer {
       inputSchema: gateDecisionInput,
     },
     async ({ gate, decision }) => result(await service.decideInteractiveGate(gate, decision)),
+  );
+  server.registerTool(
+    "reviewDecide",
+    {
+      description:
+        "Resolve all current review findings atomically by requesting revision or accepting permitted time-bound risk.",
+      inputSchema: reviewDecisionInput,
+    },
+    async ({ reviewHash, decisions }) =>
+      result(
+        await service.decideReview(
+          reviewHash,
+          decisions.map(({ expiresAt, ...decision }) => ({
+            ...decision,
+            ...(expiresAt === undefined ? {} : { expiresAt }),
+          })),
+        ),
+      ),
   );
   server.registerTool(
     "stageArtifact",
@@ -263,24 +318,54 @@ export function createMcpServer(service: ApexService): McpServer {
   server.registerTool(
     "completeTask",
     {
-      description: "Complete a task atomically. Supply outputs[] for every task with multiple required output kinds.",
+      description: "Complete a task atomically with a nonempty outputs[] bundle.",
       inputSchema: {
         taskId: z.string(),
-        kind: artifactKind.optional(),
-        value: z.unknown().optional(),
-        summary: z.string().optional(),
-        outputs: z.array(taskOutput).optional(),
+        outputs: z.array(taskOutput).min(1),
       },
     },
-    async ({ taskId, kind, value, summary, outputs }) => {
-      if (outputs !== undefined) return result(await service.completeTaskOutputs(taskId, normalizeOutputs(outputs)));
-      if (kind === undefined) throw new Error("completeTask requires kind/value or outputs[]");
-      const context = await service.taskContext(taskId);
-      if (context.task.allowedOutputKinds.length > 1) {
-        throw new Error("completeTask requires outputs[] when the task has multiple required output kinds");
-      }
-      return result(await service.completeTask(taskId, { kind, value, ...(summary === undefined ? {} : { summary }) }));
+    async ({ taskId, outputs }) => result(await service.completeTaskOutputs(taskId, normalizeOutputs(outputs))),
+  );
+  server.registerTool(
+    "requirementsComplete",
+    {
+      description: "Complete the active Requirements task atomically.",
+      inputSchema: { taskId: z.string(), requirements: z.unknown() },
     },
+    async ({ taskId, requirements }) =>
+      result(
+        await service.completeRequirements(taskId, requirements as Parameters<typeof service.completeRequirements>[1]),
+      ),
+  );
+  server.registerTool(
+    "architectureComplete",
+    {
+      description: "Complete the active Architecture task atomically with all required outputs.",
+      inputSchema: {
+        taskId: z.string(),
+        architecture: z.unknown(),
+        costEstimate: z.unknown(),
+        decisionManifest: z.unknown(),
+      },
+    },
+    async ({ taskId, architecture, costEstimate, decisionManifest }) =>
+      result(
+        await service.completeArchitecture(
+          taskId,
+          architecture as Parameters<typeof service.completeArchitecture>[1],
+          costEstimate as Parameters<typeof service.completeArchitecture>[2],
+          decisionManifest as Parameters<typeof service.completeArchitecture>[3],
+        ),
+      ),
+  );
+  server.registerTool(
+    "reviewComplete",
+    {
+      description:
+        "Complete the active review task; APEX derives subject identity, hash, timestamp, and evidence binding.",
+      inputSchema: { taskId: z.string(), findings: z.array(reviewFinding) },
+    },
+    async ({ taskId, findings }) => result(await service.completeReview(taskId, findings)),
   );
   server.registerTool(
     "planComplete",

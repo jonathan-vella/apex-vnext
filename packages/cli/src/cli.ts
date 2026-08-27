@@ -776,13 +776,15 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
 
 async function main(): Promise<void> {
   const json = process.argv.includes("--json");
+  const verbose = process.argv.includes("--verbose");
+  const args = process.argv.slice(2);
   try {
-    const result = await execute(process.argv.slice(2));
+    const result = await execute(args);
     if (result !== undefined)
       process.stdout.write(
         json
           ? `${JSON.stringify({ ok: true, result })}\n`
-          : `${typeof result === "string" ? result : JSON.stringify(result, null, 2)}\n`,
+          : `${verbose ? (typeof result === "string" ? result : JSON.stringify(result, null, 2)) : formatHumanResult(args, result)}\n`,
       );
   } catch (error) {
     const normalized = normalizeError(error);
@@ -793,6 +795,54 @@ async function main(): Promise<void> {
     process.stderr.write(json ? `${JSON.stringify(value)}\n` : `${normalized.code}: ${normalized.message}\n`);
     process.exitCode = normalized.exitCode;
   }
+}
+
+export function formatHumanResult(args: string[], result: unknown): string {
+  const command = args.find((argument) => !argument.startsWith("--"));
+  if (command === "status" && result !== null && typeof result === "object") {
+    const status = result as {
+      run?: { projectId?: string; environment?: string };
+      task?: string | null;
+      blockers?: string[];
+    };
+    const task = status.task ?? null;
+    const stage = task?.startsWith("requirements")
+      ? "Requirements"
+      : task?.startsWith("architecture") || task?.startsWith("governance")
+        ? "Architecture"
+        : task?.startsWith("plan")
+          ? "Planning"
+          : task?.startsWith("codegen") || task?.startsWith("validation")
+            ? "Build and validate"
+            : task?.startsWith("preview") || task?.startsWith("deploy") || task === "inventory"
+              ? "Operations"
+              : "Ready for next decision";
+    const blocker = status.blockers?.[0] ?? "None";
+    const next = task !== null ? `Continue ${stage}` : blocker !== "None" ? blocker : "Ask APEX to continue";
+    return [
+      `Project: ${status.run?.projectId ?? "unknown"} (${status.run?.environment ?? "unknown"})`,
+      `Stage: ${stage}`,
+      `Blocker: ${blocker}`,
+      `Next: ${next}`,
+    ].join("\n");
+  }
+  if (command === "doctor" && result !== null && typeof result === "object") {
+    const doctor = result as {
+      healthy?: boolean;
+      checks?: Array<{ ok: boolean }>;
+      remedies?: string[];
+      nextAction?: string;
+    };
+    const passed = doctor.checks?.filter(({ ok }) => ok).length ?? 0;
+    const total = doctor.checks?.length ?? 0;
+    const remaining = doctor.remedies?.length ?? 0;
+    return [
+      `Status: ${doctor.healthy ? "Ready" : "Setup incomplete"} (${passed}/${total} checks ready)`,
+      `Next: ${doctor.nextAction ?? "No action required"}`,
+      ...(remaining > 1 ? [`Later: ${remaining - 1} additional setup item${remaining === 2 ? "" : "s"}`] : []),
+    ].join("\n");
+  }
+  return typeof result === "string" ? result : JSON.stringify(result, null, 2);
 }
 
 if (process.argv[1] !== undefined && (await realpath(process.argv[1])) === (await realpath(new URL(import.meta.url))))

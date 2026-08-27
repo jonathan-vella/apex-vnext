@@ -11,7 +11,7 @@ import { sha256Json } from "@apexops/kernel";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createMcpServer } from "../mcp.js";
-import { execute } from "../cli.js";
+import { execute, formatHumanResult } from "../cli.js";
 import { ApexService } from "../service.js";
 import { nextTaskAfterInput, requirements, tempRoot, writeJson } from "./helpers.js";
 
@@ -27,8 +27,28 @@ test("CLI emits a stable JSON envelope", async () => {
   assert.equal(code, 0);
   assert.deepEqual(JSON.parse(stdout), {
     ok: true,
-    result: { version: "0.10.0-next.4", bundleVersion: "0.10.0-next.4", configVersion: "1.0.0" },
+    result: { version: "0.10.0-next.5", bundleVersion: "0.10.0-next.5", configVersion: "1.0.0" },
   });
+});
+
+test("CLI renders concise human status and doctor output", () => {
+  assert.equal(
+    formatHumanResult(["status"], {
+      run: { projectId: "freshconnect", environment: "dev" },
+      task: "requirements-review",
+      blockers: [],
+    }),
+    "Project: freshconnect (dev)\nStage: Requirements\nBlocker: None\nNext: Continue Requirements",
+  );
+  assert.equal(
+    formatHumanResult(["doctor"], {
+      healthy: false,
+      checks: [{ ok: true }, { ok: false }, { ok: false }],
+      remedies: ["Install Bicep", "Authenticate before deployment"],
+      nextAction: "Install Bicep",
+    }),
+    "Status: Setup incomplete (1/3 checks ready)\nNext: Install Bicep\nLater: 1 additional setup item",
+  );
 });
 
 test("CLI bootstrap validates onboarding files before initializing a selected client", async () => {
@@ -77,7 +97,7 @@ test("CLI bootstrap validates onboarding files before initializing a selected cl
         "--ignore-scripts",
         "--no-audit",
         "--no-fund",
-        "@apexops/cli@0.10.0-next.4",
+        "@apexops/cli@0.10.0-next.5",
       ],
       cwd: root,
       timeoutMs: 120_000,
@@ -115,7 +135,7 @@ test("bootstrap reuses an exact local runtime and rejects a conflicting version"
   const root = await tempRoot();
   await mkdir(join(root, ".git"));
   await mkdir(join(root, "node_modules", "@apexops", "cli"), { recursive: true });
-  await writeFile(join(root, "node_modules", "@apexops", "cli", "package.json"), '{"version":"0.10.0-next.4"}\n');
+  await writeFile(join(root, "node_modules", "@apexops", "cli", "package.json"), '{"version":"0.10.0-next.5"}\n');
   const service = new ApexService(root, {
     processRunner: {
       run: async () => {
@@ -154,12 +174,12 @@ test("CLI manages only its own VS Code profile bootstrap agent", async () => {
   assert.deepEqual(await execute(["profile", "status"], root, { profileRoot }), { installed: false, modified: false });
   assert.deepEqual(await execute(["profile", "install", "--yes"], root, { profileRoot }), {
     installed: true,
-    version: "0.10.0-next.4",
+    version: "0.10.0-next.5",
   });
   assert.deepEqual(await execute(["profile", "status"], root, { profileRoot }), {
     installed: true,
     modified: false,
-    version: "0.10.0-next.4",
+    version: "0.10.0-next.5",
   });
   await assert.rejects(
     execute(["profile", "install", "--client", "github-copilot-cli", "--yes"], root, { profileRoot }),
@@ -190,6 +210,7 @@ test("MCP registers only narrow tools and calls the service", async () => {
   await client.connect(clientTransport);
   const tools = await client.listTools();
   assert.deepEqual(tools.tools.map(({ name }) => name).sort(), [
+    "architectureComplete",
     "capabilityList",
     "capabilityStatus",
     "completeTask",
@@ -209,9 +230,13 @@ test("MCP registers only narrow tools and calls the service", async () => {
     "projectList",
     "projectUse",
     "promote",
+    "readTaskInput",
     "reconcile",
     "recordInput",
     "render",
+    "requirementsComplete",
+    "reviewComplete",
+    "reviewDecide",
     "stageArtifact",
     "stageFile",
     "status",
@@ -317,26 +342,108 @@ test("MCP registers only narrow tools and calls the service", async () => {
   const requirementsTask = await nextTaskAfterInput(service);
   assert.equal(requirementsTask.status, "task");
   if (requirementsTask.status !== "task") return;
-  const requirementHashes = await service.completeTaskOutputs(requirementsTask.task.taskId, [
-    { kind: "requirements", value: requirements() },
-  ]);
-  const reviewTask = await service.nextTask();
-  assert.equal(reviewTask.status, "task");
-  if (reviewTask.status !== "task") return;
-  await service.completeTaskOutputs(reviewTask.task.taskId, [
-    {
-      kind: "review-findings",
-      value: {
-        schemaVersion: CONTRACT_VERSION,
-        projectId: "demo",
-        runId: (await service.status()).run.runId,
-        subjectKind: "requirements",
-        subjectHash: requirementHashes.outputHashes.requirements!,
-        reviewedAt: "2026-01-01T00:00:00.000Z",
-        findings: [],
-      },
+  const legacyCompletion = await client.callTool({
+    name: "completeTask",
+    arguments: { taskId: requirementsTask.task.taskId, kind: "requirements", value: requirements() },
+  });
+  assert.equal(legacyCompletion.isError, true);
+  const largeRequirements = requirements();
+  largeRequirements.architectureHandoff = "Candidate service rationale. ".repeat(500);
+  const requirementsCompletion = await client.callTool({
+    name: "requirementsComplete",
+    arguments: {
+      taskId: requirementsTask.task.taskId,
+      requirements: largeRequirements,
     },
-  ]);
+  });
+  assert.equal(requirementsCompletion.isError, undefined, JSON.stringify(requirementsCompletion));
+  const requirementsHash = (requirementsCompletion.structuredContent as { outputHashes: { requirements: string } })
+    .outputHashes.requirements;
+  const reviewResult = await client.callTool({ name: "nextTask", arguments: {} });
+  const reviewTask = (reviewResult.structuredContent as { task: { taskId: string; taskType: string } }).task;
+  assert.equal(reviewTask.taskType, "requirements-review");
+  const reviewContext = await service.taskContext(reviewTask.taskId);
+  const reviewTemplate = reviewContext.outputTemplates["review-findings"] as {
+    reviewedAt: string;
+    [key: string]: unknown;
+  };
+  assert.match(reviewTemplate.reviewedAt, /^\d{4}-\d{2}-\d{2}T/u);
+  assert.deepEqual(
+    { ...reviewTemplate, reviewedAt: "TIMESTAMP" },
+    {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: "demo",
+      runId: (await service.status()).run.runId,
+      subjectKind: "requirements",
+      subjectHash: requirementsHash,
+      reviewedAt: "TIMESTAMP",
+      findings: [
+        {
+          id: "FINDING-001",
+          severity: "medium",
+          disposition: "open",
+          title: "Concise finding title",
+          detail: "Evidence, impact, and concrete remediation.",
+          evidenceRefs: [requirementsHash],
+        },
+      ],
+    },
+  );
+  const chunks: string[] = [];
+  let offset: number | undefined = 0;
+  let boundedTemplate: { reviewedAt: string; [key: string]: unknown } | undefined;
+  while (offset !== undefined) {
+    const reviewInput = await client.callTool({
+      name: "readTaskInput",
+      arguments: { taskId: reviewTask.taskId, offset, limit: 6_000 },
+    });
+    assert.equal(reviewInput.isError, undefined, JSON.stringify(reviewInput));
+    const chunk = reviewInput.structuredContent as {
+      content: string;
+      nextOffset?: number;
+      outputTemplate?: { reviewedAt: string; [key: string]: unknown };
+    };
+    chunks.push(chunk.content);
+    boundedTemplate ??= chunk.outputTemplate;
+    offset = chunk.nextOffset;
+  }
+  assert.ok(chunks.length > 1);
+  assert.equal(JSON.parse(chunks.join("")).projectId, "demo");
+  assert.ok(boundedTemplate !== undefined);
+  assert.match(boundedTemplate.reviewedAt, /^\d{4}-\d{2}-\d{2}T/u);
+  assert.deepEqual({ ...boundedTemplate, reviewedAt: "TIMESTAMP" }, { ...reviewTemplate, reviewedAt: "TIMESTAMP" });
+  const invalidOffset = await client.callTool({
+    name: "readTaskInput",
+    arguments: { taskId: reviewTask.taskId, offset: chunks.join("").length, limit: 1 },
+  });
+  assert.equal(invalidOffset.isError, true);
+  const reviewCompletion = await client.callTool({
+    name: "reviewComplete",
+    arguments: {
+      taskId: reviewTask.taskId,
+      findings: [{ id: "F-1", severity: "medium", title: "Budget risk", detail: "Accept temporarily." }],
+    },
+  });
+  assert.equal(reviewCompletion.isError, undefined, JSON.stringify(reviewCompletion));
+  assert.equal((await service.status()).run.gates[0]?.state, "closed");
+  const reviewDecision = await client.callTool({
+    name: "reviewDecide",
+    arguments: {
+      reviewHash: (reviewCompletion.structuredContent as { outputHashes: { "review-findings": string } }).outputHashes[
+        "review-findings"
+      ],
+      decisions: [
+        {
+          findingId: "F-1",
+          action: "accept-risk",
+          rationale: "Accepted for this development run.",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+        },
+      ],
+    },
+  });
+  assert.equal(reviewDecision.isError, undefined, JSON.stringify(reviewDecision));
+  assert.equal((await service.status()).run.gates[0]?.state, "open");
   const unconfirmedGate = await client.callTool({
     name: "gateDecide",
     arguments: { gate: 1, decision: "approved", confirm: false },
@@ -403,15 +510,9 @@ test("project deletion validates a replacement run before mutating selection", a
   assert.equal((await service.status()).run.projectId, "data-platform");
 });
 
-test("MCP requires an atomic bundle for multi-output tasks", async () => {
+test("MCP requires an atomic outputs bundle for every task", async () => {
   const completedBundles: unknown[] = [];
   const service = {
-    taskContext: async () => ({
-      task: { allowedOutputKinds: ["implementation-intent", "iac-binding", "environment-inputs"] },
-    }),
-    completeTask: async () => {
-      throw new Error("single-output completion must not be called");
-    },
     completeTaskOutputs: async (_taskId: string, outputs: unknown[]) => {
       completedBundles.push(outputs);
       return { outputHashes: {}, summary: "accepted" };
@@ -428,7 +529,7 @@ test("MCP requires an atomic bundle for multi-output tasks", async () => {
     arguments: { taskId: "plan-task", kind: "implementation-intent", value: {} },
   });
   assert.equal(single.isError, true);
-  assert.match(JSON.stringify(single.content), /outputs\[\]/u);
+  assert.match(JSON.stringify(single.content), /outputs/u);
 
   const bundle = await client.callTool({
     name: "completeTask",
@@ -547,8 +648,8 @@ test("CLI requires explicit Bicep stack cleanup ownership", async () => {
 
   await writeJson(path, { bicep: { ...bicep, ownershipAuthorizesDeleteResources: true } });
   assert.deepEqual(await execute(["version", "--provider-config", path], root), {
-    version: "0.10.0-next.4",
-    bundleVersion: "0.10.0-next.4",
+    version: "0.10.0-next.5",
+    bundleVersion: "0.10.0-next.5",
     configVersion: "1.0.0",
   });
 });
@@ -565,8 +666,8 @@ test("CLI defaults Bicep stack cleanup to detachAll", async () => {
     },
   });
   assert.deepEqual(await execute(["version", "--provider-config", path], root), {
-    version: "0.10.0-next.4",
-    bundleVersion: "0.10.0-next.4",
+    version: "0.10.0-next.5",
+    bundleVersion: "0.10.0-next.5",
     configVersion: "1.0.0",
   });
 });
@@ -603,7 +704,7 @@ test("CLI rejects a stale Terraform lock hash", async () => {
 
   await writeJson(path, { terraform });
   const configured = await execute(["version", "--provider-config", path], root);
-  assert.deepEqual(configured, { version: "0.10.0-next.4", bundleVersion: "0.10.0-next.4", configVersion: "1.0.0" });
+  assert.deepEqual(configured, { version: "0.10.0-next.5", bundleVersion: "0.10.0-next.5", configVersion: "1.0.0" });
 });
 
 test("CLI capability commands report retained packs and require confirmation for mutation", async () => {

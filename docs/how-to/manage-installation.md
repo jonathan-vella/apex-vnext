@@ -71,7 +71,8 @@ npx apex doctor --json
 ```
 
 APEX performs a three-way update against recorded managed hashes. It reports conflicts and preserves modified files
-rather than replacing them silently.
+rather than replacing them silently. Updates install an immutable runtime generation for future projects. Existing runs
+remain pinned to their original generation and continue without deleting `.apex` or restarting intake.
 
 Use `--customizations-source /absolute/path` only to test a deliberate local source bundle. Later updates of that
 selection require the same source.

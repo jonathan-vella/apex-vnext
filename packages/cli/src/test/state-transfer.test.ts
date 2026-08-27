@@ -35,6 +35,7 @@ async function sourceState(clock = instant): Promise<SourceState> {
   });
   const selected = await service.init({ projectId: "demo" });
   await rm(join(root, ".apex", "runtime"), { recursive: true, force: true });
+  await rm(join(root, ".apex", "runtime-generations"), { recursive: true, force: true });
   await mkdir(join(root, ".apex", "runtime"), { recursive: true });
   const transfer = (await service.createWriterTransfer({
     repository: "owner/repository",

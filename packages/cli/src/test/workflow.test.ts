@@ -115,16 +115,16 @@ test("requirements task remains blocked until pending input is recorded", async 
   );
 });
 
-test("requirements intake issues four rounds before the requirements task", async () => {
+test("requirements intake issues three panels before the requirements task", async () => {
   const service = new ApexService(await tempRoot());
   await service.init({ projectId: "demo" });
-  const rounds = ["business-discovery", "workload-pattern", "service-preferences", "security-compliance"];
+  const rounds = ["business-discovery", "workload-pattern", "security-compliance"];
 
   for (const [index, round] of rounds.entries()) {
     const pending = await service.nextTask();
     assert.equal(pending.status, "needs_input");
     if (pending.status !== "needs_input") return;
-    assert.deepEqual(pending.request.intake, { round, ordinal: index + 1, total: 4 });
+    assert.deepEqual(pending.request.intake, { round, ordinal: index + 1, total: 3 });
     await service.recordInput({
       schemaVersion: "1.0.0",
       requestId: pending.request.requestId,
@@ -194,7 +194,30 @@ test("requirements intake adds migration questions only for migration scenarios"
   const services = await service.nextTask();
   assert.equal(services.status, "needs_input");
   if (services.status !== "needs_input") return;
-  assert.equal(services.request.questions[0]?.id, "retained-services");
+  assert.equal(services.request.questions[0]?.id, "compliance");
+});
+
+test("requirements intake recommends a workload pattern and asks pattern-specific scale questions", async () => {
+  const service = new ApexService(await tempRoot());
+  await service.init({ projectId: "demo" });
+  await recordRequirementsRound(service, {
+    workload: "IoT sensors publish telemetry for offline field devices",
+    industry: "manufacturing",
+    "delivery-scenario": "greenfield",
+    "target-environments": ["dev"],
+  });
+  const pending = await service.nextTask();
+  assert.equal(pending.status, "needs_input");
+  if (pending.status !== "needs_input") return;
+  assert.deepEqual(pending.request.questions.find(({ id }) => id === "workload-pattern")?.recommendation, {
+    value: "iot",
+    source: "derived",
+    rationale: "Derived from the confirmed workload description; confirm or choose another pattern.",
+  });
+  assert.equal(
+    pending.request.questions.find(({ id }) => id === "scale")?.prompt,
+    "Describe device count, message rate, payload size, and offline behavior.",
+  );
 });
 
 test("greenfield service intake skips retained services and uses selectable recovery capabilities", async () => {
@@ -206,13 +229,6 @@ test("greenfield service intake skips retained services and uses selectable reco
     "delivery-scenario": "greenfield",
     "target-environments": ["dev"],
   });
-  await recordRequirementsRound(service, {
-    "workload-pattern": "web-api",
-    scale: "100 concurrent users",
-    budget: { kind: "budget", amount: 250, currency: "USD", cadence: "monthly" },
-    "data-sensitivity": { kind: "data-classification", classification: "internal" },
-    "iac-preference": "bicep",
-  });
   const services = await service.nextTask();
   assert.equal(services.status, "needs_input");
   if (services.status !== "needs_input") return;
@@ -222,16 +238,31 @@ test("greenfield service intake skips retained services and uses selectable reco
   );
   assert.equal(
     services.request.questions.find(({ id }) => id === "prohibited-services")?.prompt,
-    "List prohibited services, or explicitly defer the constraint.",
+    "List prohibited services, use 'none', or explicitly defer the constraint.",
   );
   await service.recordInput({
     schemaVersion: "1.0.0",
     requestId: services.request.requestId,
     expectedHead: services.request.expectedHead,
     ownerEpoch: services.request.ownerEpoch,
-    answers: services.request.questions.map(({ id, multiSelect, options }) => ({
+    answers: services.request.questions.map(({ id, multiSelect, options, valueType }) => ({
       questionId: id,
-      value: options === undefined ? `test-${id}` : multiSelect === true ? [options[0]!] : options[0]!,
+      value:
+        valueType === "budget"
+          ? { kind: "budget" as const, amount: 250, currency: "USD", cadence: "monthly" as const }
+          : valueType === "data-classification"
+            ? { kind: "data-classification" as const, classification: "internal" as const }
+            : id === "scale"
+              ? "100 concurrent users"
+              : id === "prohibited-services" || id === "environment-overrides"
+                ? "No constraints"
+                : id === "sku-preferences"
+                  ? "no preference"
+                  : options === undefined
+                    ? `test-${id}`
+                    : multiSelect === true
+                      ? [options[0]!]
+                      : options[0]!,
     })),
   });
   const security = await service.nextTask();
@@ -272,14 +303,6 @@ test("requirements intake provides selectable Azure service and security recomme
     "delivery-scenario": "greenfield",
     "target-environments": ["dev"],
   });
-  await recordRequirementsRound(service, {
-    "workload-pattern": "web-api",
-    scale: "100 concurrent users",
-    budget: { kind: "budget", amount: 250, currency: "USD", cadence: "monthly" },
-    "data-sensitivity": { kind: "data-classification", classification: "internal" },
-    "iac-preference": "bicep",
-  });
-
   const services = await service.nextTask();
   assert.equal(services.status, "needs_input");
   if (services.status !== "needs_input") return;
@@ -287,7 +310,8 @@ test("requirements intake provides selectable Azure service and security recomme
     services.request.questions.find(({ id }) => id === "service-preferences"),
     {
       id: "service-preferences",
-      prompt: "Select preferred Azure services. Select all that apply; architecture chooses the exact combination.",
+      prompt:
+        "Confirm the recommended Azure service candidates or select alternatives; Architecture makes the final choice.",
       options: [
         "app-service",
         "container-apps",
@@ -303,6 +327,11 @@ test("requirements intake provides selectable Azure service and security recomme
         "application-insights",
       ],
       multiSelect: true,
+      recommendation: {
+        value: ["app-service", "azure-sql", "storage", "service-bus", "azure-monitor", "application-insights"],
+        source: "prior-answer",
+        rationale: "Derived from the confirmed workload description as non-binding Architecture candidates.",
+      },
     },
   );
   await service.recordInput({
@@ -310,10 +339,26 @@ test("requirements intake provides selectable Azure service and security recomme
     requestId: services.request.requestId,
     expectedHead: services.request.expectedHead,
     ownerEpoch: services.request.ownerEpoch,
-    answers: services.request.questions.map(({ id }) => ({
+    answers: services.request.questions.map(({ id, options, multiSelect, valueType }) => ({
       questionId: id,
       value:
-        id === "service-preferences" ? ["container-apps", "azure-cosmos-db", "application-insights"] : `test-${id}`,
+        valueType === "budget"
+          ? { kind: "budget" as const, amount: 250, currency: "USD", cadence: "monthly" as const }
+          : valueType === "data-classification"
+            ? { kind: "data-classification" as const, classification: "internal" as const }
+            : id === "service-preferences"
+              ? ["container-apps", "azure-cosmos-db", "application-insights"]
+              : id === "scale"
+                ? "100 concurrent users"
+                : id === "prohibited-services" || id === "environment-overrides"
+                  ? "No constraints"
+                  : id === "sku-preferences"
+                    ? "no preference"
+                    : options === undefined
+                      ? `test-${id}`
+                      : multiSelect === true
+                        ? [options[0]!]
+                        : options[0]!,
     })),
   });
 
@@ -337,6 +382,11 @@ test("requirements intake provides selectable Azure service and security recomme
         "diagnostic-logging",
       ],
       multiSelect: true,
+      recommendation: {
+        value: ["managed-identity", "key-vault", "platform-managed-encryption", "diagnostic-logging"],
+        source: "default",
+        rationale: "APEX security baseline; confirm additions or exceptions for this workload.",
+      },
     },
   );
   assert.deepEqual(security.request.questions.find(({ id }) => id === "compliance")?.options, [
@@ -643,9 +693,6 @@ test("requirements task context includes recorded input and stageable output tem
     scale: "100 concurrent users",
     budget: { kind: "budget", amount: 500, currency: "USD", cadence: "monthly" },
     "data-sensitivity": { kind: "data-classification", classification: "confidential" },
-    "iac-preference": "bicep",
-  });
-  await recordRequirementsRound(service, {
     "prohibited-services": "No services are prohibited",
     "service-preferences": ["container-apps", "azure-cosmos-db", "application-insights"],
     "sku-preferences": "no preference",
@@ -673,7 +720,6 @@ test("requirements task context includes recorded input and stageable output tem
     scale: "100 concurrent users",
     budget: { kind: "budget", amount: 500, currency: "USD", cadence: "monthly" },
     "data-sensitivity": { kind: "data-classification", classification: "confidential" },
-    "iac-preference": "bicep",
     "prohibited-services": "No services are prohibited",
     "service-preferences": ["container-apps", "azure-cosmos-db", "application-insights"],
     "sku-preferences": "no preference",
@@ -929,8 +975,6 @@ test("requirements intake preserves explicit unresolved answers", async () => {
       budget: { kind: "budget", amount: 500, currency: "USD", cadence: "monthly" },
       "data-sensitivity": { kind: "data-classification", classification: "internal" },
       "iac-preference": "bicep",
-    });
-    await recordRequirementsRound(service, {
       "prohibited-services": "No services are prohibited",
       "service-preferences": ["container-apps", "azure-cosmos-db", "application-insights"],
       "sku-preferences": "no preference",
@@ -1048,6 +1092,42 @@ test("concurrent input submissions return only stable Apex errors", async () => 
     assert.equal(rejected.reason instanceof ApexError, true);
     assert.equal(["APEX_STALE", "APEX_CONFLICT"].includes((rejected.reason as ApexError).code), true);
   }
+});
+
+test("pending legacy four-round intake requests replay unchanged", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const initialized = await service.init({ projectId: "demo" });
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"));
+  await journal.append({
+    eventId: "legacy-request",
+    projectId: "demo",
+    runId: initialized.runId,
+    type: "requirements.input-requested",
+    timestamp: "2026-01-01T00:00:00.000Z",
+    ownerEpoch: 1,
+    expectedHead: await journal.head(),
+    payload: {
+      requestId: "legacy-request",
+      intake: { round: "business-discovery", ordinal: 1, total: 4 },
+      questions: [
+        { id: "workload", prompt: "Briefly describe the workload and its users." },
+        { id: "industry", prompt: "Choose the industry.", options: ["retail", "other"] },
+        { id: "delivery-scenario", prompt: "Choose the scenario.", options: ["greenfield", "migration"] },
+        {
+          id: "target-environments",
+          prompt: "Choose environments.",
+          options: ["dev", "prod"],
+          multiSelect: true,
+          valueType: "environment-set",
+        },
+      ],
+    },
+  });
+  const pending = await service.nextTask();
+  assert.equal(pending.status, "needs_input");
+  if (pending.status === "needs_input")
+    assert.deepEqual(pending.request.intake, { round: "business-discovery", ordinal: 1, total: 4 });
 });
 
 test("malformed persisted input requests fail closed", async () => {

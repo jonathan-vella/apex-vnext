@@ -839,7 +839,13 @@ describe("target family contracts", () => {
     assert.equal(
       hasValidInputRequestQuestions([
         { id: "one", prompt: "One?" },
-        { id: "two", prompt: "Two?", options: ["a", "b"], multiSelect: true },
+        {
+          id: "two",
+          prompt: "Two?",
+          options: ["a", "b"],
+          multiSelect: true,
+          recommendation: { value: ["a"], source: "default", rationale: "Recommended baseline." },
+        },
       ]),
       true,
     );
@@ -853,6 +859,23 @@ describe("target family contracts", () => {
     assert.equal(hasValidInputRequestQuestions([{ id: "bad", prompt: "Bad?", multiSelect: true }]), false);
     assert.equal(hasValidInputRequestQuestions([{ id: "bad", prompt: "Bad?", options: [] }]), false);
     assert.equal(hasValidInputRequestQuestions([{ id: "bad", prompt: "Bad?", options: ["same", "same"] }]), false);
+    assert.equal(
+      hasValidInputRequestQuestions([
+        {
+          id: "bad",
+          prompt: "Bad?",
+          options: ["a", "b"],
+          recommendation: { value: "c", source: "derived", rationale: "Outside options." },
+        },
+      ]),
+      false,
+    );
+    assert.equal(
+      hasValidInputRequestQuestions([
+        { id: "bad", prompt: "Bad?", options: ["a", "b"], recommendation: null as never },
+      ]),
+      false,
+    );
     assert.equal(
       Value.Check(InputRequestV1Schema, {
         ...request,

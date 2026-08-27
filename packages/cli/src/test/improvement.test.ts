@@ -120,7 +120,13 @@ test("improvement operations reject runtime policy drift", async () => {
   const service = new ApexService(root);
   await service.init({ projectId: "demo" });
   assert.deepEqual(await service.improvementObservations(), []);
-  const policyPath = join(root, ".apex", "runtime", "improvement-policy.v1.json");
+  const policyPath = join(
+    root,
+    ".apex",
+    "runtime-generations",
+    (await service.status()).run.runtimeLockHash,
+    "improvement-policy.v1.json",
+  );
   await writeJson(policyPath, { ...policy, recurrence: { threshold: 2, windowDays: 30 } });
   await assert.rejects(service.improvementObservations(), /Improvement policy lock is not current/);
 });
