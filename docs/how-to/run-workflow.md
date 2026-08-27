@@ -49,14 +49,14 @@ remain useful for inspection and bounded operations.
 
 ## Handle Input Before Tasks
 
-`nextTask` begins requirements with four ordered input rounds: business discovery, workload pattern, service
+`nextTask` begins requirements with three adaptive panels: business discovery, combined workload and service
 preferences, and security and compliance. Answer the exact pending request through the supported client. The client
 submits a typed input object through MCP `recordInput`, including the request ID, expected head, owner epoch, and
 nonempty answers.
 
 Call `nextTask` again after every accepted round. Continue until it returns `status=task`; request context only for that
-result. The service-preferences round captures constraints and preferences only. Architecture selection, SKU decisions,
-and implementation stay with later workflow stages.
+result. Recommendations are visible defaults or non-binding candidates and enter the journal only after confirmation.
+Architecture selection, SKU decisions, and implementation stay with later workflow stages.
 
 ## Complete Creative Stages
 
@@ -67,8 +67,8 @@ The coordinator hands work to interactive specialists:
 3. Planner produces track-neutral implementation intent, binding, and environment inputs.
 4. Operator handles preview, approval, deployment, recovery, and evidence.
 
-VS Code specialists may delegate bounded code generation, review, and validation tasks. Copilot CLI specialists do not
-have those autonomous workers and must stay within their supported projection.
+Specialists delegate bounded code generation, review, and validation tasks when supported. Review findings return as a
+single decision panel; permitted risk acceptance is time-bound, while revision creates a fresh artifact and review.
 
 ## Decide Gates
 

@@ -7,21 +7,26 @@ APEX server with independent state.
 
 ## Workflow Tools
 
-| Tool            | Purpose                                                               |
-| --------------- | --------------------------------------------------------------------- |
-| `status`        | Read selected project and run status.                                 |
-| `nextTask`      | Get the next requirements input round, a task, or terminal status.    |
-| `taskContext`   | Read context for the exact task ID returned by `nextTask`.            |
-| `recordInput`   | Submit answers for the exact pending requirements input request.      |
-| `stageArtifact` | Stage one or more typed outputs for a task.                           |
-| `stageFile`     | Stage a bounded file for a task, optionally with an expected SHA-256. |
-| `generateIac`   | Generate the selected task's Bicep or Terraform batch.                |
-| `validateTask`  | Validate staged or supplied task outputs without completion.          |
-| `completeTask`  | Validate and complete a task with typed outputs.                      |
+| Tool                   | Purpose                                                               |
+| ---------------------- | --------------------------------------------------------------------- |
+| `status`               | Read selected project and run status.                                 |
+| `nextTask`             | Get the next input, review decision, task, or terminal status.        |
+| `taskContext`          | Read context for the exact task ID returned by `nextTask`.            |
+| `recordInput`          | Submit answers for the exact pending requirements input request.      |
+| `stageArtifact`        | Stage one or more typed outputs for a task.                           |
+| `stageFile`            | Stage a bounded file for a task, optionally with an expected SHA-256. |
+| `generateIac`          | Generate the selected task's Bicep or Terraform batch.                |
+| `validateTask`         | Validate staged or supplied task outputs without completion.          |
+| `completeTask`         | Compatibility operation for a complete typed output bundle.           |
+| `requirementsComplete` | Complete Requirements without constructing a generic bundle.          |
+| `architectureComplete` | Complete Architecture, cost, and decisions atomically.                |
+| `reviewComplete`       | Complete a review with APEX-derived identity and evidence binding.    |
+| `reviewDecide`         | Revise findings or accept permitted time-bound risk.                  |
+| `planComplete`         | Complete a plan with an APEX-derived intent binding.                  |
 
 Handle `needs_input` before requesting task context. Only a `nextTask` result with `status=task` provides a valid task
-ID. Requirements intake returns four ordered `needs_input` rounds before the requirements task: business discovery,
-workload pattern, service preferences, and security and compliance. After recording each round, call `nextTask` again.
+ID. New Requirements runs return three adaptive panels before the task. Handle `needs_review` through the returned
+finding actions and `reviewDecide`.
 The returned request ID, expected head, and owner epoch are required for `recordInput`.
 
 ## Read And Operations Tools

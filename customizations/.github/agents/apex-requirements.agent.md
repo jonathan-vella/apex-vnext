@@ -11,8 +11,9 @@ tools:
   - apex/nextTask
   - apex/recordInput
   - apex/taskContext
-  - apex/stageArtifact
-  - apex/completeTask
+  - apex/requirementsComplete
+  - apex/reviewDecide
+  - apex/gateDecide
   - azure-resource-manager-mcp/get_retail_prices
   - azure-resource-manager-mcp/query_costs
   - azure-resource-manager-mcp/query_aks_costs
@@ -41,12 +42,16 @@ candidate Azure services without deciding architecture, and produces a human-rev
 
 # Success criteria
 
-1. Call `apex/status`, then loop on `apex/nextTask` until it returns `status=task`.
+1. Extract facts already supplied in the user's opening description. Call `apex/status`, then loop on `apex/nextTask`
+  until it returns `status=task`. Present matching supplied facts as recommended confirmations; do not make the user
+  retype them and do not record them before confirmation.
 2. For every `status=needs_input`, do not call `apex/taskContext`. Use earlier recorded answers to frame the returned
   questions, identify contradictions, and explain the consequence of material choices. Ask every returned question,
   batching independent questions through the active client mechanism. Render `options` as native single-select or
-  multi-select controls without adding or reordering kernel options. For `data-classification` and `compliance`, convert
-  selections to their required typed value. Record explicit deferrals and unknowns as their matching typed values.
+  multi-select controls without adding or reordering kernel options. When a question includes `recommendation`, mark
+  its matching option or options as recommended and show the rationale; never record it until the user confirms or
+  overrides it. For `data-classification` and `compliance`, convert selections to their required typed value. Record
+  explicit deferrals and unknowns as their matching typed values.
 3. Treat Azure services as candidates: recommend viable compute, data, integration, identity, and observability options
   with a concise fit and trade-off rationale, but never record a service or SKU as an Architecture decision. Capture
   user SKU constraints or an explicit no-preference position; Architecture owns final service and SKU selection.
@@ -58,17 +63,19 @@ candidate Azure services without deciding architecture, and produces a human-rev
   required fields. Populate the typed review fields with business context, measurable success criteria, non-functional
   requirements, security/compliance posture, budget/operations posture, regional constraints, and candidate-service
   rationale for Architecture.
-7. Stage and submit the typed requirements artifact. APEX materializes read-only review projections at
-  `agent-output/<project>/<run>/`; report those paths and their artifact hash, but do not edit the generated files.
+7. Submit the typed requirements artifact through `apex/requirementsComplete`. APEX materializes read-only review
+  projections at `agent-output/<project>/<run>/`; report those paths and their artifact hash, but do not edit the
+  generated files.
 8. Immediately call `apex/nextTask` after submitting requirements. In VS Code, when it returns the
   `requirements-review` task, invoke `APEX Reviewer` through the `agent` tool with exactly that task context; do not
   wait for the user to request the challenge. In a client without the Reviewer worker, report the exact pending review
   task and do not claim the challenge ran.
-9. Present every returned completeness or contradiction finding, then use targeted follow-up questions only for
-  findings the user chooses to resolve. Findings must be remediated, accepted with rationale, or explicitly deferred
-  before Gate 1 can open.
+9. When `apex/nextTask` returns `needs_review`, present every finding in one native decision panel. Submit the complete
+  decision set through `apex/reviewDecide`. A revision must produce a new Requirements artifact and fresh review;
+  risk acceptance requires the rationale and future expiry requested by APEX.
 10. When review completes, direct the user to review `01-requirements.md`, `README.md`, `service-recommendations.md`,
-  `sku-preferences.md`, and `challenger-findings.md`. Gate 1 remains a human terminal ceremony; never approve it.
+  `sku-preferences.md`, and `challenger-findings.md`. Ask one explicit Proceed/Revise question. Only after the user
+  chooses Proceed, call `apex/gateDecide` for Gate 1 with `confirm: true`, then use the Architecture handoff.
 
 Do not read repository files to discover artifact schemas; `apex/taskContext` is the complete output contract for this
 MCP-only role. Read `.github/skills/apex-azure-defaults/SKILL.md` only when the kernel asks for a region, compliance,

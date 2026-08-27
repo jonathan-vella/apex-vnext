@@ -262,6 +262,10 @@ export async function createStateTransferBundle(
     throw new Error("State transfer envelope cannot outlive its writer-transfer claim");
   }
   const runRoot = join(state.apexRoot, "projects", state.selection.projectId, "runs", state.selection.runId);
+  const generationRoot = join(state.apexRoot, "runtime-generations", state.run.runtimeLockHash);
+  const generationAvailable =
+    (await readOptionalRegular(join(generationRoot, "apex.lock.json"), "runtime generation lock")) !== undefined;
+  const runtimeRoot = generationAvailable ? generationRoot : join(state.apexRoot, "runtime");
   const paths = new Set<string>([
     "config.json",
     "apex.lock.json",
@@ -271,9 +275,11 @@ export async function createStateTransferBundle(
     paths.add(".gitignore");
   }
   try {
-    for (const entry of await readdir(join(state.apexRoot, "runtime"), { withFileTypes: true })) {
-      if (entry.isSymbolicLink()) throw new Error(`State transfer runtime contains a symlink: ${entry.name}`);
-      if (entry.isFile() && entry.name.endsWith(".json")) paths.add(`runtime/${entry.name}`);
+    for (const sourceRoot of [...new Set([runtimeRoot, join(state.apexRoot, "runtime")])]) {
+      for (const entry of await readdir(sourceRoot, { withFileTypes: true })) {
+        if (entry.isSymbolicLink()) throw new Error(`State transfer runtime contains a symlink: ${entry.name}`);
+        if (entry.isFile() && entry.name.endsWith(".json")) paths.add(`runtime/${entry.name}`);
+      }
     }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
@@ -283,9 +289,21 @@ export async function createStateTransferBundle(
   }
   const sourceFiles: Array<{ path: string; bytes: Buffer }> = [];
   for (const path of [...paths].sort()) {
+    let sourcePath = join(state.apexRoot, ...path.split("/"));
+    if (path === "apex.lock.json") {
+      sourcePath = generationAvailable ? join(runtimeRoot, "apex.lock.json") : join(state.apexRoot, "apex.lock.json");
+    }
+    if (path.startsWith("runtime/")) {
+      const relativeRuntimePath = path.slice("runtime/".length);
+      const generationPath = join(runtimeRoot, relativeRuntimePath);
+      sourcePath =
+        (await readOptionalRegular(generationPath, "runtime generation file")) === undefined
+          ? join(state.apexRoot, "runtime", relativeRuntimePath)
+          : generationPath;
+    }
     sourceFiles.push({
       path,
-      bytes: await readRegular(join(state.apexRoot, ...path.split("/")), "State transfer file"),
+      bytes: await readRegular(sourcePath, "State transfer file"),
     });
   }
   const runPrefix = `projects/${state.selection.projectId}/runs/${state.selection.runId}/`;

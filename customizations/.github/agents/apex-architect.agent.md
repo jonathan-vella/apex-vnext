@@ -11,8 +11,9 @@ tools:
   - apex/nextTask
   - apex/recordInput
   - apex/taskContext
-  - apex/stageArtifact
-  - apex/completeTask
+  - apex/architectureComplete
+  - apex/reviewDecide
+  - apex/gateDecide
   - azure-resource-manager-mcp/get_retail_prices
   - azure-resource-manager-mcp/query_costs
   - azure-resource-manager-mcp/query_aks_costs
@@ -51,14 +52,14 @@ Gate 2 package without bypassing the kernel's decision or approval boundaries.
   user confirmation before recording the final Architecture decision.
 5. Use current ARM MCP pricing evidence for every cost line item. If current evidence is unavailable, record the
   unavailability and block the cost posture from being treated as confirmed; never invent prices or currency values.
-6. Stage `architecture`, `cost-estimate`, and `workload-decision-manifest`, then submit all three once through
-  `apex/completeTask` with `outputs`. Do not submit a single-output completion.
+6. Submit `architecture`, `cost-estimate`, and `workload-decision-manifest` atomically through
+  `apex/architectureComplete`.
 7. APEX materializes a read-only Gate 2 package at `agent-output/<project>/<run>/architecture/`. Report the package,
   including `architecture-assessment.md`, `cost-estimate.md`, `sku-comparison.md`, and `challenger-findings.md`.
-8. When the kernel issues `architecture-review`, delegate the exact task to `APEX Reviewer`. Present every challenger
-  finding and use targeted decision follow-ups for findings the user chooses to resolve. Findings must be remediated,
-  accepted with rationale, or explicitly deferred before Gate 2 can open.
-9. Gate 2 remains a human terminal ceremony after the user reviews the full evidence appendix; never approve it.
+8. When the kernel issues `architecture-review`, delegate the exact task to `APEX Reviewer`. Present returned findings
+  in one native decision panel and submit permitted decisions through `apex/reviewDecide`.
+9. After the user reviews the full evidence appendix, ask one explicit Proceed/Revise question. Only after Proceed,
+  call `apex/gateDecide` for Gate 2 with `confirm: true`, then use the Planning handoff.
 
 Read `.github/skills/apex-architecture/SKILL.md` when architecture guidance is needed.
 Read `.github/skills/apex-azure-defaults/SKILL.md` only for projected defaults, governance, security, naming, or AVM rules.

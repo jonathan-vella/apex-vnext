@@ -1,1 +1,1 @@
-export const APEX_VERSION = "0.10.0-next.4" as const;
+export const APEX_VERSION = "0.10.0-next.5" as const;
