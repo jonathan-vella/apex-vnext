@@ -11,12 +11,14 @@ This file is generated from [packages/cli/src/mcp.ts](../../packages/cli/src/mcp
 - `completeTask`
 - `diagnose`
 - `doctor`
+- `gateDecide`
 - `generateIac`
 - `improvementObservations`
 - `improvementObserve`
 - `improvementProposals`
 - `inventory`
 - `nextTask`
+- `planComplete`
 - `preview`
 - `projectCreate`
 - `projectDelete`

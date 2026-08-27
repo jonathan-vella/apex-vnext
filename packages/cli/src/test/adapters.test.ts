@@ -7,6 +7,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { CONTRACT_VERSION } from "@apexops/contracts";
 import type { ProcessRequest } from "@apexops/capabilities";
+import { sha256Json } from "@apexops/kernel";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createMcpServer } from "../mcp.js";
@@ -194,12 +195,14 @@ test("MCP registers only narrow tools and calls the service", async () => {
     "completeTask",
     "diagnose",
     "doctor",
+    "gateDecide",
     "generateIac",
     "improvementObservations",
     "improvementObserve",
     "improvementProposals",
     "inventory",
     "nextTask",
+    "planComplete",
     "preview",
     "projectCreate",
     "projectDelete",
@@ -311,7 +314,45 @@ test("MCP registers only narrow tools and calls the service", async () => {
   });
   assert.equal(recorded.isError, undefined, JSON.stringify(recorded));
   assert.equal((recorded.structuredContent as { recorded: boolean }).recorded, true);
-  assert.equal((await nextTaskAfterInput(service)).status, "task");
+  const requirementsTask = await nextTaskAfterInput(service);
+  assert.equal(requirementsTask.status, "task");
+  if (requirementsTask.status !== "task") return;
+  const requirementHashes = await service.completeTaskOutputs(requirementsTask.task.taskId, [
+    { kind: "requirements", value: requirements() },
+  ]);
+  const reviewTask = await service.nextTask();
+  assert.equal(reviewTask.status, "task");
+  if (reviewTask.status !== "task") return;
+  await service.completeTaskOutputs(reviewTask.task.taskId, [
+    {
+      kind: "review-findings",
+      value: {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: "demo",
+        runId: (await service.status()).run.runId,
+        subjectKind: "requirements",
+        subjectHash: requirementHashes.outputHashes.requirements!,
+        reviewedAt: "2026-01-01T00:00:00.000Z",
+        findings: [],
+      },
+    },
+  ]);
+  const unconfirmedGate = await client.callTool({
+    name: "gateDecide",
+    arguments: { gate: 1, decision: "approved", confirm: false },
+  });
+  assert.equal(unconfirmedGate.isError, true);
+  const approvedGate = await client.callTool({
+    name: "gateDecide",
+    arguments: { gate: 1, decision: "approved", confirm: true },
+  });
+  assert.equal(approvedGate.isError, undefined, JSON.stringify(approvedGate));
+  assert.equal((approvedGate.structuredContent as { gate: number }).gate, 1);
+  const gateFour = await client.callTool({
+    name: "gateDecide",
+    arguments: { gate: 4, decision: "approved", confirm: true },
+  });
+  assert.equal(gateFour.isError, true);
   const improvement = await client.callTool({
     name: "improvementObserve",
     arguments: {
@@ -331,7 +372,6 @@ test("MCP registers only narrow tools and calls the service", async () => {
     "improvementScan",
     "improvementDecide",
     "improvementApply",
-    "gateDecide",
     "deploy",
     "publish",
     "createIssue",
@@ -403,6 +443,49 @@ test("MCP requires an atomic bundle for multi-output tasks", async () => {
   });
   assert.equal(bundle.isError, undefined);
   assert.equal(completedBundles.length, 1);
+  await client.close();
+  await server.close();
+});
+
+test("MCP planComplete derives the canonical binding intent hash", async () => {
+  let completedOutputs: Array<{ kind: string; value: unknown }> | undefined;
+  const service = {
+    completePlan: async (taskId: string, intent: unknown, binding: unknown, environmentInputs: unknown) => {
+      return await ApexService.prototype.completePlan.call(
+        {
+          completeTaskOutputs: async (_taskId: string, outputs: Array<{ kind: string; value: unknown }>) => {
+            assert.equal(_taskId, taskId);
+            completedOutputs = outputs;
+            return { outputHashes: {}, summary: "accepted" };
+          },
+        } as unknown as ApexService,
+        taskId,
+        intent as Parameters<ApexService["completePlan"]>[1],
+        binding as Parameters<ApexService["completePlan"]>[2],
+        environmentInputs as Parameters<ApexService["completePlan"]>[3],
+      );
+    },
+  } as unknown as ApexService;
+  const server = createMcpServer(service);
+  const client = new Client({ name: "test", version: "1.0.0" });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+  const result = await client.callTool({
+    name: "planComplete",
+    arguments: {
+      taskId: "plan-task",
+      implementationIntent: { schemaVersion: "1.0.0", projectId: "demo", runId: "run", resources: [], outputs: [] },
+      iacBinding: { schemaVersion: "1.0.0", projectId: "demo", runId: "run", track: "bicep", resourceBindings: {} },
+      environmentInputs: { schemaVersion: "1.0.0", projectId: "demo", runId: "run", environment: "dev", inputs: {} },
+    },
+  });
+  assert.equal(result.isError, undefined, JSON.stringify(result));
+  assert.equal(completedOutputs?.length, 3);
+  assert.equal(
+    (completedOutputs?.find(({ kind }) => kind === "iac-binding")?.value as { intentHash: string }).intentHash,
+    sha256Json({ schemaVersion: "1.0.0", projectId: "demo", runId: "run", resources: [], outputs: [] }),
+  );
   await client.close();
   await server.close();
 });

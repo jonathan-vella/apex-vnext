@@ -113,7 +113,7 @@ import {
 } from "@apexops/renderers";
 import { constants } from "node:fs";
 import { access, cp, lstat, mkdir, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
-import { homedir } from "node:os";
+import { homedir, userInfo } from "node:os";
 import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { resolveBundledAssets, type BundledClientProjection } from "./assets.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
@@ -1480,6 +1480,19 @@ export class ApexService {
     return this.acceptTaskOutputs(taskId, outputs, false);
   }
 
+  async completePlan(
+    taskId: string,
+    intent: ImplementationIntentV1,
+    binding: Omit<IacBindingV1, "intentHash">,
+    environmentInputs: EnvironmentInputsV1,
+  ): Promise<{ outputHashes: Partial<Record<ArtifactKind, string>>; summary: string }> {
+    return this.completeTaskOutputs(taskId, [
+      { kind: "implementation-intent", value: intent },
+      { kind: "iac-binding", value: { ...binding, intentHash: sha256Json(intent) } },
+      { kind: "environment-inputs", value: environmentInputs },
+    ]);
+  }
+
   private async acceptTaskOutputs(
     taskId: string,
     outputs: TaskOutput[],
@@ -2203,6 +2216,16 @@ export class ApexService {
     );
     if (gateNumber === 4) await this.materializeOperationsApprovalPackage(run, approval, approvalHash);
     return approval;
+  }
+
+  async decideInteractiveGate(gateNumber: 1 | 2 | 3, decision: "approved" | "rejected"): Promise<ApprovalEvidenceV1> {
+    let actor = "local-user";
+    try {
+      actor = userInfo().username.trim() || actor;
+    } catch {
+      // Some minimal container identities do not have an OS user entry.
+    }
+    return this.decideGateNumber(gateNumber, decision, actor);
   }
 
   async preview(options: PreviewOptions): Promise<DeploymentPreviewV1> {
