@@ -10,6 +10,16 @@ current repository version is recorded in [VERSION.md](VERSION.md).
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0-next.4] — Preview
+
+### Changed
+
+- Requirements now invokes the Reviewer task automatically in VS Code after accepted requirements are submitted.
+- Gates 1 through 3 can be explicitly approved or rejected in chat; APEX records the local OS username as actor.
+  Gate 4 remains recipient-bound and CLI-only.
+- Planner completion is now atomic: APEX derives the canonical implementation-intent hash before binding and submitting
+  the complete plan bundle.
+
 ## [0.10.0-next.3] — Preview
 
 ### Changed
