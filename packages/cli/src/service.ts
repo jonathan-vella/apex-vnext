@@ -2219,7 +2219,12 @@ export class ApexService {
   }
 
   async decideInteractiveGate(gateNumber: 1 | 2 | 3, decision: "approved" | "rejected"): Promise<ApprovalEvidenceV1> {
-    const actor = userInfo().username.trim() || "local-user";
+    let actor = "local-user";
+    try {
+      actor = userInfo().username.trim() || actor;
+    } catch {
+      // Some minimal container identities do not have an OS user entry.
+    }
     return this.decideGateNumber(gateNumber, decision, actor);
   }
 

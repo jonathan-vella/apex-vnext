@@ -7,6 +7,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { CONTRACT_VERSION } from "@apexops/contracts";
 import type { ProcessRequest } from "@apexops/capabilities";
+import { sha256Json } from "@apexops/kernel";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createMcpServer } from "../mcp.js";
@@ -447,11 +448,22 @@ test("MCP requires an atomic bundle for multi-output tasks", async () => {
 });
 
 test("MCP planComplete derives the canonical binding intent hash", async () => {
-  const completedPlans: unknown[] = [];
+  let completedOutputs: Array<{ kind: string; value: unknown }> | undefined;
   const service = {
-    completePlan: async (_taskId: string, intent: unknown, binding: unknown, environmentInputs: unknown) => {
-      completedPlans.push({ intent, binding, environmentInputs });
-      return { outputHashes: {}, summary: "accepted" };
+    completePlan: async (taskId: string, intent: unknown, binding: unknown, environmentInputs: unknown) => {
+      return await ApexService.prototype.completePlan.call(
+        {
+          completeTaskOutputs: async (_taskId: string, outputs: Array<{ kind: string; value: unknown }>) => {
+            assert.equal(_taskId, taskId);
+            completedOutputs = outputs;
+            return { outputHashes: {}, summary: "accepted" };
+          },
+        } as unknown as ApexService,
+        taskId,
+        intent as Parameters<ApexService["completePlan"]>[1],
+        binding as Parameters<ApexService["completePlan"]>[2],
+        environmentInputs as Parameters<ApexService["completePlan"]>[3],
+      );
     },
   } as unknown as ApexService;
   const server = createMcpServer(service);
@@ -469,7 +481,11 @@ test("MCP planComplete derives the canonical binding intent hash", async () => {
     },
   });
   assert.equal(result.isError, undefined, JSON.stringify(result));
-  assert.equal(completedPlans.length, 1);
+  assert.equal(completedOutputs?.length, 3);
+  assert.equal(
+    (completedOutputs?.find(({ kind }) => kind === "iac-binding")?.value as { intentHash: string }).intentHash,
+    sha256Json({ schemaVersion: "1.0.0", projectId: "demo", runId: "run", resources: [], outputs: [] }),
+  );
   await client.close();
   await server.close();
 });
