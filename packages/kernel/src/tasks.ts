@@ -13,6 +13,11 @@ import type { IdSource } from "./project-store.js";
 
 type QuestionV1 = Static<typeof QuestionV1Schema>;
 
+const EXPLICIT_NONE_ANSWERS: Readonly<Record<string, string>> = {
+  "prohibited-services": "No Azure services are prohibited.",
+  "environment-overrides": "No environment-specific service or sizing overrides.",
+};
+
 export interface CreateTaskInput extends Omit<TaskEnvelopeV1, "schemaVersion" | "taskId" | "createdAt" | "expiresAt"> {
   ttlMs: number;
 }
@@ -113,6 +118,10 @@ export function validateInputAnswers(questions: QuestionV1[], submitted: InputAn
       throw new Error(`Answer shape does not match question: ${question.id}`);
     }
     const selected: string[] = Array.isArray(value) ? value : [value];
+    const explicitNone = EXPLICIT_NONE_ANSWERS[question.id];
+    if (explicitNone !== undefined && typeof value === "string" && /^none$/iu.test(value.trim())) {
+      return { questionId: question.id, value: explicitNone };
+    }
     if (selected.some((item) => item.trim().length === 0 || /^(?:none|n\/a)$/iu.test(item.trim()))) {
       throw new Error(`Answer must be explicitly provided or deferred: ${question.id}`);
     }

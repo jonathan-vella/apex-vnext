@@ -2,7 +2,8 @@
 
 > [Current Version](../../VERSION.md) | Implemented APEX vNext command groups and error behavior.
 
-The packaged executable is `apex`. Add `--json` to receive `{ "ok": true, "result": ... }` or a structured error.
+The packaged executable is `apex`. Human `status` and `doctor` output is concise by default. Add `--verbose` for full
+human-readable detail or `--json` to receive `{ "ok": true, "result": ... }` or a structured error.
 Commands that change installation, capability, transfer, or improvement state may require `--yes`.
 
 ## Lifecycle

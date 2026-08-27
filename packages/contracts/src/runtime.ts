@@ -110,6 +110,19 @@ export const QuestionV1Schema = Type.Object(
     prompt: NonEmptyStringSchema,
     options: Type.Optional(Type.Array(NonEmptyStringSchema, { minItems: 1, uniqueItems: true })),
     multiSelect: Type.Optional(Type.Boolean()),
+    recommendation: Type.Optional(
+      Type.Object(
+        {
+          value: Type.Union([
+            NonEmptyStringSchema,
+            Type.Array(NonEmptyStringSchema, { minItems: 1, uniqueItems: true }),
+          ]),
+          source: Type.Union([Type.Literal("default"), Type.Literal("derived"), Type.Literal("prior-answer")]),
+          rationale: NonEmptyStringSchema,
+        },
+        { additionalProperties: false },
+      ),
+    ),
     valueType: Type.Optional(
       Type.Union([
         Type.Literal("budget"),
@@ -192,7 +205,7 @@ export const RequirementsIntakeV1Schema = Type.Object(
   {
     round: RequirementsIntakeRoundV1Schema,
     ordinal: Type.Integer({ minimum: 1, maximum: 4 }),
-    total: Type.Literal(4),
+    total: Type.Union([Type.Literal(3), Type.Literal(4)]),
   },
   { additionalProperties: false },
 );
@@ -317,9 +330,17 @@ export function hasValidInputRequestQuestions(questions: QuestionV1[]): boolean 
   return (
     new Set(questions.map(({ id }) => id)).size === questions.length &&
     questions.every(
-      ({ multiSelect, options }) =>
+      ({ multiSelect, options, recommendation }) =>
         (multiSelect !== true || options !== undefined) &&
-        (options === undefined || (options.length > 0 && new Set(options).size === options.length)),
+        (options === undefined || (options.length > 0 && new Set(options).size === options.length)) &&
+        (recommendation === undefined ||
+          (recommendation !== null &&
+            typeof recommendation === "object" &&
+            "value" in recommendation &&
+            (options === undefined ||
+              (Array.isArray(recommendation.value)
+                ? recommendation.value.every((value) => options.includes(value))
+                : options.includes(recommendation.value))))),
     )
   );
 }

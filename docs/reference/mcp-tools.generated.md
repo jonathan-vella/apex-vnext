@@ -6,6 +6,7 @@ This file is generated from [packages/cli/src/mcp.ts](../../packages/cli/src/mcp
 
 ## Inventory
 
+- `architectureComplete`
 - `capabilityList`
 - `capabilityStatus`
 - `completeTask`
@@ -25,9 +26,13 @@ This file is generated from [packages/cli/src/mcp.ts](../../packages/cli/src/mcp
 - `projectList`
 - `projectUse`
 - `promote`
+- `readTaskInput`
 - `reconcile`
 - `recordInput`
 - `render`
+- `requirementsComplete`
+- `reviewComplete`
+- `reviewDecide`
 - `stageArtifact`
 - `stageFile`
 - `status`

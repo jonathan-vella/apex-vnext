@@ -9,18 +9,19 @@ The requirements agent and client projections ask only the request returned by `
 versioned in [`packages/contracts/src/runtime.ts`](../../packages/contracts/src/runtime.ts). Managed guidance must
 describe that authority; it must not duplicate a mutable question list.
 
-The kernel issues four ordered rounds before the requirements task:
+New runs use three ordered panels before the requirements task:
 
 1. Business discovery
-2. Workload pattern
-3. Service preferences
-4. Security and compliance
+2. Workload pattern and service preferences
+3. Security and compliance
+
+Pending four-round requests remain valid and replay unchanged.
 
 The workload-pattern round appends migration questions only when business discovery records `migration` or
 `modernization`. Conditional questions must be derived from accepted prior-round answers in the kernel; do not let an
 agent or client choose whether to ask them.
 
-The service-preferences round is a preference boundary. Record retained, prohibited, preferred, and environment-specific
+The service portion of the workload panel is a preference boundary. Record retained, prohibited, preferred, and environment-specific
 services plus SKU preferences, without choosing an architecture, SKU, or implementation.
 
 ## Make A Compatible Change
@@ -36,8 +37,7 @@ services plus SKU preferences, without choosing an architecture, SKU, or impleme
 6. Update managed agent and skill guidance, then regenerate client projections and other generated assets through their
    owning command. Do not edit generated assets directly.
 7. Update this guide and the workflow, MCP, and configuration references when the user-visible contract changes.
-8. When an agent owns more than one required task output, require one `completeTask` call with every output in `outputs`.
-   The MCP rejects single-output completion for these tasks; keep agent and skill guidance aligned with that boundary.
+8. Managed agents use stage-specific completion operations. Keep generic `completeTask` only for compatibility callers.
 
 ## Validate The Change
 
@@ -45,7 +45,7 @@ Run the focused CLI workflow tests first, then validate the managed and document
 
 ```bash
 npm run build --workspace @apexops/cli
-node --test --test-name-pattern='four intake rounds|malformed persisted input requests|legacy' \
+node --test --test-name-pattern='three panels|malformed persisted input requests|legacy' \
    packages/cli/dist/test/workflow.test.js
 npm run validate:agents
 npm run lint:md

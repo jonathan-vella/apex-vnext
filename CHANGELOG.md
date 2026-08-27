@@ -10,6 +10,19 @@ current repository version is recorded in [VERSION.md](VERSION.md).
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0-next.5] — Preview
+
+### Changed
+
+- Requirements now uses three adaptive panels with confirmed recommendations, workload-specific scale prompts,
+  non-binding service candidates, and no duplicate IaC question. Pending four-round intake remains replayable.
+- Requirements, Architecture, Plan, and Reviewer use stage-specific completion operations. Review findings return as a
+  conversational decision panel; revision creates fresh stage evidence and permitted risk acceptance remains time-bound.
+- Human `status` and `doctor` output is concise by default, with full detail under `--verbose` or `--json`.
+- Runtime updates preserve immutable generations: existing runs stay pinned while future projects use the latest bundle.
+- Published `@apexops/*` packages now include package-specific READMEs with installation, usage, and documentation
+  links, verified as part of the release-tarball contract.
+
 ## [0.10.0-next.4] — Preview
 
 ### Changed

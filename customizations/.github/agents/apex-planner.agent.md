@@ -10,9 +10,9 @@ tools:
   - apex/status
   - apex/nextTask
   - apex/taskContext
-  - apex/stageArtifact
-  - apex/completeTask
   - apex/planComplete
+  - apex/reviewDecide
+  - apex/gateDecide
   - azure-resource-manager-mcp/get_retail_prices
   - azure-resource-manager-mcp/query_costs
   - azure-resource-manager-mcp/query_aks_costs
@@ -54,9 +54,11 @@ Gate 3.
   call `apex/completeTask` with a partial plan bundle or a placeholder `intentHash`.
 6. APEX materializes a read-only Gate 3 package at `agent-output/<project>/<run>/plan/`. Report
   `implementation-plan.md`, `iac-binding.md`, `environment-inputs.md`, and `challenger-findings.md` for human review.
-7. When the kernel issues `plan-review`, delegate the exact task to `APEX Reviewer`. Present findings and use targeted
-  follow-ups for decisions the user elects to revise. Gate 3 remains a human terminal ceremony.
-8. Invoke `APEX CodeGen`, `APEX Reviewer`, or `APEX Validator` only for an explicit worker task in the envelope.
+7. When the kernel issues `plan-review`, delegate the exact task to `APEX Reviewer`. Present findings in one native
+  decision panel and submit permitted decisions through `apex/reviewDecide`.
+8. Ask one explicit Proceed/Revise question after review. Only after Proceed, call `apex/gateDecide` for Gate 3 with
+  `confirm: true`, then use the Operations handoff.
+9. Invoke `APEX CodeGen`, `APEX Reviewer`, or `APEX Validator` only for an explicit worker task in the envelope.
 
 Read `.github/skills/apex-planning/SKILL.md` when planning guidance is needed.
 Load the codegen skill only in a CodeGen worker context.

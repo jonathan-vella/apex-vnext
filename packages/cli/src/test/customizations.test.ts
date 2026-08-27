@@ -33,10 +33,13 @@ test("init installs and update refreshes managed customizations", async () => {
   await writeFile(join(source, ".github", "managed.md"), "v1\n");
   const service = new ApexService(root);
   await service.init({ projectId: "demo", customizationsSource: source });
+  const runtimeLockHash = (await service.status()).run.runtimeLockHash;
   assert.equal(await readFile(join(root, ".github", "managed.md"), "utf8"), "v1\n");
   await writeFile(join(source, ".github", "managed.md"), "v2\n");
   await service.update(source);
   assert.equal(await readFile(join(root, ".github", "managed.md"), "utf8"), "v2\n");
+  assert.equal((await service.status()).run.runtimeLockHash, runtimeLockHash);
+  assert.equal((await service.nextTask()).status, "needs_input");
 });
 
 test("init installs bundled customizations and runtime config by default", async () => {
@@ -589,13 +592,34 @@ test("init writes a real runtime lock and doctor detects managed tampering", asy
   await writeFile(join(root, ".apex", "runtime", "defaults.v1.json"), "{}\n");
   const doctor = await service.doctor();
   assert.equal(doctor.healthy, false);
-  assert.equal(doctor.checks.find(({ id }) => id === "runtime-lock:defaults")?.ok, false);
+  assert.equal(doctor.checks.find(({ id }) => id === "runtime-lock:defaults")?.ok, true);
+  assert.equal(doctor.checks.find(({ id }) => id === "managed:.apex/runtime/defaults.v1.json")?.ok, false);
   assert.equal(doctor.nextAction, "Run doctor --fix --yes to reinstall bundled managed files");
   const fixed = await service.doctor(true, true);
   assert.equal(fixed.checks.find(({ id }) => id === "runtime-lock:defaults")?.ok, true);
   await writeFile(join(root, ".apex", "runtime", "quality-scorecard.v1.json"), "{}\n");
   const scorecardDoctor = await service.doctor();
-  assert.equal(scorecardDoctor.checks.find(({ id }) => id === "runtime-lock:quality-scorecard")?.ok, false);
+  assert.equal(scorecardDoctor.checks.find(({ id }) => id === "runtime-lock:quality-scorecard")?.ok, true);
+  assert.equal(
+    scorecardDoctor.checks.find(({ id }) => id === "managed:.apex/runtime/quality-scorecard.v1.json")?.ok,
+    false,
+  );
+});
+
+test("existing runs use their immutable runtime generation", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo" });
+  const initial = await service.status();
+  const generation = join(root, ".apex", "runtime-generations", initial.run.runtimeLockHash);
+  assert.equal(
+    JSON.parse(await readFile(join(generation, "apex.lock.json"), "utf8")).workflowHash,
+    JSON.parse(await readFile(join(root, ".apex", "apex.lock.json"), "utf8")).workflowHash,
+  );
+
+  await writeFile(join(root, ".apex", "runtime", "workflow.v1.json"), "{}\n");
+  assert.equal((await service.status()).run.runId, initial.run.runId);
+  assert.equal((await service.nextTask()).status, "needs_input");
 });
 
 test("doctor leaves unrelated core routes unaffected and service reports required workflow packs", async () => {

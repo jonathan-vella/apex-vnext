@@ -375,7 +375,13 @@ test("task validation refuses workflow bytes outside the run lock", async () => 
   const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
-  const workflowPath = join(root, ".apex", "runtime", "workflow.v1.json");
+  const workflowPath = join(
+    root,
+    ".apex",
+    "runtime-generations",
+    (await service.status()).run.runtimeLockHash,
+    "workflow.v1.json",
+  );
   const workflowBytes = await readFile(workflowPath);
   await writeFile(workflowPath, Buffer.concat([workflowBytes, Buffer.from("\n")]));
   await assert.rejects(
@@ -396,7 +402,13 @@ test("gate approval records executed manifest validators in order", async () => 
       value: review(runId, "requirements", requirementHashes.requirements!),
     },
   ]);
-  const workflowPath = join(root, ".apex", "runtime", "workflow.v1.json");
+  const workflowPath = join(
+    root,
+    ".apex",
+    "runtime-generations",
+    (await service.status()).run.runtimeLockHash,
+    "workflow.v1.json",
+  );
   const workflowBytes = await readFile(workflowPath);
   await writeFile(workflowPath, Buffer.concat([workflowBytes, Buffer.from("\n")]));
   await assert.rejects(
@@ -910,7 +922,13 @@ for (const track of ["bicep", "terraform"] as const) {
       "quality:no-subjective-deterministic-claims",
     ]);
     if (track === "bicep") {
-      const workflowPath = join(root, ".apex", "runtime", "workflow.v1.json");
+      const workflowPath = join(
+        root,
+        ".apex",
+        "runtime-generations",
+        (await service.status()).run.runtimeLockHash,
+        "workflow.v1.json",
+      );
       const workflowBytes = await readFile(workflowPath);
       await writeFile(workflowPath, Buffer.concat([workflowBytes, Buffer.from("\n")]));
       await assert.rejects(
@@ -1210,7 +1228,13 @@ test("review blockers persist, resolve, and permit gate approval", async () => {
       ]),
     },
   ]);
-  await assert.rejects(service.nextTask(), (error: unknown) => error instanceof ApexError && /F-1/.test(error.message));
+  const pendingReview = await service.nextTask();
+  assert.equal(pendingReview.status, "needs_review");
+  if (pendingReview.status !== "needs_review") return;
+  assert.deepEqual(
+    pendingReview.review.findings.map(({ id, actions }) => ({ id, actions })),
+    [{ id: "F-1", actions: ["revise"] }],
+  );
   const restarted = new ApexService(root);
   const reviewHash = reviewHashes["review-findings"]!;
   const dependencyHash = sha256Json({ "review-findings": reviewHash });
@@ -1242,6 +1266,41 @@ test("review blockers persist, resolve, and permit gate approval", async () => {
   await restarted.decideGateNumber(1, "approved", "tester");
   await acceptAvailabilityEvidence(restarted, runId);
   assert.equal((await nextTaskAfterInput(restarted)).status, "task");
+});
+
+test("requirements revision invalidates the old artifact and requires a fresh review", async () => {
+  const service = new ApexService(await tempRoot());
+  const { runId } = await service.init({ projectId: "demo" });
+  await service.nextTask();
+  const initial = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
+  const reviewHashes = await complete(service, "requirements-review", [
+    {
+      kind: "review-findings",
+      value: review(runId, "requirements", initial.requirements!, [
+        { id: "F-1", severity: "high", disposition: "open", title: "Revise", detail: "Clarify", evidenceRefs: [] },
+      ]),
+    },
+  ]);
+
+  const decision = await service.decideReview(reviewHashes["review-findings"]!, [
+    { findingId: "F-1", action: "revise", rationale: "Clarify the requirement" },
+  ]);
+  assert.deepEqual(decision, { status: "revision_requested" });
+  const replacementTask = await service.nextTask();
+  assert.equal(replacementTask.status, "task");
+  if (replacementTask.status !== "task") return;
+  assert.equal(replacementTask.task.taskType, "requirements");
+
+  const revised = requirements();
+  revised.requirements[0]!.statement = "Revised offline service requirement";
+  const revisedHashes = await service.completeRequirements(replacementTask.task.taskId, revised);
+  const replacementReview = await service.nextTask();
+  assert.equal(replacementReview.status, "task");
+  if (replacementReview.status !== "task") return;
+  assert.equal(replacementReview.task.taskType, "requirements-review");
+  await service.completeReview(replacementReview.task.taskId, []);
+  assert.equal((await service.status()).run.gates[0]?.state, "open");
+  assert.notEqual(revisedHashes.outputHashes.requirements, initial.requirements);
 });
 
 test("expired accepted risk can be replaced without reopening an open gate", async () => {
@@ -1329,8 +1388,9 @@ test("approval bookkeeping preserves authority while runtime dependency mutation
   await reachValidation(second, initialized.runId, "bicep");
   const stalePreview = await second.preview({ operation: "apply", provider: "fake" });
   await second.decideGateNumber(4, "approved", "tester");
+  const secondRuntimeHash = (await second.status()).run.runtimeLockHash;
   await import("node:fs/promises").then(({ appendFile }) =>
-    appendFile(join(secondRoot, ".apex", "runtime", "workflow.v1.json"), "\n"),
+    appendFile(join(secondRoot, ".apex", "runtime-generations", secondRuntimeHash, "workflow.v1.json"), "\n"),
   );
   await assert.rejects(
     second.deploy(stalePreview.previewHash),

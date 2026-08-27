@@ -2,7 +2,7 @@
 
 # Version Information
 
-**Current Version:** 0.10.0-next.4 (preview)
+**Current Version:** 0.10.0-next.5 (preview)
 
 **Status:** Preview - non-production npm distribution published under the `next` dist-tag
 

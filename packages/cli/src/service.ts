@@ -96,6 +96,7 @@ import {
   createTaskEnvelope,
   decideGate,
   inheritGate,
+  invalidateGate,
   openGate,
   sha256Bytes,
   sha256Json,
@@ -277,6 +278,13 @@ export interface ReviewResolution {
   dependencyHash: string;
 }
 
+export interface ReviewDecision {
+  findingId: string;
+  action: "revise" | "accept-risk";
+  rationale: string;
+  expiresAt?: string;
+}
+
 export interface ServiceOptions {
   clock?: () => Date;
   idSource?: () => string;
@@ -382,7 +390,7 @@ interface ArchitectureDecision {
   questions: InputRequestV1["questions"];
 }
 
-const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
+const LEGACY_REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
   {
     round: "business-discovery",
     questions: [
@@ -405,6 +413,11 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
         id: "delivery-scenario",
         prompt: "Is this a greenfield build, migration, modernization, or extension?",
         options: ["greenfield", "migration", "modernization", "extension"],
+        recommendation: {
+          value: "greenfield",
+          source: "default",
+          rationale: "Use greenfield unless an existing workload must be migrated, modernized, or extended.",
+        },
       },
       {
         id: "target-environments",
@@ -412,6 +425,11 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
         options: ["dev", "test", "staging", "prod"],
         multiSelect: true,
         valueType: "environment-set",
+        recommendation: {
+          value: ["dev", "prod"],
+          source: "default",
+          rationale: "Plan development and production intent; each environment remains a separate governed run.",
+        },
       },
     ],
   },
@@ -430,6 +448,11 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
         prompt: "Choose the data classification or explicitly defer it.",
         options: ["public", "internal", "confidential", "restricted"],
         valueType: "data-classification",
+        recommendation: {
+          value: "internal",
+          source: "default",
+          rationale: "Use internal as the baseline unless the workload handles public-only or more sensitive data.",
+        },
       },
       { id: "iac-preference", prompt: "Choose the preferred infrastructure tool.", options: ["bicep", "terraform"] },
     ],
@@ -437,7 +460,10 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
   {
     round: "service-preferences",
     questions: [
-      { id: "prohibited-services", prompt: "List prohibited services, or explicitly defer the constraint." },
+      {
+        id: "prohibited-services",
+        prompt: "List prohibited services, use 'none', or explicitly defer the constraint.",
+      },
       {
         id: "service-preferences",
         prompt: "Select preferred Azure services. Select all that apply; architecture chooses the exact combination.",
@@ -486,17 +512,32 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
           "diagnostic-logging",
         ],
         multiSelect: true,
+        recommendation: {
+          value: ["managed-identity", "key-vault", "platform-managed-encryption", "diagnostic-logging"],
+          source: "default",
+          rationale: "APEX security baseline; confirm additions or exceptions for this workload.",
+        },
       },
       {
         id: "authentication",
         prompt: "Select the required authentication and authorization mechanisms.",
         options: ["microsoft-entra-id", "managed-identity", "external-oidc", "api-key", "anonymous"],
         multiSelect: true,
+        recommendation: {
+          value: ["microsoft-entra-id", "managed-identity"],
+          source: "default",
+          rationale: "Use Entra ID for people and managed identity for workload-to-service access.",
+        },
       },
       {
         id: "region",
         prompt: "Choose the Azure region, or explicitly defer the decision.",
         options: ["swedencentral", "westeurope", "germanywestcentral"],
+        recommendation: {
+          value: "swedencentral",
+          source: "default",
+          rationale: "Repository default for EU data residency and service deployment.",
+        },
       },
       {
         id: "availability-recovery",
@@ -524,6 +565,18 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
       },
     ],
   },
+];
+
+const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
+  LEGACY_REQUIREMENTS_INTAKE[0]!,
+  {
+    round: "workload-pattern",
+    questions: [
+      ...LEGACY_REQUIREMENTS_INTAKE[1]!.questions.filter(({ id }) => id !== "iac-preference"),
+      ...LEGACY_REQUIREMENTS_INTAKE[2]!.questions,
+    ],
+  },
+  LEGACY_REQUIREMENTS_INTAKE[3]!,
 ];
 
 const ARCHITECTURE_DECISIONS: readonly ArchitectureDecision[] = [
@@ -709,6 +762,8 @@ export class ApexService {
       await this.installCapabilityAssets(assets);
       const runtimeLock = await this.createRuntimeLock(assets);
       await atomicWriteJson(join(this.root, ".apex", "apex.lock.json"), runtimeLock);
+      await atomicWriteJson(join(this.root, ".apex", "runtime", "apex.lock.json"), runtimeLock);
+      await this.installRuntimeGeneration(runtimeLock);
       return this.createProject(input);
     } catch (error) {
       if (await this.pathExistsLstat(join(this.root, ".apex", "customizations.lock.json"))) {
@@ -843,6 +898,10 @@ export class ApexService {
     const selection = await this.selection();
     await this.ensureLocalGitBoundary();
     const assets = await resolveBundledAssets();
+    const previousRuntimeLock = JSON.parse(
+      await readFile(join(this.root, ".apex", "apex.lock.json"), "utf8"),
+    ) as RuntimeBundleLockV1;
+    await this.installRuntimeGeneration(previousRuntimeLock);
     const lock = JSON.parse(
       await readFile(join(this.root, ".apex", "customizations.lock.json"), "utf8"),
     ) as CustomizationLock;
@@ -853,6 +912,11 @@ export class ApexService {
     }
     const source = customizationsSource ?? assets.clientProjections[clientId];
     const updated = await this.installCustomizations(source, true, assets.config, false, clientId);
+    await this.installCapabilityAssets(assets);
+    const runtimeLock = await this.createRuntimeLock(assets);
+    await atomicWriteJson(join(this.root, ".apex", "apex.lock.json"), runtimeLock);
+    await atomicWriteJson(join(this.root, ".apex", "runtime", "apex.lock.json"), runtimeLock);
+    await this.installRuntimeGeneration(runtimeLock);
     await this.append(await this.run(selection), "customizations.updated", { source: resolve(source), updated });
     return { updated };
   }
@@ -1110,7 +1174,9 @@ export class ApexService {
   }
 
   async nextTask(): Promise<
-    { status: "needs_input"; request: InputRequestV1 } | { status: "task"; task: TaskEnvelopeV1 }
+    | { status: "needs_input"; request: InputRequestV1 }
+    | { status: "needs_review"; review: Awaited<ReturnType<ApexService["pendingReview"]>> }
+    | { status: "task"; task: TaskEnvelopeV1 }
   > {
     const selection = await this.selection();
     const run = await this.run(selection);
@@ -1123,6 +1189,9 @@ export class ApexService {
       return { status: "task", task: await this.issueTask(run, TASKS[0]!, []) };
     }
     const route = await this.route(run, events);
+    if (route.blockers.length > 0 && route.reviewGate !== undefined) {
+      return { status: "needs_review", review: await this.pendingReview(events, route.reviewGate) };
+    }
     if (route.blockers.length > 0)
       throw new ApexError("APEX_AUTHORIZATION", route.blockers.join("; "), EXIT_CODES.authorization, route.blockers);
     if (route.task === undefined)
@@ -1274,12 +1343,12 @@ export class ApexService {
     const events = await this.journal(run).replay();
     const route = await this.route(run, events);
     const outputTemplates: Partial<Record<ArtifactKind, unknown>> = {};
-    if (task.taskType === "requirements" || task.taskType === "plan") {
+    if (task.taskType === "requirements" || task.taskType === "plan" || task.taskType.endsWith("-review")) {
       for (const kind of task.allowedOutputKinds) {
         if (!SUPPORTED_ARTIFACT_KINDS.includes(kind as ArtifactKind)) {
           throw new ApexError("APEX_INTERNAL", `Unsupported task output kind: ${kind}`, EXIT_CODES.internal);
         }
-        outputTemplates[kind as ArtifactKind] = this.outputTemplate(kind as ArtifactKind, run, events);
+        outputTemplates[kind as ArtifactKind] = this.outputTemplate(kind as ArtifactKind, run, events, task.taskType);
       }
     }
     const artifactHashes = this.acceptedArtifactHashes(events);
@@ -1293,6 +1362,51 @@ export class ApexService {
       outputRoot: join(this.root, ".apex", "work", run.runId, taskId),
       status: this.completedNodeIds(events).has(task.taskType) ? "completed" : "active",
       blockers: route.blockers,
+    };
+  }
+
+  async readTaskInput(
+    taskId: string,
+    offset = 0,
+    limit = 6_000,
+  ): Promise<{
+    subjectHash: string;
+    content: string;
+    offset: number;
+    nextOffset?: number;
+    outputTemplate?: unknown;
+  }> {
+    const run = await this.currentRun();
+    const task = await this.readTask(run, taskId);
+    const descriptor = TASKS.find(({ id }) => id === task.taskType);
+    if (descriptor?.reviewSubject === undefined)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Only review tasks may read their accepted input",
+        EXIT_CODES.authorization,
+      );
+    if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 6_000) {
+      throw new ApexError("APEX_VALIDATION", "Input read range is invalid", EXIT_CODES.validation);
+    }
+    const subjectKind =
+      descriptor.reviewSubject === "governance-reconciliation" ? "policy-property-map" : descriptor.reviewSubject;
+    const events = await this.journal(run).replay();
+    const subjectHash = this.artifactHash(events, subjectKind as ArtifactKind);
+    if (subjectHash === undefined || !task.inputRefs.includes(subjectHash)) {
+      throw new ApexError("APEX_STALE", "Review task input is unavailable or stale", EXIT_CODES.stale);
+    }
+    const serialized = JSON.stringify(await this.objects.getJson(subjectHash));
+    if (offset >= serialized.length) {
+      throw new ApexError("APEX_VALIDATION", "Input read offset is outside the review subject", EXIT_CODES.validation);
+    }
+    const content = serialized.slice(offset, offset + limit);
+    const nextOffset = offset + content.length;
+    return {
+      subjectHash,
+      content,
+      offset,
+      ...(offset === 0 ? { outputTemplate: this.outputTemplate("review-findings", run, events, task.taskType) } : {}),
+      ...(nextOffset < serialized.length ? { nextOffset } : {}),
     };
   }
 
@@ -1480,6 +1594,53 @@ export class ApexService {
     return this.acceptTaskOutputs(taskId, outputs, false);
   }
 
+  async completeRequirements(
+    taskId: string,
+    requirements: RequirementsV1,
+  ): Promise<{ outputHashes: Partial<Record<ArtifactKind, string>>; summary: string }> {
+    await this.assertTaskType(taskId, "requirements");
+    return this.completeTaskOutputs(taskId, [{ kind: "requirements", value: requirements }]);
+  }
+
+  async completeArchitecture(
+    taskId: string,
+    architecture: ArchitectureV1,
+    costEstimate: CostEstimateV1,
+    decisionManifest: WorkloadDecisionManifestV1,
+  ): Promise<{ outputHashes: Partial<Record<ArtifactKind, string>>; summary: string }> {
+    await this.assertTaskType(taskId, "architecture");
+    return this.completeTaskOutputs(taskId, [
+      { kind: "architecture", value: architecture },
+      { kind: "cost-estimate", value: costEstimate },
+      { kind: "workload-decision-manifest", value: decisionManifest },
+    ]);
+  }
+
+  async completeReview(
+    taskId: string,
+    findings: Array<Pick<ReviewFindingsV1["findings"][number], "id" | "severity" | "title" | "detail">>,
+  ): Promise<{ outputHashes: Partial<Record<ArtifactKind, string>>; summary: string }> {
+    const context = await this.taskContext(taskId);
+    if (!context.task.taskType.endsWith("-review")) {
+      throw new ApexError("APEX_AUTHORIZATION", "Task is not a review task", EXIT_CODES.authorization);
+    }
+    const template = context.outputTemplates["review-findings"] as ReviewFindingsV1 | undefined;
+    if (template === undefined) throw new ApexError("APEX_STALE", "Review template is unavailable", EXIT_CODES.stale);
+    return this.completeTaskOutputs(taskId, [
+      {
+        kind: "review-findings",
+        value: {
+          ...template,
+          findings: findings.map((finding) => ({
+            ...finding,
+            disposition: "open" as const,
+            evidenceRefs: [template.subjectHash],
+          })),
+        },
+      },
+    ]);
+  }
+
   async completePlan(
     taskId: string,
     intent: ImplementationIntentV1,
@@ -1491,6 +1652,14 @@ export class ApexService {
       { kind: "iac-binding", value: { ...binding, intentHash: sha256Json(intent) } },
       { kind: "environment-inputs", value: environmentInputs },
     ]);
+  }
+
+  private async assertTaskType(taskId: string, expected: string): Promise<void> {
+    const run = await this.currentRun();
+    const task = await this.readTask(run, taskId);
+    if (task.taskType !== expected) {
+      throw new ApexError("APEX_AUTHORIZATION", `Task is not the ${expected} task`, EXIT_CODES.authorization);
+    }
   }
 
   private async acceptTaskOutputs(
@@ -2088,6 +2257,150 @@ export class ApexService {
         await this.openRunGate(current, descriptor.gate, resolution.dependencyHash);
       }
     }
+  }
+
+  async decideReview(
+    reviewHash: string,
+    decisions: ReviewDecision[],
+  ): Promise<{ status: "revision_requested" | "resolved" }> {
+    if (decisions.length === 0 || new Set(decisions.map(({ findingId }) => findingId)).size !== decisions.length) {
+      throw new ApexError("APEX_VALIDATION", "Review decisions must be nonempty and unique", EXIT_CODES.validation);
+    }
+    const run = await this.currentRun();
+    const events = await this.journal(run).replay();
+    const reviewEvent = [...events]
+      .reverse()
+      .find(
+        (event) =>
+          event.type === "task.completed" && (event.payload as { reviewHash?: unknown }).reviewHash === reviewHash,
+      );
+    if (reviewEvent === undefined) throw new ApexError("APEX_STALE", "Review is not current", EXIT_CODES.stale);
+    const payload = reviewEvent.payload as { nodeId?: unknown; subjectHash?: unknown; dependencyHash?: unknown };
+    const openIds = this.reviewBlockers(events, String(payload.nodeId)).map((blocker) => blocker.split(" ")[2]!);
+    if (decisions.some(({ findingId }) => !openIds.includes(findingId))) {
+      throw new ApexError("APEX_STALE", "Review decisions do not match current open findings", EXIT_CODES.stale);
+    }
+    const revisions = decisions.filter(({ action }) => action === "revise");
+    if (revisions.length > 0) {
+      await this.reviseReview(
+        reviewHash,
+        revisions.map(({ findingId }) => findingId),
+        revisions.map(({ rationale }) => rationale).join("; "),
+      );
+      return { status: "revision_requested" };
+    }
+    if (decisions.length !== openIds.length) {
+      throw new ApexError("APEX_VALIDATION", "Every open finding requires a decision", EXIT_CODES.validation);
+    }
+    for (const decision of decisions) {
+      await this.resolveReview({
+        findingId: decision.findingId,
+        reviewHash,
+        subjectHash: String(payload.subjectHash),
+        dependencyHash: String(payload.dependencyHash),
+        disposition: "accepted-risk",
+        actor: userInfo().username,
+        rationale: decision.rationale,
+        evidenceRefs: [],
+        ...(decision.expiresAt === undefined ? {} : { expiresAt: decision.expiresAt }),
+      });
+    }
+    return { status: "resolved" };
+  }
+
+  private async pendingReview(
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+    gate: number,
+  ): Promise<{
+    gate: number;
+    reviewHash: string;
+    findings: Array<{
+      id: string;
+      severity: ReviewFindingsV1["findings"][number]["severity"];
+      title: string;
+      detail: string;
+      actions: Array<"revise" | "accept-risk">;
+    }>;
+  }> {
+    const reviewEvent = [...events]
+      .reverse()
+      .find(
+        (event) =>
+          event.type === "task.completed" &&
+          typeof (event.payload as { reviewHash?: unknown }).reviewHash === "string" &&
+          this.reviewBlockers(events, String((event.payload as { nodeId?: unknown }).nodeId)).length > 0,
+      );
+    const reviewHash = (reviewEvent?.payload as { reviewHash?: unknown } | undefined)?.reviewHash;
+    if (typeof reviewHash !== "string")
+      throw new ApexError("APEX_STALE", "Open review is unavailable", EXIT_CODES.stale);
+    const review = await this.objects.getJson<ReviewFindingsV1>(reviewHash);
+    const unresolved = new Set(
+      this.reviewBlockers(events, String((reviewEvent!.payload as { nodeId?: unknown }).nodeId)).map(
+        (blocker) => blocker.split(" ")[2],
+      ),
+    );
+    return {
+      gate,
+      reviewHash,
+      findings: review.findings
+        .filter(({ id }) => unresolved.has(id))
+        .map(({ id, severity, title, detail }) => ({
+          id,
+          severity,
+          title,
+          detail,
+          actions: ["revise", ...(["critical", "high"].includes(severity) ? [] : (["accept-risk"] as const))],
+        })),
+    };
+  }
+
+  private async reviseReview(reviewHash: string, findingIds: string[], correction: string): Promise<void> {
+    if (!/^[0-9a-f]{64}$/u.test(reviewHash) || findingIds.length === 0 || correction.trim().length === 0) {
+      throw new ApexError("APEX_VALIDATION", "Review revision request is incomplete", EXIT_CODES.validation);
+    }
+    const run = await this.currentRun();
+    const events = await this.journal(run).replay();
+    const reviewEvent = [...events]
+      .reverse()
+      .find(
+        (event) =>
+          event.type === "task.completed" && (event.payload as { reviewHash?: unknown }).reviewHash === reviewHash,
+      );
+    if (reviewEvent === undefined) {
+      throw new ApexError("APEX_STALE", "Review is not current", EXIT_CODES.stale);
+    }
+    const reviewNode = String((reviewEvent.payload as { nodeId?: unknown }).nodeId);
+    const descriptor = TASKS.find(({ id }) => id === reviewNode);
+    const subjectNode = descriptor?.reviewSubject;
+    if (subjectNode === undefined) throw new ApexError("APEX_STALE", "Review subject is unavailable", EXIT_CODES.stale);
+    const openIds = new Set(this.reviewBlockers(events, reviewNode).map((blocker) => blocker.split(" ")[2]));
+    if (findingIds.some((id) => !openIds.has(id))) {
+      throw new ApexError("APEX_STALE", "Revision does not match current open findings", EXIT_CODES.stale);
+    }
+    const workflow = await this.lockedWorkflowEngine(run);
+    const invalidatedNodes = [
+      subjectNode,
+      reviewNode,
+      ...workflow.invalidationPlan(subjectNode, correction.trim()).map(({ nodeId }) => nodeId),
+    ];
+    const uniqueNodes = [...new Set(invalidatedNodes)];
+    const artifactKinds = TASKS.filter(({ id }) => uniqueNodes.includes(id)).flatMap(({ outputs }) => outputs);
+    await this.append(run, "workflow.invalidated", {
+      reason: correction.trim(),
+      findingIds,
+      reviewHash,
+      nodeIds: uniqueNodes,
+      artifactKinds: [...new Set(artifactKinds)],
+    });
+    const dependencyHash = this.dependencyRevision(run, await this.journal(run).replay());
+    await atomicWriteJson(this.runPath(run), {
+      ...run,
+      gates: run.gates.map((gate) =>
+        uniqueNodes.includes(`gate-${gate.gate}`)
+          ? invalidateGate(gate, dependencyHash, `${subjectNode} revision requested`)
+          : gate,
+      ),
+    });
   }
 
   private assertReviewResolution(value: ReviewResolution): void {
@@ -3471,13 +3784,13 @@ export class ApexService {
           : [],
       ),
     );
+    const catalog = this.requirementsIntakeCatalog(requests);
     const latest = requests.at(-1);
     if (latest !== undefined && !recordedRequestIds.has((latest.payload as { requestId: string }).requestId)) {
       const intake = (latest.payload as { intake: { ordinal?: unknown; round?: unknown; total?: unknown } }).intake;
       const ordinal = intake.ordinal;
-      const round =
-        typeof ordinal === "number" && Number.isInteger(ordinal) ? REQUIREMENTS_INTAKE[ordinal - 1] : undefined;
-      if (round === undefined || intake.round !== round.round || intake.total !== REQUIREMENTS_INTAKE.length) {
+      const round = typeof ordinal === "number" && Number.isInteger(ordinal) ? catalog[ordinal - 1] : undefined;
+      if (round === undefined || intake.round !== round.round || intake.total !== catalog.length) {
         throw new ApexError(
           "APEX_CONFLICT",
           "Requirements intake is incompatible; start a new run",
@@ -3486,7 +3799,14 @@ export class ApexService {
       }
       return round;
     }
-    return REQUIREMENTS_INTAKE[recordedRequestIds.size];
+    return catalog[recordedRequestIds.size];
+  }
+
+  private requirementsIntakeCatalog(
+    requests: Array<Awaited<ReturnType<EventJournal["replay"]>>[number]>,
+  ): readonly RequirementsIntakeRound[] {
+    const total = (requests[0]?.payload as { intake?: { total?: unknown } } | undefined)?.intake?.total;
+    return total === LEGACY_REQUIREMENTS_INTAKE.length ? LEGACY_REQUIREMENTS_INTAKE : REQUIREMENTS_INTAKE;
   }
 
   private async issueRequirementsInput(run: RunConfigV1, round: RequirementsIntakeRound): Promise<InputRequestV1> {
@@ -3506,10 +3826,13 @@ export class ApexService {
         return this.inputRequest(latest, run.ownerEpoch);
       }
     }
-    const ordinal = REQUIREMENTS_INTAKE.findIndex(({ round: id }) => id === round.round) + 1;
+    const catalog = this.requirementsIntakeCatalog(
+      events.filter((event) => event.type === "requirements.input-requested"),
+    );
+    const ordinal = catalog.findIndex((candidate) => candidate === round) + 1;
     const event = await this.append(run, "requirements.input-requested", {
       requestId: this.idSource(),
-      intake: { round: round.round, ordinal, total: 4 },
+      intake: { round: round.round, ordinal, total: catalog.length },
       questions,
     });
     return this.inputRequest(event, run.ownerEpoch);
@@ -3519,23 +3842,125 @@ export class ApexService {
     round: RequirementsIntakeRound,
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): InputRequestV1["questions"] {
-    if (round.round === "service-preferences") {
-      const scenario = this.recordedRequirementsInput(events)?.["delivery-scenario"];
-      if (scenario !== "migration" && scenario !== "modernization" && scenario !== "extension") return round.questions;
-      return [
-        { id: "retained-services", prompt: "List Azure services or integrations that must be retained." },
-        ...round.questions,
-      ];
+    const hasServicePreferences = round.questions.some(({ id }) => id === "service-preferences");
+    if (round.round === "service-preferences" || (round.round === "workload-pattern" && hasServicePreferences)) {
+      const input = this.recordedRequirementsInput(events);
+      const scenario = input?.["delivery-scenario"];
+      const workload = typeof input?.workload === "string" ? input.workload : "";
+      const pattern = this.recommendedWorkloadPattern(workload);
+      const recommendationInput = { ...(input ?? {}), "workload-pattern": pattern } as Record<string, InputValueV1>;
+      const questions = round.questions.map((question) =>
+        question.id === "service-preferences"
+          ? {
+              ...question,
+              prompt:
+                "Confirm the recommended Azure service candidates or select alternatives; Architecture makes the final choice.",
+              recommendation: {
+                value: this.recommendedServiceCandidates(recommendationInput),
+                source: "prior-answer" as const,
+                rationale: "Derived from the confirmed workload description as non-binding Architecture candidates.",
+              },
+            }
+          : question.id === "workload-pattern"
+            ? {
+                ...question,
+                recommendation: {
+                  value: pattern,
+                  source: "derived" as const,
+                  rationale: "Derived from the confirmed workload description; confirm or choose another pattern.",
+                },
+              }
+            : question.id === "scale"
+              ? { ...question, prompt: this.workloadScalePrompt(pattern) }
+              : question,
+      );
+      const retained =
+        scenario === "migration" || scenario === "modernization" || scenario === "extension"
+          ? [{ id: "retained-services", prompt: "List Azure services or integrations that must be retained." }]
+          : [];
+      if (round.round === "service-preferences") return [...retained, ...questions];
+      const migration =
+        scenario === "migration" || scenario === "modernization"
+          ? [
+              { id: "current-platform", prompt: "Describe the current platform and hosting model." },
+              {
+                id: "migration-pain-points",
+                prompt: "Describe the problems the migration or modernization must address.",
+              },
+              { id: "preserve-components", prompt: "List components, integrations, or data that must be preserved." },
+            ]
+          : [];
+      return [...questions, ...retained, ...migration];
     }
     if (round.round !== "workload-pattern") return round.questions;
-    const scenario = this.recordedRequirementsInput(events)?.["delivery-scenario"];
-    if (scenario !== "migration" && scenario !== "modernization") return round.questions;
+    const input = this.recordedRequirementsInput(events);
+    const scenario = input?.["delivery-scenario"];
+    const workload = typeof input?.workload === "string" ? input.workload : "";
+    const pattern = this.recommendedWorkloadPattern(workload);
+    const questions = round.questions.map((question) =>
+      question.id === "workload-pattern"
+        ? {
+            ...question,
+            recommendation: {
+              value: pattern,
+              source: "derived" as const,
+              rationale: "Derived from the confirmed workload description; confirm or choose another pattern.",
+            },
+          }
+        : question.id === "scale"
+          ? { ...question, prompt: this.workloadScalePrompt(pattern) }
+          : question,
+    );
+    if (scenario !== "migration" && scenario !== "modernization") return questions;
     return [
-      ...round.questions,
+      ...questions,
       { id: "current-platform", prompt: "Describe the current platform and hosting model." },
       { id: "migration-pain-points", prompt: "Describe the problems the migration or modernization must address." },
       { id: "preserve-components", prompt: "List components, integrations, or data that must be preserved." },
     ];
+  }
+
+  private recommendedWorkloadPattern(
+    workload: string,
+  ): "web-api" | "event-driven" | "data-analytics" | "iot" | "batch" {
+    const normalized = workload.toLowerCase();
+    if (/\b(iot|device|sensor|telemetry)\b/u.test(normalized)) return "iot";
+    if (/\b(analytics|warehouse|lakehouse|reporting|etl)\b/u.test(normalized)) return "data-analytics";
+    if (/\b(batch|scheduled|nightly|cron)\b/u.test(normalized)) return "batch";
+    if (/\b(event|queue|stream|message|asynchronous)\b/u.test(normalized)) return "event-driven";
+    return "web-api";
+  }
+
+  private workloadScalePrompt(pattern: "web-api" | "event-driven" | "data-analytics" | "iot" | "batch"): string {
+    const prompts = {
+      "web-api": "Describe normal and peak concurrency, request or order rate, and latency expectations.",
+      "event-driven": "Describe normal and peak event rates, ordering requirements, and delivery guarantees.",
+      "data-analytics": "Describe ingest rate, retained volume, growth, and data-freshness expectations.",
+      iot: "Describe device count, message rate, payload size, and offline behavior.",
+      batch: "Describe schedule, data volume, expected duration, and completion window.",
+    } as const;
+    return prompts[pattern];
+  }
+
+  private recommendedServiceCandidates(input: Record<string, InputValueV1> | null): string[] {
+    const pattern = input?.["workload-pattern"];
+    const budget = input?.budget;
+    const lowBudget =
+      typeof budget === "object" && budget !== null && !Array.isArray(budget) && budget.kind === "budget"
+        ? budget.amount < 1_000
+        : false;
+    const candidates = {
+      "web-api": [lowBudget ? "azure-functions" : "app-service", "azure-sql", "storage", "service-bus"],
+      "event-driven": ["azure-functions", "service-bus", "storage"],
+      "data-analytics": ["azure-functions", "storage", "event-hubs"],
+      iot: ["azure-functions", "event-hubs", "storage"],
+      batch: ["azure-functions", "storage", "service-bus"],
+    } as const;
+    const selected =
+      typeof pattern === "string" && pattern in candidates
+        ? candidates[pattern as keyof typeof candidates]
+        : candidates["web-api"];
+    return [...selected, "azure-monitor", "application-insights"];
   }
 
   private async append(
@@ -3609,12 +4034,14 @@ export class ApexService {
         );
       }
       const intake = request.intake;
-      const round = intake === undefined ? undefined : REQUIREMENTS_INTAKE[intake.ordinal - 1];
+      const catalog =
+        intake?.total === LEGACY_REQUIREMENTS_INTAKE.length ? LEGACY_REQUIREMENTS_INTAKE : REQUIREMENTS_INTAKE;
+      const round = intake === undefined ? undefined : catalog[intake.ordinal - 1];
       if (
         round === undefined ||
         intake === undefined ||
         round.round !== intake.round ||
-        intake.total !== REQUIREMENTS_INTAKE.length
+        intake.total !== catalog.length
       ) {
         throw new ApexError(
           "APEX_CONFLICT",
@@ -3654,6 +4081,12 @@ export class ApexService {
 
   private artifactHash(events: Awaited<ReturnType<EventJournal["replay"]>>, kind: ArtifactKind): string | undefined {
     for (const event of [...events].reverse()) {
+      if (
+        event.type === "workflow.invalidated" &&
+        ((event.payload as { artifactKinds?: unknown }).artifactKinds as unknown[])?.includes?.(kind)
+      ) {
+        return undefined;
+      }
       if (event.type !== "task.completed") continue;
       const hashes = (event.payload as { artifactHashes?: Partial<Record<ArtifactKind, unknown>> }).artifactHashes;
       if (typeof hashes?.[kind] === "string") return hashes[kind];
@@ -3673,6 +4106,11 @@ export class ApexService {
       "implementation-intent": "intentHash",
     };
     for (const event of events) {
+      if (event.type === "workflow.invalidated") {
+        const kinds = (event.payload as { artifactKinds?: unknown }).artifactKinds;
+        if (Array.isArray(kinds)) for (const kind of kinds) if (typeof kind === "string") delete hashes[kind];
+        continue;
+      }
       if (event.type !== "task.completed") continue;
       const payload = event.payload as Record<string, unknown>;
       for (const [kind, hash] of Object.entries(payload.artifactHashes ?? {})) {
@@ -3744,6 +4182,7 @@ export class ApexService {
     kind: ArtifactKind,
     run: RunConfigV1,
     events: Awaited<ReturnType<EventJournal["replay"]>>,
+    taskType?: string,
   ): unknown {
     if (kind === "requirements") {
       const input = this.recordedRequirementsInput(events);
@@ -3752,7 +4191,36 @@ export class ApexService {
         projectId: run.projectId,
         workload: typeof input?.workload === "string" ? input.workload : "",
         environment: run.environment,
-        ...this.requirementsTemplateFromIntake(input),
+        ...this.requirementsTemplateFromIntake({ ...(input ?? {}), "iac-preference": run.iacTool }),
+      };
+    }
+    if (kind === "review-findings") {
+      const review = TASKS.find(({ id }) => id === taskType);
+      const subjectKind =
+        review?.reviewSubject === "governance-reconciliation" ? "policy-property-map" : review?.reviewSubject;
+      const artifactKind = subjectKind === "plan" ? "implementation-intent" : subjectKind;
+      const subjectHash =
+        artifactKind === undefined ? undefined : this.artifactHash(events, artifactKind as ArtifactKind);
+      if (subjectKind === undefined || subjectHash === undefined) {
+        throw new ApexError("APEX_STALE", "Review subject is unavailable", EXIT_CODES.stale);
+      }
+      return {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: run.projectId,
+        runId: run.runId,
+        subjectKind,
+        subjectHash,
+        reviewedAt: this.clock().toISOString(),
+        findings: [
+          {
+            id: "FINDING-001",
+            severity: "medium",
+            disposition: "open",
+            title: "Concise finding title",
+            detail: "Evidence, impact, and concrete remediation.",
+            evidenceRefs: [subjectHash],
+          },
+        ],
       };
     }
     if (kind === "implementation-intent") {
@@ -3933,19 +4401,25 @@ export class ApexService {
   }
 
   private completedNodeIds(events: Awaited<ReturnType<EventJournal["replay"]>>): Set<string> {
-    return new Set(
-      events.flatMap((event) => {
-        if (event.type !== "task.completed") return [];
-        const nodeId = (event.payload as { nodeId?: unknown }).nodeId;
-        return typeof nodeId === "string" ? [nodeId] : [];
-      }),
-    );
+    const completed = new Set<string>();
+    for (const event of events) {
+      if (event.type === "workflow.invalidated") {
+        const nodeIds = (event.payload as { nodeIds?: unknown }).nodeIds;
+        if (Array.isArray(nodeIds))
+          for (const nodeId of nodeIds) if (typeof nodeId === "string") completed.delete(nodeId);
+        continue;
+      }
+      if (event.type !== "task.completed") continue;
+      const nodeId = (event.payload as { nodeId?: unknown }).nodeId;
+      if (typeof nodeId === "string") completed.add(nodeId);
+    }
+    return completed;
   }
 
   private async lockedWorkflowEngine(run: RunConfigV1): Promise<WorkflowEngine> {
-    const runtimeRoot = join(this.root, ".apex", "runtime");
+    const runtimeRoot = await this.runtimeRootForRun(run);
     const workflowBytes = await readFile(join(runtimeRoot, "workflow.v1.json"));
-    const lock = JSON.parse(await readFile(join(this.root, ".apex", "apex.lock.json"), "utf8")) as RuntimeBundleLockV1;
+    const lock = JSON.parse(await readFile(join(runtimeRoot, "apex.lock.json"), "utf8")) as RuntimeBundleLockV1;
     this.assertValid("runtime-lock", lock);
     if (sha256Json(lock) !== run.runtimeLockHash || sha256Bytes(workflowBytes) !== lock.workflowHash) {
       throw new ApexError("APEX_STALE", "Runtime workflow lock is not current", EXIT_CODES.stale);
@@ -4374,7 +4848,7 @@ export class ApexService {
       ...(availabilityEvidence === undefined ? {} : { availabilityEvidence }),
       ...(deploymentOperation === undefined ? {} : { deploymentOperation }),
       ...(deploymentInventory === undefined ? {} : { deploymentInventory }),
-      ...(nodeId === "quality" ? await this.qualityValidatorContext() : {}),
+      ...(nodeId === "quality" ? await this.qualityValidatorContext(run) : {}),
     };
     for (const id of validatorIds) {
       this.assertValid(id, taskWorkflowValidatorInput(id, context));
@@ -4387,7 +4861,7 @@ export class ApexService {
     };
   }
 
-  private async qualityValidatorContext(): Promise<{
+  private async qualityValidatorContext(run: RunConfigV1): Promise<{
     scorecard: QualityScorecardV1;
     qualityMeasurements: QualityMeasurementsV1;
   }> {
@@ -4407,9 +4881,10 @@ export class ApexService {
       throw error;
     }
     this.assertValid("quality-measurements", qualityMeasurements);
+    const runtimeRoot = await this.runtimeRootForRun(run);
     return {
       scorecard: JSON.parse(
-        await readFile(join(this.root, ".apex", "runtime", "quality-scorecard.v1.json"), "utf8"),
+        await readFile(join(runtimeRoot, "quality-scorecard.v1.json"), "utf8"),
       ) as QualityScorecardV1,
       qualityMeasurements,
     };
@@ -4869,9 +5344,10 @@ export class ApexService {
       this.improvementRuntime ??= new ImprovementStore(this.root, this.improvementPolicy, this.clock);
       return this.improvementRuntime;
     }
+    const runtimeRoot = await this.runtimeRootForRun(run);
     const [policyBytes, lockBytes] = await Promise.all([
-      readFile(join(this.root, ".apex", "runtime", "improvement-policy.v1.json")),
-      readFile(join(this.root, ".apex", "apex.lock.json")),
+      readFile(join(runtimeRoot, "improvement-policy.v1.json")),
+      readFile(join(runtimeRoot, "apex.lock.json")),
     ]);
     const lock = JSON.parse(lockBytes.toString("utf8")) as RuntimeBundleLockV1;
     this.assertValid("runtime-lock", lock);
@@ -4952,6 +5428,30 @@ export class ApexService {
     return lock;
   }
 
+  private async installRuntimeGeneration(lock: RuntimeBundleLockV1): Promise<string> {
+    const hash = sha256Json(lock);
+    const generationsRoot = join(this.root, ".apex", "runtime-generations");
+    const destination = join(generationsRoot, hash);
+    if (!(await this.exists(destination))) {
+      await mkdir(generationsRoot, { recursive: true });
+      const staging = join(generationsRoot, `.incoming-${this.idSource()}`);
+      await cp(join(this.root, ".apex", "runtime"), staging, {
+        recursive: true,
+        dereference: false,
+        errorOnExist: true,
+        force: false,
+      });
+      await atomicWriteJson(join(staging, "apex.lock.json"), lock);
+      await rename(staging, destination);
+    }
+    return destination;
+  }
+
+  private async runtimeRootForRun(run: RunConfigV1): Promise<string> {
+    const generation = join(this.root, ".apex", "runtime-generations", run.runtimeLockHash);
+    return (await this.exists(join(generation, "apex.lock.json"))) ? generation : join(this.root, ".apex", "runtime");
+  }
+
   private capabilityPacks(manifestPath?: string): CapabilityPackManager {
     return new CapabilityPackManager({
       root: this.root,
@@ -4961,11 +5461,11 @@ export class ApexService {
   }
 
   private async runtimeLockChecks(run: RunConfigV1): Promise<DoctorCheck[]> {
-    const path = join(this.root, ".apex", "apex.lock.json");
     try {
-      const lock = JSON.parse(await readFile(path, "utf8")) as RuntimeBundleLockV1;
+      const runtimeRoot = await this.runtimeRootForRun(run);
+      const lockPath = join(runtimeRoot, "apex.lock.json");
+      const lock = JSON.parse(await readFile(lockPath, "utf8")) as RuntimeBundleLockV1;
       this.assertValid("runtime-lock", lock);
-      const runtimeRoot = join(this.root, ".apex", "runtime");
       const validatorPath = (await this.exists(join(runtimeRoot, "runtime-bundle.v1.json")))
         ? join(runtimeRoot, "runtime-bundle.v1.json")
         : join(runtimeRoot, "toolchain.v1.json");
@@ -5223,7 +5723,8 @@ export class ApexService {
   }
 
   private async evidenceStore(kind?: string, contentType?: string): Promise<EvidenceStore> {
-    const defaults = JSON.parse(await readFile(join(this.root, ".apex", "runtime", "defaults.v1.json"), "utf8")) as {
+    const runtimeRoot = await this.runtimeRootForRun(await this.currentRun());
+    const defaults = JSON.parse(await readFile(join(runtimeRoot, "defaults.v1.json"), "utf8")) as {
       evidence?: { budgets?: { perEntryBytes?: number }; immutableKinds?: string[] };
     };
     const maxBytes = defaults.evidence?.budgets?.perEntryBytes;

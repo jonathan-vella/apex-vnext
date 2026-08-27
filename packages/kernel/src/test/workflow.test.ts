@@ -140,6 +140,20 @@ test("kernel validates freeform, single-select, and multi-select answers", () =>
     );
   }
   assert.deepEqual(
+    validateInputAnswers(
+      [{ id: "prohibited-services", prompt: "List prohibited services, or use 'none'." }],
+      [{ questionId: "prohibited-services", value: "none" }],
+    ),
+    [{ questionId: "prohibited-services", value: "No Azure services are prohibited." }],
+  );
+  assert.deepEqual(
+    validateInputAnswers(
+      [{ id: "environment-overrides", prompt: "State overrides, or use 'none'." }],
+      [{ questionId: "environment-overrides", value: "none" }],
+    ),
+    [{ questionId: "environment-overrides", value: "No environment-specific service or sizing overrides." }],
+  );
+  assert.deepEqual(
     validateInputAnswers([{ id: "answer", prompt: "Answer?" }], [{ questionId: "answer", value: "unknown" }]),
     [{ questionId: "answer", value: "unknown" }],
   );
