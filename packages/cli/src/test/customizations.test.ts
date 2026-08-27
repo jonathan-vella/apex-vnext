@@ -47,6 +47,9 @@ test("init installs bundled customizations and runtime config by default", async
   assert.match(coordinatorAgent, /name: APEX/u);
   assert.match(coordinatorAgent, /target: vscode/u);
   assert.match(await readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"), /target: vscode/u);
+  const requirementsAgent = await readFile(join(root, ".github", "agents", "apex-requirements.agent.md"), "utf8");
+  assert.match(requirementsAgent, /Immediately call `apex\/nextTask` after submitting requirements/u);
+  assert.match(requirementsAgent, /invoke `APEX Reviewer` through the `agent` tool/u);
   assert.match(
     await readFile(join(root, ".github", "instructions", "apex-agent-authoring.instructions.md"), "utf8"),
     /APEX Agent Boundaries/u,
@@ -209,12 +212,16 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(requirementsAgent, /- ask_user/u);
   assert.match(requirementsAgent, /- task/u);
   assert.doesNotMatch(requirementsAgent, /vscode\/askQuestions|handoffs:|agents:/u);
+  const plannerAgent = await readFile(join(root, ".github", "agents", "apex-planner.agent.md"), "utf8");
+  assert.match(plannerAgent, /- apex\/planComplete/u);
+  assert.match(plannerAgent, /kernel derives the canonical intent hash/u);
   assert.match(
     await readFile(join(root, ".github", "instructions", "apex-agent-authoring.instructions.md"), "utf8"),
     /APEX Agent Boundaries/u,
   );
   const coordinatorAgent = await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8");
   assert.match(coordinatorAgent, /- apex\/projectCreate/u);
+  assert.match(coordinatorAgent, /- apex\/gateDecide/u);
   assert.match(coordinatorAgent, /Use `ask_user` for kernel-owned input requests/u);
   assert.match(coordinatorAgent, /request\.intake.*hand off to `APEX Requirements`/su);
   assert.match(coordinatorAgent, /replace the active project.*apex\/projectCreate.*apex\/projectDelete/su);
@@ -225,6 +232,7 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(coordinatorAgent, /agent-output\/<project>\/<run>\//u);
   assert.match(coordinatorAgent, /--decision <approved\|rejected>/u);
   assert.match(coordinatorAgent, /--recipient <RECIPIENT_ID>/u);
+  assert.match(coordinatorAgent, /call `apex\/gateDecide` with that gate, decision, and `confirm: true`/u);
   assert.match(coordinatorAgent, /Never auto-invoke a specialist, author artifacts, approve a gate, or deploy/u);
   assert.match(
     await readFile(join(root, ".github", "skills", "apex-azure-defaults", "SKILL.md"), "utf8"),

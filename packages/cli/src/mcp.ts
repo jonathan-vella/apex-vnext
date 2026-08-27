@@ -73,6 +73,29 @@ const projectCreateInput = z
 const projectIdInput = z.object({ projectId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/) }).strict();
 const projectUseInput = projectIdInput.extend({ runId: z.string().min(1).optional() });
 const projectDeleteInput = projectIdInput.extend({ confirm: z.literal(true) });
+const planCompletionInput = z
+  .object({
+    taskId: z.string().min(1),
+    implementationIntent: z.unknown(),
+    iacBinding: z
+      .object({
+        schemaVersion: z.literal("1.0.0"),
+        projectId: z.string().min(1),
+        runId: z.string().min(1),
+        track: z.enum(["bicep", "terraform"]),
+        resourceBindings: z.record(z.string().min(1), z.unknown()),
+      })
+      .strict(),
+    environmentInputs: z.unknown(),
+  })
+  .strict();
+const gateDecisionInput = z
+  .object({
+    gate: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+    decision: z.enum(["approved", "rejected"]),
+    confirm: z.literal(true),
+  })
+  .strict();
 const normalizeOutputs = (outputs: z.infer<typeof taskOutput>[]) =>
   outputs.map(({ kind, value, summary }) => ({
     kind,
@@ -145,6 +168,15 @@ export function createMcpServer(service: ApexService): McpServer {
     },
     async ({ projectId, confirm }) =>
       result(await service.deleteProject(projectId as Parameters<typeof service.deleteProject>[0], confirm)),
+  );
+  server.registerTool(
+    "gateDecide",
+    {
+      description:
+        "Record an explicitly confirmed human decision for Gate 1, 2, or 3 using the local OS username as actor. Gate 4 remains CLI-only.",
+      inputSchema: gateDecisionInput,
+    },
+    async ({ gate, decision }) => result(await service.decideInteractiveGate(gate, decision)),
   );
   server.registerTool(
     "stageArtifact",
@@ -249,6 +281,23 @@ export function createMcpServer(service: ApexService): McpServer {
       }
       return result(await service.completeTask(taskId, { kind, value, ...(summary === undefined ? {} : { summary }) }));
     },
+  );
+  server.registerTool(
+    "planComplete",
+    {
+      description:
+        "Atomically complete a plan. Derives the canonical implementation intent hash for the binding; do not supply intentHash.",
+      inputSchema: planCompletionInput,
+    },
+    async ({ taskId, implementationIntent, iacBinding, environmentInputs }) =>
+      result(
+        await service.completePlan(
+          taskId,
+          implementationIntent as Parameters<typeof service.completePlan>[1],
+          iacBinding as Parameters<typeof service.completePlan>[2],
+          environmentInputs as Parameters<typeof service.completePlan>[3],
+        ),
+      ),
   );
   server.registerTool("preview", { description: "Read the current operator-created deployment preview" }, async () =>
     result(await service.currentPreview()),

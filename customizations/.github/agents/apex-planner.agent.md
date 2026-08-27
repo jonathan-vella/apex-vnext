@@ -12,6 +12,7 @@ tools:
   - apex/taskContext
   - apex/stageArtifact
   - apex/completeTask
+  - apex/planComplete
   - azure-resource-manager-mcp/get_retail_prices
   - azure-resource-manager-mcp/query_costs
   - azure-resource-manager-mcp/query_aks_costs
@@ -48,9 +49,9 @@ Gate 3.
   secret reference must include `kind`, `provider`, and `reference`.
 4. Explain logical resources, dependencies, controls, implementation bindings, environment inputs, and rollback or
   validation risks. Ask targeted follow-ups only for unresolved user-owned choices; never infer secret values.
-5. Stage `implementation-intent` first. Use its returned hash as `iac-binding.intentHash`, then stage the binding and
-  environment inputs. Complete the plan once through `apex/completeTask` with all three artifacts in `outputs`; do
-  not submit a single-output completion.
+5. Complete plans through `apex/planComplete` with the implementation intent, binding without `intentHash`, and
+  environment inputs. The kernel derives the canonical intent hash and atomically validates all three outputs. Do not
+  call `apex/completeTask` with a partial plan bundle or a placeholder `intentHash`.
 6. APEX materializes a read-only Gate 3 package at `agent-output/<project>/<run>/plan/`. Report
   `implementation-plan.md`, `iac-binding.md`, `environment-inputs.md`, and `challenger-findings.md` for human review.
 7. When the kernel issues `plan-review`, delegate the exact task to `APEX Reviewer`. Present findings and use targeted
