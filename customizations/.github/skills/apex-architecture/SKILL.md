@@ -34,6 +34,8 @@ Use this skill only for an active architecture task.
    `apex/architectureComplete`; APEX derives identity, hashes, requirement traceability, and cost/SKU bindings.
 8. Report the derived Architecture, qualitative WAF, cost-breakdown, and uncertainty diagrams materialized in the
    Gate 2 package. These diagrams do not replace typed artifacts, pricing tables, evidence, review, or approval.
+9. Treat regional/zonal support, subscription quota, and unresolved retail meters as later validation work when the
+   Architecture discloses them accurately. Do not require implementation evidence to complete Architecture review.
 
 ## Output
 

@@ -34,6 +34,10 @@ resolve, accept with rationale, or defer through the owning interactive stage.
 2. Evaluate only supplied content, references, and review criteria. Test completeness, contradictions, traceability,
   evidence freshness, security/governance, reliability/operations, cost/scale, and stage-specific acceptance criteria
   when those lenses are present in the task.
+  For Architecture, evaluate whether unavailable regional, zonal, quota, or price evidence is represented honestly as
+  a concern, partial estimate, risk, and concrete preflight recommendation. Do not raise a finding merely because that
+  out-of-band implementation evidence is not yet present. Raise a finding only when the Architecture hides, contradicts,
+  or makes an unsupported claim about the gap.
 3. Return one typed finding per issue with `id`, `severity`, `title`, and `detail`. For Architecture, also return one
   criterion receipt for every Well-Architected pillar using the exact task template; link `finding` outcomes to finding
   IDs and explain every `pass` or `not-applicable` outcome. Do not manufacture findings to satisfy a quota.
