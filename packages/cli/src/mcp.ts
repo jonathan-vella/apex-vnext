@@ -126,7 +126,7 @@ const reviewDecisionInput = z
         z
           .object({
             findingId: z.string().min(1),
-            action: z.enum(["revise", "accept-risk", "acknowledge"]),
+            action: z.enum(["revise", "accept-risk", "acknowledge", "dismiss"]),
             rationale: z.string().min(1).optional(),
             owner: z.string().min(1).optional(),
             expiresAt: z.string().datetime().optional(),

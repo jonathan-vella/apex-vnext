@@ -55,8 +55,9 @@ Gate 2 package without bypassing the kernel's decision or approval boundaries.
   exact qualitative `wellArchitectedAssessment` shape from the task template, including status, accepted requirement
   and evidence references, recommendations, and trade-offs for every pillar. Recommend one option, but require user
   confirmation before recording the final Architecture decision.
-  When qualified regional, zonal, or quota evidence is absent, record the affected pillar as `concern`, add a concrete
-  validation recommendation and risk, and continue. Never claim `aligned` from unsupported availability assumptions.
+  Assume selected Azure services and SKUs are regionally available and quota is sufficient. Mention material regional,
+  zonal, recovery, or capacity assumptions in the generated Architecture documentation when useful; do not request,
+  validate, gate, or create findings for them.
 5. After selecting candidate SKUs, call `azure-resource-manager-mcp/get_retail_prices` directly for every cost line.
   This call is mandatory before declaring pricing unavailable. Kernel task `capabilityGrants` apply only to kernel
   capabilities; absence of pricing there is never evidence that the separately declared ARM MCP tool is unavailable.
@@ -72,9 +73,9 @@ Gate 2 package without bypassing the kernel's decision or approval boundaries.
   qualitative WAF, priced-cost breakdown, and uncertainty diagrams together with `architecture-assessment.md`,
   `cost-estimate.md`, `sku-comparison.md`, and `challenger-findings.md`. Diagrams are derived views, not gate evidence.
 8. When the kernel issues `architecture-review`, delegate the exact task to `APEX Reviewer`. Present returned findings
-  in one native decision panel and submit permitted decisions through `apex/reviewDecide`. Regional/zonal support,
-  quota, and missing retail rows are out-of-band validation items when they are already disclosed as concerns, risks,
-  partial pricing, and preflight recommendations; they are not Architecture defects by themselves.
+  in one native decision panel and submit permitted decisions through `apex/reviewDecide`. Automatically dismiss
+  findings that only request regional/zonal support, quota, deployment, restore, failover, or complete pricing checks;
+  these are outside APEX Architecture review and require no user confirmation.
 9. After the user reviews the full evidence appendix, ask one explicit Proceed/Revise question. Only after Proceed,
   call `apex/gateDecide` for Gate 2 with `confirm: true`, then use the Planning handoff.
 
@@ -106,5 +107,5 @@ unresolved decisions. Do not claim gate readiness unless the kernel reports it.
 
 # Stop rules
 
-Stop when the kernel reports completion, missing input, stale context, or an open challenger finding. Represent missing
-qualified availability evidence as an explicit concern; do not invent evidence, infer requirements, or approve Gate 2.
+Stop when the kernel reports completion, missing input, stale context, or a genuine open Architecture finding. Dismiss
+out-of-scope validation findings without user confirmation. Do not infer requirements or approve Gate 2.

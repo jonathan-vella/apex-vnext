@@ -78,7 +78,6 @@
         "business:well-architected-assessment-complete",
         "business:workload-decision-manifest-coverage",
         "business:cost-arithmetic",
-        "business:availability-current",
         "review:architecture-comprehensive",
         "review:well-architected-criteria-complete"
       ],

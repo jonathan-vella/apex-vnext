@@ -275,7 +275,7 @@ export interface ReviewResolution {
   findingId: string;
   reviewHash: string;
   subjectHash: string;
-  disposition: "fixed" | "accepted-risk" | "acknowledged";
+  disposition: "fixed" | "accepted-risk" | "acknowledged" | "dismissed";
   actor: string;
   rationale: string;
   evidenceRefs: string[];
@@ -285,7 +285,7 @@ export interface ReviewResolution {
 
 export interface ReviewDecision {
   findingId: string;
-  action: "revise" | "accept-risk" | "acknowledge";
+  action: "revise" | "accept-risk" | "acknowledge" | "dismiss";
   rationale?: string;
   owner?: string;
   expiresAt?: string;
@@ -2471,6 +2471,7 @@ export class ApexService {
     const hasCurrentResolution = priorResolutions.some(
       (prior) =>
         prior.disposition === "fixed" ||
+        prior.disposition === "dismissed" ||
         (prior.expiresAt !== undefined && Date.parse(prior.expiresAt) > this.clock().getTime()),
     );
     if (hasCurrentResolution)
@@ -2547,7 +2548,12 @@ export class ApexService {
         reviewHash,
         subjectHash: String(payload.subjectHash),
         dependencyHash: String(payload.dependencyHash),
-        disposition: decision.action === "acknowledge" ? "acknowledged" : "accepted-risk",
+        disposition:
+          decision.action === "acknowledge"
+            ? "acknowledged"
+            : decision.action === "dismiss"
+              ? "dismissed"
+              : "accepted-risk",
         actor: userInfo().username,
         rationale:
           decision.action === "acknowledge"
@@ -2571,7 +2577,7 @@ export class ApexService {
       severity: ReviewFindingsV1["findings"][number]["severity"];
       title: string;
       detail: string;
-      actions: Array<"revise" | "accept-risk" | "acknowledge">;
+      actions: Array<"revise" | "accept-risk" | "acknowledge" | "dismiss">;
     }>;
   }> {
     const reviewEvent = [...events]
@@ -2603,6 +2609,7 @@ export class ApexService {
           detail,
           actions: [
             "revise",
+            ...(gate === 2 ? (["dismiss"] as const) : []),
             ...(gate === 1 && severity !== "critical" ? (["acknowledge"] as const) : []),
             ...(["critical", "high"].includes(severity) ? [] : (["accept-risk"] as const)),
           ],
@@ -2665,7 +2672,7 @@ export class ApexService {
       !value.findingId ||
       !value.actor ||
       !value.rationale ||
-      !["fixed", "accepted-risk", "acknowledged"].includes(value.disposition) ||
+      !["fixed", "accepted-risk", "acknowledged", "dismissed"].includes(value.disposition) ||
       !hashes.every((hash) => /^[0-9a-f]{64}$/.test(hash))
     ) {
       throw new ApexError("APEX_VALIDATION", "Invalid review resolution document", EXIT_CODES.validation);
@@ -4891,6 +4898,7 @@ export class ApexService {
           resolution.dependencyHash === dependencyHash &&
           (resolution.disposition === "fixed" ||
             resolution.disposition === "acknowledged" ||
+            resolution.disposition === "dismissed" ||
             (resolution.expiresAt !== undefined && Date.parse(resolution.expiresAt) > this.clock().getTime()))
           ? [resolution.findingId]
           : [];

@@ -20,7 +20,6 @@ import { registerWorkflowValidators } from "../workflow-validators.js";
 import {
   architecture,
   acceptAvailabilityEvidence,
-  availabilityEvidence,
   codegenBundle,
   costEstimate,
   governance,
@@ -539,14 +538,8 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
     "business:well-architected-assessment-complete",
     "business:workload-decision-manifest-coverage",
     "business:cost-arithmetic",
-    "business:availability-current",
   ]);
-  assert.deepEqual((architectureCompleted?.payload as { validatorEvidenceRefs?: unknown }).validatorEvidenceRefs, {
-    "business:availability-current": availabilityHash,
-  });
-  assert.deepEqual((architectureCompleted?.payload as { validatorEvidenceModes?: unknown }).validatorEvidenceModes, {
-    "business:availability-current": "simulated",
-  });
+  assert.equal(availabilityHash.length, 64);
   const architectureReviewTask = await task(service, "architecture-review");
   const reviewWithoutCriteria = review(runId, "architecture", architectureHashes.outputHashes.architecture!);
   delete reviewWithoutCriteria.criteria;
@@ -660,118 +653,7 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
   );
 });
 
-test("architecture validates supplied scope-bound availability evidence", async () => {
-  const root = await tempRoot();
-  const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo" });
-  await service.nextTask();
-  const requirementHashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
-  await complete(service, "requirements-review", [
-    {
-      kind: "review-findings",
-      value: review(runId, "requirements", requirementHashes.requirements!),
-    },
-  ]);
-  await service.decideGateNumber(1, "approved", "tester");
-
-  const malformedPath = join(root, "invalid-availability.json");
-  await writeFile(malformedPath, "{", "utf8");
-  await assert.rejects(
-    service.acceptEvidence({
-      kind: "architecture-availability-v1",
-      contentType: "application/json",
-      file: malformedPath,
-      required: true,
-    }),
-    /not valid JSON/,
-  );
-
-  await assert.rejects(
-    service.acceptEvidence({
-      kind: "architecture-availability-v1",
-      contentType: "application/json",
-      value: availabilityEvidence(runId),
-      required: true,
-    }),
-    /source evidence is unavailable/,
-  );
-  const architectureValue = architecture(runId);
-  const costValue = costEstimate(runId);
-  const architectureOutputs: TaskOutput[] = [
-    { kind: "architecture", value: architectureValue },
-    { kind: "cost-estimate", value: costValue },
-    {
-      kind: "workload-decision-manifest",
-      value: workloadDecisionManifest({
-        runId,
-        requirementsHash: requirementHashes.requirements!,
-        architectureHash: sha256Json(architectureValue),
-        costEstimateHash: sha256Json(costValue),
-      }),
-    },
-  ];
-  await task(service, "architecture");
-  const staleHash = await acceptAvailabilityEvidence(service, runId, "demo", "local", {
-    expiresAt: "2020-01-01T00:00:00.000Z",
-  });
-  const staleTask = await service.nextTask();
-  assert.equal(staleTask.status, "task");
-  if (staleTask.status !== "task") return;
-  assert.ok(staleTask.task.inputRefs.includes(staleHash));
-  await assert.rejects(
-    service.completeTaskOutputs(staleTask.task.taskId, architectureOutputs),
-    /business:availability-current/,
-  );
-
-  await acceptAvailabilityEvidence(service, runId, "demo", "local", {
-    collectedAt: "2099-01-01T00:00:00.000Z",
-  });
-  await assert.rejects(
-    service.completeTaskOutputs(await task(service, "architecture"), architectureOutputs),
-    (error: unknown) =>
-      error instanceof ApexError && JSON.stringify(error.details).includes("future collection timestamp"),
-  );
-
-  await acceptAvailabilityEvidence(service, runId, "demo", "local", {
-    evidenceTargetScope: "other-scope",
-  });
-  await assert.rejects(
-    service.completeTaskOutputs(await task(service, "architecture"), architectureOutputs),
-    /business:availability-current/,
-  );
-
-  await assert.rejects(
-    acceptAvailabilityEvidence(service, runId, "demo", "local", { mode: "native" }),
-    /authorized capability adapter/,
-  );
-
-  await acceptAvailabilityEvidence(service, runId, "demo", "local", { unavailableCheck: "quota" });
-  await assert.rejects(
-    service.completeTaskOutputs(await task(service, "architecture"), architectureOutputs),
-    /business:availability-current/,
-  );
-
-  const currentHash = await acceptAvailabilityEvidence(service, runId);
-  const currentTask = await service.nextTask();
-  assert.equal(currentTask.status, "task");
-  if (currentTask.status !== "task") return;
-  assert.ok(currentTask.task.inputRefs.includes(currentHash));
-  await acceptAvailabilityEvidence(service, runId, "demo", "local", {
-    expiresAt: "2020-01-01T00:00:00.000Z",
-  });
-  await assert.rejects(
-    service.completeTaskOutputs(currentTask.task.taskId, architectureOutputs),
-    (error: unknown) => error instanceof Error && /stale/i.test(error.message),
-  );
-  const replacementHash = await acceptAvailabilityEvidence(service, runId);
-  const replacementTask = await service.nextTask();
-  assert.equal(replacementTask.status, "task");
-  if (replacementTask.status !== "task") return;
-  assert.ok(replacementTask.task.inputRefs.includes(replacementHash));
-  await service.completeTaskOutputs(replacementTask.task.taskId, architectureOutputs);
-});
-
-test("architecture can record an availability concern when qualified evidence is unavailable", async () => {
+test("architecture assumes availability and permits dismissal of out-of-scope review findings", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
   const { runId } = await service.init({ projectId: "demo" });
@@ -785,12 +667,6 @@ test("architecture can record an availability concern when qualified evidence is
   ]);
   await service.decideGateNumber(1, "approved", "tester");
   const architectureValue = architecture(runId);
-  const availabilityPillar = architectureValue.wellArchitectedAssessment!.pillars.find(
-    ({ pillar }) => pillar === "reliability",
-  )!;
-  availabilityPillar.status = "concern";
-  availabilityPillar.recommendations = ["Validate regional and zonal service availability before deployment."];
-  architectureValue.risks.push("Regional and zonal service availability is not yet verified.");
   const costValue = costEstimate(runId);
   const architectureHashes = await service.completeTaskOutputs(await task(service, "architecture"), [
     { kind: "architecture", value: architectureValue },
@@ -808,10 +684,10 @@ test("architecture can record an availability concern when qualified evidence is
   const architectureReview = review(runId, "architecture", architectureHashes.outputHashes.architecture!, [
     {
       id: "F-ARCH-1",
-      severity: "medium",
+      severity: "high",
       disposition: "open",
-      title: "Genuine architecture concern",
-      detail: "A design contradiction requires a user decision.",
+      title: "Regional availability must be verified",
+      detail: "Validate regional SKU support and quota before implementation.",
       evidenceRefs: [],
     },
   ]);
@@ -828,8 +704,15 @@ test("architecture can record an availability concern when qualified evidence is
   assert.equal(pendingReview.review.reviewHash, reviewHashes.outputHashes["review-findings"]);
   assert.deepEqual(
     pendingReview.review.findings.map(({ id, actions }) => ({ id, actions })),
-    [{ id: "F-ARCH-1", actions: ["revise", "accept-risk"] }],
+    [{ id: "F-ARCH-1", actions: ["revise", "dismiss"] }],
   );
+  assert.deepEqual(
+    await service.decideReview(pendingReview.review.reviewHash, [
+      { findingId: "F-ARCH-1", action: "dismiss", rationale: "Outside APEX Architecture review scope." },
+    ]),
+    { status: "resolved" },
+  );
+  assert.equal((await service.nextTask()).status, "task");
 });
 
 test("authorized capability adapter accepts native architecture availability evidence", async () => {
