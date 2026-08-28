@@ -660,7 +660,7 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
   );
 });
 
-test("architecture requires current scope-bound availability evidence", async () => {
+test("architecture validates supplied scope-bound availability evidence", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
   const { runId } = await service.init({ projectId: "demo" });
@@ -710,11 +710,7 @@ test("architecture requires current scope-bound availability evidence", async ()
       }),
     },
   ];
-  await assert.rejects(
-    service.completeTaskOutputs(await task(service, "architecture"), architectureOutputs),
-    /business:availability-current/,
-  );
-
+  await task(service, "architecture");
   const staleHash = await acceptAvailabilityEvidence(service, runId, "demo", "local", {
     expiresAt: "2020-01-01T00:00:00.000Z",
   });
@@ -773,6 +769,42 @@ test("architecture requires current scope-bound availability evidence", async ()
   if (replacementTask.status !== "task") return;
   assert.ok(replacementTask.task.inputRefs.includes(replacementHash));
   await service.completeTaskOutputs(replacementTask.task.taskId, architectureOutputs);
+});
+
+test("architecture can record an availability concern when qualified evidence is unavailable", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo" });
+  await service.nextTask();
+  const requirementHashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
+  await complete(service, "requirements-review", [
+    {
+      kind: "review-findings",
+      value: review(runId, "requirements", requirementHashes.requirements!),
+    },
+  ]);
+  await service.decideGateNumber(1, "approved", "tester");
+  const architectureValue = architecture(runId);
+  const availabilityPillar = architectureValue.wellArchitectedAssessment!.pillars.find(
+    ({ pillar }) => pillar === "reliability",
+  )!;
+  availabilityPillar.status = "concern";
+  availabilityPillar.recommendations = ["Validate regional and zonal service availability before deployment."];
+  architectureValue.risks.push("Regional and zonal service availability is not yet verified.");
+  const costValue = costEstimate(runId);
+  await service.completeTaskOutputs(await task(service, "architecture"), [
+    { kind: "architecture", value: architectureValue },
+    { kind: "cost-estimate", value: costValue },
+    {
+      kind: "workload-decision-manifest",
+      value: workloadDecisionManifest({
+        runId,
+        requirementsHash: requirementHashes.requirements!,
+        architectureHash: sha256Json(architectureValue),
+        costEstimateHash: sha256Json(costValue),
+      }),
+    },
+  ]);
 });
 
 test("authorized capability adapter accepts native architecture availability evidence", async () => {

@@ -340,8 +340,7 @@ function workloadDecisionCoverage(value: unknown): ValidationIssue[] {
 function availabilityCurrent(value: unknown): ValidationIssue[] {
   const context = taskContext(value);
   const evidence = context.availabilityEvidence;
-  if (evidence === undefined)
-    return issue("/availabilityEvidence", "Current architecture availability evidence is required");
+  if (evidence === undefined) return [];
   const architecture = context.outputs.architecture as ArchitectureV1;
   const issues: ValidationIssue[] = [];
   if (
