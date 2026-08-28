@@ -75,10 +75,12 @@
         "schema:architecture-v1",
         "schema:workload-decision-manifest-v1",
         "business:requirements-traceability",
+        "business:well-architected-assessment-complete",
         "business:workload-decision-manifest-coverage",
         "business:cost-arithmetic",
         "business:availability-current",
-        "review:architecture-comprehensive"
+        "review:architecture-comprehensive",
+        "review:well-architected-criteria-complete"
       ],
       "invalidates": [
         "gate-2",

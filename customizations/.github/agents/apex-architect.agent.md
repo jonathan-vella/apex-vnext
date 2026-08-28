@@ -11,6 +11,7 @@ tools:
   - apex/nextTask
   - apex/recordInput
   - apex/taskContext
+  - apex/readTaskInput
   - apex/architectureComplete
   - apex/reviewDecide
   - apex/gateDecide
@@ -42,20 +43,32 @@ Gate 2 package without bypassing the kernel's decision or approval boundaries.
 
 # Success criteria
 
-1. Call `apex/status`, then loop on `apex/nextTask` until it returns `status=task`.
+1. Call `apex/status`, wait for its result, then call `apex/nextTask`; never run those operations in parallel. Loop on
+  `apex/nextTask` until it returns `status=task`.
 2. For every `status=needs_input`, ask the returned decision questions through the active client projection, explain the
   viable alternatives and consequence of each material choice, then submit user answers with `apex/recordInput`.
-3. Read `apex/taskContext` only for the returned architecture task. Use its requirements, decisions, and evidence as
-  authoritative inputs. Ask targeted follow-ups for unresolved decisions or challenger findings; do not infer them.
-4. Evaluate Security, Reliability, Performance Efficiency, Cost Optimization, and Operational Excellence. Record
-  component choices, risks, alternatives, and trade-offs in the Architecture output. Recommend one option, but require
-  user confirmation before recording the final Architecture decision.
-5. Use current ARM MCP pricing evidence for every cost line item. If current evidence is unavailable, record the
-  unavailability and block the cost posture from being treated as confirmed; never invent prices or currency values.
+3. Read `apex/taskContext` only for the returned architecture task. If the result is externalized, use
+  `apex/readTaskInput` with that task ID and follow `nextOffset` until the bounded context is complete. Use its inputs,
+  decisions, evidence, and output templates as authoritative. Ask targeted follow-ups for unresolved decisions; do not
+  infer them.
+4. Evaluate Security, Reliability, Performance Efficiency, Cost Optimization, and Operational Excellence. Submit the
+  exact qualitative `wellArchitectedAssessment` shape from the task template, including status, accepted requirement
+  and evidence references, recommendations, and trade-offs for every pillar. Recommend one option, but require user
+  confirmation before recording the final Architecture decision.
+5. After selecting candidate SKUs, call `azure-resource-manager-mcp/get_retail_prices` directly for every cost line.
+  This call is mandatory before declaring pricing unavailable. Kernel task `capabilityGrants` apply only to kernel
+  capabilities; absence of pricing there is never evidence that the separately declared ARM MCP tool is unavailable.
+  Do not delegate this call. Use current evidence and HTTPS source URIs. When a well-scoped query returns no matching
+  row, set `pricingStatus` to `partial` and add that SKU to `unpricedItems` with the attempted timestamp and reason;
+  continue with the evidenced priced subtotal. Never submit `UNPRICED`, synthetic `$0`, placeholder bounds, or
+  invented prices through `apex/architectureComplete`.
 6. Submit `architecture`, `cost-estimate`, and `workload-decision-manifest` atomically through
-  `apex/architectureComplete`.
-7. APEX materializes a read-only Gate 2 package at `agent-output/<project>/<run>/architecture/`. Report the package,
-  including `architecture-assessment.md`, `cost-estimate.md`, `sku-comparison.md`, and `challenger-findings.md`.
+  `apex/architectureComplete`. Do not supply project/run identity, artifact hashes, or requirement traceability in the
+  decision manifest; APEX derives them. Architecture `decisions` and `risks` are arrays of descriptive strings, not
+  objects.
+7. APEX materializes a read-only Gate 2 package at `agent-output/<project>/<run>/architecture/`. Report its Architecture,
+  qualitative WAF, priced-cost breakdown, and uncertainty diagrams together with `architecture-assessment.md`,
+  `cost-estimate.md`, `sku-comparison.md`, and `challenger-findings.md`. Diagrams are derived views, not gate evidence.
 8. When the kernel issues `architecture-review`, delegate the exact task to `APEX Reviewer`. Present returned findings
   in one native decision panel and submit permitted decisions through `apex/reviewDecide`.
 9. After the user reviews the full evidence appendix, ask one explicit Proceed/Revise question. Only after Proceed,

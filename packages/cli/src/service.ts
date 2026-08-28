@@ -107,10 +107,16 @@ import {
 import {
   DOCUMENT_REGISTRY,
   renderApprovalEvidence,
+  rasterizeDiagram,
+  renderArchitectureDiagram,
+  renderCostBreakdownDiagram,
+  renderCostUncertaintyDiagram,
   renderDeploymentPreview,
   renderRequirementsDocument,
   renderResourceInventory,
   renderRunStatus,
+  renderWafAssessmentDiagram,
+  type DiagramSource,
 } from "@apexops/renderers";
 import { constants } from "node:fs";
 import { access, cp, lstat, mkdir, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
@@ -225,7 +231,6 @@ Do not write workspace files, .apex state, MCP configuration, or managed agents.
 Do not approve gates, deploy resources, or infer workflow state. The CLI owns
 workspace initialization and the kernel owns all workflow authority.
 `,
-    "utf8",
   );
 }
 
@@ -270,7 +275,7 @@ export interface ReviewResolution {
   findingId: string;
   reviewHash: string;
   subjectHash: string;
-  disposition: "fixed" | "accepted-risk";
+  disposition: "fixed" | "accepted-risk" | "acknowledged";
   actor: string;
   rationale: string;
   evidenceRefs: string[];
@@ -280,8 +285,9 @@ export interface ReviewResolution {
 
 export interface ReviewDecision {
   findingId: string;
-  action: "revise" | "accept-risk";
-  rationale: string;
+  action: "revise" | "accept-risk" | "acknowledge";
+  rationale?: string;
+  owner?: string;
   expiresAt?: string;
 }
 
@@ -1343,7 +1349,12 @@ export class ApexService {
     const events = await this.journal(run).replay();
     const route = await this.route(run, events);
     const outputTemplates: Partial<Record<ArtifactKind, unknown>> = {};
-    if (task.taskType === "requirements" || task.taskType === "plan" || task.taskType.endsWith("-review")) {
+    if (
+      task.taskType === "requirements" ||
+      task.taskType === "architecture" ||
+      task.taskType === "plan" ||
+      task.taskType.endsWith("-review")
+    ) {
       for (const kind of task.allowedOutputKinds) {
         if (!SUPPORTED_ARTIFACT_KINDS.includes(kind as ArtifactKind)) {
           throw new ApexError("APEX_INTERNAL", `Unsupported task output kind: ${kind}`, EXIT_CODES.internal);
@@ -1379,33 +1390,45 @@ export class ApexService {
     const run = await this.currentRun();
     const task = await this.readTask(run, taskId);
     const descriptor = TASKS.find(({ id }) => id === task.taskType);
-    if (descriptor?.reviewSubject === undefined)
-      throw new ApexError(
-        "APEX_AUTHORIZATION",
-        "Only review tasks may read their accepted input",
-        EXIT_CODES.authorization,
-      );
+    if (descriptor === undefined)
+      throw new ApexError("APEX_AUTHORIZATION", "Task type is unsupported", EXIT_CODES.authorization);
     if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 6_000) {
       throw new ApexError("APEX_VALIDATION", "Input read range is invalid", EXIT_CODES.validation);
     }
-    const subjectKind =
-      descriptor.reviewSubject === "governance-reconciliation" ? "policy-property-map" : descriptor.reviewSubject;
     const events = await this.journal(run).replay();
-    const subjectHash = this.artifactHash(events, subjectKind as ArtifactKind);
-    if (subjectHash === undefined || !task.inputRefs.includes(subjectHash)) {
+    const reviewSubjectKind =
+      descriptor.reviewSubject === "governance-reconciliation" ? "policy-property-map" : descriptor.reviewSubject;
+    const reviewSubjectHash =
+      reviewSubjectKind === undefined ? undefined : this.artifactHash(events, reviewSubjectKind as ArtifactKind);
+    if (
+      descriptor.reviewSubject !== undefined &&
+      (reviewSubjectHash === undefined || !task.inputRefs.includes(reviewSubjectHash))
+    ) {
       throw new ApexError("APEX_STALE", "Review task input is unavailable or stale", EXIT_CODES.stale);
     }
-    const serialized = JSON.stringify(await this.objects.getJson(subjectHash));
+    const context = await this.taskContext(taskId);
+    const serialized = JSON.stringify(
+      descriptor.reviewSubject === undefined
+        ? {
+            inputs: context.inputs,
+            artifactHashes: context.artifactHashes,
+            decisions: context.decisions,
+            outputTemplates: context.outputTemplates,
+          }
+        : await this.objects.getJson(reviewSubjectHash!),
+    );
     if (offset >= serialized.length) {
       throw new ApexError("APEX_VALIDATION", "Input read offset is outside the review subject", EXIT_CODES.validation);
     }
     const content = serialized.slice(offset, offset + limit);
     const nextOffset = offset + content.length;
     return {
-      subjectHash,
+      subjectHash: reviewSubjectHash ?? sha256Bytes(Buffer.from(serialized, "utf8")),
       content,
       offset,
-      ...(offset === 0 ? { outputTemplate: this.outputTemplate("review-findings", run, events, task.taskType) } : {}),
+      ...(offset === 0 && descriptor.reviewSubject !== undefined
+        ? { outputTemplate: this.outputTemplate("review-findings", run, events, task.taskType) }
+        : {}),
       ...(nextOffset < serialized.length ? { nextOffset } : {}),
     };
   }
@@ -1606,19 +1629,148 @@ export class ApexService {
     taskId: string,
     architecture: ArchitectureV1,
     costEstimate: CostEstimateV1,
-    decisionManifest: WorkloadDecisionManifestV1,
+    decisionManifest: Omit<
+      WorkloadDecisionManifestV1,
+      | "projectId"
+      | "runId"
+      | "environment"
+      | "sourceRequirementsHash"
+      | "architectureHash"
+      | "costEstimateHash"
+      | "requirementTraceability"
+    >,
   ): Promise<{ outputHashes: Partial<Record<ArtifactKind, string>>; summary: string }> {
     await this.assertTaskType(taskId, "architecture");
+    const run = await this.currentRun();
+    const events = await this.journal(run).replay();
+    const requirementsHash = this.artifactHash(events, "requirements");
+    if (requirementsHash === undefined)
+      throw new ApexError("APEX_STALE", "Accepted Requirements are unavailable", EXIT_CODES.stale);
+    const requirements = await this.objects.getJson<RequirementsV1>(requirementsHash);
+    const boundArchitecture = {
+      ...architecture,
+      projectId: run.projectId,
+      runId: run.runId,
+      sourceHashes: { ...architecture.sourceHashes, requirements: requirementsHash },
+    };
+    const components = new Map(boundArchitecture.components.map((component) => [component.id, component]));
+    for (const decision of decisionManifest.skuDecisions) {
+      const component = components.get(decision.logicalId);
+      if (
+        component === undefined ||
+        component.service !== decision.service ||
+        !decision.requirementIds.every((id) => component.requirementIds.includes(id))
+      ) {
+        throw new ApexError(
+          "APEX_VALIDATION",
+          `SKU decision ${decision.id} must match its Architecture component and requirement IDs`,
+          EXIT_CODES.validation,
+        );
+      }
+    }
+    for (const decision of decisionManifest.sloDecisions) {
+      const component = components.get(decision.logicalId);
+      if (component === undefined || !decision.requirementIds.every((id) => component.requirementIds.includes(id))) {
+        throw new ApexError(
+          "APEX_VALIDATION",
+          `SLO decision ${decision.id} must reference one Architecture component and its requirement IDs`,
+          EXIT_CODES.validation,
+        );
+      }
+    }
+    if (
+      costEstimate.lineItems.some(
+        (line) =>
+          /\bunpriced\b/iu.test(line.sku) ||
+          line.source.uri.startsWith("urn:apex:arm-mcp:pricing-unavailable") ||
+          /schema placeholder/iu.test(line.uncertainty.basis),
+      )
+    ) {
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Current ARM MCP pricing evidence is required; do not submit UNPRICED or zero-placeholder cost lines",
+        EXIT_CODES.validation,
+      );
+    }
+    const boundCostEstimate = {
+      ...costEstimate,
+      projectId: run.projectId,
+      runId: run.runId,
+      lineItems: costEstimate.lineItems.map((line) => {
+        const decision = decisionManifest.skuDecisions.find(({ logicalId }) => logicalId === line.id);
+        return decision === undefined
+          ? line
+          : { ...line, service: decision.service, sku: decision.sku, quantity: decision.quantity };
+      }),
+      ...(costEstimate.unpricedItems === undefined
+        ? {}
+        : {
+            unpricedItems: costEstimate.unpricedItems.map((item) => {
+              const decision = decisionManifest.skuDecisions.find(({ logicalId }) => logicalId === item.id);
+              return decision === undefined
+                ? item
+                : { ...item, service: decision.service, sku: decision.sku, quantity: decision.quantity };
+            }),
+          }),
+    };
+    const missingCostLines = decisionManifest.skuDecisions
+      .filter(
+        (decision) =>
+          !boundCostEstimate.lineItems.some(({ id }) => id === decision.logicalId) &&
+          !(boundCostEstimate.unpricedItems ?? []).some(({ id }) => id === decision.logicalId),
+      )
+      .map(({ logicalId }) => logicalId);
+    if (missingCostLines.length > 0) {
+      throw new ApexError(
+        "APEX_VALIDATION",
+        `Cost lines are required for Architecture components: ${missingCostLines.join(", ")}`,
+        EXIT_CODES.validation,
+      );
+    }
+    const requiredIds = requirements.requirements
+      .filter(({ priority, status }) => priority === "must" && status === "confirmed")
+      .map(({ id }) => id)
+      .sort();
+    const requirementTraceability = requiredIds.map((requirementId) => ({
+      requirementId,
+      skuDecisionIds: decisionManifest.skuDecisions
+        .filter(({ requirementIds }) => requirementIds.includes(requirementId))
+        .map(({ id }) => id),
+      sloDecisionIds: decisionManifest.sloDecisions
+        .filter(({ requirementIds }) => requirementIds.includes(requirementId))
+        .map(({ id }) => id),
+    }));
+    const incompleteRequirements = requirementTraceability
+      .filter(({ skuDecisionIds, sloDecisionIds }) => skuDecisionIds.length === 0 || sloDecisionIds.length === 0)
+      .map(({ requirementId }) => requirementId);
+    if (incompleteRequirements.length > 0) {
+      throw new ApexError(
+        "APEX_VALIDATION",
+        `Confirmed must requirements need both SKU and SLO decisions: ${incompleteRequirements.join(", ")}`,
+        EXIT_CODES.validation,
+      );
+    }
+    const boundDecisionManifest = {
+      ...decisionManifest,
+      projectId: run.projectId,
+      runId: run.runId,
+      environment: run.environment,
+      sourceRequirementsHash: requirementsHash,
+      architectureHash: sha256Json(boundArchitecture),
+      costEstimateHash: sha256Json(boundCostEstimate),
+      requirementTraceability,
+    };
     return this.completeTaskOutputs(taskId, [
-      { kind: "architecture", value: architecture },
-      { kind: "cost-estimate", value: costEstimate },
-      { kind: "workload-decision-manifest", value: decisionManifest },
+      { kind: "architecture", value: boundArchitecture },
+      { kind: "cost-estimate", value: boundCostEstimate },
+      { kind: "workload-decision-manifest", value: boundDecisionManifest },
     ]);
   }
 
   async completeReview(
     taskId: string,
     findings: Array<Pick<ReviewFindingsV1["findings"][number], "id" | "severity" | "title" | "detail">>,
+    criteria?: NonNullable<ReviewFindingsV1["criteria"]>,
   ): Promise<{ outputHashes: Partial<Record<ArtifactKind, string>>; summary: string }> {
     const context = await this.taskContext(taskId);
     if (!context.task.taskType.endsWith("-review")) {
@@ -1636,6 +1788,7 @@ export class ApexService {
             disposition: "open" as const,
             evidenceRefs: [template.subjectHash],
           })),
+          ...(criteria === undefined ? {} : { criteria }),
         },
       },
     ]);
@@ -1939,6 +2092,12 @@ export class ApexService {
       `${item.monthlyCost.toFixed(2)} ${this.reviewMarkdownText(cost.currency)}`,
       this.reviewMarkdownText(item.uncertainty.confidence),
     ]);
+    const unpricedRows = (cost.unpricedItems ?? []).map((item) => [
+      this.reviewMarkdownText(item.service),
+      this.reviewMarkdownText(item.sku),
+      String(item.quantity),
+      this.reviewMarkdownText(item.reason),
+    ]);
     const skuRows = decisions.skuDecisions.map((decision) => [
       this.reviewMarkdownText(decision.logicalId),
       this.reviewMarkdownText(decision.service),
@@ -1946,19 +2105,62 @@ export class ApexService {
       String(decision.quantity),
       this.reviewMarkdownText(decision.rationale),
     ]);
+    const renderDiagram = (name: string, render: () => DiagramSource) => {
+      try {
+        const source = render();
+        return { name, source, png: rasterizeDiagram(source.svg) };
+      } catch (error) {
+        return { name, error: error instanceof Error ? error.message : "Diagram rendering failed" };
+      }
+    };
+    const diagrams = [
+      renderDiagram("03-des-diagram", () => renderArchitectureDiagram(architecture)),
+      renderDiagram("02-waf-assessment", () => renderWafAssessmentDiagram(architecture)),
+      renderDiagram("03-des-cost-breakdown", () => renderCostBreakdownDiagram(cost)),
+      renderDiagram("03-des-cost-uncertainty", () => renderCostUncertaintyDiagram(cost)),
+    ];
+    const diagramStatus = diagrams
+      .map((diagram) =>
+        "error" in diagram
+          ? `- ${this.reviewMarkdownText(diagram.name)}: unavailable (${this.reviewMarkdownText(diagram.error)})`
+          : `- ${this.reviewMarkdownText(diagram.name)}: generated as Python, SVG, and PNG`,
+      )
+      .join("\n");
+    const architectureImages = diagrams
+      .filter(({ name }) => name === "03-des-diagram" || name === "02-waf-assessment")
+      .flatMap((diagram) => ("error" in diagram ? [] : [`![${diagram.name}](${diagram.name}.svg)`]))
+      .join("\n\n");
+    const costImages = diagrams
+      .filter(({ name }) => name === "03-des-cost-breakdown" || name === "03-des-cost-uncertainty")
+      .flatMap((diagram) => ("error" in diagram ? [] : [`![${diagram.name}](${diagram.name}.svg)`]))
+      .join("\n\n");
+    const pillarTitles: Record<string, string> = {
+      security: "Security",
+      reliability: "Reliability",
+      "performance-efficiency": "Performance Efficiency",
+      "cost-optimization": "Cost Optimization",
+      "operational-excellence": "Operational Excellence",
+    };
+    const wafAssessment =
+      architecture.wellArchitectedAssessment?.pillars
+        .map(
+          (pillar) =>
+            `### ${pillarTitles[pillar.pillar]}\n\n- Status: ${this.reviewMarkdownText(pillar.status)}\n- Assessment: ${this.reviewMarkdownText(pillar.assessment)}\n- Requirements: ${pillar.requirementIds.map((id) => this.reviewMarkdownText(id)).join(", ") || "None"}\n- Recommendations:\n${list(pillar.recommendations)}\n- Trade-offs:\n${list(pillar.tradeoffs)}`,
+        )
+        .join("\n\n") ?? "- Unavailable for this historical Architecture artifact.";
     await mkdir(directory, { recursive: true });
     await Promise.all([
       atomicWriteBytes(
         join(directory, "README.md"),
         Buffer.from(
-          `# ${this.reviewMarkdownText(architecture.title)}\n\nGenerated Gate 2 review package for run \`${this.reviewMarkdownText(run.runId)}\`. The APEX kernel state remains authoritative.\n\n- Architecture hash: ${hashes.architecture}\n- Cost estimate hash: ${hashes["cost-estimate"]}\n- Decision manifest hash: ${hashes["workload-decision-manifest"]}\n- Review status: challenger findings pending\n`,
+          `# ${this.reviewMarkdownText(architecture.title)}\n\nGenerated Gate 2 review package for run \`${this.reviewMarkdownText(run.runId)}\`. The APEX kernel state remains authoritative.\n\n- Architecture hash: ${hashes.architecture}\n- Cost estimate hash: ${hashes["cost-estimate"]}\n- Decision manifest hash: ${hashes["workload-decision-manifest"]}\n- Review status: challenger findings pending\n\n## Diagram Status\n\n${diagramStatus}\n`,
           "utf8",
         ),
       ),
       atomicWriteBytes(
         join(directory, "architecture-assessment.md"),
         Buffer.from(
-          `# Architecture Assessment\n\n## Summary\n\n${this.reviewMarkdownText(architecture.summary)}\n\n## Components\n\n${table(
+          `# Architecture Assessment\n\n## Summary\n\n${this.reviewMarkdownText(architecture.summary)}\n\n## Architecture Diagram\n\n${architectureImages || "- Diagram unavailable. See README.md for status."}\n\n## Components\n\n${table(
             ["ID", "Service", "Purpose", "Requirements"],
             architecture.components.map((component) => [
               this.reviewMarkdownText(component.id),
@@ -1966,14 +2168,14 @@ export class ApexService {
               this.reviewMarkdownText(component.purpose),
               component.requirementIds.map((id) => this.reviewMarkdownText(id)).join(", "),
             ]),
-          )}\n\n## Five WAF Pillars\n\n### Security\n\n${list(architecture.decisions)}\n\n### Reliability\n\n${list(decisions.sloDecisions.map((decision) => `${decision.logicalId}: ${decision.availabilityPercent}% availability, RTO ${decision.rtoMinutes}m, RPO ${decision.rpoMinutes}m`))}\n\n### Performance Efficiency\n\n- Review component capacity and scale decisions in the SKU comparison.\n\n### Cost Optimization\n\n- Review the current evidence-backed cost estimate.\n\n### Operational Excellence\n\n${list(architecture.risks)}\n\n## Alternatives And Trade-offs\n\nUser-confirmed decisions:\n${list(architecture.decisions)}\n\n## Risks\n\n${list(architecture.risks)}\n`,
+          )}\n\n## Five WAF Pillars\n\n${wafAssessment}\n\n## Alternatives And Trade-offs\n\nUser-confirmed decisions:\n${list(architecture.decisions)}\n\n## Risks\n\n${list(architecture.risks)}\n`,
           "utf8",
         ),
       ),
       atomicWriteBytes(
         join(directory, "cost-estimate.md"),
         Buffer.from(
-          `# Cost Estimate\n\n- Pricing date: ${this.reviewMarkdownText(cost.pricingDate)}\n- Monthly total: ${cost.totalMonthlyCost.toFixed(2)} ${this.reviewMarkdownText(cost.currency)}\n\n## Line Items\n\n${table(["Service", "SKU", "Quantity", "Monthly", "Confidence"], costRows)}\n\n## Evidence Appendix\n\n${cost.lineItems.map((item) => `- ${this.reviewMarkdownText(item.service)} / ${this.reviewMarkdownText(item.sku)}: ${this.reviewMarkdownText(item.source.provider)} — ${this.reviewMarkdownText(item.source.uri)} — retrieved ${this.reviewMarkdownText(item.source.retrievedAt)}; uncertainty ${this.reviewMarkdownText(item.uncertainty.basis)}`).join("\n")}\n\n## Assumptions\n\n${list(cost.assumptions)}\n`,
+          `# Cost Estimate\n\n- Pricing date: ${this.reviewMarkdownText(cost.pricingDate)}\n- Pricing status: ${this.reviewMarkdownText(cost.pricingStatus ?? "complete")}\n- Priced monthly subtotal: ${cost.totalMonthlyCost.toFixed(2)} ${this.reviewMarkdownText(cost.currency)}\n\n## Cost Diagrams\n\n${costImages || "- Diagrams unavailable. See README.md for status."}\n\nUnpriced items are excluded from the priced subtotal and diagrams.\n\n## Priced Line Items\n\n${costRows.length === 0 ? "- None." : table(["Service", "SKU", "Quantity", "Monthly", "Confidence"], costRows)}\n\n## Unpriced Items\n\n${unpricedRows.length === 0 ? "- None." : table(["Service", "SKU", "Quantity", "Reason"], unpricedRows)}\n\n## Evidence Appendix\n\n${cost.lineItems.map((item) => `- ${this.reviewMarkdownText(item.service)} / ${this.reviewMarkdownText(item.sku)}: ${this.reviewMarkdownText(item.source.provider)} — ${this.reviewMarkdownText(item.source.uri)} — retrieved ${this.reviewMarkdownText(item.source.retrievedAt)}; uncertainty ${this.reviewMarkdownText(item.uncertainty.basis)}`).join("\n") || "- No priced evidence rows."}\n\n## Assumptions\n\n${list(cost.assumptions)}\n`,
           "utf8",
         ),
       ),
@@ -1991,10 +2193,25 @@ export class ApexService {
           "utf8",
         ),
       ),
+      ...diagrams.flatMap((diagram) =>
+        "error" in diagram
+          ? []
+          : [
+              atomicWriteBytes(join(directory, `${diagram.name}.py`), Buffer.from(diagram.source.python, "utf8")),
+              atomicWriteBytes(join(directory, `${diagram.name}.svg`), Buffer.from(diagram.source.svg, "utf8")),
+              atomicWriteBytes(join(directory, `${diagram.name}.png`), Buffer.from(diagram.png)),
+            ],
+      ),
     ]);
   }
 
   private async materializeArchitectureChallengeFindings(run: RunConfigV1, review: ReviewFindingsV1): Promise<void> {
+    const table = (headers: string[], rows: string[][]): string =>
+      [
+        `| ${headers.join(" | ")} |`,
+        `| ${headers.map(() => "---").join(" | ")} |`,
+        ...rows.map((row) => `| ${row.join(" | ")} |`),
+      ].join("\n");
     const findings =
       review.findings.length === 0
         ? "No challenger findings remain open."
@@ -2004,9 +2221,21 @@ export class ApexService {
                 `## ${this.reviewMarkdownText(id)}: ${this.reviewMarkdownText(title)}\n\n- Severity: ${this.reviewMarkdownText(severity)}\n- Finding: ${this.reviewMarkdownText(detail)}${resolution === undefined ? "" : `\n- Resolution: ${this.reviewMarkdownText(resolution)}`}`,
             )
             .join("\n\n");
+    const criteria =
+      review.criteria === undefined
+        ? "- Criterion receipts unavailable for this historical review."
+        : table(
+            ["Pillar", "Outcome", "Finding IDs", "Rationale"],
+            review.criteria.map((criterion) => [
+              this.reviewMarkdownText(criterion.criterionId),
+              this.reviewMarkdownText(criterion.outcome),
+              criterion.findingIds.map((id) => this.reviewMarkdownText(id)).join(", ") || "None",
+              this.reviewMarkdownText(criterion.rationale),
+            ]),
+          );
     await atomicWriteBytes(
       join(this.architectureReviewDirectory(run), "challenger-findings.md"),
-      Buffer.from(`# Challenger Findings\n\n${findings}\n`, "utf8"),
+      Buffer.from(`# Challenger Findings\n\n## Well-Architected Criteria\n\n${criteria}\n\n${findings}\n`, "utf8"),
     );
   }
 
@@ -2266,6 +2495,19 @@ export class ApexService {
     if (decisions.length === 0 || new Set(decisions.map(({ findingId }) => findingId)).size !== decisions.length) {
       throw new ApexError("APEX_VALIDATION", "Review decisions must be nonempty and unique", EXIT_CODES.validation);
     }
+    if (
+      decisions.some((decision) =>
+        decision.action === "acknowledge"
+          ? decision.owner?.trim().length === 0 || decision.owner === undefined
+          : decision.rationale?.trim().length === 0 || decision.rationale === undefined,
+      )
+    ) {
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Acknowledgment requires an owner; revision and risk acceptance require rationale",
+        EXIT_CODES.validation,
+      );
+    }
     const run = await this.currentRun();
     const events = await this.journal(run).replay();
     const reviewEvent = [...events]
@@ -2285,7 +2527,7 @@ export class ApexService {
       await this.reviseReview(
         reviewHash,
         revisions.map(({ findingId }) => findingId),
-        revisions.map(({ rationale }) => rationale).join("; "),
+        revisions.map(({ rationale }) => rationale ?? "Revision requested").join("; "),
       );
       return { status: "revision_requested" };
     }
@@ -2293,14 +2535,24 @@ export class ApexService {
       throw new ApexError("APEX_VALIDATION", "Every open finding requires a decision", EXIT_CODES.validation);
     }
     for (const decision of decisions) {
+      if (decision.action === "acknowledge" && payload.nodeId !== "requirements-review") {
+        throw new ApexError(
+          "APEX_AUTHORIZATION",
+          "Acknowledgment is limited to Requirements review obligations",
+          EXIT_CODES.authorization,
+        );
+      }
       await this.resolveReview({
         findingId: decision.findingId,
         reviewHash,
         subjectHash: String(payload.subjectHash),
         dependencyHash: String(payload.dependencyHash),
-        disposition: "accepted-risk",
+        disposition: decision.action === "acknowledge" ? "acknowledged" : "accepted-risk",
         actor: userInfo().username,
-        rationale: decision.rationale,
+        rationale:
+          decision.action === "acknowledge"
+            ? `Acknowledged for downstream owner: ${decision.owner}`
+            : (decision.rationale ?? ""),
         evidenceRefs: [],
         ...(decision.expiresAt === undefined ? {} : { expiresAt: decision.expiresAt }),
       });
@@ -2319,7 +2571,7 @@ export class ApexService {
       severity: ReviewFindingsV1["findings"][number]["severity"];
       title: string;
       detail: string;
-      actions: Array<"revise" | "accept-risk">;
+      actions: Array<"revise" | "accept-risk" | "acknowledge">;
     }>;
   }> {
     const reviewEvent = [...events]
@@ -2349,7 +2601,11 @@ export class ApexService {
           severity,
           title,
           detail,
-          actions: ["revise", ...(["critical", "high"].includes(severity) ? [] : (["accept-risk"] as const))],
+          actions: [
+            "revise",
+            ...(gate === 1 && severity !== "critical" ? (["acknowledge"] as const) : []),
+            ...(["critical", "high"].includes(severity) ? [] : (["accept-risk"] as const)),
+          ],
         })),
     };
   }
@@ -2409,13 +2665,15 @@ export class ApexService {
       !value.findingId ||
       !value.actor ||
       !value.rationale ||
-      !["fixed", "accepted-risk"].includes(value.disposition) ||
+      !["fixed", "accepted-risk", "acknowledged"].includes(value.disposition) ||
       !hashes.every((hash) => /^[0-9a-f]{64}$/.test(hash))
     ) {
       throw new ApexError("APEX_VALIDATION", "Invalid review resolution document", EXIT_CODES.validation);
     }
     if (value.disposition === "fixed" && value.evidenceRefs.length === 0)
       throw new ApexError("APEX_VALIDATION", "Fixed findings require evidenceRefs", EXIT_CODES.validation);
+    if (value.disposition === "acknowledged" && !value.rationale.startsWith("Acknowledged for downstream owner: "))
+      throw new ApexError("APEX_VALIDATION", "Acknowledged findings require a downstream owner", EXIT_CODES.validation);
     if (
       value.disposition === "accepted-risk" &&
       (value.expiresAt === undefined || Date.parse(value.expiresAt) <= this.clock().getTime())
@@ -4221,6 +4479,132 @@ export class ApexService {
             evidenceRefs: [subjectHash],
           },
         ],
+        ...(subjectKind === "architecture"
+          ? {
+              criteria: [
+                "security",
+                "reliability",
+                "performance-efficiency",
+                "cost-optimization",
+                "operational-excellence",
+              ].map((criterionId) => ({
+                criterionId,
+                outcome: "pass",
+                rationale: "Explain how this pillar was independently reviewed.",
+                findingIds: [],
+              })),
+            }
+          : {}),
+      };
+    }
+    if (kind === "architecture") {
+      return {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: run.projectId,
+        runId: run.runId,
+        title: "Architecture title",
+        summary: "Architecture summary and key trade-offs",
+        sourceHashes: { requirements: this.artifactHash(events, "requirements") ?? "0".repeat(64) },
+        components: [
+          {
+            id: "COMPONENT_ID",
+            service: "AZURE_SERVICE",
+            purpose: "Component purpose",
+            requirementIds: ["REQUIREMENT_ID"],
+            dependsOn: [],
+          },
+        ],
+        decisions: ["Describe one decision, rationale, alternatives, and consequences."],
+        risks: ["Describe one risk, impact, mitigation, and owner."],
+        wellArchitectedAssessment: {
+          framework: "azure-well-architected-framework",
+          assessmentType: "qualitative",
+          pillars: [
+            "security",
+            "reliability",
+            "performance-efficiency",
+            "cost-optimization",
+            "operational-excellence",
+          ].map((pillar) => ({
+            pillar,
+            status: "aligned",
+            assessment: "Explain the accepted design posture for this pillar.",
+            requirementIds: ["REQUIREMENT_ID"],
+            evidenceRefs: [this.artifactHash(events, "requirements") ?? "0".repeat(64)],
+            recommendations: [],
+            tradeoffs: [],
+          })),
+        },
+      };
+    }
+    if (kind === "cost-estimate") {
+      return {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: run.projectId,
+        runId: run.runId,
+        currency: "USD",
+        pricingDate: this.clock().toISOString().slice(0, 10),
+        pricingStatus: "partial",
+        lineItems: [
+          {
+            id: "COMPONENT_ID",
+            service: "AZURE_SERVICE",
+            sku: "SKU",
+            quantity: 1,
+            unitPrice: 0,
+            unitsPerMonth: 1,
+            monthlyCost: 0,
+            source: { provider: "ARM MCP", uri: "PRICING_SOURCE_URI", retrievedAt: this.clock().toISOString() },
+            uncertainty: { lowerMonthlyCost: 0, upperMonthlyCost: 0, confidence: "low", basis: "Pricing basis" },
+          },
+        ],
+        unpricedItems: [
+          {
+            id: "UNPRICED_COMPONENT_ID",
+            service: "AZURE_SERVICE",
+            sku: "SELECTED_SKU",
+            quantity: 1,
+            attemptedAt: this.clock().toISOString(),
+            reason: "A well-scoped ARM MCP query returned no matching retail row.",
+          },
+        ],
+        totalMonthlyCost: 0,
+        assumptions: ["The total is a priced subtotal while pricingStatus is partial."],
+      };
+    }
+    if (kind === "workload-decision-manifest") {
+      const requirementsHash = this.artifactHash(events, "requirements") ?? "0".repeat(64);
+      return {
+        schemaVersion: CONTRACT_VERSION,
+        environments: [run.environment],
+        skuDecisions: [
+          {
+            id: "SKU_DECISION_ID",
+            logicalId: "COMPONENT_ID",
+            service: "AZURE_SERVICE",
+            sku: "SKU",
+            quantity: 1,
+            rationale: "Decision rationale",
+            requirementIds: ["REQUIREMENT_ID"],
+            environmentOverrides: [],
+          },
+        ],
+        sloDecisions: [
+          {
+            id: "SLO_DECISION_ID",
+            logicalId: "COMPONENT_ID",
+            availabilityPercent: 99.9,
+            rtoMinutes: 240,
+            rpoMinutes: 60,
+            supportWindow: "business-hours",
+            complianceScopes: ["COMPLIANCE_SCOPE"],
+            requirementIds: ["REQUIREMENT_ID"],
+            environmentOverrides: [],
+          },
+        ],
+        revisions: [
+          { number: 1, createdAt: this.clock().toISOString(), sourceHash: requirementsHash, reason: "Initial" },
+        ],
       };
     }
     if (kind === "implementation-intent") {
@@ -4504,6 +4888,7 @@ export class ApexService {
           resolution.subjectHash === subjectHash &&
           resolution.dependencyHash === dependencyHash &&
           (resolution.disposition === "fixed" ||
+            resolution.disposition === "acknowledged" ||
             (resolution.expiresAt !== undefined && Date.parse(resolution.expiresAt) > this.clock().getTime()))
           ? [resolution.findingId]
           : [];

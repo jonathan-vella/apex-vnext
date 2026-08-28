@@ -85,6 +85,12 @@ Requirements acceptance also materializes a read-only Gate 1 review package at
 before approving Gate 1. These documents are derived from accepted APEX state;
 regeneration overwrites local edits.
 
+Architecture acceptance materializes `agent-output/<project>/<run>/architecture/` with authoritative assessment, cost,
+SKU, and challenger Markdown. It also includes editable Python, SVG, and PNG views for Architecture topology,
+qualitative WAF status, priced monthly cost breakdown, and lower/base/upper cost uncertainty. Unpriced items remain
+listed separately and are excluded from cost diagrams and the priced subtotal. Diagram failures are visible but do not
+replace or block typed review evidence.
+
 Repeat the inspection and decision ceremony for architecture/cost and implementation plan. Gate 4 is decided only after
 an exact provider preview exists. Rejection or upstream changes reopen the earliest affected work.
 

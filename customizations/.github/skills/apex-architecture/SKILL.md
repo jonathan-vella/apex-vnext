@@ -11,20 +11,29 @@ Use this skill only for an active architecture task.
 ## Prerequisites
 
 - Requirements and recorded architecture decisions are projected by `apex/taskContext`.
-- Required governance, pricing, quota, region, and service-availability evidence is present and current.
+- Required governance, quota, region, and service-availability evidence is present and current.
+- Pricing is retrieved directly through the Architect's declared read-only ARM MCP tool. Kernel task capability grants
+   do not represent ARM MCP availability.
 
 ## Workflow
 
 1. Use only accepted requirements and current task-context evidence. Trace each proposed resource and decision to
    projected requirements, evidence references, and required SLO or workload decisions where supplied.
-2. Explain Security, Reliability, Cost, Operational Excellence, and Performance Efficiency trade-offs where material.
+2. Complete the task template's qualitative assessment for Security, Reliability, Cost Optimization, Operational
+   Excellence, and Performance Efficiency. Bind every pillar to accepted requirements and evidence; do not derive
+   numeric scores.
 3. Keep identity, networking, diagnostics, recovery, data, and lifecycle decisions explicit.
 4. Present user-owned choices only when `apex/nextTask` returns `needs_input`; record them through `apex/recordInput`
    before reading the architecture task context.
-5. Return missing, unavailable, or stale discovery as a blocker rather than inventing evidence or asserting a live
+5. Call `azure-resource-manager-mcp/get_retail_prices` after selecting candidate SKUs. Do not infer unavailability from
+   task capability grants. Record a well-scoped no-result query as an explicit partial estimate `unpricedItems` entry;
+   do not create a synthetic zero-price line or stop the Architecture stage solely because one meter is absent.
+6. Return missing, unavailable, or stale discovery as a blocker rather than inventing evidence or asserting a live
    provider contract.
-6. Stage `architecture`, `cost-estimate`, and `workload-decision-manifest`, then call `apex/completeTask` once with
-   every required output in `outputs`. Do not submit a single-output completion.
+7. Submit `architecture`, `cost-estimate`, and `workload-decision-manifest` once through
+   `apex/architectureComplete`; APEX derives identity, hashes, requirement traceability, and cost/SKU bindings.
+8. Report the derived Architecture, qualitative WAF, cost-breakdown, and uncertainty diagrams materialized in the
+   Gate 2 package. These diagrams do not replace typed artifacts, pricing tables, evidence, review, or approval.
 
 ## Output
 

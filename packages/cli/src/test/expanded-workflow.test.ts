@@ -495,6 +495,24 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
   );
   const architectureValue = architecture(runId);
   const costValue = costEstimate(runId);
+  const architectureWithoutWaf = structuredClone(architectureValue);
+  delete architectureWithoutWaf.wellArchitectedAssessment;
+  await assert.rejects(
+    service.completeTaskOutputs(architectureTask, [
+      { kind: "architecture", value: architectureWithoutWaf },
+      { kind: "cost-estimate", value: costValue },
+      {
+        kind: "workload-decision-manifest",
+        value: workloadDecisionManifest({
+          runId,
+          requirementsHash: requirementHashes.outputHashes.requirements!,
+          architectureHash: sha256Json(architectureWithoutWaf),
+          costEstimateHash: sha256Json(costValue),
+        }),
+      },
+    ]),
+    /business:well-architected-assessment-complete/,
+  );
   const architectureHashes = await service.completeTaskOutputs(architectureTask, [
     { kind: "architecture", value: architectureValue },
     { kind: "cost-estimate", value: costValue },
@@ -518,6 +536,7 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
     "schema:architecture-v1",
     "schema:workload-decision-manifest-v1",
     "business:requirements-traceability",
+    "business:well-architected-assessment-complete",
     "business:workload-decision-manifest-coverage",
     "business:cost-arithmetic",
     "business:availability-current",
@@ -528,7 +547,14 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
   assert.deepEqual((architectureCompleted?.payload as { validatorEvidenceModes?: unknown }).validatorEvidenceModes, {
     "business:availability-current": "simulated",
   });
-  await complete(service, "architecture-review", [
+  const architectureReviewTask = await task(service, "architecture-review");
+  const reviewWithoutCriteria = review(runId, "architecture", architectureHashes.outputHashes.architecture!);
+  delete reviewWithoutCriteria.criteria;
+  await assert.rejects(
+    service.completeTaskOutputs(architectureReviewTask, [{ kind: "review-findings", value: reviewWithoutCriteria }]),
+    /review:well-architected-criteria-complete/,
+  );
+  await service.completeTaskOutputs(architectureReviewTask, [
     {
       kind: "review-findings",
       value: review(runId, "architecture", architectureHashes.outputHashes.architecture!),
@@ -1233,7 +1259,7 @@ test("review blockers persist, resolve, and permit gate approval", async () => {
   if (pendingReview.status !== "needs_review") return;
   assert.deepEqual(
     pendingReview.review.findings.map(({ id, actions }) => ({ id, actions })),
-    [{ id: "F-1", actions: ["revise"] }],
+    [{ id: "F-1", actions: ["revise", "acknowledge"] }],
   );
   const restarted = new ApexService(root);
   const reviewHash = reviewHashes["review-findings"]!;
@@ -1266,6 +1292,40 @@ test("review blockers persist, resolve, and permit gate approval", async () => {
   await restarted.decideGateNumber(1, "approved", "tester");
   await acceptAvailabilityEvidence(restarted, runId);
   assert.equal((await nextTaskAfterInput(restarted)).status, "task");
+});
+
+test("requirements obligations can be acknowledged with a downstream owner", async () => {
+  const service = new ApexService(await tempRoot());
+  const { runId } = await service.init({ projectId: "demo" });
+  await service.nextTask();
+  const hashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
+  const reviewHashes = await complete(service, "requirements-review", [
+    {
+      kind: "review-findings",
+      value: review(runId, "requirements", hashes.requirements!, [
+        {
+          id: "F-1",
+          severity: "high",
+          disposition: "open",
+          title: "GDPR ownership is unresolved",
+          detail: "Document and assign this downstream obligation.",
+          evidenceRefs: [],
+        },
+      ]),
+    },
+  ]);
+
+  await assert.rejects(
+    service.decideReview(reviewHashes["review-findings"]!, [{ findingId: "F-1", action: "acknowledge" }]),
+    /Acknowledgment requires an owner/u,
+  );
+  assert.deepEqual(
+    await service.decideReview(reviewHashes["review-findings"]!, [
+      { findingId: "F-1", action: "acknowledge", owner: "Nordic Fresh Foods Product Owner" },
+    ]),
+    { status: "resolved" },
+  );
+  assert.equal((await service.status()).run.gates[0]?.state, "open");
 });
 
 test("requirements revision invalidates the old artifact and requires a fresh review", async () => {
