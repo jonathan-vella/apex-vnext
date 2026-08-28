@@ -487,6 +487,25 @@ describe("target family contracts", () => {
         ],
         decisions: ["Use managed identity"],
         risks: [],
+        wellArchitectedAssessment: {
+          framework: "azure-well-architected-framework",
+          assessmentType: "qualitative",
+          pillars: [
+            "security",
+            "reliability",
+            "performance-efficiency",
+            "cost-optimization",
+            "operational-excellence",
+          ].map((pillar) => ({
+            pillar,
+            status: "aligned",
+            assessment: `${pillar} requirements are addressed`,
+            requirementIds: ["REQ-001"],
+            evidenceRefs: [hash],
+            recommendations: [],
+            tradeoffs: [],
+          })),
+        },
       },
     ],
     [
@@ -534,6 +553,18 @@ describe("target family contracts", () => {
             resolution: "Added zone-redundant deployment",
           },
         ],
+        criteria: [
+          "security",
+          "reliability",
+          "performance-efficiency",
+          "cost-optimization",
+          "operational-excellence",
+        ].map((criterionId) => ({
+          criterionId,
+          outcome: criterionId === "reliability" ? "finding" : "pass",
+          rationale: `${criterionId} was reviewed`,
+          findingIds: criterionId === "reliability" ? ["finding-1"] : [],
+        })),
       },
     ],
     [

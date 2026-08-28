@@ -127,12 +127,23 @@
         ],
         "type": "object"
       },
-      "minItems": 1,
       "type": "array"
     },
     "pricingDate": {
       "format": "date",
       "type": "string"
+    },
+    "pricingStatus": {
+      "anyOf": [
+        {
+          "const": "complete",
+          "type": "string"
+        },
+        {
+          "const": "partial",
+          "type": "string"
+        }
+      ]
     },
     "projectId": {
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
@@ -149,6 +160,48 @@
     "totalMonthlyCost": {
       "minimum": 0,
       "type": "number"
+    },
+    "unpricedItems": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "attemptedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "quantity": {
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          "reason": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "service": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "sku": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "service",
+          "sku",
+          "quantity",
+          "attemptedAt",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
     }
   },
   "required": [

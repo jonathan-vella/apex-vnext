@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Architecture now requires a typed qualitative assessment of all five Azure Well-Architected pillars and an explicit
+  Reviewer criterion receipt for each pillar. The Gate 2 package includes derived Python, SVG, and PNG views for
+  Architecture, WAF status, priced cost breakdown, and cost uncertainty while retaining authoritative evidence tables.
+- Interactive authoring agents can recover externalized task context through one bounded MCP reader; Architecture now
+  receives exact output templates while APEX derives decision-manifest identity, artifact hashes, must-requirement
+  traceability, and cost/SKU bindings. Partial estimates record missing retail meters explicitly while synthetic
+  unpriced cost placeholders remain rejected.
+- Requirements review can acknowledge business-owned obligations with a responsible role, allowing Azure architects
+  to document GDPR, retention, workload-volume, and product-policy gaps without inventing rationale or expiry dates.
 - Requirements now uses three adaptive panels with confirmed recommendations, workload-specific scale prompts,
   non-binding service candidates, and no duplicate IaC question. Pending four-round intake remains replayable.
 - Requirements, Architecture, Plan, and Reviewer use stage-specific completion operations. Review findings return as a

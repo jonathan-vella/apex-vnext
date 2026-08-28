@@ -3,6 +3,75 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "criteria": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "criterionId": {
+            "anyOf": [
+              {
+                "const": "security",
+                "type": "string"
+              },
+              {
+                "const": "reliability",
+                "type": "string"
+              },
+              {
+                "const": "performance-efficiency",
+                "type": "string"
+              },
+              {
+                "const": "cost-optimization",
+                "type": "string"
+              },
+              {
+                "const": "operational-excellence",
+                "type": "string"
+              }
+            ]
+          },
+          "findingIds": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "const": "pass",
+                "type": "string"
+              },
+              {
+                "const": "finding",
+                "type": "string"
+              },
+              {
+                "const": "not-applicable",
+                "type": "string"
+              }
+            ]
+          },
+          "rationale": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "criterionId",
+          "outcome",
+          "rationale",
+          "findingIds"
+        ],
+        "type": "object"
+      },
+      "maxItems": 5,
+      "minItems": 5,
+      "type": "array"
+    },
     "findings": {
       "items": {
         "additionalProperties": false,

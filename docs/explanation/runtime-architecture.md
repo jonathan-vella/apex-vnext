@@ -28,8 +28,10 @@ translates commands into service calls, and exposes a narrow MCP facade. The CLI
 
 ## Renderers And Testkit
 
-`packages/renderers` turns typed contracts into deterministic Markdown. `packages/testkit` provides fixtures, providers,
-clocks, IDs, and qualification scenarios. Neither package owns production decisions.
+`packages/renderers` turns typed contracts into deterministic Markdown and bounded documentation diagrams. Architecture,
+qualitative WAF, cost-breakdown, and cost-uncertainty views share accepted typed sources; SVG is rendered directly, PNG
+is rasterized from that SVG, and editable Python is emitted but never executed by APEX. `packages/testkit` provides
+fixtures, providers, clocks, IDs, and qualification scenarios. Neither package owns production decisions.
 
 ## Managed Clients
 

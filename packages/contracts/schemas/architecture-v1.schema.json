@@ -90,6 +90,125 @@
     "title": {
       "minLength": 1,
       "type": "string"
+    },
+    "wellArchitectedAssessment": {
+      "additionalProperties": false,
+      "properties": {
+        "assessmentType": {
+          "const": "qualitative",
+          "type": "string"
+        },
+        "framework": {
+          "const": "azure-well-architected-framework",
+          "type": "string"
+        },
+        "pillars": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "assessment": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "evidenceRefs": {
+                "items": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "pillar": {
+                "anyOf": [
+                  {
+                    "const": "security",
+                    "type": "string"
+                  },
+                  {
+                    "const": "reliability",
+                    "type": "string"
+                  },
+                  {
+                    "const": "performance-efficiency",
+                    "type": "string"
+                  },
+                  {
+                    "const": "cost-optimization",
+                    "type": "string"
+                  },
+                  {
+                    "const": "operational-excellence",
+                    "type": "string"
+                  }
+                ]
+              },
+              "recommendations": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "requirementIds": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "const": "aligned",
+                    "type": "string"
+                  },
+                  {
+                    "const": "concern",
+                    "type": "string"
+                  },
+                  {
+                    "const": "blocker",
+                    "type": "string"
+                  },
+                  {
+                    "const": "not-applicable",
+                    "type": "string"
+                  }
+                ]
+              },
+              "tradeoffs": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "pillar",
+              "status",
+              "assessment",
+              "requirementIds",
+              "evidenceRefs",
+              "recommendations",
+              "tradeoffs"
+            ],
+            "type": "object"
+          },
+          "maxItems": 5,
+          "minItems": 5,
+          "type": "array"
+        }
+      },
+      "required": [
+        "framework",
+        "assessmentType",
+        "pillars"
+      ],
+      "type": "object"
     }
   },
   "required": [

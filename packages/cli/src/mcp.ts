@@ -19,6 +19,20 @@ const reviewFinding = z
     detail: z.string().min(1),
   })
   .strict();
+const reviewCriterion = z
+  .object({
+    criterionId: z.enum([
+      "security",
+      "reliability",
+      "performance-efficiency",
+      "cost-optimization",
+      "operational-excellence",
+    ]),
+    outcome: z.enum(["pass", "finding", "not-applicable"]),
+    rationale: z.string().min(1),
+    findingIds: z.array(z.string().min(1)),
+  })
+  .strict();
 const uniqueStrings = z
   .array(z.string().min(1))
   .min(1)
@@ -112,8 +126,9 @@ const reviewDecisionInput = z
         z
           .object({
             findingId: z.string().min(1),
-            action: z.enum(["revise", "accept-risk"]),
-            rationale: z.string().min(1),
+            action: z.enum(["revise", "accept-risk", "acknowledge"]),
+            rationale: z.string().min(1).optional(),
+            owner: z.string().min(1).optional(),
             expiresAt: z.string().datetime().optional(),
           })
           .strict(),
@@ -164,7 +179,7 @@ export function createMcpServer(service: ApexService): McpServer {
   server.registerTool(
     "readTaskInput",
     {
-      description: "Read a bounded chunk of the accepted source artifact for an active review task.",
+      description: "Read a bounded chunk of authoritative context for the exact active task.",
       inputSchema: {
         taskId: z.string(),
         offset: z.number().int().nonnegative().optional(),
@@ -219,15 +234,17 @@ export function createMcpServer(service: ApexService): McpServer {
     "reviewDecide",
     {
       description:
-        "Resolve all current review findings atomically by requesting revision or accepting permitted time-bound risk.",
+        "Resolve review findings atomically by revision, Requirements obligation acknowledgment with an owner, or permitted time-bound risk.",
       inputSchema: reviewDecisionInput,
     },
     async ({ reviewHash, decisions }) =>
       result(
         await service.decideReview(
           reviewHash,
-          decisions.map(({ expiresAt, ...decision }) => ({
+          decisions.map(({ rationale, owner, expiresAt, ...decision }) => ({
             ...decision,
+            ...(rationale === undefined ? {} : { rationale }),
+            ...(owner === undefined ? {} : { owner }),
             ...(expiresAt === undefined ? {} : { expiresAt }),
           })),
         ),
@@ -340,7 +357,8 @@ export function createMcpServer(service: ApexService): McpServer {
   server.registerTool(
     "architectureComplete",
     {
-      description: "Complete the active Architecture task atomically with all required outputs.",
+      description:
+        "Complete Architecture atomically; APEX derives identity, artifact hashes, exact must-requirement traceability, and cost/SKU bindings.",
       inputSchema: {
         taskId: z.string(),
         architecture: z.unknown(),
@@ -363,9 +381,13 @@ export function createMcpServer(service: ApexService): McpServer {
     {
       description:
         "Complete the active review task; APEX derives subject identity, hash, timestamp, and evidence binding.",
-      inputSchema: { taskId: z.string(), findings: z.array(reviewFinding) },
+      inputSchema: {
+        taskId: z.string(),
+        findings: z.array(reviewFinding),
+        criteria: z.array(reviewCriterion).optional(),
+      },
     },
-    async ({ taskId, findings }) => result(await service.completeReview(taskId, findings)),
+    async ({ taskId, findings, criteria }) => result(await service.completeReview(taskId, findings, criteria)),
   );
   server.registerTool(
     "planComplete",

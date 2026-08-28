@@ -71,15 +71,15 @@ export const DOCUMENT_REGISTRY: Readonly<Record<string, DocumentDefinition>> = {
   },
   "architecture-assessment": {
     sourceArtifactKind: "architecture",
-    sourceAvailability: "unavailable",
+    sourceAvailability: "available",
     templateAvailability: "reference-only",
-    renderer: "unavailable",
+    renderer: "architecture-assessment-v1",
   },
   "cost-estimate": {
     sourceArtifactKind: "cost-estimate",
-    sourceAvailability: "unavailable",
+    sourceAvailability: "available",
     templateAvailability: "reference-only",
-    renderer: "unavailable",
+    renderer: "cost-estimate-v1",
   },
   "governance-constraints": {
     sourceArtifactKind: "governance-constraints",

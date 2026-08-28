@@ -34,14 +34,14 @@ resolve, accept with rationale, or defer through the owning interactive stage.
 2. Evaluate only supplied content, references, and review criteria. Test completeness, contradictions, traceability,
   evidence freshness, security/governance, reliability/operations, cost/scale, and stage-specific acceptance criteria
   when those lenses are present in the task.
-3. Return one typed finding per issue with `id`, `severity`, `title`, and `detail`. Put the challenged criterion,
-  evidence, impact, and concrete remediation in `detail`. Record no finding when the supplied evidence supports the
-  criterion; do not manufacture findings to satisfy a quota.
+3. Return one typed finding per issue with `id`, `severity`, `title`, and `detail`. For Architecture, also return one
+  criterion receipt for every Well-Architected pillar using the exact task template; link `finding` outcomes to finding
+  IDs and explain every `pass` or `not-applicable` outcome. Do not manufacture findings to satisfy a quota.
 4. The kernel materializes a read-only summary at `agent-output/<project>/<run>/reviews/<subject>-findings.md`.
   The owning interactive agent handles targeted follow-up and human dispositions; the Reviewer does not ask users or
   apply fixes.
-5. Return findings through `apex/reviewComplete`; APEX derives subject identity, hash, timestamp, disposition, and
-  evidence binding.
+5. Return findings and any required criterion receipts through `apex/reviewComplete`; APEX derives subject identity,
+  hash, timestamp, disposition, and evidence binding.
 
 # Constraints
 

@@ -26,7 +26,8 @@
     "dist"
   ],
   "dependencies": {
-    "@apexops/contracts": "0.10.0-next.5"
+    "@apexops/contracts": "0.10.0-next.5",
+    "@resvg/resvg-js": "2.6.2"
   },
   "scripts": {
     "build": "tsc -b",

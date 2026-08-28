@@ -134,6 +134,14 @@ const VALIDATION_EVIDENCE_IDS = new Set([
   "terraform:validate",
 ]);
 
+const WELL_ARCHITECTED_PILLARS = [
+  "security",
+  "reliability",
+  "performance-efficiency",
+  "cost-optimization",
+  "operational-excellence",
+] as const;
+
 function issue(path: string, message: string): ValidationIssue[] {
   return [{ path, message }];
 }
@@ -184,6 +192,59 @@ function requirementsTraceability(value: unknown): ValidationIssue[] {
   return missing.length === 0
     ? []
     : issue("/outputs/architecture/components", `Uncovered confirmed must requirements: ${missing.join(", ")}`);
+}
+
+function wellArchitectedAssessmentComplete(value: unknown): ValidationIssue[] {
+  const context = taskContext(value);
+  const architecture = context.outputs.architecture as ArchitectureV1;
+  const requirements = context.artifacts.requirements as RequirementsV1 | undefined;
+  const assessment = architecture.wellArchitectedAssessment;
+  if (requirements === undefined) return issue("/artifacts/requirements", "Accepted requirements are required");
+  if (assessment === undefined) {
+    return issue("/outputs/architecture/wellArchitectedAssessment", "Well-Architected assessment is required");
+  }
+  const expectedPillars = [...WELL_ARCHITECTED_PILLARS].sort();
+  const actualPillars = assessment.pillars.map(({ pillar }) => pillar).sort();
+  if (
+    new Set(actualPillars).size !== expectedPillars.length ||
+    JSON.stringify(actualPillars) !== JSON.stringify(expectedPillars)
+  ) {
+    return issue(
+      "/outputs/architecture/wellArchitectedAssessment/pillars",
+      "Assessment must cover exactly the five Azure Well-Architected pillars",
+    );
+  }
+  const knownRequirementIds = new Set(requirements.requirements.map(({ id }) => id));
+  const acceptedEvidence = new Set([...context.inputRefs, ...Object.values(context.artifactHashes)]);
+  for (const pillar of assessment.pillars) {
+    if (pillar.requirementIds.length === 0 && pillar.evidenceRefs.length === 0) {
+      return issue(
+        "/outputs/architecture/wellArchitectedAssessment/pillars",
+        `${pillar.pillar} must reference at least one accepted requirement or evidence item`,
+      );
+    }
+    const unknownRequirements = pillar.requirementIds.filter((id) => !knownRequirementIds.has(id));
+    if (unknownRequirements.length > 0) {
+      return issue(
+        "/outputs/architecture/wellArchitectedAssessment/pillars/requirementIds",
+        `${pillar.pillar} references unknown requirements: ${unknownRequirements.join(", ")}`,
+      );
+    }
+    const unknownEvidence = pillar.evidenceRefs.filter((hash) => !acceptedEvidence.has(hash));
+    if (unknownEvidence.length > 0) {
+      return issue(
+        "/outputs/architecture/wellArchitectedAssessment/pillars/evidenceRefs",
+        `${pillar.pillar} references evidence not accepted for this task`,
+      );
+    }
+    if ((pillar.status === "concern" || pillar.status === "blocker") && pillar.recommendations.length === 0) {
+      return issue(
+        "/outputs/architecture/wellArchitectedAssessment/pillars/recommendations",
+        `${pillar.pillar} ${pillar.status} requires a recommendation`,
+      );
+    }
+  }
+  return [];
 }
 
 function costArithmetic(value: unknown): ValidationIssue[] {
@@ -238,17 +299,31 @@ function workloadDecisionCoverage(value: unknown): ValidationIssue[] {
     const costMatches = estimate.lineItems.filter(
       (line) => line.service === decision.service && line.sku === decision.sku && line.quantity === decision.quantity,
     );
+    const unavailableMatches = (estimate.unpricedItems ?? []).filter(
+      (line) => line.service === decision.service && line.sku === decision.sku && line.quantity === decision.quantity,
+    );
     if (
       component === undefined ||
       component.service !== decision.service ||
       !decision.requirementIds.every((id) => component.requirementIds.includes(id)) ||
-      costMatches.length !== 1
+      costMatches.length + unavailableMatches.length !== 1
     ) {
       return issue(
         "/outputs/workload-decision-manifest/skuDecisions",
         `SKU decision ${decision.id} is not architecture and cost traceable`,
       );
     }
+  }
+  const unpricedItems = estimate.unpricedItems ?? [];
+  if (
+    (unpricedItems.length > 0 && estimate.pricingStatus !== "partial") ||
+    (unpricedItems.length === 0 && estimate.pricingStatus === "partial") ||
+    estimate.lineItems.length + unpricedItems.length === 0
+  ) {
+    return issue(
+      "/outputs/cost-estimate",
+      "Partial pricing requires explicit unpriced items; complete pricing requires priced line items",
+    );
   }
   for (const decision of manifest.sloDecisions) {
     const component = components.get(decision.logicalId);
@@ -447,6 +522,64 @@ function comprehensiveReview(expectedNode: string, value: unknown): ValidationIs
   return review.subjectKind === subjectKind && expectedHash !== undefined && review.subjectHash === expectedHash
     ? []
     : issue("/outputs/review-findings", `Review does not bind the accepted ${subjectKind} artifact`);
+}
+
+function wellArchitectedCriteriaComplete(value: unknown): ValidationIssue[] {
+  const context = taskContext(value);
+  const review = context.outputs["review-findings"] as ReviewFindingsV1;
+  const architecture = context.artifacts.architecture as ArchitectureV1 | undefined;
+  if (architecture?.wellArchitectedAssessment === undefined) {
+    return issue(
+      "/artifacts/architecture/wellArchitectedAssessment",
+      "Accepted Well-Architected assessment is required",
+    );
+  }
+  const criteria = review.criteria;
+  if (criteria === undefined) {
+    return issue("/outputs/review-findings/criteria", "Well-Architected review criteria are required");
+  }
+  const expectedPillars = [...WELL_ARCHITECTED_PILLARS].sort();
+  const actualPillars = criteria.map(({ criterionId }) => criterionId).sort();
+  if (
+    new Set(actualPillars).size !== expectedPillars.length ||
+    JSON.stringify(actualPillars) !== JSON.stringify(expectedPillars)
+  ) {
+    return issue(
+      "/outputs/review-findings/criteria",
+      "Review must cover exactly the five Azure Well-Architected pillars",
+    );
+  }
+  const findingIds = new Set(review.findings.map(({ id }) => id));
+  const statusByPillar = new Map(
+    architecture.wellArchitectedAssessment.pillars.map(({ pillar, status }) => [pillar, status]),
+  );
+  for (const criterion of criteria) {
+    if (criterion.findingIds.some((id) => !findingIds.has(id))) {
+      return issue(
+        "/outputs/review-findings/criteria/findingIds",
+        `${criterion.criterionId} references an unknown finding`,
+      );
+    }
+    if (criterion.outcome === "finding" && criterion.findingIds.length === 0) {
+      return issue(
+        "/outputs/review-findings/criteria/findingIds",
+        `${criterion.criterionId} requires a linked finding`,
+      );
+    }
+    if (criterion.outcome === "pass" && criterion.findingIds.length > 0) {
+      return issue(
+        "/outputs/review-findings/criteria/findingIds",
+        `${criterion.criterionId} pass cannot link findings`,
+      );
+    }
+    if (criterion.outcome === "not-applicable" && statusByPillar.get(criterion.criterionId) !== "not-applicable") {
+      return issue(
+        "/outputs/review-findings/criteria/outcome",
+        `${criterion.criterionId} can be not applicable only when the accepted assessment is not applicable`,
+      );
+    }
+  }
+  return [];
 }
 
 function requiredValidationEvidence(id: string, value: unknown): ValidationIssue[] {
@@ -989,6 +1122,7 @@ export function registerWorkflowValidators(registry: ValidatorRegistry): void {
 
   registry.registerHandler("business:requirements-completeness", requirementsCompleteness);
   registry.registerHandler("business:requirements-traceability", requirementsTraceability);
+  registry.registerHandler("business:well-architected-assessment-complete", wellArchitectedAssessmentComplete);
   registry.registerHandler("business:workload-decision-manifest-coverage", workloadDecisionCoverage);
   registry.registerHandler("business:cost-arithmetic", costArithmetic);
   registry.registerHandler("business:availability-current", availabilityCurrent, "freshness");
@@ -1003,6 +1137,7 @@ export function registerWorkflowValidators(registry: ValidatorRegistry): void {
 
   registry.registerHandler("review:requirements-comprehensive", (value) => comprehensiveReview("requirements", value));
   registry.registerHandler("review:architecture-comprehensive", (value) => comprehensiveReview("architecture", value));
+  registry.registerHandler("review:well-architected-criteria-complete", wellArchitectedCriteriaComplete);
   registry.registerHandler("review:governance-reconciliation", (value) =>
     comprehensiveReview("governance-reconciliation", value),
   );
