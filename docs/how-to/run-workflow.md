@@ -92,7 +92,8 @@ listed separately and are excluded from cost diagrams and the priced subtotal. D
 replace or block typed review evidence.
 
 When qualified regional, zonal, or quota evidence is unavailable, Architecture records an explicit WAF concern and
-pre-deployment validation recommendation. Supplied availability evidence is still rejected if stale or scope-mismatched.
+pre-deployment validation recommendation. These out-of-band checks do not block Architecture review when the gap is
+accurately disclosed. Supplied availability evidence is still rejected if stale or scope-mismatched.
 
 Repeat the inspection and decision ceremony for architecture/cost and implementation plan. Gate 4 is decided only after
 an exact provider preview exists. Rejection or upstream changes reopen the earliest affected work.

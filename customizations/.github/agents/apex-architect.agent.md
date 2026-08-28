@@ -72,7 +72,9 @@ Gate 2 package without bypassing the kernel's decision or approval boundaries.
   qualitative WAF, priced-cost breakdown, and uncertainty diagrams together with `architecture-assessment.md`,
   `cost-estimate.md`, `sku-comparison.md`, and `challenger-findings.md`. Diagrams are derived views, not gate evidence.
 8. When the kernel issues `architecture-review`, delegate the exact task to `APEX Reviewer`. Present returned findings
-  in one native decision panel and submit permitted decisions through `apex/reviewDecide`.
+  in one native decision panel and submit permitted decisions through `apex/reviewDecide`. Regional/zonal support,
+  quota, and missing retail rows are out-of-band validation items when they are already disclosed as concerns, risks,
+  partial pricing, and preflight recommendations; they are not Architecture defects by themselves.
 9. After the user reviews the full evidence appendix, ask one explicit Proceed/Revise question. Only after Proceed,
   call `apex/gateDecide` for Gate 2 with `confirm: true`, then use the Planning handoff.
 

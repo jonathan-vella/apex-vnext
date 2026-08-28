@@ -792,7 +792,7 @@ test("architecture can record an availability concern when qualified evidence is
   availabilityPillar.recommendations = ["Validate regional and zonal service availability before deployment."];
   architectureValue.risks.push("Regional and zonal service availability is not yet verified.");
   const costValue = costEstimate(runId);
-  await service.completeTaskOutputs(await task(service, "architecture"), [
+  const architectureHashes = await service.completeTaskOutputs(await task(service, "architecture"), [
     { kind: "architecture", value: architectureValue },
     { kind: "cost-estimate", value: costValue },
     {
@@ -805,6 +805,31 @@ test("architecture can record an availability concern when qualified evidence is
       }),
     },
   ]);
+  const architectureReview = review(runId, "architecture", architectureHashes.outputHashes.architecture!, [
+    {
+      id: "F-ARCH-1",
+      severity: "medium",
+      disposition: "open",
+      title: "Genuine architecture concern",
+      detail: "A design contradiction requires a user decision.",
+      evidenceRefs: [],
+    },
+  ]);
+  const reliabilityCriterion = architectureReview.criteria!.find(({ criterionId }) => criterionId === "reliability")!;
+  reliabilityCriterion.outcome = "finding";
+  (reliabilityCriterion.findingIds as string[]).push("F-ARCH-1");
+  const reviewHashes = await service.completeTaskOutputs(await task(service, "architecture-review"), [
+    { kind: "review-findings", value: architectureReview },
+  ]);
+  const pendingReview = await service.nextTask();
+  assert.equal(pendingReview.status, "needs_review");
+  if (pendingReview.status !== "needs_review") return;
+  assert.equal(pendingReview.review.gate, 2);
+  assert.equal(pendingReview.review.reviewHash, reviewHashes.outputHashes["review-findings"]);
+  assert.deepEqual(
+    pendingReview.review.findings.map(({ id, actions }) => ({ id, actions })),
+    [{ id: "F-ARCH-1", actions: ["revise", "accept-risk"] }],
+  );
 });
 
 test("authorized capability adapter accepts native architecture availability evidence", async () => {

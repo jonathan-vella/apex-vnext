@@ -4843,7 +4843,9 @@ export class ApexService {
         if (reviewBlockers.length > 0)
           return {
             blockers: reviewBlockers,
-            ...(descriptor.gate === undefined ? {} : { reviewGate: descriptor.gate }),
+            ...(descriptor.gate === undefined && descriptor.id !== "architecture-review"
+              ? {}
+              : { reviewGate: descriptor.gate ?? 2 }),
           };
         if (descriptor.gate !== undefined && !this.gateApproved(run, descriptor.gate)) {
           return { blockers: [`Gate ${descriptor.gate} approval is required`] };
