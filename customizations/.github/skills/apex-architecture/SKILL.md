@@ -11,7 +11,7 @@ Use this skill only for an active architecture task.
 ## Prerequisites
 
 - Requirements and recorded architecture decisions are projected by `apex/taskContext`.
-- Required governance, quota, region, and service-availability evidence is present and current.
+- Accepted governance, quota, region, and service-availability evidence is used when present and current.
 - Pricing is retrieved directly through the Architect's declared read-only ARM MCP tool. Kernel task capability grants
    do not represent ARM MCP availability.
 
@@ -28,8 +28,8 @@ Use this skill only for an active architecture task.
 5. Call `azure-resource-manager-mcp/get_retail_prices` after selecting candidate SKUs. Do not infer unavailability from
    task capability grants. Record a well-scoped no-result query as an explicit partial estimate `unpricedItems` entry;
    do not create a synthetic zero-price line or stop the Architecture stage solely because one meter is absent.
-6. Return missing, unavailable, or stale discovery as a blocker rather than inventing evidence or asserting a live
-   provider contract.
+6. Reject stale or mismatched supplied evidence. When no qualified quota, region, or service-availability capability is
+   available, record a `concern`, recommendation, and risk instead of inventing evidence or blocking Architecture.
 7. Submit `architecture`, `cost-estimate`, and `workload-decision-manifest` once through
    `apex/architectureComplete`; APEX derives identity, hashes, requirement traceability, and cost/SKU bindings.
 8. Report the derived Architecture, qualitative WAF, cost-breakdown, and uncertainty diagrams materialized in the

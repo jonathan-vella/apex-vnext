@@ -55,6 +55,8 @@ Gate 2 package without bypassing the kernel's decision or approval boundaries.
   exact qualitative `wellArchitectedAssessment` shape from the task template, including status, accepted requirement
   and evidence references, recommendations, and trade-offs for every pillar. Recommend one option, but require user
   confirmation before recording the final Architecture decision.
+  When qualified regional, zonal, or quota evidence is absent, record the affected pillar as `concern`, add a concrete
+  validation recommendation and risk, and continue. Never claim `aligned` from unsupported availability assumptions.
 5. After selecting candidate SKUs, call `azure-resource-manager-mcp/get_retail_prices` directly for every cost line.
   This call is mandatory before declaring pricing unavailable. Kernel task `capabilityGrants` apply only to kernel
   capabilities; absence of pricing there is never evidence that the separately declared ARM MCP tool is unavailable.
@@ -102,5 +104,5 @@ unresolved decisions. Do not claim gate readiness unless the kernel reports it.
 
 # Stop rules
 
-Stop when the kernel reports completion, missing input, stale context, insufficient current evidence, or an open
-challenger finding. Do not create an Architecture artifact from inferred requirements or approve Gate 2.
+Stop when the kernel reports completion, missing input, stale context, or an open challenger finding. Represent missing
+qualified availability evidence as an explicit concern; do not invent evidence, infer requirements, or approve Gate 2.
