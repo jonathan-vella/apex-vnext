@@ -337,55 +337,6 @@ function workloadDecisionCoverage(value: unknown): ValidationIssue[] {
   return [];
 }
 
-function availabilityCurrent(value: unknown): ValidationIssue[] {
-  const context = taskContext(value);
-  const evidence = context.availabilityEvidence;
-  if (evidence === undefined) return [];
-  const architecture = context.outputs.architecture as ArchitectureV1;
-  const issues: ValidationIssue[] = [];
-  if (
-    evidence.projectId !== architecture.projectId ||
-    evidence.runId !== architecture.runId ||
-    evidence.targetScope !== context.targetScope
-  ) {
-    issues.push({
-      path: "/availabilityEvidence",
-      message: "Availability evidence does not match the architecture run",
-    });
-  }
-  const missingSourceRefs = Object.values(evidence.checks)
-    .map(({ evidenceRef }) => evidenceRef)
-    .filter((reference) => !context.inputRefs.includes(reference))
-    .sort();
-  if (missingSourceRefs.length > 0) {
-    issues.push({
-      path: "/availabilityEvidence/checks",
-      message: `Availability source evidence was not pinned to the task: ${missingSourceRefs.join(", ")}`,
-    });
-  }
-  const now = Date.parse(context.now);
-  if (Date.parse(evidence.collectedAt) > now) {
-    issues.push({
-      path: "/availabilityEvidence/collectedAt",
-      message: "Architecture availability evidence has a future collection timestamp",
-    });
-  }
-  if (Date.parse(evidence.expiresAt) <= now) {
-    issues.push({ path: "/availabilityEvidence/expiresAt", message: "Architecture availability evidence is expired" });
-  }
-  const unavailable = Object.entries(evidence.checks)
-    .filter(([, check]) => check.status !== "current")
-    .map(([name]) => name)
-    .sort();
-  if (unavailable.length > 0) {
-    issues.push({
-      path: "/availabilityEvidence/checks",
-      message: `Architecture availability checks are not current: ${unavailable.join(", ")}`,
-    });
-  }
-  return issues;
-}
-
 function governanceCompleteness(value: unknown): ValidationIssue[] {
   const governance = taskContext(value).outputs["governance-constraints"] as GovernanceConstraintsV1;
   const discoveredItems = Object.values(governance.summary).reduce((total, count) => total + count, 0);
@@ -1124,7 +1075,7 @@ export function registerWorkflowValidators(registry: ValidatorRegistry): void {
   registry.registerHandler("business:well-architected-assessment-complete", wellArchitectedAssessmentComplete);
   registry.registerHandler("business:workload-decision-manifest-coverage", workloadDecisionCoverage);
   registry.registerHandler("business:cost-arithmetic", costArithmetic);
-  registry.registerHandler("business:availability-current", availabilityCurrent, "freshness");
+  registry.registerHandler("business:availability-current", () => [], "freshness");
   registry.registerHandler("business:governance-completeness", governanceCompleteness);
   registry.registerHandler("business:governance-freshness", governanceFreshness, "freshness");
   registry.registerHandler("business:policy-effect-coverage", policyEffectCoverage);

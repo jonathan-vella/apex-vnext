@@ -17,10 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Architecture now requires a typed qualitative assessment of all five Azure Well-Architected pillars and an explicit
   Reviewer criterion receipt for each pillar. The Gate 2 package includes derived Python, SVG, and PNG views for
   Architecture, WAF status, priced cost breakdown, and cost uncertainty while retaining authoritative evidence tables.
-- Architecture no longer deadlocks when the installed client has no qualified regional or quota discovery capability;
-  missing availability is recorded as a reviewable WAF concern, while supplied stale or mismatched evidence fails closed.
-- Architecture review now treats disclosed regional, quota, and missing-price checks as out-of-band preflight work and
-  exposes genuine open findings through the Gate 2 decision payload with the review hash and permitted actions.
+- Architecture assumes regional service/SKU availability and sufficient quota; regional, zonal, deployment, restore,
+  failover, and capacity checks are optional documentation rather than APEX validations or review findings. Explicit
+  partial pricing is accepted documentation, and out-of-scope findings can be dismissed without revising Architecture.
 - Interactive authoring agents can recover externalized task context through one bounded MCP reader; Architecture now
   receives exact output templates while APEX derives decision-manifest identity, artifact hashes, must-requirement
   traceability, and cost/SKU bindings. Partial estimates record missing retail meters explicitly while synthetic

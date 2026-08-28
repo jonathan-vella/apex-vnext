@@ -91,9 +91,8 @@ qualitative WAF status, priced monthly cost breakdown, and lower/base/upper cost
 listed separately and are excluded from cost diagrams and the priced subtotal. Diagram failures are visible but do not
 replace or block typed review evidence.
 
-When qualified regional, zonal, or quota evidence is unavailable, Architecture records an explicit WAF concern and
-pre-deployment validation recommendation. These out-of-band checks do not block Architecture review when the gap is
-accurately disclosed. Supplied availability evidence is still rejected if stale or scope-mismatched.
+Architecture assumes regional service/SKU availability and sufficient quota. Regional, zonal, deployment, restore,
+failover, and capacity details may appear as descriptive assumptions, but APEX does not request, validate, or gate them.
 
 Repeat the inspection and decision ceremony for architecture/cost and implementation plan. Gate 4 is decided only after
 an exact provider preview exists. Rejection or upstream changes reopen the earliest affected work.
