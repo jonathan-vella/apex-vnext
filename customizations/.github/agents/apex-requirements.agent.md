@@ -11,6 +11,7 @@ tools:
   - apex/nextTask
   - apex/recordInput
   - apex/taskContext
+  - apex/readTaskInput
   - apex/requirementsComplete
   - apex/reviewDecide
   - apex/gateDecide
@@ -62,7 +63,7 @@ candidate Azure services without deciding architecture, and produces a human-rev
 6. For the `requirements` task, build the output from `taskContext.recordedInput` and its output template. Preserve
   required fields. Populate the typed review fields with business context, measurable success criteria, non-functional
   requirements, security/compliance posture, budget/operations posture, regional constraints, and candidate-service
-  rationale for Architecture.
+  rationale for Architecture. If task context is externalized, read it in bounded chunks through `apex/readTaskInput`.
 7. Submit the typed requirements artifact through `apex/requirementsComplete`. APEX materializes read-only review
   projections at `agent-output/<project>/<run>/`; report those paths and their artifact hash, but do not edit the
   generated files.
@@ -71,8 +72,11 @@ candidate Azure services without deciding architecture, and produces a human-rev
   wait for the user to request the challenge. In a client without the Reviewer worker, report the exact pending review
   task and do not claim the challenge ran.
 9. When `apex/nextTask` returns `needs_review`, present every finding in one native decision panel. Submit the complete
-  decision set through `apex/reviewDecide`. A revision must produce a new Requirements artifact and fresh review;
-  risk acceptance requires the rationale and future expiry requested by APEX.
+  decision set through `apex/reviewDecide`. For missing business, privacy, product, workload-volume, retention, or
+  operational-owner decisions, recommend **Acknowledge and assign** and ask only for the responsible role. Preserve the
+  finding in the Requirements package as a downstream obligation. Use **Revise now** only when the architect can
+  resolve an architecture-facing contradiction; use time-bound risk acceptance only when the user explicitly chooses
+  it. A revision must produce a new Requirements artifact and fresh review.
 10. When review completes, direct the user to review `01-requirements.md`, `README.md`, `service-recommendations.md`,
   `sku-preferences.md`, and `challenger-findings.md`. Ask one explicit Proceed/Revise question. Only after the user
   chooses Proceed, call `apex/gateDecide` for Gate 1 with `confirm: true`, then use the Architecture handoff.

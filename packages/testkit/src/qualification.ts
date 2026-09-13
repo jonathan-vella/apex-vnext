@@ -582,6 +582,21 @@ function architecture(context: TrackContext) {
     components: [{ id: "api", service: "fake/service", purpose: "Serve", requirementIds: ["REQ-1"], dependsOn: [] }],
     decisions: [],
     risks: [],
+    wellArchitectedAssessment: {
+      framework: "azure-well-architected-framework",
+      assessmentType: "qualitative",
+      pillars: ["security", "reliability", "performance-efficiency", "cost-optimization", "operational-excellence"].map(
+        (pillar) => ({
+          pillar,
+          status: "aligned",
+          assessment: `${pillar} is addressed by the qualification architecture`,
+          requirementIds: ["REQ-1"],
+          evidenceRefs: [],
+          recommendations: [],
+          tradeoffs: [],
+        }),
+      ),
+    },
   };
 }
 function costEstimate(context: TrackContext) {
@@ -617,6 +632,22 @@ function review(context: TrackContext, subjectKind: string, subjectHash: string)
     subjectHash,
     reviewedAt: context.clock.now().toISOString(),
     findings: [],
+    ...(subjectKind === "architecture"
+      ? {
+          criteria: [
+            "security",
+            "reliability",
+            "performance-efficiency",
+            "cost-optimization",
+            "operational-excellence",
+          ].map((criterionId) => ({
+            criterionId,
+            outcome: "pass",
+            rationale: `${criterionId} was reviewed during qualification`,
+            findingIds: [],
+          })),
+        }
+      : {}),
   };
 }
 function governance(context: TrackContext) {

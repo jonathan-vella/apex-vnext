@@ -24,10 +24,10 @@ test("document registry limits template bindings to supported sources", () => {
   assert.equal(DOCUMENT_REGISTRY.requirements?.sourceAvailability, "available");
   assert.equal(DOCUMENT_REGISTRY.requirements?.templateAvailability, "available");
   assert.equal(DOCUMENT_REGISTRY.inventory?.sourceAvailability, "available");
+  assert.equal(DOCUMENT_REGISTRY["architecture-assessment"]?.sourceAvailability, "available");
+  assert.equal(DOCUMENT_REGISTRY["cost-estimate"]?.sourceAvailability, "available");
   assert.equal(DOCUMENT_REGISTRY["resource-inventory-template"]?.templateAvailability, "reference-only");
   for (const documentId of [
-    "architecture-assessment",
-    "cost-estimate",
     "governance-constraints",
     "implementation-plan",
     "deployment-summary",
