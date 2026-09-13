@@ -441,9 +441,118 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
   if (issued.status === "task") {
     assert.equal(issued.task.taskType, "architecture");
     assert.equal(issued.task.taskId, taskId);
-    assert.deepEqual((await service.taskContext(issued.task.taskId)).decisions, {
+    const context = await service.taskContext(issued.task.taskId);
+    assert.deepEqual(context.decisions, {
       "network-exposure": "private-only",
     });
+    assert.deepEqual(Object.keys(context.outputTemplates).sort(), [
+      "architecture",
+      "cost-estimate",
+      "workload-decision-manifest",
+    ]);
+    assert.deepEqual(
+      (context.outputTemplates["cost-estimate"] as { unpricedItems: Array<{ id: string; quantity: number }> })
+        .unpricedItems,
+      [
+        {
+          id: "UNPRICED_COMPONENT_ID",
+          service: "AZURE_SERVICE",
+          sku: "SELECTED_SKU",
+          quantity: 1,
+          attemptedAt: (context.outputTemplates["cost-estimate"] as { unpricedItems: Array<{ attemptedAt: string }> })
+            .unpricedItems[0]!.attemptedAt,
+          reason: "A well-scoped ARM MCP query returned no matching retail row.",
+        },
+      ],
+    );
+    const chunks: string[] = [];
+    let offset: number | undefined = 0;
+    while (offset !== undefined) {
+      const chunk = await service.readTaskInput(issued.task.taskId, offset, 500);
+      chunks.push(chunk.content);
+      offset = chunk.nextOffset;
+    }
+    const bounded = JSON.parse(chunks.join("")) as { decisions: Record<string, string>; outputTemplates: object };
+    assert.deepEqual(bounded.decisions, { "network-exposure": "private-only" });
+    assert.deepEqual(Object.keys(bounded.outputTemplates).sort(), Object.keys(context.outputTemplates).sort());
+
+    const architectureValue = architecture(initialized.runId);
+    architectureValue.components.push({
+      id: "identity",
+      service: "global/identity",
+      purpose: "Authenticate external users",
+      requirementIds: ["REQ-1"],
+      dependsOn: [],
+    });
+    const costValue = costEstimate(initialized.runId);
+    costValue.lineItems[0]!.sku = "caller-meter-name";
+    const partialCost = costValue as Parameters<typeof service.completeArchitecture>[2];
+    partialCost.pricingStatus = "partial";
+    partialCost.unpricedItems = [
+      {
+        id: "identity",
+        service: "caller service",
+        sku: "caller sku",
+        quantity: 1,
+        attemptedAt: "2026-01-01T00:00:00.000Z",
+        reason: "Well-scoped ARM MCP query returned no matching retail row.",
+      },
+    ];
+    const manifest = workloadDecisionManifest({
+      runId: initialized.runId,
+      requirementsHash: "0".repeat(64),
+      architectureHash: "0".repeat(64),
+      costEstimateHash: "0".repeat(64),
+    });
+    manifest.requirementTraceability.push({
+      requirementId: "REQ-SHOULD-NOT-BE-TRACED",
+      skuDecisionIds: ["api-sku"],
+      sloDecisionIds: ["api-slo"],
+    });
+    manifest.skuDecisions.push({
+      id: "identity-sku",
+      logicalId: "identity",
+      service: "global/identity",
+      sku: "usage",
+      quantity: 1,
+      rationale: "Global identity service",
+      requirementIds: ["REQ-1"],
+      environmentOverrides: [],
+    });
+    const unpriced = structuredClone(partialCost);
+    unpriced.lineItems[0]!.sku = "test - UNPRICED";
+    unpriced.lineItems[0]!.source.uri = "urn:apex:arm-mcp:pricing-unavailable";
+    await assert.rejects(
+      service.completeArchitecture(
+        issued.task.taskId,
+        architectureValue,
+        unpriced as Parameters<typeof service.completeArchitecture>[2],
+        manifest,
+      ),
+      /Current ARM MCP pricing evidence is required/u,
+    );
+    const completed = await service.completeArchitecture(issued.task.taskId, architectureValue, partialCost, manifest);
+    assert.match(completed.outputHashes.architecture ?? "", /^[0-9a-f]{64}$/u);
+    assert.match(completed.outputHashes["workload-decision-manifest"] ?? "", /^[0-9a-f]{64}$/u);
+    const store = new ObjectStore(service.root);
+    const storedCost = await store.getJson<{
+      pricingStatus: string;
+      lineItems: Array<{ sku: string }>;
+      unpricedItems: Array<{ service: string; sku: string }>;
+    }>(completed.outputHashes["cost-estimate"]!);
+    const storedManifest = await store.getJson<{ requirementTraceability: Array<{ requirementId: string }> }>(
+      completed.outputHashes["workload-decision-manifest"]!,
+    );
+    assert.equal(storedCost.lineItems[0]?.sku, "test");
+    assert.equal(storedCost.pricingStatus, "partial");
+    assert.deepEqual(
+      storedCost.unpricedItems.map(({ service, sku }) => ({ service, sku })),
+      [{ service: "global/identity", sku: "usage" }],
+    );
+    assert.deepEqual(
+      storedManifest.requirementTraceability.map(({ requirementId }) => requirementId),
+      ["REQ-1"],
+    );
   }
 });
 
@@ -856,7 +965,23 @@ test("plan task context projects source hashes and valid output templates", asyn
     await readFile(join(architectureReviewDirectory, "architecture-assessment.md"), "utf8"),
     /Five WAF Pillars/u,
   );
-  assert.match(await readFile(join(architectureReviewDirectory, "cost-estimate.md"), "utf8"), /Evidence Appendix/u);
+  const expectedDiagrams = ["02-waf-assessment", "03-des-cost-breakdown", "03-des-cost-uncertainty", "03-des-diagram"];
+  for (const name of expectedDiagrams) {
+    for (const extension of ["py", "svg", "png"]) {
+      assert.ok((await readFile(join(architectureReviewDirectory, `${name}.${extension}`))).byteLength > 0);
+    }
+  }
+  const architectureAssessment = await readFile(
+    join(architectureReviewDirectory, "architecture-assessment.md"),
+    "utf8",
+  );
+  assert.match(architectureAssessment, /03-des-diagram\.svg/u);
+  assert.match(architectureAssessment, /02-waf-assessment\.svg/u);
+  const costAssessment = await readFile(join(architectureReviewDirectory, "cost-estimate.md"), "utf8");
+  assert.match(costAssessment, /03-des-cost-breakdown\.svg/u);
+  assert.match(costAssessment, /03-des-cost-uncertainty\.svg/u);
+  assert.match(costAssessment, /Unpriced items are excluded from the priced subtotal and diagrams/u);
+  assert.match(costAssessment, /Evidence Appendix/u);
   assert.match(await readFile(join(architectureReviewDirectory, "sku-comparison.md"), "utf8"), /SKU Comparison/u);
   assert.match(
     await readFile(join(architectureReviewDirectory, "challenger-findings.md"), "utf8"),
@@ -868,6 +993,10 @@ test("plan task context projects source hashes and valid output templates", asyn
       value: review(initialized.runId, "architecture", architectureHashes.outputHashes.architecture!),
     },
   ]);
+  assert.match(
+    await readFile(join(architectureReviewDirectory, "challenger-findings.md"), "utf8"),
+    /Well-Architected Criteria/u,
+  );
   const reviewsDirectory = join(root, "agent-output", "demo", initialized.runId, "reviews");
   assert.match(
     await readFile(join(reviewsDirectory, "architecture-findings.md"), "utf8"),

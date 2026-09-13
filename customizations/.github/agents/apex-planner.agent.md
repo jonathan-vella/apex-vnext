@@ -10,6 +10,7 @@ tools:
   - apex/status
   - apex/nextTask
   - apex/taskContext
+  - apex/readTaskInput
   - apex/planComplete
   - apex/reviewDecide
   - apex/gateDecide
@@ -43,8 +44,9 @@ Gate 3.
 # Success criteria
 
 1. Call `apex/status`, `apex/nextTask`, and `apex/taskContext`.
-2. Use `taskContext.artifactHashes` and `taskContext.outputTemplates` as the complete schema contract. Do not query
-  session stores, repository files, chat history, or external schema sources.
+2. Use `taskContext.artifactHashes` and `taskContext.outputTemplates` as the complete schema contract. If task context
+  is externalized, read it in bounded chunks through `apex/readTaskInput`. Do not query session stores, repository
+  files, chat history, or external schema sources.
 3. Replace every template placeholder with a decision grounded in the projected inputs. For `environment-inputs`, every
   secret reference must include `kind`, `provider`, and `reference`.
 4. Explain logical resources, dependencies, controls, implementation bindings, environment inputs, and rollback or

@@ -26,6 +26,19 @@ export const DispositionSchema = Type.Union([
 ]);
 export const ConfidenceSchema = Type.Union([Type.Literal("low"), Type.Literal("medium"), Type.Literal("high")]);
 export const CurrencySchema = Type.String({ pattern: "^[A-Z]{3}$" });
+export const WellArchitectedPillarSchema = Type.Union([
+  Type.Literal("security"),
+  Type.Literal("reliability"),
+  Type.Literal("performance-efficiency"),
+  Type.Literal("cost-optimization"),
+  Type.Literal("operational-excellence"),
+]);
+export const WellArchitectedStatusSchema = Type.Union([
+  Type.Literal("aligned"),
+  Type.Literal("concern"),
+  Type.Literal("blocker"),
+  Type.Literal("not-applicable"),
+]);
 
 const RevisionV1Schema = Type.Object(
   {
@@ -144,6 +157,30 @@ export const ArchitectureV1Schema = Type.Object(
     ),
     decisions: Type.Array(NonEmptyStringSchema),
     risks: Type.Array(NonEmptyStringSchema),
+    wellArchitectedAssessment: Type.Optional(
+      Type.Object(
+        {
+          framework: Type.Literal("azure-well-architected-framework"),
+          assessmentType: Type.Literal("qualitative"),
+          pillars: Type.Array(
+            Type.Object(
+              {
+                pillar: WellArchitectedPillarSchema,
+                status: WellArchitectedStatusSchema,
+                assessment: NonEmptyStringSchema,
+                requirementIds: Type.Array(NonEmptyStringSchema, { uniqueItems: true }),
+                evidenceRefs: Type.Array(Sha256Schema, { uniqueItems: true }),
+                recommendations: Type.Array(NonEmptyStringSchema, { uniqueItems: true }),
+                tradeoffs: Type.Array(NonEmptyStringSchema, { uniqueItems: true }),
+              },
+              { additionalProperties: false },
+            ),
+            { minItems: 5, maxItems: 5 },
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
   },
   { $id: "https://schemas.apexops.dev/architecture-v1.json", additionalProperties: false },
 );
@@ -186,7 +223,24 @@ export const CostEstimateV1Schema = Type.Object(
     runId: RunIdSchema,
     currency: CurrencySchema,
     pricingDate: Type.String({ format: "date" }),
-    lineItems: Type.Array(CostLineItemV1Schema, { minItems: 1 }),
+    pricingStatus: Type.Optional(Type.Union([Type.Literal("complete"), Type.Literal("partial")])),
+    lineItems: Type.Array(CostLineItemV1Schema),
+    unpricedItems: Type.Optional(
+      Type.Array(
+        Type.Object(
+          {
+            id: NonEmptyStringSchema,
+            service: NonEmptyStringSchema,
+            sku: NonEmptyStringSchema,
+            quantity: Type.Number({ exclusiveMinimum: 0 }),
+            attemptedAt: IsoDateTimeSchema,
+            reason: NonEmptyStringSchema,
+          },
+          { additionalProperties: false },
+        ),
+        { minItems: 1 },
+      ),
+    ),
     totalMonthlyCost: Type.Number({ minimum: 0 }),
     assumptions: Type.Array(NonEmptyStringSchema),
   },
@@ -213,6 +267,20 @@ export const ReviewFindingsV1Schema = Type.Object(
           resolution: Type.Optional(NonEmptyStringSchema),
         },
         { additionalProperties: false },
+      ),
+    ),
+    criteria: Type.Optional(
+      Type.Array(
+        Type.Object(
+          {
+            criterionId: WellArchitectedPillarSchema,
+            outcome: Type.Union([Type.Literal("pass"), Type.Literal("finding"), Type.Literal("not-applicable")]),
+            rationale: NonEmptyStringSchema,
+            findingIds: Type.Array(NonEmptyStringSchema, { uniqueItems: true }),
+          },
+          { additionalProperties: false },
+        ),
+        { minItems: 5, maxItems: 5 },
       ),
     ),
   },

@@ -167,7 +167,31 @@ function policyMappings(governance) {
 }
 
 function review(projectId, runId, subjectKind, subjectHash, reviewedAt) {
-  return { schemaVersion: "1.0.0", projectId, runId, subjectKind, subjectHash, reviewedAt, findings: [] };
+  return {
+    schemaVersion: "1.0.0",
+    projectId,
+    runId,
+    subjectKind,
+    subjectHash,
+    reviewedAt,
+    findings: [],
+    ...(subjectKind === "architecture"
+      ? {
+          criteria: [
+            "security",
+            "reliability",
+            "performance-efficiency",
+            "cost-optimization",
+            "operational-excellence",
+          ].map((criterionId) => ({
+            criterionId,
+            outcome: "pass",
+            rationale: `${criterionId} was reviewed for the qualification architecture`,
+            findingIds: [],
+          })),
+        }
+      : {}),
+  };
 }
 
 function validationEntry(kind, value) {
@@ -240,6 +264,21 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
     ],
     decisions: ["Use equivalent AVM-backed Bicep and Terraform implementations", "Use local Gate 4 before CI handoff"],
     risks: ["Qualification evidence is non-production and cannot authorize a production deployment"],
+    wellArchitectedAssessment: {
+      framework: "azure-well-architected-framework",
+      assessmentType: "qualitative",
+      pillars: ["security", "reliability", "performance-efficiency", "cost-optimization", "operational-excellence"].map(
+        (pillar) => ({
+          pillar,
+          status: "aligned",
+          assessment: `${pillar} requirements are addressed by the bounded qualification architecture`,
+          requirementIds: requirements.requirements.map(({ id }) => id),
+          evidenceRefs: [requirementsHash],
+          recommendations: [],
+          tradeoffs: [],
+        }),
+      ),
+    },
   };
   const monthlyCost = price.unitPrice;
   const costEstimate = {

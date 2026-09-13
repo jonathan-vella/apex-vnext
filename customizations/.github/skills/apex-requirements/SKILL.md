@@ -28,7 +28,9 @@ Use this skill only for an active requirements task.
    capture retained, prohibited, and preferred services, SKU preferences, and environment overrides without selecting
    architecture, SKUs, or implementation details.
 7. Submit the task-context-defined output through `apex/requirementsComplete`, invoke the required Reviewer, and handle
-   `needs_review` through one native findings panel and `apex/reviewDecide`.
+   `needs_review` through one native findings panel and `apex/reviewDecide`. Treat business/privacy ownership,
+   retention, workload-volume, and product-policy gaps as documented downstream obligations: ask for a responsible
+   role and acknowledge them instead of requiring the Azure architect to supply the missing business decision.
 8. After a clean or fully dispositioned review, ask for explicit Gate 1 approval. Call `apex/gateDecide` only after the
    user chooses Proceed, then continue to Architecture in the same turn.
 

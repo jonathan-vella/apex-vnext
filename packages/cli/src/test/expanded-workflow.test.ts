@@ -20,7 +20,6 @@ import { registerWorkflowValidators } from "../workflow-validators.js";
 import {
   architecture,
   acceptAvailabilityEvidence,
-  availabilityEvidence,
   codegenBundle,
   costEstimate,
   governance,
@@ -495,6 +494,24 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
   );
   const architectureValue = architecture(runId);
   const costValue = costEstimate(runId);
+  const architectureWithoutWaf = structuredClone(architectureValue);
+  delete architectureWithoutWaf.wellArchitectedAssessment;
+  await assert.rejects(
+    service.completeTaskOutputs(architectureTask, [
+      { kind: "architecture", value: architectureWithoutWaf },
+      { kind: "cost-estimate", value: costValue },
+      {
+        kind: "workload-decision-manifest",
+        value: workloadDecisionManifest({
+          runId,
+          requirementsHash: requirementHashes.outputHashes.requirements!,
+          architectureHash: sha256Json(architectureWithoutWaf),
+          costEstimateHash: sha256Json(costValue),
+        }),
+      },
+    ]),
+    /business:well-architected-assessment-complete/,
+  );
   const architectureHashes = await service.completeTaskOutputs(architectureTask, [
     { kind: "architecture", value: architectureValue },
     { kind: "cost-estimate", value: costValue },
@@ -518,17 +535,19 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
     "schema:architecture-v1",
     "schema:workload-decision-manifest-v1",
     "business:requirements-traceability",
+    "business:well-architected-assessment-complete",
     "business:workload-decision-manifest-coverage",
     "business:cost-arithmetic",
-    "business:availability-current",
   ]);
-  assert.deepEqual((architectureCompleted?.payload as { validatorEvidenceRefs?: unknown }).validatorEvidenceRefs, {
-    "business:availability-current": availabilityHash,
-  });
-  assert.deepEqual((architectureCompleted?.payload as { validatorEvidenceModes?: unknown }).validatorEvidenceModes, {
-    "business:availability-current": "simulated",
-  });
-  await complete(service, "architecture-review", [
+  assert.equal(availabilityHash.length, 64);
+  const architectureReviewTask = await task(service, "architecture-review");
+  const reviewWithoutCriteria = review(runId, "architecture", architectureHashes.outputHashes.architecture!);
+  delete reviewWithoutCriteria.criteria;
+  await assert.rejects(
+    service.completeTaskOutputs(architectureReviewTask, [{ kind: "review-findings", value: reviewWithoutCriteria }]),
+    /review:well-architected-criteria-complete/,
+  );
+  await service.completeTaskOutputs(architectureReviewTask, [
     {
       kind: "review-findings",
       value: review(runId, "architecture", architectureHashes.outputHashes.architecture!),
@@ -634,7 +653,7 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
   );
 });
 
-test("architecture requires current scope-bound availability evidence", async () => {
+test("architecture assumes availability and permits dismissal of out-of-scope review findings", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
   const { runId } = await service.init({ projectId: "demo" });
@@ -647,31 +666,9 @@ test("architecture requires current scope-bound availability evidence", async ()
     },
   ]);
   await service.decideGateNumber(1, "approved", "tester");
-
-  const malformedPath = join(root, "invalid-availability.json");
-  await writeFile(malformedPath, "{", "utf8");
-  await assert.rejects(
-    service.acceptEvidence({
-      kind: "architecture-availability-v1",
-      contentType: "application/json",
-      file: malformedPath,
-      required: true,
-    }),
-    /not valid JSON/,
-  );
-
-  await assert.rejects(
-    service.acceptEvidence({
-      kind: "architecture-availability-v1",
-      contentType: "application/json",
-      value: availabilityEvidence(runId),
-      required: true,
-    }),
-    /source evidence is unavailable/,
-  );
   const architectureValue = architecture(runId);
   const costValue = costEstimate(runId);
-  const architectureOutputs: TaskOutput[] = [
+  const architectureHashes = await service.completeTaskOutputs(await task(service, "architecture"), [
     { kind: "architecture", value: architectureValue },
     { kind: "cost-estimate", value: costValue },
     {
@@ -683,70 +680,39 @@ test("architecture requires current scope-bound availability evidence", async ()
         costEstimateHash: sha256Json(costValue),
       }),
     },
-  ];
-  await assert.rejects(
-    service.completeTaskOutputs(await task(service, "architecture"), architectureOutputs),
-    /business:availability-current/,
+  ]);
+  const architectureReview = review(runId, "architecture", architectureHashes.outputHashes.architecture!, [
+    {
+      id: "F-ARCH-1",
+      severity: "high",
+      disposition: "open",
+      title: "Regional availability must be verified",
+      detail: "Validate regional SKU support and quota before implementation.",
+      evidenceRefs: [],
+    },
+  ]);
+  const reliabilityCriterion = architectureReview.criteria!.find(({ criterionId }) => criterionId === "reliability")!;
+  reliabilityCriterion.outcome = "finding";
+  (reliabilityCriterion.findingIds as string[]).push("F-ARCH-1");
+  const reviewHashes = await service.completeTaskOutputs(await task(service, "architecture-review"), [
+    { kind: "review-findings", value: architectureReview },
+  ]);
+  const pendingReview = await service.nextTask();
+  assert.equal(pendingReview.status, "needs_review");
+  if (pendingReview.status !== "needs_review") return;
+  assert.equal(pendingReview.review.gate, 2);
+  assert.equal(pendingReview.review.reviewHash, reviewHashes.outputHashes["review-findings"]);
+  assert.deepEqual(
+    pendingReview.review.findings.map(({ id, actions }) => ({ id, actions })),
+    [{ id: "F-ARCH-1", actions: ["revise", "dismiss"] }],
   );
-
-  const staleHash = await acceptAvailabilityEvidence(service, runId, "demo", "local", {
-    expiresAt: "2020-01-01T00:00:00.000Z",
-  });
-  const staleTask = await service.nextTask();
-  assert.equal(staleTask.status, "task");
-  if (staleTask.status !== "task") return;
-  assert.ok(staleTask.task.inputRefs.includes(staleHash));
-  await assert.rejects(
-    service.completeTaskOutputs(staleTask.task.taskId, architectureOutputs),
-    /business:availability-current/,
+  assert.deepEqual(
+    await service.decideReview(pendingReview.review.reviewHash, [
+      { findingId: "F-ARCH-1", action: "dismiss", rationale: "Outside APEX Architecture review scope." },
+    ]),
+    { status: "resolved" },
   );
-
-  await acceptAvailabilityEvidence(service, runId, "demo", "local", {
-    collectedAt: "2099-01-01T00:00:00.000Z",
-  });
-  await assert.rejects(
-    service.completeTaskOutputs(await task(service, "architecture"), architectureOutputs),
-    (error: unknown) =>
-      error instanceof ApexError && JSON.stringify(error.details).includes("future collection timestamp"),
-  );
-
-  await acceptAvailabilityEvidence(service, runId, "demo", "local", {
-    evidenceTargetScope: "other-scope",
-  });
-  await assert.rejects(
-    service.completeTaskOutputs(await task(service, "architecture"), architectureOutputs),
-    /business:availability-current/,
-  );
-
-  await assert.rejects(
-    acceptAvailabilityEvidence(service, runId, "demo", "local", { mode: "native" }),
-    /authorized capability adapter/,
-  );
-
-  await acceptAvailabilityEvidence(service, runId, "demo", "local", { unavailableCheck: "quota" });
-  await assert.rejects(
-    service.completeTaskOutputs(await task(service, "architecture"), architectureOutputs),
-    /business:availability-current/,
-  );
-
-  const currentHash = await acceptAvailabilityEvidence(service, runId);
-  const currentTask = await service.nextTask();
-  assert.equal(currentTask.status, "task");
-  if (currentTask.status !== "task") return;
-  assert.ok(currentTask.task.inputRefs.includes(currentHash));
-  await acceptAvailabilityEvidence(service, runId, "demo", "local", {
-    expiresAt: "2020-01-01T00:00:00.000Z",
-  });
-  await assert.rejects(
-    service.completeTaskOutputs(currentTask.task.taskId, architectureOutputs),
-    (error: unknown) => error instanceof Error && /stale/i.test(error.message),
-  );
-  const replacementHash = await acceptAvailabilityEvidence(service, runId);
-  const replacementTask = await service.nextTask();
-  assert.equal(replacementTask.status, "task");
-  if (replacementTask.status !== "task") return;
-  assert.ok(replacementTask.task.inputRefs.includes(replacementHash));
-  await service.completeTaskOutputs(replacementTask.task.taskId, architectureOutputs);
+  assert.equal((await service.nextTask()).status, "task");
 });
 
 test("authorized capability adapter accepts native architecture availability evidence", async () => {
@@ -1233,7 +1199,7 @@ test("review blockers persist, resolve, and permit gate approval", async () => {
   if (pendingReview.status !== "needs_review") return;
   assert.deepEqual(
     pendingReview.review.findings.map(({ id, actions }) => ({ id, actions })),
-    [{ id: "F-1", actions: ["revise"] }],
+    [{ id: "F-1", actions: ["revise", "acknowledge"] }],
   );
   const restarted = new ApexService(root);
   const reviewHash = reviewHashes["review-findings"]!;
@@ -1266,6 +1232,40 @@ test("review blockers persist, resolve, and permit gate approval", async () => {
   await restarted.decideGateNumber(1, "approved", "tester");
   await acceptAvailabilityEvidence(restarted, runId);
   assert.equal((await nextTaskAfterInput(restarted)).status, "task");
+});
+
+test("requirements obligations can be acknowledged with a downstream owner", async () => {
+  const service = new ApexService(await tempRoot());
+  const { runId } = await service.init({ projectId: "demo" });
+  await service.nextTask();
+  const hashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
+  const reviewHashes = await complete(service, "requirements-review", [
+    {
+      kind: "review-findings",
+      value: review(runId, "requirements", hashes.requirements!, [
+        {
+          id: "F-1",
+          severity: "high",
+          disposition: "open",
+          title: "GDPR ownership is unresolved",
+          detail: "Document and assign this downstream obligation.",
+          evidenceRefs: [],
+        },
+      ]),
+    },
+  ]);
+
+  await assert.rejects(
+    service.decideReview(reviewHashes["review-findings"]!, [{ findingId: "F-1", action: "acknowledge" }]),
+    /Acknowledgment requires an owner/u,
+  );
+  assert.deepEqual(
+    await service.decideReview(reviewHashes["review-findings"]!, [
+      { findingId: "F-1", action: "acknowledge", owner: "Nordic Fresh Foods Product Owner" },
+    ]),
+    { status: "resolved" },
+  );
+  assert.equal((await service.status()).run.gates[0]?.state, "open");
 });
 
 test("requirements revision invalidates the old artifact and requires a fresh review", async () => {

@@ -1,5 +1,6 @@
 import {
   CONTRACT_VERSION,
+  type ArchitectureV1,
   type ImplementationIntentV1,
   type QualityScorecardV1,
   type RequirementsV1,
@@ -105,7 +106,7 @@ export function workloadDecisionManifest(input: {
   };
 }
 
-export function architecture(runId: string) {
+export function architecture(runId: string): ArchitectureV1 {
   return {
     schemaVersion: CONTRACT_VERSION,
     projectId: "demo",
@@ -116,6 +117,21 @@ export function architecture(runId: string) {
     components: [{ id: "api", service: "fake/service", purpose: "Serve", requirementIds: ["REQ-1"], dependsOn: [] }],
     decisions: [],
     risks: [],
+    wellArchitectedAssessment: {
+      framework: "azure-well-architected-framework",
+      assessmentType: "qualitative",
+      pillars: (
+        ["security", "reliability", "performance-efficiency", "cost-optimization", "operational-excellence"] as const
+      ).map((pillar) => ({
+        pillar,
+        status: "aligned",
+        assessment: `${pillar} is addressed for the test workload`,
+        requirementIds: ["REQ-1"],
+        evidenceRefs: [],
+        recommendations: [],
+        tradeoffs: [],
+      })),
+    },
   };
 }
 
@@ -153,6 +169,22 @@ export function review(runId: string, subjectKind: string, subjectHash: string, 
     subjectHash,
     reviewedAt: "2026-01-01T00:00:00.000Z",
     findings,
+    ...(subjectKind === "architecture"
+      ? {
+          criteria: [
+            "security",
+            "reliability",
+            "performance-efficiency",
+            "cost-optimization",
+            "operational-excellence",
+          ].map((criterionId) => ({
+            criterionId,
+            outcome: "pass",
+            rationale: `${criterionId} was independently reviewed`,
+            findingIds: [],
+          })),
+        }
+      : {}),
   };
 }
 
