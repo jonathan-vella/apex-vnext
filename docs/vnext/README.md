@@ -20,6 +20,13 @@ explanations, and references start at the [documentation index](../README.md).
 Versioned runtime behavior is owned by `packages/`, `config/`, and `customizations/`. Project controls may add release
 requirements but may not create a competing runtime state machine.
 
+## Approved Product Direction
+
+Start with the [PRD goals](PRD.md#goals), [workload boundary](PRD.md#workload-boundary), and
+[output quality reference](PRD.md#output-quality-reference). The roadmap orders governance, COE reuse and conversational
+changes, rich output, both-client WSL2 workflows, then distribution including APEX MCP. No token baseline is current work.
+Do not duplicate these rules in a new master plan or treat target requirements as already implemented commands.
+
 ## Scope Boundary
 
 This table governs the APEX repository: its product requirements, delivery, release, and qualification. In a consumer
@@ -61,3 +68,7 @@ The project-control validator preserves required files, unique IDs, local links,
 
 Predecessor history belongs only in [Migration](../MIGRATION.md) and frozen/archive evidence. Active product behavior is
 documented from vNext source authorities.
+
+Frozen compatibility records and existing ADRs retain their historical text. Later decisions in
+[DECISIONS.md](DECISIONS.md) and current PRD requirements govern changed product direction. Existing code/registry
+contracts still require explicit tested alignment; prose changes do not retroactively qualify a candidate.

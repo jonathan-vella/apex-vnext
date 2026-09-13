@@ -1,19 +1,26 @@
 # APEX vNext Product Requirements
 
-APEX vNext is a deterministic TypeScript runtime and npm CLI for governed Azure platform engineering. Managed GitHub
-Copilot experiences in VS Code and GitHub Copilot CLI provide client-specific interfaces; the kernel owns workflow,
-state, authorization, validation, evidence, and controlled capabilities.
+APEX vNext is a workload platform factory for a Center of Excellence (COE) and its consumers. It turns reusable
+engineering intent into governed Azure workload infrastructure, code, and useful design and operational documentation.
+It sits between an existing platform landing zone and separately developed application code, and also supports
+standalone single-subscription labs and demos from day one.
+
+The existing TypeScript runtime, npm CLI, and managed Copilot clients are foundations, not reasons to expand the product.
+This document defines the target contract; [PROJECT.md](PROJECT.md) distinguishes implemented behavior from remaining
+work. Updating this plan does not implement new commands or authorize live operations.
 
 ## Goals
 
-- Make platform-engineering runs deterministic, resumable, auditable, and safe under one active writer.
-- Preserve the approved frozen compatibility dispositions without making them active product documentation.
-- Support Bicep and Terraform through one track-neutral workflow and equivalent logical outcomes.
-- Ship a clean-installable npm runtime plus managed Copilot customizations with safe update and rollback.
-- Provide equivalent governed workflow outcomes in GitHub Copilot for VS Code and GitHub Copilot CLI.
-- Preserve required Azure and IaC domain knowledge while optimizing managed skill and instruction context.
-- Bind every approval and external operation to exact inputs, state, target, commit, evidence, and expiry.
-- Measure release quality from deterministic events and retain unavailable evidence without inventing claims.
+- Preserve existing APEX output quality while reducing input-token demand through reuse.
+- Complete the workload lifecycle in both GitHub Copilot for VS Code and GitHub Copilot CLI.
+- Support Windows through WSL2 without Docker or a devcontainer requirement.
+- Make installation, everyday use, updates, upgrades, rollback, and eventual distribution straightforward.
+- Reuse one COE archetype per consumer project, then adapt only what changes.
+- Keep one authoritative location per fact, reuse existing contracts and parameters, and avoid parallel frameworks.
+- Preserve durable state, human gates, Azure Policy precedence, security, and equivalent Bicep/Terraform outcomes.
+
+Input efficiency is a design goal. No token baseline, comparative benchmark, new telemetry framework, or claimed
+percentage reduction is required now. Existing correctness and safety checks remain in force.
 
 ## Users
 
@@ -21,15 +28,76 @@ state, authorization, validation, evidence, and controlled capabilities.
 - Reviewers and approvers who need bounded, traceable decisions and exact deployment previews.
 - Repository maintainers who package, qualify, release, support, and roll back APEX.
 - Security and governance owners who require least privilege, policy traceability, and evidence retention.
+- COE authors who maintain documented, coded workload archetypes and consumers who adapt independent copies.
+- Application teams who receive provisioned services, deployment guidance, and operational handoff material.
+
+## Workload Boundary
+
+Both profiles are first-release requirements within one workflow, not separate engines. Record the profile explicitly;
+do not infer it from subscription count or an environment name such as `dev`.
+
+| Profile             | Supplied foundation                                       | APEX responsibility                                                  |
+| ------------------- | --------------------------------------------------------- | -------------------------------------------------------------------- |
+| ALZ-backed workload | Subscription, networking, identity, monitoring and policy | Application services using supplied references by default            |
+| Standalone lab/demo | One subscription; no landing zone assumed                 | Workload and required supporting networking, identity and monitoring |
+
+For non-lab work, missing platform inputs require clarification, not permission to create replacements. Any departure
+from the supplied-resource default must be explicit and policy-compliant. Shared platform resources must not be
+modified or deleted as if workload-owned. Labs do not build an ALZ platform or waive security, policy, cost visibility,
+ownership, or deployment approval. No ALZ does not imply that no Azure Policy is assigned.
+
+APEX does not develop application code or deploy foundation landing zones. It provisions the workload into the assigned
+subscription so the application team can deploy its existing code.
 
 ## Functional Requirements
 
 ### REQ-DIST-001: Distribution And Installation
 
-The release must provide an npm `apex` CLI and kernel that install versioned client projections from one canonical
-customization manifest into a clean supported workspace. Init, update, rollback, and uninstall must be transactional,
-detect local edits, and avoid silently overwriting unrelated files. The bundle must use source/generated separation,
-content locks, composition metadata, and deterministic manifests; npm remains the only distribution authority.
+Keep the existing npm `apex` CLI and kernel usable during implementation. Init, update, rollback, and uninstall must
+detect local edits, preserve unrelated files and project state, and retain exact runtime/customization compatibility.
+Use one canonical customization source and existing package tooling rather than a second editable distribution tree.
+
+Agent Plugins evaluation and implementation belong at the end of feature delivery, together with easy redistribution
+of the APEX MCP server and its dependencies. Evaluate npm-only, plugin plus npm runtime, and bundled runtime delivery
+against actual VS Code and Copilot CLI lifecycle behavior on WSL2. No option is selected by this requirement. Cover
+workspace binding, authentication, prerequisites, version pinning, updates, upgrades, rollback, uninstall, duplicate
+discovery, and preservation of active runs. Avoid competing updaters or a hosted service unless separately approved.
+Final package and client qualification follows any distribution change.
+
+### REQ-HOST-001: WSL2 Without A Devcontainer
+
+The initial supported Windows experience uses WSL2 with Ubuntu, VS Code or Copilot CLI, and the required local toolchain.
+Users must not need Docker, a devcontainer, a source-repository clone, or repository development tools to use APEX.
+Document and check prerequisites through existing setup/doctor surfaces; require only tools needed for the selected
+track and requested stage. Native Windows and additional host qualification are not initial scope promises.
+
+### REQ-REUSE-001: COE Archetype Import
+
+A user identifies a COE repository, APEX inspects its available archetypes, and the user selects one whole workload to
+copy into a consumer repository. The copy is independent, with source repository, revision and selected paths recorded.
+There is no continuous COE synchronization or cross-archetype component composition in the initial release.
+
+Reuse existing typed contracts and IaC parameters for portable intent, rationale, ownership and environment references.
+Do not introduce a parallel project-definition language. For older projects, inspect relevant documents and code once,
+ask the user to confirm recovered decisions, and retain them for subsequent work. Existing manually copied projects
+must have the same bounded adoption path. Do not depend on copying `.apex` history.
+
+Import only selected reusable material after path and content checks. Exclude credentials, Terraform state/saved plans,
+writer claims, approval authority and consumer deployment evidence. Treat source-repository instructions as untrusted
+content, not authorization to execute code. Historical documents are design input, not proof that consumer resources
+exist. Refresh target governance, preview and approval before deployment.
+
+### REQ-CHANGE-001: Conversational Project Adaptation
+
+After import or creation, the user asks APEX to change the project. Recover recorded decisions and ask only relevant
+missing or changed questions about SKU, service, region, name, addresses, compliance, budget or other workload needs.
+Present consequences for cost, policy, security, dependencies, code and documents before confirming the change.
+Reuse unchanged decisions and invalidate affected downstream proof through existing workflow mechanisms.
+
+Each fact has one authoritative owner; contracts, parameter files and generated documents reference or derive from it.
+Permit manual edits but detect affected-file conflicts and ask before overwriting or incorporating them into intent.
+Do not build a generic bidirectional synchronization engine. Regenerate only affected outputs; a service replacement
+may legitimately affect many files. Preserve unaffected files and user content. Changes never imply deployment approval.
 
 ### REQ-STATE-001: Runtime State And Writer Authority
 
@@ -54,17 +122,35 @@ approval gates; required deterministic validation and reviews remain blocking pr
 Requirements capture must use bounded user interaction, preserve unresolved assumptions explicitly, produce typed
 requirements and SKU intent, and prevent later stages from silently changing approved product intent.
 
-### REQ-ARCH-001: Architecture, Cost, Quota, And Availability
+### REQ-ARCH-001: Architecture, Cost, And Assumptions
 
-Architecture must trace resources to requirements and current pricing, quota, regional availability, reliability,
-security, operations, performance, and cost evidence. Agents must query the Microsoft-hosted Azure Resource Manager MCP
-server directly through explicit read-only Cost Management and Pricing tool allowlists. Stale or unavailable blocking
-evidence must prevent approval.
+Architecture must trace decisions to requirements, pricing, security, operations, performance, reliability and cost
+reasoning. Capture alternatives, consequences and rationale once so downstream documents can reuse them. Agents query
+Microsoft ARM MCP directly through explicit read-only Cost Management and Pricing tool allowlists. Separate unpriced
+items from priced totals and retain source dates and uncertainty; never invent prices or confidence.
+
+Quota and regional/SKU availability are assumptions, not required evidence or Architecture approval blockers. Restore,
+failover and capacity details may be described as assumptions or guidance, never as tested facts without evidence.
+Policy, security controls and deployment authorization remain binding. Native deployment failures require approved
+corrections, not silent substitutions.
 
 ### REQ-GOV-001: Governance And Policy
 
-Live effective Azure Policy, including inherited assignments and exemptions, must be discovered before architecture
-approval. Every applicable effect must map to implementation properties or an explicit blocking disposition.
+Azure Policy always wins in both profiles. Follow [issue #344](https://github.com/jonathan-vella/apex-vnext/issues/344):
+a scheduled/manual GitHub Actions collector exports effective management-group policy, including inheritance and
+exemptions, to one reviewed committed JSON baseline. Resolve the subscription from the run scope, import only its entry,
+and preserve discovery, reconciliation, governance review, then Gate 2.
+
+Reuse the baseline schema, parser, artifacts, object store, validators and gate. Add only a deterministic importer and
+path-only CLI/MCP operation. Carry Deny, Modify and DeployIfNotExists mappings into planning and code validation; other
+applicable effects need a mapped or explicit disposition. Missing, stale, unmapped or mismatched baseline evidence must
+be surfaced under existing governance checks, never interpreted as no policy.
+
+The same collector/import contract must represent a standalone subscription's effective policies or an evidenced empty
+result; labs do not require an ALZ hierarchy. No new Governance agent, hidden worker, local live discovery path,
+capability-pack execution, external storage, GitHub artifact delivery or new gate. The full baseline stays outside MCP
+payloads, task/model context and journals. Copied COE policy is not consumer authority. A baseline does not guarantee
+that Azure Policy will remain unchanged at deployment time.
 
 ### REQ-PLAN-001: Track-Neutral Planning
 
@@ -105,9 +191,10 @@ inventory, and destroy must preserve operation ownership and evidence.
 
 ### REQ-QUALITY-001: Quality And Evidence
 
-The runtime must produce deterministic scorecard measurements, evidence hashes, provenance, redacted logs, restart and
-fault results, cache correctness results, and explicit unavailable dispositions. Subjective evidence must be labeled and
-must not satisfy deterministic gates.
+Retain deterministic validation, evidence hashes, provenance, redaction, restart/fault and cache-correctness checks.
+Use the [Output Quality Reference](#output-quality-reference) for human review of usefulness and completeness.
+Human judgments must be labeled and cannot satisfy deterministic security or deployment gates. No new token baseline
+or token-reduction release gate is required now; existing measurement utilities need not be removed.
 
 ### REQ-CAPABILITY-001: Capabilities And Optional Packs
 
@@ -115,8 +202,9 @@ External operations must pass through a versioned capability protocol with grant
 timeouts, redaction, and safe argv execution. Astro, Terraform, and custom Azure Pricing MCP servers must not be active
 dependencies. Supported clients must connect directly to Microsoft ARM MCP with explicit read-only tool grants; managed
 agents must not receive deployment, budget-write, pricesheet-operation, unknown, or renamed tools. APEX remains the
-authority for workflow state, evidence acceptance, and gates. Governance capability packs remain independently locked,
-verified, and transactional.
+authority for workflow state, evidence acceptance, and gates. The target governance path is `REQ-GOV-001`, not
+capability-pack execution. Existing unrelated packs retain their locks and safety boundaries; this plan does not
+authorize their removal or a broader pack framework.
 
 ### REQ-SECURITY-001: Security And Supply Chain
 
@@ -129,10 +217,13 @@ otherwise.
 ### REQ-CUSTOMIZATION-001: Managed Copilot Experiences
 
 APEX must support GitHub Copilot in VS Code and GitHub Copilot CLI for this release. Both clients must produce equivalent
-typed workflow outcomes, state and resume behavior, authorization decisions, gates, evidence, and hidden-worker
-boundaries. VS Code may use direct handoffs and `vscode/askQuestions`; Copilot CLI may use custom-agent delegation and
+typed workflow outcomes, state and resume behavior, authorization decisions, gates and evidence. Worker mechanics need
+not be identical. VS Code may use direct handoffs and `vscode/askQuestions`; Copilot CLI may use delegation and
 `ask_user`. Both paths must resolve the kernel-owned `needs_input` contract and record typed answers without relying on
 chat history. Model availability, grants, agents, skills, managed files, and MCP inventory must be qualified per client.
+The current CLI hidden-worker omission is not permission to omit code generation, review or validation outcomes; provide
+a bounded supported path without pretending unavailable mechanics exist. Qualify both environment profiles and COE
+import/change workflows in each client on WSL2. Basic interaction checks accompany features; distribution work is last.
 
 ### REQ-GUIDANCE-001: Skill And Instruction Capability Parity
 
@@ -142,8 +233,9 @@ consumer map, disposition, replacement proof, rollback or removal gate, and supp
 Concise role skills may route work, but must not silently replace Azure architecture, WAF, ADR, pricing, security,
 governance, IaC pattern, validation, deployment, or diagnostic knowledge with generic model reasoning. Deterministic
 authority belongs in the kernel and capability code; non-deterministic domain guidance must remain discoverable on
-demand. Context optimization must use measured progressive disclosure, shared references, and duplicate removal only
-after semantic and scenario parity passes in both supported clients.
+demand. Use progressive disclosure, bounded task inputs, shared references and removal of redundant reads while
+preserving semantic quality. Do not repeatedly feed full documents, policy baselines or the quality-reference corpus
+into model context. No token baseline or measurement project is required at this stage.
 
 ### REQ-DETERMINISM-001: Deterministic Packaging And Validation
 
@@ -154,30 +246,22 @@ changing required check names, permissions, triggers, diagnostics, release autho
 
 ### REQ-MAINTAINABILITY-001: Guidance And Automation Ownership
 
-Before client projection, lint/hook consolidation, workflow simplification, or active guidance rewrite, APEX must
-characterize agent-related skills and instructions, Markdown guidance, linting configuration, and workflow
-configuration. Every rule and duplicate cluster must have a current owner, consumers, effective behavior, diagnostics,
-security boundary, proposed disposition, proof test, and rollback or removal gate. Consolidation must reduce editable
-owners or measured duplication without flattening audience-specific guidance, weakening language-native validation,
-changing required checks, or introducing a generic task/workflow framework.
+For each changed concern, identify its existing owner, consumers, diagnostics and security boundary before editing.
+Prefer one authoritative fact, focused changes and existing helpers over new schemas, agents, render pipelines or
+frameworks. DRY means removing duplicate ownership, not merging unrelated responsibilities. Preserve native validation,
+required checks and useful audience-specific guidance. Do not launch repository-wide cleanup as a prerequisite for a
+bounded feature; retain historical characterization and existing safety tests.
 
-### REQ-OPTIMIZATION-001: Pre-Agent Repository Optimization
+### REQ-OPTIMIZATION-001: Bounded Input Efficiency
 
-Before managed-agent scenario testing, model comparison, paired-client execution, or live qualification begins, APEX
-must complete a candidate-bound review of npm scripts, every instruction and skill, workspace and package manifests,
-lock and build configuration, GitHub Actions and runtime workflows, and every file at the repository root. The review
-must map owners and consumers; detect errors, gaps, contradictions, dead paths, duplicate authority, and stale content;
-and assess performance, consolidation, shared implementation, maintainability, and retirement opportunities. Proposed
-reductions in lines of code or file count must preserve behavior, diagnostics, security boundaries, provenance, and
-rollback. Each disposition must be implemented or explicitly deferred with an owner, rationale, expiry, and release
-impact. Characterization and unit tests may run during this work, but managed-agent and client scenario testing remains
-blocked until the optimization gate records a completion receipt. A local repository-maintenance controller may execute
-the approved work autonomously outside the APEX runtime when a human supplies a candidate-bound authorization manifest
-with allowed paths, commands, budgets, stop conditions, and expiry. The controller must use fresh bounded tasks, verify
-every diff mechanically, run focused slice checks, and checkpoint each accepted change. It cannot use improvement
-proposals as mutation authority or push, create or merge pull requests, create issues, publish, deploy, or alter the
-terminal verification rules. Full repository validation and managed-agent testing remain a final human-started stage on
-the immutable completion tree.
+Reduce unnecessary model input as part of each feature: compact authoritative context, relevant questions, unchanged
+decision reuse, deterministic filtering and selective regeneration. Preserve rich output and explicit reasoning.
+Do not add a token baseline, percentage target, new measurement framework or whole-repository optimization campaign now.
+
+This supersedes the blanket product requirement to finish repository-wide optimization before client learning.
+Existing executable optimization gates and receipts remain unchanged by documentation edits. Reconcile any blocking
+implementation in a focused tested follow-up before running affected scenarios; never bypass checks or fabricate a
+receipt. Separately authorized maintenance remains bounded by its manifest and has no merge or deployment authority.
 
 ### REQ-DOCS-001: Documentation And Lifecycle
 
@@ -186,6 +270,35 @@ release, supported Copilot clients, and diagram formats must match the candidate
 New inline diagrams use Mermaid; new standalone architecture and chart artifacts use editable Python sources and rendered
 outputs. Active `.github/copilot-instructions.md` and applicable `AGENTS.md` files must identify canonical owners without
 duplicating volatile values. Unsupported external state is not resumable in vNext.
+
+### REQ-OUTPUT-001: Rich Output From Accepted Decisions
+
+Produce requirements, architecture/WAF assessment, cost estimates, ADRs, architecture/dependency/runtime diagrams,
+implementation plans and references, deployment summaries, and design/as-built documentation from accepted sources.
+The operational set includes a runbook, inventory, backup/DR guidance, compliance matrix, as-built costs and an index.
+Record justified non-applicability rather than generating empty boilerplate. Separate intended design, observed state,
+assumptions and untested procedures. Never report a restore test, deployment, compliance certification or saving without
+supporting evidence.
+
+Reuse existing contracts and renderers. Preserve rationale in accepted design data; a renderer formats reasoning, it
+does not invent it. Extend an owning contract only for a demonstrated information gap. Render only affected documents
+and figures after changes, preserving source lineage and the conflict handling in `REQ-CHANGE-001`.
+
+Use readable summaries, consistent headings and navigation, decision/alternatives tables, clear units and currency,
+labelled diagrams and accessible status text. Diagrams must reflect the same accepted data as tables and prose.
+Prefer useful structure over badges, decoration or arbitrary length. Editable sources and rendered images should agree
+semantically; never execute imported diagram code merely to inspect an archetype.
+
+### REQ-HANDOFF-001: Application And Operations Handoff
+
+Initial scope requires infrastructure outputs and a deployment guide plus operational readiness documentation. Include
+service/resource identifiers, endpoints, configuration names, identity/access prerequisites, ownership boundaries,
+health checks, monitoring, incident response, rollback and recovery guidance. Reference secrets without embedding them.
+The application team supplies its code; APEX does not develop that application.
+
+Ready-to-use application GitHub Actions pipelines and platform-specific application deployment configuration, such as
+Helm values or application manifests, are optional follow-on work after vNext is working. This does not defer the IaC
+bindings, platform configuration or infrastructure validation needed to provision the workload itself.
 
 ### REQ-IMPROVE-001: Bounded Improvement
 
@@ -196,6 +309,29 @@ proposals cannot inject context or autonomously edit policy, prompts, agents, sk
 releases, or deployments. Release acceptance requires measured precision, duplication, quarantine, recurrence, storage,
 and triage outcomes; a noisy automatic adapter remains disabled without weakening manual observation.
 
+## Output Quality Reference
+
+The human quality reference is `agent-output/apex-aks` in the GitHub repository `jonathan-vella/aks-basic`.
+Access requires an authorized GitHub session; anonymous link validation returns 404. Reviewers can use authenticated
+GitHub access to that repository without making its contents public or copying the corpus into ordinary task context.
+Record the inspected revision and selected artifacts when reviewing a candidate. It is an example of useful output,
+not a universal workload template or an authority for current prices, resource choices or compliance claims.
+The current predecessor-source designation is recorded separately in
+[Migration](../MIGRATION.md#current-predecessor-reference); it is distinct from vNext extraction provenance.
+
+| Area                          | Review criterion                                                                               |
+| ----------------------------- | ---------------------------------------------------------------------------------------------- |
+| Requirements and architecture | Workload-specific constraints, traceability, WAF reasoning and justified choices               |
+| Costs                         | Quantities, source dates, units/currency, uncertainty and consistent priced/unpriced treatment |
+| Decisions                     | Context, alternatives, consequences and implementation implications                            |
+| Diagrams                      | Legible topology, dependencies and runtime flows consistent with accepted state                |
+| Operations                    | Environment-specific, actionable health checks, diagnostics, recovery and escalation           |
+| Whole project                 | Navigable documents, consistent facts and no needless regeneration after changes               |
+
+Use a compact review checklist in existing review evidence, not a new benchmark framework. Matching file counts,
+document length, decorative style or numeric WAF scores is not required. The reference's AKS-specific configuration
+does not become the default for other workloads. Human quality review complements, never replaces, technical checks.
+
 ## Non-Functional Requirements
 
 - **Compatibility:** Every approved Phase 0A disposition is preserved, changed through its named replacement owner, or
@@ -205,8 +341,8 @@ and triage outcomes; a noisy automatic adapter remains disabled without weakenin
 - **Reliability:** Runs survive restart at each gate, reject stale writers, reconcile partial commits, and retain evidence.
 - **Performance:** Release measurements meet [quality-scorecard.v1.json](../../config/quality-scorecard.v1.json) targets,
   tolerances, minimum samples, and unavailable-data rules.
-- **Portability:** The supported devcontainer and clean consumer workflow install exact locked dependencies without
-  depending on unpublished workspace state.
+- **Portability:** Windows via WSL2 is the initial supported host path. Consumer use requires neither Docker nor a
+  devcontainer and must not depend on unpublished source-workspace state.
 - **Accessibility:** User-facing CLI and documentation provide clear text status, actionable diagnostics, and no
   color-only meaning.
 - **Privacy:** Telemetry is separate, optional, exportable, and deletable; raw chat history is never scraped or replayed.
@@ -220,8 +356,12 @@ and triage outcomes; a noisy automatic adapter remains disabled without weakenin
 - Resume of state that does not satisfy current vNext contracts.
 - GitHub Copilot cloud coding-agent sessions, Copilot code review as an APEX client, and non-VS Code/non-Copilot-CLI
   runtimes.
-- Preview VS Code plugin behavior as a first-release dependency.
-- APM as a package manager or a second runtime distribution authority.
+- Early Agent Plugins implementation; the distribution decision is the final feature-delivery phase.
+- A second independent runtime/distribution authority or a new hosted control plane without explicit approval.
+- Continuous COE synchronization, cross-archetype composition, and a generic document/code synchronization engine.
+- ALZ foundation deployment, application development, and initial native-Windows/additional-host promises.
+- Token-baseline or comparative-token benchmarking work for now.
+- Application deployment pipelines and application-specific deployment configuration until follow-on work.
 - Autonomous issue creation, repository edits, pull requests, approvals, releases, or deployments from improvement data
   or the APEX runtime. The separately authorized local pre-agent maintenance controller is limited by
   `REQ-OPTIMIZATION-001`.
@@ -238,11 +378,21 @@ setup completion, first-task success, workflow elapsed time, restart and resume,
 capability failure, context size, and cache correctness. Gate-revision loops may omit a claim when unavailable; all other
 unavailable blocking measurements block release.
 
+These existing deterministic measurements are not a new legacy-versus-vNext input-token baseline. Retain their current
+executable semantics until any needed alignment is separately implemented and tested. Do not report token savings from
+document size alone or add a token measurement prerequisite to the roadmap.
+
 ## Cutover Acceptance
 
 Cutover requires all of the following on the exact candidate head:
 
 - Every requirement above maps to passing automated evidence or an explicitly required manual/live result.
+- Both ALZ-backed and standalone lab/demo profiles pass without weakening policy or shared-resource ownership.
+- COE import and conversational changes preserve independent origin, exclude source authority, and leave unaffected
+  outputs unchanged; manual conflicts require confirmation.
+- Human review against the output-quality reference passes; mandatory application and operational handoff is complete.
+- WSL2 consumer installation and both client workflows work without a devcontainer or source-repository clone.
+- The final distribution decision covers the APEX MCP lifecycle and is followed by exact-candidate qualification.
 - The Phase 0A compatibility matrix has no unowned drift.
 - Required CI and CodeQL checks pass, with no unresolved critical or high security finding.
 - Clean install, update, rollback, uninstall, package reproducibility, SBOM, provenance, and publication dry run pass.
@@ -253,8 +403,8 @@ Cutover requires all of the following on the exact candidate head:
 - ARM pricing and Python diagram replacements satisfy their measured compatibility, reliability, security, and
   maintainability gates.
 - Automatic improvement ingestion meets its precision and privacy thresholds while proposals remain inert.
-- The guidance and automation review gate is complete; every consolidation or retirement has characterized consumers,
-  behavior, diagnostics, security boundaries, rollback, and proof tests.
+- Changed guidance and automation have identified consumers, behavior, diagnostics, security boundaries and proof tests.
+  Any executable gate alignment required by this revised plan is complete; no existing check is bypassed.
 - Bicep and Terraform preview, approval, apply, inventory, diagnosis, destroy, and recovery scenarios are qualified.
 - Local APEX Gate 4 approval, GitHub OIDC, and local-to-CI writer transfer are proven.
 - Scorecard sample requirements and unavailable-data dispositions are satisfied.

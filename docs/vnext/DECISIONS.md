@@ -76,8 +76,9 @@ reintroduction check.
 
 ## DECISION-016: Keep Npm As The Sole Distribution Authority
 
-The CLI package, exact runtime dependencies, release manifest, SBOM, and provenance define distribution. No second
-package manager or customization distribution authority is supported.
+Current implementation remains npm-owned: CLI packages, exact dependencies, release manifest, SBOM and provenance.
+The permanent npm-only product restriction is superseded by DECISION-024. No distribution migration has been selected
+or implemented by revising the plan.
 
 ## DECISION-017: Operationalize Bounded Improvement Without Promotion Authority
 
@@ -98,3 +99,46 @@ than active product instructions.
 
 Repository maintenance may use a separately authorized local controller with exact scope, commands, budgets, checks,
 expiry, checkpoints, and stop conditions. It has no merge, release, or deployment authority.
+
+Its availability does not require a new repository-wide optimization campaign. DECISION-025 supersedes the blanket
+pre-agent product prerequisite, without bypassing executable gates or changing historical receipts.
+
+## DECISION-021: Build A Workload Factory With Two Profiles
+
+ALZ-backed workloads and standalone single-subscription labs/demos are both day-one requirements. Use one workflow with
+explicit profile and ownership data. Outside labs, application services consume supplied networking, identity and
+monitoring by default. Labs can create their workload support resources without creating an ALZ platform. Azure Policy
+always wins. [PRD workload boundary](PRD.md#workload-boundary) owns the detailed scope.
+
+## DECISION-022: Reuse Independent Archetypes And Adapt In Conversation
+
+Import one selected COE archetype as an independent snapshot with source revision, not a continuously linked product.
+Reuse existing contracts and parameters, with one authoritative owner per fact. Ask relevant change questions, confirm
+consequences and manual-edit conflicts, then update affected outputs. Do not copy source deployment authority or create
+a generic synchronization engine. Requirements `REQ-REUSE-001` and `REQ-CHANGE-001` own acceptance.
+
+## DECISION-023: Preserve Rich Output Without Repeated Authoring
+
+Use [the PRD quality reference](PRD.md#output-quality-reference) to assess useful design reasoning, visuals and
+operational guidance. Reuse accepted decisions in existing renderers. Infrastructure outputs, deployment guidance and
+operational readiness are mandatory; application pipelines and application-specific deployment configuration are later
+optional work. Quality is not document length or a numeric score copied from a reference workload.
+
+## DECISION-024: Use WSL2 And Decide Distribution Last
+
+Windows via WSL2 is the initial host path; consumers do not require Docker or a devcontainer. Keep npm usable now.
+Evaluate Agent Plugins together with APEX MCP redistribution only after functional delivery, then qualify the chosen
+lifecycle in both clients. The choice remains open; avoid competing runtime owners, updaters and custom frameworks.
+
+## DECISION-025: Minimize Input Without A Token Baseline Now
+
+Use compact task inputs, scoped guidance, relevant questions and unchanged-decision reuse. No token baseline, comparative
+benchmark or new measurement framework is current work. Preserve existing safety tests and measurement utilities.
+Reconcile conflicting executable gate contracts through focused tested changes before affected scenarios; no bypasses.
+
+## DECISION-026: Use Reviewed Policy Baselines And Explicit Assumptions
+
+Implement [issue #344](https://github.com/jonathan-vella/apex-vnext/issues/344) through deterministic subscription-only
+import, existing governance reconciliation/review and Gate 2. Cover standalone subscriptions through the same contract.
+The full baseline never enters model context. Quota and regional availability remain assumptions, not Architecture
+evidence gates. Policy, security and deployment approval cannot be waived by an assumption or lab profile.

@@ -3,6 +3,11 @@
 This control defines release-blocking evidence for GitHub Copilot in VS Code and GitHub Copilot CLI. Generated
 projection tests are necessary but do not replace live client interaction.
 
+The initial host path is Windows via WSL2/Ubuntu, without Docker or a devcontainer. Required outcomes follow the
+[PRD](PRD.md), including both environment profiles, COE reuse and conversational changes. Basic interaction checks
+accompany feature delivery; final installation qualification follows the distribution decision. No token baseline is
+required now. Existing executable gate alignment must be completed before affected scenarios; do not bypass it.
+
 ## Candidate Binding
 
 Before interaction, record the exact source commit, package and runtime locks, managed projection digests, client
@@ -27,6 +32,25 @@ that client result.
 
 Unavailable client mechanics remain unavailable; they are not inferred as passing. Copilot CLI autonomous workers are
 intentionally omitted under ADR-0006.
+
+That omission is a client-mechanics boundary, not permission to omit generation, review or validation. Demonstrate a
+supported bounded path for every required outcome. These additional acceptance scenarios are planned requirements,
+not assertions that corresponding runtime or registry coverage already exists:
+
+| ID           | Required outcome in both clients                                                              |
+| ------------ | --------------------------------------------------------------------------------------------- |
+| `CLIENT-012` | WSL2 clean consumer setup and use without a devcontainer or APEX source checkout              |
+| `CLIENT-013` | Explicit ALZ/lab profile selection and correct supplied-versus-owned resource handling        |
+| `CLIENT-014` | COE discovery, one-archetype selection, independent import and recorded source revision       |
+| `CLIENT-015` | Manually copied project adoption without importing secrets, state or approval authority       |
+| `CLIENT-016` | Relevant change questions, consequences and confirmation; unchanged decisions are reused      |
+| `CLIENT-017` | Affected outputs refresh, unrelated files remain unchanged and manual conflicts are confirmed |
+| `CLIENT-018` | Target-subscription policy import; full baseline never enters model-facing context            |
+| `CLIENT-019` | Complete design and operational handoff reviewed against the PRD quality reference            |
+| `CLIENT-020` | Final distribution starts the correct APEX MCP and preserves active runs across updates       |
+
+Exercise both IaC tracks and both profiles with representative cases in the existing tests. Reuse fixtures and helpers;
+do not build a separate benchmark harness. Record explicit gaps until implemented.
 
 ## Execution Rules
 

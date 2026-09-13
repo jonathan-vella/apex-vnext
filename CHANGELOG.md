@@ -10,6 +10,16 @@ current repository version is recorded in [VERSION.md](VERSION.md).
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Rebaseline product requirements, roadmap and supporting documentation around COE archetype reuse, conversational
+  adaptation, ALZ-backed and standalone lab profiles, rich output quality and WSL2 without a devcontainer.
+- Keep input efficiency simple and DRY without a token-baseline project; defer Agent Plugins and APEX MCP distribution
+  decisions until feature completion. Document planned behavior and executable-control alignment separately from
+  implemented commands, existing safety checks and historical qualification evidence.
+
 ## [0.10.0-next.5] — Preview
 
 ### Changed

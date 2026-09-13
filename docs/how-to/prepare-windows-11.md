@@ -5,6 +5,10 @@
 This guide assumes Windows 11, WSL2 with Ubuntu, an existing Azure subscription, and a GitHub account with an active
 Copilot entitlement. Run Linux commands from an Ubuntu WSL terminal unless a step explicitly says PowerShell.
 
+This is the initial supported Windows host path. Docker, a devcontainer and a clone of the APEX development repository
+are not consumer prerequisites. Install tools for the selected client and requested stage; cloud credentials are not
+needed merely to inspect local project state. Both workload profiles follow the [PRD boundary](../vnext/PRD.md#workload-boundary).
+
 > [!IMPORTANT]
 > Use a Linux workspace under your WSL home directory, such as `~/src`. Do not create the APEX workspace under
 > `/mnt/c`; WSL filesystem performance and file permission behavior are more reliable inside the Linux filesystem.
@@ -65,7 +69,8 @@ npm --version
 ```
 
 > [!NOTE]
-> APEX uses npm as its distribution authority. Use the npm that ships with the selected Node release.
+> APEX currently uses npm. Use the npm that ships with the selected Node release. Final distribution, including
+> Agent Plugins and APEX MCP packaging, is a later roadmap decision rather than an onboarding requirement today.
 
 ## Install Azure Tooling
 
@@ -85,7 +90,10 @@ az account set --subscription "SUBSCRIPTION_NAME_OR_ID"
 az account show --output table
 ```
 
-This onboarding path requires **Owner** access on the selected subscription. Verify it before beginning a workload:
+Use the least-privilege access granted for the intended workload operations. ALZ consumers must not require blanket
+subscription Owner access just to start APEX; supplied identity/networking/monitoring references may have separate read
+and use permissions. Labs may need additional rights to create workload-owned support resources, but do not assume or
+grant those rights automatically. Inspect the signed-in user's direct assignments as one input:
 
 ```bash
 az role assignment list \
@@ -96,8 +104,9 @@ az role assignment list \
 ```
 
 > [!CAUTION]
-> The Owner role can assign access and change subscription resources. Use the requested subscription only, and use a
-> lower-privilege operational role after organization policy and deployment ownership are established.
+> This listing is not a complete effective-permission proof: group membership, inheritance, deny assignments and
+> conditions can affect access. Ask the platform owner to resolve missing permissions; do not elevate access or
+> replace shared resources to bypass a boundary. Service-principal identities need their own permission assessment.
 
 ## Choose An IaC Tool
 

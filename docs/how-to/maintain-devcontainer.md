@@ -2,6 +2,10 @@
 
 > [Current Version](../../VERSION.md) | Keep the vNext toolchain portable, deterministic, and context-efficient.
 
+This page covers existing repository-development infrastructure only. APEX consumers use Windows via WSL2 without
+Docker or a devcontainer; see [Prepare Windows 11](prepare-windows-11.md). Retaining maintenance instructions does not
+make the development container a product dependency or authorize further container investment.
+
 ## Preserve The Core Toolchain
 
 The container supports Windows, macOS, and Linux Docker hosts and Linux `amd64` and `arm64` execution. Core features

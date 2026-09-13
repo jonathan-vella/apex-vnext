@@ -18,6 +18,8 @@ request was not merged into it.
 
 ## Extraction Policy
 
+The source boundary above is historical extraction provenance, not the current predecessor maintenance reference.
+
 The snapshot retains the runtime packages, customizations, configuration,
 qualification infrastructure, validators, tests, project controls, and frozen
 evidence that existed at the source commit.
@@ -28,6 +30,14 @@ Markdown, then rebuilt under `docs/tutorials/`, `docs/how-to/`, `docs/explanatio
 Devcontainer CI is disabled in the destination repository and is not an
 acceptance gate. Re-enabling or dispatching it requires a new explicit
 maintainer decision.
+
+## Current Predecessor Reference
+
+The maintainer-designated most up-to-date legacy APEX source is
+[jonathan-vella/apex at perf/apex-workflow-optimization](https://github.com/jonathan-vella/apex/tree/perf/apex-workflow-optimization),
+not that repository's `main` branch. Refresh and record its exact revision when a comparison is needed; do not substitute
+the extraction branch or frozen source commit above. The current output-quality reference and review criteria are owned
+by the [vNext PRD](vnext/PRD.md#output-quality-reference), not by this historical record.
 
 ## Ongoing Work
 

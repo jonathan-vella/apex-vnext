@@ -4,6 +4,9 @@
 
 ## Install A Local Candidate
 
+This is a maintainer/local-candidate path, not the intended normal consumer prerequisite. Consumers use Windows via
+WSL2 without Docker or a devcontainer and install an available approved package. They do not need a source checkout.
+
 Build and install every tarball from the same release manifest:
 
 ```bash
@@ -108,6 +111,20 @@ npx apex capability verify --pack azure-governance-discovery --json
 
 Optional packs have independent update, rollback, and uninstall commands. Core APEX remains usable when an unrelated
 optional pack is absent; workflows that require the missing pack block explicitly.
+
+These are existing lifecycle commands, not the target governance setup. The approved
+[governance baseline plan](../vnext/PRD.md#req-gov-001-governance-and-policy) does not use capability-pack execution.
+Its implementation must replace the relevant workflow dependency before that path is advertised as available.
+
+## Final Distribution Decision
+
+npm remains the current runtime delivery mechanism. Agent Plugins and easy APEX MCP redistribution are evaluated
+[at the end of feature delivery](../vnext/ROADMAP.md#phase-6-distribution-last). No plugin installation command is promised
+yet. The eventual path must cover both clients, the correct workspace, authentication, runtime dependencies, version
+compatibility and safe update/upgrade/rollback/uninstall without a second updater managing the same files.
+
+Plugin removal must not accidentally remove consumer project state. Updating APEX does not automatically migrate
+persisted contracts, reconcile consumer design changes, or approve an infrastructure operation.
 
 ## Related
 

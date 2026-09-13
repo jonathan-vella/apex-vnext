@@ -4,6 +4,9 @@
 
 ## Select The Project
 
+The commands below describe current runtime behavior. The [planned COE import and change experience](../explanation/workflow-and-gates.md#planned-coe-reuse-and-change)
+is a target requirement, not a new CLI command advertised by this guide. Use Windows via WSL2 without a devcontainer.
+
 ```bash
 apex project list --json
 apex project use --project PROJECT_ID --json
@@ -63,7 +66,7 @@ Architecture selection, SKU decisions, and implementation stay with later workfl
 The coordinator hands work to interactive specialists:
 
 1. Requirements gathers workload outcomes and constraints.
-2. Architect resolves design, cost, availability, governance, and risk decisions.
+2. Architect resolves design, cost, governance, assumptions and risk decisions.
 3. Planner produces track-neutral implementation intent, binding, and environment inputs.
 4. Operator handles preview, approval, deployment, recovery, and evidence.
 
@@ -84,6 +87,9 @@ Requirements acceptance also materializes a read-only Gate 1 review package at
 `service-recommendations.md`, `sku-preferences.md`, and `challenger-findings.md`
 before approving Gate 1. These documents are derived from accepted APEX state;
 regeneration overwrites local edits.
+
+Conflict-aware selective updates are planned under `REQ-CHANGE-001`; until implemented, do not treat manual edits to
+these generated packages as persistent project intent. Ask APEX to revise accepted decisions through supported tasks.
 
 Architecture acceptance materializes `agent-output/<project>/<run>/architecture/` with authoritative assessment, cost,
 SKU, and challenger Markdown. It also includes editable Python, SVG, and PNG views for Architecture topology,

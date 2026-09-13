@@ -1,5 +1,12 @@
 # Optimization Audit
 
+## Historical Status
+
+This is a retained candidate-bound audit, not the current delivery plan. Its findings and measurements below describe
+the audited revision. [DECISION-025](DECISIONS.md#decision-025-minimize-input-without-a-token-baseline-now) supersedes the
+product requirement for a new context/token baseline. No measured savings are claimed; existing executable gate
+alignment is tracked in the roadmap and must not be bypassed.
+
 ## Candidate
 
 The audit receipt is bound to commit `7214b0e2ea720d45cbf12db15b1b249f8af23f43` and tree

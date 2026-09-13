@@ -2,9 +2,13 @@
 
 > [Current Version](../VERSION.md) | Pre-release documentation for the governed APEX runtime and clients.
 
-APEX vNext is a deterministic workflow runtime for governed Azure platform engineering. The kernel owns state,
-authorization, gates, evidence, and bounded operations. Copilot clients guide people through that runtime; they do not
-replace its authority.
+APEX vNext targets COE workload reuse and conversational adaptation with rich design and operational output. Both
+ALZ-backed workloads and standalone labs/demos are initial scope, using VS Code or Copilot CLI on Windows via WSL2
+without a devcontainer. The kernel owns state, gates and evidence; clients guide people through it.
+
+The [PRD](vnext/PRD.md) defines the target contract. Guides describe implemented commands and mark planned extensions
+explicitly; the [checkpoint](vnext/PROJECT.md) identifies remaining work. Distribution and APEX MCP packaging are the
+last feature-delivery phase, not prerequisites for completing governance and workload reuse.
 
 ## Start By Goal
 
@@ -14,6 +18,8 @@ replace its authority.
 | Evaluate APEX locally | [Complete the first local run](tutorials/first-run.md) |
 | Install or update APEX | [Manage installation](how-to/manage-installation.md) |
 | Run a governed workflow | [Run the workflow](how-to/run-workflow.md) |
+| Understand planned COE reuse and changes | [Project adaptation](explanation/workflow-and-gates.md#planned-coe-reuse-and-change) |
+| Review output quality expectations | [Quality reference](vnext/PRD.md#output-quality-reference) |
 | Preview or reconcile infrastructure | [Operate a project](how-to/operate-project.md) |
 | Contribute to the repository | [Contribute to APEX vNext](how-to/contribute.md) |
 | Understand kernel authority | [Runtime architecture](explanation/runtime-architecture.md) |
@@ -35,7 +41,7 @@ replace its authority.
 - [Operate a project](how-to/operate-project.md)
 - [Qualify a candidate](how-to/qualify-candidate.md)
 - [Contribute to APEX vNext](how-to/contribute.md)
-- [Maintain the development container](how-to/maintain-devcontainer.md)
+- [Maintain the development container](how-to/maintain-devcontainer.md) (repository maintenance only, not consumer setup)
 
 ## Explanation
 

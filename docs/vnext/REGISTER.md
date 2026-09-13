@@ -15,8 +15,8 @@ and the repository archives.
 
 - **Owner:** Platform operations
 - **Impact:** Bicep or Terraform could fail policy, provider, state, preview, apply, inventory, or cleanup checks.
-- **Mitigation:** Use isolated targets, current governance and availability evidence, exact previews, bounded credentials,
-  and owned cleanup.
+- **Mitigation:** Use isolated targets, target governance, exact previews, bounded credentials and owned cleanup.
+  Quota and availability remain assumptions; report native failures and obtain approval for corrections.
 - **State:** Open
 - **Closure proof:** Candidate-bound Bicep and Terraform live qualification both pass.
 
@@ -47,11 +47,53 @@ and the repository archives.
 - **State:** Open by design
 - **Closure proof:** Deterministic adversarial tests and live transfer scenarios pass on the candidate.
 
+## RISK-006: Imported Material Can Carry Wrong Authority
+
+- **Owner:** COE reuse and kernel maintainers
+- **Impact:** Copied policy, approvals, state, secrets or instructions could be mistaken for consumer authority.
+- **Mitigation:** Record origin/revision, import selected reusable content only, confirm recovered intent, and refresh
+  target governance and approval. Do not execute repository content during discovery.
+- **State:** Open
+- **Closure proof:** Import/adaptation tests reject source authority and preserve independent consumer ownership.
+
+## RISK-007: Profiles Can Confuse Resource Ownership
+
+- **Owner:** Workload planning and operations
+- **Impact:** A workload could modify shared ALZ resources or a lab could bypass policy by assuming an empty baseline.
+- **Mitigation:** Explicit profiles, supplied-resource defaults outside labs, evidenced policy results and owned cleanup.
+- **State:** Open
+- **Closure proof:** Both tracks protect platform references and support standalone policies through the same workflow.
+
+## RISK-008: Reuse Can Lose Quality Or User Edits
+
+- **Owner:** Artifacts and project adaptation
+- **Impact:** Generated documents become shallow, contradictory, stale or overwrite manually maintained content.
+- **Mitigation:** One owner per fact, retained decision rationale, affected-output regeneration and conflict confirmation.
+- **State:** Open
+- **Closure proof:** Human review against the PRD quality reference plus selective-update and conflict tests.
+
+## RISK-009: Distribution Can Split Runtime And Guidance
+
+- **Owner:** Release engineering and client experience
+- **Impact:** A plugin update could launch the wrong MCP runtime, select the wrong workspace or alter an active run.
+- **Mitigation:** Evaluate distribution last; pin compatible components, preserve state and avoid competing updaters.
+- **State:** Open; final distribution option not selected
+- **Closure proof:** Final delivery lifecycle passes in both clients on WSL2, including rollback and uninstall.
+
+## RISK-010: Revised Plans Can Outrun Executable Controls
+
+- **Owner:** Repository maintainers
+- **Impact:** Older optimization, guidance or release validators may block the new delivery order or overstate support.
+- **Mitigation:** Keep current checks intact; align affected owners in focused tested changes, not fabricated receipts.
+- **State:** Open
+- **Closure proof:** Required checks reflect the accepted scope and documentation distinguishes targets from implementation.
+
 ## ASSUMPTION-001: Supported Clients Can Share Typed Outcomes
 
 - **Owner:** Client experience
 - **Assumption:** VS Code and Copilot CLI can produce equivalent kernel outcomes for their shared supported interactions.
-- **Constraint:** Copilot CLI autonomous workers remain omitted and unavailable scenarios cannot be inferred as passing.
+- **Constraint:** Copilot CLI autonomous workers remain omitted; required generation/review/validation outcomes still
+  need a supported path. Unavailable mechanics cannot be inferred as passing.
 - **State:** Pending current-candidate proof
 
 ## ASSUMPTION-002: Equal IaC Support Means Equivalent Governed Outcomes
@@ -61,6 +103,14 @@ and the repository archives.
   different native mechanics.
 - **Constraint:** Equality does not require identical commands, state models, preview TTLs, or provider metadata.
 - **State:** Deterministically supported; live proof pending
+
+## ASSUMPTION-003: Quota And Regional Availability
+
+- **Owner:** Workload architect and consumer
+- **Assumption:** Selected services/SKUs are available with sufficient quota in the requested region.
+- **Constraint:** This is intentional, not an Architecture evidence gate. Policy still wins, and actual deployment
+  failures require visible recovery or approved design changes. No successful deployment or capacity claim is inferred.
+- **State:** Accepted product behavior
 
 ## Release Rule
 

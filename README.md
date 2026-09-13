@@ -4,6 +4,17 @@ APEX vNext is the standalone development repository for the deterministic APEX
 runtime, CLI, managed Copilot customizations, qualification infrastructure, and
 release controls.
 
+The product goal is a workload platform factory: a COE builds documented, coded
+archetypes, and consumers reuse independent copies and adapt them through APEX.
+Preserve rich output while minimizing repeated input and keeping one owner per
+fact. Both ALZ-backed workloads and standalone labs/demos are initial scope.
+
+The target user experience is VS Code and Copilot CLI on Windows via WSL2,
+without a devcontainer. npm remains the current implementation; Agent Plugins
+and APEX MCP redistribution are evaluated at the end of feature delivery.
+See the [PRD](docs/vnext/PRD.md) and [roadmap](docs/vnext/ROADMAP.md) for planned
+scope, and the [checkpoint](docs/vnext/PROJECT.md) for implementation status.
+
 > [!WARNING]
 > This repository is a pre-cutover release line with no current release
 > candidate. The `0.10.0` contract is being re-baselined for GitHub Copilot in
@@ -11,12 +22,15 @@ release controls.
 
 ## Start Here
 
-Install the locked dependencies and run deterministic qualification:
+For repository development, install locked dependencies and run qualification:
 
 ```bash
 npm ci
 npm run qualify:vnext
 ```
+
+Consumer onboarding starts with the [WSL2 runbook](docs/tutorials/wsl2-vscode-consumer-runbook.md),
+not a clone of this development repository. No token-baseline project is required now.
 
 Use focused commands while developing:
 
