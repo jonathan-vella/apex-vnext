@@ -124,6 +124,53 @@ async function reachValidation(service: ApexService, runId: string, track: "bice
   ]);
 }
 
+for (const track of ["bicep", "terraform"] as const) {
+  test(`${track} rejects contradictory resource ownership before staging`, async () => {
+    const root = await tempRoot();
+    const service = new ApexService(root);
+    const initialized = await service.init({ projectId: "demo", iacTool: track });
+    const codegen = await reachCodegen(service, initialized.runId, track);
+    const bundle = codegenBundle(initialized.runId, track, codegen.plan);
+    const output = bundle.find(({ kind }) => kind === "logical-resource-manifest")!;
+    const manifest = output.value as LogicalResourceManifestV1;
+    const invalid = {
+      ...manifest,
+      resources: manifest.resources.map((resource) => ({ ...resource, ownership: "existing" as const })),
+    };
+    const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"));
+    const head = await journal.head();
+    const rejectOwnership = (error: unknown) =>
+      error instanceof ApexError && error.code === "APEX_VALIDATION" && error.message.includes("ownership");
+    await assert.rejects(
+      service.stageArtifact(codegen.taskId, { kind: "logical-resource-manifest", value: invalid }),
+      rejectOwnership,
+    );
+    await assert.rejects(
+      service.completeTaskOutputs(
+        codegen.taskId,
+        bundle.map((entry) => (entry.kind === "logical-resource-manifest" ? { ...entry, value: invalid } : entry)),
+      ),
+      rejectOwnership,
+    );
+    assert.equal(await journal.head(), head);
+    await assert.rejects(
+      readFile(join(root, ".apex", "work", initialized.runId, codegen.taskId, "logical-resource-manifest.json")),
+      (error: unknown) => (error as NodeJS.ErrnoException).code === "ENOENT",
+    );
+    const accepted = await service.stageArtifact(codegen.taskId, {
+      kind: "logical-resource-manifest",
+      value: {
+        ...invalid,
+        resources: invalid.resources.map((resource) => ({
+          ...resource,
+          implementationKind: track === "bicep" ? "existing" : "data",
+        })),
+      },
+    });
+    assert.equal(accepted.kind, "logical-resource-manifest");
+  });
+}
+
 function terraformPreviewProvider(
   now: Date,
   mutation?:

@@ -10,6 +10,18 @@ preview, approval evidence, an operation record, and inventory.
 
 A track cannot reuse the other track's preview or approval.
 
+## Resource Ownership
+
+The logical-resource manifest distinguishes `existing` from `managed` ownership. Artifact staging and acceptance reject
+contradictory declarations with `APEX_VALIDATION`: existing resources use Bicep `existing` declarations or Terraform
+`data` sources, while managed resources use `resource` or `module` implementations. Cross-track reference kinds are
+rejected. The owning predicate is
+[`hasValidLogicalResourceReferences`](../../packages/contracts/src/targets.ts).
+
+This check validates manifest consistency, not the truth of an ownership claim or the generated code. Binding supplied
+platform resource identities to approved intent, native preview changes and cleanup remains follow-on work. An accepted
+manifest does not grant authority to modify shared platform resources or bypass deployment approval.
+
 ## Differences
 
 | Concern           | Bicep                               | Terraform                                                      |

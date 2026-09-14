@@ -5067,7 +5067,11 @@ export class ApexService {
       output.kind === "logical-resource-manifest" &&
       !hasValidLogicalResourceReferences(output.value as LogicalResourceManifestV1)
     ) {
-      throw new ApexError("APEX_VALIDATION", "Logical resource dependencies are invalid", EXIT_CODES.validation);
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Logical resource dependencies or ownership declarations are invalid",
+        EXIT_CODES.validation,
+      );
     }
   }
 

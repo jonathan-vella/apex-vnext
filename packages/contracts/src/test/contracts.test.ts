@@ -960,6 +960,30 @@ describe("target family contracts", () => {
     );
   });
 
+  it("requires track-specific read-only declarations for existing resource ownership", () => {
+    const manifest = fixtures[7][1] as unknown as LogicalResourceManifestV1;
+    for (const track of ["bicep", "terraform"] as const) {
+      for (const implementationKind of ["resource", "module", "data", "existing"] as const) {
+        for (const ownership of ["managed", "existing"] as const) {
+          const referenceKind = track === "bicep" ? "existing" : "data";
+          const expected =
+            ownership === "existing"
+              ? implementationKind === referenceKind
+              : implementationKind === "resource" || implementationKind === "module";
+          assert.equal(
+            hasValidLogicalResourceReferences({
+              ...manifest,
+              track,
+              resources: manifest.resources.map((resource) => ({ ...resource, implementationKind, ownership })),
+            }),
+            expected,
+            `${track}: ${implementationKind} with ${ownership} ownership`,
+          );
+        }
+      }
+    }
+  });
+
   it("binds encrypted plan attestations to the preview and approval recipient", () => {
     const attestation = fixtures[9][1] as ExecutionPlanAttestationV1;
     const preview: DeploymentPreviewV1 = {

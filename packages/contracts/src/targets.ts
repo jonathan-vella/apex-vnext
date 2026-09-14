@@ -646,7 +646,14 @@ export function hasValidLogicalResourceReferences(manifest: LogicalResourceManif
   const knownIds = new Set(ids);
   return (
     new Set(ids).size === ids.length &&
-    manifest.resources.every((resource) => resource.dependsOn.every((id) => knownIds.has(id)))
+    manifest.resources.every((resource) => {
+      const referenceKind = manifest.track === "bicep" ? "existing" : "data";
+      const ownershipMatches =
+        resource.ownership === "existing"
+          ? resource.implementationKind === referenceKind
+          : resource.implementationKind === "resource" || resource.implementationKind === "module";
+      return ownershipMatches && resource.dependsOn.every((id) => knownIds.has(id));
+    })
   );
 }
 
