@@ -6,7 +6,7 @@ import { join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { releaseSbomArguments } from "../../scripts/pack-vnext.mjs";
+import { parseNpmPackResult, releaseSbomArguments } from "../../scripts/pack-vnext.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
 const resistantProcessTree = join(import.meta.dirname, "fixtures", "resistant-process-tree.mjs");
@@ -20,6 +20,35 @@ test("release SBOM is derived from the lockfile instead of ambient node_modules"
 });
 
 const delay = (milliseconds) => new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
+
+test("npm pack results accept array and workspace-keyed formats", () => {
+  const entry = {
+    name: "@apexops/contracts",
+    filename: "apexops-contracts-0.10.0-next.5.tgz",
+    files: [{ path: "package.json" }],
+  };
+  for (const result of [[entry], { [entry.name]: entry }]) {
+    assert.deepEqual(parseNpmPackResult(JSON.stringify(result), entry.name), entry);
+  }
+});
+
+test("npm pack results reject malformed, missing, mismatched and ambiguous packages", () => {
+  const name = "@apexops/contracts";
+  const entry = { name, filename: "contracts.tgz" };
+  assert.throws(() => parseNpmPackResult("not JSON", name), /invalid JSON/);
+  for (const result of [
+    null,
+    [],
+    {},
+    [entry, entry],
+    [{ name }],
+    { [name]: null },
+    { [name]: { ...entry, name: "@apexops/kernel" } },
+    { [name]: { ...entry, filename: "" } },
+  ]) {
+    assert.throws(() => parseNpmPackResult(JSON.stringify(result), name), /unique filename/);
+  }
+});
 
 function processExists(pid) {
   try {
@@ -299,10 +328,11 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     assert.equal(entry.bytes, (await stat(tarball)).size);
     assert.equal(entry.sha256, createHash("sha256").update(bytes).digest("hex"));
 
-    const dryRun = JSON.parse(
+    const dryRun = parseNpmPackResult(
       (await runInTest("npm", ["pack", "--workspace", entry.package, "--json", "--dry-run"])).stdout,
+      entry.package,
     );
-    const expectedFiles = dryRun[0].files.map(({ path }) => path).sort();
+    const expectedFiles = dryRun.files.map(({ path }) => path).sort();
     const actualFiles = (await runInTest("tar", ["-tzf", tarball])).stdout
       .split("\n")
       .filter((path) => path.startsWith("package/") && !path.endsWith("/"))
