@@ -574,7 +574,18 @@ const LEGACY_REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
 ];
 
 const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
-  LEGACY_REQUIREMENTS_INTAKE[0]!,
+  {
+    round: "business-discovery",
+    questions: [
+      ...LEGACY_REQUIREMENTS_INTAKE[0]!.questions,
+      {
+        id: "workload-profile",
+        prompt:
+          "Choose ALZ-backed to use supplied networking, identity and monitoring, or standalone-lab for a single-subscription lab/demo with workload support resources. Both require Azure Policy, security and deployment approval.",
+        options: ["alz-backed", "standalone-lab"],
+      },
+    ],
+  },
   {
     round: "workload-pattern",
     questions: [
@@ -4709,6 +4720,7 @@ export class ApexService {
       { id: "workload-pattern", label: "Workload pattern", priority: "should" },
       { id: "delivery-scenario", label: "Delivery scenario", priority: "should" },
       { id: "region", label: "Region", priority: "should" },
+      { id: "workload-profile", label: "Workload profile", priority: "must" },
     ];
     const requirements = fields.flatMap(({ id, label, priority }, index) => {
       const value = input?.[id];

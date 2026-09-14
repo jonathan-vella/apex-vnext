@@ -115,6 +115,59 @@ test("requirements task remains blocked until pending input is recorded", async 
   );
 });
 
+for (const profile of ["alz-backed", "standalone-lab"]) {
+  test(`requirements intake records explicit workload profile ${profile} across restart`, async () => {
+    const root = await tempRoot();
+    const service = new ApexService(root);
+    const initialized = await service.init({ projectId: "demo" });
+    const pending = await service.nextTask();
+    assert.equal(pending.status, "needs_input");
+    if (pending.status !== "needs_input") return;
+    const question = pending.request.questions.find(({ id }) => id === "workload-profile");
+    assert.deepEqual(question?.options, ["alz-backed", "standalone-lab"]);
+    assert.equal(question?.recommendation, undefined);
+    const answers = pending.request.questions.map(({ id, options, multiSelect }) => ({
+      questionId: id,
+      value: id === "workload-profile" ? profile : multiSelect ? [options![0]!] : (options?.[0] ?? "demo workload"),
+    }));
+    const response = {
+      schemaVersion: "1.0.0" as const,
+      requestId: pending.request.requestId,
+      expectedHead: pending.request.expectedHead,
+      ownerEpoch: pending.request.ownerEpoch,
+      answers,
+    };
+    await assert.rejects(
+      service.recordInput({
+        ...response,
+        answers: answers.filter(({ questionId }) => questionId !== "workload-profile"),
+      }),
+      (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
+    );
+    await assert.rejects(
+      service.recordInput({
+        ...response,
+        answers: answers.map((answer) =>
+          answer.questionId === "workload-profile" ? { ...answer, value: "dev" } : answer,
+        ),
+      }),
+      (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
+    );
+    await service.recordInput(response);
+    const restarted = new ApexService(root);
+    const next = await restarted.nextTask();
+    assert.equal(next.status, "needs_input");
+    if (next.status === "needs_input") assert.equal(next.request.intake?.round, "workload-pattern");
+    const events = await new EventJournal(
+      join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"),
+    ).replay();
+    const recorded = events.find(({ type }) => type === "requirements.input-recorded");
+    const recordedAnswers = (recorded?.payload as { answers: Array<{ questionId: string; value: InputValueV1 }> })
+      .answers;
+    assert.equal(recordedAnswers.find(({ questionId }) => questionId === "workload-profile")?.value, profile);
+  });
+}
+
 test("requirements intake issues three panels before the requirements task", async () => {
   const service = new ApexService(await tempRoot());
   await service.init({ projectId: "demo" });
@@ -164,6 +217,7 @@ test("requirements intake adds migration questions only for migration scenarios"
     industry: "retail",
     "delivery-scenario": "migration",
     "target-environments": ["dev"],
+    "workload-profile": "alz-backed",
   });
   const pending = await service.nextTask();
   assert.equal(pending.status, "needs_input");
@@ -205,6 +259,7 @@ test("requirements intake recommends a workload pattern and asks pattern-specifi
     industry: "manufacturing",
     "delivery-scenario": "greenfield",
     "target-environments": ["dev"],
+    "workload-profile": "alz-backed",
   });
   const pending = await service.nextTask();
   assert.equal(pending.status, "needs_input");
@@ -228,6 +283,7 @@ test("greenfield service intake skips retained services and uses selectable reco
     industry: "retail",
     "delivery-scenario": "greenfield",
     "target-environments": ["dev"],
+    "workload-profile": "alz-backed",
   });
   const services = await service.nextTask();
   assert.equal(services.status, "needs_input");
@@ -302,6 +358,7 @@ test("requirements intake provides selectable Azure service and security recomme
     industry: "retail",
     "delivery-scenario": "greenfield",
     "target-environments": ["dev"],
+    "workload-profile": "alz-backed",
   });
   const services = await service.nextTask();
   assert.equal(services.status, "needs_input");
@@ -747,6 +804,7 @@ test("typed input recording rejects premature, stale, malformed, duplicate, and 
       { questionId: "industry", value: "technology" },
       { questionId: "delivery-scenario", value: "greenfield" },
       { questionId: "target-environments", value: ["dev"] },
+      { questionId: "workload-profile", value: "alz-backed" },
     ],
   };
   await assert.rejects(
@@ -796,6 +854,7 @@ test("requirements task context includes recorded input and stageable output tem
     industry: "retail",
     "delivery-scenario": "greenfield",
     "target-environments": ["dev"],
+    "workload-profile": "standalone-lab",
   });
   await recordRequirementsRound(service, {
     "workload-pattern": "web-api",
@@ -825,6 +884,7 @@ test("requirements task context includes recorded input and stageable output tem
     industry: "retail",
     "delivery-scenario": "greenfield",
     "target-environments": ["dev"],
+    "workload-profile": "standalone-lab",
     "workload-pattern": "web-api",
     scale: "100 concurrent users",
     budget: { kind: "budget", amount: 500, currency: "USD", cadence: "monthly" },
@@ -871,6 +931,16 @@ test("requirements task context includes recorded input and stageable output tem
     },
   ]);
   assert.deepEqual(template.assumptions, ["industry: retail", "target-environments: dev"]);
+  assert.deepEqual(
+    template.requirements.find(({ source }) => source === "intake:workload-profile"),
+    {
+      id: "REQ-018",
+      statement: "Workload profile: standalone-lab",
+      priority: "must",
+      status: "confirmed",
+      source: "intake:workload-profile",
+    },
+  );
   assert.deepEqual(template.unknowns, []);
   assert.equal(template.businessContext, "retail; greenfield; web-api");
   assert.equal(template.successCriteria, "100 concurrent users");
@@ -1097,6 +1167,7 @@ test("requirements intake preserves explicit unresolved answers", async () => {
       industry: "retail",
       "delivery-scenario": "greenfield",
       "target-environments": ["dev"],
+      "workload-profile": "alz-backed",
     });
     await recordRequirementsRound(service, {
       "workload-pattern": "web-api",
@@ -1223,41 +1294,62 @@ test("concurrent input submissions return only stable Apex errors", async () => 
   }
 });
 
-test("pending legacy four-round intake requests replay unchanged", async () => {
-  const root = await tempRoot();
-  const service = new ApexService(root);
-  const initialized = await service.init({ projectId: "demo" });
-  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"));
-  await journal.append({
-    eventId: "legacy-request",
-    projectId: "demo",
-    runId: initialized.runId,
-    type: "requirements.input-requested",
-    timestamp: "2026-01-01T00:00:00.000Z",
-    ownerEpoch: 1,
-    expectedHead: await journal.head(),
-    payload: {
-      requestId: "legacy-request",
-      intake: { round: "business-discovery", ordinal: 1, total: 4 },
-      questions: [
-        { id: "workload", prompt: "Briefly describe the workload and its users." },
-        { id: "industry", prompt: "Choose the industry.", options: ["retail", "other"] },
-        { id: "delivery-scenario", prompt: "Choose the scenario.", options: ["greenfield", "migration"] },
-        {
-          id: "target-environments",
-          prompt: "Choose environments.",
-          options: ["dev", "prod"],
-          multiSelect: true,
-          valueType: "environment-set",
-        },
-      ],
-    },
+for (const total of [3, 4]) {
+  test(`pending legacy ${total}-round intake requests replay unchanged`, async () => {
+    const root = await tempRoot();
+    const service = new ApexService(root);
+    const initialized = await service.init({ projectId: "demo" });
+    const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"));
+    await journal.append({
+      eventId: "legacy-request",
+      projectId: "demo",
+      runId: initialized.runId,
+      type: "requirements.input-requested",
+      timestamp: "2026-01-01T00:00:00.000Z",
+      ownerEpoch: 1,
+      expectedHead: await journal.head(),
+      payload: {
+        requestId: "legacy-request",
+        intake: { round: "business-discovery", ordinal: 1, total },
+        questions: [
+          { id: "workload", prompt: "Briefly describe the workload and its users." },
+          { id: "industry", prompt: "Choose the industry.", options: ["retail", "other"] },
+          { id: "delivery-scenario", prompt: "Choose the scenario.", options: ["greenfield", "migration"] },
+          {
+            id: "target-environments",
+            prompt: "Choose environments.",
+            options: ["dev", "prod"],
+            multiSelect: true,
+            valueType: "environment-set",
+          },
+        ],
+      },
+    });
+    const pending = await service.nextTask();
+    assert.equal(pending.status, "needs_input");
+    if (pending.status !== "needs_input") return;
+    assert.deepEqual(pending.request.intake, { round: "business-discovery", ordinal: 1, total });
+    assert.equal(
+      pending.request.questions.some(({ id }) => id === "workload-profile"),
+      false,
+    );
+    await service.recordInput({
+      schemaVersion: "1.0.0",
+      requestId: pending.request.requestId,
+      expectedHead: pending.request.expectedHead,
+      ownerEpoch: pending.request.ownerEpoch,
+      answers: pending.request.questions.map(({ id, options, multiSelect }) => ({
+        questionId: id,
+        value: multiSelect ? [options![0]!] : (options?.[0] ?? "demo workload"),
+      })),
+    });
+    const next = await new ApexService(root).nextTask();
+    assert.equal(next.status, "needs_input");
+    if (next.status === "needs_input") {
+      assert.deepEqual(next.request.intake, { round: "workload-pattern", ordinal: 2, total });
+    }
   });
-  const pending = await service.nextTask();
-  assert.equal(pending.status, "needs_input");
-  if (pending.status === "needs_input")
-    assert.deepEqual(pending.request.intake, { round: "business-discovery", ordinal: 1, total: 4 });
-});
+}
 
 test("malformed persisted input requests fail closed", async () => {
   const root = await tempRoot();
