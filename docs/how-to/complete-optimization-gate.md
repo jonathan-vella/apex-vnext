@@ -10,11 +10,16 @@ context and regenerate affected outputs. Do not launch a token measurement campa
 
 ## Existing Executable Gate
 
-The committed [optimization gate manifest](../../tools/registry/optimization-gate.v1.json) is intentionally a draft.
-It defines the repository review surfaces, owners, consumers, proof commands, and required baselines without granting
-mutation authority or claiming a qualification receipt.
+The committed [optimization gate manifest](../../tools/registry/optimization-gate.v1.json) retains a historical,
+candidate-bound read-only audit authorization. Its `authorized` state does not mean the authorization is current or the
+audit is complete. Preserve its candidate, expiry, pending baselines and findings; it grants no new execution authority.
 
-Run the structural check before changing the manifest:
+The [structural validator](../../tools/scripts/validate-optimization-gate.mjs) checks schema, path ownership and proof
+commands. A valid draft or authorized record may have pending baselines; passing this check is not an audit-completion
+receipt or a client-execution permission. Only a record claiming `complete` must have every baseline captured and no
+deferred release-blocking findings. Keep these completion checks for separately authorized maintenance.
+
+Run the structural check and its regression tests when changing these controls:
 
 ```bash
 npm run validate:optimization-gate
