@@ -56,6 +56,7 @@ async function reachCodegen(
   service: ApexService,
   runId: string,
   track: "bicep" | "terraform",
+  configurePlan?: (plan: ReturnType<typeof planBundle>) => void,
 ): Promise<{ taskId: string; plan: ReturnType<typeof planBundle> }> {
   await service.nextTask();
   const requirementValues: TaskOutput[] = [{ kind: "requirements", value: requirements() }];
@@ -108,6 +109,7 @@ async function reachCodegen(
       "policy-property-map": policyHashes["policy-property-map"]!,
     },
   );
+  configurePlan?.(plan);
   const planHashes = await complete(service, "plan", plan);
   await complete(service, "plan-review", [
     { kind: "review-findings", value: review(runId, "plan", planHashes["implementation-intent"]!) },
@@ -125,6 +127,80 @@ async function reachValidation(service: ApexService, runId: string, track: "bice
 }
 
 for (const track of ["bicep", "terraform"] as const) {
+  for (const mixedOwnership of [false, true]) {
+    test(`${track} excludes existing resources from apply and destroy (mixed: ${mixedOwnership})`, async () => {
+      const root = await tempRoot();
+      const capturedRequests: PreviewRequest[] = [];
+      const stopped = new Error("Provider request captured without execution");
+      const capturePreview = async (request: PreviewRequest): Promise<DeploymentPreviewV1> => {
+        capturedRequests.push(request);
+        throw stopped;
+      };
+      const provider = {
+        ...(track === "bicep" ? bicepPreviewProvider(new Date()) : terraformPreviewProvider(new Date())),
+        previewApply: capturePreview,
+        previewDestroy: capturePreview,
+      };
+      const service = new ApexService(root, { providers: { [track]: provider } });
+      const initialized = await service.init({ projectId: "demo", iacTool: track });
+      const codegen = await reachCodegen(service, initialized.runId, track, (plan) => {
+        if (!mixedOwnership) return;
+        const intent = plan.find(({ kind }) => kind === "implementation-intent")!.value as ImplementationIntentV1;
+        intent.resources.push({ ...intent.resources[0]!, id: "managed", dependsOn: ["api"] });
+        const binding = plan.find(({ kind }) => kind === "iac-binding")!.value as IacBindingV1;
+        binding.resourceBindings.managed = { ...binding.resourceBindings.api! };
+        binding.intentHash = sha256Json(intent);
+      });
+      const bundle = codegenBundle(initialized.runId, track, codegen.plan);
+      const manifest = bundle.find(({ kind }) => kind === "logical-resource-manifest")!
+        .value as LogicalResourceManifestV1;
+      for (const resource of manifest.resources) {
+        resource.ownership = "existing";
+        resource.implementationKind = track === "bicep" ? "existing" : "data";
+      }
+      if (mixedOwnership) {
+        manifest.resources.push({
+          ...manifest.resources[0]!,
+          logicalId: "managed",
+          implementationAddress: "managed",
+          ownership: "managed",
+          implementationKind: "resource",
+          dependsOn: ["api"],
+          generatedDependencies: ["api"],
+        });
+      }
+      const handoff = bundle.find(({ kind }) => kind === "iac-handoff")!.value as {
+        logicalResourceManifestHash: string;
+      };
+      handoff.logicalResourceManifestHash = sha256Json(manifest);
+      await service.completeTaskOutputs(codegen.taskId, bundle);
+      await complete(service, `validation-${track}`, [
+        { kind: "validation-evidence", value: validationEvidence(initialized.runId, track) },
+      ]);
+      for (const operation of ["apply", "destroy"] as const) {
+        await assert.rejects(service.preview({ operation, provider: track }), (error: unknown) => error === stopped);
+        assert.deepEqual(
+          capturedRequests.at(-1)?.resources.map(({ logicalId }) => logicalId),
+          mixedOwnership ? ["managed"] : [],
+        );
+        assert.equal(capturedRequests.at(-1)?.inputHash, sha256Json(codegen.plan[0]!.value));
+        const preview = await service.preview({ operation, provider: "fake" });
+        assert.deepEqual(
+          preview.changes.map(({ resourceId }) => resourceId),
+          mixedOwnership ? ["fake://dev/managed"] : [],
+        );
+        assert.equal((await service.status()).run.gates[3]?.state, "open");
+        await service.decideGateNumber(4, "approved", "tester");
+        const deployed = await service.deploy(preview.previewHash);
+        assert.deepEqual(
+          deployed.inventory.resources.map(({ logicalId }) => logicalId),
+          mixedOwnership && operation === "apply" ? ["managed"] : [],
+        );
+      }
+      assert.equal(capturedRequests.length, 2);
+    });
+  }
+
   test(`${track} rejects contradictory resource ownership before staging`, async () => {
     const root = await tempRoot();
     const service = new ApexService(root);

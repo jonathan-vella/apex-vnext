@@ -1,6 +1,6 @@
 # APEX vNext Checkpoint
 
-- **Updated:** 2026-09-13
+- **Updated:** 2026-09-15
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Integration branch:** `main`
 - **Product status:** Pre-release
@@ -21,6 +21,8 @@ around vNext source authorities and Diátaxis navigation.
 
 ## Open Release Work
 
+- Complete the [first optimization batch](ROADMAP.md#first-batch-input-correctness-and-scope): revision-safe reads,
+  bounded context/reviewer packs, routing/tool scope, then proven prompt deduplication. All items are planned, not done.
 - Complete governance baseline import and standalone-subscription coverage with the owner of issue #344.
 - Implement and qualify COE import, provenance, relevant change questions, manual-edit conflicts and selective
   regeneration using existing contracts and parameters.
@@ -62,6 +64,17 @@ COE import/adaptation, explicit profile behavior, full output parity and final d
 until backed by implementation and tests. Existing code supports parts of these outcomes; this revision does not mark
 them complete. Registry/validator alignment, including the existing optimization gate, is a focused follow-up rather
 than permission to bypass checks. No token baseline is planned now.
+
+On 2026-09-15, a source review at `0615bbe` assessed the external token, quality and latency recommendations. Isolated
+in-memory probes reproduced historical input selection after invalidation and plan-review's incorrect artifact lookup;
+these are findings, not full integration-test or client qualification receipts. The reviewed worktree included existing
+service and test edits. Refresh the head, local changes and issue ownership before implementation.
+
+The approved next work is the roadmap's ordered first batch, beginning with `readTaskInput`, `inputRefs` and their
+workflow/dependency-revision regressions. All four reviewer passes remain required. Applicable requirements, pricing,
+bundle and client follow-ons have named phases in the
+[recommendation dispositions](ROADMAP.md#optimization-recommendation-dispositions). Deferred mechanisms, new telemetry,
+model downgrades and unsupported CLI worker shortcuts are not authorized by this planning update.
 
 ## Resume Protocol
 

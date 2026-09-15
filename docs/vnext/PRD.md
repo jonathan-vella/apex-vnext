@@ -117,10 +117,20 @@ A data-only workflow manifest must be routing authority. A run targets one envir
 track. It exposes Requirements, Architecture and Cost, Implementation Plan, and Deployment Preview as the only human
 approval gates; required deterministic validation and reviews remain blocking preconditions.
 
+Retain requirements-review, architecture-review, governance-review and plan-review. Each must complete against its
+current subject and required dependencies before the corresponding gate can proceed. Both clients must handle
+`needs_input`, `needs_review` and `task` explicitly; a missing worker is not evidence that a review ran.
+
 ### REQ-REQUIREMENTS-001: Requirements And Intent
 
 Requirements capture must use bounded user interaction, preserve unresolved assumptions explicitly, produce typed
 requirements and SKU intent, and prevent later stages from silently changing approved product intent.
+
+Reuse confirmed intake data without requiring the model to repeat unchanged fields. A bounded amendment path must bind
+the base revision, preserve stable requirement IDs, unknowns, deferrals and ownership, and validate the merged artifact
+through the same completeness, contradiction and traceability checks as full-document submission. Keep full-document
+submission available. Reuse confirmed network intent only when it answers the current Architecture decision; otherwise
+ask for confirmation with consequences. Recommendations never record answers or accept risk without human confirmation.
 
 ### REQ-ARCH-001: Architecture, Cost, And Assumptions
 
@@ -128,6 +138,10 @@ Architecture must trace decisions to requirements, pricing, security, operations
 reasoning. Capture alternatives, consequences and rationale once so downstream documents can reuse them. Agents query
 Microsoft ARM MCP directly through explicit read-only Cost Management and Pricing tool allowlists. Separate unpriced
 items from priced totals and retain source dates and uncertainty; never invent prices or confidence.
+
+Scope pricing tools to the roles that need them. Reuse matching rows from bounded current pricing evidence rather than
+querying again per line item. Broader queries require a supported provider interface, bounded responses and exact
+service, SKU, region, currency and meter matching; do not assume a batch API or invent missing prices.
 
 Quota and regional/SKU availability are assumptions, not required evidence or Architecture approval blockers. Restore,
 failover and capacity details may be described as assumptions or guidance, never as tested facts without evidence.
@@ -237,6 +251,11 @@ demand. Use progressive disclosure, bounded task inputs, shared references and r
 preserving semantic quality. Do not repeatedly feed full documents, policy baselines or the quality-reference corpus
 into model context. No token baseline or measurement project is required at this stage.
 
+Keep sequencing in the owning agent and domain knowledge in on-demand skills. Consolidate only demonstrated duplicate
+guidance; preserve distinct operational checklists and essential worker safety rules. A shared reference must remain
+available in both client projections without requiring speculative skill reads. Tool descriptions must explain each
+operation's purpose and boundary, and role/client allowlists must retain required tools while excluding irrelevant ones.
+
 ### REQ-DETERMINISM-001: Deterministic Packaging And Validation
 
 Equivalent inputs must produce byte-stable contracts, rendered artifacts, generated IaC, package tarballs, release
@@ -257,6 +276,34 @@ bounded feature; retain historical characterization and existing safety tests.
 Reduce unnecessary model input as part of each feature: compact authoritative context, relevant questions, unchanged
 decision reuse, deterministic filtering and selective regeneration. Preserve rich output and explicit reasoning.
 Do not add a token baseline, percentage target, new measurement framework or whole-repository optimization campaign now.
+
+Acceptance for the first delivery batch:
+
+1. Task inputs contain the current accepted revisions required by that task, not every historical completion. Exclude
+  superseded and invalidated artifacts from ordinary execution inputs; an explicit revision comparison must identify
+  its historical sources separately. Prove that both code-generation tracks select the replacement intent after change.
+2. Bounded input reads resolve every review subject to its canonical artifact kind, including plan-review to
+  `implementation-intent`. Test missing and stale references, pagination boundaries and complete reconstruction.
+3. Context uses deterministic task-specific projections with required dependency evidence and explicit retrieval
+  references. Keep useful compact content inline; do not replace one oversized response with mandatory full-history
+  pagination. Required templates, recorded input and decisions remain accessible through authorized MCP reads.
+4. Enforce input and output byte limits from the run's locked configuration and test the applicable context-size
+  contract. Include large fixtures and multibyte content; no silent truncation or claim of measured token savings.
+5. Reviewer packs contain the subject, necessary upstream evidence and dispositions, criteria and the exact receipt
+  contract. Preserve all review passes and stage-specific reasoning without irrelevant history or full policy baselines.
+6. Remove redundant context loading within a request, including subject-only review reads. Preserve task freshness,
+  ownership, expiry and journal-integrity checks; this does not authorize persistent snapshots or cross-call caches.
+7. Correct next-task guidance, describe registered tools, and test role/client tool coverage. Narrow ARM access by actual
+  workflow need; retain legitimate pricing and operational cost paths without granting writes or unsupported tools.
+8. Remove proven prompt duplication only with named owners and consumer checks. Keep essential worker boundaries,
+  domain-specific guidance and supported output quality; installed file size is not a model-token measurement.
+
+Follow-on acceptance covers bounded requirements amendments and confirmed-decision reuse under `REQ-REQUIREMENTS-001`,
+pricing-row reuse under `REQ-ARCH-001`, and supported-client outcomes under `REQ-CUSTOMIZATION-001`. The
+[roadmap](ROADMAP.md#optimization-recommendation-dispositions) records the disposition of each reviewed recommendation.
+Changes to model routing, transport representation, rendering lifecycle, review concurrency or invalidation semantics
+need their stated evidence and authority checks before becoming implementation work. Byte reduction alone cannot
+justify weaker review, missing human-readable packages, stale approval reuse or unsupported client mechanics.
 
 This supersedes the blanket product requirement to finish repository-wide optimization before client learning.
 Existing executable optimization gates and receipts remain unchanged by documentation edits. Reconcile any blocking

@@ -88,6 +88,28 @@ and the repository archives.
 - **State:** Open
 - **Closure proof:** Required checks reflect the accepted scope and documentation distinguishes targets from implementation.
 
+## RISK-011: Task Context Can Select Obsolete Or Incomplete Inputs
+
+- **Owner:** CLI/kernel and contracts maintainers
+- **Impact:** Historical completion hashes can precede replacement intent, while a review-subject alias mismatch can
+  reject a valid bounded read. Unscoped context also adds irrelevant evidence and repeated loading.
+- **Mitigation:** Complete the first roadmap batch using accepted-revision selection, canonical review-kind mapping,
+  bounded task/reviewer packs and request-local reuse without weakening integrity or freshness checks.
+- **State:** Open; source review and isolated probes identified the defects, implementation remains pending
+- **Closure proof:** Workflow, dependency-revision and reader tests cover invalidation, replacement intent in both IaC
+  tracks, all review subjects, large/multibyte inputs and stale ownership/expiry; deterministic qualification passes.
+
+## RISK-012: Optimization Can Weaken Review Or Client Boundaries
+
+- **Owner:** Managed customization and client experience maintainers
+- **Impact:** Tool removal, shared-only safety guidance, unsupported MCP representation or worker shortcuts can lose
+  required outcomes. Smaller prompts or files alone do not demonstrate preserved reasoning or reduced model cost.
+- **Mitigation:** Follow the roadmap dispositions, retain all four review passes and domain-specific checklists, and
+  verify required-tool coverage in both projections. Preserve compatible responses and the CLI hidden-worker boundary.
+- **State:** Open
+- **Closure proof:** Changed guidance and projections pass consumer/contract tests; behavior changes have authorized
+  exact-client evidence, and no unsupported token-saving, review-completion or parity claim is made.
+
 ## ASSUMPTION-001: Supported Clients Can Share Typed Outcomes
 
 - **Owner:** Client experience

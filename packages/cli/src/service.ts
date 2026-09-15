@@ -2831,6 +2831,7 @@ export class ApexService {
     if (intentHash === undefined)
       throw new ApexError("APEX_VALIDATION", "Implementation intent is required", EXIT_CODES.validation);
     const intent = await this.objects.getJson<ImplementationIntentV1>(intentHash);
+    const managedResources = await this.managedPreviewResources(run, events, intent);
     if (options.provider !== "fake") {
       if (options.provider !== run.iacTool) {
         throw new ApexError(
@@ -2859,7 +2860,7 @@ export class ApexService {
         inputHash: intentHash,
         iacHash: this.artifactHash(events, "iac-handoff") ?? sha256Json(intent.resources),
         policyHash: this.artifactHash(events, "policy-property-map") ?? run.runtimeLockHash,
-        resources: intent.resources.map((resource) => ({
+        resources: managedResources.map((resource) => ({
           logicalId: resource.id,
           resourceId: `${options.provider}://${run.environment}/${resource.id}`,
           type: resource.type,
@@ -2927,7 +2928,7 @@ export class ApexService {
       inputHash: intentHash,
       iacHash: sha256Json(intent.resources),
       policyHash: this.artifactHash(events, "policy-property-map") ?? run.runtimeLockHash,
-      changes: intent.resources.map((resource) => ({
+      changes: managedResources.map((resource) => ({
         resourceId: `fake://${run.environment}/${resource.id}`,
         action: options.operation === "destroy" ? ("delete" as const) : ("create" as const),
         material: true,
@@ -5389,6 +5390,32 @@ export class ApexService {
     return validatorIds;
   }
 
+  private async managedPreviewResources(
+    run: RunConfigV1,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+    intent: ImplementationIntentV1,
+  ): Promise<ImplementationIntentV1["resources"]> {
+    const manifestHash = this.artifactHash(events, "logical-resource-manifest");
+    if (manifestHash === undefined) {
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Logical resource manifest is required for preview",
+        EXIT_CODES.validation,
+      );
+    }
+    const manifest = await this.objects.getJson<LogicalResourceManifestV1>(manifestHash);
+    this.validateOutput(run, { kind: "logical-resource-manifest", value: manifest });
+    const ownership = new Map(manifest.resources.map(({ logicalId, ownership }) => [logicalId, ownership]));
+    if (ownership.size !== intent.resources.length || intent.resources.some(({ id }) => !ownership.has(id))) {
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Logical resource ownership coverage is incomplete",
+        EXIT_CODES.validation,
+      );
+    }
+    return intent.resources.filter(({ id }) => ownership.get(id) === "managed");
+  }
+
   private async validatePreviewValidators(
     run: RunConfigV1,
     events: Awaited<ReturnType<EventJournal["replay"]>>,
@@ -5421,7 +5448,9 @@ export class ApexService {
           : (this.artifactHash(events, "iac-handoff") ?? sha256Json(intent.resources)),
       expectedPolicyHash: this.artifactHash(events, "policy-property-map") ?? run.runtimeLockHash,
       currentDependencyRevision: this.dependencyRevision(run, events),
-      expectedResourceIds: intent.resources.map(({ id }) => `${provider}://${run.environment}/${id}`),
+      expectedResourceIds: (await this.managedPreviewResources(run, events, intent)).map(
+        ({ id }) => `${provider}://${run.environment}/${id}`,
+      ),
       intendedExecutionRecipientIdentity,
       ...(attestation === undefined ? {} : { attestation }),
     };

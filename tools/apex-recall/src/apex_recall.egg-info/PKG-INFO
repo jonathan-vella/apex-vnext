@@ -1,0 +1,6 @@
+Metadata-Version: 2.4
+Name: apex-recall
+Version: 0.2.0
+Summary: Progressive session recall CLI for APEX agent-output artifacts
+License-Expression: MIT
+Requires-Python: >=3.14

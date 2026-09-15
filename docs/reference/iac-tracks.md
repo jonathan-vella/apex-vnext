@@ -18,6 +18,10 @@ contradictory declarations with `APEX_VALIDATION`: existing resources use Bicep 
 rejected. The owning predicate is
 [`hasValidLogicalResourceReferences`](../../packages/contracts/src/targets.ts).
 
+Preview requires a valid accepted manifest covering every intent resource. Only `managed` entries enter APEX's provider
+apply/destroy request resource lists and simulated changes/inventory. Existing references remain in the accepted intent
+and its hash binding. An all-existing workload has no simulated changes but still requires fresh deployment approval.
+
 This check validates manifest consistency, not the truth of an ownership claim or the generated code. Binding supplied
 platform resource identities to approved intent, native preview changes and cleanup remains follow-on work. An accepted
 manifest does not grant authority to modify shared platform resources or bypass deployment approval.

@@ -142,3 +142,16 @@ Implement [issue #344](https://github.com/jonathan-vella/apex-vnext/issues/344) 
 import, existing governance reconciliation/review and Gate 2. Cover standalone subscriptions through the same contract.
 The full baseline never enters model context. Quota and regional availability remain assumptions, not Architecture
 evidence gates. Policy, security and deployment approval cannot be waived by an assumption or lab profile.
+
+## DECISION-027: Optimize Current Inputs Before Changing Execution Mechanics
+
+Start with the [first roadmap batch](ROADMAP.md#first-batch-input-correctness-and-scope): repair revision-safe reads,
+bound task/reviewer context, correct routing and tool scope, then remove proven prompt duplication. Acceptance remains
+in `REQ-OPTIMIZATION-001`; recommendation dispositions remain in the roadmap. Retain requirements-review,
+architecture-review, governance-review and plan-review, equivalent client outcomes, and rich deterministic output.
+
+Reuse confirmed requirements, decisions and pricing evidence in the existing delivery phases. This does not authorize
+model downgrades, new telemetry, persistent snapshots, concurrent review commits, ID-only invalidation, asynchronous
+rendering or structured-only MCP results. Those proposals require the evidence and boundaries in the roadmap before
+adoption. Preserve DECISION-025, CLI worker restrictions, journal integrity and human approval; changing documentation
+does not alter executable gates or close historical findings.

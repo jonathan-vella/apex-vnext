@@ -23,8 +23,10 @@ requirements but may not create a competing runtime state machine.
 ## Approved Product Direction
 
 Start with the [PRD goals](PRD.md#goals), [workload boundary](PRD.md#workload-boundary), and
-[output quality reference](PRD.md#output-quality-reference). The roadmap orders governance, COE reuse and conversational
-changes, rich output, both-client WSL2 workflows, then distribution including APEX MCP. No token baseline is current work.
+[output quality reference](PRD.md#output-quality-reference). Start with the
+[first optimization batch](ROADMAP.md#first-batch-input-correctness-and-scope), then follow the existing phases for
+governance, COE reuse and conversational changes, rich output, both-client WSL2 workflows and distribution including
+APEX MCP. The roadmap records applicable recommendation follow-ons and deferrals. No token baseline is current work.
 Do not duplicate these rules in a new master plan or treat target requirements as already implemented commands.
 
 ## Scope Boundary
