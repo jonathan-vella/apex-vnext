@@ -19,6 +19,10 @@
             "type": "array",
             "uniqueItems": true
           },
+          "executionAddress": {
+            "minLength": 1,
+            "type": "string"
+          },
           "generatedDependencies": {
             "items": {
               "minLength": 1,

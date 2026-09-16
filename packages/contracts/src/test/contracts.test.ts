@@ -936,6 +936,20 @@ describe("target family contracts", () => {
     );
   });
 
+  it("accepts optional non-empty execution addresses without changing binding descriptors", () => {
+    const manifest = fixtures[7][1] as unknown as LogicalResourceManifestV1;
+    assert.equal(Value.Check(LogicalResourceManifestV1Schema, manifest), true);
+    for (const executionAddress of ["plan", "azapi_resource.plan", "data.azapi_resource.plan", "module.plan", "", 42]) {
+      assert.equal(
+        Value.Check(LogicalResourceManifestV1Schema, {
+          ...manifest,
+          resources: manifest.resources.map((resource) => ({ ...resource, executionAddress })),
+        }),
+        typeof executionAddress === "string" && executionAddress.length > 0,
+      );
+    }
+  });
+
   it("requires unique logical IDs and resolvable dependency references", () => {
     const manifest = fixtures[7][1] as unknown as LogicalResourceManifestV1;
     assert.equal(hasValidLogicalResourceReferences(manifest), true);

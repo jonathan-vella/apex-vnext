@@ -274,6 +274,7 @@ function virtualTree(
 function manifest(
   intent: ImplementationIntentV1,
   binding: IacBindingV1,
+  contexts: readonly ResourceContext[],
   sourcePath: string,
   existing: ReadonlySet<string>,
 ): LogicalResourceManifestV1 {
@@ -282,24 +283,30 @@ function manifest(
     projectId: intent.projectId,
     runId: intent.runId,
     track: binding.track,
-    resources: [...intent.resources]
-      .sort((left, right) => left.id.localeCompare(right.id))
-      .map((resource) => ({
-        logicalId: resource.id,
-        type: resource.type,
-        implementationAddress: binding.resourceBindings[resource.id]!.implementation,
-        implementationKind: existing.has(resource.id)
-          ? binding.track === "terraform"
-            ? ("data" as const)
-            : ("existing" as const)
-          : binding.resourceBindings[resource.id]!.implementation.startsWith("avm:")
-            ? ("module" as const)
-            : ("resource" as const),
-        ownership: existing.has(resource.id) ? ("existing" as const) : ("managed" as const),
-        dependsOn: [...resource.dependsOn].sort(),
-        generatedDependencies: [...resource.dependsOn].sort(),
-        sourcePath,
-      })),
+    resources: contexts.map(({ resource, declaration, parsed }) => ({
+      logicalId: resource.id,
+      type: resource.type,
+      implementationAddress: binding.resourceBindings[resource.id]!.implementation,
+      executionAddress:
+        binding.track === "bicep"
+          ? declaration
+          : parsed.kind === "avm"
+            ? `module.${declaration}`
+            : existing.has(resource.id)
+              ? `data.azapi_resource.${declaration}`
+              : `azapi_resource.${declaration}`,
+      implementationKind: existing.has(resource.id)
+        ? binding.track === "terraform"
+          ? ("data" as const)
+          : ("existing" as const)
+        : binding.resourceBindings[resource.id]!.implementation.startsWith("avm:")
+          ? ("module" as const)
+          : ("resource" as const),
+      ownership: existing.has(resource.id) ? ("existing" as const) : ("managed" as const),
+      dependsOn: [...resource.dependsOn].sort(),
+      generatedDependencies: [...resource.dependsOn].sort(),
+      sourcePath,
+    })),
   };
 }
 
@@ -371,7 +378,7 @@ export function generateBicepTree(
     ["targetScope = 'resourceGroup'", descriptions, blocks.join("\n\n")]
       .filter((part) => part.length > 0)
       .join("\n\n") + "\n";
-  return virtualTree([{ path: "main.bicep", content }], manifest(intent, binding, "main.bicep", existing));
+  return virtualTree([{ path: "main.bicep", content }], manifest(intent, binding, contexts, "main.bicep", existing));
 }
 
 function exactProviderConstraint(value: string | undefined, fallback: string, label: string): string {
@@ -467,7 +474,7 @@ export function generateTerraformTree(
   ];
   if (options.lockFileContent !== undefined)
     files.push({ path: ".terraform.lock.hcl", content: options.lockFileContent });
-  return virtualTree(files, manifest(intent, binding, "main.tf", existing));
+  return virtualTree(files, manifest(intent, binding, contexts, "main.tf", existing));
 }
 
 function logicalImplementation(value: string): string {

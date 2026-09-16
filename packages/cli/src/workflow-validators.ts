@@ -112,6 +112,106 @@ export interface WorkflowDeployValidatorContext {
   };
 }
 
+export interface NativeBicepResourceOwnership {
+  readonly expectedResourceIds: readonly string[];
+  readonly resourceIdsByLogicalId: Readonly<Record<string, string>>;
+  readonly protectedResourceIds: readonly string[];
+  readonly issues: readonly ValidationIssue[];
+}
+
+export function resolveNativeBicepResourceOwnership(context: {
+  readonly intent: ImplementationIntentV1;
+  readonly binding: IacBindingV1;
+  readonly manifest: LogicalResourceManifestV1;
+  readonly targetScope: string;
+}): NativeBicepResourceOwnership {
+  const { intent, binding, manifest, targetScope } = context;
+  const issues: ValidationIssue[] = [];
+  const resourceIdsByLogicalId: Record<string, string> = Object.create(null);
+  const protectedResourceIds: string[] = [];
+  const scopePattern =
+    /^\/subscriptions\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/resourceGroups\/[A-Za-z0-9_.()-]+$/i;
+  if (!scopePattern.test(targetScope)) {
+    issues.push({ path: "/targetScope", message: "Native Bicep ownership requires an exact resource-group scope" });
+  }
+  const intentIds = intent.resources.map(({ id }) => id).sort();
+  if (
+    binding.track !== "bicep" ||
+    manifest.track !== "bicep" ||
+    binding.projectId !== intent.projectId ||
+    manifest.projectId !== intent.projectId ||
+    binding.runId !== intent.runId ||
+    manifest.runId !== intent.runId ||
+    binding.intentHash !== sha256Json(intent) ||
+    new Set(intentIds).size !== intentIds.length ||
+    JSON.stringify(Object.keys(binding.resourceBindings).sort()) !== JSON.stringify(intentIds) ||
+    JSON.stringify(manifest.resources.map(({ logicalId }) => logicalId).sort()) !== JSON.stringify(intentIds)
+  ) {
+    issues.push({
+      path: "/binding",
+      message: "Bicep ownership requires matching accepted intent, binding, and manifest coverage",
+    });
+  }
+  if (issues.length > 0) {
+    return { expectedResourceIds: [], resourceIdsByLogicalId, protectedResourceIds, issues };
+  }
+  const manifestResources = new Map(manifest.resources.map((resource) => [resource.logicalId, resource]));
+  const physicalIds = new Set<string>();
+  for (const resource of intent.resources) {
+    const resourceBinding = binding.resourceBindings[resource.id]!;
+    const entry = manifestResources.get(resource.id)!;
+    const path = `/binding/resourceBindings/${resource.id}`;
+    if (entry.type !== resource.type || entry.implementationAddress !== resourceBinding.implementation) {
+      issues.push({ path, message: "Manifest resource does not match the accepted binding and type" });
+      continue;
+    }
+    if (resourceBinding.implementation.startsWith("avm:") || entry.implementationKind === "module") {
+      if (entry.ownership === "managed") {
+        issues.push({
+          path,
+          message: "Bicep module ownership is unresolved; expanded resource IDs cannot be inferred",
+        });
+      }
+      continue;
+    }
+    const descriptor =
+      /^native:(Microsoft\.[A-Za-z0-9.]+\/[A-Za-z0-9.]+)@([0-9]{4}-[0-9]{2}-[0-9]{2}(?:-preview)?)$/.exec(
+        resourceBinding.implementation,
+      );
+    const { name, parentId } = resourceBinding.parameters;
+    if (
+      descriptor === null ||
+      descriptor[1]!.toLowerCase() !== resource.type.toLowerCase() ||
+      (resourceBinding.version !== "legacy" && resourceBinding.version !== descriptor[2]) ||
+      typeof name !== "string" ||
+      !/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(name) ||
+      typeof parentId !== "string" ||
+      (parentId !== "/" && parentId.toLowerCase() !== targetScope.toLowerCase()) ||
+      (entry.ownership === "managed" && entry.implementationKind !== "resource")
+    ) {
+      issues.push({
+        path,
+        message: "Native Bicep ownership requires a matching top-level type, literal name, and target RG parent",
+      });
+      continue;
+    }
+    const resourceId = `${targetScope}/providers/${descriptor[1]}/${name}`;
+    const normalizedId = resourceId.toLowerCase();
+    if (physicalIds.has(normalizedId)) {
+      issues.push({ path, message: "Bicep bindings resolve to duplicate resource IDs" });
+    }
+    physicalIds.add(normalizedId);
+    if (entry.ownership === "existing") protectedResourceIds.push(resourceId);
+    else resourceIdsByLogicalId[resource.id] = resourceId;
+  }
+  return {
+    expectedResourceIds: issues.length === 0 ? Object.values(resourceIdsByLogicalId) : [],
+    resourceIdsByLogicalId: issues.length === 0 ? resourceIdsByLogicalId : {},
+    protectedResourceIds,
+    issues,
+  };
+}
+
 export interface WorkflowInventoryValidatorContext {
   readonly run: RunConfigV1;
   readonly preview: DeploymentPreviewV1;
@@ -704,7 +804,8 @@ function previewCoverage(value: unknown): ValidationIssue[] {
   const changes = context.preview.changes;
   const resourceIds = changes.map(({ resourceId }) => resourceId);
   const issues: ValidationIssue[] = [];
-  if (new Set(resourceIds).size !== resourceIds.length) {
+  const uniqueIds = context.provider === "bicep" ? resourceIds.map((id) => id.toLowerCase()) : resourceIds;
+  if (new Set(uniqueIds).size !== resourceIds.length) {
     issues.push({ path: "/changes", message: "Preview contains duplicate resource changes" });
   }
   if (changes.some(({ action }) => action === "unknown")) {
@@ -715,6 +816,29 @@ function previewCoverage(value: unknown): ValidationIssue[] {
     const expected = [...context.expectedResourceIds].sort();
     if (JSON.stringify(actual) !== JSON.stringify(expected)) {
       issues.push({ path: "/changes", message: "Fake preview does not cover every requested resource" });
+    }
+  }
+  if (context.provider === "terraform") {
+    const managedAddresses = new Set(context.expectedResourceIds);
+    if (changes.some(({ resourceId, action }) => action !== "no-op" && !managedAddresses.has(resourceId))) {
+      issues.push({
+        path: "/changes",
+        message: "Terraform preview would modify a resource outside accepted managed ownership",
+      });
+    }
+  }
+  if (context.provider === "bicep") {
+    const managedIds = new Set(context.expectedResourceIds.map((id) => id.toLowerCase()));
+    if (
+      changes.some(
+        ({ resourceId, action, material }) =>
+          (action !== "no-op" || material) && !managedIds.has(resourceId.toLowerCase()),
+      )
+    ) {
+      issues.push({
+        path: "/changes",
+        message: "Bicep preview would modify a resource outside accepted managed ownership",
+      });
     }
   }
   return issues;

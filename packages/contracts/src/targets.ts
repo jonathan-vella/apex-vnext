@@ -404,6 +404,7 @@ export const LogicalResourceManifestV1Schema = Type.Object(
           logicalId: NonEmptyStringSchema,
           type: NonEmptyStringSchema,
           implementationAddress: NonEmptyStringSchema,
+          executionAddress: Type.Optional(NonEmptyStringSchema),
           implementationKind: Type.Union([
             Type.Literal("resource"),
             Type.Literal("module"),

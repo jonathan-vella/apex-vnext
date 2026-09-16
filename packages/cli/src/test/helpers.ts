@@ -2,6 +2,7 @@ import {
   CONTRACT_VERSION,
   type ArchitectureV1,
   type ImplementationIntentV1,
+  type IacBindingV1,
   type QualityScorecardV1,
   type RequirementsV1,
 } from "@apexops/contracts";
@@ -335,8 +336,9 @@ export function codegenBundle(runId: string, track: "bicep" | "terraform", plan:
     resources: [
       {
         logicalId: "api",
-        type: "fake/service",
-        implementationAddress: "api",
+        type: (plan[0]!.value as ImplementationIntentV1).resources[0]!.type,
+        implementationAddress: (plan[1]!.value as IacBindingV1).resourceBindings.api!.implementation,
+        executionAddress: track === "terraform" ? "azapi_resource.api" : "api",
         implementationKind: "resource",
         ownership: "managed",
         dependsOn: [],

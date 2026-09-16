@@ -139,6 +139,7 @@ import { ApexError, EXIT_CODES } from "./errors.js";
 import { APEX_VERSION } from "./version.js";
 import {
   registerWorkflowValidators,
+  resolveNativeBicepResourceOwnership,
   taskWorkflowValidatorInput,
   type WorkflowGateValidatorContext,
   type WorkflowDeployValidatorContext,
@@ -1361,6 +1362,63 @@ export class ApexService {
     });
   }
 
+  private async taskReviewMetadata(
+    run: RunConfigV1,
+    task: TaskEnvelopeV1,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+    descriptor: WorkflowTaskDescriptor,
+  ) {
+    const subjectKind = this.reviewSubjectArtifactKind(descriptor);
+    if (subjectKind === undefined) return undefined;
+    const subjectHash = this.artifactHash(events, subjectKind);
+    if (subjectHash === undefined || !task.inputRefs.includes(subjectHash))
+      throw new ApexError("APEX_STALE", "Review task input is unavailable or stale", EXIT_CODES.stale);
+    const node = (await this.lockedWorkflowEngine(run)).manifest.nodes.find(
+      ({ id }) => id === descriptor.reviewSubject,
+    );
+    if (node === undefined)
+      throw new ApexError("APEX_AUTHORIZATION", "Task has no locked workflow node", EXIT_CODES.authorization);
+    const reviewIndex = events.findLastIndex(
+      (event) => event.type === "task.completed" && (event.payload as { nodeId?: unknown }).nodeId === task.taskType,
+    );
+    const currentReview = events[reviewIndex]?.payload as
+      { reviewHash?: string; subjectHash?: string; dependencyHash?: string } | undefined;
+    const dispositions = new Map<string, ReviewResolution>();
+    if (currentReview?.subjectHash === subjectHash && currentReview.reviewHash !== undefined) {
+      for (const event of events.slice(reviewIndex + 1)) {
+        if (event.type !== "review.resolved") continue;
+        const resolution = (event.payload as { resolution?: ReviewResolution }).resolution;
+        if (
+          resolution?.subjectHash === subjectHash &&
+          resolution.reviewHash === currentReview.reviewHash &&
+          resolution.dependencyHash === currentReview.dependencyHash
+        ) {
+          const { findingId, reviewHash, dependencyHash, disposition, actor, rationale, evidenceRefs, expiresAt } =
+            resolution;
+          dispositions.set(findingId, {
+            findingId,
+            reviewHash,
+            subjectHash,
+            dependencyHash,
+            disposition,
+            actor,
+            rationale,
+            evidenceRefs,
+            ...(expiresAt === undefined ? {} : { expiresAt }),
+          });
+        }
+      }
+    }
+    return {
+      subjectKind,
+      subjectHash,
+      criteria: node.validators.filter((id) => workflowValidatorOwnership(id)?.boundary === "review"),
+      dispositions: [...dispositions.values()],
+      evidenceRefs: task.inputRefs,
+      evidenceRefsRequired: true,
+    };
+  }
+
   async taskContext(taskId: string): Promise<{
     task: TaskEnvelopeV1;
     inputs: unknown[];
@@ -1369,6 +1427,8 @@ export class ApexService {
     recordedInput: Record<string, InputValueV1> | null;
     decisions: Record<string, InputValueV1>;
     outputTemplates: Partial<Record<ArtifactKind, unknown>>;
+    reviewMetadata?: Awaited<ReturnType<ApexService["taskReviewMetadata"]>>;
+    reviewMetadataReference?: { selector: "review-metadata"; bytes: number; inlined: boolean };
     outputRoot: string;
     status: string;
     blockers: string[];
@@ -1409,6 +1469,7 @@ export class ApexService {
       Object.entries(this.acceptedArtifactHashes(events)).filter(([, hash]) => task.inputRefs.includes(hash)),
     );
     const values = await Promise.all(task.inputRefs.map((hash) => this.objects.getJson(hash)));
+    const reviewMetadata = await this.taskReviewMetadata(run, task, events, descriptor);
     const context = {
       task,
       inputs: [] as unknown[],
@@ -1421,10 +1482,24 @@ export class ApexService {
       recordedInput: task.taskType === "requirements" ? this.recordedRequirementsInput(events) : null,
       decisions: task.taskType === "architecture" ? this.architectureDecisionValues(events, task.taskId) : {},
       outputTemplates,
+      reviewMetadata,
+      ...(reviewMetadata === undefined
+        ? {}
+        : {
+            reviewMetadataReference: {
+              selector: "review-metadata" as const,
+              bytes: Buffer.byteLength(JSON.stringify(reviewMetadata)),
+              inlined: true,
+            },
+          }),
       outputRoot: join(this.root, ".apex", "work", run.runId, taskId),
       status: this.completedNodeIds(events).has(task.taskType) ? "completed" : "active",
       blockers: route.blockers,
     };
+    if (Buffer.byteLength(JSON.stringify(context)) > limits.maxInputBytes && context.reviewMetadata !== undefined) {
+      context.reviewMetadata = undefined;
+      context.reviewMetadataReference!.inlined = false;
+    }
     if (Buffer.byteLength(JSON.stringify(context)) > limits.maxInputBytes)
       throw new ApexError(
         "APEX_VALIDATION",
@@ -1482,25 +1557,34 @@ export class ApexService {
     ) {
       throw new ApexError("APEX_STALE", "Review task input is unavailable or stale", EXIT_CODES.stale);
     }
-    if (inputHash !== undefined && (!task.inputRefs.includes(inputHash) || !authorizedRefs.includes(inputHash)))
+    const metadataSelected = inputHash === "review-metadata" && descriptor.reviewSubject !== undefined;
+    if (
+      !metadataSelected &&
+      inputHash !== undefined &&
+      (!task.inputRefs.includes(inputHash) || !authorizedRefs.includes(inputHash))
+    )
       throw new ApexError(
         "APEX_AUTHORIZATION",
         "Input hash is not a current task dependency",
         EXIT_CODES.authorization,
       );
-    const selectedHash = inputHash ?? reviewSubjectHash;
-    const context = selectedHash === undefined ? await this.taskContext(taskId) : undefined;
+    const selectedHash = metadataSelected ? undefined : (inputHash ?? reviewSubjectHash);
+    const context = !metadataSelected && selectedHash === undefined ? await this.taskContext(taskId) : undefined;
     const serialized = JSON.stringify(
-      context !== undefined
-        ? {
-            inputs: context.inputs,
-            inputReferences: context.inputReferences,
-            artifactHashes: context.artifactHashes,
-            recordedInput: context.recordedInput,
-            decisions: context.decisions,
-            outputTemplates: context.outputTemplates,
-          }
-        : await this.objects.getJson(selectedHash!),
+      metadataSelected
+        ? await this.taskReviewMetadata(run, task, events, descriptor)
+        : context !== undefined
+          ? {
+              inputs: context.inputs,
+              inputReferences: context.inputReferences,
+              artifactHashes: context.artifactHashes,
+              recordedInput: context.recordedInput,
+              decisions: context.decisions,
+              outputTemplates: context.outputTemplates,
+              reviewMetadata: context.reviewMetadata,
+              reviewMetadataReference: context.reviewMetadataReference,
+            }
+          : await this.objects.getJson(selectedHash!),
     );
     if (offset >= serialized.length) {
       throw new ApexError("APEX_VALIDATION", "Input read offset is outside the review subject", EXIT_CODES.validation);
@@ -3036,11 +3120,12 @@ export class ApexService {
               logicalResourceManifest: Object.fromEntries(
                 (logicalManifest?.resources ?? [])
                   .filter(({ ownership }) => ownership === "managed")
-                  .map(({ logicalId, implementationAddress }) => [
+                  .filter(({ executionAddress }) => executionAddress !== undefined)
+                  .map(({ logicalId, executionAddress }) => [
                     logicalId,
                     run.iacTool === "bicep"
-                      ? { codeSymbol: implementationAddress }
-                      : { terraformAddress: implementationAddress },
+                      ? { codeSymbol: executionAddress! }
+                      : { terraformAddress: executionAddress! },
                   ]),
               ),
             }
@@ -3048,11 +3133,11 @@ export class ApexService {
       const handoffHash = this.artifactHash(events, "iac-handoff");
       const handoff = handoffHash === undefined ? undefined : await this.objects.getJson<IacHandoffV1>(handoffHash);
       const generatedRoot = handoff === undefined ? undefined : resolve(this.root, handoff.rootPath);
-      if (policyValidation !== undefined) {
+      if (options.operation === "apply") {
         if (generatedRoot === undefined || handoff === undefined)
           throw new ApexError(
             "APEX_STALE",
-            "Accepted generated source is required for policy preview",
+            "Accepted generated source is required for native preview",
             EXIT_CODES.stale,
           );
         await this.assertSafeDestination(this.root, generatedRoot);
@@ -3079,7 +3164,7 @@ export class ApexService {
         blockers: [],
         ttlMs: options.expiresInMs ?? PREVIEW_TTL_MS,
         ...(policyValidation === undefined ? {} : { policyValidation }),
-        ...(policyValidation === undefined || handoff === undefined || generatedRoot === undefined
+        ...(options.operation !== "apply" || handoff === undefined || generatedRoot === undefined
           ? {}
           : { generatedSource: { rootPath: generatedRoot, treeHash: handoff.treeHash } }),
       };
@@ -5789,6 +5874,25 @@ export class ApexService {
     const omittedValidatorIds: string[] =
       provider === "fake" ? declaredIds.filter((id) => id === "terraform:saved-plan-binding") : [];
     const validatorIds = declaredIds.filter((id) => !omittedValidatorIds.includes(id));
+    const logicalManifestHash = this.artifactHash(events, "logical-resource-manifest");
+    const logicalManifest =
+      provider === "fake" || logicalManifestHash === undefined
+        ? undefined
+        : await this.objects.getJson<LogicalResourceManifestV1>(logicalManifestHash);
+    const bindingHash = this.artifactHash(events, "iac-binding");
+    const binding =
+      provider !== "bicep" || bindingHash === undefined
+        ? undefined
+        : await this.objects.getJson<IacBindingV1>(bindingHash);
+    const bicepOwnership =
+      provider === "bicep" && binding !== undefined && logicalManifest !== undefined
+        ? resolveNativeBicepResourceOwnership({
+            intent,
+            binding,
+            manifest: logicalManifest,
+            targetScope: run.targetScope,
+          })
+        : undefined;
     const context: WorkflowPreviewValidatorContext = {
       now: this.clock().toISOString(),
       run,
@@ -5803,9 +5907,16 @@ export class ApexService {
           : (this.artifactHash(events, "iac-handoff") ?? sha256Json(intent.resources)),
       expectedPolicyHash: this.artifactHash(events, "policy-property-map") ?? run.runtimeLockHash,
       currentDependencyRevision: this.dependencyRevision(run, events),
-      expectedResourceIds: (await this.managedPreviewResources(run, events, intent)).map(
-        ({ id }) => `${provider}://${run.environment}/${id}`,
-      ),
+      expectedResourceIds:
+        provider === "terraform"
+          ? (logicalManifest?.resources ?? [])
+              .filter(({ ownership }) => ownership === "managed")
+              .flatMap(({ executionAddress }) => (executionAddress === undefined ? [] : [executionAddress]))
+          : provider === "bicep"
+            ? (bicepOwnership?.expectedResourceIds ?? [])
+            : (await this.managedPreviewResources(run, events, intent)).map(
+                ({ id }) => `${provider}://${run.environment}/${id}`,
+              ),
       intendedExecutionRecipientIdentity,
       ...(policyValidationBinding === undefined ? {} : { policyValidationBinding }),
       ...(attestation === undefined ? {} : { attestation }),

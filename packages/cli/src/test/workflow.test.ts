@@ -983,7 +983,7 @@ test("task context rejects a task whose journal head changed", async () => {
 });
 
 test("large multibyte review context stays bounded with authorized selective reads", async () => {
-  const service = new ApexService(await tempRoot());
+  const service = new ApexService(await tempRoot(), { clock: () => new Date("2026-01-01T00:00:00.000Z") });
   await service.init({ projectId: "demo" });
   const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
@@ -996,6 +996,17 @@ test("large multibyte review context stays bounded with authorized selective rea
   if (reviewTask.status !== "task") return;
   const context = await service.taskContext(reviewTask.task.taskId);
   assert.ok(Buffer.byteLength(JSON.stringify(context)) <= 262_144);
+  assert.deepEqual(context.reviewMetadata, {
+    subjectKind: "requirements",
+    subjectHash: accepted.outputHashes.requirements,
+    criteria: ["review:requirements-comprehensive"],
+    dispositions: [],
+    evidenceRefs: reviewTask.task.inputRefs,
+    evidenceRefsRequired: true,
+  });
+  const metadata = await service.readTaskInput(reviewTask.task.taskId, 0, 6_000, "review-metadata");
+  assert.deepEqual(JSON.parse(metadata.content), context.reviewMetadata);
+  assert.deepEqual(metadata.outputTemplate, context.outputTemplates["review-findings"]);
   assert.deepEqual(context.inputs, []);
   assert.equal(context.inputReferences[0]!.inlined, false);
   const hash = accepted.outputHashes.requirements!;
@@ -1012,6 +1023,125 @@ test("large multibyte review context stays bounded with authorized selective rea
   await assert.rejects(
     service.readTaskInput(reviewTask.task.taskId, 0, 500, "f".repeat(64)),
     /current task dependency/,
+  );
+});
+
+test("review context filters current dispositions and selectively reads oversized metadata", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root, { clock: () => new Date("2026-01-01T00:00:00.000Z") });
+  const initialized = await service.init({ projectId: "demo" });
+  const requirementsTask = await nextTaskAfterInput(service);
+  assert.equal(requirementsTask.status, "task");
+  if (requirementsTask.status !== "task") return;
+  await assert.rejects(
+    service.readTaskInput(requirementsTask.task.taskId, 0, 500, "review-metadata"),
+    /current task dependency/,
+  );
+  const accepted = await service.completeRequirements(requirementsTask.task.taskId, requirements());
+  const issued = await service.nextTask();
+  assert.equal(issued.status, "task");
+  if (issued.status !== "task") return;
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"));
+  const taskPath = join(
+    root,
+    ".apex",
+    "projects",
+    "demo",
+    "runs",
+    initialized.runId,
+    "tasks",
+    `${issued.task.taskId}.json`,
+  );
+  let sequence = 0;
+  const append = async (type: EventV1["type"], payload: Parameters<EventJournal["append"]>[0]["payload"]) => {
+    await journal.append({
+      eventId: `review-context-${sequence++}`,
+      projectId: "demo",
+      runId: initialized.runId,
+      type,
+      timestamp: "2026-01-01T00:00:00.000Z",
+      ownerEpoch: 1,
+      expectedHead: await journal.head(),
+      payload,
+    });
+    await writeFile(taskPath, JSON.stringify({ ...issued.task, expectedHead: await journal.head() }));
+  };
+  const subjectHash = accepted.outputHashes.requirements!;
+  const current = {
+    findingId: "FIND-001",
+    reviewHash: "a".repeat(64),
+    subjectHash,
+    dependencyHash: "b".repeat(64),
+    disposition: "dismissed",
+    actor: "tester",
+    rationale: "Evidence addresses the finding",
+    evidenceRefs: [subjectHash],
+  };
+  const oldReviewHash = "c".repeat(64);
+  await append("task.completed", {
+    nodeId: "requirements-review",
+    subjectHash,
+    reviewHash: oldReviewHash,
+    dependencyHash: current.dependencyHash,
+  });
+  await append("review.resolved", { resolution: { ...current, reviewHash: oldReviewHash, findingId: "old-review" } });
+  await append("task.completed", {
+    nodeId: "requirements-review",
+    subjectHash,
+    reviewHash: current.reviewHash,
+    dependencyHash: current.dependencyHash,
+  });
+  for (const resolution of [
+    { ...current, reviewHash: oldReviewHash, findingId: "late-old-review" },
+    { ...current, subjectHash: "d".repeat(64), findingId: "other-subject" },
+    { ...current, dependencyHash: "e".repeat(64), findingId: "old-dependency" },
+    { ...current, rationale: "Superseded rationale" },
+    { ...current, unrelatedJournalData: "must not be projected" },
+  ])
+    await append("review.resolved", { resolution });
+  await append("task.completed", {
+    nodeId: "architecture-review",
+    subjectHash: "d".repeat(64),
+    reviewHash: "f".repeat(64),
+  });
+  const context = await service.taskContext(issued.task.taskId);
+  assert.deepEqual(context.reviewMetadata?.dispositions, [current]);
+  assert.equal(context.reviewMetadataReference?.inlined, true);
+
+  const oversized = { ...current, rationale: "\u{1f642}\u00e9".repeat(50_000) };
+  await append("review.resolved", { resolution: oversized });
+  const bounded = await service.taskContext(issued.task.taskId);
+  assert.ok(Buffer.byteLength(JSON.stringify(bounded)) <= 262_144);
+  assert.equal(bounded.reviewMetadata, undefined);
+  assert.equal(bounded.reviewMetadataReference?.selector, "review-metadata");
+  assert.equal(bounded.reviewMetadataReference?.inlined, false);
+  assert.ok(bounded.outputTemplates["review-findings"]);
+  assert.deepEqual(
+    bounded.inputReferences.map(({ hash }) => hash),
+    issued.task.inputRefs,
+  );
+  service.taskContext = async () => {
+    throw new Error("Selective metadata reads must not construct the full context");
+  };
+  const chunks: string[] = [];
+  let offset: number | undefined = 0;
+  while (offset !== undefined) {
+    const chunk = await service.readTaskInput(issued.task.taskId, offset, 6_000, "review-metadata");
+    assert.ok(Buffer.byteLength(chunk.content) <= 6_000);
+    chunks.push(chunk.content);
+    offset = chunk.nextOffset;
+  }
+  const serialized = chunks.join("");
+  assert.equal(Buffer.byteLength(serialized), bounded.reviewMetadataReference?.bytes);
+  assert.deepEqual(JSON.parse(serialized), { ...context.reviewMetadata, dispositions: [oversized] });
+  await assert.rejects(service.readTaskInput(issued.task.taskId, 0, 500, "f".repeat(64)), /current task dependency/);
+  await writeFile(
+    taskPath,
+    JSON.stringify({ ...issued.task, expectedHead: await journal.head(), inputRefs: [subjectHash, "f".repeat(64)] }),
+  );
+  await assert.rejects(
+    service.readTaskInput(issued.task.taskId, 0, 500, "review-metadata"),
+    /unauthorized input reference/,
   );
 });
 
@@ -1158,6 +1288,70 @@ test("plan task context projects source hashes and valid output templates", asyn
   const root = await tempRoot();
   const service = new ApexService(root);
   const initialized = await service.init({ projectId: "demo" });
+  const assertReviewContext = async (taskId: string, taskType: string, subjectHash: string) => {
+    const context = await service.taskContext(taskId);
+    const packs: Record<string, { subjectKind: string; criteria: string[]; kinds: string[] }> = {
+      "requirements-review": {
+        subjectKind: "requirements",
+        criteria: ["review:requirements-comprehensive"],
+        kinds: ["requirements"],
+      },
+      "architecture-review": {
+        subjectKind: "architecture",
+        criteria: ["review:architecture-comprehensive", "review:well-architected-criteria-complete"],
+        kinds: ["requirements", "architecture", "cost-estimate", "workload-decision-manifest"],
+      },
+      "governance-review": {
+        subjectKind: "policy-property-map",
+        criteria: ["review:governance-reconciliation"],
+        kinds: ["architecture", "governance-constraints", "policy-property-map"],
+      },
+      "plan-review": {
+        subjectKind: "implementation-intent",
+        criteria: ["review:plan-comprehensive"],
+        kinds: [
+          "requirements",
+          "architecture",
+          "governance-constraints",
+          "policy-property-map",
+          "implementation-intent",
+          "iac-binding",
+          "environment-inputs",
+        ],
+      },
+    };
+    const pack = packs[taskType]!;
+    assert.deepEqual(context.reviewMetadata, {
+      subjectKind: pack.subjectKind,
+      subjectHash,
+      criteria: pack.criteria,
+      dispositions: [],
+      evidenceRefs: context.task.inputRefs,
+      evidenceRefsRequired: true,
+    });
+    assert.deepEqual(Object.keys(context.artifactHashes).sort(), pack.kinds.sort());
+    assert.deepEqual(
+      context.inputReferences.map(({ hash }) => hash),
+      context.task.inputRefs,
+    );
+    assert.ok(Buffer.byteLength(JSON.stringify(context)) <= 262_144);
+    const template = context.outputTemplates["review-findings"] as {
+      subjectHash: string;
+      subjectKind: string;
+      criteria?: unknown[];
+    };
+    assert.equal(template.subjectHash, subjectHash);
+    assert.equal(
+      template.subjectKind,
+      taskType === "governance-review" ? "governance-reconciliation" : taskType.replace("-review", ""),
+    );
+    if (taskType === "architecture-review") assert.equal(template.criteria?.length, 5);
+    for (const reference of context.inputReferences) {
+      const chunk = await service.readTaskInput(taskId, 0, 6_000, reference.hash);
+      assert.equal(chunk.subjectHash, reference.hash);
+    }
+    await assert.rejects(service.readTaskInput(taskId, 0, 500, "f".repeat(64)), /current task dependency/);
+  };
   const complete = async (taskType: string, outputs: Parameters<typeof service.completeTaskOutputs>[1]) => {
     const issued = await nextTaskAfterInput(service);
     assert.equal(issued.status, "task");
@@ -1165,6 +1359,7 @@ test("plan task context projects source hashes and valid output templates", asyn
     assert.equal(issued.task.taskType, taskType);
     if (taskType.endsWith("-review")) {
       const subjectHash = (outputs[0]!.value as { subjectHash: string }).subjectHash;
+      await assertReviewContext(issued.task.taskId, taskType, subjectHash);
       const chunks: string[] = [];
       let offset: number | undefined = 0;
       while (offset !== undefined) {
@@ -1324,6 +1519,7 @@ test("plan task context projects source hashes and valid output templates", asyn
   assert.equal(reviewTask.status, "task");
   if (reviewTask.status !== "task") return;
   assert.equal(reviewTask.task.taskType, "plan-review");
+  await assertReviewContext(reviewTask.task.taskId, "plan-review", planHashes.outputHashes["implementation-intent"]!);
   const reviewInput = await service.readTaskInput(reviewTask.task.taskId);
   assert.equal(reviewInput.subjectHash, planHashes.outputHashes["implementation-intent"]);
   assert.deepEqual(JSON.parse(reviewInput.content), plan[0]!.value);

@@ -177,8 +177,20 @@ async function reachCodegen(
   return { taskId: await task(service, `codegen-${track}`), plan };
 }
 
-async function reachValidation(service: ApexService, runId: string, track: "bicep" | "terraform"): Promise<void> {
-  const codegen = await reachCodegen(service, runId, track);
+function configureNativeBicepPlan(plan: ReturnType<typeof planBundle>): void {
+  const intent = plan.find(({ kind }) => kind === "implementation-intent")!.value as ImplementationIntentV1;
+  intent.resources.find(({ id }) => id === "api")!.type = "Microsoft.Storage/storageAccounts";
+  const binding = plan.find(({ kind }) => kind === "iac-binding")!.value as IacBindingV1;
+  binding.intentHash = sha256Json(intent);
+}
+
+async function reachValidation(
+  service: ApexService,
+  runId: string,
+  track: "bicep" | "terraform",
+  configurePlan?: (plan: ReturnType<typeof planBundle>) => void,
+): Promise<void> {
+  const codegen = await reachCodegen(service, runId, track, configurePlan);
   await service.completeTaskOutputs(codegen.taskId, codegenBundle(runId, track, codegen.plan));
   await complete(service, `validation-${track}`, [
     { kind: "validation-evidence", value: validationEvidence(runId, track) },
@@ -222,6 +234,7 @@ for (const track of ["bicep", "terraform"] as const) {
           ...manifest.resources[0]!,
           logicalId: "managed",
           implementationAddress: "managed",
+          executionAddress: track === "terraform" ? "azapi_resource.managed" : "managed",
           ownership: "managed",
           implementationKind: "resource",
           dependsOn: ["api"],
@@ -310,6 +323,7 @@ function terraformPreviewProvider(
   now: Date,
   mutation?:
     | "input-hash"
+    | "foreign-address"
     | "operation"
     | "state"
     | "apply-error"
@@ -351,7 +365,11 @@ function terraformPreviewProvider(
       artifactHash: sha256Json(plan),
       stateLineage: "lineage-1",
       stateSerial: 1,
-      changes: request.resources.map(({ resourceId }) => ({ resourceId, action: "create" as const, material: true })),
+      changes: request.resources.map(({ logicalId }) => ({
+        resourceId: mutation === "foreign-address" ? "azapi_resource.foreign" : `azapi_resource.${logicalId}`,
+        action: "create" as const,
+        material: true,
+      })),
       blockers: [],
       createdAt: now.toISOString(),
       expiresAt: new Date(now.getTime() + request.ttlMs).toISOString(),
@@ -474,7 +492,12 @@ function bicepPreviewProvider(now: Date): IacProvider {
       iacHash: request.iacHash,
       policyHash: request.policyHash,
       artifactHash: "8".repeat(64),
-      changes: request.resources.map(({ resourceId }) => ({ resourceId, action: "create" as const, material: true })),
+      changes: request.resources.map(({ logicalId, resourceId }) => ({
+        resourceId:
+          logicalId === "api" ? `${request.target}/providers/Microsoft.Storage/storageAccounts/apidemo` : resourceId,
+        action: "create" as const,
+        material: true,
+      })),
       blockers: [],
       createdAt: now.toISOString(),
       expiresAt: new Date(now.getTime() + request.ttlMs).toISOString(),
@@ -1130,8 +1153,12 @@ test("native Bicep deploy records stack ownership evidence in manifest order", a
   const now = new Date("2026-01-01T00:00:00.000Z");
   const root = await tempRoot();
   const service = new ApexService(root, { clock: () => now, providers: { bicep: bicepPreviewProvider(now) } });
-  const { runId } = await service.init({ projectId: "demo", iacTool: "bicep" });
-  await reachValidation(service, runId, "bicep");
+  const { runId } = await service.init({
+    projectId: "demo",
+    iacTool: "bicep",
+    targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
+  });
+  await reachValidation(service, runId, "bicep", configureNativeBicepPlan);
   const preview = await service.preview({ operation: "apply", provider: "bicep" });
   await service.decideGateNumber(4, "approved", "tester");
   await service.deploy(preview.previewHash);
@@ -1151,6 +1178,69 @@ test("native Bicep deploy records stack ownership evidence in manifest order", a
   ]);
   assert.equal((completed?.payload as { evidenceMode?: unknown }).evidenceMode, "native");
 });
+
+for (const scenario of ["foreign ID", "existing update", "existing delete"] as const) {
+  test(`native Bicep preview rejects ${scenario} outside accepted managed ownership`, async () => {
+    const root = await tempRoot();
+    const now = new Date("2026-01-01T00:00:00.000Z");
+    const base = bicepPreviewProvider(now);
+    let mutatePreview = true;
+    const provider: IacProvider = {
+      ...base,
+      async previewApply(request) {
+        assert.deepEqual(
+          request.resources.map(({ logicalId }) => logicalId),
+          scenario === "foreign ID" ? ["api"] : [],
+        );
+        const original = await base.previewApply(request);
+        if (!mutatePreview) return original;
+        const { previewHash, ...body } = original;
+        assert.equal(previewHash, sha256Json(body));
+        const changed = {
+          ...body,
+          changes: [
+            {
+              resourceId: `${request.target}/providers/Microsoft.Storage/storageAccounts/${scenario === "foreign ID" ? "foreign" : "apidemo"}`,
+              action: scenario === "existing delete" ? ("delete" as const) : ("update" as const),
+              material: true,
+            },
+          ],
+        };
+        return { ...changed, previewHash: sha256Json(changed) };
+      },
+    };
+    const service = new ApexService(root, { clock: () => now, providers: { bicep: provider } });
+    const { runId } = await service.init({
+      projectId: "demo",
+      iacTool: "bicep",
+      targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
+    });
+    const codegen = await reachCodegen(service, runId, "bicep", configureNativeBicepPlan);
+    const bundle = codegenBundle(runId, "bicep", codegen.plan);
+    if (scenario !== "foreign ID") {
+      const manifest = bundle.find(({ kind }) => kind === "logical-resource-manifest")!
+        .value as LogicalResourceManifestV1;
+      manifest.resources[0]!.ownership = "existing";
+      manifest.resources[0]!.implementationKind = "existing";
+      const handoff = bundle.find(({ kind }) => kind === "iac-handoff")!.value as {
+        logicalResourceManifestHash: string;
+      };
+      handoff.logicalResourceManifestHash = sha256Json(manifest);
+    }
+    await service.completeTaskOutputs(codegen.taskId, bundle);
+    await complete(service, "validation-bicep", [
+      { kind: "validation-evidence", value: validationEvidence(runId, "bicep") },
+    ]);
+    const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+    const head = await journal.head();
+    await assert.rejects(service.preview({ operation: "apply", provider: "bicep" }), /preview:coverage/);
+    assert.equal((await service.status()).run.gates[3]!.state, "closed");
+    assert.equal(await journal.head(), head);
+    mutatePreview = false;
+    await service.preview({ operation: "apply", provider: "bicep" });
+    assert.equal((await service.status()).run.gates[3]!.state, "open");
+  });
+}
 
 test("native apply requires complete source-bound policy receipts before Gate 4", async () => {
   const root = await tempRoot();
@@ -1179,8 +1269,12 @@ test("native apply requires complete source-bound policy receipts before Gate 4"
     policyValidation: () => (includeReceipt ? receipt : undefined),
   };
   const service = new ApexService(root, { clock: () => now, providers: { bicep: provider } });
-  const { runId } = await service.init({ projectId: "demo", iacTool: "bicep" });
-  const codegen = await reachCodegen(service, runId, "bicep", undefined, false, undefined, (policy) => {
+  const { runId } = await service.init({
+    projectId: "demo",
+    iacTool: "bicep",
+    targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
+  });
+  const codegen = await reachCodegen(service, runId, "bicep", configureNativeBicepPlan, false, undefined, (policy) => {
     policy.mappings.push({
       policyAssignmentId: "https",
       effect: "deny",
@@ -1202,6 +1296,24 @@ test("native apply requires complete source-bound policy receipts before Gate 4"
   const created = events.findLast(({ type }) => type === "preview.created");
   const hash = (created!.payload as { policyValidationHash: string }).policyValidationHash;
   assert.equal((await new ObjectStore(root).getJson<PolicyValidationV1>(hash)).outcome, "pass");
+});
+
+test("native Terraform preview rejects changes outside accepted managed addresses", () => {
+  const registry = new ValidatorRegistry();
+  registerWorkflowValidators(registry);
+  const context = {
+    provider: "terraform",
+    expectedResourceIds: ["azurerm_storage_account.workload"],
+    preview: { changes: [{ resourceId: "azurerm_virtual_network.platform", action: "update", material: true }] },
+  };
+  assert.equal(registry.validate("preview:coverage", context).valid, false);
+  context.preview.changes[0]!.action = "no-op";
+  context.preview.changes[0]!.material = false;
+  assert.equal(registry.validate("preview:coverage", context).valid, true);
+  context.preview.changes[0]!.resourceId = "azurerm_storage_account.workload";
+  context.preview.changes[0]!.action = "create";
+  context.preview.changes[0]!.material = true;
+  assert.equal(registry.validate("preview:coverage", context).valid, true);
 });
 
 test("imported governance validates actionable effects without inventing audit mappings", () => {
@@ -1348,10 +1460,28 @@ test("native Terraform apply requires complete source-bound policy receipts befo
     assert.equal(request.iacHash, (hashes.outputHashes as Record<string, string>)["iac-handoff"]);
     assert.deepEqual(request.generatedSource, { rootPath: join(root, handoff.rootPath), treeHash: handoff.treeHash });
     assert.equal(request.policyHash, storedReceipt.policyMapHash);
-    assert.deepEqual(request.policyValidation?.logicalResourceManifest, { api: { terraformAddress: "api" } });
+    assert.deepEqual(request.policyValidation?.logicalResourceManifest, {
+      api: { terraformAddress: "azapi_resource.api" },
+    });
   }
   await service.decideGateNumber(4, "approved", "tester");
   assert.equal((await service.status()).run.gates[3]!.state, "approved");
+});
+
+test("native Terraform service preview rejects a foreign managed address", async () => {
+  const root = await tempRoot();
+  const now = new Date("2026-01-01T00:00:00.000Z");
+  const service = new ApexService(root, {
+    clock: () => now,
+    providers: { terraform: terraformPreviewProvider(now, "foreign-address") },
+  });
+  const { runId } = await service.init({ projectId: "demo", iacTool: "terraform" });
+  await reachValidation(service, runId, "terraform");
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+  const head = await journal.head();
+  await assert.rejects(service.preview({ operation: "apply", provider: "terraform" }), /preview:coverage/);
+  assert.equal((await service.status()).run.gates[3]!.state, "closed");
+  assert.equal(await journal.head(), head);
 });
 
 test("native Terraform preview records saved-plan validation and rejects wrong bindings", async () => {

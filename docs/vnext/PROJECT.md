@@ -22,12 +22,13 @@ around vNext source authorities and Diátaxis navigation.
 ## Open Release Work
 
 - Complete the [first optimization batch](ROADMAP.md#first-batch-input-correctness-and-scope): revision-safe reads,
-  bounded context/reviewer packs and routing/tool scope have implementation and focused tests. Complete reviewer
-  evidence/disposition coverage and exact-client checks. Scoped prompt inspection found no further safe deletion.
+  bounded context/reviewer packs, stage criteria/dispositions and routing/tool scope have implementation and focused
+  tests. Exact-client checks remain pending. Scoped prompt inspection found no further safe deletion.
 - Complete issue #344's nonempty-policy enforcement through planning and native code validation. Path-only import,
   standalone collection and evidenced-empty import-to-simulated-deployment tests exist for both tracks. Native apply
   previews check concrete policy values against compiled Bicep/saved Terraform plans with source-bound receipts;
-  physical-identity ownership and earlier code-validation integration remain open.
+  native top-level ownership checks reject foreign mutations; AVM child-resource identity and earlier code-validation
+  integration remain open.
 - Implement and qualify COE import, provenance, relevant change questions, manual-edit conflicts and selective
   regeneration using existing contracts and parameters.
 - Complete design/ADR and operational/as-built output against the PRD quality checklist.
@@ -94,6 +95,19 @@ A read-only repository collector check against the authorized subscription succe
 six retained, three Defender-filtered, and 48 actionable findings (13 blockers and 35 auto-remediation findings).
 Schema validation and selected-subscription import passed. Temporary baseline data was deleted; no Azure resources or
 policies were changed. Audit-only classifications remain visible summary evidence, not fabricated property mappings.
+
+The maintainer clarified that all generated code must comply with target Azure Policy. Unknown checks are deployment
+blockers to resolve, not accepted compliance exceptions. Native Terraform previews now compare material changes with
+exact emitted managed addresses. Native Bicep previews resolve literal top-level IDs from accepted bindings and reject
+foreign mutations and existing-resource updates/deletes. AVM child ownership remains unresolved and blocked.
+
+Reviewer context includes locked stage criteria and current matching dispositions, with selective bounded retrieval
+for oversized metadata. The ownership/reviewer batch passed a dedicated final `qualify:vnext` run. An earlier run was
+interrupted and is not used as passing evidence. External checks passed with the existing Python virtual environment.
+
+The latest cost refresh still returned HTTP 429 for exact-window actuals. A partial September 17-29 forecast of
+USD 503.08 excludes September 16, and the new budget's zero accrued value conflicts with the earlier budget read.
+Do not infer usable deployment headroom from these incomplete values; no billable resources have been provisioned.
 
 Final `npm run qualify:vnext` passed after repairing two stale guidance/tool inventory assertions, including
 143 validator tests and 29 packaging tests. Repository Node checks passed after regenerating public references.

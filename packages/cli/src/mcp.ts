@@ -179,15 +179,13 @@ export function createMcpServer(service: ApexService): McpServer {
   server.registerTool(
     "readTaskInput",
     {
-      description: "Read a bounded chunk of authoritative context for the exact active task.",
+      description:
+        "Read authoritative UTF-8-bounded task input; inputHash selects an authorized dependency or review-metadata from taskContext.",
       inputSchema: {
         taskId: z.string(),
         offset: z.number().int().nonnegative().optional(),
         limit: z.number().int().min(1).max(6_000).optional(),
-        inputHash: z
-          .string()
-          .regex(/^[0-9a-f]{64}$/u)
-          .optional(),
+        inputHash: z.union([z.string().regex(/^[0-9a-f]{64}$/u), z.literal("review-metadata")]).optional(),
       },
     },
     async ({ taskId, offset, limit, inputHash }) =>
