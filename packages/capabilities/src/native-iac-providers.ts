@@ -1,11 +1,15 @@
 import { createHash, randomUUID } from "node:crypto";
-import { readFile, rm } from "node:fs/promises";
-import { isAbsolute, resolve } from "node:path";
+import { constants } from "node:fs";
+import { lstat, open, opendir, readFile, realpath, rm } from "node:fs/promises";
+import { isAbsolute, relative, resolve, sep } from "node:path";
+import { hasValidPolicyValidation } from "@apexops/contracts";
 import type {
   ApprovalEvidenceV1,
   DeploymentPreviewV1,
   ExecutionPlanAttestationV1,
   OperationRecordV1,
+  PolicyValidationBinding,
+  PolicyValidationV1,
   ResourceInventoryV1,
 } from "@apexops/contracts";
 import {
@@ -34,6 +38,7 @@ import {
 import type { ProcessRunnerLike } from "./process-runner.js";
 import { secretFreeProperties } from "./secret-redaction.js";
 import { LocalEncryptedPlanTransport, type LocalEncryptedPlan } from "./local-plan-transport.js";
+import { validatePolicyProperties } from "./policy-validation.js";
 
 export interface NativeProviderRuntime {
   readonly runner: ProcessRunnerLike;
@@ -83,7 +88,26 @@ export interface NativeTerraformProviderOptions extends NativeProviderRuntime {
   readonly transport?: LocalEncryptedPlanTransport;
 }
 
-export interface BicepPreviewBinding {
+export type NativePolicyValidationBinding = PolicyValidationBinding & { readonly receiptHash: string };
+
+export function nativePolicyValidationBinding(receipt: PolicyValidationV1): NativePolicyValidationBinding {
+  return {
+    track: receipt.track,
+    sourceHash: receipt.sourceHash,
+    policyMapHash: receipt.policyMapHash,
+    policyMapContentHash: receipt.policyMapContentHash,
+    logicalResourceManifestHash: receipt.logicalResourceManifestHash,
+    inputHash: receipt.inputHash,
+    receiptHash: receipt.receiptHash,
+  };
+}
+
+interface NativePolicyBinding {
+  readonly policyValidation?: PolicyValidationV1;
+  readonly policyValidationBinding?: NativePolicyValidationBinding;
+}
+
+export interface BicepPreviewBinding extends NativePolicyBinding {
   readonly kind: "bicep";
   readonly preview: DeploymentPreviewV1;
   readonly providerBindingHash: string;
@@ -92,7 +116,7 @@ export interface BicepPreviewBinding {
   readonly stackStateHash: string;
 }
 
-export interface TerraformPreviewBinding {
+export interface TerraformPreviewBinding extends NativePolicyBinding {
   readonly kind: "terraform";
   readonly preview: DeploymentPreviewV1;
   readonly attestation: TerraformPlanAttestation;
@@ -114,6 +138,110 @@ function terraformStateIdentityOutput(stdout: string): { stateLineage?: string; 
   return stdout.trim().length === 0 ? {} : terraformStateIdentity(parseJsonProcessOutput("terraform-state", stdout));
 }
 
+const maxGeneratedSourceBytes = 16 * 1024 * 1024;
+
+interface GeneratedSourceSnapshot {
+  readonly rootPath: string;
+  readonly treeHash: string;
+  readonly paths: ReadonlySet<string>;
+  readonly fileHashes: ReadonlyMap<string, string>;
+}
+
+function sourceBindingError(): IacProviderError {
+  return new IacProviderError(
+    "PREVIEW_HASH_MISMATCH",
+    "Native preview source does not match the accepted generated tree",
+  );
+}
+
+async function readGeneratedSource(
+  source: NonNullable<PreviewRequest["generatedSource"]>,
+  accepted?: GeneratedSourceSnapshot,
+  outputs: ReadonlySet<string> = new Set(),
+): Promise<GeneratedSourceSnapshot> {
+  try {
+    const rootPath = resolve(source.rootPath);
+    if (!isAbsolute(source.rootPath) || !/^[a-f0-9]{64}$/.test(source.treeHash)) throw sourceBindingError();
+    const rootStat = await lstat(rootPath);
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink() || (await realpath(rootPath)) !== rootPath) {
+      throw sourceBindingError();
+    }
+    let bytes = 0;
+    let entries = 0;
+    const files: Array<{ path: string; content: string }> = [];
+    const fileHashes = new Map<string, string>();
+    const visit = async (directory: string, depth: number): Promise<void> => {
+      if (depth > 64) throw sourceBindingError();
+      const handle = await opendir(directory);
+      for await (const entry of handle) {
+        if (++entries > 4096) throw sourceBindingError();
+        const filePath = resolve(directory, entry.name);
+        if (!filePath.startsWith(`${rootPath}${sep}`) || (await realpath(filePath)) !== filePath) {
+          throw sourceBindingError();
+        }
+        const metadata = await lstat(filePath);
+        if (metadata.isSymbolicLink()) throw sourceBindingError();
+        const path = relative(rootPath, filePath).split(sep).join("/");
+        const isAccepted = accepted?.paths.has(path) === true;
+        if (accepted !== undefined && !isAccepted && outputs.has(filePath)) {
+          if (metadata.isFile() || (path === ".terraform" && metadata.isDirectory())) continue;
+          throw sourceBindingError();
+        }
+        if (metadata.isDirectory()) {
+          await visit(filePath, depth + 1);
+          continue;
+        }
+        if (!metadata.isFile() || metadata.size > maxGeneratedSourceBytes - bytes) throw sourceBindingError();
+        const input = await open(filePath, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+        try {
+          if (!(await input.stat()).isFile()) throw sourceBindingError();
+          const chunks: Buffer[] = [];
+          for (;;) {
+            const chunk = Buffer.alloc(Math.min(64 * 1024, maxGeneratedSourceBytes - bytes + 1));
+            const { bytesRead } = await input.read(chunk);
+            if (bytesRead === 0) break;
+            bytes += bytesRead;
+            if (bytes > maxGeneratedSourceBytes) throw sourceBindingError();
+            chunks.push(chunk.subarray(0, bytesRead));
+          }
+          const buffer = Buffer.concat(chunks);
+          const content = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(buffer);
+          files.push({ path, content });
+          fileHashes.set(path, createHash("sha256").update(buffer).digest("hex"));
+        } finally {
+          await input.close();
+        }
+      }
+    };
+    await visit(rootPath, 0);
+    files.sort((left, right) => left.path.localeCompare(right.path));
+    if (sha256(files) !== source.treeHash) throw sourceBindingError();
+    return { rootPath, treeHash: source.treeHash, paths: new Set(files.map(({ path }) => path)), fileHashes };
+  } catch {
+    throw sourceBindingError();
+  }
+}
+
+async function bindGeneratedSource(
+  request: PreviewRequest,
+  cwd: string | undefined,
+  templateFile?: string,
+  parametersFile?: string,
+): Promise<GeneratedSourceSnapshot | undefined> {
+  if (request.generatedSource === undefined) return undefined;
+  const source = await readGeneratedSource({ ...request.generatedSource });
+  if (resolve(cwd ?? process.cwd()) !== source.rootPath) throw sourceBindingError();
+  if (templateFile !== undefined && resolve(source.rootPath, templateFile) !== resolve(source.rootPath, "main.bicep")) {
+    throw sourceBindingError();
+  }
+  for (const file of [templateFile, parametersFile]) {
+    if (file === undefined) continue;
+    const path = relative(source.rootPath, resolve(source.rootPath, file)).split(sep).join("/");
+    if (!source.paths.has(path)) throw sourceBindingError();
+  }
+  return source;
+}
+
 abstract class NativeProviderBase {
   protected readonly runner: ProcessRunnerLike;
   protected readonly now: () => Date;
@@ -123,6 +251,7 @@ abstract class NativeProviderBase {
   readonly #maxOutputBytes: number;
   readonly #operations = new Map<string, OperationRecordV1>();
   readonly #executionEvidence = new Map<string, ProviderExecutionEvidence>();
+  readonly #policyValidations = new Map<string, PolicyValidationV1>();
   protected readonly bindingStore: PreviewBindingStore | undefined;
 
   protected constructor(options: NativeProviderRuntime) {
@@ -217,6 +346,67 @@ abstract class NativeProviderBase {
     return this.#executionEvidence.get(operationId);
   }
 
+  policyValidation(previewHash: string): PolicyValidationV1 | undefined {
+    const receipt = this.#policyValidations.get(previewHash);
+    return receipt === undefined ? undefined : structuredClone(receipt);
+  }
+
+  protected evaluatePolicy(
+    track: "bicep" | "terraform",
+    request: PreviewRequest,
+    json: string,
+    blockers: string[],
+  ): NativePolicyBinding {
+    const input = request.policyValidation;
+    if (input === undefined || input.policyMap.mappings.length === 0) return {};
+    const receipt = validatePolicyProperties({
+      ...input,
+      track,
+      sourceHash: request.iacHash,
+      policyMapHash: request.policyHash,
+      json,
+    });
+    if (receipt.projectId !== request.projectId || receipt.runId !== request.runId) {
+      blockers.push("Policy validation project/run does not match the preview");
+    }
+    for (const result of receipt.results) {
+      if (result.outcome !== "pass") {
+        blockers.push(`Policy validation mapping ${result.mappingIndex}: ${result.outcome} (${result.reason})`);
+      }
+    }
+    return {
+      policyValidation: receipt,
+      policyValidationBinding: nativePolicyValidationBinding(receipt),
+    };
+  }
+
+  protected rememberPolicy(preview: DeploymentPreviewV1, binding: NativePolicyBinding): void {
+    if (binding.policyValidation !== undefined) {
+      this.#policyValidations.set(preview.previewHash, structuredClone(binding.policyValidation));
+    }
+  }
+
+  protected verifyPolicy(preview: DeploymentPreviewV1, binding: NativePolicyBinding): void {
+    const receipt = binding.policyValidation;
+    const expected = binding.policyValidationBinding;
+    if (receipt === undefined && expected === undefined) return;
+    if (
+      receipt === undefined ||
+      expected === undefined ||
+      !hasValidPolicyValidation(receipt, expected) ||
+      receipt.receiptHash !== expected.receiptHash ||
+      receipt.track !== preview.track ||
+      receipt.sourceHash !== preview.iacHash ||
+      receipt.policyMapHash !== preview.policyHash ||
+      receipt.projectId !== preview.projectId ||
+      receipt.runId !== preview.runId ||
+      preview.operation !== "apply" ||
+      receipt.outcome !== "pass"
+    ) {
+      throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Policy validation receipt does not match the preview");
+    }
+  }
+
   protected previewKey(request: PreviewRequest, operation: "apply" | "destroy"): string {
     return `${request.projectId}\u0000${request.runId}\u0000${operation}`;
   }
@@ -281,11 +471,20 @@ export class NativeBicepProvider extends NativeProviderBase implements IacProvid
   }
 
   async validate(): Promise<readonly string[]> {
-    await this.run(this.#commands.validate(this.#target.templateFile, this.#target.cwd));
+    await this.#compiledTemplate();
     return [];
   }
 
   async previewApply(request: PreviewRequest): Promise<DeploymentPreviewV1> {
+    const source = await bindGeneratedSource(
+      request,
+      this.#target.cwd,
+      this.#target.templateFile,
+      this.#target.parametersFile,
+    );
+    const policyInputs = request.policyValidation?.policyMap.mappings.length
+      ? await this.#inputHashes(source)
+      : undefined;
     const [stdout, stackResources] = await Promise.all([
       this.run(this.#commands.preview(this.#target)),
       this.#currentStackResources(),
@@ -298,10 +497,26 @@ export class NativeBicepProvider extends NativeProviderBase implements IacProvid
         `Group what-if cannot prove action-on-unmanage behavior for current stack resources: ${unrepresented.map(({ resourceId }) => resourceId).join(", ")}`,
       );
     }
-    return await this.#bind(request, "apply", normalized, stackResources);
+    let policy: NativePolicyBinding = {};
+    if (policyInputs !== undefined) {
+      let compiled = "";
+      try {
+        compiled = await this.#compiledTemplate();
+      } catch {
+        normalized.blockers.push("Policy validation compiler output is unavailable");
+      }
+      policy = this.evaluatePolicy(this.track, request, compiled, normalized.blockers);
+    }
+    return await this.#bind(request, "apply", normalized, stackResources, policy, policyInputs, source);
   }
 
   async previewDestroy(request: PreviewRequest): Promise<DeploymentPreviewV1> {
+    const source = await bindGeneratedSource(
+      request,
+      this.#target.cwd,
+      this.#target.templateFile,
+      this.#target.parametersFile,
+    );
     const resources = await this.#currentStackResources();
     return await this.#bind(
       request,
@@ -311,6 +526,9 @@ export class NativeBicepProvider extends NativeProviderBase implements IacProvid
         blockers: [],
       },
       resources,
+      {},
+      undefined,
+      source,
     );
   }
 
@@ -347,22 +565,20 @@ export class NativeBicepProvider extends NativeProviderBase implements IacProvid
     operation: "apply" | "destroy",
     normalized: ReturnType<typeof normalizeAzureWhatIf>,
     stackResources: ReturnType<typeof normalizeAzureStackResources>,
+    policy: NativePolicyBinding = {},
+    policyInputs?: { templateHash: string; parametersHash: string },
+    source?: GeneratedSourceSnapshot,
   ): Promise<DeploymentPreviewV1> {
-    const templateHash = await this.#rawFileHash(this.#target.templateFile);
-    const parametersHash =
-      this.#target.parametersFile === undefined
-        ? createHash("sha256").update(Buffer.alloc(0)).digest("hex")
-        : await this.#rawFileHash(this.#target.parametersFile);
+    if (source !== undefined) await readGeneratedSource(source, source);
+    const { templateHash, parametersHash } = await this.#inputHashes(source);
+    if (
+      policyInputs !== undefined &&
+      (policyInputs.templateHash !== templateHash || policyInputs.parametersHash !== parametersHash)
+    ) {
+      normalized.blockers.push("Bicep inputs changed during policy validation preview");
+    }
     const stackStateHash = sha256(stackResources);
-    const providerBindingHash = sha256({
-      resourceGroup: this.#target.resourceGroup,
-      stackName: this.#target.stackName,
-      actionOnUnmanage: this.#target.actionOnUnmanage,
-      denySettingsMode: this.#target.denySettingsMode,
-      templateHash,
-      parametersHash,
-      stackStateHash,
-    });
+    const providerBindingHash = this.#providerBindingHash(templateHash, parametersHash, stackStateHash, policy);
     const preview = this.createPreview(this.track, operation, request, normalized, {
       artifactHash: providerBindingHash,
     });
@@ -373,10 +589,55 @@ export class NativeBicepProvider extends NativeProviderBase implements IacProvid
       templateHash,
       parametersHash,
       stackStateHash,
+      ...policy,
     };
     this.#bindings.set(this.previewKey(request, operation), binding);
     await this.bindingStore?.save(preview.previewHash, binding);
+    this.rememberPolicy(preview, binding);
     return preview;
+  }
+
+  #providerBindingHash(
+    templateHash: string,
+    parametersHash: string,
+    stackStateHash: string,
+    policy: NativePolicyBinding,
+  ): string {
+    return sha256({
+      resourceGroup: this.#target.resourceGroup,
+      stackName: this.#target.stackName,
+      actionOnUnmanage: this.#target.actionOnUnmanage,
+      denySettingsMode: this.#target.denySettingsMode,
+      templateHash,
+      parametersHash,
+      stackStateHash,
+      ...(policy.policyValidationBinding === undefined ? {} : { policyValidation: policy.policyValidationBinding }),
+    });
+  }
+
+  async #inputHashes(source?: GeneratedSourceSnapshot): Promise<{ templateHash: string; parametersHash: string }> {
+    const fileHash = async (file: string): Promise<string> => {
+      if (source === undefined) return await this.#rawFileHash(file);
+      const path = relative(source.rootPath, resolve(source.rootPath, file)).split(sep).join("/");
+      const hash = source.fileHashes.get(path);
+      if (hash === undefined) throw sourceBindingError();
+      return hash;
+    };
+    return {
+      templateHash: await fileHash(this.#target.templateFile),
+      parametersHash:
+        this.#target.parametersFile === undefined
+          ? createHash("sha256").update(Buffer.alloc(0)).digest("hex")
+          : await fileHash(this.#target.parametersFile),
+    };
+  }
+
+  async #compiledTemplate(): Promise<string> {
+    return await this.run({
+      executable: "bicep",
+      args: ["build", this.#target.templateFile, "--stdout"],
+      ...(this.#target.cwd === undefined ? {} : { cwd: this.#target.cwd }),
+    });
   }
 
   async #rawFileHash(path: string): Promise<string> {
@@ -421,23 +682,30 @@ export class NativeBicepProvider extends NativeProviderBase implements IacProvid
     if (binding === undefined || binding.preview.previewHash !== preview.previewHash) {
       throw new IacProviderError("PREVIEW_HASH_MISMATCH", "No exact Bicep stack binding is available for this preview");
     }
-    const templateHash = await this.#rawFileHash(this.#target.templateFile);
-    const parametersHash =
-      this.#target.parametersFile === undefined
-        ? createHash("sha256").update(Buffer.alloc(0)).digest("hex")
-        : await this.#rawFileHash(this.#target.parametersFile);
+    this.verifyPolicy(preview, binding);
+    if (
+      binding.policyValidationBinding !== undefined &&
+      createHash("sha256")
+        .update(await this.#compiledTemplate())
+        .digest("hex") !== binding.policyValidationBinding.inputHash
+    ) {
+      throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Bicep compiler output changed after policy validation");
+    }
+    const { templateHash, parametersHash } = await this.#inputHashes();
     const stackStateHash = sha256(await this.#currentStackResources());
     if (
       templateHash !== binding.templateHash ||
       parametersHash !== binding.parametersHash ||
       stackStateHash !== binding.stackStateHash ||
-      preview.artifactHash !== binding.providerBindingHash
+      preview.artifactHash !== binding.providerBindingHash ||
+      preview.artifactHash !== this.#providerBindingHash(templateHash, parametersHash, stackStateHash, binding)
     ) {
       throw new IacProviderError(
         "PREVIEW_HASH_MISMATCH",
         "Bicep stack inputs, configuration, or managed state changed after preview",
       );
     }
+    this.rememberPolicy(preview, binding);
     const stdout = await this.run(
       operation === "apply" ? this.#commands.stackApply(this.#target) : this.#commands.stackDestroy(this.#target),
     );
@@ -554,8 +822,32 @@ export class NativeTerraformProvider extends NativeProviderBase implements IacPr
         "Terraform local/reference plan transport requires injected key, artifact, and binding stores",
       );
     }
-    const planPath = this.#target.planPath(request, operation);
+    const source = await bindGeneratedSource(request, this.#target.cwd);
+    const requestedPlanPath = this.#target.planPath(request, operation);
+    const planPath = source === undefined ? requestedPlanPath : resolve(source.rootPath, requestedPlanPath);
+    const outputs = new Set<string>();
+    if (source !== undefined) {
+      const relativePlanPath = relative(source.rootPath, planPath).split(sep).join("/");
+      if (
+        source.paths.has(relativePlanPath) ||
+        planPath === source.rootPath ||
+        [...source.paths].some((path) => path.startsWith(`${relativePlanPath}/`)) ||
+        /\.(?:tf|tfvars)(?:\.json)?$/i.test(planPath) ||
+        relativePlanPath === ".terraform.lock.hcl" ||
+        relativePlanPath === ".terraform" ||
+        relativePlanPath.startsWith(".terraform/") ||
+        [...source.paths].some((path) => path.startsWith(".terraform/"))
+      ) {
+        throw sourceBindingError();
+      }
+      outputs.add(planPath);
+      outputs.add(resolve(source.rootPath, ".terraform"));
+      outputs.add(resolve(source.rootPath, ".terraform.lock.hcl"));
+    }
     await this.run(this.#commands.init(this.#target.cwd, true));
+    const policyExpected = operation === "apply" && Boolean(request.policyValidation?.policyMap.mappings.length);
+    const initialConfigHash = policyExpected ? await this.#target.configHash() : undefined;
+    const initialLockfileHash = this.#target.lockfileHash;
     const stateIdentity = terraformStateIdentityOutput(await this.run(this.#commands.statePull(this.#target.cwd)));
     await this.run(this.#commands.preview(this.#target.cwd, planPath, operation === "destroy"));
     try {
@@ -563,6 +855,15 @@ export class NativeTerraformProvider extends NativeProviderBase implements IacPr
       const planDigest = createHash("sha256").update(planBytes).digest("hex");
       const showOutput = await this.run(this.#commands.showJson(this.#target.cwd, planPath));
       const normalized = normalizeTerraformPlan(parseJsonProcessOutput("terraform-plan", showOutput));
+      const policy = policyExpected ? this.evaluatePolicy(this.track, request, showOutput, normalized.blockers) : {};
+      if (
+        policyExpected &&
+        createHash("sha256")
+          .update(await readFile(planPath))
+          .digest("hex") !== planDigest
+      ) {
+        normalized.blockers.push("Terraform saved plan changed during policy validation preview");
+      }
       const authority = await this.currentAuthority();
       if (
         authority.ownerEpoch !== request.ownerEpoch ||
@@ -577,14 +878,21 @@ export class NativeTerraformProvider extends NativeProviderBase implements IacPr
         ttlMs: request.ttlMs,
       });
       const artifactRef = `${request.projectId}/${request.runId}/${operation}/${planDigest}.tfplan.enc`;
-      await this.#artifactStore.put(artifactRef, encrypted);
       const configHash = await this.#target.configHash();
+      if (source !== undefined) {
+        if (resolve(this.#target.cwd) !== source.rootPath) throw sourceBindingError();
+        await readGeneratedSource(source, source, outputs);
+      }
+      if (policyExpected && (configHash !== initialConfigHash || this.#target.lockfileHash !== initialLockfileHash)) {
+        normalized.blockers.push("Terraform configuration changed during policy validation preview");
+      }
       const artifactHash = sha256({
         planDigest,
         configHash,
         lockfileHash: this.#target.lockfileHash,
         recipient: executionRecipient,
         artifactRef,
+        ...(policy.policyValidationBinding === undefined ? {} : { policyValidation: policy.policyValidationBinding }),
       });
       const preview = this.createPreview(this.track, operation, request, normalized, {
         artifactHash,
@@ -619,9 +927,11 @@ export class NativeTerraformProvider extends NativeProviderBase implements IacPr
         createdAt: createdAt.toISOString(),
         expiresAt: preview.expiresAt,
       };
-      const binding: TerraformPreviewBinding = { kind: "terraform", preview, attestation };
+      const binding: TerraformPreviewBinding = { kind: "terraform", preview, attestation, ...policy };
+      await this.#artifactStore.put(artifactRef, encrypted);
       this.#bindings.set(this.previewKey(request, operation), binding);
       await this.bindingStore.save(preview.previewHash, binding);
+      this.rememberPolicy(preview, binding);
       return preview;
     } finally {
       await rm(planPath, { force: true });
@@ -650,6 +960,7 @@ export class NativeTerraformProvider extends NativeProviderBase implements IacPr
     if (binding === undefined) {
       throw new IacProviderError("PREVIEW_HASH_MISMATCH", "No exact saved plan is bound to this preview");
     }
+    this.verifyPolicy(preview, binding);
     if (binding.attestation.recipient !== authority.recipientIdentity) {
       throw new IacProviderError("APPROVAL_RECIPIENT_MISMATCH", "Saved plan recipient is not the current authority");
     }
@@ -657,6 +968,9 @@ export class NativeTerraformProvider extends NativeProviderBase implements IacPr
       binding.attestation.configHash !== (await this.#target.configHash()) ||
       binding.attestation.lockfileHash !== this.#target.lockfileHash ||
       binding.attestation.inputHash !== preview.inputHash ||
+      binding.attestation.iacHash !== preview.iacHash ||
+      binding.attestation.policyHash !== preview.policyHash ||
+      binding.attestation.previewHash !== preview.previewHash ||
       binding.attestation.stateLineage !== preview.stateLineage ||
       binding.attestation.stateSerial !== preview.stateSerial
     ) {
@@ -675,10 +989,12 @@ export class NativeTerraformProvider extends NativeProviderBase implements IacPr
       lockfileHash: binding.attestation.lockfileHash,
       recipient: binding.attestation.recipient,
       artifactRef: binding.attestation.artifactRef,
+      ...(binding.policyValidationBinding === undefined ? {} : { policyValidation: binding.policyValidationBinding }),
     });
     if (preview.artifactHash !== providerArtifactHash) {
       throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Terraform provider binding hash does not match the preview");
     }
+    this.rememberPolicy(preview, binding);
     if (this.#keyProvider === undefined || this.#artifactStore === undefined) {
       throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Terraform plan decryption dependencies are unavailable");
     }

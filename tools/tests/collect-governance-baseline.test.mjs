@@ -61,12 +61,13 @@ function collect(context, responses, options = {}) {
           $responses[$route.Key] = $route.Value
         }
       function az {
+        Write-Host "TOKEN REQUEST"
             $global:LASTEXITCODE = [int]$env:COLLECTOR_TOKEN_EXIT
             return $env:COLLECTOR_TOKEN
       }
       function Invoke-RestMethod {
           param($Uri, $Headers, $Method, $ErrorAction)
-            if ($Headers.Authorization -ne "Bearer offline-test-token" -or $Method -ne "Get") {
+        if ($Headers.Authorization -cne "Bearer test-token" -or $Method -ne "Get") {
               throw "Unexpected offline authentication or method"
             }
           if (-not $responses.ContainsKey([string]$Uri)) { throw "Unexpected offline request: $Uri" }
@@ -89,7 +90,7 @@ function collect(context, responses, options = {}) {
         COLLECTOR_RESPONSES: JSON.stringify(responses),
         COLLECTOR_CAP: String(options.cap ?? 100),
         COLLECTOR_ROOT: JSON.stringify(options.root ?? { ManagementGroupId: "test-root" }),
-        COLLECTOR_TOKEN: JSON.stringify(options.token ?? { accessToken: "offline-test-token" }),
+        COLLECTOR_TOKEN: JSON.stringify(options.token ?? { accessToken: "test-token" }),
         COLLECTOR_TOKEN_EXIT: String(options.tokenExit ?? 0),
       },
     },
@@ -184,6 +185,51 @@ for (const detail of [{}, { state: "Disabled" }, { state: "Enabled", subscriptio
   });
 }
 
+for (const managementGroupId of ["a", "9", "Az09-_.(group)", "group-", "group_", "a".repeat(90)]) {
+  test(`valid management-group ID ${JSON.stringify(managementGroupId)} is collected`, powershellOptions, (context) => {
+    const responses = routes();
+    const url = `${arm}/providers/Microsoft.Management/managementGroups/${managementGroupId}/descendants?api-version=2020-05-01`;
+    responses[url] = responses[descendantsUrl];
+    delete responses[descendantsUrl];
+    const result = collect(context, responses, { root: { ManagementGroupId: managementGroupId } });
+    assert.equal(assertComplete(result).management_group_id, managementGroupId);
+    assert.ok(result.stdout.includes(`REQUEST ${url}`));
+  });
+}
+
+for (const managementGroupId of [
+  "",
+  "a".repeat(91),
+  "group/child",
+  "group?query",
+  "group#fragment",
+  "group%2Fchild",
+  "group\\child",
+  " group",
+  "group ",
+  "group name",
+  "group\tname",
+  "group\rname",
+  "group\nname",
+  "group\n",
+  "group\u00a0name",
+  "-group",
+  "_group",
+  ".group",
+  "(group)",
+  "group.",
+]) {
+  test(
+    `invalid management-group ID ${JSON.stringify(managementGroupId)} fails before token or REST requests`,
+    powershellOptions,
+    (context) => {
+      const result = collect(context, routes(), { root: { ManagementGroupId: managementGroupId } });
+      assertAborted(result, /ManagementGroupId/);
+      assert.doesNotMatch(result.stdout, /TOKEN REQUEST|REQUEST /);
+    },
+  );
+}
+
 for (const [endpoint, url] of Object.entries({
   descendants: descendantsUrl,
   assignments: assignmentsUrl,
@@ -260,6 +306,21 @@ for (const [initiative, standalone] of [
       assert.equal(envelope.discovery_summary.management_group_inherited_count, 1);
       assert.equal(envelope.assignment_inventory[0].assignmentType, "management-group");
       assert.deepEqual(envelope.discovery_metadata.scope.management_groups, ["test-root"]);
+      for (const url of [
+        subscriptionUrl,
+        assignmentsUrl,
+        definitionsUrl,
+        setsUrl,
+        exemptionsUrl,
+        `${arm}${policyId}?api-version=2021-06-01`,
+        ...(initiative ? [`${arm}${setId}?api-version=2021-06-01`] : []),
+        ...(standalone ? [] : [descendantsUrl]),
+      ]) {
+        assert.ok(
+          result.stdout.toLowerCase().includes(`REQUEST ${url}`.toLowerCase()),
+          `Expected exact Bearer test-token authentication for ${url}`,
+        );
+      }
     },
   );
 }

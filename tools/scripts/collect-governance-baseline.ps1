@@ -31,6 +31,7 @@
 param(
     [Parameter(Mandatory, ParameterSetName = "ManagementGroup")]
     [ValidateNotNullOrEmpty()]
+    [ValidatePattern('\A[a-zA-Z0-9](?:[a-zA-Z0-9_().-]{0,88}[a-zA-Z0-9_()-])?\z')]
     [string]$ManagementGroupId,
 
     [Parameter(Mandatory, ParameterSetName = "Subscription")]

@@ -5,6 +5,7 @@ export * from "./evidence.js";
 export * from "./improvement.js";
 export * from "./onboarding.js";
 export * from "./pricing.js";
+export * from "./policy-validation.js";
 export * from "./runtime.js";
 export * from "./targets.js";
 
@@ -34,6 +35,7 @@ import {
 } from "./improvement.js";
 import { OnboardingConfigV1Schema } from "./onboarding.js";
 import { PricingEvidenceV1Schema, PricingRequestV1Schema } from "./pricing.js";
+import { PolicyValidationV1Schema } from "./policy-validation.js";
 import {
   EventV1Schema,
   InputRequestV1Schema,
@@ -100,6 +102,7 @@ export const contractSchemas = [
   GovernanceConstraintsV1Schema,
   PolicyPropertyMapV1Schema,
   EnvironmentInputsV1Schema,
+  PolicyValidationV1Schema,
   LogicalResourceManifestV1Schema,
   IacHandoffV1Schema,
   ExecutionPlanAttestationV1Schema,
@@ -163,6 +166,7 @@ export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
   "https://schemas.apexops.dev/review-findings-v1.json": metadata(1_048_576, "confidential"),
   "https://schemas.apexops.dev/governance-constraints-v1.json": metadata(131_072, "confidential"),
   "https://schemas.apexops.dev/policy-property-map-v1.json": metadata(2_097_152, "confidential"),
+  "https://schemas.apexops.dev/policy-validation-v1.json": metadata(4_194_304, "confidential"),
   "https://schemas.apexops.dev/environment-inputs-v1.json": metadata(524_288, "restricted"),
   "https://schemas.apexops.dev/logical-resource-manifest-v1.json": metadata(2_097_152),
   "https://schemas.apexops.dev/iac-handoff-v1.json": metadata(131_072, "confidential"),

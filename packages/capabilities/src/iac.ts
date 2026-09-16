@@ -5,8 +5,11 @@ import type {
   IacTool,
   Operation,
   OperationRecordV1,
+  PolicyPropertyMapV1,
+  PolicyValidationV1,
   ResourceInventoryV1,
 } from "@apexops/contracts";
+import type { PolicyResourceBinding } from "./policy-validation.js";
 
 export type IacProviderErrorCode =
   | "APPROVAL_EXPIRED"
@@ -53,6 +56,14 @@ export interface PreviewRequest {
   readonly inputHash: string;
   readonly iacHash: string;
   readonly policyHash: string;
+  readonly generatedSource?: {
+    readonly rootPath: string;
+    readonly treeHash: string;
+  };
+  readonly policyValidation?: {
+    readonly policyMap: PolicyPropertyMapV1;
+    readonly logicalResourceManifest: Record<string, PolicyResourceBinding>;
+  };
   readonly resources: readonly IacResourceSpec[];
   readonly blockers?: readonly string[];
   readonly ttlMs: number;
@@ -167,6 +178,7 @@ export interface IacProvider {
   inventory(projectId: string, runId: string): Promise<ResourceInventoryV1>;
   reconcile(operationId: string): Promise<OperationRecordV1 | undefined>;
   executionEvidence?(operationId: string): ProviderExecutionEvidence | undefined;
+  policyValidation?(previewHash: string): PolicyValidationV1 | undefined;
 }
 
 export interface FakeIaCProviderOptions {

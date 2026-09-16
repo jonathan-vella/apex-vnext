@@ -22,6 +22,7 @@ import {
   type ImplementationIntentV1,
   type LogicalResourceManifestV1,
   type OperationRecordV1,
+  type PolicyValidationBinding,
   type PolicyPropertyMapV1,
   type QualityMeasurementsV1,
   type QualityReportV1,
@@ -88,6 +89,7 @@ export interface WorkflowPreviewValidatorContext {
   readonly expectedResourceIds: readonly string[];
   readonly intendedExecutionRecipientIdentity: string;
   readonly attestation?: ExecutionPlanAttestationV1;
+  readonly policyValidationBinding?: PolicyValidationBinding & { readonly receiptHash: string };
 }
 
 export interface WorkflowDeployValidatorContext {
@@ -733,6 +735,7 @@ function terraformSavedPlanBinding(value: unknown): ValidationIssue[] {
     lockfileHash: attestation.lockfileHash,
     recipient: attestation.recipient,
     artifactRef: attestation.artifactRef,
+    ...(context.policyValidationBinding === undefined ? {} : { policyValidation: context.policyValidationBinding }),
   });
   const valid =
     attestation.projectId === preview.projectId &&

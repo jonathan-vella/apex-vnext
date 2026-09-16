@@ -30,6 +30,9 @@ import {
   hasValidInputRequestQuestions,
   hasValidCostArithmetic,
   hasValidLogicalResourceReferences,
+  hasValidPolicyValidation,
+  calculatePolicyValidationDigest,
+  type PolicyValidationBinding,
   type ApprovalEvidenceV1,
   type ArchitectureAvailabilityV1,
   type ArchitectureV1,
@@ -40,6 +43,7 @@ import {
   type PolicyPropertyMapV1,
   type EvidenceManifestV1,
   type IacBindingV1,
+  type IacHandoffV1,
   type InputRequestV1,
   type InputValueV1,
   type RequirementsIntakeRoundV1,
@@ -78,6 +82,7 @@ import {
   generateTerraformTree,
   importGovernanceBaseline,
   GovernanceBaselineError,
+  nativePolicyValidationBinding,
   type GovernanceBaselineSelection,
   type CapabilityPackInstallOptions,
   type IacProvider,
@@ -1568,6 +1573,7 @@ export class ApexService {
         EXIT_CODES.authorization,
       );
     const sourcePath = resolve(this.root, path);
+    await this.assertSafeDestination(this.root, sourcePath);
     const metadata = await lstat(sourcePath);
     if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > 20_000_000)
       throw new ApexError(
@@ -1609,7 +1615,7 @@ export class ApexService {
         {
           subscriptionId: subscription[1]!,
           now: this.clock().toISOString(),
-          maxAgeMs: 24 * 60 * 60 * 1_000,
+          maxAgeMs: 7 * 24 * 60 * 60 * 1_000,
         },
         validate,
       );
@@ -3017,6 +3023,40 @@ export class ApexService {
           EXIT_CODES.validation,
         );
       }
+      const policyHash = this.artifactHash(events, "policy-property-map");
+      const policyMap =
+        policyHash === undefined ? undefined : await this.objects.getJson<PolicyPropertyMapV1>(policyHash);
+      const manifestHash = this.artifactHash(events, "logical-resource-manifest");
+      const logicalManifest =
+        manifestHash === undefined ? undefined : await this.objects.getJson<LogicalResourceManifestV1>(manifestHash);
+      const policyValidation =
+        options.operation === "apply" && policyMap !== undefined && policyMap.mappings.length > 0
+          ? {
+              policyMap,
+              logicalResourceManifest: Object.fromEntries(
+                (logicalManifest?.resources ?? [])
+                  .filter(({ ownership }) => ownership === "managed")
+                  .map(({ logicalId, implementationAddress }) => [
+                    logicalId,
+                    run.iacTool === "bicep"
+                      ? { codeSymbol: implementationAddress }
+                      : { terraformAddress: implementationAddress },
+                  ]),
+              ),
+            }
+          : undefined;
+      const handoffHash = this.artifactHash(events, "iac-handoff");
+      const handoff = handoffHash === undefined ? undefined : await this.objects.getJson<IacHandoffV1>(handoffHash);
+      const generatedRoot = handoff === undefined ? undefined : resolve(this.root, handoff.rootPath);
+      if (policyValidation !== undefined) {
+        if (generatedRoot === undefined || handoff === undefined)
+          throw new ApexError(
+            "APEX_STALE",
+            "Accepted generated source is required for policy preview",
+            EXIT_CODES.stale,
+          );
+        await this.assertSafeDestination(this.root, generatedRoot);
+      }
       const request = {
         projectId: run.projectId,
         runId: run.runId,
@@ -3038,10 +3078,41 @@ export class ApexService {
         })),
         blockers: [],
         ttlMs: options.expiresInMs ?? PREVIEW_TTL_MS,
+        ...(policyValidation === undefined ? {} : { policyValidation }),
+        ...(policyValidation === undefined || handoff === undefined || generatedRoot === undefined
+          ? {}
+          : { generatedSource: { rootPath: generatedRoot, treeHash: handoff.treeHash } }),
       };
       const preview =
         options.operation === "apply" ? await provider.previewApply(request) : await provider.previewDestroy(request);
       this.assertValid("preview", preview);
+      const policyReceipt =
+        policyValidation === undefined ? undefined : provider.policyValidation?.(preview.previewHash);
+      if (
+        policyValidation !== undefined &&
+        (policyReceipt === undefined ||
+          !hasValidPolicyValidation(policyReceipt, {
+            track: run.iacTool,
+            sourceHash: request.iacHash,
+            policyMapHash: request.policyHash,
+            policyMapContentHash: calculatePolicyValidationDigest(policyValidation.policyMap),
+            logicalResourceManifestHash: calculatePolicyValidationDigest(policyValidation.logicalResourceManifest),
+            inputHash: policyReceipt.inputHash,
+          }) ||
+          policyReceipt.projectId !== run.projectId ||
+          policyReceipt.runId !== run.runId ||
+          policyReceipt.outcome !== "pass" ||
+          policyReceipt.results.length !== policyValidation.policyMap.mappings.length ||
+          policyReceipt.results.some(
+            (result, index) =>
+              result.mappingHash !== calculatePolicyValidationDigest(policyValidation.policyMap.mappings[index]),
+          ))
+      )
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Native preview requires passing source-bound policy validation for every mapping",
+          EXIT_CODES.validation,
+        );
       let attestation: ExecutionPlanAttestationV1 | undefined;
       if (options.provider === "terraform" && "attestation" in provider && typeof provider.attestation === "function") {
         attestation = (provider.attestation as (previewHash: string) => ExecutionPlanAttestationV1 | undefined)(
@@ -3058,9 +3129,11 @@ export class ApexService {
         intent,
         attestation,
         intendedExecutionRecipientIdentity,
+        policyReceipt === undefined ? undefined : nativePolicyValidationBinding(policyReceipt),
       );
       const previewObjectHash = await this.objects.putJson(preview);
       const attestationHash = attestation === undefined ? undefined : await this.objects.putJson(attestation);
+      const policyValidationHash = policyReceipt === undefined ? undefined : await this.objects.putJson(policyReceipt);
       await this.append(run, "preview.requested", {
         provider: options.provider,
         operation: options.operation,
@@ -3077,6 +3150,7 @@ export class ApexService {
         evidenceMode: validation.evidenceMode,
         ...(validation.omittedValidatorIds.length === 0 ? {} : { omittedValidatorIds: validation.omittedValidatorIds }),
         ...(attestationHash === undefined ? {} : { attestationHash }),
+        ...(policyValidationHash === undefined ? {} : { policyValidationHash }),
       });
       await this.materializeOperationsPreviewPackage(run, preview, previewObjectHash);
       await this.openRunGate(await this.currentRun(), 4, preview.previewHash);
@@ -5693,6 +5767,7 @@ export class ApexService {
     intent: ImplementationIntentV1,
     attestation?: ExecutionPlanAttestationV1,
     intendedExecutionRecipientIdentity = "local",
+    policyValidationBinding?: PolicyValidationBinding & { readonly receiptHash: string },
   ): Promise<{ validatorIds: string[]; omittedValidatorIds: string[]; evidenceMode: "native" | "simulated" }> {
     const workflow = await this.lockedWorkflowEngine(run);
     const nodeId = `preview-${run.iacTool}`;
@@ -5720,6 +5795,7 @@ export class ApexService {
         ({ id }) => `${provider}://${run.environment}/${id}`,
       ),
       intendedExecutionRecipientIdentity,
+      ...(policyValidationBinding === undefined ? {} : { policyValidationBinding }),
       ...(attestation === undefined ? {} : { attestation }),
     };
     for (const id of validatorIds) this.assertValid(id, context);

@@ -25,7 +25,9 @@ around vNext source authorities and Diátaxis navigation.
   bounded context/reviewer packs and routing/tool scope have implementation and focused tests. Complete reviewer
   evidence/disposition coverage and exact-client checks. Scoped prompt inspection found no further safe deletion.
 - Complete issue #344's nonempty-policy enforcement through planning and native code validation. Path-only import,
-  standalone collection and evidenced-empty import-to-simulated-deployment tests exist for both tracks.
+  standalone collection and evidenced-empty import-to-simulated-deployment tests exist for both tracks. Native apply
+  previews check concrete policy values against compiled Bicep/saved Terraform plans with source-bound receipts;
+  physical-identity ownership and earlier code-validation integration remain open.
 - Implement and qualify COE import, provenance, relevant change questions, manual-edit conflicts and selective
   regeneration using existing contracts and parameters.
 - Complete design/ADR and operational/as-built output against the PRD quality checklist.
@@ -77,6 +79,16 @@ The active worktree adds current-dependency task inputs, UTF-8 input/output budg
 review pagination/expiry checks, narrow role grants, and governance import/collector safeguards. An experimental local
 archetype copy capability was removed after adversarial review found filesystem-race and secret-detection defects.
 COE import remains unimplemented; no release candidate has been selected.
+
+Draft [PR #345](https://github.com/jonathan-vella/apex-vnext/pull/345) contains the implementation checkpoint and prior
+cleanup/dependency work. The native-policy follow-up adds a typed digest-only receipt, bounded property comparison,
+exact generated-source verification, persisted preview binding and rejection of missing or altered evidence before
+Gate 4. Unsupported expressions, missing values and unverified exemptions fail closed. This is concrete-property
+preflight, not an Azure Policy interpreter or proof that supplied platform resources cannot be changed.
+
+PR feedback identified path containment, a weekly baseline TTL mismatch and management-group ID validation; these have
+focused fixes. Reported literal authorization placeholders were review redaction artifacts, verified against local and
+GitHub source; tests now assert Bearer-header construction. Catalog generation excludes Python caches to match clean CI.
 
 Final `npm run qualify:vnext` passed after repairing two stale guidance/tool inventory assertions, including
 143 validator tests and 29 packaging tests. Repository Node checks passed after regenerating public references.

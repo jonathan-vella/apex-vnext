@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, readdir, writeFile } from "node:fs/promises";
+import { readFile, readdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -10,7 +10,11 @@ import type {
   IacBindingV1,
   ImplementationIntentV1,
   LogicalResourceManifestV1,
+  PolicyPropertyMapV1,
+  PolicyValidationV1,
 } from "@apexops/contracts";
+import { calculatePolicyValidationHash } from "@apexops/contracts";
+import { nativePolicyValidationBinding, validatePolicyProperties } from "@apexops/capabilities";
 import type { IacProvider, PreviewRequest } from "@apexops/capabilities";
 import { EventJournal, ObjectStore, ValidatorRegistry, sha256Json } from "@apexops/kernel";
 import { ApexError } from "../errors.js";
@@ -59,6 +63,7 @@ async function reachCodegen(
   configurePlan?: (plan: ReturnType<typeof planBundle>) => void,
   revisePlan = false,
   baselinePath?: string,
+  configurePolicy?: (policy: PolicyPropertyMapV1) => void,
 ): Promise<{ taskId: string; plan: ReturnType<typeof planBundle> }> {
   await service.nextTask();
   const requirementValues: TaskOutput[] = [{ kind: "requirements", value: requirements() }];
@@ -89,6 +94,12 @@ async function reachCodegen(
     { kind: "review-findings", value: review(runId, "architecture", architectureHashes.architecture!) },
   ]);
   const governanceValue = governance(runId);
+  if (baselinePath !== undefined) {
+    await assert.rejects(service.importGovernanceBaseline("../outside-baseline.json"), /escapes its root/);
+    const link = join(baselinePath, "..", "linked-baseline");
+    await symlink(join(baselinePath, ".."), link);
+    await assert.rejects(service.importGovernanceBaseline(join(link, "baseline.json")), /symlink/);
+  }
   const governanceHashes =
     baselinePath === undefined
       ? await complete(service, "governance-discovery", [{ kind: "governance-constraints", value: governanceValue }])
@@ -106,8 +117,10 @@ async function reachCodegen(
     const chunk = await service.readTaskInput(reconciliationTask, 0, 6_000, selected.hash);
     assert.match(chunk.content, /governance-baseline-selection-v1/);
   }
+  const policy = policyMap(runId, governanceHashes["governance-constraints"]!) as PolicyPropertyMapV1;
+  configurePolicy?.(policy);
   const policyHashes = await complete(service, "governance-reconciliation", [
-    { kind: "policy-property-map", value: policyMap(runId, governanceHashes["governance-constraints"]!) },
+    { kind: "policy-property-map", value: policy },
   ]);
   await complete(service, "governance-review", [
     { kind: "review-findings", value: review(runId, "policy-property-map", policyHashes["policy-property-map"]!) },
@@ -1139,6 +1152,184 @@ test("native Bicep deploy records stack ownership evidence in manifest order", a
   assert.equal((completed?.payload as { evidenceMode?: unknown }).evidenceMode, "native");
 });
 
+test("native apply requires complete source-bound policy receipts before Gate 4", async () => {
+  const root = await tempRoot();
+  const now = new Date("2026-01-01T00:00:00.000Z");
+  const base = bicepPreviewProvider(now);
+  let receipt: PolicyValidationV1 | undefined;
+  let includeReceipt = false;
+  const provider: IacProvider = {
+    ...base,
+    async previewApply(request) {
+      assert.ok(request.policyValidation);
+      const binding = request.policyValidation.logicalResourceManifest.api!;
+      receipt = validatePolicyProperties({
+        ...request.policyValidation,
+        track: "bicep",
+        sourceHash: request.iacHash,
+        policyMapHash: request.policyHash,
+        json: JSON.stringify({
+          resources: {
+            [binding.codeSymbol!]: { properties: { httpsOnly: true } },
+          },
+        }),
+      });
+      return base.previewApply(request);
+    },
+    policyValidation: () => (includeReceipt ? receipt : undefined),
+  };
+  const service = new ApexService(root, { clock: () => now, providers: { bicep: provider } });
+  const { runId } = await service.init({ projectId: "demo", iacTool: "bicep" });
+  const codegen = await reachCodegen(service, runId, "bicep", undefined, false, undefined, (policy) => {
+    policy.mappings.push({
+      policyAssignmentId: "https",
+      effect: "deny",
+      logicalResourceId: "api",
+      propertyPath: "properties.httpsOnly",
+      expectedValue: true,
+      disposition: "planned",
+    });
+  });
+  await service.completeTaskOutputs(codegen.taskId, codegenBundle(runId, "bicep", codegen.plan));
+  await complete(service, "validation-bicep", [
+    { kind: "validation-evidence", value: validationEvidence(runId, "bicep") },
+  ]);
+  await assert.rejects(service.preview({ operation: "apply", provider: "bicep" }), /source-bound policy validation/);
+  assert.equal((await service.status()).run.gates[3]!.state, "closed");
+  includeReceipt = true;
+  await service.preview({ operation: "apply", provider: "bicep" });
+  const events = await new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal")).replay();
+  const created = events.findLast(({ type }) => type === "preview.created");
+  const hash = (created!.payload as { policyValidationHash: string }).policyValidationHash;
+  assert.equal((await new ObjectStore(root).getJson<PolicyValidationV1>(hash)).outcome, "pass");
+});
+
+test("native Terraform apply requires complete source-bound policy receipts before Gate 4", async () => {
+  const root = await tempRoot();
+  const now = new Date("2026-01-01T00:00:00.000Z");
+  const base = terraformPreviewProvider(now);
+  const requests: PreviewRequest[] = [];
+  let receipt: PolicyValidationV1 | undefined;
+  let attestation: ExecutionPlanAttestationV1 | undefined;
+  let receiptMode: "missing" | "rehashed" | "valid" = "missing";
+  const provider: typeof base = {
+    ...base,
+    async previewApply(request) {
+      requests.push(request);
+      assert.ok(request.policyValidation);
+      const address = request.policyValidation.logicalResourceManifest.api!.terraformAddress!;
+      const values = { https_only: true };
+      receipt = validatePolicyProperties({
+        ...request.policyValidation,
+        track: "terraform",
+        sourceHash: request.iacHash,
+        policyMapHash: request.policyHash,
+        json: JSON.stringify({
+          planned_values: { root_module: { resources: [{ address, mode: "managed", values }] } },
+          resource_changes: [
+            { address, mode: "managed", change: { actions: ["create"], after: values, after_unknown: {} } },
+          ],
+        }),
+      });
+      assert.equal(receipt.outcome, "pass");
+      const original = await base.previewApply(request);
+      const originalAttestation = base.attestation(original.previewHash);
+      assert.ok(originalAttestation);
+      const originalSnapshot = structuredClone(original);
+      const attestationSnapshot = structuredClone(originalAttestation);
+      const { previewHash: originalHash, ...previewBody } = original;
+      const boundBody = {
+        ...previewBody,
+        artifactHash: sha256Json({
+          planDigest: originalAttestation.planDigest,
+          configHash: originalAttestation.configHash,
+          lockfileHash: originalAttestation.lockfileHash,
+          recipient: originalAttestation.recipient,
+          artifactRef: originalAttestation.artifactRef,
+          policyValidation: nativePolicyValidationBinding(receipt),
+        }),
+      };
+      const preview = Object.freeze({ ...boundBody, previewHash: sha256Json(boundBody) });
+      attestation = Object.freeze({ ...originalAttestation, previewHash: preview.previewHash });
+      assert.notEqual(preview.previewHash, originalHash);
+      assert.deepEqual(original, originalSnapshot);
+      assert.deepEqual(base.attestation(originalHash), attestationSnapshot);
+      return preview;
+    },
+    attestation: (previewHash) => (attestation?.previewHash === previewHash ? attestation : undefined),
+    policyValidation(previewHash) {
+      assert.equal(previewHash, attestation?.previewHash);
+      assert.ok(receipt);
+      if (receiptMode === "missing") return undefined;
+      if (receiptMode === "rehashed") {
+        const { receiptHash, ...receiptBody } = receipt;
+        const changed = { ...receiptBody, inputHash: "f".repeat(64) };
+        const changedHash = calculatePolicyValidationHash(changed);
+        assert.notEqual(changedHash, receiptHash);
+        return { ...changed, receiptHash: changedHash };
+      }
+      return receipt;
+    },
+  };
+  const service = new ApexService(root, { clock: () => now, providers: { terraform: provider } });
+  const { runId } = await service.init({ projectId: "demo", iacTool: "terraform" });
+  const codegen = await reachCodegen(service, runId, "terraform", undefined, false, undefined, (policy) => {
+    policy.mappings.push({
+      policyAssignmentId: "https",
+      effect: "deny",
+      logicalResourceId: "api",
+      propertyPath: "https_only",
+      expectedValue: true,
+      disposition: "planned",
+    });
+  });
+  const bundle = codegenBundle(runId, "terraform", codegen.plan);
+  const handoff = bundle.find(({ kind }) => kind === "iac-handoff")!.value;
+  assert.ok("rootPath" in handoff);
+  const hashes = await service.completeTaskOutputs(codegen.taskId, bundle);
+  await complete(service, "validation-terraform", [
+    { kind: "validation-evidence", value: validationEvidence(runId, "terraform") },
+  ]);
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+  const head = await journal.head();
+  await assert.rejects(
+    service.preview({ operation: "apply", provider: "terraform" }),
+    /source-bound policy validation/,
+  );
+  assert.equal((await service.status()).run.gates[3]!.state, "closed");
+  assert.equal(await journal.head(), head);
+  receiptMode = "rehashed";
+  await assert.rejects(service.preview({ operation: "apply", provider: "terraform" }), /terraform:saved-plan-binding/);
+  assert.equal((await service.status()).run.gates[3]!.state, "closed");
+  assert.equal(await journal.head(), head);
+  receiptMode = "valid";
+  const preview = await service.preview({ operation: "apply", provider: "terraform" });
+  assert.equal((await service.status()).run.gates[3]!.state, "open");
+  assert.equal(requests.length, 3);
+  const events = await journal.replay();
+  const created = events.findLast(({ type }) => type === "preview.created");
+  assert.ok(created);
+  const payload = created.payload as { policyValidationHash: string; attestationHash: string; validatorIds: string[] };
+  const objects = new ObjectStore(root);
+  const storedReceipt = await objects.getJson<PolicyValidationV1>(payload.policyValidationHash);
+  assert.deepEqual(storedReceipt, receipt);
+  assert.equal(storedReceipt.outcome, "pass");
+  assert.equal(storedReceipt.results.length, 1);
+  assert.deepEqual(await objects.getJson<ExecutionPlanAttestationV1>(payload.attestationHash), attestation);
+  assert.equal(attestation?.previewHash, preview.previewHash);
+  assert.ok(payload.validatorIds.includes("terraform:saved-plan-binding"));
+  for (const request of requests) {
+    assert.equal(request.projectId, "demo");
+    assert.equal(request.runId, runId);
+    assert.equal(request.iacHash, (hashes.outputHashes as Record<string, string>)["iac-handoff"]);
+    assert.deepEqual(request.generatedSource, { rootPath: join(root, handoff.rootPath), treeHash: handoff.treeHash });
+    assert.equal(request.policyHash, storedReceipt.policyMapHash);
+    assert.deepEqual(request.policyValidation?.logicalResourceManifest, { api: { terraformAddress: "api" } });
+  }
+  await service.decideGateNumber(4, "approved", "tester");
+  assert.equal((await service.status()).run.gates[3]!.state, "approved");
+});
+
 test("native Terraform preview records saved-plan validation and rejects wrong bindings", async () => {
   const now = new Date("2026-01-01T00:00:00.000Z");
   const root = await tempRoot();
@@ -1695,7 +1886,7 @@ for (const track of ["bicep", "terraform"] as const) {
   test(`${track} imports an evidenced-empty standalone baseline through deployment without copying other data`, async () => {
     const root = await tempRoot();
     const subscriptionId = "11111111-1111-1111-1111-111111111111";
-    const discoveredAt = new Date().toISOString();
+    const discoveredAt = new Date(Date.now() - 2 * 24 * 60 * 60 * 1_000).toISOString();
     const baseline = {
       schema_version: "governance-baseline-v1",
       subscription_id: subscriptionId,
