@@ -41,6 +41,7 @@ last feature-delivery phase, not prerequisites for completing governance and wor
 - [Operate a project](how-to/operate-project.md)
 - [Qualify a candidate](how-to/qualify-candidate.md)
 - [Contribute to APEX vNext](how-to/contribute.md)
+- [Historical development agent logging](how-to/debug-local.md)
 
 ## Explanation
 
