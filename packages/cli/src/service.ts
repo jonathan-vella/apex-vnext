@@ -5558,6 +5558,17 @@ export class ApexService {
     let availabilityHash: string | undefined;
     let deploymentOperation: OperationRecordV1 | undefined;
     let deploymentInventory: ResourceInventoryV1 | undefined;
+    let importedPolicyEffects: string[] | undefined;
+    const governance = artifacts["governance-constraints"] as GovernanceConstraintsV1 | undefined;
+    if (
+      descriptor.id === "governance-reconciliation" &&
+      governance !== undefined &&
+      governance.constraintsRef.uri === `apex-object:${governance.constraintsRef.digest}`
+    ) {
+      importedPolicyEffects = (await this.selectedGovernanceSnapshot(run, governance)).findings.map(
+        ({ effect }) => effect,
+      );
+    }
     if (descriptor.id === "architecture") {
       const pinnedRefs = new Set(task.inputRefs);
       availabilityHash = this.latestPayloadHash(
@@ -5602,6 +5613,7 @@ export class ApexService {
       ...(availabilityEvidence === undefined ? {} : { availabilityEvidence }),
       ...(deploymentOperation === undefined ? {} : { deploymentOperation }),
       ...(deploymentInventory === undefined ? {} : { deploymentInventory }),
+      ...(importedPolicyEffects === undefined ? {} : { importedPolicyEffects }),
       ...(nodeId === "quality" ? await this.qualityValidatorContext(run) : {}),
     };
     for (const id of validatorIds) {

@@ -90,6 +90,11 @@ PR feedback identified path containment, a weekly baseline TTL mismatch and mana
 focused fixes. Reported literal authorization placeholders were review redaction artifacts, verified against local and
 GitHub source; tests now assert Bearer-header construction. Catalog generation excludes Python caches to match clean CI.
 
+A read-only repository collector check against the authorized subscription succeeded on 2026-09-16: nine assignments,
+six retained, three Defender-filtered, and 48 actionable findings (13 blockers and 35 auto-remediation findings).
+Schema validation and selected-subscription import passed. Temporary baseline data was deleted; no Azure resources or
+policies were changed. Audit-only classifications remain visible summary evidence, not fabricated property mappings.
+
 Final `npm run qualify:vnext` passed after repairing two stale guidance/tool inventory assertions, including
 143 validator tests and 29 packaging tests. Repository Node checks passed after regenerating public references.
 The external validation stage initially used system Python without pytest; rerunning with the existing virtual

@@ -1204,6 +1204,30 @@ test("native apply requires complete source-bound policy receipts before Gate 4"
   assert.equal((await new ObjectStore(root).getJson<PolicyValidationV1>(hash)).outcome, "pass");
 });
 
+test("imported governance validates actionable effects without inventing audit mappings", () => {
+  const registry = new ValidatorRegistry();
+  registerWorkflowValidators(registry);
+  const constraints = governance("run-test");
+  constraints.summary.auditCount = 252;
+  const policy = policyMap("run-test", "a".repeat(64)) as PolicyPropertyMapV1;
+  policy.mappings.push({
+    policyAssignmentId: "diagnostics",
+    effect: "deployIfNotExists",
+    logicalResourceId: "api",
+    propertyPath: "diagnostics",
+    expectedValue: true,
+    disposition: "planned",
+  });
+  const context = {
+    artifacts: { "governance-constraints": constraints },
+    outputs: { "policy-property-map": policy },
+    importedPolicyEffects: ["deployIfNotExists"],
+  };
+  assert.equal(registry.validate("business:policy-effect-coverage", context).valid, true);
+  policy.mappings = [];
+  assert.equal(registry.validate("business:policy-effect-coverage", context).valid, false);
+});
+
 test("native Terraform apply requires complete source-bound policy receipts before Gate 4", async () => {
   const root = await tempRoot();
   const now = new Date("2026-01-01T00:00:00.000Z");

@@ -56,6 +56,7 @@ export interface WorkflowTaskValidatorContext {
   readonly availabilityEvidence?: ArchitectureAvailabilityV1;
   readonly deploymentOperation?: OperationRecordV1;
   readonly deploymentInventory?: ResourceInventoryV1;
+  readonly importedPolicyEffects?: readonly string[];
 }
 
 export interface WorkflowGateValidatorContext {
@@ -368,11 +369,18 @@ function policyEffectCoverage(value: unknown): ValidationIssue[] {
   }
   const counts = new Map<string, number>();
   for (const mapping of policyMap.mappings) counts.set(mapping.effect, (counts.get(mapping.effect) ?? 0) + 1);
-  const missing = [
-    ["deny", governance.summary.denyCount],
-    ["modify", governance.summary.modifyCount],
-    ["audit", governance.summary.auditCount],
-  ].flatMap(([effect, required]) =>
+  const requiredCounts =
+    context.importedPolicyEffects === undefined
+      ? [
+          ["deny", governance.summary.denyCount],
+          ["modify", governance.summary.modifyCount],
+          ["audit", governance.summary.auditCount],
+        ]
+      : ["deny", "modify", "deployIfNotExists"].map((effect) => [
+          effect,
+          context.importedPolicyEffects!.filter((value) => value === effect).length,
+        ]);
+  const missing = requiredCounts.flatMap(([effect, required]) =>
     (counts.get(effect as string) ?? 0) < (required as number) ? [effect as string] : [],
   );
   return missing.length === 0
