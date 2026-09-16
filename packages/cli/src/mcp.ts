@@ -164,7 +164,7 @@ export function createMcpServer(service: ApexService): McpServer {
     "nextTask",
     {
       description:
-        "Get the next workflow result. Handle needs_input before requesting context; only status=task returns a task.taskId.",
+        "Get the next workflow result. For status=needs_input, collect answers and call recordInput; for status=needs_review, present findings and call reviewDecide with the user's decisions. Only status=task returns a task.taskId for taskContext. Do not poll unresolved input or review results.",
     },
     async () => result(await service.nextTask()),
   );
@@ -184,14 +184,28 @@ export function createMcpServer(service: ApexService): McpServer {
         taskId: z.string(),
         offset: z.number().int().nonnegative().optional(),
         limit: z.number().int().min(1).max(6_000).optional(),
+        inputHash: z
+          .string()
+          .regex(/^[0-9a-f]{64}$/u)
+          .optional(),
       },
     },
-    async ({ taskId, offset, limit }) => result(await service.readTaskInput(taskId, offset, limit)),
+    async ({ taskId, offset, limit, inputHash }) =>
+      result(await service.readTaskInput(taskId, offset, limit, inputHash)),
   );
   server.registerTool(
     "recordInput",
     { description: "Record answers for the exact pending kernel input request", inputSchema: inputSubmission },
     async (input) => result(await service.recordInput(input)),
+  );
+  server.registerTool(
+    "governanceImport",
+    {
+      description:
+        "Import the active subscription from a reviewed local governance baseline; provide only its path, never baseline contents.",
+      inputSchema: { path: z.string().min(1) },
+    },
+    async ({ path }) => result(await service.importGovernanceBaseline(path)),
   );
   server.registerTool(
     "projectCreate",
@@ -253,6 +267,8 @@ export function createMcpServer(service: ApexService): McpServer {
   server.registerTool(
     "stageArtifact",
     {
+      description:
+        "Stage one typed artifact or an outputs[] bundle for the exact active task; staging does not complete the task.",
       inputSchema: {
         taskId: z.string(),
         kind: artifactKind.optional(),
@@ -275,6 +291,8 @@ export function createMcpServer(service: ApexService): McpServer {
   server.registerTool(
     "stageFile",
     {
+      description:
+        "Stage a generated file for the exact active task, optionally checking its expected SHA; does not deploy it.",
       inputSchema: {
         taskId: z.string(),
         path: z.string(),
@@ -291,6 +309,8 @@ export function createMcpServer(service: ApexService): McpServer {
   server.registerTool(
     "generateIac",
     {
+      description:
+        "Generate IaC for the active CodeGen task from accepted inputs and bindings; does not authorize deployment.",
       inputSchema: {
         taskId: z.string(),
         existingResources: z.array(z.string()).optional(),
@@ -312,6 +332,7 @@ export function createMcpServer(service: ApexService): McpServer {
   server.registerTool(
     "validateTask",
     {
+      description: "Validate the active task's staged outputs or supplied artifacts without completing the task.",
       inputSchema: {
         taskId: z.string(),
         kind: artifactKind.optional(),
@@ -409,9 +430,21 @@ export function createMcpServer(service: ApexService): McpServer {
   server.registerTool("preview", { description: "Read the current operator-created deployment preview" }, async () =>
     result(await service.currentPreview()),
   );
-  server.registerTool("reconcile", {}, async () => result(await service.reconcile()));
-  server.registerTool("inventory", {}, async () => result(await service.inventory()));
-  server.registerTool("diagnose", {}, async () => result(await service.diagnose()));
+  server.registerTool(
+    "reconcile",
+    { description: "Run the kernel-authorized reconciliation operation for the selected run." },
+    async () => result(await service.reconcile()),
+  );
+  server.registerTool(
+    "inventory",
+    { description: "Run the bounded inventory operation for the selected run and return its evidence." },
+    async () => result(await service.inventory()),
+  );
+  server.registerTool(
+    "diagnose",
+    { description: "Run bounded diagnosis for the selected run and return the kernel-recorded result." },
+    async () => result(await service.diagnose()),
+  );
   server.registerTool(
     "improvementObserve",
     {
@@ -461,22 +494,36 @@ export function createMcpServer(service: ApexService): McpServer {
   );
   server.registerTool(
     "render",
-    { inputSchema: { kind: z.enum(["status", "requirements", "preview", "approval", "inventory"]) } },
+    {
+      description:
+        "Render the selected run's status, requirements, preview, approval, or inventory as a human-readable projection.",
+      inputSchema: { kind: z.enum(["status", "requirements", "preview", "approval", "inventory"]) },
+    },
     async ({ kind }) => result(await service.render(kind)),
   );
   server.registerTool(
     "promote",
-    { inputSchema: { environment: z.string(), target: z.string() } },
+    {
+      description:
+        "Promote the selected run to a target environment through kernel checks; does not approve or execute deployment.",
+      inputSchema: { environment: z.string(), target: z.string() },
+    },
     async ({ environment, target }) => result(await service.promote(environment, target)),
   );
   server.registerTool(
     "doctor",
-    { inputSchema: { fix: z.boolean().optional(), yes: z.boolean().optional() } },
+    {
+      description:
+        "Inspect local APEX installation health; request repairs with fix and explicit confirmation with yes.",
+      inputSchema: { fix: z.boolean().optional(), yes: z.boolean().optional() },
+    },
     async ({ fix, yes }) => result(await service.doctor(fix, yes)),
   );
   server.registerTool(
     "submitEvidence",
     {
+      description:
+        "Submit JSON evidence bound to the exact active task after validating its context; does not complete the task.",
       inputSchema: {
         taskId: z.string(),
         kind: z.string(),

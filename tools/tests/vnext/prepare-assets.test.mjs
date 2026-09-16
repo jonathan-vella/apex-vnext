@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { execFile as execFileCallback } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
+import { load } from "js-yaml";
 import {
   canonicalJson,
   pinSourceRoot,
@@ -42,6 +44,163 @@ test("asset generator canonical JSON ignores object insertion order", () => {
     canonicalJson({ z: 1, a: { y: true, x: "value" } }),
     canonicalJson({ a: { x: "value", y: true }, z: 1 }),
   );
+});
+
+test("asset generator inventories only the reviewed governance baseline schema", async () => {
+  await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
+  const assets = join(root, "packages/cli/assets");
+  const schemaName = "governance-baseline.schema.json";
+  const sourcePath = `tools/schemas/${schemaName}`;
+  const source = await readFile(join(root, sourcePath));
+  assert.deepEqual(await readdir(join(assets, "schemas")), [schemaName]);
+  assert.deepEqual(await readFile(join(assets, "schemas", schemaName)), source);
+  const manifest = JSON.parse(await readFile(join(assets, "manifest.json"), "utf8"));
+  assert.deepEqual(
+    manifest.files.filter(({ path }) => path.startsWith("schemas/")),
+    [
+      {
+        path: `schemas/${schemaName}`,
+        source: { kind: "repository-file", path: sourcePath, mapping: "governance-baseline-schema" },
+        sha256: createHash("sha256").update(source).digest("hex"),
+        bytes: source.byteLength,
+      },
+    ],
+  );
+  assert.deepEqual(
+    manifest.composition.mappings.find(({ id }) => id === "governance-baseline-schema"),
+    {
+      id: "governance-baseline-schema",
+      mode: "copy-entries",
+      sourceRoot: "tools/schemas",
+      generatedRoot: "schemas",
+    },
+  );
+});
+
+test("managed role projections retain required tools and exclude unrelated grants", async () => {
+  await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
+  const manifest = JSON.parse(await readFile(join(root, "customizations/manifest.json"), "utf8"));
+  const arm = JSON.parse(await readFile(join(root, "tools/registry/arm-mcp-cost-pricing.v1.json"), "utf8"));
+  const requiredApex = {
+    coordinator: ["status", "nextTask", "projectCreate", "projectList", "projectUse", "projectDelete", "gateDecide"],
+    requirements: [
+      "status",
+      "nextTask",
+      "recordInput",
+      "taskContext",
+      "readTaskInput",
+      "requirementsComplete",
+      "reviewDecide",
+      "gateDecide",
+    ],
+    architecture: [
+      "status",
+      "nextTask",
+      "recordInput",
+      "taskContext",
+      "readTaskInput",
+      "architectureComplete",
+      "reviewDecide",
+      "gateDecide",
+    ],
+    planning: ["status", "nextTask", "taskContext", "readTaskInput", "planComplete", "reviewDecide", "gateDecide"],
+    operations: [
+      "status",
+      "nextTask",
+      "taskContext",
+      "governanceImport",
+      "preview",
+      "reconcile",
+      "inventory",
+      "diagnose",
+      "completeTask",
+    ],
+    "code-generation": ["taskContext", "stageFile", "generateIac", "completeTask"],
+    review: ["taskContext", "readTaskInput", "reviewComplete"],
+    validation: ["taskContext", "validateTask", "completeTask"],
+  };
+  const requiredArm = {
+    coordinator: [],
+    requirements: ["get_retail_prices"],
+    architecture: ["get_retail_prices"],
+    planning: [],
+    operations: arm.managedPolicy.candidateReadAllowlist,
+    "code-generation": [],
+    review: [],
+    validation: [],
+  };
+  assert.deepEqual(manifest.roles.map(({ id }) => id).sort(), Object.keys(requiredApex).sort());
+  for (const client of ["github-copilot-vscode", "github-copilot-cli"]) {
+    for (const role of manifest.roles) {
+      const path = join(root, "packages/cli/assets/client-projections", client, role.source);
+      if (["code-generation", "review", "validation"].includes(role.id)) {
+        assert.deepEqual(role.supportedTargets, ["vscode"], `${role.id} must remain VS Code-only`);
+      }
+      if (!roleSupportsClient(role, client)) {
+        await assert.rejects(readFile(path), { code: "ENOENT" });
+        continue;
+      }
+      const content = await readFile(path, "utf8");
+      const metadata = load(content.match(/^---\r?\n([\s\S]*?)\r?\n---/u)[1]);
+      const label = `${client}/${role.id}`;
+      if (role.id === "operations") {
+        assert.match(content, /apex\/governanceImport.*only the local `path`/u, label);
+        assert.match(content, /Never read or paste baseline bytes/u, label);
+      }
+      const apexTools = requiredApex[role.id].map((tool) => `apex/${tool}`);
+      const armTools = requiredArm[role.id].map((tool) => `azure-resource-manager-mcp/${tool}`);
+      assert.deepEqual(metadata.tools.filter((tool) => tool.startsWith("apex/")).sort(), apexTools.sort(), label);
+      assert.deepEqual(
+        metadata.tools.filter((tool) => tool.startsWith("azure-resource-manager-mcp/")).sort(),
+        armTools.sort(),
+        label,
+      );
+      const interactive = client === "github-copilot-cli" ? ["ask_user", "task"] : ["vscode/askQuestions", "agent"];
+      const allowed = new Set([...apexTools, ...armTools, ...interactive]);
+      for (const tool of metadata.tools) assert.ok(allowed.has(tool), `${label}: unexpected tool ${tool}`);
+      for (const tool of [...arm.managedPolicy.denyBeforeTransport, ...arm.managedPolicy.deferredTools]) {
+        assert.ok(
+          !metadata.tools.includes(`azure-resource-manager-mcp/${tool}`),
+          `${label}: forbidden ARM tool ${tool}`,
+        );
+      }
+      if (role.interactionType === "autonomous-subagent") {
+        assert.equal(metadata["user-invocable"], false, label);
+        assert.ok(!metadata.tools.includes("vscode/askQuestions"), label);
+      }
+    }
+  }
+});
+
+test("managed routing distinguishes input, review dispositions, and exact task context in both clients", async () => {
+  await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
+  const agents = ["apex", "apex-requirements", "apex-architect", "apex-planner", "apex-operator"];
+  const skills = ["apex-workflow", "apex-requirements", "apex-operations"];
+  for (const client of ["github-copilot-vscode", "github-copilot-cli"]) {
+    const projection = join(root, "packages/cli/assets/client-projections", client);
+    for (const agent of agents) {
+      const content = await readFile(join(projection, ".github/agents", `${agent}.agent.md`), "utf8");
+      for (const state of ["status=needs_input", "status=needs_review", "status=task", "task.taskId"]) {
+        assert.ok(content.includes(state), `${client}/${agent}: missing ${state} routing`);
+      }
+      assert.match(content, /do not poll|not.*poll/iu, `${client}/${agent}: unresolved results must not be polled`);
+      assert.doesNotMatch(content, /loop on[\s\S]*?until it returns `status=task`/iu);
+    }
+    for (const skill of skills) {
+      const relative = `.github/skills/${skill}/SKILL.md`;
+      const content = await readFile(join(projection, relative), "utf8");
+      assert.equal(content, await readFile(join(root, "customizations", relative), "utf8"));
+      if (skill === "apex-operations") {
+        assert.match(content, /apex\/governanceImport.*\{ "path": "<local-baseline-path>" \}.*only/u);
+        assert.match(content, /apex governance import --path <local-baseline-path>/u);
+        assert.match(content, /Import preserves reconciliation, governance review, and Gate 2/u);
+      }
+      for (const state of ["needs_input", "needs_review", "status=task", "task.taskId"]) {
+        assert.ok(content.includes(state), `${client}/${skill}: missing ${state} routing`);
+      }
+      assert.doesNotMatch(content, /returns only `needs_input` or `task`/u);
+    }
+  }
 });
 
 test("asset generator refuses a source replaced by a symlink before open", async (context) => {

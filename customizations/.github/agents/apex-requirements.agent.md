@@ -16,16 +16,6 @@ tools:
   - apex/reviewDecide
   - apex/gateDecide
   - azure-resource-manager-mcp/get_retail_prices
-  - azure-resource-manager-mcp/query_costs
-  - azure-resource-manager-mcp/query_aks_costs
-  - azure-resource-manager-mcp/forecast_costs
-  - azure-resource-manager-mcp/list_dimensions
-  - azure-resource-manager-mcp/list_budgets
-  - azure-resource-manager-mcp/get_budget
-  - azure-resource-manager-mcp/list_alerts
-  - azure-resource-manager-mcp/list_benefit_utilization
-  - azure-resource-manager-mcp/get_benefit_recommendations
-  - azure-resource-manager-mcp/list_reservation_transactions
 agents:
   - APEX Reviewer
   - APEX Validator
@@ -43,9 +33,10 @@ candidate Azure services without deciding architecture, and produces a human-rev
 
 # Success criteria
 
-1. Extract facts already supplied in the user's opening description. Call `apex/status`, then loop on `apex/nextTask`
-  until it returns `status=task`. Present matching supplied facts as recommended confirmations; do not make the user
-  retype them and do not record them before confirmation.
+1. Extract facts already supplied in the user's opening description. Call `apex/status`, wait for its result, then call
+  `apex/nextTask`. Handle `status=needs_input`, `status=needs_review`, or `status=task` before requesting another result;
+  do not poll unresolved input or review. Present matching supplied facts as recommended confirmations; do not make
+  the user retype them and do not record them before confirmation.
 2. For every `status=needs_input`, do not call `apex/taskContext`. Use earlier recorded answers to frame the returned
   questions, identify contradictions, and explain the consequence of material choices. Ask every returned question,
   batching independent questions through the active client mechanism. Render `options` as native single-select or
@@ -71,8 +62,9 @@ candidate Azure services without deciding architecture, and produces a human-rev
   `requirements-review` task, invoke `APEX Reviewer` through the `agent` tool with exactly that task context; do not
   wait for the user to request the challenge. In a client without the Reviewer worker, report the exact pending review
   task and do not claim the challenge ran.
-9. When `apex/nextTask` returns `needs_review`, present every finding in one native decision panel. Submit the complete
-  decision set through `apex/reviewDecide`. For missing business, privacy, product, workload-volume, retention, or
+9. When `apex/nextTask` returns `needs_review`, do not request task context or invoke the Reviewer again. Present every
+  finding in one native decision panel. Submit the complete decision set through `apex/reviewDecide` with the returned
+  review hash, then call `apex/nextTask` again. For missing business, privacy, product, workload-volume, retention, or
   operational-owner decisions, recommend **Acknowledge and assign** and ask only for the responsible role. Preserve the
   finding in the Requirements package as a downstream obligation. Use **Revise now** only when the architect can
   resolve an architecture-facing contradiction; use time-bound risk acceptance only when the user explicitly chooses

@@ -328,6 +328,8 @@ export const PolicyPropertyMapV1Schema = Type.Object(
       Type.Object(
         {
           policyAssignmentId: NonEmptyStringSchema,
+          policyDefinitionId: Type.Optional(NonEmptyStringSchema),
+          policyDefinitionReferenceId: Type.Optional(NonEmptyStringSchema),
           effect: Type.Union([
             Type.Literal("deny"),
             Type.Literal("modify"),

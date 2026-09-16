@@ -14,17 +14,6 @@ tools:
   - apex/projectUse
   - apex/projectDelete
   - apex/gateDecide
-  - azure-resource-manager-mcp/get_retail_prices
-  - azure-resource-manager-mcp/query_costs
-  - azure-resource-manager-mcp/query_aks_costs
-  - azure-resource-manager-mcp/forecast_costs
-  - azure-resource-manager-mcp/list_dimensions
-  - azure-resource-manager-mcp/list_budgets
-  - azure-resource-manager-mcp/get_budget
-  - azure-resource-manager-mcp/list_alerts
-  - azure-resource-manager-mcp/list_benefit_utilization
-  - azure-resource-manager-mcp/get_benefit_recommendations
-  - azure-resource-manager-mcp/list_reservation_transactions
 agents: []
 handoffs:
   - label: Gather requirements
@@ -76,8 +65,11 @@ Coordinate APEX without authoring project artifacts or inferring workflow state.
   evidence under `operations/`.
 7. When `nextTask` returns `status=needs_input` with `request.intake`, immediately use the active client's interactive
   delegation mechanism to hand off to `APEX Requirements`; do not ask, answer, summarize, or record any intake
-  question in the coordinator. For other results, use the active client projection's interactive delegation mechanism
-  for the specialist named by the kernel. Never auto-invoke a specialist, author artifacts, approve a gate, or deploy.
+  question in the coordinator. Route other `status=needs_input` requests to their owning interactive role. For
+  `status=needs_review`, route the returned review to the owning interactive stage for finding dispositions, not to a
+  hidden review worker. Only `status=task` supplies `task.taskId`; hand off that exact task to its kernel-selected owner.
+  Do not poll unresolved input or review results. Use the active client's interactive handoff.
+  Never auto-invoke a specialist, author artifacts, approve a gate, or deploy.
 8. At Gates 1 through 3, tell the user to review the current stage package and use the trusted terminal ceremony
   `apex gate decide --gate <N> --decision <approved|rejected> --actor <USER_ID> --json`. At Gate 4, also require
   review of the exact preview, target, expiry, and approval recipient before directing

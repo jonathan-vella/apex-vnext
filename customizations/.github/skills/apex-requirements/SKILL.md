@@ -10,7 +10,7 @@ Use this skill only for an active requirements task.
 
 ## Prerequisites
 
-- `apex/taskContext` returns a requirements task envelope.
+- The kernel returns a requirements input request, review, or task; task context is read only for `status=task`.
 - The interactive Requirements agent is active when user input may be needed.
 - The kernel's returned input request is the authoritative requirements question catalog.
 
@@ -23,7 +23,9 @@ Use this skill only for an active requirements task.
    supplied value, typed unknown, or explicit deferral with its owner; never replace an unknown with an inferred value.
 4. Submit that request only through `apex/recordInput`, preserving its request ID, expected journal head, and owner
    epoch.
-5. Call `apex/nextTask` again and repeat until it returns a requirements `task`; only then read `apex/taskContext`.
+5. After accepted input, call `apex/nextTask` again. Handle `needs_review` through the findings panel and
+   `apex/reviewDecide`, not by polling or requesting task context. Only `status=task` supplies `task.taskId`; read
+   `apex/taskContext` with that exact ID only for a requirements task, otherwise route to its owning role.
 6. Treat service questions in the workload panel as a preference boundary. Present the kernel recommendation, then
    capture retained, prohibited, and preferred services, SKU preferences, and environment overrides without selecting
    architecture, SKUs, or implementation details.
@@ -39,9 +41,9 @@ implementation details while gathering requirements.
 
 ## Boundaries
 
-Do not read task context for `needs_input`, a task owned by another role, or a stale task ID. Treat `APEX_STALE` as a
-fresh-status requirement, and return kernel validation or authorization errors without fabricating a requirements
-result.
+Do not read task context for `needs_input`, `needs_review`, a task owned by another role, or a stale task ID.
+Treat `APEX_STALE` as a fresh-status requirement, and return kernel validation or authorization errors without
+fabricating a requirements result.
 
 ## Output
 

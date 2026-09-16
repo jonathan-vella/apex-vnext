@@ -14,6 +14,7 @@ This file is generated from [packages/cli/src/mcp.ts](../../packages/cli/src/mcp
 - `doctor`
 - `gateDecide`
 - `generateIac`
+- `governanceImport`
 - `improvementObservations`
 - `improvementObserve`
 - `improvementProposals`

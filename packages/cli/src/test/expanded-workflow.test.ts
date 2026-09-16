@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -12,7 +12,7 @@ import type {
   LogicalResourceManifestV1,
 } from "@apexops/contracts";
 import type { IacProvider, PreviewRequest } from "@apexops/capabilities";
-import { EventJournal, ValidatorRegistry, sha256Json } from "@apexops/kernel";
+import { EventJournal, ObjectStore, ValidatorRegistry, sha256Json } from "@apexops/kernel";
 import { ApexError } from "../errors.js";
 import { createMcpServer } from "../mcp.js";
 import { ApexService, type TaskOutput } from "../service.js";
@@ -57,6 +57,8 @@ async function reachCodegen(
   runId: string,
   track: "bicep" | "terraform",
   configurePlan?: (plan: ReturnType<typeof planBundle>) => void,
+  revisePlan = false,
+  baselinePath?: string,
 ): Promise<{ taskId: string; plan: ReturnType<typeof planBundle> }> {
   await service.nextTask();
   const requirementValues: TaskOutput[] = [{ kind: "requirements", value: requirements() }];
@@ -87,9 +89,23 @@ async function reachCodegen(
     { kind: "review-findings", value: review(runId, "architecture", architectureHashes.architecture!) },
   ]);
   const governanceValue = governance(runId);
-  const governanceHashes = await complete(service, "governance-discovery", [
-    { kind: "governance-constraints", value: governanceValue },
-  ]);
+  const governanceHashes =
+    baselinePath === undefined
+      ? await complete(service, "governance-discovery", [{ kind: "governance-constraints", value: governanceValue }])
+      : { "governance-constraints": (await service.importGovernanceBaseline(baselinePath)).outputHash };
+  if (baselinePath !== undefined) {
+    const reconciliationTask = await task(service, "governance-reconciliation");
+    const context = await service.taskContext(reconciliationTask);
+    assert.ok(
+      context.inputs.some(
+        (value) => (value as { schemaVersion?: string }).schemaVersion === "governance-baseline-selection-v1",
+      ),
+    );
+    const selected = context.inputReferences.find(({ hash }) => !Object.values(context.artifactHashes).includes(hash));
+    assert.ok(selected);
+    const chunk = await service.readTaskInput(reconciliationTask, 0, 6_000, selected.hash);
+    assert.match(chunk.content, /governance-baseline-selection-v1/);
+  }
   const policyHashes = await complete(service, "governance-reconciliation", [
     { kind: "policy-property-map", value: policyMap(runId, governanceHashes["governance-constraints"]!) },
   ]);
@@ -110,7 +126,37 @@ async function reachCodegen(
     },
   );
   configurePlan?.(plan);
-  const planHashes = await complete(service, "plan", plan);
+  let planHashes = await complete(service, "plan", plan);
+  if (revisePlan) {
+    const reviewHashes = await complete(service, "plan-review", [
+      {
+        kind: "review-findings",
+        value: review(runId, "plan", planHashes["implementation-intent"]!, [
+          {
+            id: "F-1",
+            severity: "high",
+            disposition: "open",
+            title: "Revise",
+            detail: "Rename resource",
+            evidenceRefs: [],
+          },
+        ]),
+      },
+    ]);
+    await service.decideReview(reviewHashes["review-findings"]!, [
+      { findingId: "F-1", action: "revise", rationale: "Use the confirmed replacement resource name" },
+    ]);
+    const intent = plan.find(({ kind }) => kind === "implementation-intent")!.value as ImplementationIntentV1;
+    const binding = plan.find(({ kind }) => kind === "iac-binding")!.value as IacBindingV1;
+    const previousId = intent.resources[0]!.id;
+    intent.resources[0]!.id = "replacement";
+    binding.resourceBindings.replacement = binding.resourceBindings[previousId]!;
+    delete binding.resourceBindings[previousId];
+    binding.intentHash = sha256Json(intent);
+    const previousHash = planHashes["implementation-intent"];
+    planHashes = await complete(service, "plan", plan);
+    assert.notEqual(planHashes["implementation-intent"], previousHash);
+  }
   await complete(service, "plan-review", [
     { kind: "review-findings", value: review(runId, "plan", planHashes["implementation-intent"]!) },
   ]);
@@ -1632,3 +1678,99 @@ test("restricted staging and generateIac produce a real accepted tree", async ()
   assert.ok(generated.files.some(({ path }) => path.endsWith("main.bicep")));
   assert.match(generated.outputHashes["iac-handoff"]!, /^[0-9a-f]{64}$/);
 });
+
+for (const track of ["bicep", "terraform"] as const) {
+  test(`${track} generates the replacement intent after plan review revision`, async () => {
+    const root = await tempRoot();
+    const service = new ApexService(root);
+    const { runId } = await service.init({ projectId: "demo", iacTool: track });
+    const { taskId, plan } = await reachCodegen(service, runId, track, undefined, true);
+    const generated = await service.generateIac(taskId);
+    const main = generated.files.find(({ path }) => path.endsWith(track === "bicep" ? "main.bicep" : "main.tf"));
+    assert.ok(main);
+    assert.match(await readFile(main.path, "utf8"), /replacement/);
+    const handoff = await new ObjectStore(root).getJson<{ intentHash: string }>(generated.outputHashes["iac-handoff"]!);
+    assert.equal(handoff.intentHash, sha256Json(plan.find(({ kind }) => kind === "implementation-intent")!.value));
+  });
+  test(`${track} imports an evidenced-empty standalone baseline through deployment without copying other data`, async () => {
+    const root = await tempRoot();
+    const subscriptionId = "11111111-1111-1111-1111-111111111111";
+    const discoveredAt = new Date().toISOString();
+    const baseline = {
+      schema_version: "governance-baseline-v1",
+      subscription_id: subscriptionId,
+      coverage_status: "COMPLETE",
+      subscriptions_discovered: 1,
+      subscriptions_processed: 1,
+      subscriptions_skipped: [],
+      subscriptions_excluded: [],
+      summary: { total_findings: 0, total_blockers: 0, total_auto_remediate: 0, subscriptions_complete: 1 },
+      subscriptions: {
+        [subscriptionId]: {
+          schema_version: "governance-constraints-v1",
+          subscription_id: subscriptionId,
+          discovered_at: discoveredAt,
+          source: "github-actions-baseline",
+          discovery_status: "COMPLETE",
+          discovery_metadata: {
+            discovery_status: "COMPLETE",
+            discovered_at: discoveredAt,
+            scope: { subscription_id: subscriptionId, management_groups: [] },
+            api_versions: {
+              policyAssignments: "2022-06-01",
+              policyDefinitions: "2021-06-01",
+              policyExemptions: "2022-07-01-preview",
+            },
+            page_counts: { policyAssignments: 0, policyDefinitions: 0, policyExemptions: 0 },
+            completeness_signature: "",
+            ttl_days: 7,
+          },
+          discovery_summary: {
+            assignment_total: 0,
+            assignment_kept: 0,
+            defender_auto_filtered: 0,
+            subscription_scope_count: 0,
+            management_group_inherited_count: 0,
+            blocker_count: 0,
+            auto_remediate_count: 0,
+            informational_count: 0,
+            audit_count: 0,
+            disabled_count: 0,
+            exempted_count: 0,
+          },
+          assignment_inventory: [],
+          findings: [],
+          policies: [],
+          tags_required: [],
+          allowed_locations: [],
+          irrelevant_metadata: "UNSELECTED_BASELINE_MARKER",
+        },
+      },
+    };
+    const path = join(root, "baseline.json");
+    await writeJson(path, baseline);
+    const service = new ApexService(root);
+    const { runId } = await service.init({
+      projectId: "demo",
+      iacTool: track,
+      targetScope: `/subscriptions/${subscriptionId}`,
+    });
+    await assert.rejects(service.importGovernanceBaseline(path), /active discovery task/);
+    const codegen = await reachCodegen(service, runId, track, undefined, false, path);
+    await service.completeTaskOutputs(codegen.taskId, codegenBundle(runId, track, codegen.plan));
+    await complete(service, `validation-${track}`, [
+      { kind: "validation-evidence", value: validationEvidence(runId, track) },
+    ]);
+    const preview = await service.preview({ operation: "apply", provider: "fake" });
+    await service.decideGateNumber(4, "approved", "tester");
+    const deployed = await service.deploy(preview.previewHash);
+    assert.equal(deployed.inventory.resources.length, 1);
+    for (const file of await readdir(join(root, ".apex"), { recursive: true, withFileTypes: true })) {
+      if (!file.isFile()) continue;
+      assert.equal(
+        (await readFile(join(file.parentPath, file.name), "utf8")).includes("UNSELECTED_BASELINE_MARKER"),
+        false,
+      );
+    }
+  });
+}

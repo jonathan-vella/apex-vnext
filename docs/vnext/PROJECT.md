@@ -1,6 +1,6 @@
 # APEX vNext Checkpoint
 
-- **Updated:** 2026-09-15
+- **Updated:** 2026-09-16
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Integration branch:** `main`
 - **Product status:** Pre-release
@@ -22,8 +22,10 @@ around vNext source authorities and Diátaxis navigation.
 ## Open Release Work
 
 - Complete the [first optimization batch](ROADMAP.md#first-batch-input-correctness-and-scope): revision-safe reads,
-  bounded context/reviewer packs, routing/tool scope, then proven prompt deduplication. All items are planned, not done.
-- Complete governance baseline import and standalone-subscription coverage with the owner of issue #344.
+  bounded context/reviewer packs and routing/tool scope have implementation and focused tests. Complete reviewer
+  evidence/disposition coverage and exact-client checks. Scoped prompt inspection found no further safe deletion.
+- Complete issue #344's nonempty-policy enforcement through planning and native code validation. Path-only import,
+  standalone collection and evidenced-empty import-to-simulated-deployment tests exist for both tracks.
 - Implement and qualify COE import, provenance, relevant change questions, manual-edit conflicts and selective
   regeneration using existing contracts and parameters.
 - Complete design/ADR and operational/as-built output against the PRD quality checklist.
@@ -33,7 +35,8 @@ around vNext source authorities and Diátaxis navigation.
 - Complete separately authorized Bicep and Terraform cloud qualification.
 - Bind target governance, pricing, security and cleanup evidence. Quota and availability remain assumptions.
 - Select an exact release candidate only after all blocking evidence is current.
-- Keep package publication, tags, releases, deployment, and cutover explicitly unauthorized until final approval.
+- Publication, tags, releases, deployment and cutover have conditional maintainer authorization as recorded below;
+  required evidence, protected checks and operation-specific approval contracts remain mandatory.
 
 GitHub Issues and the repository project own day-to-day work selection. [ROADMAP.md](ROADMAP.md) owns dependency order;
 [REGISTER.md](REGISTER.md) owns unresolved risks; [PRD.md](PRD.md) owns acceptance.
@@ -49,16 +52,43 @@ GitHub Issues and the repository project own day-to-day work selection. [ROADMAP
 | Copilot CLI live client outcomes                               | Current candidate pending with autonomous-worker omission |
 | Bicep live Azure outcomes                                      | Current candidate pending                                 |
 | Terraform live Azure outcomes                                  | Current candidate pending                                 |
-| Release authority                                              | Not granted                                               |
+| Release authority                                              | Conditional authorization; acceptance evidence pending     |
 
-Historical candidate dossiers are archived and do not satisfy current gates.
+Only exact-candidate evidence satisfies current gates.
+
+## Active Delivery Authorization
+
+On 2026-09-16 the maintainer authorized autonomous roadmap delivery, takeover of issue #344, commits, PRs, protected
+merges and publication after release acceptance. No protections, approval contracts or credential permissions may be
+bypassed. Manual VS Code and Copilot CLI/app tests remain maintainer actions. Live qualification is limited to isolated
+run-owned resources in the authenticated non-production `apex-shared` subscription; pre-existing resources are protected.
+
+The authorized spending window is 2026-09-16 00:00 UTC through 2026-09-30 00:00 UTC, with a USD 2,000 total-subscription
+ceiling and USD 400 reserve. Stop new provisioning at USD 1,600 estimated accrued spend or earlier projected overrun.
+Both requested email recipients are configured on the qualification budget, with actual thresholds 50/75/80/90/100%
+and forecast thresholds 80/100%. Email receipt is unverified. Azure requires a month-start budget; its September scope
+is more conservative than the authorized window. Budget alerts are not hard spending caps.
+
+No billable qualification resources have been provisioned. The initial existing-budget read reported USD 1,000.60
+September accrued and USD 1,539.88 monthly forecast; exact-window cost queries were rate-limited. These figures are
+historical observations, not current deployment headroom. Refresh actual and projected costs before provisioning.
+
+The active worktree adds current-dependency task inputs, UTF-8 input/output budgets, selective authorized reads,
+review pagination/expiry checks, narrow role grants, and governance import/collector safeguards. An experimental local
+archetype copy capability was removed after adversarial review found filesystem-race and secret-detection defects.
+COE import remains unimplemented; no release candidate has been selected.
+
+Final `npm run qualify:vnext` passed after repairing two stale guidance/tool inventory assertions, including
+143 validator tests and 29 packaging tests. Repository Node checks passed after regenerating public references.
+The external validation stage initially used system Python without pytest; rerunning with the existing virtual
+environment passed, including 16 Python tests and four optional skips. No live client or cloud proof is inferred.
 
 ## Planning Checkpoint
 
 On 2026-09-13, [PR #343](https://github.com/jonathan-vella/apex-vnext/pull/343) was verified merged, delivering the
 creative-workflow changes. [Issue #344](https://github.com/jonathan-vella/apex-vnext/issues/344) was open with no comments
 or linked completion evidence in the inspected timeline. It is the governance plan, not an implementation receipt.
-Refresh GitHub and the implementation branch before acting; another session owns that work.
+The authorized delivery session has taken over that work and posted implementation progress on the issue.
 
 COE import/adaptation, explicit profile behavior, full output parity and final distribution remain target requirements
 until backed by implementation and tests. Existing code supports parts of these outcomes; this revision does not mark

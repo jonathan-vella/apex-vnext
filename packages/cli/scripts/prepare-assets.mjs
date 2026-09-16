@@ -532,6 +532,25 @@ async function prepareAssets() {
   );
   await prepareCapabilityPacks(inventory);
 
+  const schemasRoot = join(repositoryRoot, "tools", "schemas");
+  const pinnedSchemas = await pinSourceRoot(schemasRoot);
+  const schemaName = "governance-baseline.schema.json";
+  const schemaBytes = await readSourceFile(pinnedSchemas.resolvedRoot, join(schemasRoot, schemaName));
+  const schemaDestination = join(assetsRoot, "schemas", schemaName);
+  assertContained(assetsRoot, schemaDestination);
+  await mkdir(dirname(schemaDestination), { recursive: true });
+  await writeFile(schemaDestination, schemaBytes);
+  inventory.push({
+    path: `schemas/${schemaName}`,
+    source: {
+      kind: "repository-file",
+      path: `tools/schemas/${schemaName}`,
+      mapping: "governance-baseline-schema",
+    },
+    sha256: createHash("sha256").update(schemaBytes).digest("hex"),
+    bytes: schemaBytes.byteLength,
+  });
+
   const sourcesMetadata = {
     customizations: customizationManifest.version,
     config: runtimeBundle.schemaVersion,
@@ -548,6 +567,12 @@ async function prepareAssets() {
         generatedRoot: bundleDeclaration.generatedRoot,
       },
       { id: "config", mode: "copy-tree", sourceRoot: "config", generatedRoot: "config" },
+      {
+        id: "governance-baseline-schema",
+        mode: "copy-entries",
+        sourceRoot: "tools/schemas",
+        generatedRoot: "schemas",
+      },
       {
         id: "copilot-cli-tool-inventory",
         mode: "copy-entries",

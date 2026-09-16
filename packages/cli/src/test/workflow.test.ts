@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { EventJournal, ObjectStore, sha256Json } from "@apexops/kernel";
-import type { EventV1, InputValueV1 } from "@apexops/contracts";
+import type { EventV1, InputValueV1, RunConfigV1, PolicyPropertyMapV1 } from "@apexops/contracts";
 import { ApexError } from "../errors.js";
 import { ApexService } from "../service.js";
 import {
@@ -959,7 +959,7 @@ test("requirements task context includes recorded input and stageable output tem
   });
 });
 
-test("task context projects hashes from legacy task completions", async () => {
+test("task context rejects a task whose journal head changed", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
   const initialized = await service.init({ projectId: "demo" });
@@ -979,24 +979,179 @@ test("task context projects hashes from legacy task completions", async () => {
     payload: { nodeId: "requirements", requirementsHash, legacy: true },
   });
 
-  const context = await service.taskContext(issued.task.taskId);
-  assert.equal(context.artifactHashes.requirements, requirementsHash);
+  await assert.rejects(service.taskContext(issued.task.taskId), /stale/);
 });
 
-test("task inputs exclude invalidated artifact revisions", async () => {
+test("large multibyte review context stays bounded with authorized selective reads", async () => {
   const service = new ApexService(await tempRoot());
+  await service.init({ projectId: "demo" });
+  const issued = await nextTaskAfterInput(service);
+  assert.equal(issued.status, "task");
+  if (issued.status !== "task") return;
+  const large = requirements();
+  large.architectureHandoff = "\u00e9".repeat(140_000);
+  const accepted = await service.completeRequirements(issued.task.taskId, large);
+  const reviewTask = await service.nextTask();
+  assert.equal(reviewTask.status, "task");
+  if (reviewTask.status !== "task") return;
+  const context = await service.taskContext(reviewTask.task.taskId);
+  assert.ok(Buffer.byteLength(JSON.stringify(context)) <= 262_144);
+  assert.deepEqual(context.inputs, []);
+  assert.equal(context.inputReferences[0]!.inlined, false);
+  const hash = accepted.outputHashes.requirements!;
+  assert.equal(context.inputReferences[0]!.hash, hash);
+  const chunks: string[] = [];
+  let offset: number | undefined = 0;
+  while (offset !== undefined) {
+    const chunk = await service.readTaskInput(reviewTask.task.taskId, offset, 6_000, hash);
+    assert.ok(Buffer.byteLength(chunk.content) <= 6_000);
+    chunks.push(chunk.content);
+    offset = chunk.nextOffset;
+  }
+  assert.deepEqual(JSON.parse(chunks.join("")), large);
+  await assert.rejects(
+    service.readTaskInput(reviewTask.task.taskId, 0, 500, "f".repeat(64)),
+    /current task dependency/,
+  );
+});
+
+test("codegen task inputs exclude invalidated revisions and unrelated accepted artifacts", async () => {
+  const service = new ApexService(await tempRoot());
+  await service.init({ projectId: "demo" });
+  const internal = service as unknown as {
+    currentRun(): Promise<RunConfigV1>;
+    inputRefs(run: RunConfigV1, events: EventV1[], descriptor: { id: string }): Promise<string[]>;
+  };
+  const run = await internal.currentRun();
   const oldIntent = "a".repeat(64);
   const currentIntent = "b".repeat(64);
+  const requirementsHash = "c".repeat(64);
+  const reviewHash = "d".repeat(64);
   const events = [
+    { type: "task.completed", payload: { artifactHashes: { requirements: requirementsHash } } },
     { type: "task.completed", payload: { artifactHashes: { "implementation-intent": oldIntent } } },
     { type: "workflow.invalidated", payload: { artifactKinds: ["implementation-intent"] } },
     { type: "task.completed", payload: { artifactHashes: { "implementation-intent": currentIntent } } },
+    { type: "task.completed", payload: { artifactHashes: { "review-findings": reviewHash } } },
   ] as EventV1[];
-  const inputRefs = (service as unknown as {
-    inputRefs(events: EventV1[], descriptor: { id: string }): string[];
-  }).inputRefs(events, { id: "codegen-bicep" });
+  for (const track of ["bicep", "terraform"]) {
+    const inputRefs = await internal.inputRefs(run, events, { id: `codegen-${track}` });
+    assert.deepEqual(inputRefs, [currentIntent]);
+  }
+});
 
-  assert.deepEqual(inputRefs, [currentIntent]);
+test("issued task output limit matches locked defaults and counts multibyte content", async () => {
+  const service = new ApexService(await tempRoot());
+  await service.init({ projectId: "demo" });
+  const issued = await nextTaskAfterInput(service);
+  assert.equal(issued.status, "task");
+  if (issued.status !== "task") return;
+  assert.equal(issued.task.maxOutputBytes, 1_048_576);
+  const oversized = requirements();
+  oversized.architectureHandoff = "\u00e9".repeat(600_000);
+  await assert.rejects(
+    service.stageArtifact(issued.task.taskId, { kind: "requirements", value: oversized }),
+    /size limit/,
+  );
+});
+
+test("imported initiative members require distinct mappings and run-owned evidence", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const subscriptionId = "11111111-1111-1111-1111-111111111111";
+  await service.init({ projectId: "demo", targetScope: `/subscriptions/${subscriptionId}` });
+  const internal = service as unknown as {
+    currentRun(): Promise<RunConfigV1>;
+    validateBundle(
+      run: RunConfigV1,
+      descriptor: { id: string },
+      outputs: Array<{ kind: string; value: unknown }>,
+      events: EventV1[],
+    ): Promise<void>;
+    inputRefs(run: RunConfigV1, events: EventV1[], descriptor: { id: string }): Promise<string[]>;
+  };
+  const run = await internal.currentRun();
+  const objects = new ObjectStore(root);
+  const snapshot = {
+    schemaVersion: "governance-baseline-selection-v1",
+    projectId: run.projectId,
+    runId: run.runId,
+    subscriptionId,
+    findings: ["member-1", "member-2"].map((policyDefinitionReferenceId) => ({
+      assignmentId: "assignment",
+      policyId: "definition",
+      policyDefinitionReferenceId,
+      effect: "deployIfNotExists",
+    })),
+  };
+  const digest = await objects.putJson(snapshot);
+  const constraints = {
+    ...governance(run.runId),
+    targetScope: run.targetScope,
+    constraintsRef: {
+      mediaType: "application/json",
+      uri: `apex-object:${digest}`,
+      digest,
+      bytes: (await objects.getBytes(digest)).byteLength,
+    },
+  };
+  const governanceHash = await objects.putJson(constraints);
+  const events = [
+    { type: "task.completed", payload: { artifactHashes: { "governance-constraints": governanceHash } } },
+  ] as EventV1[];
+  const policy: PolicyPropertyMapV1 = {
+    ...policyMap(run.runId, governanceHash),
+    mappings: [
+      {
+        policyAssignmentId: "assignment",
+        policyDefinitionId: "definition",
+        policyDefinitionReferenceId: "member-1",
+        effect: "deployIfNotExists",
+        logicalResourceId: "api",
+        propertyPath: "diagnostics",
+        disposition: "planned",
+      },
+    ],
+  };
+  const validate = () =>
+    internal.validateBundle(
+      run,
+      { id: "governance-reconciliation" },
+      [{ kind: "policy-property-map", value: policy }],
+      events,
+    );
+  await assert.rejects(validate(), /explicit mappings/);
+  policy.mappings.push({ ...policy.mappings[0]!, policyDefinitionReferenceId: "member-2" });
+  await validate();
+  policy.mappings[1]!.disposition = "exempt";
+  await assert.rejects(validate(), /exemptions are not verified/);
+  const foreignDigest = await objects.putJson({ ...snapshot, runId: "another-run" });
+  const foreignHash = await objects.putJson({
+    ...constraints,
+    constraintsRef: {
+      ...constraints.constraintsRef,
+      digest: foreignDigest,
+      uri: `apex-object:${foreignDigest}`,
+      bytes: (await objects.getBytes(foreignDigest)).byteLength,
+    },
+  });
+  await assert.rejects(
+    internal.inputRefs(
+      run,
+      [
+        {
+          type: "task.completed",
+          payload: {
+            artifactHashes: {
+              "governance-constraints": foreignHash,
+            },
+          },
+        },
+      ] as EventV1[],
+      { id: "governance-reconciliation" },
+    ),
+    /does not belong/,
+  );
 });
 
 test("plan task context projects source hashes and valid output templates", async () => {
@@ -1008,6 +1163,21 @@ test("plan task context projects source hashes and valid output templates", asyn
     assert.equal(issued.status, "task");
     if (issued.status !== "task") throw new Error("Expected a task");
     assert.equal(issued.task.taskType, taskType);
+    if (taskType.endsWith("-review")) {
+      const subjectHash = (outputs[0]!.value as { subjectHash: string }).subjectHash;
+      const chunks: string[] = [];
+      let offset: number | undefined = 0;
+      while (offset !== undefined) {
+        const chunk = await service.readTaskInput(issued.task.taskId, offset, 137);
+        assert.equal(chunk.subjectHash, subjectHash);
+        assert.equal(chunk.outputTemplate !== undefined, offset === 0);
+        chunks.push(chunk.content);
+        offset = chunk.nextOffset;
+      }
+      assert.equal(sha256Json(JSON.parse(chunks.join(""))), subjectHash);
+      await assert.rejects(service.readTaskInput(issued.task.taskId, chunks.join("").length, 137), /offset/i);
+      await assert.rejects(service.readTaskInput(issued.task.taskId, 0, 6_001), /range/i);
+    }
     return service.completeTaskOutputs(issued.task.taskId, outputs);
   };
 
@@ -1138,12 +1308,17 @@ test("plan task context projects source hashes and valid output templates", asyn
     },
   });
 
-  const plan = planBundle(initialized.runId, "bicep", {}, {
-    requirements: requirementHashes.outputHashes.requirements!,
-    architecture: architectureHashes.outputHashes.architecture!,
-    "governance-constraints": governanceHashes.outputHashes["governance-constraints"]!,
-    "policy-property-map": policyHashes.outputHashes["policy-property-map"]!,
-  });
+  const plan = planBundle(
+    initialized.runId,
+    "bicep",
+    {},
+    {
+      requirements: requirementHashes.outputHashes.requirements!,
+      architecture: architectureHashes.outputHashes.architecture!,
+      "governance-constraints": governanceHashes.outputHashes["governance-constraints"]!,
+      "policy-property-map": policyHashes.outputHashes["policy-property-map"]!,
+    },
+  );
   const planHashes = await service.completeTaskOutputs(issued.task.taskId, plan);
   const reviewTask = await service.nextTask();
   assert.equal(reviewTask.status, "task");
@@ -1152,6 +1327,30 @@ test("plan task context projects source hashes and valid output templates", asyn
   const reviewInput = await service.readTaskInput(reviewTask.task.taskId);
   assert.equal(reviewInput.subjectHash, planHashes.outputHashes["implementation-intent"]);
   assert.deepEqual(JSON.parse(reviewInput.content), plan[0]!.value);
+  const chunks: string[] = [];
+  let offset: number | undefined = 0;
+  while (offset !== undefined) {
+    const chunk = await service.readTaskInput(reviewTask.task.taskId, offset, 137);
+    chunks.push(chunk.content);
+    offset = chunk.nextOffset;
+  }
+  assert.deepEqual(JSON.parse(chunks.join("")), plan[0]!.value);
+});
+
+test("review input reads reject expired tasks", async () => {
+  let now = Date.parse("2026-01-01T00:00:00.000Z");
+  const service = new ApexService(await tempRoot(), { clock: () => new Date(now) });
+  await service.init({ projectId: "demo" });
+  const requirementsTask = await nextTaskAfterInput(service);
+  assert.equal(requirementsTask.status, "task");
+  if (requirementsTask.status !== "task") return;
+  await service.completeRequirements(requirementsTask.task.taskId, requirements());
+  const reviewTask = await service.nextTask();
+  assert.equal(reviewTask.status, "task");
+  if (reviewTask.status !== "task") return;
+  await service.readTaskInput(reviewTask.task.taskId);
+  now += 25 * 60 * 60 * 1_000;
+  await assert.rejects(service.readTaskInput(reviewTask.task.taskId), /expired/i);
 });
 
 test("reviewer summary preserves non-empty findings and evidence references", async () => {

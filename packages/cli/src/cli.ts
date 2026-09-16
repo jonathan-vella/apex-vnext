@@ -611,6 +611,8 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
     }
     case "status":
       return service.status();
+    case "governance import":
+      return service.importGovernanceBaseline(required(flags, "path"));
     case "task next":
       return service.nextTask();
     case "task context":

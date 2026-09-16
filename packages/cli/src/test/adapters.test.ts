@@ -51,6 +51,19 @@ test("CLI renders concise human status and doctor output", () => {
   );
 });
 
+test("CLI governance import requires a path and forwards only that path", async (context) => {
+  const root = await tempRoot();
+  const expected = { outputHash: "a".repeat(64), summary: "Reviewed baseline imported" };
+  const importer = context.mock.method(ApexService.prototype, "importGovernanceBaseline", async () => expected);
+  for (const flags of [[], ["--path"], ["--path", "first.json", "--path", "second.json"]]) {
+    await assert.rejects(execute(["governance", "import", ...flags], root), /Missing --path/u);
+  }
+  assert.equal(importer.mock.callCount(), 0);
+  const path = "reviewed baselines/governance.json";
+  assert.deepEqual(await execute(["governance", "import", "--path", path], root), expected);
+  assert.deepEqual(importer.mock.calls[0]?.arguments, [path]);
+});
+
 test("CLI bootstrap validates onboarding files before initializing a selected client", async () => {
   const root = await tempRoot();
   const configPath = join(root, "onboarding.json");
@@ -218,6 +231,7 @@ test("MCP registers only narrow tools and calls the service", async () => {
     "doctor",
     "gateDecide",
     "generateIac",
+    "governanceImport",
     "improvementObservations",
     "improvementObserve",
     "improvementProposals",
@@ -244,7 +258,15 @@ test("MCP registers only narrow tools and calls the service", async () => {
     "taskContext",
     "validateTask",
   ]);
+  for (const tool of tools.tools) {
+    assert.ok(tool.description?.trim(), `${tool.name} must describe its operation`);
+  }
   assert.match(tools.tools.find(({ name }) => name === "nextTask")?.description ?? "", /needs_input/u);
+  assert.match(tools.tools.find(({ name }) => name === "nextTask")?.description ?? "", /needs_review.*reviewDecide/u);
+  assert.match(
+    tools.tools.find(({ name }) => name === "nextTask")?.description ?? "",
+    /Only status=task.*taskContext/u,
+  );
   assert.match(tools.tools.find(({ name }) => name === "taskContext")?.description ?? "", /exact task\.taskId/u);
   const response = await client.callTool({ name: "status", arguments: {} });
   assert.equal(response.isError, undefined);

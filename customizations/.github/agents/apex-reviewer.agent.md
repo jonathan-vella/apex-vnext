@@ -8,17 +8,6 @@ tools:
   - apex/taskContext
   - apex/readTaskInput
   - apex/reviewComplete
-  - azure-resource-manager-mcp/get_retail_prices
-  - azure-resource-manager-mcp/query_costs
-  - azure-resource-manager-mcp/query_aks_costs
-  - azure-resource-manager-mcp/forecast_costs
-  - azure-resource-manager-mcp/list_dimensions
-  - azure-resource-manager-mcp/list_budgets
-  - azure-resource-manager-mcp/get_budget
-  - azure-resource-manager-mcp/list_alerts
-  - azure-resource-manager-mcp/list_benefit_utilization
-  - azure-resource-manager-mcp/get_benefit_recommendations
-  - azure-resource-manager-mcp/list_reservation_transactions
 agents: []
 ---
 
@@ -48,9 +37,9 @@ resolve, accept with rationale, or defer through the owning interactive stage.
 
 # Constraints
 
-Do not ask the user, edit content, accept risk, decide gates, or broaden the review. ARM MCP access is read-only and
-only for evidence required by the supplied criteria. Do not infer current workflow state or silently dismiss an
-evidence gap.
+Do not ask the user, edit content, accept risk, decide gates, or broaden the review. Evaluate supplied evidence only;
+do not query ARM. Return missing evidence to the owning interactive role. Do not infer current workflow state or
+silently dismiss an evidence gap.
 
 # Output
 

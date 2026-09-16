@@ -36,6 +36,8 @@ import {
   type CostEstimateV1,
   type DeploymentPreviewV1,
   type EnvironmentInputsV1,
+  type GovernanceConstraintsV1,
+  type PolicyPropertyMapV1,
   type EvidenceManifestV1,
   type IacBindingV1,
   type InputRequestV1,
@@ -67,12 +69,16 @@ import {
   type ExecutionPlanAttestationV1,
 } from "@apexops/contracts";
 import { Value } from "@sinclair/typebox/value";
+import { Ajv2020 } from "ajv/dist/2020.js";
 import {
   CapabilityPackManager,
   FakeIaCProvider,
   ProcessRunner,
   generateBicepTree,
   generateTerraformTree,
+  importGovernanceBaseline,
+  GovernanceBaselineError,
+  type GovernanceBaselineSelection,
   type CapabilityPackInstallOptions,
   type IacProvider,
   type ProviderExecutionEvidence,
@@ -119,7 +125,7 @@ import {
   type DiagramSource,
 } from "@apexops/renderers";
 import { constants } from "node:fs";
-import { access, cp, lstat, mkdir, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
+import { access, cp, lstat, mkdir, open, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
 import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { resolveBundledAssets, type BundledClientProjection } from "./assets.js";
@@ -1227,12 +1233,18 @@ export class ApexService {
         if (task.expectedHead === events.at(-1)?.hash && task.ownerEpoch === run.ownerEpoch) {
           return { status: "task", task };
         }
-        return { status: "task", task: await this.issueTask(run, route.task, this.inputRefs(events, route.task)) };
+        return {
+          status: "task",
+          task: await this.issueTask(run, route.task, await this.inputRefs(run, events, route.task)),
+        };
       }
-      const task = await this.issueTask(run, route.task, this.inputRefs(events, route.task));
+      const task = await this.issueTask(run, route.task, await this.inputRefs(run, events, route.task));
       return { status: "needs_input", request: await this.issueArchitectureDecision(run, task) };
     }
-    return { status: "task", task: await this.issueTask(run, route.task, this.inputRefs(events, route.task)) };
+    return {
+      status: "task",
+      task: await this.issueTask(run, route.task, await this.inputRefs(run, events, route.task)),
+    };
   }
 
   async recordInput(input: InputSubmissionV1): Promise<{ recorded: true; requestId: string }> {
@@ -1347,6 +1359,7 @@ export class ApexService {
   async taskContext(taskId: string): Promise<{
     task: TaskEnvelopeV1;
     inputs: unknown[];
+    inputReferences: Array<{ hash: string; bytes: number; inlined: boolean }>;
     artifactHashes: Record<string, string>;
     recordedInput: Record<string, InputValueV1> | null;
     decisions: Record<string, InputValueV1>;
@@ -1358,6 +1371,20 @@ export class ApexService {
     const run = await this.currentRun();
     const task = await this.readTask(run, taskId);
     const events = await this.journal(run).replay();
+    const head = events.at(-1)?.hash;
+    if (head === undefined) throw new ApexError("APEX_STALE", "Task journal is empty", EXIT_CODES.stale);
+    assertTaskCurrent(task, head, run.ownerEpoch, this.clock);
+    const limits = await this.taskLimits(run);
+    const descriptor = TASKS.find(({ id }) => id === task.taskType);
+    if (descriptor === undefined)
+      throw new ApexError("APEX_AUTHORIZATION", "Task type is unsupported", EXIT_CODES.authorization);
+    const authorizedRefs = await this.inputRefs(run, events, descriptor);
+    if (task.inputRefs.some((hash) => !authorizedRefs.includes(hash)))
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Task contains an unauthorized input reference",
+        EXIT_CODES.authorization,
+      );
     const route = await this.route(run, events);
     const outputTemplates: Partial<Record<ArtifactKind, unknown>> = {};
     if (
@@ -1373,10 +1400,18 @@ export class ApexService {
         outputTemplates[kind as ArtifactKind] = this.outputTemplate(kind as ArtifactKind, run, events, task.taskType);
       }
     }
-    const artifactHashes = this.acceptedArtifactHashes(events);
-    return {
+    const artifactHashes = Object.fromEntries(
+      Object.entries(this.acceptedArtifactHashes(events)).filter(([, hash]) => task.inputRefs.includes(hash)),
+    );
+    const values = await Promise.all(task.inputRefs.map((hash) => this.objects.getJson(hash)));
+    const context = {
       task,
-      inputs: await Promise.all(task.inputRefs.map((hash) => this.objects.getJson(hash))),
+      inputs: [] as unknown[],
+      inputReferences: task.inputRefs.map((hash, index) => ({
+        hash,
+        bytes: Buffer.byteLength(JSON.stringify(values[index])),
+        inlined: false,
+      })),
       artifactHashes,
       recordedInput: task.taskType === "requirements" ? this.recordedRequirementsInput(events) : null,
       decisions: task.taskType === "architecture" ? this.architectureDecisionValues(events, task.taskId) : {},
@@ -1385,12 +1420,28 @@ export class ApexService {
       status: this.completedNodeIds(events).has(task.taskType) ? "completed" : "active",
       blockers: route.blockers,
     };
+    if (Buffer.byteLength(JSON.stringify(context)) > limits.maxInputBytes)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Task context metadata exceeds the locked input byte limit",
+        EXIT_CODES.validation,
+      );
+    for (const [index, value] of values.entries()) {
+      context.inputs.push(value);
+      context.inputReferences[index]!.inlined = true;
+      if (Buffer.byteLength(JSON.stringify(context)) > limits.maxInputBytes) {
+        context.inputs.pop();
+        context.inputReferences[index]!.inlined = false;
+      }
+    }
+    return context;
   }
 
   async readTaskInput(
     taskId: string,
     offset = 0,
     limit = 6_000,
+    inputHash?: string,
   ): Promise<{
     subjectHash: string;
     content: string;
@@ -1407,6 +1458,16 @@ export class ApexService {
       throw new ApexError("APEX_VALIDATION", "Input read range is invalid", EXIT_CODES.validation);
     }
     const events = await this.journal(run).replay();
+    const head = events.at(-1)?.hash;
+    if (head === undefined) throw new ApexError("APEX_STALE", "Task journal is empty", EXIT_CODES.stale);
+    assertTaskCurrent(task, head, run.ownerEpoch, this.clock);
+    const authorizedRefs = await this.inputRefs(run, events, descriptor);
+    if (task.inputRefs.some((hash) => !authorizedRefs.includes(hash)))
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Task contains an unauthorized input reference",
+        EXIT_CODES.authorization,
+      );
     const reviewSubjectKind = this.reviewSubjectArtifactKind(descriptor);
     const reviewSubjectHash =
       reviewSubjectKind === undefined ? undefined : this.artifactHash(events, reviewSubjectKind as ArtifactKind);
@@ -1416,24 +1477,42 @@ export class ApexService {
     ) {
       throw new ApexError("APEX_STALE", "Review task input is unavailable or stale", EXIT_CODES.stale);
     }
-    const context = await this.taskContext(taskId);
+    if (inputHash !== undefined && (!task.inputRefs.includes(inputHash) || !authorizedRefs.includes(inputHash)))
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Input hash is not a current task dependency",
+        EXIT_CODES.authorization,
+      );
+    const selectedHash = inputHash ?? reviewSubjectHash;
+    const context = selectedHash === undefined ? await this.taskContext(taskId) : undefined;
     const serialized = JSON.stringify(
-      descriptor.reviewSubject === undefined
+      context !== undefined
         ? {
             inputs: context.inputs,
+            inputReferences: context.inputReferences,
             artifactHashes: context.artifactHashes,
+            recordedInput: context.recordedInput,
             decisions: context.decisions,
             outputTemplates: context.outputTemplates,
           }
-        : await this.objects.getJson(reviewSubjectHash!),
+        : await this.objects.getJson(selectedHash!),
     );
     if (offset >= serialized.length) {
       throw new ApexError("APEX_VALIDATION", "Input read offset is outside the review subject", EXIT_CODES.validation);
     }
-    const content = serialized.slice(offset, offset + limit);
+    let content = "";
+    let bytes = 0;
+    for (const character of serialized.slice(offset)) {
+      const characterBytes = Buffer.byteLength(character);
+      if (bytes + characterBytes > limit) break;
+      content += character;
+      bytes += characterBytes;
+    }
+    if (content.length === 0)
+      throw new ApexError("APEX_VALIDATION", "Input read limit cannot fit the next character", EXIT_CODES.validation);
     const nextOffset = offset + content.length;
     return {
-      subjectHash: reviewSubjectHash ?? sha256Bytes(Buffer.from(serialized, "utf8")),
+      subjectHash: selectedHash ?? sha256Bytes(Buffer.from(serialized, "utf8")),
       content,
       offset,
       ...(offset === 0 && descriptor.reviewSubject !== undefined
@@ -1470,6 +1549,97 @@ export class ApexService {
       expectedHead,
     });
     return { taskId, kind: output.kind, path, bytes: bytes.byteLength, hash };
+  }
+
+  async importGovernanceBaseline(path: string): Promise<{ outputHash: string; summary: string }> {
+    const run = await this.currentRun();
+    const subscription = /^\/subscriptions\/([0-9a-f-]{36})(?:\/resourceGroups\/[^/]+)?$/iu.exec(run.targetScope);
+    if (subscription === null)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Governance import requires a subscription-scoped run target",
+        EXIT_CODES.validation,
+      );
+    const next = await this.nextTask();
+    if (next.status !== "task" || next.task.taskType !== "governance-discovery")
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Governance import requires the active discovery task",
+        EXIT_CODES.authorization,
+      );
+    const sourcePath = resolve(this.root, path);
+    const metadata = await lstat(sourcePath);
+    if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > 20_000_000)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Baseline must be a regular JSON file within the size limit",
+        EXIT_CODES.validation,
+      );
+    const handle = await open(sourcePath, constants.O_RDONLY | constants.O_NOFOLLOW);
+    let bytes: Buffer;
+    try {
+      const current = await handle.stat();
+      if (
+        !current.isFile() ||
+        current.dev !== metadata.dev ||
+        current.ino !== metadata.ino ||
+        current.size > 20_000_000
+      )
+        throw new ApexError("APEX_STALE", "Governance baseline file changed", EXIT_CODES.stale);
+      const buffer = Buffer.alloc(20_000_001);
+      let length = 0;
+      while (length < buffer.length) {
+        const read = await handle.read(buffer, length, buffer.length - length, length);
+        if (read.bytesRead === 0) break;
+        length += read.bytesRead;
+      }
+      if (length > 20_000_000)
+        throw new ApexError("APEX_VALIDATION", "Governance baseline exceeds the size limit", EXIT_CODES.validation);
+      bytes = buffer.subarray(0, length);
+    } finally {
+      await handle.close();
+    }
+    const assets = await resolveBundledAssets();
+    const schema = JSON.parse(await readFile(join(assets.root, "schemas", "governance-baseline.schema.json"), "utf8"));
+    const validate = new Ajv2020({ strict: false }).compile(schema);
+    let selection;
+    try {
+      selection = importGovernanceBaseline(
+        bytes,
+        {
+          subscriptionId: subscription[1]!,
+          now: this.clock().toISOString(),
+          maxAgeMs: 24 * 60 * 60 * 1_000,
+        },
+        validate,
+      );
+    } catch (error) {
+      if (!(error instanceof GovernanceBaselineError)) throw error;
+      throw new ApexError(
+        error.code === "stale" ? "APEX_STALE" : "APEX_VALIDATION",
+        error.message,
+        error.code === "stale" ? EXIT_CODES.stale : EXIT_CODES.validation,
+      );
+    }
+    const digest = await this.objects.putJson({ ...selection.snapshot, projectId: run.projectId, runId: run.runId });
+    const completed = await this.completeTaskOutputs(next.task.taskId, [
+      {
+        kind: "governance-constraints",
+        value: {
+          ...selection.constraints,
+          projectId: run.projectId,
+          runId: run.runId,
+          targetScope: run.targetScope,
+          constraintsRef: {
+            mediaType: "application/json",
+            uri: `apex-object:${digest}`,
+            digest,
+            bytes: (await this.objects.getBytes(digest)).byteLength,
+          },
+        },
+      },
+    ]);
+    return { outputHash: completed.outputHashes["governance-constraints"]!, summary: completed.summary };
   }
 
   async stageFile(
@@ -3848,6 +4018,7 @@ export class ApexService {
     const head = await this.journal(run).head();
     if (head === null)
       throw new ApexError("APEX_STALE", "Cannot issue a task before run initialization", EXIT_CODES.stale);
+    const limits = await this.taskLimits(run);
     const task = createTaskEnvelope(
       {
         projectId: run.projectId,
@@ -3863,7 +4034,7 @@ export class ApexService {
           sideEffect: "remote" as const,
           expiresAt: new Date(this.clock().getTime() + TASK_TTL_MS).toISOString(),
         })),
-        maxOutputBytes: 4 * 1024 * 1024,
+        maxOutputBytes: limits.maxOutputBytes,
         ttlMs: TASK_TTL_MS,
       },
       this.clock,
@@ -4400,7 +4571,30 @@ export class ApexService {
     return hashes;
   }
 
-  private inputRefs(events: Awaited<ReturnType<EventJournal["replay"]>>, descriptor: WorkflowTaskDescriptor): string[] {
+  private async inputRefs(
+    run: RunConfigV1,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+    descriptor: WorkflowTaskDescriptor,
+  ): Promise<string[]> {
+    const manifest = (await this.lockedWorkflowEngine(run)).manifest;
+    const node = manifest.nodes.find(({ id }) => id === (descriptor.reviewSubject ?? descriptor.id));
+    if (node === undefined)
+      throw new ApexError("APEX_AUTHORIZATION", "Task has no locked workflow node", EXIT_CODES.authorization);
+    const dependencies = new Set([
+      ...node.sourceDependencies,
+      ...(descriptor.reviewSubject === undefined ? [] : (node.outputs ?? [])),
+    ]);
+    const artifactHashes = Object.entries(this.acceptedArtifactHashes(events))
+      .filter(([kind]) => dependencies.has(`${kind}-v1`))
+      .map(([, hash]) => hash);
+    const governanceHash = this.artifactHash(events, "governance-constraints");
+    if (governanceHash !== undefined && artifactHashes.includes(governanceHash)) {
+      const governance = await this.objects.getJson<GovernanceConstraintsV1>(governanceHash);
+      if (governance.constraintsRef.uri === `apex-object:${governance.constraintsRef.digest}`) {
+        await this.selectedGovernanceSnapshot(run, governance);
+        artifactHashes.push(governance.constraintsRef.digest);
+      }
+    }
     const availabilityKinds = new Set([
       "architecture-availability-v1",
       "pricing-evidence",
@@ -4426,13 +4620,45 @@ export class ApexService {
       }
       return [];
     });
-    return [...new Set([...Object.values(this.acceptedArtifactHashes(events)), ...hashes])];
+    return [...new Set([...artifactHashes, ...hashes])];
   }
 
   private reviewSubjectArtifactKind(descriptor: WorkflowTaskDescriptor): ArtifactKind | undefined {
     if (descriptor.reviewSubject === "governance-reconciliation") return "policy-property-map";
     if (descriptor.reviewSubject === "plan") return "implementation-intent";
     return descriptor.reviewSubject as ArtifactKind | undefined;
+  }
+
+  private async selectedGovernanceSnapshot(
+    run: RunConfigV1,
+    governance: GovernanceConstraintsV1,
+  ): Promise<GovernanceBaselineSelection["snapshot"]> {
+    const bytes = await this.objects.getBytes(governance.constraintsRef.digest);
+    const snapshot = JSON.parse(bytes.toString("utf8")) as GovernanceBaselineSelection["snapshot"] & {
+      projectId: string;
+      runId: string;
+    };
+    const subscriptionScope = typeof snapshot?.subscriptionId === "string"
+      ? `/subscriptions/${snapshot.subscriptionId.toLowerCase()}` : undefined;
+    if (
+      snapshot === null || snapshot.schemaVersion !== "governance-baseline-selection-v1" ||
+      !Array.isArray(snapshot.findings) ||
+      snapshot.projectId !== run.projectId ||
+      snapshot.runId !== run.runId ||
+      governance.projectId !== run.projectId ||
+      governance.runId !== run.runId ||
+      governance.targetScope !== run.targetScope ||
+      bytes.byteLength !== governance.constraintsRef.bytes ||
+      subscriptionScope === undefined ||
+      (run.targetScope.toLowerCase() !== subscriptionScope &&
+        !run.targetScope.toLowerCase().startsWith(`${subscriptionScope}/resourcegroups/`))
+    )
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Governance evidence does not belong to this run and target",
+        EXIT_CODES.authorization,
+      );
+    return snapshot;
   }
 
   private recordedRequirementsInput(
@@ -4830,6 +5056,26 @@ export class ApexService {
     return new WorkflowEngine(JSON.parse(workflowBytes.toString("utf8")));
   }
 
+  private async taskLimits(run: RunConfigV1): Promise<{ maxInputBytes: number; maxOutputBytes: number }> {
+    const runtimeRoot = await this.runtimeRootForRun(run);
+    const bytes = await readFile(join(runtimeRoot, "defaults.v1.json"));
+    const lock = JSON.parse(await readFile(join(runtimeRoot, "apex.lock.json"), "utf8")) as RuntimeBundleLockV1;
+    this.assertValid("runtime-lock", lock);
+    if (sha256Json(lock) !== run.runtimeLockHash || sha256Bytes(bytes) !== lock.defaultsHash)
+      throw new ApexError("APEX_STALE", "Runtime defaults lock is not current", EXIT_CODES.stale);
+    const limits = (
+      JSON.parse(bytes.toString("utf8")) as { tasks?: { maxInputBytes?: number; maxOutputBytes?: number } }
+    ).tasks;
+    if (
+      !Number.isSafeInteger(limits?.maxInputBytes) ||
+      !Number.isSafeInteger(limits?.maxOutputBytes) ||
+      limits!.maxInputBytes! < 1 ||
+      limits!.maxOutputBytes! < 1
+    )
+      throw new ApexError("APEX_VALIDATION", "Locked task byte limits are invalid", EXIT_CODES.validation);
+    return { maxInputBytes: limits!.maxInputBytes!, maxOutputBytes: limits!.maxOutputBytes! };
+  }
+
   private async route(
     run: RunConfigV1,
     events: Awaited<ReturnType<EventJournal["replay"]>>,
@@ -5146,13 +5392,33 @@ export class ApexService {
       }
     }
     if (descriptor.id === "governance-reconciliation") {
-      const policy = byKind["policy-property-map"] as { governanceHash: string };
+      const policy = byKind["policy-property-map"] as PolicyPropertyMapV1;
       if (policy.governanceHash !== this.artifactHash(events, "governance-constraints")) {
         throw new ApexError(
           "APEX_VALIDATION",
           "Policy property map does not bind accepted governance constraints",
           EXIT_CODES.validation,
         );
+      }
+      const governance = await this.objects.getJson<GovernanceConstraintsV1>(policy.governanceHash);
+      if (governance.constraintsRef.uri === `apex-object:${governance.constraintsRef.digest}`) {
+        const snapshot = await this.selectedGovernanceSnapshot(run, governance);
+        for (const finding of snapshot.findings) {
+          if (!["deny", "modify", "deployIfNotExists"].includes(finding.effect)) continue;
+          const mappings = policy.mappings.filter(
+            (mapping) =>
+              mapping.policyAssignmentId === finding.assignmentId &&
+              mapping.policyDefinitionId === finding.policyId &&
+              mapping.policyDefinitionReferenceId === finding.policyDefinitionReferenceId &&
+              mapping.effect === finding.effect,
+          );
+          if (mappings.length === 0 || mappings.some(({ disposition }) => disposition === "exempt"))
+            throw new ApexError(
+              "APEX_VALIDATION",
+              "Imported policy controls require explicit mappings; reported exemptions are not verified",
+              EXIT_CODES.validation,
+            );
+        }
       }
     }
     if (descriptor.reviewSubject !== undefined) {
