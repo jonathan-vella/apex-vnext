@@ -1,7 +1,7 @@
 {
   "$schema": "schemas/github-workflow-contract.schema.json",
   "schemaVersion": "1.0.0",
-  "expectedRequiredContexts": ["ci", "External Python tests (apex-recall)", "CodeQL"],
+  "expectedRequiredContexts": ["ci", "CodeQL"],
   "managedContexts": ["CodeQL"],
   "actionVersions": {
     "actions/checkout": ["v7"],
@@ -15,7 +15,7 @@
   },
   "localActions": {
     ".github/actions/setup-node-repo/action.yml": "bcd3482dfefc75687a780123e9a1a698090c184a7b05cb601edb8eff4dd67183",
-    ".github/actions/setup-python-validation/action.yml": "26b4977c7a6cd1940314070f5e3ba0d592acbd787c22d0b22918dca6f6b5b05c"
+    ".github/actions/setup-python-validation/action.yml": "092d7cc90ae337545b5c8281a7296aa8024fd1037f54b2a46cdd142821b6a894"
   },
   "workflows": [
     {
@@ -26,7 +26,9 @@
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
       "jobsDigest": "e096ac61b6a99d7e8a60d1d3182b2da8ed89d06494c8d9cdfd069a7270773ede",
-      "jobs": { "policy": "Branch Policy" }
+      "jobs": {
+        "policy": "Branch Policy"
+      }
     },
     {
       "id": "ci",
@@ -35,10 +37,9 @@
       "triggerDigest": "5c375602c9ef5d8ec711bfa7db1aaaf0484d84e8339627fa7f3bcb8de81edbb6",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "46bf5aa86d4b9101cc56a386b37fbb2cf311420768a01dc7ee6a86cf96c2e651",
+      "jobsDigest": "ad4ff567e44c63e5cc34fe24ffc8beb87a811f159bb0e2b7e1e8413f90ff4dac",
       "jobs": {
-        "ci": "ci",
-        "external-tests": "External Python tests (apex-recall)"
+        "ci": "ci"
       }
     },
     {
@@ -49,7 +50,9 @@
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
       "jobsDigest": "66dc42a8f8d8a3402ee88a262ab57f05d46a45c0595b0c793ecfc5111f3e4bcf",
-      "jobs": { "validate": "Markdown docs" }
+      "jobs": {
+        "validate": "Markdown docs"
+      }
     },
     {
       "id": "governance-policy-baseline",
@@ -59,7 +62,9 @@
       "permissionsDigest": "e780d99acb8992dbb7dd375a4e4167b135d1ace462209423726fdfe650ac01c7",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
       "jobsDigest": "ca128029c3a978503c43d2751a4ef3ad47011a59c33e1b2ded221e0d0a227031",
-      "jobs": { "collect-baseline": "collect-baseline" }
+      "jobs": {
+        "collect-baseline": "collect-baseline"
+      }
     },
     {
       "id": "iac-checks",
@@ -69,7 +74,10 @@
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
       "jobsDigest": "f6575fea1c5d37bb9f05c230778d9501541226c8e35b073ab475f7de38b6719f",
-      "jobs": { "terraform": "Terraform fmt + validate", "bicep": "Bicep fmt" }
+      "jobs": {
+        "terraform": "Terraform fmt + validate",
+        "bicep": "Bicep fmt"
+      }
     },
     {
       "id": "release-candidate-qualification",
@@ -79,7 +87,9 @@
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
       "jobsDigest": "ef151f8720accb255a4fa5992b91062461084e75733aa11951976fa9f1159ffa",
-      "jobs": { "qualify": "Exact-head release qualification" }
+      "jobs": {
+        "qualify": "Exact-head release qualification"
+      }
     },
     {
       "id": "publish-npm",
@@ -89,20 +99,8 @@
       "permissionsDigest": "d57abeeb8232850a40cc2fd3e29e491dd077df7b2a7988ae52899fba4527b761",
       "concurrencyDigest": "1cf197bb4117f498288d0df9e90c8d763fe22f45c6b50310ae61aa8bca8a4178",
       "jobsDigest": "2c471594c00a1925117e4541f6aa1e2b578a8239a2293043c1c93d0a430e4233",
-      "jobs": { "publish": "Publish trusted npm release" }
-    },
-    {
-      "id": "sensei-branch-maintenance",
-      "path": ".github/workflows/sensei-branch-maintenance.yml",
-      "name": "Sensei Branch Maintenance",
-      "triggerDigest": "790fda8901d7b6df162030cafd9d442fcab98722edcbb9520aede9b90755d456",
-      "permissionsDigest": "89bca53c88856951c2b5fadca05cdef10954ff73e93f0a1f6df49919b7acc8fd",
-      "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "158cbc38c27822fe74bb305b6e2ac1778b252f8d5a73812303fea738bd00c146",
       "jobs": {
-        "verify-branch-exists": "Verify feat/skills-sensei still exists",
-        "merge-main-into-sensei": "Merge main into feat/skills-sensei",
-        "validate-sensei-branch": "Validate skills + agents on feat/skills-sensei"
+        "publish": "Publish trusted npm release"
       }
     },
     {

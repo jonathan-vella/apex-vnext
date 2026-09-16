@@ -55,7 +55,7 @@ The companion `04-governance-constraints.json` MUST include a
 four-layer governance stack — every downstream consumer (Planner,
 CodeGen, Deploy) reads it first and STOPS on staleness or signature
 drift. See
-[governance-discovery.md](../../azure-defaults/references/governance-discovery.md#l0-discovery-envelope-mandatory)
+[governance evidence](../../../../customizations/.github/skills/apex-azure-governance/SKILL.md)
 for the full envelope shape and consumer protocol.
 
 ```jsonc

@@ -18,7 +18,7 @@ const trackedPaths = [
   "tools/scripts/example.mjs",
   "docs/vnext/PRD.md",
   "infra/terraform/example.tf",
-  ".archive/example.md",
+  ".vale/example.md",
 ];
 const stats = new Map(trackedPaths.map((path, index) => [path, { size: index + 1 }]));
 

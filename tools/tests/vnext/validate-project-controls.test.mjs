@@ -39,11 +39,18 @@ test("rejects a broken local link", () => {
   assert.ok(hasRule(findings, "link.local"));
 });
 
-test("rejects a changed Phase 0A tree", () => {
+test("rejects a missing current product document", () => {
   const findings = mutate((model) => {
-    model.phase0aDigest = "changed";
+    model.documents["PRD.md"] = null;
   });
-  assert.ok(hasRule(findings, "phase-0a.frozen"));
+  assert.ok(hasRule(findings, "document.required"));
+});
+
+test("rejects duplicate current decisions", () => {
+  const findings = mutate((model) => {
+    model.documents["DECISIONS.md"] += "\n## DECISION-001: Duplicate\n";
+  });
+  assert.ok(hasRule(findings, "decision.unique"));
 });
 
 test("rejects a missing required work-item field", () => {

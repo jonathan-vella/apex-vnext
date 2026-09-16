@@ -1,2 +1,0 @@
-[console_scripts]
-apex-recall = apex_recall.__main__:main

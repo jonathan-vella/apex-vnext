@@ -42,7 +42,7 @@ test("current GitHub workflows satisfy the hosted contract", () => {
   assert.deepEqual(validate(), []);
 });
 
-test("rejects required context and external-runtime check drift", () => {
+test("rejects required vNext context drift", () => {
   const changedContract = structuredClone(contract);
   changedContract.expectedRequiredContexts[0] = "renamed-ci";
   assert.ok(
@@ -51,11 +51,12 @@ test("rejects required context and external-runtime check drift", () => {
     ),
   );
 
-  const errors = validate(
-    mutate(".github/workflows/ci.yml", "name: External Python tests (apex-recall)", "name: Combined tests"),
-  );
+  const errors = validate(mutate(".github/workflows/ci.yml", "    name: ci", "    name: renamed-ci"));
   assert.ok(errors.some((error) => error.includes("job/check name drift")));
-  assert.ok(errors.some((error) => error.includes("separate required Node and external Python checks")));
+  assert.ok(errors.some((error) => error.includes("required vNext job")));
+  const extra = structuredClone(contract);
+  extra.expectedRequiredContexts.push("retired-external-check");
+  assert.ok(validate(workflowTexts, extra).some((error) => error.includes("status contexts drift")));
 });
 
 test("rejects trigger, permission, and action-version drift", () => {
@@ -94,7 +95,7 @@ test("rejects job permission escalation, no-op execution, and exact action subst
     ),
   );
   assert.ok(
-    validate(mutate(path, "run: npm run test:apex-recall", "run: echo skipped-apex-recall")).some((error) =>
+    validate(mutate(path, "run: npm run qualify:vnext", "run: echo skipped-qualification")).some((error) =>
       error.includes("complete job contract drift"),
     ),
   );
@@ -136,11 +137,6 @@ test("rejects Python validation setup weakening and caller removal", () => {
   for (const [search, replacement, expected] of [
     ['python-version: "3.14"', 'python-version: "3.13"', "version or cache contract drift"],
     ["cache: pip", "cache: none", "version or cache contract drift"],
-    [
-      "python -m pip install --no-deps --no-build-isolation -e tools/apex-recall",
-      "python -m pip install tools/apex-recall",
-      "dependency bootstrap drift",
-    ],
     ["--require-hashes", "--no-deps", "dependency bootstrap drift"],
     [".github/python-validation-requirements.txt", ".github/other-requirements.txt", "dependency bootstrap drift"],
     ["using: composite", "using: node20", "structure or runtime drift"],
@@ -165,7 +161,7 @@ test("rejects Python validation setup weakening and caller removal", () => {
     assert.ok(errors.some((error) => error.startsWith(`${actionPath}: `) && error.includes(expected)));
   }
 
-  for (const path of [".github/workflows/ci.yml"]) {
+  for (const path of [".github/workflows/publish-npm.yml"]) {
     const texts = mutate(
       path,
       "      - name: Setup Python validation\n        uses: ./.github/actions/setup-python-validation\n",

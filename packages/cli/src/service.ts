@@ -1407,8 +1407,7 @@ export class ApexService {
       throw new ApexError("APEX_VALIDATION", "Input read range is invalid", EXIT_CODES.validation);
     }
     const events = await this.journal(run).replay();
-    const reviewSubjectKind =
-      descriptor.reviewSubject === "governance-reconciliation" ? "policy-property-map" : descriptor.reviewSubject;
+    const reviewSubjectKind = this.reviewSubjectArtifactKind(descriptor);
     const reviewSubjectHash =
       reviewSubjectKind === undefined ? undefined : this.artifactHash(events, reviewSubjectKind as ArtifactKind);
     if (
@@ -4410,10 +4409,6 @@ export class ApexService {
       "regional-availability-evidence",
     ]);
     const hashes = events.flatMap((event) => {
-      if (event.type === "task.completed") {
-        const artifactHashes = (event.payload as { artifactHashes?: Record<string, unknown> }).artifactHashes ?? {};
-        return Object.values(artifactHashes).filter((hash): hash is string => typeof hash === "string");
-      }
       if (event.type === "evidence.accepted" && descriptor.id === "architecture") {
         const payload = event.payload as { hash?: unknown; kind?: unknown; status?: unknown };
         return typeof payload.hash === "string" &&
@@ -4431,7 +4426,13 @@ export class ApexService {
       }
       return [];
     });
-    return [...new Set(hashes)];
+    return [...new Set([...Object.values(this.acceptedArtifactHashes(events)), ...hashes])];
+  }
+
+  private reviewSubjectArtifactKind(descriptor: WorkflowTaskDescriptor): ArtifactKind | undefined {
+    if (descriptor.reviewSubject === "governance-reconciliation") return "policy-property-map";
+    if (descriptor.reviewSubject === "plan") return "implementation-intent";
+    return descriptor.reviewSubject as ArtifactKind | undefined;
   }
 
   private recordedRequirementsInput(
@@ -4473,11 +4474,9 @@ export class ApexService {
     }
     if (kind === "review-findings") {
       const review = TASKS.find(({ id }) => id === taskType);
-      const subjectKind =
-        review?.reviewSubject === "governance-reconciliation" ? "policy-property-map" : review?.reviewSubject;
-      const artifactKind = subjectKind === "plan" ? "implementation-intent" : subjectKind;
-      const subjectHash =
-        artifactKind === undefined ? undefined : this.artifactHash(events, artifactKind as ArtifactKind);
+      const subjectKind = review?.reviewSubject;
+      const artifactKind = review === undefined ? undefined : this.reviewSubjectArtifactKind(review);
+      const subjectHash = artifactKind === undefined ? undefined : this.artifactHash(events, artifactKind);
       if (subjectKind === undefined || subjectHash === undefined) {
         throw new ApexError("APEX_STALE", "Review subject is unavailable", EXIT_CODES.stale);
       }

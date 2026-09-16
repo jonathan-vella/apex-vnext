@@ -9,6 +9,12 @@ import test from "node:test";
 const script = resolve("tools/scripts/setup-wsl.sh");
 const windowsScript = resolve("tools/scripts/setup-windows.ps1");
 
+test("setup requires current CLI source and never installs the retired recall package", () => {
+  const source = readFileSync(script, "utf8");
+  assert.match(source, /packages\/cli\/package\.json/u);
+  assert.doesNotMatch(source, /apex[-_]recall/u);
+});
+
 function bash(body, env = {}) {
   return spawnSync("bash", ["-c", `source "$SETUP_SCRIPT"; ${body}`], {
     encoding: "utf8",

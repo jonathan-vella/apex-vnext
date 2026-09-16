@@ -52,22 +52,3 @@ jobs:
 
       - name: Validate handoff references
         run: bash tools/scripts/validate-handoff-references.sh
-
-  external-tests:
-    name: External Python tests (apex-recall)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Setup Node
-        uses: ./.github/actions/setup-node-repo
-
-      - name: Setup Python validation
-        uses: ./.github/actions/setup-python-validation
-
-      - name: Lint Python (ruff)
-        run: npm run lint:python
-
-      - name: Run apex-recall test suite
-        run: npm run test:apex-recall

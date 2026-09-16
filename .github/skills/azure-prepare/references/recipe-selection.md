@@ -4,7 +4,7 @@
 
 Choose the deployment recipe based on project needs and existing tooling.
 
-> **See also**: [azd vs deploy.ps1 guide](../../iac-common/references/azd-vs-deploy-guide.md)
+> **See also**: [azd vs deploy.ps1 guide](../../../../customizations/.github/skills/apex-azure-deploy/SKILL.md)
 > for detailed comparison, per-project conventions, hooks, and troubleshooting.
 
 ## ⛔ Special Cases: Detect First

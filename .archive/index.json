@@ -1,0 +1,2899 @@
+{
+  "schemaVersion": "1.0.0",
+  "bundle": "legacy.tar.gz",
+  "sha256": "b5cf9843e340ae8a653e27dfe99c182d112e716b28e73629d11c7db797ef4b9d",
+  "files": [
+    {
+      "path": ".archive/documentation/candidate-evidence-v1/docs/vnext/CLIENT-CONTEXT-BASELINE.md",
+      "bytes": 7714,
+      "mode": 420,
+      "sha256": "1980d7c82fbc33bc919a8a57bce833139b18b9ef24f3e38c9fcc75c71df17df2"
+    },
+    {
+      "path": ".archive/documentation/candidate-evidence-v1/docs/vnext/CUSTOM-AGENT-CONTRACT-PLAN.md",
+      "bytes": 13445,
+      "mode": 420,
+      "sha256": "fb2071457ae8ce88caa875f1aba66c9e0c0b46d71ffd5399264a84cef38b9929"
+    },
+    {
+      "path": ".archive/documentation/candidate-evidence-v1/docs/vnext/FINAL-QUALIFICATION.md",
+      "bytes": 17265,
+      "mode": 420,
+      "sha256": "6d6ac919641491847f7166f88862efd181e19dac2b24c07ebc7635366b4c8385"
+    },
+    {
+      "path": ".archive/documentation/candidate-evidence-v1/docs/vnext/GUIDANCE-AUTOMATION-CHARACTERIZATION.md",
+      "bytes": 19621,
+      "mode": 420,
+      "sha256": "f404c033e1f6e3917aeec47b6fca875d8bbdff452663bcb8ee954328dce16985"
+    },
+    {
+      "path": ".archive/documentation/candidate-evidence-v1/docs/vnext/GUIDANCE-AUTOMATION-REVIEW.md",
+      "bytes": 9326,
+      "mode": 420,
+      "sha256": "2fff246571309e25741e1c89697bf5db073cc7e90f74a8da7e9b699a90249e38"
+    },
+    {
+      "path": ".archive/documentation/candidate-evidence-v1/docs/vnext/HIDDEN-WORKER-CHARACTERIZATION.md",
+      "bytes": 10402,
+      "mode": 420,
+      "sha256": "5cd65516a12240748ca386afab4d3649da331527fa1927acc0bd21cc0ed8ee43"
+    },
+    {
+      "path": ".archive/documentation/candidate-evidence-v1/docs/vnext/SECURITY-REVIEW.md",
+      "bytes": 5436,
+      "mode": 420,
+      "sha256": "4d399eaa3aff220e98298b9b5a7299fe6b41ac88e7851adace10ea51d74a83c3"
+    },
+    {
+      "path": ".archive/documentation/candidate-evidence-v1/docs/vnext/TERRAFORM-MCP-CHARACTERIZATION.md",
+      "bytes": 5055,
+      "mode": 420,
+      "sha256": "ab1f99f08607aacc9e465035cf571d9c20caa5e034cc168fa413a9eacd5e106c"
+    },
+    {
+      "path": ".archive/documentation/candidate-evidence-v1/docs/vnext/TERRAFORM-PROVIDER-INTROSPECTION.md",
+      "bytes": 3195,
+      "mode": 420,
+      "sha256": "2684aac7b9c0dc97c6210e408ff3e5a82bc2e09004cad38f53f633fe572806fd"
+    },
+    {
+      "path": ".archive/documentation/candidate-evidence-v1/docs/vnext/TERRAFORM-REGISTRY-CLIENT.md",
+      "bytes": 2989,
+      "mode": 420,
+      "sha256": "047af523384690b53391c5fdef12466fc1212ec2c0700d5cea4001d04a31bebb"
+    },
+    {
+      "path": ".archive/documentation/candidate-evidence-v1/provenance.json",
+      "bytes": 1665,
+      "mode": 420,
+      "sha256": "1e803bd06d530aba9881e33bc52c4816357a7e45bd417f787e4db87365513fd5"
+    },
+    {
+      "path": ".archive/documentation/candidate-evidence-v1/README.md",
+      "bytes": 987,
+      "mode": 420,
+      "sha256": "6d934d4d79571da695722ee595d74a7e297811d2c9d8a55f9b1bda6e9aec0cbe"
+    },
+    {
+      "path": ".archive/documentation/guides-v1/docs/guides/cli-reference.md",
+      "bytes": 21251,
+      "mode": 420,
+      "sha256": "47ef4edeb6742dcefd8ca2349e5d0526a698f50422b69e0259c3e7aadeaf3781"
+    },
+    {
+      "path": ".archive/documentation/guides-v1/docs/guides/devcontainer-hygiene.md",
+      "bytes": 5649,
+      "mode": 420,
+      "sha256": "e494069c0bda66a4c3116772d2e125e56b01711ddf8b85d5c05aac3c0115a7a7"
+    },
+    {
+      "path": ".archive/documentation/guides-v1/docs/guides/index.md",
+      "bytes": 3146,
+      "mode": 420,
+      "sha256": "9d879209d8ca112103410e75f612d2c084dfb0c8d7798219fd495116730d9ef9"
+    },
+    {
+      "path": ".archive/documentation/guides-v1/docs/guides/installation.md",
+      "bytes": 5615,
+      "mode": 420,
+      "sha256": "a68ae9668dabd4c9a218967b4d34edb987b7b96c24dd16bff864123f6d96143e"
+    },
+    {
+      "path": ".archive/documentation/guides-v1/docs/guides/live-qualification.md",
+      "bytes": 24849,
+      "mode": 420,
+      "sha256": "c3117e563111404deb0b2a34883d703456bf4b55db7b64d64ceb46721f1a9572"
+    },
+    {
+      "path": ".archive/documentation/guides-v1/docs/guides/operations.md",
+      "bytes": 11790,
+      "mode": 420,
+      "sha256": "d11269ca13d70fe0a2335afdf6c7f8ebb61dc223f144515d4bcb49ae468e5c80"
+    },
+    {
+      "path": ".archive/documentation/guides-v1/docs/guides/security.md",
+      "bytes": 8228,
+      "mode": 420,
+      "sha256": "e2d19a8bda840b0243c3e19bb11c068f94f074505c0e5635500a32c5e522c756"
+    },
+    {
+      "path": ".archive/documentation/guides-v1/docs/guides/testing.md",
+      "bytes": 9146,
+      "mode": 420,
+      "sha256": "e60480372e90f62ebce5ed18de434bb13a669e7d5d73d1eb2f8fc2e2c2e754ad"
+    },
+    {
+      "path": ".archive/documentation/guides-v1/docs/guides/workflow.md",
+      "bytes": 3542,
+      "mode": 420,
+      "sha256": "8e8ea2e256e47d5a8a631ef612914796277719e5e04417e78aa129091ff28937"
+    },
+    {
+      "path": ".archive/documentation/guides-v1/provenance.json",
+      "bytes": 1348,
+      "mode": 420,
+      "sha256": "e5551bf5ee2dc30540a01fd8be2003b35e64d2b73593ad2d338a76f20cfa3a2b"
+    },
+    {
+      "path": ".archive/documentation/guides-v1/README.md",
+      "bytes": 892,
+      "mode": 420,
+      "sha256": "fcfce1f9bb7a03c5a98186993f28badd92b337d8319779bc19645d8102344dd3"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/_subagents/bicep-validate-subagent.agent.md",
+      "bytes": 13918,
+      "mode": 420,
+      "sha256": "825222c1fcc1469cb485bcdc771bcb35dc365d5435a173112d086eb777a5312f"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/_subagents/bicep-whatif-subagent.agent.md",
+      "bytes": 8748,
+      "mode": 420,
+      "sha256": "4ca79c1b57b04220d54bcd32388e62ddf3c26ebd56810a1d72acb98f44747cd6"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/_subagents/challenger-review-subagent.agent.md",
+      "bytes": 23577,
+      "mode": 420,
+      "sha256": "bafc28d2f2b6d9b6b817094a57935ab0bf2a5308f219ca696c39eb7cc7955264"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/_subagents/cost-estimate-subagent.agent.md",
+      "bytes": 28537,
+      "mode": 420,
+      "sha256": "c35f2f5dc36f29c9b0f10ea8cfa492a48f6bc04eb7dd5b9f5ebec49bde4b32f6"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/_subagents/policy-precheck-subagent.agent.md",
+      "bytes": 11642,
+      "mode": 420,
+      "sha256": "4e3e05c1c5b256bc0eeedbfc257449868f79dc60e5059fbbd67ce693740c1478"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/_subagents/terraform-plan-subagent.agent.md",
+      "bytes": 10359,
+      "mode": 420,
+      "sha256": "06347b28ed593871b5d9809b24d1fb262b13fb40d07cfd1c5aadbe88e79f7819"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/_subagents/terraform-validate-subagent.agent.md",
+      "bytes": 14729,
+      "mode": 420,
+      "sha256": "3c0061d5f32cbf8330bc3b0be9ac16e2d5a0e88d71e3ad92bb467a851b181ad7"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/01-orchestrator.agent.md",
+      "bytes": 37341,
+      "mode": 420,
+      "sha256": "e3be015cecb973ed97b39b31e0be37951e90b76356cbbfed379ec7273aea14bc"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/02-requirements.agent.md",
+      "bytes": 27738,
+      "mode": 420,
+      "sha256": "efde1ec8afa57e15717a6fd5cfdaf0dd27bd20a8868a296570b7493223c658d0"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/03-architect.agent.md",
+      "bytes": 31888,
+      "mode": 420,
+      "sha256": "2a29fa59ae3fc92d413690a9a407f16878bda43b86137cd2e691f514caf90dcf"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/04-design.agent.md",
+      "bytes": 26264,
+      "mode": 420,
+      "sha256": "f6f78d33bd409322d2fa43a5b065b5800b9972c3f4801f3ff0691820ab891106"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/04g-governance.agent.md",
+      "bytes": 34914,
+      "mode": 420,
+      "sha256": "6a1fd7ae36a42dcf6a80f1310a0757a437bd42c7cb4759893bf98ce588417571"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/05-iac-planner.agent.md",
+      "bytes": 35776,
+      "mode": 420,
+      "sha256": "6ac4f1b20f6e2c90a2561c07ff7cf8db039f9068648c5be5105f30604fedf431"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/06b-bicep-codegen.agent.md",
+      "bytes": 26477,
+      "mode": 420,
+      "sha256": "9259c397a4bd0a6d9da8b07bcef75b2ecb2813b51053ca300fbe6d466a3ddd06"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/06t-terraform-codegen.agent.md",
+      "bytes": 26763,
+      "mode": 420,
+      "sha256": "9d331e1812b145afb5304015d7b0110301392901a256f18798bde89e8cb7cec4"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/07b-bicep-deploy.agent.md",
+      "bytes": 25300,
+      "mode": 420,
+      "sha256": "1f4eca17d729d411a3ebfa461df665cabf52e8265058e3b7efabd3252c1914a7"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/07t-terraform-deploy.agent.md",
+      "bytes": 26093,
+      "mode": 420,
+      "sha256": "d40e549f473c60c85f365b0c43c8e2462e3d78f364b56a66eb2bfad3b362aca3"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/08-as-built.agent.md",
+      "bytes": 34790,
+      "mode": 420,
+      "sha256": "5d1d85d0cac932e3c07b0581743f0d7971b865c25e6fd38d00052ed81afd1b41"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/09-diagnose.agent.md",
+      "bytes": 13310,
+      "mode": 420,
+      "sha256": "c963779e28e73febb54e91cd0ae3f9f1923db86eab7d917784debb73fdd7abb3"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/10-challenger.agent.md",
+      "bytes": 15862,
+      "mode": 420,
+      "sha256": "183360559ed4ed7457a4e259395077639aaeb5bba7302be8a861271da676101c"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/11-context-optimizer.agent.md",
+      "bytes": 13453,
+      "mode": 420,
+      "sha256": "6f267d02ba4e8d76c546ca50599af84dcbe74f1ac602afd6b03e59b5da8e3c40"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/agents/e2e-orchestrator.agent.md",
+      "bytes": 23736,
+      "mode": 420,
+      "sha256": "1cecb6546868e0943448731a9fa3300cc3616b9949af089a9c310f367e4a06c5"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/instructions/agent-authoring.instructions.md",
+      "bytes": 36131,
+      "mode": 420,
+      "sha256": "464076e89bb95e1c931aa4b66d2ecc138e4059338983191e8d4582a4df84a701"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/.github/instructions/agent-operating-frame.instructions.md",
+      "bytes": 5386,
+      "mode": 420,
+      "sha256": "d0772d0c5cfd538e9a1336b428db516993d474ba42ae75d20d881a18e62daa46"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/README.md",
+      "bytes": 2395,
+      "mode": 420,
+      "sha256": "02c1a01ce241df93ad28a474a2a333e0e0cb410f1b3ae4a9eb83ee5f98a533fb"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/tools/registry/agent-registry.json",
+      "bytes": 5449,
+      "mode": 420,
+      "sha256": "694c8b8acebd30dd49c278c7abd1af74b98fbfd2c3cf71ef31194e449c7897b5"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/tools/schemas/agent-registry.schema.json",
+      "bytes": 2847,
+      "mode": 420,
+      "sha256": "e75052e1775abdb0479791d4a526c2c013bbfc67feed176a422446af3d0ccc73"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/tools/scripts/validate_orchestrator_handoff.py",
+      "bytes": 6795,
+      "mode": 420,
+      "sha256": "3d0026756f1505211b19f2a7afdc3e315943588279e1fbf178f38edb0af456dd"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/tools/scripts/validate_question_batching.py",
+      "bytes": 3210,
+      "mode": 420,
+      "sha256": "8a1fbe4d75b9314122ed95b1f06e3d6235d531c1e4ec7cb2c8b20b55185b55af"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/tools/scripts/validate_review_ceiling.py",
+      "bytes": 5911,
+      "mode": 420,
+      "sha256": "2313d4aec9dafd3770d5b63ccf7b010e86415d2cb4184fda3176ad95776c6d3a"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/tools/scripts/validate-agent-registry.mjs",
+      "bytes": 4419,
+      "mode": 420,
+      "sha256": "1244e2517373971388cbe810a81fe3a7b4f24a752b9dcb78ad6ebb832d965ad8"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/tools/scripts/validate-decision-keys.mjs",
+      "bytes": 9477,
+      "mode": 420,
+      "sha256": "1d8149d0427e94350f0671a82db499fe9123edaffc071677a260b72ef670df99"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/tools/scripts/validate-governance-refs.mjs",
+      "bytes": 8369,
+      "mode": 420,
+      "sha256": "530442e8292ca3a3423518859d0b4dd71badd4f4b1cbc53ec5bd59999feb9746"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/tools/scripts/validate-v1-compatibility-matrix.mjs",
+      "bytes": 3871,
+      "mode": 420,
+      "sha256": "fabb0f1365cef398b2e1648faeb2bf2510bb9fc2e9e148c9a85bf64b193d9c20"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/tools/scripts/validate-workflow-table-sync.mjs",
+      "bytes": 6782,
+      "mode": 420,
+      "sha256": "99dfa2cf3f28a1cf4665ea043ca5b22a316dd4d8ef7189c0efd222dc59911ff7"
+    },
+    {
+      "path": ".archive/legacy-agents-v0.10/tools/tests/workflow-handoffs/run.test.mjs",
+      "bytes": 6942,
+      "mode": 420,
+      "sha256": "bda2b9fd3d9214454d4ea2e731dcf08543411df496dde32a1b9781ac729898a7"
+    },
+    {
+      "path": ".archive/qualification/vnext-qualification-v1/agent-output/vnext-qualification/03-des-adr-0001-use-split-encrypted-ci-transport.md",
+      "bytes": 9371,
+      "mode": 420,
+      "sha256": "0f2bd4e302347ace2f9701600b35275020576e812054f384715e75550d5ad606"
+    },
+    {
+      "path": ".archive/qualification/vnext-qualification-v1/agent-output/vnext-qualification/04-governance-constraints.md",
+      "bytes": 110527,
+      "mode": 420,
+      "sha256": "0b555e5dcc1a15ac6e7ca3cb16c5a5decdee030607d96a6429287db63bdb24b0"
+    },
+    {
+      "path": ".archive/qualification/vnext-qualification-v1/agent-output/vnext-qualification/challenge-findings-governance-constraints-pass1.json",
+      "bytes": 10970,
+      "mode": 420,
+      "sha256": "75d804a1da96f93f9d9a20444e885c0fc276091066e24a49031cfc21ebd11fa4"
+    },
+    {
+      "path": ".archive/qualification/vnext-qualification-v1/agent-output/vnext-qualification/challenge-findings-governance-constraints-pass10.json",
+      "bytes": 3170,
+      "mode": 420,
+      "sha256": "7ca6407b02ddb2437a1b58f3c9a9a65dcde9f083b5d319861804d0cc52776fa7"
+    },
+    {
+      "path": ".archive/qualification/vnext-qualification-v1/agent-output/vnext-qualification/challenge-findings-governance-constraints-pass2.json",
+      "bytes": 9631,
+      "mode": 420,
+      "sha256": "a277ee609cc8d9ba95ad685cf4a931750da52eabca343012f6de338723f02e48"
+    },
+    {
+      "path": ".archive/qualification/vnext-qualification-v1/agent-output/vnext-qualification/challenge-findings-governance-constraints-pass3.json",
+      "bytes": 6329,
+      "mode": 420,
+      "sha256": "676783fd8c8911eaf36939d9c53059ea3dff84d3ec3e6925e141a7fa951e27d8"
+    },
+    {
+      "path": ".archive/qualification/vnext-qualification-v1/agent-output/vnext-qualification/challenge-findings-governance-constraints-pass4.json",
+      "bytes": 7404,
+      "mode": 420,
+      "sha256": "89f5b15efd4e1aaa021ef9fcecb4d3d621c03f42c9eea5269facba180803ca8c"
+    },
+    {
+      "path": ".archive/qualification/vnext-qualification-v1/agent-output/vnext-qualification/challenge-findings-governance-constraints-pass5.json",
+      "bytes": 9576,
+      "mode": 420,
+      "sha256": "cfd42cb5903696e865f1634e863cf0c31317f7b0b4fa4e9f3aa2c943db5d1ef6"
+    },
+    {
+      "path": ".archive/qualification/vnext-qualification-v1/agent-output/vnext-qualification/challenge-findings-governance-constraints-pass6.json",
+      "bytes": 11652,
+      "mode": 420,
+      "sha256": "cf17c97e49b9855ebc38bcaa0a78b6fccba19aa822b7fb417ffb13cce6d0d04e"
+    },
+    {
+      "path": ".archive/qualification/vnext-qualification-v1/agent-output/vnext-qualification/challenge-findings-governance-constraints-pass7.json",
+      "bytes": 13325,
+      "mode": 420,
+      "sha256": "d52fa6cd3574280e547d3f733e5572de6eb879873c13642eec2c4a6ae31189ab"
+    },
+    {
+      "path": ".archive/qualification/vnext-qualification-v1/agent-output/vnext-qualification/challenge-findings-governance-constraints-pass8.json",
+      "bytes": 3500,
+      "mode": 420,
+      "sha256": "f31c2873a64bf2aaff3923e39f048ff676192152692f11c58a4c3fce0658dcda"
+    },
+    {
+      "path": ".archive/qualification/vnext-qualification-v1/agent-output/vnext-qualification/challenge-findings-governance-constraints-pass9.json",
+      "bytes": 5384,
+      "mode": 420,
+      "sha256": "94717f8b804e27b42d264bec6792d02ebd94d2806a69fc1f143c29ccb8c36e05"
+    },
+    {
+      "path": ".archive/qualification/vnext-qualification-v1/agent-output/vnext-qualification/README.md",
+      "bytes": 6484,
+      "mode": 420,
+      "sha256": "6a644a90c088e14473dcf4a60a70ec66d7cdebad69de32bd632f7fd0abef8d34"
+    },
+    {
+      "path": ".archive/qualification/vnext-qualification-v1/provenance.json",
+      "bytes": 2535,
+      "mode": 420,
+      "sha256": "8df11a6214d9409cac2de92a5c5d3d6253b44ad7fa6a0e3d12f0a6371d67b869"
+    },
+    {
+      "path": ".archive/qualification/vnext-qualification-v1/README.md",
+      "bytes": 998,
+      "mode": 420,
+      "sha256": "24599fc70e5112272f808662fbaaa1009c99b27ac4651654a4f42f205b487a96"
+    },
+    {
+      "path": ".archive/retired-automation/devcontainer-base-v1/.github/workflows/validate-devcontainer-base.yml",
+      "bytes": 11080,
+      "mode": 420,
+      "sha256": "9651f41df11f2d6b848cdb8f9f16c545c74fc0d445704029c94346f9d5e85662"
+    },
+    {
+      "path": ".archive/retired-automation/devcontainer-base-v1/provenance.json",
+      "bytes": 637,
+      "mode": 420,
+      "sha256": "a37793244903163d8c855ab33605e0e192158528174f36e89b3f64698af73ed0"
+    },
+    {
+      "path": ".archive/retired-automation/devcontainer-base-v1/README.md",
+      "bytes": 1032,
+      "mode": 420,
+      "sha256": "1f6c8fadb8497a76b525c8f823bcbd6b3f1b61914bf02304562c371122f89396"
+    },
+    {
+      "path": ".archive/retired-automation/devcontainer-base-v1/tools/scripts/compare-devcontainer-verdicts.mjs",
+      "bytes": 8083,
+      "mode": 420,
+      "sha256": "82d6397e2769e99c760b9493290479cb704cdd4293512dc2ab81aa98a4ac6ff3"
+    },
+    {
+      "path": ".archive/retired-automation/devcontainer-base-v1/tools/tests/compare-devcontainer-verdicts.test.mjs",
+      "bytes": 3922,
+      "mode": 420,
+      "sha256": "d0e79f1f462f5e5fb9b8b49419669bc2114a156a837cb9c535c6bd8d870c655c"
+    },
+    {
+      "path": ".archive/retired-automation/e2e-v1/.github/workflows/e2e-validation.yml",
+      "bytes": 2003,
+      "mode": 420,
+      "sha256": "cfbadde605e0cd388f64d2fe52373cbc537c3f10cda5ae12862bc2b89c69bc6c"
+    },
+    {
+      "path": ".archive/retired-automation/e2e-v1/provenance.json",
+      "bytes": 2316,
+      "mode": 420,
+      "sha256": "a15a91efe8a2cdf535d671861c16a5b557020ea9c3d7863d883c985c8600e003"
+    },
+    {
+      "path": ".archive/retired-automation/e2e-v1/README.md",
+      "bytes": 2639,
+      "mode": 420,
+      "sha256": "263b3fc62ee930f842066ca8f2ff41f356d4bcb77b9957109fd272de714aa0b4"
+    },
+    {
+      "path": ".archive/retired-automation/e2e-v1/tools/scripts/_lib/e2e-helpers.mjs",
+      "bytes": 1473,
+      "mode": 420,
+      "sha256": "b8689b45da83613b6851c0f4ed644238195a95860e05fd0c97993970022a2610"
+    },
+    {
+      "path": ".archive/retired-automation/e2e-v1/tools/scripts/benchmark-e2e.mjs",
+      "bytes": 25221,
+      "mode": 420,
+      "sha256": "d35e8b24e97493f91597cf4ef1f07ef54fdf831617b130c2bdfc6bd75248be3b"
+    },
+    {
+      "path": ".archive/retired-automation/e2e-v1/tools/scripts/combine-e2e-runs.mjs",
+      "bytes": 14472,
+      "mode": 420,
+      "sha256": "bd336890db665b21db0e6e39411e72e10f4162c7ad0bcce50dd69b91f2c5c33e"
+    },
+    {
+      "path": ".archive/retired-automation/e2e-v1/tools/scripts/validate-e2e-step.mjs",
+      "bytes": 11081,
+      "mode": 420,
+      "sha256": "1ce6a817c22a0a00f64e62caf7813d85dd204d19e54a369079257b13f0346329"
+    },
+    {
+      "path": ".archive/retired-automation/e2e-v1/tools/tests/e2e-inputs/contoso-rfq.md",
+      "bytes": 21080,
+      "mode": 420,
+      "sha256": "38d34f97f38fb1265403ce38d677b50b0779eacb91d6c02659112251fed5dbe2"
+    },
+    {
+      "path": ".archive/retired-automation/e2e-v1/tools/tests/e2e-inputs/README.md",
+      "bytes": 726,
+      "mode": 420,
+      "sha256": "2f3dc359a2f4b8e58008157223f9ca909ba0835359eace988deded2a051aebf9"
+    },
+    {
+      "path": ".archive/retired-automation/e2e-v1/tools/tests/lib/e2e-helpers.test.mjs",
+      "bytes": 1976,
+      "mode": 420,
+      "sha256": "013e0f22d34ea520e463e1738e5ead281fba2bffbf1ab2e4c223de05fa2895de"
+    },
+    {
+      "path": ".archive/retired-automation/e2e-v1/tools/tests/prompts/e2e-analyze-lessons.prompt.md",
+      "bytes": 8762,
+      "mode": 420,
+      "sha256": "1f26b26099493cdbd5ed5c8f3bd89ad7ce8e9471b7283de106a3d3b428395de4"
+    },
+    {
+      "path": ".archive/retired-automation/e2e-v1/tools/tests/prompts/e2e-contoso-rfp.prompt.md",
+      "bytes": 23482,
+      "mode": 420,
+      "sha256": "43745dfd6bb5cab0238428cc92b40421e5d3418c472ccaa10e6ee6eda4732d5d"
+    },
+    {
+      "path": ".archive/retired-automation/e2e-v1/tools/tests/README.md",
+      "bytes": 8408,
+      "mode": 420,
+      "sha256": "17dfedfaabaf8439dd54620e3584f44b8a426c0ac6dba46d5824d792c17b412e"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/.github/prompts/apex-autonomous-pre-agent-loop.prompt.md",
+      "bytes": 2597,
+      "mode": 420,
+      "sha256": "6491df45622b22c55c3b8cfe22484b4efc4aa1b56f1a3813c1796125d3318168"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/docs/vnext/MODERNIZATION-INVENTORY.md",
+      "bytes": 17715,
+      "mode": 420,
+      "sha256": "2209cc6b72b25d863ac790a8f5274a77be70708817cf4c370c10faafa3e7ec31"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/docs/vnext/pre-agent-loop/authorization.json",
+      "bytes": 4952,
+      "mode": 420,
+      "sha256": "6351efa3d659e53f93159eb5c9dde5060cf89c1651ea6513ec3fcf78262a345c"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/docs/vnext/pre-agent-loop/authorization.schema.json",
+      "bytes": 5755,
+      "mode": 420,
+      "sha256": "e7c3feac98b5e4eadb983517bb9cb5ca23068df70342ce92f0f006c3a12187d1"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/docs/vnext/pre-agent-loop/checkpoints.jsonl",
+      "bytes": 10195,
+      "mode": 420,
+      "sha256": "3b6dbf4d8d0ce21432333cb9d3421af9d12f527f38e21f4228553f721108a436"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/docs/vnext/pre-agent-loop/completion-handoff.md",
+      "bytes": 1933,
+      "mode": 420,
+      "sha256": "10cbff8ee0d43b47095a409bd8f8fd040b245307ad38e6a4d6e9b54a852194a3"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/docs/vnext/pre-agent-loop/findings.jsonl",
+      "bytes": 1878,
+      "mode": 420,
+      "sha256": "329f36625cf1add1e9ebf9a43b8b97028be60c688fdb929703c81de8cb1e5a78"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/docs/vnext/pre-agent-loop/inventory.json",
+      "bytes": 25447,
+      "mode": 420,
+      "sha256": "de785122dae8823d63465701a4fcbd33884fef109606cb7b44db1e97ac50cec3"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/docs/vnext/pre-agent-loop/measurements.json",
+      "bytes": 12442,
+      "mode": 420,
+      "sha256": "5773044ff7c90de36295bb2511519c4dd2cbdbc2ee41aa94b26a1cfdfceaebf7"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/docs/vnext/pre-agent-loop/queue.json",
+      "bytes": 25805,
+      "mode": 420,
+      "sha256": "12a08f5a0a989a0f9bf0c70a821aaea205915d5217c16ab568e92686aa9422f3"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/docs/vnext/pre-agent-loop/README.md",
+      "bytes": 1387,
+      "mode": 420,
+      "sha256": "7ff4fdc64a492a2104b354fbf2bfd3258e37aeec9f8113d133946e813d45cf8c"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/provenance.json",
+      "bytes": 1566,
+      "mode": 420,
+      "sha256": "9632626aae261d7279e4309427becb3fd93547cc1505bd098445fcc4b662cfa7"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/README.md",
+      "bytes": 1308,
+      "mode": 420,
+      "sha256": "e50e5f29407afc29fa6d95aff6e8580efaa267e6e502abae0137e12aaa0bdf18"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/tools/registry/modernization-ownership.json",
+      "bytes": 49713,
+      "mode": 420,
+      "sha256": "b9532ddb901e026062e4f6d0e31440df787b77cd414549dd529d340381d90592"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/tools/registry/schemas/modernization-ownership.schema.json",
+      "bytes": 3734,
+      "mode": 420,
+      "sha256": "ccf15dde387bfbbb571e5bb5b957eb2cf57ad43576d465a420237974710601d0"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/tools/scripts/pre-agent-loop-hashes.mjs",
+      "bytes": 4519,
+      "mode": 420,
+      "sha256": "79e8d01128ed9dd7a6d45195bf82e29f542202ba8554e9e5b93513a8af6b66ac"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/tools/scripts/pre-agent-loop.mjs",
+      "bytes": 30119,
+      "mode": 420,
+      "sha256": "22dc1fc0c35be723e6f7191e3397c8bc3a7b38c5c7979f77885ddf0dff8b35fd"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/tools/scripts/validate-modernization-ownership.mjs",
+      "bytes": 7120,
+      "mode": 420,
+      "sha256": "650cde913423540d5b4faf6d182fbd9ace11edfe2bf6593c107c6f9fd13b80c8"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/tools/tests/pre-agent-loop.test.mjs",
+      "bytes": 21817,
+      "mode": 420,
+      "sha256": "a1918bad90407b7dbb5645552825071fe6048c4fff0954fca9cbd639f3947e84"
+    },
+    {
+      "path": ".archive/retired-automation/pre-agent-loop-v1/tools/tests/validate-modernization-ownership.test.mjs",
+      "bytes": 4347,
+      "mode": 420,
+      "sha256": "59a2b3da7029666e4aa44538cd4595862c9cd6e78a50373fe0553fb2e8e8d50f"
+    },
+    {
+      "path": ".archive/retired-automation/README.md",
+      "bytes": 2015,
+      "mode": 420,
+      "sha256": "2de969855c5370abf683e5c2caf5c4a9da8cc11bce9408bcd22a3d3ed7a56462"
+    },
+    {
+      "path": ".archive/retired-automation/sync-workflows.mjs",
+      "bytes": 4656,
+      "mode": 420,
+      "sha256": "46e0cb833f06420d23911fdb129e041beba9854ce86a992ff4f7fe8594a57fb8"
+    },
+    {
+      "path": ".archive/retired-automation/terraform-mcp/provenance.json",
+      "bytes": 1615,
+      "mode": 420,
+      "sha256": "d2274bb6652a9b1d3ca39a8b1fe14aefd11733b6e800d1083ae877670d3bfbb0"
+    },
+    {
+      "path": ".archive/retired-automation/terraform-mcp/README.md",
+      "bytes": 2748,
+      "mode": 420,
+      "sha256": "a69c8ebbb1ea67a646edb94aad17092358877e64e52379bc5f063d3194356329"
+    },
+    {
+      "path": ".archive/retired-automation/terraform-mcp/tools/registry/schemas/terraform-mcp-characterization.schema.json",
+      "bytes": 4296,
+      "mode": 420,
+      "sha256": "419a2b3817349644d5033bcec71038687611ba19cecebfa9d667c39a84f352e2"
+    },
+    {
+      "path": ".archive/retired-automation/terraform-mcp/tools/registry/terraform-mcp-characterization.json",
+      "bytes": 5565,
+      "mode": 420,
+      "sha256": "5c7ad2e8094bb66cd33afea1ab63c5d193b5e524b6b18a57fe768080eb8d5643"
+    },
+    {
+      "path": ".archive/retired-automation/terraform-mcp/tools/registry/terraform-mcp-tools-list.fixture.json",
+      "bytes": 5834,
+      "mode": 420,
+      "sha256": "0559fd51a2c05f08c2f74c1b64591a2f74837e416eb73cb1904d9b76f3cbfaec"
+    },
+    {
+      "path": ".archive/retired-automation/terraform-mcp/tools/scripts/validate-terraform-mcp-characterization.mjs",
+      "bytes": 6776,
+      "mode": 420,
+      "sha256": "129fa42b7205d9573fc1a4442e00e3021131e43fa7f29739be7da4cb16af3d60"
+    },
+    {
+      "path": ".archive/retired-automation/terraform-mcp/tools/tests/validate-terraform-mcp-characterization.test.mjs",
+      "bytes": 3533,
+      "mode": 420,
+      "sha256": "c4451f3a1527cb5259b05f37d02d365a12b74db1ff1bc3aaeb857fe8991ed0e6"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/.devcontainer/devcontainer-lock.json",
+      "bytes": 1862,
+      "mode": 420,
+      "sha256": "720962b3eed4a6dd4b567440097bad52b4b92bc89ca653095850f90a0ba8e6c4"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/.devcontainer/devcontainer.json",
+      "bytes": 5913,
+      "mode": 420,
+      "sha256": "bf1f530930ab7781337c6b5fff1cbd69f82bdf2daa5a2e434a4b388c99a39ebf"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/.devcontainer/features/terraform/devcontainer-feature.json",
+      "bytes": 165,
+      "mode": 420,
+      "sha256": "ac155131b8eadb3c723e6926e8a06f6f133fb0b6a82eb313343ccf517f195f47"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/.devcontainer/features/terraform/install.sh",
+      "bytes": 1231,
+      "mode": 420,
+      "sha256": "d05db4a111a3db1dc6f4d5f9f1d4a0962cf093202c930a1fa0be8c4cf91bb7ae"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/.devcontainer/post-create.sh",
+      "bytes": 2486,
+      "mode": 420,
+      "sha256": "fce7c373c9d3240c279e5eb481e7f658e829dd7bc57fccf93c6de90c062e8d03"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/.devcontainer/README.md",
+      "bytes": 3988,
+      "mode": 493,
+      "sha256": "e7ed8fbb1b3fe4cf3eac3d85ca49158e76e2616bc260ce03c581ef3f68400dc1"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/.github/CODEOWNERS",
+      "bytes": 1489,
+      "mode": 420,
+      "sha256": "95e2ac1b92f02a74efc05d460fe30c219fafcaec6ffa7b9f7c12430e1a49f822"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/.github/prompts/apex-git-commit.prompt.md",
+      "bytes": 6974,
+      "mode": 420,
+      "sha256": "f59f4ab7a373e5d106bc50e8963b40d1bf688e384b1adcb2faebed2b4bfb15b0"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/.github/prompts/plan-buildApexVnext.prompt.md",
+      "bytes": 58984,
+      "mode": 420,
+      "sha256": "77db1d7694b96ad2d08d6e105d6bbf5e85741811f83c14b767c0c7cd954c520d"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/.github/prompts/plan-governAndCompleteApexVnext.prompt.md",
+      "bytes": 25108,
+      "mode": 420,
+      "sha256": "26458122d9ef4065d95d90d7f6eb56535fa78c0c76a47114ec9e318b7bd27991"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/.github/skills/docs-writer/references/repo-architecture.md",
+      "bytes": 18959,
+      "mode": 420,
+      "sha256": "778e2cc333e0085e3ca358e078de0ac64fff8bc193c6794db6a1329f0c3ea6ed"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/.github/skills/README.md",
+      "bytes": 4790,
+      "mode": 420,
+      "sha256": "f56e70d8bc94fbff80c8eb236eacfd553b87e2db4081791f495b5b26b599e90c"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/.github/workflows/sensei-branch-maintenance.yml",
+      "bytes": 7593,
+      "mode": 420,
+      "sha256": "31b4a71c5871df20dcad70f644cacd950ba7e50c099588545684c16aa183cc6b"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/docs/how-to/maintain-devcontainer.md",
+      "bytes": 2625,
+      "mode": 420,
+      "sha256": "3a7cacf317435cac6e1ae8a4b6b0a6d3e7f3750aa3a24898cff716ed077970d8"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/docs/vnext/OPTIMIZATION-AUDIT.md",
+      "bytes": 2469,
+      "mode": 420,
+      "sha256": "a680f77a3d723411e15329e4836f9a51e6e060d17e2daa352e0ea8ba2fff04d1"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/provenance.json",
+      "bytes": 4197,
+      "mode": 420,
+      "sha256": "b3c7d4570eaa5fdd6dd6727c975e45569822b444b3323005fed574dd257cd86c"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/README.md",
+      "bytes": 5987,
+      "mode": 420,
+      "sha256": "437125269f0c832f981c3ead5e8ebcdd660df51fc01f3281cb9f19d8325e00df"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/tools/scripts/validate-extension-bloat.mjs",
+      "bytes": 3421,
+      "mode": 420,
+      "sha256": "6b6ef1ff12284437ab7f5f7bebd1a593996aedac89f230772b4185c7a2719e92"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/tools/scripts/validate-terraform-mcp-retirement.mjs",
+      "bytes": 5387,
+      "mode": 420,
+      "sha256": "9577b1e0d56c4d1b936f6d834deda16841f9d600aab59407e53bce37f6d7b116"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/tools/scripts/validate-vscode-config.mjs",
+      "bytes": 11793,
+      "mode": 420,
+      "sha256": "315749a5ae9f0ad6e4c63d462f2401d87f95794950c270bc02e9036609872cca"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/tools/scripts/validate-workflow-graph.mjs",
+      "bytes": 13296,
+      "mode": 420,
+      "sha256": "54552cda8a9bf69ef134a6c0321d136c2e0a6c024050978473d38c5b36c4ff25"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/tools/tests/retired-automation.test.mjs",
+      "bytes": 19366,
+      "mode": 420,
+      "sha256": "b14c3e3045c4aa362b29f83ebe771dfc90c61ca0b405c187b2ffe66bcc43ba60"
+    },
+    {
+      "path": ".archive/retired-automation/wsl-maintenance-v1/tools/tests/validate-terraform-mcp-retirement.test.mjs",
+      "bytes": 3151,
+      "mode": 420,
+      "sha256": "f7951d338d965cc201de78c9016c65e2098cf357d6eaf2f44215a19897f9db23"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/.github/hooks/subagent-validation/hooks.json",
+      "bytes": 198,
+      "mode": 420,
+      "sha256": "915f9e635e137cc0243417b2492e2f352bd48592c6cad3f3f4f9d71ef68a1d57"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/.github/hooks/subagent-validation/subagent-validation.sh",
+      "bytes": 2918,
+      "mode": 420,
+      "sha256": "41e9cdaf189807350f7700363b610e4f7e27ea98a02d74866be49f6533994111"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/provenance.json",
+      "bytes": 2864,
+      "mode": 420,
+      "sha256": "f345b333a3c324aa7ed49139e04fa6573815e809f48249c6cb8c02aece3a8de9"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/QUALITY_SCORE.md",
+      "bytes": 59221,
+      "mode": 420,
+      "sha256": "fa9befa399cb980c29570fb611d20669c42544f4556be764edcb950697036861"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/README.md",
+      "bytes": 1141,
+      "mode": 420,
+      "sha256": "05b11da71400c1d66701a6d0d7c4f026f5c0d491475720760d0b4021e938063a"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/tests/cost-estimate-subagent/sku-alias-resolution.test.mjs",
+      "bytes": 4242,
+      "mode": 420,
+      "sha256": "e19cc5ae7f4dec5a132e13ae3ad137c3da8090c616c66d7c0cc17ff774542689"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/tools/apex-prompts/utility-prompts/assess-agents.prompt.md",
+      "bytes": 7309,
+      "mode": 420,
+      "sha256": "f6a2cba0d84a98e685ab77cd97276d7588ab57c242239f9463e2b25a09bebde7"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/tools/apex-prompts/utility-prompts/assess-github-folder.prompt.md",
+      "bytes": 5504,
+      "mode": 420,
+      "sha256": "332dae5570c391345571c7c3bb9ce22ee145388afab790c9d975ba4ef4548c98"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/tools/apex-prompts/utility-prompts/doc-gardening.prompt.md",
+      "bytes": 4489,
+      "mode": 420,
+      "sha256": "afb3c0ea7d14e4f715abfe02307394584678ca102a085ba2f6c981311f2f1aa0"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/tools/apex-prompts/utility-prompts/plan-fourLayerAgentAssessment.prompt.md",
+      "bytes": 9281,
+      "mode": 420,
+      "sha256": "eb0452b725e76a5f35e564551526b2348ce04f2e4afb463e71b30d1f07c7dd4e"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/tools/apex-prompts/utility-prompts/references/agent-adversarial-checklist.md",
+      "bytes": 5339,
+      "mode": 420,
+      "sha256": "380d83351df8f733297d32377ec59f2610ec8969a9a1119fa047c547cf97430c"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/tools/apex-prompts/utility-prompts/references/agent-scorecard-rubric.md",
+      "bytes": 6958,
+      "mode": 420,
+      "sha256": "94792ade198210a98dd3cd787dbad6e18dea3e83c884c310462b699aff98f96c"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/tools/registry/challenger-coverage-evidence.md",
+      "bytes": 7910,
+      "mode": 420,
+      "sha256": "3aa1c3fd38afd172441962ed79278acadeae07f001c0698eee2cc8081b71e02e"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/tools/registry/challenger-effectiveness.md",
+      "bytes": 892,
+      "mode": 420,
+      "sha256": "485d24422b95e3cc95dad25952c516d4522630fd14e792da45fbcb765cca5228"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/tools/registry/challenger-telemetry.json",
+      "bytes": 465,
+      "mode": 420,
+      "sha256": "fb783133431b9b3aa99146e2acda24f47d490e4a0242a3a3886e4265aed7bac0"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/tools/schemas/agent-scorecard.schema.json",
+      "bytes": 6973,
+      "mode": 420,
+      "sha256": "8fac6629bc806d602f5ccb494d3587e94161b03099e4ad85965ab978b5d05908"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/tools/schemas/subnet-plan.schema.json",
+      "bytes": 3733,
+      "mode": 420,
+      "sha256": "dc0306064306ce3ac1b0a811315c314d301c12fb277d2ec5017080e82b2a95c1"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/tools/scripts/assess-agents.mjs",
+      "bytes": 30712,
+      "mode": 420,
+      "sha256": "8e061ccd780b9bf51f3183e55750f54f5437c4c9a727d0165e3a8e89c2316914"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/tools/scripts/challenger-telemetry.mjs",
+      "bytes": 7745,
+      "mode": 420,
+      "sha256": "3d86d31ac1687d358f24021513fc494e03c701114e08c4a99fbb81c1ad9ffeab"
+    },
+    {
+      "path": ".archive/retired-compatibility/original-apex-v1/tools/tests/bats/subagent-validation.bats",
+      "bytes": 2026,
+      "mode": 420,
+      "sha256": "54337b055b9280683ff67b12b11e058155790143e7e06b624404edbc8310b5dd"
+    },
+    {
+      "path": ".archive/retired-compatibility/predecessor-product/CHANGELOG.md",
+      "bytes": 72954,
+      "mode": 420,
+      "sha256": "ea27eebfafd2fbe22bad82395d6046cc5842faecc4809253f89ba9f4925f55c3"
+    },
+    {
+      "path": ".archive/retired-compatibility/predecessor-product/docs/MIGRATION.md",
+      "bytes": 2538,
+      "mode": 420,
+      "sha256": "b088f1b5ce7b0d3f0d533ffd7cf58dc64b784cdbde8e9cccecd7bdcfd95af64a"
+    },
+    {
+      "path": ".archive/retired-compatibility/predecessor-product/docs/vnext/phase-0a/baseline-evidence.json",
+      "bytes": 3774,
+      "mode": 420,
+      "sha256": "87d96fe0e01bfb7e3fd2fc60fee53378d2a2d6e8a9e6a3a1be5b8976f60dd460"
+    },
+    {
+      "path": ".archive/retired-compatibility/predecessor-product/docs/vnext/phase-0a/evidence/baseline-failure-python-2026-07-13.log",
+      "bytes": 47385,
+      "mode": 420,
+      "sha256": "a9a99a97f3e0be0d7ea426e7e6cdf29d2dfb32413dc1b97393a168a4bf315a84"
+    },
+    {
+      "path": ".archive/retired-compatibility/predecessor-product/docs/vnext/phase-0a/evidence/baseline-failure-site-2026-07-13.log",
+      "bytes": 532,
+      "mode": 420,
+      "sha256": "9f1cd727cf38203bf8e4d35edda9999144e0b20997a062af73ae325a2a3807bc"
+    },
+    {
+      "path": ".archive/retired-compatibility/predecessor-product/docs/vnext/phase-0a/evidence/baseline-success-2026-07-13.log",
+      "bytes": 67405,
+      "mode": 420,
+      "sha256": "c7ddb15e05c3af25a93a4d5171220f6fad3bd75a061b01f2bee72c35efb33e5c"
+    },
+    {
+      "path": ".archive/retired-compatibility/predecessor-product/docs/vnext/phase-0a/evidence/golden-scenarios-2026-07-13.log",
+      "bytes": 79645,
+      "mode": 420,
+      "sha256": "8a63a2397a79036fe74995e2d94438c79860d2ccb9e94cf43ed0e0cb9e8daeea"
+    },
+    {
+      "path": ".archive/retired-compatibility/predecessor-product/docs/vnext/phase-0a/README.md",
+      "bytes": 2022,
+      "mode": 420,
+      "sha256": "46a615a71e73588a9d6d36a033e84eb14aff4e3ae8c17bd921c1e9830d9fdca9"
+    },
+    {
+      "path": ".archive/retired-compatibility/predecessor-product/docs/vnext/phase-0a/v1-behavior-compatibility.md",
+      "bytes": 41507,
+      "mode": 420,
+      "sha256": "e949882050c7821b5ee5e191df8e2bacf448d4d7d6abdd3426fc309077556123"
+    },
+    {
+      "path": ".archive/retired-compatibility/predecessor-product/docs/vnext/phase-0a/v1-golden-scenarios.json",
+      "bytes": 6037,
+      "mode": 420,
+      "sha256": "71721d6663eacaab02f6de7305ad821b0c557e8e5974a31df96258ff0653a273"
+    },
+    {
+      "path": ".archive/retired-compatibility/predecessor-product/docs/vnext/phase-0a/v1-known-defects.md",
+      "bytes": 6103,
+      "mode": 420,
+      "sha256": "b86dbad0ca8ba3644663de07d9bf53fa280c85e042f39a9b01c9536239548e81"
+    },
+    {
+      "path": ".archive/retired-compatibility/predecessor-product/docs/vnext/phase-0a/v1-maintenance-policy.md",
+      "bytes": 4227,
+      "mode": 420,
+      "sha256": "68f1e9a75c7bfbaca74ac24deb17c80af25678bd1ad830a9f19f363496b03886"
+    },
+    {
+      "path": ".archive/retired-compatibility/predecessor-product/SOURCE_PROVENANCE.json",
+      "bytes": 449,
+      "mode": 420,
+      "sha256": "68224b882a6c9c24459c21149af65827e0cdd7ec6c0ea75641aa65344e2b7527"
+    },
+    {
+      "path": ".archive/retired-config/root-v1/.git-blame-ignore-revs",
+      "bytes": 318,
+      "mode": 420,
+      "sha256": "8787a560540d38b2cfa002df57a4eef0195f6f65ba2ae661302f8f8a9935269a"
+    },
+    {
+      "path": ".archive/retired-config/root-v1/.markdown-link-check-site.json",
+      "bytes": 1440,
+      "mode": 420,
+      "sha256": "0421351da1f09f29d30364b8c0c484cf3ad8c0b0d31f063656723ae28f2d1e26"
+    },
+    {
+      "path": ".archive/retired-config/root-v1/provenance.json",
+      "bytes": 495,
+      "mode": 420,
+      "sha256": "4458626a91d5dd468cc63cb38c9db82ce90e29bbd8ce7728e4acdd02823d0e94"
+    },
+    {
+      "path": ".archive/retired-config/root-v1/README.md",
+      "bytes": 749,
+      "mode": 420,
+      "sha256": "f45380971852c0d595c146d642ad91cc8fe8d48d754c9b0023571260725b4608"
+    },
+    {
+      "path": ".archive/retired-guidance/context-v1/.github/skills/context-management/references/analysis-methodology.md",
+      "bytes": 8671,
+      "mode": 420,
+      "sha256": "ab5169f113bf8e3e15ecd28cd50598e8d314743ea22e1202ebd8bb0d82f89a71"
+    },
+    {
+      "path": ".archive/retired-guidance/context-v1/.github/skills/context-management/references/audit-setup.md",
+      "bytes": 1947,
+      "mode": 420,
+      "sha256": "9a6ba8a4ecbcd1a2220612fa832477be1e58c9856e502762c1253e4cb18641f1"
+    },
+    {
+      "path": ".archive/retired-guidance/context-v1/.github/skills/context-management/references/compression-templates.md",
+      "bytes": 6635,
+      "mode": 420,
+      "sha256": "8f9b6545d9cdbb7886bd5287f7df18bd12e6eae42e5c65edb60fba5f2c8f03bd"
+    },
+    {
+      "path": ".archive/retired-guidance/context-v1/.github/skills/context-management/references/hard-checkpoints.md",
+      "bytes": 2624,
+      "mode": 420,
+      "sha256": "f5fc35adfa6b5217feab0e902a81a7b932f82d2ba098dd71d63f58d9aa88be18"
+    },
+    {
+      "path": ".archive/retired-guidance/context-v1/.github/skills/context-management/references/log-profiling.md",
+      "bytes": 3994,
+      "mode": 420,
+      "sha256": "4cca045465a9d2741e34a6e74c00191e40158656c2afbf91542dd8344e636296"
+    },
+    {
+      "path": ".archive/retired-guidance/context-v1/.github/skills/context-management/references/skill-loading.md",
+      "bytes": 734,
+      "mode": 420,
+      "sha256": "d883a69ec39c51765518b73b4fffacab4189e2c36320da1fc3a4556f3b675a2b"
+    },
+    {
+      "path": ".archive/retired-guidance/context-v1/.github/skills/context-management/SKILL.md",
+      "bytes": 6078,
+      "mode": 420,
+      "sha256": "acb7847bf48b070e6c45ef3148ce748a26be2b1ff7b4b1fbf596f6dbbd255662"
+    },
+    {
+      "path": ".archive/retired-guidance/final-unused/.github/skills/azure-defaults/references/artifact-type-categories.md",
+      "bytes": 2153,
+      "mode": 420,
+      "sha256": "f8bb5bd1e5be243089c2e7b63ba83988dca1c6ba82454557a7a60734d2ab1219"
+    },
+    {
+      "path": ".archive/retired-guidance/final-unused/.github/skills/azure-defaults/references/governance-discovery.md",
+      "bytes": 4089,
+      "mode": 420,
+      "sha256": "6898fd5e2154e631a14fd4f468a4b2e645376610ee20aab943573188ff71def6"
+    },
+    {
+      "path": ".archive/retired-guidance/final-unused/.github/skills/azure-defaults/references/pricing-guidance.md",
+      "bytes": 42487,
+      "mode": 420,
+      "sha256": "12c3032e8a21aa53026d8176a9d2ab067e08f790acee5ba017cae91ea2ad370c"
+    },
+    {
+      "path": ".archive/retired-guidance/final-unused/.github/skills/azure-defaults/references/research-workflow.md",
+      "bytes": 2063,
+      "mode": 420,
+      "sha256": "9e80cf77aee8edaacb77fe003cd2a276905e1705c6da85889542a3759ed4ad38"
+    },
+    {
+      "path": ".archive/retired-guidance/final-unused/.github/skills/azure-defaults/references/terraform-conventions.md",
+      "bytes": 1372,
+      "mode": 420,
+      "sha256": "2be6548dbf4bac0c2a95f0c45f1a434579f0110c48463ae28e80e33e5061ac83"
+    },
+    {
+      "path": ".archive/retired-guidance/final-unused/tools/apex-recall/docs/decision-keys.md",
+      "bytes": 15220,
+      "mode": 420,
+      "sha256": "8805c7b05d8d6dbe4479ef6f3de081337229ce3a1f548ee3e17fb5a6638941e4"
+    },
+    {
+      "path": ".archive/retired-guidance/final-unused/tools/schemas/workflow-graph.schema.json",
+      "bytes": 7448,
+      "mode": 420,
+      "sha256": "3ba264af8cda0b710d5315c743ed1b1eb53288caea2d55f2b6eaf292246842ff"
+    },
+    {
+      "path": ".archive/retired-guidance/final-unused/tools/scripts/validate-lens-references.mjs",
+      "bytes": 5164,
+      "mode": 420,
+      "sha256": "4f88d6a167e03e3af448578800a6f4481b49843ec581f263f7036a366094cfa1"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/instructions/references/iac-cost-monitoring.md",
+      "bytes": 7367,
+      "mode": 420,
+      "sha256": "de5edbb36301acba90bec755f321dde22dbc6ed2b68ea93d6a3fdb864e36a049"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-adr/references/step-3-adr-review.md",
+      "bytes": 1630,
+      "mode": 420,
+      "sha256": "3f139fb70fe094305c8e4959d3ff03be4e7caa6787b673ee0d02a7699a08ddf4"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-artifacts/references/revision-workflow.md",
+      "bytes": 1999,
+      "mode": 420,
+      "sha256": "7bffb33683d478ef790cfb788942f01546ae0243b1a1de9bd95548ad8a0bb15c"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-artifacts/templates/00-session-state.template.json",
+      "bytes": 3266,
+      "mode": 420,
+      "sha256": "e5828db31ded287b08516648744f10898220b9a01c0011de335e41e4153e8ba7"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-artifacts/templates/04-implementation-plan.template.md",
+      "bytes": 11051,
+      "mode": 420,
+      "sha256": "78d02562e4b64e98871516385dc3442951c9cd5848b753f1340fe33ed77c51b8"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-bicep-patterns/references/bicepparam-pattern.md",
+      "bytes": 3535,
+      "mode": 420,
+      "sha256": "2ceeee70b33bbd5cc9fdcce1191d95975b1b3ea579d868e92fb6c8b632dbcacd"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-defaults/references/adversarial-checklists.md",
+      "bytes": 21848,
+      "mode": 420,
+      "sha256": "812a9c2a31c348ef50fe9d14d97eb980a11f0ffde5bdb29ade606e2760ed2769"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-defaults/references/adversarial-review-deep.md",
+      "bytes": 4308,
+      "mode": 420,
+      "sha256": "ede3bd9af46e8e8150f23447a1b3b428846eecabaf1e24fbe713ae2a676a3779"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-defaults/references/adversarial-review-protocol.md",
+      "bytes": 27221,
+      "mode": 420,
+      "sha256": "74435d615b6fd51004596f651619b507b92633698641eb70acb59fc876fe7499"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-defaults/references/avm-modules.md",
+      "bytes": 4957,
+      "mode": 420,
+      "sha256": "7f86a63e9cad15549a346385fcd9d65b864f60094a310bd1dcee575f91a34dc5"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-defaults/references/cost-alerts-baseline.md",
+      "bytes": 8741,
+      "mode": 420,
+      "sha256": "3319fce6a7ecf539e73aab1b37c802c9395eaa6ae67cdeb30c6fce092d4ec76a"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-defaults/references/cost-alerts-bicep.md",
+      "bytes": 9315,
+      "mode": 420,
+      "sha256": "7530446bc11e122911e16caf1e1f618d78e8c7295786de54467b3f0efe2734bb"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-defaults/references/cost-alerts-terraform.md",
+      "bytes": 6479,
+      "mode": 420,
+      "sha256": "de85183be9e1d12918df32acc33581f027cf2ebc46571b5b59ef9354cfc85b08"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-defaults/references/cost-estimate-parent-contract.md",
+      "bytes": 3993,
+      "mode": 420,
+      "sha256": "47b60c3ea75f5d2ad6a80219ccc4d5b78bf3ce2d3abeabbe64359fe4af6421a0"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-defaults/references/identity-resolution.md",
+      "bytes": 5894,
+      "mode": 420,
+      "sha256": "84329247ae6203cca1ff48c85601ccc741b64a13891aa5c05c58946b197f8e66"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-defaults/references/plan-design-decisions.md",
+      "bytes": 5407,
+      "mode": 420,
+      "sha256": "1ba199864201a54aa44dfc57d6e99b7236378c72cda9f18601240991b404eae8"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-defaults/references/service-class-menu.md",
+      "bytes": 9552,
+      "mode": 420,
+      "sha256": "dd6f48a6347d78e7f73ad478d82a94611c83edb7488fd5cc026f2e20237a617f"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-defaults/references/tag-strategy.md",
+      "bytes": 5534,
+      "mode": 420,
+      "sha256": "fd6e9ccb3e234261b4583e14029b374d58f4d6f57579da688bd4708e59e5dae9"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-defaults/references/vnet-planning.md",
+      "bytes": 18026,
+      "mode": 420,
+      "sha256": "2d892be827fb96bff8d4413279dde250f727b28ca10e9f24d3992751a5e4923e"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-defaults/references/workflow-gates.md",
+      "bytes": 12608,
+      "mode": 420,
+      "sha256": "f711c209cbdb1425a8127fa15977efe1e27372398e1b75e0eaf5a473185f60f8"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-defaults/SKILL.md",
+      "bytes": 14269,
+      "mode": 420,
+      "sha256": "26121ecdb912a9f30f364fb391c25d32f44523a80fede6b2dbb789faa23e3fa1"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-governance-discovery/references/baseline-check.md",
+      "bytes": 2470,
+      "mode": 420,
+      "sha256": "0cb912a91f88b9bede0bf6c434c38a156d442761d5f014a3e052720b30faae8d"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-governance-discovery/references/discover-output.md",
+      "bytes": 3604,
+      "mode": 420,
+      "sha256": "60f2860668d76e3c2f177977d91c5fc8bced3a37ab2a11605e3b5125008c3799"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-governance-discovery/references/effect-classification.md",
+      "bytes": 2604,
+      "mode": 420,
+      "sha256": "dba9a12a9381c7351e8a70156bd865996f339bcc3e9cd474376966c7ea0809e8"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-governance-discovery/references/inline-resolution-gate.md",
+      "bytes": 9976,
+      "mode": 420,
+      "sha256": "01508717a873398e6ea0d8a8ec066aad7a43c1e9fbdbcd668fc22936f5f6d3ae"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-governance-discovery/references/l0-envelope.md",
+      "bytes": 5411,
+      "mode": 420,
+      "sha256": "30b709fd84109684c52e53e3a393f78de2de47ed79e02bfbb28fa37155dfd35b"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-governance-discovery/references/policy-override-pattern.md",
+      "bytes": 1887,
+      "mode": 420,
+      "sha256": "b5da0567d81b779821cf851e4fc8f09ede4259fb96225b8b80dcda5fab812e6a"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-governance-discovery/references/reconciliation-disposition.md",
+      "bytes": 2791,
+      "mode": 420,
+      "sha256": "0e860791499cfc971cee60fb17d71fbe437c261a73e97fec35d42d967f15cf6c"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-governance-discovery/references/resume-checks.md",
+      "bytes": 2218,
+      "mode": 420,
+      "sha256": "5e2fb6cc507a52aefd966f4c13657a16026acf9ccd61e7ac37cd00e4204f6f46"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-governance-discovery/references/schema.md",
+      "bytes": 6367,
+      "mode": 420,
+      "sha256": "f0b010ac7c71c1b766f969f5f2d0e48a56344794b479128c1fe5a5eee087b0bc"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-governance-discovery/references/terminal-commands.md",
+      "bytes": 7121,
+      "mode": 420,
+      "sha256": "2d0da3bfcfbb0fc2b9d66a463556b276b3c3135d5f762457c4fec25b5a367baf"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-governance-discovery/scripts/discover.py",
+      "bytes": 49361,
+      "mode": 420,
+      "sha256": "e14cd39d279f75d353a0578928004cdfc2c7a98c43a0ba9b111332603b9829e2"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-governance-discovery/scripts/fixtures/README.md",
+      "bytes": 207,
+      "mode": 420,
+      "sha256": "595acf7e825e926c78d35cbb10900c36e8bd573feb1c78652725661337bc584e"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-governance-discovery/scripts/render_cached_governance.py",
+      "bytes": 8112,
+      "mode": 420,
+      "sha256": "104433fc8b3e91386bf0e5d6979244b3888a68d6160a1cf2a983c6095cfd29ff"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-governance-discovery/scripts/render_governance.py",
+      "bytes": 31618,
+      "mode": 420,
+      "sha256": "205952ebc8504f15a81e0a386902d4019aba87ec084f4c9b37243516556e437e"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-governance-discovery/scripts/test_discover.py",
+      "bytes": 50741,
+      "mode": 420,
+      "sha256": "6438e71ece85d83e655a03b193e74e3190428532ac6c19a17cf05121e0cccc46"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-governance-discovery/scripts/test_render_governance.py",
+      "bytes": 36781,
+      "mode": 420,
+      "sha256": "ec95e3dfa79be8ef49eb6d55f073b8b2010eb8e895cdf8ad9f38e39f8eb6c5d7"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-governance-discovery/scripts/test_signature_parity.py",
+      "bytes": 5130,
+      "mode": 420,
+      "sha256": "4277205cf12c3dbf8e93e5c0997b8d505f89a6d0b1b4444325413bb64d860bc4"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/azure-governance-discovery/SKILL.md",
+      "bytes": 7945,
+      "mode": 420,
+      "sha256": "e45e7418ab25313e35ccbe71dca12ea40706bedeecd37ad76fa04ea6cf09fad5"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/avm-module-index.md",
+      "bytes": 6849,
+      "mode": 420,
+      "sha256": "f5a6a97e0f9c83917a1fa1edaee63848ca20c87d5fde1a3db381937e04295782"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/avm-version-freeze-gate.md",
+      "bytes": 4848,
+      "mode": 420,
+      "sha256": "c87e7ebb59fdc1cc652a1ec859382492e1e3943287bac0cbb665396d0732b757"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/azd-vs-deploy-guide.md",
+      "bytes": 15859,
+      "mode": 420,
+      "sha256": "37fa489d8a27b8aedd641aa0cb1818c0d76563f264f3f7793697ba4f3b76998a"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/azure-resource-graph-primer.md",
+      "bytes": 3111,
+      "mode": 420,
+      "sha256": "75747cba015a0f3570d5a9ca542b7291cd69b0089aba793573a1f2201cc0c2a3"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/circuit-breaker.md",
+      "bytes": 3348,
+      "mode": 420,
+      "sha256": "7ea1d85f105dabe1e26b50cff9f552179c04fec8614c6156fb6771702e96bb69"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/codegen-do-dont.md",
+      "bytes": 4604,
+      "mode": 420,
+      "sha256": "ad00e1737a0fac35894f82a173d1ad99068075987aee2ff6d8056bd1a148d96a"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/codegen-file-order.md",
+      "bytes": 6987,
+      "mode": 420,
+      "sha256": "71fc1d54f6ecb07d26e3ba9bd962882e2d8d1ba53704dd2d4f8b43256f0fde9d"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/codegen-shared-workflow.md",
+      "bytes": 10795,
+      "mode": 420,
+      "sha256": "0f06e66d795dff99410f60306d822daa79e1c7f480fda0e698f35f334a4d322f"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/contract-emission-and-handoff.md",
+      "bytes": 5176,
+      "mode": 420,
+      "sha256": "0c41de38fa6a9722122cc1c10ea87853b3ff99c7afabd9636449c67ed7c5a56f"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/deploy-shared-workflow.md",
+      "bytes": 7767,
+      "mode": 420,
+      "sha256": "0764dd9bfbe440e8ffd87a9e621fe557a475bff8dbc4c65ff2e1510ed14f026f"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/deploy-validation-checklist.md",
+      "bytes": 6740,
+      "mode": 420,
+      "sha256": "4cc366ce07030b566223f1dfc014b1b71283279541e203fdad7c54caeb716f25"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/deployment-strategies.md",
+      "bytes": 4330,
+      "mode": 420,
+      "sha256": "a7fea944aee2d466c2fbbcee25cd38375594640d985aad51c34870becb0e70b0"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/governance-drift-routing.md",
+      "bytes": 7297,
+      "mode": 420,
+      "sha256": "a4a2fb6a782f4da726a30fb1704ff989b772be9aca18af07d6cdbc74fddeedd8"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/iac-planner-approval-gate.md",
+      "bytes": 3595,
+      "mode": 420,
+      "sha256": "5041b791ffd8cab24f24aee4f03437636ca2fccb59f17b370b660e0034b8d219"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/known-deploy-issues.md",
+      "bytes": 12094,
+      "mode": 420,
+      "sha256": "281d3d7ef49462ffd4c2cfce34b8f0a58da68525054cd1482e581aec39620a0e"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/placeholder-scan-protocol.md",
+      "bytes": 668,
+      "mode": 420,
+      "sha256": "a83ea1686fa181aabe9ff692f4c1caa04f510808019b53eff160192980b10ed5"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/plan-consistency-checks.md",
+      "bytes": 7125,
+      "mode": 420,
+      "sha256": "41a94d7f96c8b92167eee1bd8e525e8fa28e9a6cdac04f3d9bd54509e363d41a"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/policy-precheck-contract.md",
+      "bytes": 14525,
+      "mode": 420,
+      "sha256": "d9a831e3795f63a767d46ef7b89a54b79115115cb7c0943fa775e5bb5bf5c92e"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/preflight-policy-checks.md",
+      "bytes": 2904,
+      "mode": 420,
+      "sha256": "70d0380e7c1ef6450757667fcbc9eaa00909ddeb603a889bb5f89a623047fd99"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/references/step4-required-artifacts.md",
+      "bytes": 3453,
+      "mode": 420,
+      "sha256": "62745701616f1e64e1374ff538a31098b7a0d12494a36999d84aef6d122cbbc7"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/iac-common/SKILL.md",
+      "bytes": 10038,
+      "mode": 420,
+      "sha256": "0741c129a3f6a583af125c9ec2e098e7a0b2148dc40868a4e8eca907edd2e2ab"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/terraform-patterns/references/azuread-pattern.md",
+      "bytes": 4868,
+      "mode": 420,
+      "sha256": "768bd377e1344ef4f74b54aa12d95d501d310cadfb951ff18799c78f7a5616bc"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/vendor-prompting/references/checklists.md",
+      "bytes": 5310,
+      "mode": 420,
+      "sha256": "ac6ee9eae254292e8398f04b71b6496dd0d4212098cdae556270e87063329d39"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/vendor-prompting/references/cross-model-rules.md",
+      "bytes": 5323,
+      "mode": 420,
+      "sha256": "f8abb9b84b7e48811c9a61a1652f73bcc76cda88ac490f05451080a0e27f65a9"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/vendor-prompting/references/gpt-5-upgrade.md",
+      "bytes": 5396,
+      "mode": 420,
+      "sha256": "7a5b92f7b6545d891370c33e210b745687c203b0358a3904b3ddbfc9721d9762"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/workflow-engine/references/dag-concepts.md",
+      "bytes": 1973,
+      "mode": 420,
+      "sha256": "24332b014ff1f22446256b94a22907d364600e0a4732b9504d1862fc4dcd0f4b"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/workflow-engine/references/handoff-validation-rules.md",
+      "bytes": 6025,
+      "mode": 420,
+      "sha256": "4e4c74a8775038ac014fc051327233789582e6e84aa3562a689d781f90d9a0d1"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/workflow-engine/references/orchestrator-handoff-guide.md",
+      "bytes": 11584,
+      "mode": 420,
+      "sha256": "6c20f990cb7bce077539be1e5e3c66f8079a7c43972f213d08b8718a95af145a"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/workflow-engine/references/schema-evolution.md",
+      "bytes": 3653,
+      "mode": 420,
+      "sha256": "4ffbfb57154d9538aeb9e4c77088a01c21c230673cc3d90da5c989ba1012ef82"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/workflow-engine/references/subagent-integration.md",
+      "bytes": 7977,
+      "mode": 420,
+      "sha256": "2b79c757b0a00d222bd3c2e747b586b6a7f41c3d6e86e7ab4bb7e409d76c5c93"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/workflow-engine/references/track-parity-spec.md",
+      "bytes": 3810,
+      "mode": 420,
+      "sha256": "46895eb92d8a630c954fe69bdaf9468b650758d9519a204691b1f2086954e868"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/workflow-engine/SKILL.md",
+      "bytes": 5938,
+      "mode": 420,
+      "sha256": "939d451daacd6c62729358c4bb04f572278a4abb9691bd2a82ac9484f147d87b"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/.github/skills/workflow-engine/templates/workflow-graph.json",
+      "bytes": 21824,
+      "mode": 420,
+      "sha256": "5c1ba89373a1b719ea39de3aad171c067ebfff990aeb33e81fca5a63263de710"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/tools/schemas/challenge-findings-decisions.schema.json",
+      "bytes": 3437,
+      "mode": 420,
+      "sha256": "dfae32ac7948f1b6242a245265720686c731a08bc22b7e2f2d48f1e475986934"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/tools/schemas/governance-constraints.schema.json",
+      "bytes": 5590,
+      "mode": 420,
+      "sha256": "fba55fb92b4c873d0cf1c072fe9a5d8da018d226f9797c37e14940cc5c9099c4"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/tools/schemas/session-state.schema.json",
+      "bytes": 8269,
+      "mode": 420,
+      "sha256": "b2ed8d71214d03da4d907c95dccc89a9090b0eefe9483423ef1c73a1fc053a3e"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/tools/scripts/_lib/workflow-handoffs.mjs",
+      "bytes": 9523,
+      "mode": 420,
+      "sha256": "1bff046f5ee200a1b2c62d5258d1111d0c6f1870339664c3d501a7fc04711c51"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/tools/scripts/measure-workflow-baseline.mjs",
+      "bytes": 7492,
+      "mode": 420,
+      "sha256": "5b3ed50d5b4b1251115ec416446d087846f6514039c2b2737f5aa7d440b6e090"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/tools/scripts/validate-agents.mjs",
+      "bytes": 65874,
+      "mode": 420,
+      "sha256": "f6e4905f94f8bd451d7023894d0505b4ff58598024da565b0aa72a4e266de09e"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/tools/scripts/validate-challenger-presence.mjs",
+      "bytes": 4642,
+      "mode": 420,
+      "sha256": "d2a6d97c2d9a2d79ba16690f89a6faccf4d659245174884b0732e886814b4093"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/tools/scripts/validate-context-budget.mjs",
+      "bytes": 4478,
+      "mode": 420,
+      "sha256": "06fdfbae09de9fae26ffbf6738795426966f3f3f593ad912da9e5da1b88f840a"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/tools/scripts/validate-governance-trace.mjs",
+      "bytes": 15683,
+      "mode": 420,
+      "sha256": "3023c179e214adc06e98785c330c93f68cb86d4bf14b1e0825fee052924619dd"
+    },
+    {
+      "path": ".archive/retired-guidance/final-vnext/tools/scripts/validate-session-state.mjs",
+      "bytes": 11149,
+      "mode": 420,
+      "sha256": "5636ef5e2d307ab525c81e6f84862cd004dcc02d1d8de892cefad457c4999711"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/agent-authoring.instructions.md",
+      "bytes": 3457,
+      "mode": 420,
+      "sha256": "f2253cd8f22c6f9eba35f2c7dc44575a1b91f07807b23c8e5379aa9590411e0e"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/agent-skills.instructions.md",
+      "bytes": 13909,
+      "mode": 420,
+      "sha256": "d6e88a7c5ad63db5c5352e304f3c1c1ffa8e8941fa034870d53008b722632c18"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/azure-artifacts.instructions.md",
+      "bytes": 10140,
+      "mode": 420,
+      "sha256": "759390a97581599450e836e94778d6004455f70f85dab3adda492425f40d844e"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/azure-yaml.instructions.md",
+      "bytes": 1397,
+      "mode": 420,
+      "sha256": "a27945cdada78c04d737e6890f3bb12476d56b6a0a62beb470b501651cf79137"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/code-quality.instructions.md",
+      "bytes": 3907,
+      "mode": 420,
+      "sha256": "5223713c1f411117df41bc6ddfed98ebac33c77bf098a5feaf752a8453e0cba1"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/context-optimization.instructions.md",
+      "bytes": 9262,
+      "mode": 420,
+      "sha256": "549a67d43feb89999908f201a6897cbf2771128ab172fa652550e4b3b1680d3e"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/docs-trigger.instructions.md",
+      "bytes": 2500,
+      "mode": 420,
+      "sha256": "b1ff114d64c4687e029d3f999421e8a30bcc9f09ee61855c3ed90a4388d0782f"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/docs.instructions.md",
+      "bytes": 4159,
+      "mode": 420,
+      "sha256": "0fa9d76ff36fa26836d86298e482b1afb41ea3d16e0018ec3bbee46edc9834c0"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/github-actions.instructions.md",
+      "bytes": 4887,
+      "mode": 420,
+      "sha256": "141541edecd5e8ec9b9b0b3db18494d1074514441d35b7d67ec30d4e6150b1c9"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/governance-discovery.instructions.md",
+      "bytes": 3304,
+      "mode": 420,
+      "sha256": "1c0e62be1eb42ae25a1c49c54f0b8fbc923e140eac37490101ff97887ea95ad0"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/iac-bicep-best-practices.instructions.md",
+      "bytes": 4387,
+      "mode": 420,
+      "sha256": "16b2ffa484fa93403c1c11dfd728f8f0467155655835ec17d9709a871d289e12"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/iac-plan-best-practices.instructions.md",
+      "bytes": 1824,
+      "mode": 420,
+      "sha256": "869918703119942267b388ebc7821e1dd8dcd875ceda1f36efd9d6b87f2eab2a"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/iac-terraform-best-practices.instructions.md",
+      "bytes": 5290,
+      "mode": 420,
+      "sha256": "868c1571958f3806dc9dc2fc6ad6752b67c7895f5efaf478e56553a4c26f078f"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/instructions.instructions.md",
+      "bytes": 4229,
+      "mode": 420,
+      "sha256": "d5a5881c93522ab8bc85f253e3759df48a7cccf6ff6d9045f4e1790788af4159"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/javascript.instructions.md",
+      "bytes": 2851,
+      "mode": 420,
+      "sha256": "f207cbea41680a3a20473ba6abea3580747be24771cc93525dcab08f1f019054"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/json.instructions.md",
+      "bytes": 1592,
+      "mode": 420,
+      "sha256": "7ad4662e52ad9f88aa96095bfd7d76ae488af94287c8860c306f9bbd7c9bbd75"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/lesson-collection.instructions.md",
+      "bytes": 2396,
+      "mode": 420,
+      "sha256": "74454ff36e2a9a31252b1140d314f0048f7d5d9b14815721701529b04fc1a91a"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/markdown-docs.instructions.md",
+      "bytes": 1118,
+      "mode": 420,
+      "sha256": "fa84dbc724291d16407c96d3f50ec303db977e1b6d5d59053ee635ef138d46e4"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/markdown.instructions.md",
+      "bytes": 3587,
+      "mode": 493,
+      "sha256": "baaabb4929fff9c844a2845bea1cdd33899140118e63bd8ea6a3487dfb8b2a8c"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/no-hardcoded-counts.instructions.md",
+      "bytes": 2351,
+      "mode": 420,
+      "sha256": "21c4ca9692cc021b6fc0a72c2279a7d277c9972b9ecf49ff6307c69802a54848"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/no-heredoc.instructions.md",
+      "bytes": 3489,
+      "mode": 420,
+      "sha256": "265c03846e9d48c8c8fc0f1d25c9dc11c5a5eefcd069d319eb0309bdd19895ae"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/no-interactive-shell.instructions.md",
+      "bytes": 6180,
+      "mode": 420,
+      "sha256": "738836cadc6c943e0871b6fdb45aef02c21e94f4affdb60ed3bbb8923ab8d9e0"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/powershell.instructions.md",
+      "bytes": 2718,
+      "mode": 420,
+      "sha256": "ea886f051aba64dd45ed205f3e03dd599e73cdcfa7507957769acf79456c5f12"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/prompt.instructions.md",
+      "bytes": 6053,
+      "mode": 420,
+      "sha256": "c154b7aafe41533e7bba125013c174a16b025b088bd48bd6d4851c44937ae312"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/python.instructions.md",
+      "bytes": 1732,
+      "mode": 420,
+      "sha256": "0dcdfb88b1238ee31da31c60fc25898fe9df289de29328b0a94e4deaa29a118c"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/README.md",
+      "bytes": 686,
+      "mode": 420,
+      "sha256": "2754cc79d1b1cc813d3887a5a49b5985a6354d1612cd6e06f6fb5f636f974de6"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/shell.instructions.md",
+      "bytes": 1758,
+      "mode": 420,
+      "sha256": "cd20e996d2980b65ca3c5c29e4347a342e127219420ac30228b47a7c97fa7286"
+    },
+    {
+      "path": ".archive/retired-instructions-v1/vendor-prompting.instructions.md",
+      "bytes": 5629,
+      "mode": 420,
+      "sha256": "22648576a473bfccdf11ab6dd5c1bbba0bfcf1609d718bcb888b85b8a88dabec"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/.github/prompts/apex-resume-workflow.prompt.md",
+      "bytes": 8625,
+      "mode": 420,
+      "sha256": "63bac5d29cfa1a4281ddf9c28a9f0dfa75df04501acf3f81295f3479407a1688"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/provenance.json",
+      "bytes": 4073,
+      "mode": 420,
+      "sha256": "c7f031004350e2a62907fcd5857834b0c68ad199644c841247b8c01f2d5374d9"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/README.md",
+      "bytes": 1264,
+      "mode": 420,
+      "sha256": "28aef0768b5644deb4b23f3123067ac5defcade786bafbb805f46438b8aa4e4b"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tests/scripts/test_execution_subagent_contract.mjs",
+      "bytes": 2222,
+      "mode": 420,
+      "sha256": "9bb0039782bf255adab01ba93565b8457849aa3be59d15e422a5c0d029f0ac92"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/utility-prompts/as-built-from-azure.prompt.md",
+      "bytes": 19068,
+      "mode": 420,
+      "sha256": "25d457e647b4d606b334860553b8585537269bf4ba585cfd81cc6eec8f14716d"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/utility-prompts/context-audit.prompt.md",
+      "bytes": 2394,
+      "mode": 420,
+      "sha256": "2ea2c83eec166494576bc33a7db72b41381b110d7caa6d84662395d67cb224bb"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/utility-prompts/execution-subagent-claude.prompt.md",
+      "bytes": 2620,
+      "mode": 420,
+      "sha256": "072acd06e2d8930e5168ed171a5bad7623388e0b7f7ceac1d84cea9d1d609dae"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/utility-prompts/execution-subagent-gpt.prompt.md",
+      "bytes": 2544,
+      "mode": 420,
+      "sha256": "8e41bf8d82fe330cc37d22ee1b90e68ce17beaf455e9a2f3281e131b58f624f1"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/utility-prompts/execution-subagent.prompt.md",
+      "bytes": 3837,
+      "mode": 420,
+      "sha256": "37b43d502801ec23e851a1a12d6382399e555d410d10f50ec442f7305b971e05"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/utility-prompts/merge-sensei-free-pr.prompt.md",
+      "bytes": 12504,
+      "mode": 420,
+      "sha256": "cc4a93681f01da9d2c6d45f10b99cd4784863d26fb45f0c2a428071ebcbc66a6"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/utility-prompts/project-wide-review.prompt.md",
+      "bytes": 18075,
+      "mode": 420,
+      "sha256": "da3a81b5096440198501e4339098d6e232f33e69994b8e07a348db0b30565626"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/utility-prompts/review-imported-iac.prompt.md",
+      "bytes": 12455,
+      "mode": 420,
+      "sha256": "729cd457b740ca9b8a1c0e2a8adbe63d23dfb9f75f2184e87aaade457081e01f"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/utility-prompts/review-markdown-docs.prompt.md",
+      "bytes": 2959,
+      "mode": 420,
+      "sha256": "eae8ecb34636bb4eb22ddf74368e6080506848eca7586c0d899a89aca09b26fc"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/workflow-prompts/00-resume-workflow.prompt.md",
+      "bytes": 8968,
+      "mode": 420,
+      "sha256": "5faa641c2b515d8bee154e184b3479f422c6fd04797761507ccdb801fe587e29"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/workflow-prompts/02-requirements.prompt.md",
+      "bytes": 2847,
+      "mode": 420,
+      "sha256": "e966a9c706c997263e71d85e207aa5f2736b519bb3a4de74f02c2cfabc869bf0"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/workflow-prompts/03-architect.prompt.md",
+      "bytes": 3260,
+      "mode": 420,
+      "sha256": "59ff064c1f602e54b8fe05831a59b4ed900756f88d25d71b8728765031d1219d"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/workflow-prompts/04-design.prompt.md",
+      "bytes": 2462,
+      "mode": 420,
+      "sha256": "9986da69373125ba07cb5ce16175eb741711a33d18879cc55d893148ecd5f94c"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/workflow-prompts/04g-governance.prompt.md",
+      "bytes": 2750,
+      "mode": 420,
+      "sha256": "ae26b4b9050f5964bc90039a81c34597da63940338040d9595695863231ecf56"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/workflow-prompts/05-iac-planner.prompt.md",
+      "bytes": 3370,
+      "mode": 420,
+      "sha256": "68dba98d1b27b925115a276947dcc27156c4a592d8352de92138dd483b144071"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/workflow-prompts/06b-bicep-codegen.prompt.md",
+      "bytes": 2570,
+      "mode": 420,
+      "sha256": "aa70e9c3be77a633a4326ea58e5da039823361fa2d64fd89561a7a79493a8e5d"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/workflow-prompts/06t-terraform-codegen.prompt.md",
+      "bytes": 2784,
+      "mode": 420,
+      "sha256": "2a2956bb65ef62b106acdf21e559788342d465e01c38b18311ece62ba9522c3a"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/workflow-prompts/07b-bicep-deploy.prompt.md",
+      "bytes": 2297,
+      "mode": 420,
+      "sha256": "2c9cadf2803d8c3c41c59429d2379d99cf7eabb0d480798c9c68bf5cf66bbbe1"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/workflow-prompts/07t-terraform-deploy.prompt.md",
+      "bytes": 2335,
+      "mode": 420,
+      "sha256": "dab009819263866f42016de789c8fb36eb2f0f0dfd07e01a34c8a29703ffdf26"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/workflow-prompts/08-as-built.prompt.md",
+      "bytes": 2431,
+      "mode": 420,
+      "sha256": "2c431d22999cd5b87e198a34cf1fa778fe4ce74d47d355c1567509013e496297"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/workflow-prompts/09-diagnose-resource.prompt.md",
+      "bytes": 2678,
+      "mode": 420,
+      "sha256": "d3a8bed659e91cc2687e164867afd06b25e106feb17a4f6a9c684948d2a38181"
+    },
+    {
+      "path": ".archive/retired-prompts/original-apex-v1/tools/apex-prompts/workflow-prompts/10-challenger-review.prompt.md",
+      "bytes": 2252,
+      "mode": 420,
+      "sha256": "33bb2a05586d92948d08dfc64738a3ef9e9efb73fd151a7c4819ebc1cff1c3e2"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-adr/trigger_tests.yaml",
+      "bytes": 1963,
+      "mode": 420,
+      "sha256": "963a3daa15df281d366ddc531b0237dcfcbb6f9e7f01c3540f6367162f527939"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-artifacts/sku-manifest/invalid/allowlist-violation.json",
+      "bytes": 1240,
+      "mode": 420,
+      "sha256": "d7586dceea37a20f447c70ed61419856c20f215ebdb4fe32a837bb941f9240b6"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-artifacts/sku-manifest/invalid/current-revision-mismatch.json",
+      "bytes": 588,
+      "mode": 420,
+      "sha256": "23add7832aeef341f5256596a8b65391549029fe8b57adf51e58a5763d32e7c9"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-artifacts/sku-manifest/invalid/duplicate-id.json",
+      "bytes": 1440,
+      "mode": 420,
+      "sha256": "d6b89797826332698cc3334a551c8e8e99f9ea23338c3fd4fee7168c037a6ebd"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-artifacts/sku-manifest/invalid/env-override-not-in-environments.json",
+      "bytes": 1107,
+      "mode": 420,
+      "sha256": "19e8029a54c08b9b98166d8c0b80b112bb458f2968a4e449067af6831805379f"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-artifacts/sku-manifest/invalid/reserved-missing-term-years.json",
+      "bytes": 1025,
+      "mode": 420,
+      "sha256": "fe9580bf29992c2d9b624c56f504b8a4d45e0816fb8f5dce0db3be5339b0d945"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-artifacts/sku-manifest/invalid/stamp-references-unknown-service.json",
+      "bytes": 1217,
+      "mode": 420,
+      "sha256": "7853bc03e581a66e3307ab260b5cc5670aa73acce0f90234663bee0795f345d6"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-artifacts/sku-manifest/valid/allowlist-satisfied.json",
+      "bytes": 1228,
+      "mode": 420,
+      "sha256": "74a3827bca3d200917d9eeb9b139999586d3828cbd7adfec0c500b91d8ccc94d"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-artifacts/sku-manifest/valid/empty-user-pins.json",
+      "bytes": 565,
+      "mode": 420,
+      "sha256": "689982035086a51ab04b3e60bbd027b397ac7020e7ea2454f37f1afe90ce23fa"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-artifacts/sku-manifest/valid/multi-env-autoscale-ri.json",
+      "bytes": 1862,
+      "mode": 420,
+      "sha256": "b31114c3985a0a86ea2872468f03434bfd9343eaef39cada466059795f855697"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-artifacts/sku-manifest/valid/multi-stamp.json",
+      "bytes": 1428,
+      "mode": 420,
+      "sha256": "f710d6688ff872415a7eaa495062d2adc75fc225683171d00bb12a60698efc15"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-artifacts/trigger_tests.yaml",
+      "bytes": 1684,
+      "mode": 420,
+      "sha256": "462a5d29ed6b6212552a5943b87e9ab9a02d10836aad38bf9a8e20bb328d5e22"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-bicep-patterns/trigger_tests.yaml",
+      "bytes": 2023,
+      "mode": 420,
+      "sha256": "acb65656494a920fe210f5d67a34ff0040233193e602dc70fba61c053a5a8bd6"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-cloud-migrate/trigger_tests.yaml",
+      "bytes": 2058,
+      "mode": 420,
+      "sha256": "b22a3ef6c3724b51a6a9b8a77cb8e55cbfad8791d1e430d805b6f5bb4e738ebf"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-compliance/trigger_tests.yaml",
+      "bytes": 1945,
+      "mode": 420,
+      "sha256": "140971035823bcc8a7314a17c2e0125cc3e789aa5414cfad6f4ba5f09155cffa"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-compute/trigger_tests.yaml",
+      "bytes": 1873,
+      "mode": 420,
+      "sha256": "57a05b23b001b417177bbdb9ed1ce46bb40c4317ca3c682b2ed99fdc04ab81dd"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-cost-optimization/trigger_tests.yaml",
+      "bytes": 2197,
+      "mode": 420,
+      "sha256": "e72012aab7ea43a0d6de8e26005aad76f9461d05d640d1a5705b11b6c0231302"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-defaults/trigger_tests.yaml",
+      "bytes": 1688,
+      "mode": 420,
+      "sha256": "1c40db45dc48699814cfab6c9459ad373375bbb35cfa2aac26843975200bcce0"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-deploy/trigger_tests.yaml",
+      "bytes": 1879,
+      "mode": 420,
+      "sha256": "70cb2837511c257ebcf266e0252183b4d4cc930d4d2b31fe33e94998485c4f10"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-diagnostics/trigger_tests.yaml",
+      "bytes": 2099,
+      "mode": 420,
+      "sha256": "f87f86992e4940a7114730fb17037768f9d88b3c0645df961289441fb5251a89"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-governance-discovery/trigger_tests.yaml",
+      "bytes": 1984,
+      "mode": 420,
+      "sha256": "175cd6025d1a467689746298e178752f485dc7402a5de416a87ede2987c9ed6f"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-kusto/trigger_tests.yaml",
+      "bytes": 2062,
+      "mode": 420,
+      "sha256": "146702487e9d719921be152bde72ca7204ce84a36f3e471959e993f727a59869"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-prepare/trigger_tests.yaml",
+      "bytes": 2911,
+      "mode": 420,
+      "sha256": "17659033f77caf8eabc9ed81906e49bfdb01b5937ab382d48b8c2ef4fb07f9fa"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-quotas/trigger_tests.yaml",
+      "bytes": 2071,
+      "mode": 420,
+      "sha256": "31721bc2094aad41c870284ce8bc5442f423f1a7977e492254c861bb15e17cb9"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-rbac/trigger_tests.yaml",
+      "bytes": 2008,
+      "mode": 420,
+      "sha256": "be1cfe9379b1919ede03dadf4a34a3a6488fbd3d4638b0134845c323109f2c8c"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-resources/trigger_tests.yaml",
+      "bytes": 2332,
+      "mode": 420,
+      "sha256": "afef51c312e3e8010d59b32b3accf2d1a0edfd6e825382d737145779b5aafc55"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-storage/trigger_tests.yaml",
+      "bytes": 1902,
+      "mode": 420,
+      "sha256": "03a70d4a2b180e28824baf68cc1a07bf1df7a4ff6306376affc4d3ba64024516"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/azure-validate/trigger_tests.yaml",
+      "bytes": 2279,
+      "mode": 420,
+      "sha256": "fbde32b3bcaa48481ba71a7c9c37ca59c2aac0b101b08e53fb5365b4fc85c4ae"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/context-management/trigger_tests.yaml",
+      "bytes": 1468,
+      "mode": 420,
+      "sha256": "7548db18880e896d5c47fb63d7ad65131f4ce3c2a6e50486c7a679ffb3cda560"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/docs-writer/trigger_tests.yaml",
+      "bytes": 2189,
+      "mode": 420,
+      "sha256": "fbdc58bc73689a070aeaf3e3dfc5dbe25a93fae0fad1a877273e99b5e5eac855"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/entra-app-registration/trigger_tests.yaml",
+      "bytes": 2353,
+      "mode": 420,
+      "sha256": "8bda83185ce5ca02b58cfd7701c17809e72b07db4dcd860f2a64bc656a718178"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/fixtures/golden-diffs/BUDGET.md",
+      "bytes": 632,
+      "mode": 420,
+      "sha256": "ff9caf297384e59c7039ee70434c6e5074b98227d6991b0953b05152773e3962"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/fixtures/golden-diffs/OWNERS",
+      "bytes": 28,
+      "mode": 420,
+      "sha256": "89e7b38e9555ae2aa7682309e05c5833f9640928aadfd5ad7a0b234bebb5a81d"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/fixtures/hub-spoke-complex/BUDGET.md",
+      "bytes": 626,
+      "mode": 420,
+      "sha256": "86ed654b69410e6a871e6244b391d0d8728f6d1b48aa53d2881b1e5bac2e3963"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/fixtures/hub-spoke-complex/OWNERS",
+      "bytes": 28,
+      "mode": 420,
+      "sha256": "89e7b38e9555ae2aa7682309e05c5833f9640928aadfd5ad7a0b234bebb5a81d"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/fixtures/manual-identity/BUDGET.md",
+      "bytes": 562,
+      "mode": 420,
+      "sha256": "136a555fb3bf37c1490d7712c81e97c6cbfd542734cfcc87ed932eeaad713897"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/fixtures/manual-identity/OWNERS",
+      "bytes": 28,
+      "mode": 420,
+      "sha256": "89e7b38e9555ae2aa7682309e05c5833f9640928aadfd5ad7a0b234bebb5a81d"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/fixtures/minimal-storage-only/BUDGET.md",
+      "bytes": 396,
+      "mode": 420,
+      "sha256": "e8af84b18a480339923b224b92aa09a91445e89de2e4232e9057a8a823f2fd52"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/fixtures/minimal-storage-only/OWNERS",
+      "bytes": 28,
+      "mode": 420,
+      "sha256": "89e7b38e9555ae2aa7682309e05c5833f9640928aadfd5ad7a0b234bebb5a81d"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/fixtures/nordic-foods-replay/affirmative-checks.json",
+      "bytes": 1286,
+      "mode": 420,
+      "sha256": "7b30fad84343f5e7a859bde8bc56b4f09e23206524d6d0f37e84034a7edb81f4"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/fixtures/nordic-foods-replay/expected-transcript.md",
+      "bytes": 4133,
+      "mode": 420,
+      "sha256": "15abc7eed1d6432286d9a8f1082cf3b883f932c99a9222939d8a17f23e1ba0cb"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/fixtures/nordic-foods-replay/forbidden-patterns.json",
+      "bytes": 1178,
+      "mode": 420,
+      "sha256": "97ca305eda8d987854726e32f8c393d7109507e953644f7f8cd4fa10da59a682"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/fixtures/nordic-foods-replay/README.md",
+      "bytes": 1878,
+      "mode": 420,
+      "sha256": "3a71202f55f8fdadb24476beaa4b2da24c0ec508fdcfc49c16cbdb8dbaecf0f8"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/fixtures/nordic-foods-replay/transcript-checks.test.mjs",
+      "bytes": 2274,
+      "mode": 420,
+      "sha256": "9d9d79931489e301698726cb8b27adfa4ae45d388e2e95678a0bae36a06cd49d"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/fixtures/otel-log-min.json",
+      "bytes": 4084,
+      "mode": 420,
+      "sha256": "15e9caae0119118caa2c1b02772027758049c0e5695bba9eeb3b5818919edb76"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/github-operations/trigger_tests.yaml",
+      "bytes": 2049,
+      "mode": 420,
+      "sha256": "c2ddd86ca41791456640800d6e7d72b568aaf59830918e0d3fcfa2bad5cfb2e4"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/golden-principles/trigger_tests.yaml",
+      "bytes": 1461,
+      "mode": 420,
+      "sha256": "90d64a16f4fc29e381192cb52f608eaec860117bf1254537c0425e9b72771916"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/iac-common/trigger_tests.yaml",
+      "bytes": 1696,
+      "mode": 420,
+      "sha256": "2b6f5e275cc1f40f03ff7bc779b030c9408a5fc58b122ee68d5010a7f282816e"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/mermaid/trigger_tests.yaml",
+      "bytes": 2178,
+      "mode": 420,
+      "sha256": "222ec4e266c9e3b3d3a1b7e7426084671fb696a6217cdb575d27f4ee12bf6ec2"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/microsoft-docs/trigger_tests.yaml",
+      "bytes": 2169,
+      "mode": 420,
+      "sha256": "c970b9b197282aa4a1db4725ced480222aaf363ec1dab562b105ca3b764e35e7"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/python-diagrams/test_diagram_io.py",
+      "bytes": 5006,
+      "mode": 420,
+      "sha256": "a702e40b91aaeb19e44bd3ccb3331e7026b6b0383e7df4e5ccdfce26e20cbefb"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/python-diagrams/trigger_tests.yaml",
+      "bytes": 2689,
+      "mode": 420,
+      "sha256": "412c0d3b50f1a9dd14ff20099dbaa807d6012f8c6f5a7ef8b9d5b8d77be257d6"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/fixtures/challenge-findings-decisions/invalid-bad-disposition.json",
+      "bytes": 186,
+      "mode": 420,
+      "sha256": "c693f29bd9e5d8a32f1a7964da766bd3d6563ac32fbfeea0794679f0e8242f7c"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/fixtures/challenge-findings-decisions/invalid-missing-id.json",
+      "bytes": 163,
+      "mode": 420,
+      "sha256": "beff8fa3a6b8785d4b75355f9ebc39c0e381ca1f626d2ef0477307dfc8bdd349"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/fixtures/challenge-findings-decisions/valid-architecture-shape.json",
+      "bytes": 338,
+      "mode": 420,
+      "sha256": "acf750b4bd922ad8181b443e0fdecc27e8198fcd2eb1bbdff74680e557739230"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/fixtures/challenge-findings-decisions/valid-governance-shape.json",
+      "bytes": 336,
+      "mode": 420,
+      "sha256": "4868733d2663f4c2ab917ea7ac9f94820192acb2016573b4f6e04eccb91feff6"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/fixtures/challenge-findings-decisions/valid-requirements-shape.json",
+      "bytes": 342,
+      "mode": 420,
+      "sha256": "af4cfdac9ca312662d67fc3d550d4e308dedd527fd499fa4c0a332ea7b959f03"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/fixtures/deployment-preview/invalid-bad-enum.json",
+      "bytes": 236,
+      "mode": 420,
+      "sha256": "320888d7c6bf92c898cec6cb2228e1457ca7bab1dd84069f4723208cb0abd329"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/fixtures/deployment-preview/valid-bicep-whatif.json",
+      "bytes": 388,
+      "mode": 420,
+      "sha256": "1eb25333ea0c3372d0e7770a98c2ad06dbf440e8e36a7d75c6ae923f4ccf727a"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/fixtures/deployment-preview/valid-policy-precheck-block.json",
+      "bytes": 413,
+      "mode": 420,
+      "sha256": "d49e76375bacee69dcd457da5b26aa88245094ef7233c8d158b8f2bab96623d3"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/fixtures/safe-shell/compliant-agent-output-heredoc.md",
+      "bytes": 467,
+      "mode": 420,
+      "sha256": "dc7e4d02b9ab17efc36df50c795a542c5b302e6bfbb89f1784dddbfd1fa0d9ab"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/fixtures/safe-shell/compliant-command-portability.md",
+      "bytes": 491,
+      "mode": 420,
+      "sha256": "cb7290386d99a779ca16d495d5730903948ba2606b09f9187b6b16b5ad446be6"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/fixtures/safe-shell/compliant-grep-set-e.md",
+      "bytes": 316,
+      "mode": 420,
+      "sha256": "90ac9b01cf961cbcfe31a2a70c927b1ebdd94f43cd9fb924f6bb2a7b8b5e9413"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/fixtures/safe-shell/non-compliant-agent-output-heredoc.md",
+      "bytes": 525,
+      "mode": 420,
+      "sha256": "a15a95438570b8ad30476aceae52e2ca0944721e37ff9e3cfc28d1b2d4ef0a2f"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/fixtures/safe-shell/non-compliant-command-portability.md",
+      "bytes": 221,
+      "mode": 420,
+      "sha256": "3424fb86f36bcb44245c49ebd5600b9f0d5adc337647b4e904fd85fb0996381f"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/fixtures/safe-shell/non-compliant-grep-set-e.md",
+      "bytes": 316,
+      "mode": 420,
+      "sha256": "b14d3e0cac8c1d482640bc81a36d4ad404d9ea4b2d589c792ca62ed493b18376"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/test_challenge_findings_decisions_schema.mjs",
+      "bytes": 3482,
+      "mode": 420,
+      "sha256": "f5d35e3e16e121c9dfc701b6f813d4826eee5754886aec136422d9298c3d7410"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/test_deployment_preview_schema.mjs",
+      "bytes": 2559,
+      "mode": 420,
+      "sha256": "ccf0d579b9f51389fb074d015addcf80753f82bc47783ebeca1f07a3d8dcdcd9"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/test_post_write_validation.mjs",
+      "bytes": 2782,
+      "mode": 420,
+      "sha256": "8d928336fe9f58ff210b97e356e0143744afb9f03bd44ba9525bc4c310db77b0"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/test_profile_debug_log.py",
+      "bytes": 5011,
+      "mode": 420,
+      "sha256": "70445cb7f6fb2ff7c9393160654ee24196c1d089c6d58eff3b2eb474ba6e6c4b"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/scripts/test_safe_shell.mjs",
+      "bytes": 3843,
+      "mode": 420,
+      "sha256": "fcdc9c6eb19a368dd098c0144e4f85c58ab0f1f7b6d5baf9a1c8159b98d9e181"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/terraform-patterns/trigger_tests.yaml",
+      "bytes": 2009,
+      "mode": 420,
+      "sha256": "6204f237d63c82430e124e4ef2e20d66028e51e31f046bf6e5d047361372c60d"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/terraform-search-import/trigger_tests.yaml",
+      "bytes": 2209,
+      "mode": 420,
+      "sha256": "b38fa542d42fbde7a868f843a8332dbc93a2e8d7ed6bd9617088359bfef61f8a"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/terraform-test/trigger_tests.yaml",
+      "bytes": 2282,
+      "mode": 420,
+      "sha256": "8cf0d5af74f422874814ba04eb2bc615ca189e74477e4f8088b3621e1747dc59"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/vendor-prompting/trigger_tests.yaml",
+      "bytes": 2221,
+      "mode": 420,
+      "sha256": "375164f4fb4e7881f989fbb8692371b09c7e67145923b440cd4c3cb03219aff7"
+    },
+    {
+      "path": ".archive/retired-tests/top-level-v1/tests/workflow-engine/trigger_tests.yaml",
+      "bytes": 1609,
+      "mode": 420,
+      "sha256": "7f3e3c927f20339e22608d66b19cde6b18380e557ca0d9b17c1dcfb654de04d0"
+    },
+    {
+      "path": ".archive/retired-utilities/devcontainer-v1/.devcontainer/post-create.sh",
+      "bytes": 20449,
+      "mode": 420,
+      "sha256": "5634f75859b4a358d3d28baf02beddc4a84c253384c1dd83873ee01f591bde2c"
+    },
+    {
+      "path": ".archive/retired-utilities/devcontainer-v1/.devcontainer/post-start.sh",
+      "bytes": 3795,
+      "mode": 420,
+      "sha256": "0a5b0566ea1993b59ab5e3fc7fec5f116de1517ee9563b1e5d95874ece62e2ea"
+    },
+    {
+      "path": ".archive/retired-utilities/devcontainer-v1/.devcontainer/update-tools.sh",
+      "bytes": 2664,
+      "mode": 493,
+      "sha256": "783aa4025967d078ef43e60430af876fe2f3d0b545cf2252c7153000b9b1cc08"
+    },
+    {
+      "path": ".archive/retired-utilities/devcontainer-v1/provenance.json",
+      "bytes": 1006,
+      "mode": 420,
+      "sha256": "7ebfb740fed89023a38bcf3eaa73219c3b19d986c08f6eba9fc99a0c18fbe45c"
+    },
+    {
+      "path": ".archive/retired-utilities/devcontainer-v1/README.md",
+      "bytes": 1168,
+      "mode": 420,
+      "sha256": "f6e8d8954c9fe993f72a32ed9554ac0501396d99df7da635aefabd726b3ff890"
+    },
+    {
+      "path": ".archive/retired-utilities/devcontainer-v1/requirements.txt",
+      "bytes": 681,
+      "mode": 420,
+      "sha256": "fd66b1a63e7cd2bd9e648b87ff4ab732cc3bb3e2678a10d3ef799fd18b2efcf4"
+    },
+    {
+      "path": ".archive/retired-utilities/devcontainer-v1/tools/scripts/validate-devcontainer.sh",
+      "bytes": 9656,
+      "mode": 420,
+      "sha256": "5f8f925d98665f7ef1cbf623008e23c42a94f54e3808e115972740bc788bdf12"
+    },
+    {
+      "path": ".archive/retired-utilities/npm-scripts-v1/.yamllint.yml",
+      "bytes": 666,
+      "mode": 420,
+      "sha256": "34afc9989547c23a0d814a62723b67d188d91decb9ec28982bc07441ab70ee7e"
+    },
+    {
+      "path": ".archive/retired-utilities/npm-scripts-v1/provenance.json",
+      "bytes": 2239,
+      "mode": 420,
+      "sha256": "c0279466862b89cfaf27183a5b8e3d202e2ae1d94150907a4068b52105a4c9a1"
+    },
+    {
+      "path": ".archive/retired-utilities/npm-scripts-v1/README.md",
+      "bytes": 911,
+      "mode": 420,
+      "sha256": "96e5d84785af433da5c0eeb262f320851e26a972994e1704015b6dcf38e07d07"
+    },
+    {
+      "path": ".archive/retired-utilities/npm-scripts-v1/tools/registry/precommit-baseline.json",
+      "bytes": 2052,
+      "mode": 420,
+      "sha256": "cfad311715fed6ff1cc01510f8bdc25e4fe4a59197da7923ef8006cd9656f3fa"
+    },
+    {
+      "path": ".archive/retired-utilities/npm-scripts-v1/tools/scripts/check-context-redundancy.mjs",
+      "bytes": 4034,
+      "mode": 420,
+      "sha256": "78403d6d6727a20ceba71a6cc08ecfd6e4208766383de3e080f47fbe03a7c47e"
+    },
+    {
+      "path": ".archive/retired-utilities/npm-scripts-v1/tools/scripts/lessons-to-checklists.mjs",
+      "bytes": 4108,
+      "mode": 420,
+      "sha256": "2d31198d64f6e3696298fe37642dadd4c7a5b8d89b7d8652e1b26d9627ce378a"
+    },
+    {
+      "path": ".archive/retired-utilities/npm-scripts-v1/tools/scripts/lint-docs-frontmatter.mjs",
+      "bytes": 2518,
+      "mode": 420,
+      "sha256": "089e75da3f7a7134dbff0a1de456fc85cc63f13bef9b429011cce765b2c0fcac"
+    },
+    {
+      "path": ".archive/retired-utilities/npm-scripts-v1/tools/scripts/measure-precommit-baseline.mjs",
+      "bytes": 7552,
+      "mode": 420,
+      "sha256": "a938447aa41aba6be1a49e4937ae6fd790b130e17754c8c94c1550a42e257204"
+    },
+    {
+      "path": ".archive/retired-utilities/npm-scripts-v1/tools/tests/fixtures/subagent-file-contract/challenger-review.findings.json",
+      "bytes": 2774,
+      "mode": 420,
+      "sha256": "8a2f1f86bc82bfee1fd15f9dd23bf24a40d6a8751bab34716a9544beb9275bfc"
+    },
+    {
+      "path": ".archive/retired-utilities/npm-scripts-v1/tools/tests/fixtures/subagent-file-contract/challenger-review.summary.txt",
+      "bytes": 265,
+      "mode": 420,
+      "sha256": "0fa7e67c2f3f4ce12147dfb32010b73ed9cdbf6094e0d70c6b42745a3400bf4f"
+    },
+    {
+      "path": ".archive/retired-utilities/npm-scripts-v1/tools/tests/fixtures/subagent-file-contract/cost-estimate.findings.json",
+      "bytes": 2023,
+      "mode": 420,
+      "sha256": "773baafdf0a11d552f82c0aaf7d748e8300754b93d50d2d07bd62d06cfdf00b5"
+    },
+    {
+      "path": ".archive/retired-utilities/npm-scripts-v1/tools/tests/fixtures/subagent-file-contract/cost-estimate.summary.txt",
+      "bytes": 300,
+      "mode": 420,
+      "sha256": "167b21ab40e4045b8b5224630a77246fde06e1d84d43f6e592e2733879b9c1a6"
+    },
+    {
+      "path": ".archive/retired-utilities/npm-scripts-v1/tools/tests/measure-precommit-baseline.test.mjs",
+      "bytes": 3386,
+      "mode": 420,
+      "sha256": "a38eb45089aefc88db1b84fb101bdb7396f7fbad0d075f8873d1a3f96b5b06aa"
+    },
+    {
+      "path": ".archive/retired-utilities/npm-scripts-v1/tools/tests/orphan-skill-discovery.test.mjs",
+      "bytes": 2874,
+      "mode": 420,
+      "sha256": "c8f4a0440facdbd95e4348bc17bdfee91fc91880853acd6e3ca4b4e784229bbc"
+    },
+    {
+      "path": ".archive/retired-utilities/npm-scripts-v1/tools/tests/subagent-file-contract.test.mjs",
+      "bytes": 6619,
+      "mode": 420,
+      "sha256": "61bc7ee97daf25f464228c23a943b137d3dce75781ce509c1fb0495602978630"
+    },
+    {
+      "path": ".archive/retired-utilities/npm-scripts-v1/tools/tests/validate-context-budget.test.mjs",
+      "bytes": 2202,
+      "mode": 420,
+      "sha256": "5bd681a824a3a1cf122558cb4ac3be62ddc060f8d2b606d032d9be5c34e3e599"
+    },
+    {
+      "path": ".archive/retired-utilities/original-apex-v1/agent-output/README.md",
+      "bytes": 6721,
+      "mode": 420,
+      "sha256": "63d26d57db543f8614e0c4a1c57260b9010e8439b2cc773efffe017ad5b3de0f"
+    },
+    {
+      "path": ".archive/retired-utilities/original-apex-v1/provenance.json",
+      "bytes": 1699,
+      "mode": 420,
+      "sha256": "c8ac53cfd8d88ed38e67932151c2a4ffa693127f657351e3b2f3fcffaf664f11"
+    },
+    {
+      "path": ".archive/retired-utilities/original-apex-v1/README.md",
+      "bytes": 1052,
+      "mode": 420,
+      "sha256": "ef0a1f10bfde0f964a59bf083390bde79ae532e48566b36f871ed13665688e65"
+    },
+    {
+      "path": ".archive/retired-utilities/original-apex-v1/tests/integration/smoke-run.md",
+      "bytes": 6457,
+      "mode": 420,
+      "sha256": "db0ad9c667850de15c45b0c80895fb6aa2bc03099b7ada7b06973ae10885d17c"
+    },
+    {
+      "path": ".archive/retired-utilities/original-apex-v1/tests/scripts/test_smoke_verify.py",
+      "bytes": 12011,
+      "mode": 420,
+      "sha256": "4a8dfcea8a70548bdda122cbfd2554c270d454d8e053bfe559251fe09c35320b"
+    },
+    {
+      "path": ".archive/retired-utilities/original-apex-v1/tests/scripts/test_validate_orchestrator_handoff.py",
+      "bytes": 2061,
+      "mode": 420,
+      "sha256": "9e359dd72fa35e6d60a7cbc818abeb68421fcc2b9e37f899cf02049fd42e2733"
+    },
+    {
+      "path": ".archive/retired-utilities/original-apex-v1/tests/scripts/test_validate_question_batching.py",
+      "bytes": 1877,
+      "mode": 420,
+      "sha256": "16061a6cfc794dd50857b54dc3008019ad3400f8d21b8279e3947600dd43d690"
+    },
+    {
+      "path": ".archive/retired-utilities/original-apex-v1/tests/scripts/test_validate_review_ceiling.py",
+      "bytes": 3043,
+      "mode": 420,
+      "sha256": "d85eb199652be3049ee97b61f006a567c8b765e6369492770b1b90cc00a1f5de"
+    },
+    {
+      "path": ".archive/retired-utilities/original-apex-v1/tools/scripts/export-agent-output-html.py",
+      "bytes": 27026,
+      "mode": 420,
+      "sha256": "ad92aa550d22298023b90ae2665662f2b342043da1b2dba9bce10e6b8aa78fbf"
+    },
+    {
+      "path": ".archive/retired-utilities/original-apex-v1/tools/scripts/init-from-template.mjs",
+      "bytes": 4503,
+      "mode": 420,
+      "sha256": "7ea1cc863da17e0a1fdd0774f1bf87e0255b15f98d7d48515ff08a43f9fae804"
+    },
+    {
+      "path": ".archive/retired-utilities/original-apex-v1/tools/scripts/promote-sku-aliases.mjs",
+      "bytes": 6988,
+      "mode": 420,
+      "sha256": "4316201ab35e38ba5e0de13369bbca653e3f878f48348583559bfb31364ad03f"
+    },
+    {
+      "path": ".archive/retired-utilities/original-apex-v1/tools/scripts/setup-azure.sh",
+      "bytes": 22073,
+      "mode": 420,
+      "sha256": "9e80183d679205338475863d24c691e7255c09f49ec128a17d440e83114f930d"
+    },
+    {
+      "path": ".archive/retired-utilities/original-apex-v1/tools/scripts/smoke_verify.py",
+      "bytes": 18870,
+      "mode": 420,
+      "sha256": "0104c29c119ba63e1f0c917d70eb5a1cb7f23362e459419115935328b8ffb7eb"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/docs/decision-keys.md",
+      "bytes": 15153,
+      "mode": 420,
+      "sha256": "23e4a1b2e3331dcf86cf1495007ff415e51ba1a2726b131bfc03c6b0694dc2f0"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/docs/show-schema.md",
+      "bytes": 3398,
+      "mode": 420,
+      "sha256": "caebcd89935279e137764074b84ddf428fc0a7cfe458ac58f39c04cb672a17b5"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/pyproject.toml",
+      "bytes": 404,
+      "mode": 420,
+      "sha256": "2149e2a9653616b8e076a239d76e01a267e50f11bcc60f0e3f59f3647a7c45fa"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall.egg-info/dependency_links.txt",
+      "bytes": 1,
+      "mode": 420,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall.egg-info/entry_points.txt",
+      "bytes": 58,
+      "mode": 420,
+      "sha256": "79e21395658c736936356f6e8b6da1ee0648706233b617c2d903700de9f7cdce"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall.egg-info/PKG-INFO",
+      "bytes": 175,
+      "mode": 420,
+      "sha256": "807b6b7e4cb5ecce52b0534db05b1f62d2ccb912c895c99f162c73fca6d86060"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall.egg-info/SOURCES.txt",
+      "bytes": 1050,
+      "mode": 420,
+      "sha256": "00e3a9b143a79104867ad9e9c9520cb054d4c61fc4d62f9ee837b549c52dba1e"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall.egg-info/top_level.txt",
+      "bytes": 12,
+      "mode": 420,
+      "sha256": "f90908f36bef423baca576d6c087dcf150dd60c865a77cb19ccf273538b45ce6"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/__init__.py",
+      "bytes": 106,
+      "mode": 420,
+      "sha256": "9563afc3cf69929f1a025edcc808960a0885a7c429acd2c7f7a9f89f48f7c2bb"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/__main__.py",
+      "bytes": 10968,
+      "mode": 420,
+      "sha256": "0bd1bdba290d81f6b9e7d8dc22f89652be7ce057cddc39b5e0e2ce827b9b1234"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/commands/__init__.py",
+      "bytes": 44,
+      "mode": 420,
+      "sha256": "74dcb3ec8793e0e805db847789ea5e6a88117aa64bd828a3cd15a9dc821bbeab"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/commands/checkpoint.py",
+      "bytes": 2257,
+      "mode": 420,
+      "sha256": "fe9a73ee7c16ec5e540ad172c6a3162533fb4930d6564672743b448a4d4bf5ea"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/commands/complete_step.py",
+      "bytes": 7277,
+      "mode": 420,
+      "sha256": "92c46641149fec1bf286651f71003c403196ed61107acc34ebd77c564de36bb7"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/commands/decide.py",
+      "bytes": 2569,
+      "mode": 420,
+      "sha256": "99a720324f155e89445d3baa12dfe5e4bc3e3af8f4b7b05caae8ff8438e4e17f"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/commands/decisions.py",
+      "bytes": 2527,
+      "mode": 420,
+      "sha256": "76ac567981e018a91dd4de16c13e2109e50ebf8982b01ab239ae2825457c3a9b"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/commands/files.py",
+      "bytes": 1393,
+      "mode": 420,
+      "sha256": "ee0335384f10d367cb4c4b2d54d7c7e6cb065e0547558cb370a53bcc13d0d228"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/commands/finding.py",
+      "bytes": 4935,
+      "mode": 420,
+      "sha256": "caca7de6749a117ada24082757e3e42e404e5bc3354eddeebcc54a18fc882b41"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/commands/health.py",
+      "bytes": 3521,
+      "mode": 420,
+      "sha256": "2deda39d96875ef4f7f43b3a473e7809b12fba1a5bf5c17639609445dc447c65"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/commands/init.py",
+      "bytes": 898,
+      "mode": 420,
+      "sha256": "9076945e3e26305fb3e37b5c345297850bd12f06c2dc1134c69aa1e53a4519f4"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/commands/reindex.py",
+      "bytes": 434,
+      "mode": 420,
+      "sha256": "9bfd51184c4b413ff3b656710792dda8315e2de3cb15cb212bf1dbdd07c84f7b"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/commands/review_audit.py",
+      "bytes": 2090,
+      "mode": 420,
+      "sha256": "c54e314e61c425223905f26ed6d29c5fcd9db0c9f920a19add0cdb97f8bf705b"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/commands/search.py",
+      "bytes": 1976,
+      "mode": 420,
+      "sha256": "bf58038d54e1902b948f8c6e099d26fb8feaff1145d106cdc97119e1fb38cf37"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/commands/sessions.py",
+      "bytes": 2248,
+      "mode": 420,
+      "sha256": "c204beac035ab47983d209a6b9f9b0e58b75ab34067048c83dc62c814b8b4785"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/commands/show.py",
+      "bytes": 3147,
+      "mode": 420,
+      "sha256": "ebb7c48b58cba4de0f4b51c07cc18d0f240fd20f4ad66793b6b96ca31ff7c2f1"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/commands/start_step.py",
+      "bytes": 1343,
+      "mode": 420,
+      "sha256": "99bf48ca85b4c2c70d9f7866a024c854d69aea601340322bd0a8fd5263b234e4"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/commands/transition.py",
+      "bytes": 7415,
+      "mode": 420,
+      "sha256": "bf7b886f0c4938523084be948da2f1ade01aea5ce2c2de4bec08db5116bfedfe"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/config.py",
+      "bytes": 1151,
+      "mode": 420,
+      "sha256": "a83feded49cf3043f94779130ebe32e4f6468019ea7ae64b107ca2046285958f"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/indexer.py",
+      "bytes": 8845,
+      "mode": 420,
+      "sha256": "9d362432490c62e12bda9e2574b8b65f6337121b36b9db52b5fb7b212884ca61"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/state_writer.py",
+      "bytes": 8518,
+      "mode": 420,
+      "sha256": "8b3ad97a6421434fc1fe58600bd647a3b6e7dc7bd9eaddf514629ce2ab37d5eb"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/src/apex_recall/types.py",
+      "bytes": 1102,
+      "mode": 420,
+      "sha256": "6aeab56771c4f6409ad0d9ced5a4d9c0cadfdf656c8f8e2edf663f1e5f061430"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/tests/__init__.py",
+      "bytes": 0,
+      "mode": 420,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/tests/test_complete_step_hint.py",
+      "bytes": 3572,
+      "mode": 420,
+      "sha256": "2a7eb58ac5cdb792ecc95e11ca76d9dbcce86817d26301eccbd4b8fb9094c3e3"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/tests/test_show_steps.py",
+      "bytes": 3637,
+      "mode": 420,
+      "sha256": "a1992a28253edd1910f062ab933b2968e3ee9dd29634371628d443ecd8fdacea"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/apex-recall/tests/test_transition.py",
+      "bytes": 7690,
+      "mode": 420,
+      "sha256": "3d4b03e1a6f009b5434db87e1dd6a5eb2591c9fb2ea9ad9b213881b2397aacbc"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/tests/test_apex_recall/__init__.py",
+      "bytes": 45,
+      "mode": 420,
+      "sha256": "b7a77f0989c2583faf8fd03c2a498b68bed5fb96057c55ad5b11e7c887c17fcb"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/tests/test_apex_recall/test_commands.py",
+      "bytes": 8057,
+      "mode": 420,
+      "sha256": "d64184aaf91783063fb605885e4269f47bdfb01c52bde1dbde01cde349640db0"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/tests/test_apex_recall/test_indexer.py",
+      "bytes": 7486,
+      "mode": 420,
+      "sha256": "7259c5279c0a0f6b0b2101e5813fc41f9e29a9840877e8d4c5f82068a55795b0"
+    },
+    {
+      "path": ".archive/retired-utilities/recall-final/tools/tests/test_apex_recall/test_write_commands.py",
+      "bytes": 17838,
+      "mode": 420,
+      "sha256": "c4ed1130a74f403c7c71f35e78ae80f5da12ee880f2112546a42c4917d638f52"
+    }
+  ]
+}

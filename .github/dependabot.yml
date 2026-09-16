@@ -1,8 +1,7 @@
 # Dependabot configuration for automated dependency updates.
 #
-# Scope: dev container features, GitHub Actions, root npm, and the
-# in-repo apex-recall Python package. Repository Python test tools are
-# installed by the deterministic devcontainer bootstrap.
+# Scope: GitHub Actions and root npm dependencies.
+# Repository Python test tools are installed by the WSL setup workflow.
 #
 # Update cadence is weekly to balance freshness with PR noise. Open PR limit
 # is conservative (3 per ecosystem) to avoid review-queue overload.
@@ -11,21 +10,6 @@
 
 version: 2
 updates:
-  # ─── Dev container features ───────────────────────────────────────────────
-  # Tracks ghcr.io/devcontainers/features/* digests in
-  # .devcontainer/devcontainer.json + regenerates devcontainer-lock.json.
-  - package-ecosystem: "devcontainers"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 3
-    commit-message:
-      prefix: "chore(devcontainer)"
-    labels:
-      - "dependencies"
-      - "devcontainer"
-
   # ─── GitHub Actions ────────────────────────────────────────────────────────
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -68,16 +52,3 @@ updates:
         update-types:
           - "minor"
           - "patch"
-
-  # ─── Python: apex-recall CLI ───────────────────────────────────────────────
-  - package-ecosystem: "pip"
-    directory: "/tools/apex-recall"
-    schedule:
-      interval: "weekly"
-      day: "wednesday"
-    open-pull-requests-limit: 3
-    commit-message:
-      prefix: "chore(apex-recall)"
-    labels:
-      - "dependencies"
-      - "apex-recall"

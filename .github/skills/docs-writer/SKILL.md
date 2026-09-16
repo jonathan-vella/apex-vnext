@@ -1,6 +1,8 @@
 ---
 name: docs-writer
-description: '**WORKFLOW SKILL** — Maintains Markdown documentation accuracy and freshness across docs, root guides, and changelog. WHEN: "update docs", "doc gardening", "staleness check", "changelog entry", "repo explanation", "agent change docs", "skill change docs".'
+user-invocable: true
+disable-model-invocation: true
+description: "**WORKFLOW SKILL** — Manually invoked documentation maintenance with automatic scoped prose cleanup. WHEN: explicitly invoked as /docs-writer. Do not auto-select for ordinary documentation edits."
 license: MIT
 compatibility: Works with GitHub Copilot, VS Code, and any Agent Skills compatible tool; no external dependencies required.
 metadata:
@@ -29,7 +31,9 @@ all user-facing documentation to be accurate, current, and consistent.
 
 ## Prerequisites
 
-None — all tools and references are workspace-local.
+Load [apex-unslop](../apex-unslop/SKILL.md) once when this skill is manually invoked. Apply its prose rules within the
+user's selected documentation scope, including a final clarity pass. Review-only requests remain read-only. Do not
+recursively invoke docs-writer from unslop or run either skill on unrelated files.
 
 ## Scope
 
@@ -61,7 +65,9 @@ All markdown documentation **except** `agent-output/**/*.md`:
 - **Version source of truth** is `VERSION.md`; never hard-code version numbers in prose
 - **No hard-coded counts** — use descriptive language for entity counts (per `no-hardcoded-counts.instructions.md`); `count-manifest.json` is the source of truth
 - **Verify links** — all relative links must resolve to existing files; run `npm run lint:links` before committing
-- **Run validators** — `npm run validate:docs` for style, links, and freshness
+- **Run focused checks** — lint changed Markdown and check its links; validate project controls only when changed.
+  Use `npm run validate:docs` for broad documentation changes. Do not run runtime/package qualification for prose-only
+  changes; shared runtime, packaging and archive-consumer changes still require their applicable tests.
 - **Match adjacent patterns** when adding entries to existing tables (column format, emoji, description style)
 
 ## Step-by-Step Workflows
@@ -106,10 +112,10 @@ one-line summary so the agent knows which one to load.
 
 ## Reference Index
 
-| Reference                           | When to Load                                      |
-| ----------------------------------- | ------------------------------------------------- |
-| `references/doc-standards.md`       | When checking documentation standards             |
-| `references/freshness-checklist.md` | When running freshness audits                     |
-| `references/repo-architecture.md`   | When analyzing repo structure                     |
-| `references/extended-workflows.md`  | Changelog generation, proofreading, freshness fix |
+| Reference                              | When to Load                                         |
+| -------------------------------------- | ---------------------------------------------------- |
+| `references/doc-standards.md`          | When checking documentation standards                |
+| `references/freshness-checklist.md`    | When running freshness audits                        |
+| `references/repo-architecture.md`      | When analyzing repo structure                        |
+| `references/extended-workflows.md`     | Changelog generation, proofreading, freshness fix    |
 | `references/workload-documentation.md` | Workload guide structure and lifecycle documentation |

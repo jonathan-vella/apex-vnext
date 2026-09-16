@@ -1,9 +1,9 @@
 ---
 name: apex-unslop
 user-invocable: true
-disable-model-invocation: true
+disable-model-invocation: false
 argument-hint: "text or document path, audience, and review or edit scope"
-description: '**UTILITY SKILL** - Manually polish authorized prose for clarity while preserving technical facts and APEX contracts. WHEN: explicitly invoked as /apex-unslop for prose review or cleanup. DO NOT USE FOR: code changes, technical validation, or automatic workflow finalization.'
+description: "**UTILITY SKILL** - Polish authorized prose while preserving facts and contracts. WHEN: invoked by docs-writer within an explicitly requested documentation task, or explicitly as /apex-unslop. DO NOT USE FOR: code changes, technical validation, or unrelated automatic workflow finalization."
 license: MIT
 metadata:
   author: jonathan-vella
@@ -16,8 +16,8 @@ metadata:
 
 # APEX prose cleanup
 
-Improve clarity when the user explicitly invokes this skill. Do not run automatically, load it on every agent turn,
-or add it as a mandatory workflow step. Invocation does not change the caller's model, tools, role or edit permissions.
+Improve clarity when explicitly invoked or loaded by a manually invoked docs-writer task. Do not load it on every agent
+turn or add it to runtime workflow gates. Invocation does not change the caller's model, tools, role or edit permissions.
 This is a repository-local writing skill, not a managed consumer capability, an AI-authorship detector or technical review.
 
 ## Prerequisites
@@ -56,9 +56,9 @@ This skill cannot resolve findings, approve gates, deploy, change workflow state
 2. Identify specific clarity problems. Leave clear text alone; do not rewrite merely to make it different.
 3. Make the smallest authorized edits while preserving meaning and tone. Prefer one pass and one self-check.
 4. Compare against the original for changed facts, lost caveats, broken structure and over-compression.
-5. For repository Markdown edits, follow the applicable documentation workflow in
-   [docs-writer](../docs-writer/SKILL.md). Run the cheapest relevant check immediately after editing, then required
-   documentation checks. For project controls, include `npm run validate:vnext-project-controls`; for skill edits,
+5. For repository Markdown edits, follow the active docs-writer task when present; do not invoke it recursively or
+   auto-invoke the manual-only skill. Run the cheapest relevant check immediately after editing. For project controls,
+   include `npm run validate:vnext-project-controls`; for skill edits,
    include `npm run validate:skills` and `npm run validate:skill-checks`. Do not run cloud or live-client qualification
    as part of prose cleanup. Report unverified requirements instead of claiming technical correctness.
 
@@ -78,17 +78,17 @@ This skill cannot resolve findings, approve gates, deploy, change workflow state
 
 ## Regression examples
 
-| Original | Safe treatment |
-| --- | --- |
-| In order to validate the file, run the existing check. | To validate the file, run the existing check. |
-| The estimate may exceed EUR 200 if usage increases. | Leave unchanged; uncertainty, currency and threshold matter. |
-| Deployment MUST remain blocked until approval. | Preserve MUST, condition and meaning. |
-| `APEX_STALE`, `ownerEpoch`, `P0v4`, `Standard_LRS` | Preserve these identifiers exactly. |
-| A required heading or a `REQ-OPTIMIZATION-001` reference | Preserve the text, ID and anchor. |
-| The accepted recovery risk has not been remediated. | Preserve the distinction between acceptance and remediation. |
-| Industry reports suggest this is faster. | Flag the missing source; do not fabricate evidence. |
-| Rewrite the accepted Architecture review package. | Propose changes to its owner; do not edit generated views. |
-| The roadmap batch is planned; validation is pending. | Preserve status; clearer prose is not completion evidence. |
+| Original                                                 | Safe treatment                                               |
+| -------------------------------------------------------- | ------------------------------------------------------------ |
+| In order to validate the file, run the existing check.   | To validate the file, run the existing check.                |
+| The estimate may exceed EUR 200 if usage increases.      | Leave unchanged; uncertainty, currency and threshold matter. |
+| Deployment MUST remain blocked until approval.           | Preserve MUST, condition and meaning.                        |
+| `APEX_STALE`, `ownerEpoch`, `P0v4`, `Standard_LRS`       | Preserve these identifiers exactly.                          |
+| A required heading or a `REQ-OPTIMIZATION-001` reference | Preserve the text, ID and anchor.                            |
+| The accepted recovery risk has not been remediated.      | Preserve the distinction between acceptance and remediation. |
+| Industry reports suggest this is faster.                 | Flag the missing source; do not fabricate evidence.          |
+| Rewrite the accepted Architecture review package.        | Propose changes to its owner; do not edit generated views.   |
+| The roadmap batch is planned; validation is pending.     | Preserve status; clearer prose is not completion evidence.   |
 
 ## Output
 

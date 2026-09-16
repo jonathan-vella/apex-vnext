@@ -7,9 +7,7 @@ AD) identities in Terraform: existing app registrations are the default,
 new app-registration creation is opt-in behind a permission preflight,
 and the committed `infra/terraform/{project}/` tree never embeds a GUID.
 
-> Loaded on demand by `06t-Terraform CodeGen` and `07t-Terraform Deploy`
-> when they touch Entra identities. Source: workflow simplification
-> plan, Workstream E.
+> Use for accepted Terraform intent involving Entra identities. Changes require explicit authorization and least privilege.
 
 ---
 
@@ -38,11 +36,6 @@ data "azuread_application" "api" {
   object_id = var.existing_api_app_object_id
 }
 
-resource "azurerm_role_assignment" "deployer_owner" {
-  scope                = azurerm_resource_group.this.id
-  role_definition_name = "Owner"
-  principal_id         = var.deployer_object_id
-}
 ```
 
 The deploy agent renders a per-environment `*.tfvars.json` from
@@ -57,12 +50,9 @@ emits them.
 
 ## Opt-in: `entra_app_creation = create` (HIGH Graph blast radius)
 
-Set `decisions.entra_app_creation = create` in apex-recall **and**
-`identity.entra_app_creation = "create"` in
-`04-iac-contract.json#identity` before the planner emits a
-contract that asks Terraform to create an `azuread_application`. The
-deploy agent's preflight blocks the apply unless the signed-in principal
-holds `Application.ReadWrite.All`.
+Record explicit app-creation intent and identity prerequisites in the accepted requirements and plan before generating
+an `azuread_application`. Confirm the least-privilege Microsoft Graph permissions for the requested operation. The
+plan must not grant itself broader permissions or infer approval from an existing identity.
 
 ```hcl
 resource "azuread_application" "api" {
@@ -130,7 +120,7 @@ locals {
 
 For every Deny-effect policy that touches Entra (e.g. "Require app reg
 naming convention", "Block default access grants"),
-`06t-Terraform CodeGen` MUST emit an attestation row in
+Terraform code generation must emit an attestation row in
 `05-iac-handoff.json#governance_attestation.rows[]` pointing at the
 exact `azuread_application` / `azuread_service_principal` block + line
 that satisfies the policy. Deploy agent reads these instead of
@@ -142,5 +132,5 @@ re-walking the tree.
 
 - `tools/schemas/iac-contract.schema.json` → `identity.entra_app_creation`
 - `tools/schemas/environment-manifest.schema.json` → `principal_ids`
-- `.github/skills/azure-defaults/references/identity-resolution.md`
+- `customizations/.github/skills/apex-azure-defaults/references/security-baseline.md`
 - `tools/scripts/validate-iac-handoff.mjs` (verifies attestation rows reference real lines)

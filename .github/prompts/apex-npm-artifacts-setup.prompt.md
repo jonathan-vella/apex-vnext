@@ -30,7 +30,7 @@ provider, and run the selected validation depth. Keep feed routing local to the 
   unavailable. The fallback PAT requires Packaging Read for installs and Packaging Read & Write only when publishing.
 - Never switch from a device-flow mode to PAT fallback implicitly. If device flow cannot satisfy the requirement, stop
   and use `vscode/askQuestions` to obtain an explicit `User-scoped PAT fallback` selection before continuing.
-- This prompt configures a developer workstation or devcontainer. It does not configure Azure DevOps Pipelines; those use
+- This prompt configures a developer workstation in WSL2. It does not configure Azure DevOps Pipelines; those use
   `NpmAuthenticate@0`.
 - Do not commit `.npmrc`, credentials, corporate feed configuration, generated tokens, or identity-cache files.
 

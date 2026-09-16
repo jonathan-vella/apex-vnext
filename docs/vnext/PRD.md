@@ -280,23 +280,23 @@ Do not add a token baseline, percentage target, new measurement framework or who
 Acceptance for the first delivery batch:
 
 1. Task inputs contain the current accepted revisions required by that task, not every historical completion. Exclude
-  superseded and invalidated artifacts from ordinary execution inputs; an explicit revision comparison must identify
-  its historical sources separately. Prove that both code-generation tracks select the replacement intent after change.
+   superseded and invalidated artifacts from ordinary execution inputs; an explicit revision comparison must identify
+   its historical sources separately. Prove that both code-generation tracks select the replacement intent after change.
 2. Bounded input reads resolve every review subject to its canonical artifact kind, including plan-review to
-  `implementation-intent`. Test missing and stale references, pagination boundaries and complete reconstruction.
+   `implementation-intent`. Test missing and stale references, pagination boundaries and complete reconstruction.
 3. Context uses deterministic task-specific projections with required dependency evidence and explicit retrieval
-  references. Keep useful compact content inline; do not replace one oversized response with mandatory full-history
-  pagination. Required templates, recorded input and decisions remain accessible through authorized MCP reads.
+   references. Keep useful compact content inline; do not replace one oversized response with mandatory full-history
+   pagination. Required templates, recorded input and decisions remain accessible through authorized MCP reads.
 4. Enforce input and output byte limits from the run's locked configuration and test the applicable context-size
-  contract. Include large fixtures and multibyte content; no silent truncation or claim of measured token savings.
+   contract. Include large fixtures and multibyte content; no silent truncation or claim of measured token savings.
 5. Reviewer packs contain the subject, necessary upstream evidence and dispositions, criteria and the exact receipt
-  contract. Preserve all review passes and stage-specific reasoning without irrelevant history or full policy baselines.
+   contract. Preserve all review passes and stage-specific reasoning without irrelevant history or full policy baselines.
 6. Remove redundant context loading within a request, including subject-only review reads. Preserve task freshness,
-  ownership, expiry and journal-integrity checks; this does not authorize persistent snapshots or cross-call caches.
+   ownership, expiry and journal-integrity checks; this does not authorize persistent snapshots or cross-call caches.
 7. Correct next-task guidance, describe registered tools, and test role/client tool coverage. Narrow ARM access by actual
-  workflow need; retain legitimate pricing and operational cost paths without granting writes or unsupported tools.
+   workflow need; retain legitimate pricing and operational cost paths without granting writes or unsupported tools.
 8. Remove proven prompt duplication only with named owners and consumer checks. Keep essential worker boundaries,
-  domain-specific guidance and supported output quality; installed file size is not a model-token measurement.
+   domain-specific guidance and supported output quality; installed file size is not a model-token measurement.
 
 Follow-on acceptance covers bounded requirements amendments and confirmed-decision reuse under `REQ-REQUIREMENTS-001`,
 pricing-row reuse under `REQ-ARCH-001`, and supported-client outcomes under `REQ-CUSTOMIZATION-001`. The
@@ -363,8 +363,6 @@ Access requires an authorized GitHub session; anonymous link validation returns 
 GitHub access to that repository without making its contents public or copying the corpus into ordinary task context.
 Record the inspected revision and selected artifacts when reviewing a candidate. It is an example of useful output,
 not a universal workload template or an authority for current prices, resource choices or compliance claims.
-The current predecessor-source designation is recorded separately in
-[Migration](../MIGRATION.md#current-predecessor-reference); it is distinct from vNext extraction provenance.
 
 | Area                          | Review criterion                                                                               |
 | ----------------------------- | ---------------------------------------------------------------------------------------------- |
@@ -381,8 +379,8 @@ does not become the default for other workloads. Human quality review complement
 
 ## Non-Functional Requirements
 
-- **Compatibility:** Every approved Phase 0A disposition is preserved, changed through its named replacement owner, or
-  retired through its approved removal gate.
+- **Compatibility:** Supported vNext contracts, installation upgrades and persisted state retain explicit version and
+  migration guarantees. Unsupported state is rejected with actionable diagnostics.
 - **Security:** Kernel authorization and deterministic validators fail closed on missing, stale, malformed, secret-bearing,
   or substituted state.
 - **Reliability:** Runs survive restart at each gate, reject stale writers, reconcile partial commits, and retain evidence.
@@ -425,7 +423,7 @@ setup completion, first-task success, workflow elapsed time, restart and resume,
 capability failure, context size, and cache correctness. Gate-revision loops may omit a claim when unavailable; all other
 unavailable blocking measurements block release.
 
-These existing deterministic measurements are not a new legacy-versus-vNext input-token baseline. Retain their current
+These existing deterministic measurements are not a comparative input-token baseline. Retain their current
 executable semantics until any needed alignment is separately implemented and tested. Do not report token savings from
 document size alone or add a token measurement prerequisite to the roadmap.
 
@@ -440,7 +438,6 @@ Cutover requires all of the following on the exact candidate head:
 - Human review against the output-quality reference passes; mandatory application and operational handoff is complete.
 - WSL2 consumer installation and both client workflows work without a devcontainer or source-repository clone.
 - The final distribution decision covers the APEX MCP lifecycle and is followed by exact-candidate qualification.
-- The Phase 0A compatibility matrix has no unowned drift.
 - Required CI and CodeQL checks pass, with no unresolved critical or high security finding.
 - Clean install, update, rollback, uninstall, package reproducibility, SBOM, provenance, and publication dry run pass.
 - Supported VS Code and Copilot CLI agents, questions, hidden workers, MCP startup, restart, and cross-device resume are
@@ -455,6 +452,6 @@ Cutover requires all of the following on the exact candidate head:
 - Bicep and Terraform preview, approval, apply, inventory, diagnosis, destroy, and recovery scenarios are qualified.
 - Local APEX Gate 4 approval, GitHub OIDC, and local-to-CI writer transfer are proven.
 - Scorecard sample requirements and unavailable-data dispositions are satisfied.
-- Release and rollback rehearsals, documentation audit, v1 critical-fix sync, and `npm run validate:all` pass.
+- Release and rollback rehearsals, documentation audit, and `npm run validate:all` pass.
 - Every open risk has an owner and acceptable release disposition.
 - A maintainer explicitly authorizes cutover, publication, final tags, and merge to `main`.

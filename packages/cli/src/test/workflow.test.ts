@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { EventJournal, ObjectStore, sha256Json } from "@apexops/kernel";
-import type { InputValueV1 } from "@apexops/contracts";
+import type { EventV1, InputValueV1 } from "@apexops/contracts";
 import { ApexError } from "../errors.js";
 import { ApexService } from "../service.js";
 import {
@@ -12,6 +12,7 @@ import {
   costEstimate,
   governance,
   nextTaskAfterInput,
+  planBundle,
   policyMap,
   prepareValidatedRun,
   requirements,
@@ -982,6 +983,22 @@ test("task context projects hashes from legacy task completions", async () => {
   assert.equal(context.artifactHashes.requirements, requirementsHash);
 });
 
+test("task inputs exclude invalidated artifact revisions", async () => {
+  const service = new ApexService(await tempRoot());
+  const oldIntent = "a".repeat(64);
+  const currentIntent = "b".repeat(64);
+  const events = [
+    { type: "task.completed", payload: { artifactHashes: { "implementation-intent": oldIntent } } },
+    { type: "workflow.invalidated", payload: { artifactKinds: ["implementation-intent"] } },
+    { type: "task.completed", payload: { artifactHashes: { "implementation-intent": currentIntent } } },
+  ] as EventV1[];
+  const inputRefs = (service as unknown as {
+    inputRefs(events: EventV1[], descriptor: { id: string }): string[];
+  }).inputRefs(events, { id: "codegen-bicep" });
+
+  assert.deepEqual(inputRefs, [currentIntent]);
+});
+
 test("plan task context projects source hashes and valid output templates", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
@@ -1120,6 +1137,21 @@ test("plan task context projects source hashes and valid output templates", asyn
       },
     },
   });
+
+  const plan = planBundle(initialized.runId, "bicep", {}, {
+    requirements: requirementHashes.outputHashes.requirements!,
+    architecture: architectureHashes.outputHashes.architecture!,
+    "governance-constraints": governanceHashes.outputHashes["governance-constraints"]!,
+    "policy-property-map": policyHashes.outputHashes["policy-property-map"]!,
+  });
+  const planHashes = await service.completeTaskOutputs(issued.task.taskId, plan);
+  const reviewTask = await service.nextTask();
+  assert.equal(reviewTask.status, "task");
+  if (reviewTask.status !== "task") return;
+  assert.equal(reviewTask.task.taskType, "plan-review");
+  const reviewInput = await service.readTaskInput(reviewTask.task.taskId);
+  assert.equal(reviewInput.subjectHash, planHashes.outputHashes["implementation-intent"]);
+  assert.deepEqual(JSON.parse(reviewInput.content), plan[0]!.value);
 });
 
 test("reviewer summary preserves non-empty findings and evidence references", async () => {

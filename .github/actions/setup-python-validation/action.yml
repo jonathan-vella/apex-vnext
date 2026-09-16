@@ -2,7 +2,7 @@
 # Callers must check out the repository first so this local action can be resolved.
 
 name: Setup Python Validation
-description: Install Python 3.14 validation dependencies for apex-recall
+description: Install pinned Python 3.14 repository validation dependencies
 
 runs:
   using: composite
@@ -17,4 +17,3 @@ runs:
       shell: bash
       run: |
         python -m pip install --require-hashes --only-binary=:all: -r .github/python-validation-requirements.txt
-        python -m pip install --no-deps --no-build-isolation -e tools/apex-recall

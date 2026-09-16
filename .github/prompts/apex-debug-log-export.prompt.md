@@ -185,13 +185,12 @@ mapfile -t AGENT_FILES < <(ls -1 customizations/.github/agents/*.agent.md 2>/dev
 mapfile -t AGENT_KEYS < <(node -e "const m=require('./customizations/manifest.json'); console.log(m.roles.map((role)=>role.agent).join('\n'))" 2>/dev/null)
 
 # Combined alternation regex for grep.
-FILTER_RE="$(printf '%s\n' "${AGENT_FILES[@]}" "${AGENT_KEYS[@]}" .github/skills/ .github/instructions/ apex-recall '@01-Orchestrator' '@02-Requirements' '@03-Architect' '@04-Design' '@04g-Governance' '@05-IaC-Planner' '@06b-Bicep-CodeGen' '@06t-Terraform-CodeGen' '@07b-Bicep-Deploy' '@07t-Terraform-Deploy' '@08-As-Built' '@e2e-Orchestrator' | awk 'NF' | paste -sd'|' -)"
+FILTER_RE="$(printf '%s\n' "${AGENT_FILES[@]}" "${AGENT_KEYS[@]}" .github/skills/ .github/instructions/ | awk 'NF' | paste -sd'|' -)"
 echo "filter pattern length: ${#FILTER_RE}"
 ```
 
 This produces a regex covering: every managed `.agent.md` file path, every
-managed role name, the skills/instructions roots, the `apex-recall`
-CLI, and every chat participant mention. That is the definition of
+managed role name and the skills/instructions roots. That is the definition of
 "work done by my custom agents" used everywhere downstream.
 
 ### Step 3 — Stage files into `.apex-logs/_staging/`

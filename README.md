@@ -59,15 +59,15 @@ does not include or publish an Astro site.
 
 ## Repository Structure
 
-| Path | Purpose |
-| ---- | ------- |
-| `packages/` | TypeScript contracts, kernel, capabilities, renderers, testkit, and CLI |
-| `customizations/` | Canonical managed source for supported Copilot client projections |
-| `config/` | Runtime, workflow, capability-pack, toolchain, and scorecard contracts |
-| `infra/` | Bicep and Terraform qualification infrastructure |
-| `tools/` | Validators, packaging, live qualification, MCP servers, and project utilities |
-| `docs/tutorials/`, `docs/how-to/`, `docs/explanation/`, `docs/reference/` | vNext product documentation |
-| `docs/vnext/` | Product scope, roadmap, decisions, risks, and qualification procedures |
+| Path                                                                      | Purpose                                                                       |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `packages/`                                                               | TypeScript contracts, kernel, capabilities, renderers, testkit, and CLI       |
+| `customizations/`                                                         | Canonical managed source for supported Copilot client projections             |
+| `config/`                                                                 | Runtime, workflow, capability-pack, toolchain, and scorecard contracts        |
+| `infra/`                                                                  | Bicep and Terraform qualification infrastructure                              |
+| `tools/`                                                                  | Validators, packaging, live qualification, MCP servers, and project utilities |
+| `docs/tutorials/`, `docs/how-to/`, `docs/explanation/`, `docs/reference/` | vNext product documentation                                                   |
+| `docs/vnext/`                                                             | Product scope, roadmap, decisions, risks, and qualification procedures        |
 
 ## Release Safety
 
@@ -75,10 +75,6 @@ Cloud deployment, GitHub Environment approval, package publication, tags, and
 release cutover remain explicit maintainer-authorized operations. Local tests do
 not substitute for the live evidence required by the
 [product acceptance criteria](docs/vnext/PRD.md#cutover-acceptance).
-
-## Provenance
-
-See [Migration](docs/MIGRATION.md) and [SOURCE_PROVENANCE.json](SOURCE_PROVENANCE.json) for extraction provenance.
 
 ## License
 

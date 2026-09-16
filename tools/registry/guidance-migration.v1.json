@@ -2,6 +2,12 @@
   "version": "1.0",
   "skillDispositions": [
     {
+      "source": "apex-unslop",
+      "disposition": "repository-only",
+      "owner": "Repository documentation maintainers",
+      "reason": "Scoped prose cleanup used by manually invoked docs-writer; not a consumer runtime capability."
+    },
+    {
       "source": "azure-adr",
       "disposition": "consumer",
       "consumerSkill": "apex-azure-adr",
@@ -43,16 +49,6 @@
           "disposition": "adapt",
           "targets": ["references/decision-quality.md"],
           "reason": "Preserves bounded decision quality checks in managed consumer guidance.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/step-3-adr-review.md",
-          "disposition": "exclude-unsafe",
-          "targets": [],
-          "reason": "Excludes retired repository workflow, subagent, filesystem, and recall-command instructions.",
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
@@ -148,27 +144,7 @@
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
-          "source": "references/revision-workflow.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
           "source": "references/styling-standards.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "templates/00-session-state.template.json",
           "disposition": "defer-capability",
           "targets": [],
           "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
@@ -918,60 +894,10 @@
       "lifecycle": "complete",
       "resourceDispositions": [
         {
-          "source": "references/adversarial-checklists.md",
-          "disposition": "exclude-unsafe",
-          "targets": [],
-          "reason": "Excludes repository-only adversarial review procedures and command-oriented checks.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/adversarial-review-deep.md",
-          "disposition": "exclude-unsafe",
-          "targets": [],
-          "reason": "Excludes repository-only deep-review procedures that are not managed consumer guidance.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/adversarial-review-protocol.md",
-          "disposition": "exclude-unsafe",
-          "targets": [],
-          "reason": "Excludes repository-only review protocol and its direct operational instructions.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
           "source": "references/arm-mcp-pricing-guidance.md",
           "disposition": "defer-capability",
           "targets": [],
           "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/artifact-type-categories.md",
-          "disposition": "adapt",
-          "targets": ["references/decision-boundaries.md"],
-          "reason": "Preserves the decision-artifact boundary without retaining repository artifact workflow details.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/avm-modules.md",
-          "disposition": "already-owned",
-          "targets": ["references/avm-binding-guidance.md"],
-          "reason": "Managed AVM binding guidance already owns the stable selection and exception rules.",
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
@@ -988,70 +914,10 @@
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
-          "source": "references/cost-alerts-baseline.md",
-          "disposition": "adapt",
-          "targets": ["references/decision-boundaries.md"],
-          "reason": "Preserves cost-monitoring intent as an evidence-bound architecture decision.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/cost-alerts-bicep.md",
-          "disposition": "exclude-unsafe",
-          "targets": [],
-          "reason": "Excludes executable Bicep examples and direct subscription-scoped operations.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/cost-alerts-terraform.md",
-          "disposition": "exclude-unsafe",
-          "targets": [],
-          "reason": "Excludes executable Terraform examples and direct provider operations.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/cost-estimate-parent-contract.md",
-          "disposition": "adapt",
-          "targets": ["references/decision-boundaries.md"],
-          "reason": "Preserves cost-evidence fallback and uncertainty handling without a pricing operation.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
           "source": "references/deprecated-services.md",
           "disposition": "already-owned",
           "targets": ["references/security-baseline.md"],
           "reason": "Managed security guidance already requires supported service and runtime selections.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/governance-discovery.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/identity-resolution.md",
-          "disposition": "already-owned",
-          "targets": ["references/security-baseline.md"],
-          "reason": "Managed security guidance already owns identity preference and evidence boundaries.",
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
@@ -1068,37 +934,7 @@
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
-          "source": "references/plan-design-decisions.md",
-          "disposition": "adapt",
-          "targets": ["references/decision-boundaries.md"],
-          "reason": "Preserves stable decision ordering and explicit fallback treatment.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
           "source": "references/policy-effect-decision-tree.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/pricing-guidance.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/research-workflow.md",
           "disposition": "defer-capability",
           "targets": [],
           "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
@@ -1118,16 +954,6 @@
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
-          "source": "references/service-class-menu.md",
-          "disposition": "already-owned",
-          "targets": ["references/service-selection.md"],
-          "reason": "Managed service selection already treats classes as evidence-bound candidates.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
           "source": "references/service-matrices.md",
           "disposition": "adapt",
           "targets": ["references/decision-boundaries.md"],
@@ -1138,50 +964,10 @@
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
-          "source": "references/tag-strategy.md",
-          "disposition": "already-owned",
-          "targets": ["references/tag-precedence.md"],
-          "reason": "Managed tag guidance already owns policy precedence and authorized fallback categories.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/terraform-conventions.md",
-          "disposition": "already-owned",
-          "targets": ["references/avm-binding-guidance.md"],
-          "reason": "Managed binding guidance already owns track-approved module and provider constraints.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/vnet-planning.md",
-          "disposition": "already-owned",
-          "targets": ["references/security-baseline.md"],
-          "reason": "Managed security guidance already owns private-access and network-posture intent.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
           "source": "references/waf-criteria.md",
           "disposition": "already-owned",
           "targets": ["references/service-selection.md"],
           "reason": "Managed service guidance already owns WAF comparison questions and evidence boundaries.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/workflow-gates.md",
-          "disposition": "exclude-unsafe",
-          "targets": [],
-          "reason": "Excludes retired repository workflow gates and direct operational procedures.",
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
@@ -1633,178 +1419,7 @@
       "consumerSkill": "apex-azure-governance",
       "owner": "governance capability pack",
       "lifecycle": "complete",
-      "resourceDispositions": [
-        {
-          "source": "references/baseline-check.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/discover-output.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/effect-classification.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/inline-resolution-gate.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/l0-envelope.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/policy-override-pattern.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/reconciliation-disposition.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/resume-checks.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/schema.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/terminal-commands.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "scripts/discover.py",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "scripts/fixtures/README.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "scripts/render_cached_governance.py",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "scripts/render_governance.py",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "scripts/test_discover.py",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "scripts/test_render_governance.py",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "scripts/test_signature_parity.py",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        }
-      ]
+      "resourceDispositions": []
     },
     {
       "source": "azure-kusto",
@@ -4396,197 +4011,7 @@
       "lifecycle": "complete",
       "resourceDispositions": [
         {
-          "source": "references/avm-module-index.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/avm-version-freeze-gate.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/azd-vs-deploy-guide.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
           "source": "references/azure-resource-graph-primer.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/circuit-breaker.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/codegen-do-dont.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/codegen-file-order.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/codegen-shared-workflow.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/contract-emission-and-handoff.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/deploy-shared-workflow.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/deploy-validation-checklist.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/deployment-strategies.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/governance-drift-routing.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/iac-planner-approval-gate.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/known-deploy-issues.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/placeholder-scan-protocol.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/plan-consistency-checks.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/policy-precheck-contract.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/preflight-policy-checks.md",
-          "disposition": "defer-capability",
-          "targets": [],
-          "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",
-          "capabilityOwner": "future bounded consumer capability",
-          "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
-          "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
-          "source": "references/step4-required-artifacts.md",
           "disposition": "defer-capability",
           "targets": [],
           "reason": "Defer source guidance until its bounded consumer capability owns a reviewed replacement.",

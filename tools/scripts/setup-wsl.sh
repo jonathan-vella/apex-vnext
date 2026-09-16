@@ -123,7 +123,7 @@ check_tools() {
         printf 'Repository dependencies missing; run --install.\n'
         missing=1
     else
-        "$repo_root/.venv/bin/python3" -c 'import pytest, ruff, apex_recall'
+        "$repo_root/.venv/bin/python3" -c 'import pytest, ruff'
     fi
     return "$missing"
 }
@@ -146,7 +146,7 @@ login() {
 }
 
 install_tools() {
-    [[ -f "$repo_root/package-lock.json" && -f "$repo_root/tools/apex-recall/pyproject.toml" ]] || {
+    [[ -f "$repo_root/package-lock.json" && -f "$repo_root/packages/cli/package.json" ]] || {
         fail 'Run the script from an APEX source checkout.'; return 1;
     }
     [[ "$repo_root" != /mnt/* ]] || { fail 'Move the source checkout to the WSL Linux filesystem (for example ~/src).'; return 1; }
@@ -171,8 +171,7 @@ install_tools() {
         fail '.venv exists but is not a Python virtual environment; refusing to replace it.'; return 1
     fi
     uv venv --allow-existing --python "$python_version" "$repo_root/.venv"
-    uv pip install --python "$repo_root/.venv/bin/python3" --upgrade pytest ruff setuptools yamllint \
-        "$repo_root/tools/apex-recall"
+    uv pip install --python "$repo_root/.venv/bin/python3" --upgrade pytest ruff setuptools yamllint
     github_tool cli/cli "^gh_.*_linux_${architecture}\\.tar\\.gz$" bin/gh gh
     github_tool github/copilot-cli "^copilot-linux-${node_arch}\\.tar\\.gz$" copilot copilot
     github_tool Azure/bicep "^bicep-linux-${node_arch}$" bicep bicep
@@ -203,7 +202,7 @@ main() {
         --plan)
             printf '%s\n' 'Windows: WSL2 + Ubuntu, VS Code, WSL/Copilot extensions and VS Code account sign-in.' \
                 'WSL2: latest stable Node/npm, Python/uv, Git, Azure/Bicep/Terraform, gh/Copilot and validation tools.' \
-                'Repository: npm ci (existing lock), isolated .venv with latest Python test tools and local apex-recall.' \
+                'Repository: npm ci (existing lock), isolated .venv with latest Python test tools.' \
                 'Sign-in: separate interactive --login. No credentials copied from Windows or a container.'
             return ;;
         --install|--check|--login) ;;

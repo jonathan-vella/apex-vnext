@@ -173,7 +173,7 @@ test("init installs bundled customizations and runtime config by default", async
   };
   assert.deepEqual(
     registry.packs.map(({ id }) => id),
-    ["azure-governance-discovery"],
+    [],
   );
   for (const pack of registry.packs) {
     const source = join(root, ".apex", "runtime", pack.artifact.spec);
@@ -587,7 +587,7 @@ test("init writes a real runtime lock and doctor detects managed tampering", asy
       /^[a-f0-9]{64}$/.test(hash),
     ),
   );
-  assert.ok(lock.requiredCapabilityPacks.includes("azure-governance-discovery"));
+  assert.deepEqual(lock.requiredCapabilityPacks, []);
   assert.equal((await service.status()).run.runId, initialized.runId);
   await writeFile(join(root, ".apex", "runtime", "defaults.v1.json"), "{}\n");
   const doctor = await service.doctor();
@@ -622,7 +622,7 @@ test("existing runs use their immutable runtime generation", async () => {
   assert.equal((await service.nextTask()).status, "needs_input");
 });
 
-test("doctor leaves unrelated core routes unaffected and service reports required workflow packs", async () => {
+test("doctor and core routes work without shipped governance discovery packs", async () => {
   const root = await tempRoot();
   const service = new ApexService(root, {
     executableChecker: async () => true,
@@ -635,24 +635,10 @@ test("doctor leaves unrelated core routes unaffected and service reports require
     false,
   );
   assert.equal(runId.length > 0, true);
-  const governance = (await service.capabilityStatus("azure-governance-discovery")) as {
-    state: string;
-    reason?: string;
-    requiredWorkflows: string[];
-    action: string;
-  };
-  assert.equal(governance.state, "not-installed");
-  assert.equal(governance.reason, undefined);
-  assert.deepEqual(governance.requiredWorkflows, [
-    "governance-discovery",
-    "governance-reconciliation",
-    "preview-bicep",
-    "preview-terraform",
-  ]);
-  assert.match(governance.action, /capability install/);
+  await assert.rejects(service.capabilityStatus("azure-governance-discovery"));
   const listed = (await service.capabilityList()) as Array<{ id: string; state: string }>;
   assert.deepEqual(
     listed.map(({ id, state }) => ({ id, state })),
-    [{ id: "azure-governance-discovery", state: "not-installed" }],
+    [],
   );
 });

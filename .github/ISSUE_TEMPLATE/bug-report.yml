@@ -61,7 +61,7 @@ body:
       label: Steps to Reproduce
       description: How can we reproduce this issue?
       placeholder: |
-        1. Open devcontainer
+        1. Open the repository in Ubuntu WSL2
         2. Navigate to `infra/bicep/scenario-name/`
         3. Run `bicep build main.bicep`
         4. Observe error

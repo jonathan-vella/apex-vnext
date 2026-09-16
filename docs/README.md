@@ -12,18 +12,18 @@ last feature-delivery phase, not prerequisites for completing governance and wor
 
 ## Start By Goal
 
-| Goal | Start here |
-| --- | --- |
-| Start on Windows 11 with WSL2 | [WSL2 consumer runbook](tutorials/wsl2-vscode-consumer-runbook.md) |
-| Evaluate APEX locally | [Complete the first local run](tutorials/first-run.md) |
-| Install or update APEX | [Manage installation](how-to/manage-installation.md) |
-| Run a governed workflow | [Run the workflow](how-to/run-workflow.md) |
+| Goal                                     | Start here                                                                           |
+| ---------------------------------------- | ------------------------------------------------------------------------------------ |
+| Start on Windows 11 with WSL2            | [WSL2 consumer runbook](tutorials/wsl2-vscode-consumer-runbook.md)                   |
+| Evaluate APEX locally                    | [Complete the first local run](tutorials/first-run.md)                               |
+| Install or update APEX                   | [Manage installation](how-to/manage-installation.md)                                 |
+| Run a governed workflow                  | [Run the workflow](how-to/run-workflow.md)                                           |
 | Understand planned COE reuse and changes | [Project adaptation](explanation/workflow-and-gates.md#planned-coe-reuse-and-change) |
-| Review output quality expectations | [Quality reference](vnext/PRD.md#output-quality-reference) |
-| Preview or reconcile infrastructure | [Operate a project](how-to/operate-project.md) |
-| Contribute to the repository | [Contribute to APEX vNext](how-to/contribute.md) |
-| Understand kernel authority | [Runtime architecture](explanation/runtime-architecture.md) |
-| Look up commands or support | [Reference index](reference/README.md) |
+| Review output quality expectations       | [Quality reference](vnext/PRD.md#output-quality-reference)                           |
+| Preview or reconcile infrastructure      | [Operate a project](how-to/operate-project.md)                                       |
+| Contribute to the repository             | [Contribute to APEX vNext](how-to/contribute.md)                                     |
+| Understand kernel authority              | [Runtime architecture](explanation/runtime-architecture.md)                          |
+| Look up commands or support              | [Reference index](reference/README.md)                                               |
 
 ## Tutorials
 
@@ -41,7 +41,6 @@ last feature-delivery phase, not prerequisites for completing governance and wor
 - [Operate a project](how-to/operate-project.md)
 - [Qualify a candidate](how-to/qualify-candidate.md)
 - [Contribute to APEX vNext](how-to/contribute.md)
-- [Maintain the development container](how-to/maintain-devcontainer.md) (repository maintenance only, not consumer setup)
 
 ## Explanation
 
@@ -66,13 +65,7 @@ last feature-delivery phase, not prerequisites for completing governance and wor
 Binding product requirements, decisions, risks, release controls, and qualification procedures remain under
 [`docs/vnext`](vnext/README.md). These files govern repository development and are not user tutorials.
 
-The [documentation inventory](vnext/documentation-inventory.v1.json) records content ownership and migration status.
-Frozen Phase 0A evidence remains immutable.
-
-## Migration History
-
-Predecessor history and extraction provenance are isolated in [Migration](MIGRATION.md). Active product documentation is
-vNext-only.
+The [documentation inventory](vnext/documentation-inventory.v1.json) records current content ownership.
 
 ## Validate Documentation
 

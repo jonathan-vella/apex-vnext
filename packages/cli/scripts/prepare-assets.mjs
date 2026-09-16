@@ -461,126 +461,12 @@ async function walkFiles(root, directory = root, expectedIdentity) {
   return files;
 }
 
-async function fileDigest(path) {
-  return createHash("sha256")
-    .update(await readFile(path))
-    .digest("hex");
-}
-
-async function treeDigest(root) {
-  const hash = createHash("sha256");
-  const visit = async (directory) => {
-    const entries = (await readdir(directory, { withFileTypes: true })).sort((left, right) =>
-      bytewise(left.name, right.name),
-    );
-    for (const entry of entries) {
-      const path = join(directory, entry.name);
-      const name = portablePath(relative(root, path));
-      const metadata = await lstat(path);
-      if (metadata.isSymbolicLink()) throw new Error(`Asset source contains a symlink: ${path}`);
-      hash.update(metadata.isDirectory() ? `d:${name}\0` : `f:${name}\0`);
-      if (metadata.isDirectory()) await visit(path);
-      else if (metadata.isFile()) hash.update(await readFile(path));
-      else throw new Error(`Unsupported asset source entry: ${path}`);
-    }
-  };
-  await visit(root);
-  return hash.digest("hex");
-}
-
-async function copyEntry(sourceRoot, pinnedRoot, destinationRoot, sourceRelative, mapping, inventory) {
-  const sourceRootMetadata = await lstat(sourceRoot, { bigint: true });
-  if (
-    !sourceRootMetadata.isDirectory() ||
-    sourceRootMetadata.isSymbolicLink() ||
-    sourceRootMetadata.dev !== pinnedRoot.identity.dev ||
-    sourceRootMetadata.ino !== pinnedRoot.identity.ino
-  ) {
-    throw new Error(`Asset source directory changed during generation: ${sourceRoot}`);
-  }
-  const source = join(sourceRoot, sourceRelative);
-  const metadata = await lstat(source, { bigint: true });
-  if (metadata.isSymbolicLink()) throw new Error(`Asset source contains a symlink: ${source}`);
-  const files = metadata.isDirectory()
-    ? await walkFiles(source, source, { dev: metadata.dev, ino: metadata.ino })
-    : [{ path: source, identity: { dev: metadata.dev, ino: metadata.ino } }];
-  for (const sourceFile of files) {
-    const destinationRelative = metadata.isDirectory()
-      ? join(sourceRelative, relative(source, sourceFile.path))
-      : sourceRelative;
-    const destination = join(destinationRoot, destinationRelative);
-    assertContained(destinationRoot, destination);
-    await mkdir(dirname(destination), { recursive: true });
-    const bytes = await readSourceFile(pinnedRoot.resolvedRoot, sourceFile.path, async () => {}, sourceFile.identity);
-    await writeFile(destination, bytes);
-    inventory.push({
-      path: portablePath(relative(assetsRoot, destination)),
-      source: {
-        kind: "repository-file",
-        path: portablePath(relative(repositoryRoot, sourceFile.path)),
-        mapping,
-      },
-      sha256: createHash("sha256").update(bytes).digest("hex"),
-      bytes: bytes.byteLength,
-    });
-  }
-}
-
 async function prepareCapabilityPacks(inventory) {
   const policy = JSON.parse(await readFile(join(repositoryRoot, "config", "capability-packs.v1.json"), "utf8"));
-  const definitions = new Map(policy.packs.map((pack) => [pack.id, pack]));
+  if (policy.packs.length !== 0) throw new Error("New shipped capability packs require an explicit asset binding");
   const packsRoot = join(assetsRoot, "capability-packs");
-  const sources = [
-    {
-      id: "azure-governance-discovery",
-      root: join(repositoryRoot, ".github", "skills", "azure-governance-discovery"),
-      entries: [join("scripts", "discover.py"), join("scripts", "render_governance.py")],
-    },
-  ];
-  for (const source of sources) {
-    const pinnedRoot = await pinSourceRoot(source.root);
-    const destination = join(packsRoot, source.id, "source");
-    for (const entry of source.entries) {
-      await copyEntry(source.root, pinnedRoot, destination, entry, source.id, inventory);
-    }
-  }
-
-  const emptyDigest = createHash("sha256").update("").digest("hex");
-  const governanceSource = join(packsRoot, "azure-governance-discovery", "source");
-  const governanceScriptDigest = await fileDigest(join(governanceSource, "scripts", "discover.py"));
-  const metadata = (id) => {
-    const definition = definitions.get(id);
-    if (definition === undefined) throw new Error(`Capability pack metadata is missing for ${id}`);
-    return definition;
-  };
-  const registry = {
-    schemaVersion: policy.schemaVersion,
-    protocolVersion: policy.protocolVersion,
-    installationPolicy: policy.installationPolicy,
-    packs: [
-      {
-        ...metadata("azure-governance-discovery"),
-        version: "1.0.0",
-        runtime: "python",
-        artifact: {
-          type: "local-directory",
-          spec: "capability-packs/azure-governance-discovery/source",
-          digest: await treeDigest(governanceSource),
-        },
-        lock: {
-          installer: "pip-hashes",
-          digest: emptyDigest,
-          directDigest: emptyDigest,
-          transitiveDigest: emptyDigest,
-        },
-        executable: { command: "python", args: ["scripts/discover.py"] },
-        dependencyFree: true,
-        script: "scripts/discover.py",
-        scriptDigest: governanceScriptDigest,
-        capabilities: ["governance-discovery"],
-      },
-    ],
-  };
+  await mkdir(packsRoot, { recursive: true });
+  const registry = { ...policy, packs: [] };
   const registryPath = join(packsRoot, "registry.v1.json");
   await writeFile(registryPath, `${JSON.stringify(registry, null, 2)}\n`);
   const registryBytes = await readFile(registryPath);
@@ -673,12 +559,6 @@ async function prepareAssets() {
         mode: "render-client-projections",
         sourceRoot: "customizations",
         generatedRoot: "client-projections",
-      },
-      {
-        id: "azure-governance-discovery",
-        mode: "copy-entries",
-        sourceRoot: ".github/skills/azure-governance-discovery",
-        generatedRoot: "capability-packs/azure-governance-discovery/source",
       },
       { id: "capability-pack-registry", mode: "compose-json", generatedPath: "capability-packs/registry.v1.json" },
     ],

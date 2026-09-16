@@ -1,7 +1,7 @@
 # APEX vNext Decision Register
 
-Stable IDs remain available for requirements, risks, ADRs, and issue references. Detailed migration provenance is kept in
-[Migration](../MIGRATION.md); consequential architecture records live in [ADRs](adrs/README.md).
+Stable IDs remain available for requirements, risks, ADRs, and issue references. Consequential architecture records
+live in [ADRs](adrs/README.md).
 
 ## DECISION-001: Use Hybrid Project Governance
 
@@ -33,15 +33,16 @@ vNext regressions use the repository bug form with integration head, failed chec
 
 Current requirements, roadmap, decisions, risks, source packages, and versioned configuration are authoritative.
 
-## DECISION-008: Keep Migration History Separate From Product Documentation
+## DECISION-008: Keep Product Documentation Self-Contained
 
-Extraction and predecessor history lives in [Migration](../MIGRATION.md), frozen evidence, and archives. Active product
-documentation is vNext-only.
+Current source, contracts and requirements own product behavior. No historical record is required to build, test,
+install or operate vNext. Supported vNext version transitions retain their explicit contract guarantees.
 
 ## DECISION-009: Do Not Run Devcontainer CI
 
-The disabled container workflow remains archived. Static contracts, focused checks, and deliberate local rebuilds own
-container validation.
+The disabled container workflow remains archived. Repository maintenance on 2026-09-16 also retired the remaining
+container setup in favor of the WSL2 setup scripts. Workspace editor and hook validation remain active. Historical
+materials are optional retention only: current checks do not depend on their presence.
 
 ## DECISION-010: Keep Deployment Approval In APEX Gate 4
 

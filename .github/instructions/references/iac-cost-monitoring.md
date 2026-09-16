@@ -4,7 +4,7 @@ Cost-management resources required in every IaC deployment.
 Referenced by the IaC best-practices instruction files.
 
 > **Canonical contract owner**:
-> [`.github/skills/azure-defaults/references/cost-alerts-baseline.md`](../../skills/azure-defaults/references/cost-alerts-baseline.md).
+> [`customizations/.github/skills/apex-azure-defaults/references/decision-boundaries.md`](../../../customizations/.github/skills/apex-azure-defaults/references/decision-boundaries.md).
 > The tables below are an extract for IaC-author convenience; on
 > conflict the azure-defaults reference and the discovered
 > `04-governance-constraints.json` `cost_monitoring.*` block win
@@ -15,11 +15,11 @@ Referenced by the IaC best-practices instruction files.
 Scope is selected by Planner-set `cost_monitoring_scope ∈ {rg, sub, mg}`
 (see `cost-alerts-baseline.md` → "Scope-aware Resource Matrix").
 
-| Scope | Bicep resource                                       | Terraform resource                                  |
-| ----- | ---------------------------------------------------- | --------------------------------------------------- |
-| `rg`  | `Microsoft.Consumption/budgets` (RG-scoped)          | `azurerm_consumption_budget_resource_group`         |
-| `sub` | `Microsoft.Consumption/budgets` (sub-scoped)         | `azurerm_consumption_budget_subscription`           |
-| `mg`  | `Microsoft.Consumption/budgets` (MG-scoped)          | `azurerm_consumption_budget_management_group`       |
+| Scope | Bicep resource                               | Terraform resource                            |
+| ----- | -------------------------------------------- | --------------------------------------------- |
+| `rg`  | `Microsoft.Consumption/budgets` (RG-scoped)  | `azurerm_consumption_budget_resource_group`   |
+| `sub` | `Microsoft.Consumption/budgets` (sub-scoped) | `azurerm_consumption_budget_subscription`     |
+| `mg`  | `Microsoft.Consumption/budgets` (MG-scoped)  | `azurerm_consumption_budget_management_group` |
 
 - Amount: aligned to cost estimate from Step 2 (`03-des-cost-estimate.md`).
 - Time grain: Monthly.
@@ -30,13 +30,13 @@ Scope is selected by Planner-set `cost_monitoring_scope ∈ {rg, sub, mg}`
 
 ## Threshold Contract (5 hard-coded, Budget API limit)
 
-| # | Type       | Threshold | Operator                |
-| - | ---------- | --------- | ----------------------- |
-| 1 | Actual     | 80%       | GreaterThan             |
-| 2 | Actual     | 100%      | GreaterThanOrEqualTo    |
-| 3 | Actual     | 125%      | GreaterThan             |
-| 4 | Forecasted | 100%      | GreaterThan             |
-| 5 | Forecasted | 125%      | GreaterThan             |
+| #   | Type       | Threshold | Operator             |
+| --- | ---------- | --------- | -------------------- |
+| 1   | Actual     | 80%       | GreaterThan          |
+| 2   | Actual     | 100%      | GreaterThanOrEqualTo |
+| 3   | Actual     | 125%      | GreaterThan          |
+| 4   | Forecasted | 100%      | GreaterThan          |
+| 5   | Forecasted | 125%      | GreaterThan          |
 
 Do **not** add a 6th notification — the
 `Microsoft.Consumption/budgets` API rejects budgets with more than 5
@@ -73,7 +73,7 @@ only. See `cost-alerts-baseline.md` for the rule text.
   `kind: "InsightAlert"`, **subscription-scoped only**.
 - **Terraform**: `azurerm_cost_anomaly_alert`, subscription-scoped
   (only scope supported by the provider), `email_addresses =
-  cost_alert_emails`.
+cost_alert_emails`.
 - RG-scoped anomaly is **deferred** — no current shape in either stack.
 
 ### InsightAlert shape constraints (Bicep)
@@ -82,16 +82,16 @@ The Azure REST API rejects InsightAlerts that violate these shape rules,
 even when `bicep build` and `what-if` pass. The IaC Planner must freeze
 every property below in the Code-Generation Contract:
 
-| Property | Constraint |
-| -------- | ---------- |
-| `scope` | Subscription only — module must use `targetScope = 'subscription'` and main.bicep invokes it with `scope: subscription()`. |
-| `displayName` | **≤ 25 characters** — `anomaly-{project}-{env}` only works for short slugs; use `anomaly-{short-slug}` if longer. |
-| `viewId` | Subscription-scope cost view, e.g. `/providers/Microsoft.CostManagement/views/ms:DailyAnomalyBySubscription` or `ms:DailyCosts`. **Never** `ms:DailyAnomalyByResourceGroup` (RG-scope view is rejected). |
-| `schedule.frequency` | `Daily`. |
-| `schedule.startDate` | ISO 8601 UTC midnight, e.g. `2026-05-17T00:00:00Z`. Must be present at deploy time. |
-| `schedule.endDate` | ISO 8601 UTC midnight, **≤ 365 days** after startDate. The API rejects ranges > 1 year. |
-| `notification.to` | Array of email addresses; CodeGen sources from `cost_alert_emails`. |
-| `notificationEmail` | The ARM-level sender field; freeze as `senderEmail` param even when `notification.to` is set. Both are required for legacy deployments. |
+| Property             | Constraint                                                                                                                                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scope`              | Subscription only — module must use `targetScope = 'subscription'` and main.bicep invokes it with `scope: subscription()`.                                                                               |
+| `displayName`        | **≤ 25 characters** — `anomaly-{project}-{env}` only works for short slugs; use `anomaly-{short-slug}` if longer.                                                                                        |
+| `viewId`             | Subscription-scope cost view, e.g. `/providers/Microsoft.CostManagement/views/ms:DailyAnomalyBySubscription` or `ms:DailyCosts`. **Never** `ms:DailyAnomalyByResourceGroup` (RG-scope view is rejected). |
+| `schedule.frequency` | `Daily`.                                                                                                                                                                                                 |
+| `schedule.startDate` | ISO 8601 UTC midnight, e.g. `2026-05-17T00:00:00Z`. Must be present at deploy time.                                                                                                                      |
+| `schedule.endDate`   | ISO 8601 UTC midnight, **≤ 365 days** after startDate. The API rejects ranges > 1 year.                                                                                                                  |
+| `notification.to`    | Array of email addresses; CodeGen sources from `cost_alert_emails`.                                                                                                                                      |
+| `notificationEmail`  | The ARM-level sender field; freeze as `senderEmail` param even when `notification.to` is set. Both are required for legacy deployments.                                                                  |
 
 ### Module placement (Bicep)
 
@@ -135,20 +135,15 @@ the implementation plan; Challenger D-6 asserts the merge is faithful.
 
 ## Opt-out (`cost_monitoring_mode`)
 
-| Mode       | Resources                              | Allowed when                                 |
-| ---------- | -------------------------------------- | -------------------------------------------- |
-| `enforced` | Budget + Action Group + anomaly        | Default for prod; allowed everywhere         |
-| `minimal`  | Budget only                            | `environment ∈ {dev, sandbox}` only          |
-| `deferred` | None (exception record required)      | `environment ∈ {dev, sandbox}` only, plus    |
-|            |                                        | `cost_monitoring_exception = {rationale, expiry_date}` |
+| Mode       | Resources                        | Allowed when                                           |
+| ---------- | -------------------------------- | ------------------------------------------------------ |
+| `enforced` | Budget + Action Group + anomaly  | Default for prod; allowed everywhere                   |
+| `minimal`  | Budget only                      | `environment ∈ {dev, sandbox}` only                    |
+| `deferred` | None (exception record required) | `environment ∈ {dev, sandbox}` only, plus              |
+|            |                                  | `cost_monitoring_exception = {rationale, expiry_date}` |
 
 ## Enforcement
 
-- IaC Planner Phase 2 performs the live AVM lookup; Phase 4 runs the
-  preflight Action Group discovery and writes the resolved decision
-  keys to `apex-recall`.
-- 06b/06t CodeGen Wave 4 emits the budget + Action Group + anomaly
-  resources per the scope/stack/mode matrix.
-- Challenger assertions D-1 through D-7 (see
-  `azure-defaults/references/adversarial-checklists.md`) verify
-  contract compliance.
+- Accepted architecture and implementation intent record cost-monitoring scope and required existing-resource references.
+- Code generation follows the accepted intent and governance mappings; it does not invent deployment authority.
+- Current validation and review receipts establish compliance before the exact deployment preview is approved.

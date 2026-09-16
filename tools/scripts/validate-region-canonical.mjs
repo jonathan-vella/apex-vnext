@@ -2,14 +2,8 @@
 /**
  * Region Canonical Validator
  *
- * Asserts that the Default Regions table in
- * `.github/skills/azure-defaults/SKILL.md` matches the canonical
- * declaration in `.github/copilot-instructions.md` (the
- * `## Azure Defaults (canonical)` section).
- *
- * This prevents silent drift between the two files. The canonical
- * source is copilot-instructions.md; the skill restates the table
- * for IaC-output convenience and must stay byte-equivalent.
+ * Checks the canonical region table and its skill reference without
+ * requiring a duplicate table in the skill.
  *
  * @example
  * node tools/scripts/validate-region-canonical.mjs
@@ -66,41 +60,14 @@ function extractRegionsTable(filePath) {
 r.tick();
 const canonical = extractRegionsTable(CANONICAL_PATH);
 r.tick();
-const mirror = extractRegionsTable(MIRROR_PATH);
-
-if (canonical && mirror) {
-  // Compare row-by-row (each cell stripped of leading/trailing whitespace inside pipes)
-  const norm = (row) =>
-    row
-      .split("|")
-      .map((cell) => cell.trim())
-      .filter((cell, idx, arr) => idx !== 0 && idx !== arr.length - 1)
-      .join(" | ");
-
-  const canonicalNorm = canonical.map(norm);
-  const mirrorNorm = mirror.map(norm);
-
-  if (canonicalNorm.length !== mirrorNorm.length) {
-    r.error(
-      "regions-table",
-      `row-count mismatch: copilot-instructions.md has ${canonicalNorm.length}, azure-defaults/SKILL.md has ${mirrorNorm.length}`,
-    );
-  } else {
-    let allMatch = true;
-    for (let idx = 0; idx < canonicalNorm.length; idx += 1) {
-      if (canonicalNorm[idx] !== mirrorNorm[idx]) {
-        r.error(
-          "regions-table",
-          `row ${idx + 1} differs:\n    canonical: ${canonicalNorm[idx]}\n    mirror:    ${mirrorNorm[idx]}`,
-        );
-        allMatch = false;
-      }
-    }
-    if (allMatch) {
-      r.ok("regions-table", `${canonicalNorm.length} rows match between canonical and mirror`);
-    }
-  }
+const skill = fs.readFileSync(MIRROR_PATH, "utf8");
+if (!skill.includes("../../copilot-instructions.md#azure-defaults-canonical")) {
+  r.error(MIRROR_PATH, "Skill must reference the canonical Azure defaults");
 }
+if (/^###\s+Default Regions\s*$/mu.test(skill)) {
+  r.error(MIRROR_PATH, "Do not duplicate the canonical region table in skill guidance");
+}
+if (canonical) r.ok("regions-table", "Canonical region table exists and skill guidance references its owner");
 
 r.summary();
 r.exitOnError("Region canonical check passed");

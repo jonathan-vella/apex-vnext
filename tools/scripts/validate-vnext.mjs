@@ -241,7 +241,6 @@ export function loadRepositoryModel(root = process.cwd()) {
     },
     mcpTools: parseMcpTools(mcpSource),
     sources: sourceFiles.map((file) => ({ path: relative(root, file), content: readFileSync(file, "utf8") })),
-    plan: readFileSync(path.join(root, ".github", "prompts", "plan-buildApexVnext.prompt.md"), "utf8"),
   };
 }
 
@@ -1039,13 +1038,6 @@ function validateSourceBoundaries(model, findings) {
 }
 
 function validateDeferredPlan(model, findings) {
-  if (!/plugin packaging is an optional convenience/i.test(model.plan))
-    finding(
-      findings,
-      "plan.deferred",
-      "Plan must keep plugin packaging optional",
-      ".github/prompts/plan-buildApexVnext.prompt.md",
-    );
   if (model.packages.plugin || model.packages["copilot-cli"])
     finding(findings, "plan.deferred", "Deferred plugin or Copilot CLI package must not be mandatory");
   for (const { manifest } of Object.values(model.packages))

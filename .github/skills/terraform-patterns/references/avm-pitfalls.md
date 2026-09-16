@@ -138,7 +138,7 @@ detail in
 [`azure-bicep-patterns/references/avm-pitfalls.md`](../../azure-bicep-patterns/references/avm-pitfalls.md));
 only the `azurerm` argument names differ. The shared, language-neutral
 catalogue lives in
-[`iac-common/references/known-deploy-issues.md`](../../iac-common/references/known-deploy-issues.md).
+[`customizations/.github/skills/apex-azure-deploy/SKILL.md`](../../../../customizations/.github/skills/apex-azure-deploy/SKILL.md).
 
 ### AKS outbound type must match the egress topology
 
@@ -160,9 +160,9 @@ or apply fails with
 
 ### MySQL Flexible Server: private endpoint vs delegated subnet
 
-`azurerm_mysql_flexible_server` is *either* VNet-injected
+`azurerm_mysql_flexible_server` is _either_ VNet-injected
 (`delegated_subnet_id` + a subnet delegated to
-`Microsoft.DBforMySQL/flexibleServers`, /29 minimum) *or* reached via an
+`Microsoft.DBforMySQL/flexibleServers`, /29 minimum) _or_ reached via an
 `azurerm_private_endpoint` — not both. Pointing it at a shared PE subnet
 without delegation fails with `VnetSubnetMissingDelegation`. For a shared
 PE subnet, use a private endpoint.

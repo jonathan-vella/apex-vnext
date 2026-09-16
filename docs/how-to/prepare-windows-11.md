@@ -177,12 +177,12 @@ then verify its version and sign-in status.
 This automation prepares the development checkout, not an Azure deployment. Use the scripts from the reviewed checkout;
 they do not clone repositories, remove a devcontainer, copy credentials, grant Azure roles or change subscriptions.
 
-| Install location         | Contents                                                                                            |
-| ------------------------ | --------------------------------------------------------------------------------------------------- |
-| Windows                  | WSL2/Ubuntu, VS Code, WSL and Copilot extensions                                                    |
-| Ubuntu WSL2              | Node/npm, Git, Python/uv, Azure CLI, Bicep, Terraform, GitHub CLI and Copilot CLI                   |
-| Ubuntu development tools | PowerShell, azd, Gitleaks, Vale, actionlint, Bats, ShellCheck, ripgrep and build utilities          |
-| Repository               | Declared npm dependencies and an isolated Python `.venv` with test/lint tools and local apex-recall |
+| Install location         | Contents                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------ |
+| Windows                  | WSL2/Ubuntu, VS Code, WSL and Copilot extensions                                           |
+| Ubuntu WSL2              | Node/npm, Git, Python/uv, Azure CLI, Bicep, Terraform, GitHub CLI and Copilot CLI          |
+| Ubuntu development tools | PowerShell, azd, Gitleaks, Vale, actionlint, Bats, ShellCheck, ripgrep and build utilities |
+| Repository               | Declared npm dependencies and an isolated Python `.venv` with test/lint tools              |
 
 No Windows Node, Python, Azure CLI, Terraform or Git installation is required for Linux development. VS Code runs on
 Windows and connects to the Linux workspace; install language extensions on the WSL side when VS Code requests them.
