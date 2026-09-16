@@ -124,7 +124,7 @@ const QUALIFICATION_RUNTIME_LAUNCHER =
   'for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal));\n' +
   'child.once("error", (error) => { console.error(error.message); process.exit(1); });\n' +
   'child.once("exit", (code, signal) => process.exit(code ?? { SIGINT: 130, SIGTERM: 143 }[signal] ?? 1));\n';
-const APPROVED_NPM_REGISTRY = "https://packagefeedproxy.microsoft.io/npm/";
+const APPROVED_NPM_REGISTRY = "https://registry.npmjs.org/";
 
 async function installQualifiedRuntime(workspace, options, root = ROOT) {
   const releaseManifestPath = candidateInputPath(root, required(options, "release-manifest"));
