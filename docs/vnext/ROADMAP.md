@@ -6,15 +6,15 @@ Preserve working safety mechanisms; do not rebuild the runtime or create a gener
 
 ## Delivery Order
 
-| Phase | Outcome                                       | Primary acceptance                                                       |
-| ----- | --------------------------------------------- | ------------------------------------------------------------------------ |
+| Phase | Outcome                                      | Primary acceptance                                                       |
+| ----- | -------------------------------------------- | ------------------------------------------------------------------------ |
 | 1     | Correct and compact task inputs and guidance | First optimization batch passes; controls stay aligned and enforced      |
-| 2     | Complete governance baseline import           | Subscription policy reaches review, Gate 2, planning and code validation |
-| 3     | Support both profiles and COE adaptation      | Independent import and conversational changes reuse accepted decisions   |
-| 4     | Complete design and operational output        | Useful, consistent documents and handoff match the quality reference     |
-| 5     | Close WSL2 and paired-client workflow gaps    | Both clients complete the lifecycle without a devcontainer               |
-| 6     | Finalize distribution and APEX MCP delivery   | Easy install/update/upgrade/rollback with compatible runtime versions    |
-| 7     | Qualify and release the final candidate       | Current evidence and explicit release authority                          |
+| 2     | Complete governance baseline import          | Subscription policy reaches review, Gate 2, planning and code validation |
+| 3     | Support both profiles and COE adaptation     | Independent import and conversational changes reuse accepted decisions   |
+| 4     | Complete design and operational output       | Useful, consistent documents and handoff match the quality reference     |
+| 5     | Close WSL2 and paired-client workflow gaps   | Both clients complete the lifecycle without a devcontainer               |
+| 6     | Finalize distribution and APEX MCP delivery  | Easy install/update/upgrade/rollback with compatible runtime versions    |
+| 7     | Qualify and release the final candidate      | Current evidence and explicit release authority                          |
 
 ## Phase 1: Align Without Rebuilding
 
@@ -36,22 +36,22 @@ Implement these slices in order, validating each before moving on. Canonical acc
 [REQ-OPTIMIZATION-001](PRD.md#req-optimization-001-bounded-input-efficiency).
 
 1. **Fix review reads and current-revision selection.** Owner: CLI/kernel maintainers. Repair plan-review's
-  `implementation-intent` lookup and select current accepted task dependencies instead of historical completion lists.
-  Add regressions for superseded/invalidated inputs, every review subject, pagination and both IaC generation tracks.
-  Anchors: `readTaskInput`, `inputRefs`, `generateIac` in `packages/cli/src/service.ts`. Addresses R-13 and prerequisites
-  for R-12/R-20. Do not weaken invalidation or approval checks.
+   `implementation-intent` lookup and select current accepted task dependencies instead of historical completion lists.
+   Add regressions for superseded/invalidated inputs, every review subject, pagination and both IaC generation tracks.
+   Anchors: `readTaskInput`, `inputRefs`, `generateIac` in `packages/cli/src/service.ts`. Addresses R-13 and prerequisites
+   for R-12/R-20. Do not weaken invalidation or approval checks.
 2. **Bound context and all reviewer packs.** Owner: CLI/kernel and contracts maintainers. Build task-specific projections,
-  enforce locked byte budgets, preserve compact templates and offer selective authoritative reads. Remove redundant
-  full-context loading for subject-only reads. Test large/multibyte fixtures, missing dependencies, stale ownership and
-  expiry, review criteria/dispositions and required retrieval coverage. Addresses R-12/R-13/R-16/R-20 without new caches.
+   enforce locked byte budgets, preserve compact templates and offer selective authoritative reads. Remove redundant
+   full-context loading for subject-only reads. Test large/multibyte fixtures, missing dependencies, stale ownership and
+   expiry, review criteria/dispositions and required retrieval coverage. Addresses R-12/R-13/R-16/R-20 without new caches.
 3. **Correct routing guidance and narrow tools.** Owner: managed customization and MCP maintainers. Handle `needs_review`,
-  describe every registered tool and remove demonstrably irrelevant role grants. Preserve Architect pricing and needed
-  Operator cost paths. Test both generated projections for required-tool coverage and forbidden-tool exclusion, plus
-  `needs_input`/`needs_review`/`task` behavior. Addresses R-01/R-02/R-06; no new worker or client authority.
+   describe every registered tool and remove demonstrably irrelevant role grants. Preserve Architect pricing and needed
+   Operator cost paths. Test both generated projections for required-tool coverage and forbidden-tool exclusion, plus
+   `needs_input`/`needs_review`/`task` behavior. Addresses R-01/R-02/R-06; no new worker or client authority.
 4. **Remove proven prompt duplication.** Owner: managed customization maintainers. Consolidate repeated sequencing and
-  use compact domain references only where they reduce actual duplicate guidance. Keep essential worker rules and
-  distinct operational checklists. Test guidance consumers, installed references, delegation boundaries and output
-  contracts in both projections. Addresses R-03/R-04 and useful R-09 ordering; no broad bundle deletion.
+   use compact domain references only where they reduce actual duplicate guidance. Keep essential worker rules and
+   distinct operational checklists. Test guidance consumers, installed references, delegation boundaries and output
+   contracts in both projections. Addresses R-03/R-04 and useful R-09 ordering; no broad bundle deletion.
 
 For each slice, run its focused regression or contract check first, then relevant documentation and projection checks.
 Use existing CLI workflow, adapter, dependency-revision and customization tests rather than a new measurement harness.
@@ -63,32 +63,32 @@ qualification before parity claims. Preserve all four review passes, determinist
 R-IDs refer to the token, quality and latency brief reviewed on 2026-09-15. This register owns delivery disposition;
 the PRD owns acceptance. Applicable follow-ons belong in existing phases, not a second roadmap.
 
-| Recommendation | Disposition and delivery |
-| --- | --- |
-| R-01: ARM grants | Adapt in first batch 3: scope per role, including legitimate Operator cost needs. |
-| R-02: Tool metadata | First batch 3: descriptions and client coverage checks before allowlist changes. |
-| R-03: Prompt ownership | Adapt in first batch 4: remove duplicates without losing worker safety rules. |
-| R-04: Skill index | Adapt in first batch 4: compact references, no mandatory extra read per task. |
-| R-05: Bundle removal | Phase 4: assess dormant/reference-only consumers; retire only with replacement proof. |
-| R-06: Next-task outcomes | First batch 3: document and test `needs_review` alongside other outcomes. |
-| R-07: Model tiers | Deferred: require review-quality and delegation-boundary evidence before routing changes. |
-| R-08: Intake prose | No standalone work: already concise; preserve recommendation provenance in Phase 3. |
-| R-09: Prompt ordering | First batch 4 where useful: stable-first guidance, no cache-saving claim. |
-| R-10: Pricing reuse | Phase 4: reuse exact matching evidence rows; batching requires provider support. |
-| R-11: MCP duplication | Deferred: prove compatibility in both clients before changing response representation. |
-| R-12: Context budgets | Adapt in first batch 2: locked limits, compact inline content and selective retrieval. |
-| R-13: Input filtering | First batch 1 then 2: accepted revisions and task dependencies, not kind filtering alone. |
-| R-14: Requirements delta | Phase 3: base-bound amendments, stable IDs, merged validation and full-submit fallback. |
-| R-15: Network decision | Phase 3: reuse confirmed intent when sufficient; retain necessary Architecture confirmation. |
-| R-16: Replay reduction | First batch 2: remove redundant request-local work; defer cross-call caching. |
-| R-17: Deferred rendering | Deferred: require durable retry/recovery and package readiness before review or approval. |
-| R-18: Journal snapshots | Deferred: demonstrate need and preserve journal integrity, expiry and ownership checks. |
-| R-19: New telemetry | Not current scope under DECISION-025; preserve utilities and reconcile executable gates. |
-| R-20: Reviewer packs | First batch 2: bounded evidence and exact criteria for all four unchanged review passes. |
-| R-21: Parallel reviews | Deferred: scheduler and head/commit semantics need a separate correctness design. |
-| R-22: CLI workers | Reject terminal-wrapper shortcut; Phase 5 delivers a supported path retaining ADR-0006 bounds. |
-| R-23: Partial invalidation | Reject ID-only invalidation; Phase 3 reuses unchanged decisions with conservative proof. |
-| R-24: Recommendations | Phase 3: recommend permitted choices; never record or accept risk without confirmation. |
+| Recommendation             | Disposition and delivery                                                                       |
+| -------------------------- | ---------------------------------------------------------------------------------------------- |
+| R-01: ARM grants           | Adapt in first batch 3: scope per role, including legitimate Operator cost needs.              |
+| R-02: Tool metadata        | First batch 3: descriptions and client coverage checks before allowlist changes.               |
+| R-03: Prompt ownership     | Adapt in first batch 4: remove duplicates without losing worker safety rules.                  |
+| R-04: Skill index          | Adapt in first batch 4: compact references, no mandatory extra read per task.                  |
+| R-05: Bundle removal       | Phase 4: assess dormant/reference-only consumers; retire only with replacement proof.          |
+| R-06: Next-task outcomes   | First batch 3: document and test `needs_review` alongside other outcomes.                      |
+| R-07: Model tiers          | Deferred: require review-quality and delegation-boundary evidence before routing changes.      |
+| R-08: Intake prose         | No standalone work: already concise; preserve recommendation provenance in Phase 3.            |
+| R-09: Prompt ordering      | First batch 4 where useful: stable-first guidance, no cache-saving claim.                      |
+| R-10: Pricing reuse        | Phase 4: reuse exact matching evidence rows; batching requires provider support.               |
+| R-11: MCP duplication      | Deferred: prove compatibility in both clients before changing response representation.         |
+| R-12: Context budgets      | Adapt in first batch 2: locked limits, compact inline content and selective retrieval.         |
+| R-13: Input filtering      | First batch 1 then 2: accepted revisions and task dependencies, not kind filtering alone.      |
+| R-14: Requirements delta   | Phase 3: base-bound amendments, stable IDs, merged validation and full-submit fallback.        |
+| R-15: Network decision     | Phase 3: reuse confirmed intent when sufficient; retain necessary Architecture confirmation.   |
+| R-16: Replay reduction     | First batch 2: remove redundant request-local work; defer cross-call caching.                  |
+| R-17: Deferred rendering   | Deferred: require durable retry/recovery and package readiness before review or approval.      |
+| R-18: Journal snapshots    | Deferred: demonstrate need and preserve journal integrity, expiry and ownership checks.        |
+| R-19: New telemetry        | Not current scope under DECISION-025; preserve utilities and reconcile executable gates.       |
+| R-20: Reviewer packs       | First batch 2: bounded evidence and exact criteria for all four unchanged review passes.       |
+| R-21: Parallel reviews     | Deferred: scheduler and head/commit semantics need a separate correctness design.              |
+| R-22: CLI workers          | Reject terminal-wrapper shortcut; Phase 5 delivers a supported path retaining ADR-0006 bounds. |
+| R-23: Partial invalidation | Reject ID-only invalidation; Phase 3 reuses unchanged decisions with conservative proof.       |
+| R-24: Recommendations      | Phase 3: recommend permitted choices; never record or accept risk without confirmation.        |
 
 Deferred mechanisms are not authorized implementation work. Reconsider only with a concrete functional need, named
 owner, compatibility and security design, focused tests and the required client evidence. Do not introduce model

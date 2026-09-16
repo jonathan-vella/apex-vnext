@@ -52,7 +52,7 @@ GitHub Issues and the repository project own day-to-day work selection. [ROADMAP
 | Copilot CLI live client outcomes                               | Current candidate pending with autonomous-worker omission |
 | Bicep live Azure outcomes                                      | Current candidate pending                                 |
 | Terraform live Azure outcomes                                  | Current candidate pending                                 |
-| Release authority                                              | Conditional authorization; acceptance evidence pending     |
+| Release authority                                              | Conditional authorization; acceptance evidence pending    |
 
 Only exact-candidate evidence satisfies current gates.
 

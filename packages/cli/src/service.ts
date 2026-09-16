@@ -4638,10 +4638,13 @@ export class ApexService {
       projectId: string;
       runId: string;
     };
-    const subscriptionScope = typeof snapshot?.subscriptionId === "string"
-      ? `/subscriptions/${snapshot.subscriptionId.toLowerCase()}` : undefined;
+    const subscriptionScope =
+      typeof snapshot?.subscriptionId === "string"
+        ? `/subscriptions/${snapshot.subscriptionId.toLowerCase()}`
+        : undefined;
     if (
-      snapshot === null || snapshot.schemaVersion !== "governance-baseline-selection-v1" ||
+      snapshot === null ||
+      snapshot.schemaVersion !== "governance-baseline-selection-v1" ||
       !Array.isArray(snapshot.findings) ||
       snapshot.projectId !== run.projectId ||
       snapshot.runId !== run.runId ||
