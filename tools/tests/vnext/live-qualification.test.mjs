@@ -337,6 +337,19 @@ test("prepares exact paired client workspaces and cleans partial failure", async
   assert.deepEqual(calls, ["github-copilot-cli", "github-copilot-vscode"]);
   assert.equal(preparation.workspaces.cli.clientId, "github-copilot-cli");
   assert.equal(preparation.workspaces.vscode.clientId, "github-copilot-vscode");
+  for (const client of ["cli", "vscode"]) {
+    const workspace = join(root, client);
+    const repository = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: workspace, encoding: "utf8" });
+    assert.equal(repository.status, 0, repository.stderr);
+    assert.equal(repository.stdout.trim(), workspace);
+    assert.equal(
+      await lstat(join(workspace, ".git", "hooks")).then(
+        () => true,
+        () => false,
+      ),
+      false,
+    );
+  }
   const installedCli = join(root, "cli", ".apex", "runtime-packages", "node_modules", "@apexops", "cli", "dist");
   await mkdir(installedCli, { recursive: true });
   await writeFile(join(installedCli, "cli.js"), "console.log(JSON.stringify(process.argv.slice(2)));\n");

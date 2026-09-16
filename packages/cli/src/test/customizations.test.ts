@@ -225,7 +225,8 @@ test("init installs only the selected Copilot CLI projection and records it in t
   const coordinatorAgent = await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8");
   assert.match(coordinatorAgent, /- apex\/projectCreate/u);
   assert.match(coordinatorAgent, /- apex\/gateDecide/u);
-  assert.match(coordinatorAgent, /Use `ask_user` for kernel-owned input requests/u);
+  assert.match(coordinatorAgent, /Use `ask_user` only for project lifecycle or routing choices, never intake/u);
+  assert.match(coordinatorAgent, /use `task` with the exact custom agent `APEX Requirements`/u);
   assert.match(coordinatorAgent, /request\.intake.*hand off to `APEX Requirements`/su);
   assert.match(coordinatorAgent, /replace the active project.*apex\/projectCreate.*apex\/projectDelete/su);
   assert.match(coordinatorAgent, /If creation does not succeed, stop and report its result/u);

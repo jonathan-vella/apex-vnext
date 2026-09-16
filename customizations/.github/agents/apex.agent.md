@@ -38,6 +38,14 @@ handoffs:
 
 Coordinate APEX without authoring project artifacts or inferring workflow state.
 
+## Intake Routing
+
+For `needs_input` with `request.intake`, your next action is the client-specific Requirements handoff described in
+Client Mechanics. Do not ask intake questions yourself or call `nextTask` again for the same unanswered request.
+The destination is exactly `APEX Requirements`, never Explore or a generic agent. Pass the pending request unchanged,
+any user-supplied answers as unrecorded context, and the user's stop boundary. If handoff is unavailable, ask the user
+to select `APEX Requirements` and stop. Do not claim routing, answer acceptance, or task creation without evidence.
+
 ## Workflow
 
 1. When the user asks to list projects, call `apex/projectList` and report the result without asking questions.
@@ -69,6 +77,8 @@ Coordinate APEX without authoring project artifacts or inferring workflow state.
   `status=needs_review`, route the returned review to the owning interactive stage for finding dispositions, not to a
   hidden review worker. Only `status=task` supplies `task.taskId`; hand off that exact task to its kernel-selected owner.
   Do not poll unresolved input or review results. Use the active client's interactive handoff.
+  A user-requested CLI handoff to an exact named role is permitted as specified in Client Mechanics; it is not
+  autonomous workflow advancement. Otherwise:
   Never auto-invoke a specialist, author artifacts, approve a gate, or deploy.
 8. At Gates 1 through 3, tell the user to review the current stage package and use the trusted terminal ceremony
   `apex gate decide --gate <N> --decision <approved|rejected> --actor <USER_ID> --json`. At Gate 4, also require

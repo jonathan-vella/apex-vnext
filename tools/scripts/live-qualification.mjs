@@ -208,6 +208,11 @@ async function lifecycleClient(root, clientId, projectId, serviceFactory) {
 
 async function prepareClient(root, clientId, projectId, serviceFactory, installRuntime, options) {
   await mkdir(root, { recursive: false });
+  execFileSync("git", ["init", "--quiet", "--template=", root], {
+    encoding: "utf8",
+    timeout: 30_000,
+    maxBuffer: MAX_CLI_OUTPUT_BYTES,
+  });
   const initialized = await serviceFactory(root).init({ projectId, clientId });
   await installRuntime(root, options);
   const launcher = join(root, QUALIFICATION_RUNTIME_LAUNCHER_PATH);
@@ -437,7 +442,7 @@ async function assertPreparedWorkspaceInventory(root, managedFiles) {
       entryCount += 1;
       if (entryCount > 4096) throw new Error("Prepared workspace inventory is too large");
       const relativePath = relativeDirectory === "" ? name : `${relativeDirectory}/${name}`;
-      if (relativePath === ".apex") {
+      if (relativePath === ".apex" || relativePath === ".git") {
         await assertRuntimeDirectory(join(root, relativePath), "Prepared workspace runtime directory");
         continue;
       }

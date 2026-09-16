@@ -61,9 +61,11 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
   if ("target" in frontmatter) throw new Error("Shared agent source must not declare target");
   if (clientId === "github-copilot-vscode") {
     const mechanics = [
-      Array.isArray(frontmatter.tools) && frontmatter.tools.includes("vscode/askQuestions")
-        ? "Use `vscode/askQuestions` for kernel-owned input requests."
-        : null,
+      frontmatter.name === "APEX"
+        ? "For requirements intake, present the declared Gather requirements handoff to `APEX Requirements` and stop for the user's interactive transition. If unavailable, ask the user to select `APEX Requirements`. Use `vscode/askQuestions` only for project lifecycle or routing choices, never intake."
+        : Array.isArray(frontmatter.tools) && frontmatter.tools.includes("vscode/askQuestions")
+          ? "Use `vscode/askQuestions` for kernel-owned input requests."
+          : null,
       Array.isArray(frontmatter.handoffs) && frontmatter.handoffs.length > 0
         ? "Use the declared direct handoffs for interactive transitions."
         : null,
@@ -110,10 +112,12 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
     tools,
   };
   const mechanics = [
-    tools.includes(inventory.interactiveTools.askUser)
-      ? `Use \`${inventory.interactiveTools.askUser}\` for kernel-owned input requests.`
-      : null,
-    tools.includes(inventory.interactiveTools.delegate)
+    frontmatter.name === "APEX"
+      ? `For requirements intake, use \`${inventory.interactiveTools.delegate}\` with the exact custom agent \`APEX Requirements\` only when the user requested that routing. Preserve the pending request and the user's stop boundary; never substitute Explore. If the exact agent is unavailable, ask the user to select it and stop. Use \`${inventory.interactiveTools.askUser}\` only for project lifecycle or routing choices, never intake.`
+      : tools.includes(inventory.interactiveTools.askUser)
+        ? `Use \`${inventory.interactiveTools.askUser}\` for kernel-owned input requests.`
+        : null,
+    frontmatter.name !== "APEX" && tools.includes(inventory.interactiveTools.delegate)
       ? `Use \`${inventory.interactiveTools.delegate}\` for declared worker delegation.`
       : null,
   ].filter(Boolean);

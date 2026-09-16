@@ -178,6 +178,31 @@ test("managed routing distinguishes input, review dispositions, and exact task c
   const skills = ["apex-workflow", "apex-requirements", "apex-operations"];
   for (const client of ["github-copilot-vscode", "github-copilot-cli"]) {
     const projection = join(root, "packages/cli/assets/client-projections", client);
+    const coordinator = await readFile(join(projection, ".github/agents/apex.agent.md"), "utf8");
+    const mechanics = coordinator.split("<!-- apex-shared-body -->")[0];
+    assert.match(mechanics, /never intake/);
+    assert.match(coordinator, /exactly `APEX Requirements`, never Explore or a generic agent/);
+    assert.match(coordinator, /user's stop boundary/);
+    assert.match(coordinator, /If handoff is unavailable, ask the user/);
+    if (client === "github-copilot-cli") {
+      assert.match(
+        mechanics,
+        /use `task` with the exact custom agent `APEX Requirements` only when the user requested/,
+      );
+      assert.doesNotMatch(mechanics, /for declared worker delegation/);
+    } else {
+      assert.match(mechanics, /present the declared Gather requirements handoff/);
+      assert.match(mechanics, /stop for the user's interactive transition/);
+    }
+    const requirements = await readFile(join(projection, ".github/agents/apex-requirements.agent.md"), "utf8");
+    const submission = requirements.indexOf("Immediately after the user answers a panel, call `apex/recordInput`");
+    const acknowledgment = requirements.indexOf("Wait for `recorded: true` with the same request ID");
+    assert.ok(submission > 0 && acknowledgment > submission);
+    for (const field of ["schemaVersion", "requestId", "expectedHead", "ownerEpoch", "questionId", "value"]) {
+      assert.ok(requirements.slice(submission, acknowledgment).includes(field), `Missing submission field ${field}`);
+    }
+    assert.match(requirements, /question-tool response is not kernel\s+acceptance/);
+    assert.match(requirements, /intake-only check ending at task context, stop here/);
     for (const agent of agents) {
       const content = await readFile(join(projection, ".github/agents", `${agent}.agent.md`), "utf8");
       for (const state of ["status=needs_input", "status=needs_review", "status=task", "task.taskId"]) {

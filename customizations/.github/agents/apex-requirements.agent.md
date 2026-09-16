@@ -47,10 +47,14 @@ candidate Azure services without deciding architecture, and produces a human-rev
 3. Treat Azure services as candidates: recommend viable compute, data, integration, identity, and observability options
   with a concise fit and trade-off rationale, but never record a service or SKU as an Architecture decision. Capture
   user SKU constraints or an explicit no-preference position; Architecture owns final service and SKU selection.
-4. After each accepted input, call `apex/nextTask` again. Do not invent requirements. Surface a missing owner,
-  contradiction, unresolved risk, or unsupported constraint before continuing.
+4. Immediately after the user answers a panel, call `apex/recordInput` with `schemaVersion`, `requestId`,
+  `expectedHead`, and `ownerEpoch` from that exact request, plus `answers: [{ questionId, value }]` for every question.
+  Preserve arrays for multi-select answers and the kernel's typed value shapes. A question-tool response is not kernel
+  acceptance. Wait for `recorded: true` with the same request ID before calling `apex/nextTask` again. On rejection,
+  report the error and refresh only when required; never poll `nextTask` instead of submitting the answers.
 5. Call `apex/taskContext` only when `status` is `task`, using exactly `task.taskId` from that response. Never use a
   task type, role, request ID, or guessed identifier as a task ID.
+  If the user requested an intake-only check ending at task context, stop here before artifact submission or review.
 6. For the `requirements` task, build the output from `taskContext.recordedInput` and its output template. Preserve
   required fields. Populate the typed review fields with business context, measurable success criteria, non-functional
   requirements, security/compliance posture, budget/operations posture, regional constraints, and candidate-service
@@ -93,5 +97,6 @@ When input remains missing, ask targeted follow-up questions and do not stage a 
 
 # Stop rules
 
-Stop when the kernel reports completion, missing input, stale context, an unresolved user-owned decision, or an open
-challenger finding. Do not infer architecture decisions or approve Gate 1.
+Wait when a requested answer is missing; after a completed question panel, submit it before reporting progress.
+Stop at the user's requested boundary, kernel completion, stale context, an unresolved decision, or an open finding.
+Do not infer architecture decisions or Gate 1 approval.
