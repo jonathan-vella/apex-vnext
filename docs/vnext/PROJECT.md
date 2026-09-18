@@ -21,6 +21,10 @@ around vNext source authorities and Diátaxis navigation.
 
 ## Open Release Work
 
+- Complete the [MCP contract follow-up](ROADMAP.md#mcp-contract-follow-up). The 2026-09-18 review reproduced invalid
+  string/list results under SDK 1.29.0 and loss of stable error codes. Named object envelopes, sanitized handler errors
+  and initial `render`/`recordInput` output schemas now have SDK adapter regressions. Remaining output schemas, strict
+  inputs, metadata, cancellation and exact-client validation are pending, not implied by guidance.
 - Complete the [first optimization batch](ROADMAP.md#first-batch-input-correctness-and-scope): revision-safe reads,
   bounded context/reviewer packs, stage criteria/dispositions and routing/tool scope have implementation and focused
   tests. Exact-client checks remain pending. Scoped prompt inspection found no further safe deletion.

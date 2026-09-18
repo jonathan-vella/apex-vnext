@@ -13,6 +13,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createMcpServer } from "../mcp.js";
 import { execute, formatHumanResult } from "../cli.js";
 import { ApexService } from "../service.js";
+import { ApexError, EXIT_CODES } from "../errors.js";
 import { nextTaskAfterInput, requirements, tempRoot, writeJson } from "./helpers.js";
 
 test("CLI emits a stable JSON envelope", async () => {
@@ -211,6 +212,94 @@ test("CLI rejects a symlinked profile bootstrap agent", async () => {
   await mkdir(profileRoot, { recursive: true });
   await symlink(outside, join(profileRoot, "apex-bootstrap.agent.md"));
   await assert.rejects(execute(["profile", "install", "--yes"], root, { profileRoot }), /regular file/u);
+});
+
+test("MCP preserves valid result envelopes and sanitized execution errors", async () => {
+  const service = new ApexService(await tempRoot());
+  service.render = async () => "# Run status";
+  service.improvementObservations = async () => [];
+  service.improvementProposals = async () => [];
+  service.capabilityList = async () => [];
+  service.stageArtifact = async (taskId, output) => ({
+    taskId,
+    kind: output.kind,
+    path: "staged.json",
+    bytes: 2,
+    hash: "a".repeat(64),
+  });
+  service.taskContext = async () => {
+    throw new ApexError("APEX_STALE", "Task expired", EXIT_CODES.stale, { token: "private-detail" });
+  };
+  service.status = async () => {
+    throw new Error("Bearer synthetic-private-token");
+  };
+  const server = createMcpServer(service);
+  const client = new Client({ name: "response-contract-test", version: "1.0.0" });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+  try {
+    for (const [name, args, expected] of [
+      ["render", { kind: "status" }, { markdown: "# Run status" }],
+      ["improvementObservations", {}, { observations: [] }],
+      ["improvementProposals", {}, { proposals: [] }],
+      ["capabilityList", {}, { packs: [] }],
+    ] as const) {
+      const response = await client.callTool({ name, arguments: args });
+      assert.equal(response.isError, undefined);
+      assert.deepEqual(response.structuredContent, expected);
+      assert.deepEqual(JSON.parse((response.content as Array<{ text: string }>)[0]!.text), expected);
+    }
+    const stale = await client.callTool({ name: "taskContext", arguments: { taskId: "expired" } });
+    assert.equal(stale.isError, true);
+    assert.deepEqual(stale.structuredContent, {
+      error: { code: "APEX_STALE", message: "Task is stale or expired; refresh status before retrying." },
+    });
+    assert.doesNotMatch(JSON.stringify(stale), /private-detail/);
+    const unexpected = await client.callTool({ name: "status", arguments: {} });
+    assert.equal(unexpected.isError, true);
+    assert.deepEqual(unexpected.structuredContent, {
+      error: { code: "APEX_INTERNAL", message: "APEX could not complete the operation." },
+    });
+    assert.doesNotMatch(JSON.stringify(unexpected), /synthetic-private-token|Bearer/);
+    for (const code of [
+      "APEX_VALIDATION",
+      "APEX_AUTHORIZATION",
+      "APEX_CONFLICT",
+      "APEX_NOT_FOUND",
+      "APEX_USAGE",
+    ] as const) {
+      service.status = async () => {
+        throw new ApexError(code, "Bearer private-diagnostic", EXIT_CODES.validation);
+      };
+      const response = await client.callTool({ name: "status", arguments: {} });
+      assert.equal(response.isError, true);
+      assert.equal((response.structuredContent as { error: { code: string } }).error.code, code);
+      assert.doesNotMatch(JSON.stringify(response), /private-diagnostic|Bearer/);
+    }
+    service.status = async () => {
+      throw new Error("Task has expired");
+    };
+    const expired = await client.callTool({ name: "status", arguments: {} });
+    assert.equal((expired.structuredContent as { error: { code: string } }).error.code, "APEX_STALE");
+    const staged = await client.callTool({
+      name: "stageArtifact",
+      arguments: {
+        taskId: "task-1",
+        outputs: [{ kind: "requirements", value: {} }],
+      },
+    });
+    assert.equal(staged.isError, undefined);
+    assert.deepEqual(staged.structuredContent, {
+      artifacts: [{ taskId: "task-1", kind: "requirements", path: "staged.json", bytes: 2, hash: "a".repeat(64) }],
+    });
+    const tools = await client.listTools();
+    for (const name of ["render", "recordInput"])
+      assert.ok(tools.tools.find((tool) => tool.name === name)?.outputSchema);
+  } finally {
+    await client.close();
+    await server.close();
+  }
 });
 
 test("MCP registers only narrow tools and calls the service", async () => {

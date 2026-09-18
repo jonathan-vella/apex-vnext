@@ -110,6 +110,17 @@ and the repository archives.
 - **Closure proof:** Changed guidance and projections pass consumer/contract tests; behavior changes have authorized
   exact-client evidence, and no unsupported token-saving, review-completion or parity claim is made.
 
+## RISK-013: MCP Wire Contracts Can Hide Recovery Or Reject Results
+
+- **Owner:** CLI adapter and client experience maintainers
+- **Impact:** SDK-incompatible results fail after work runs; missing error codes impede safe recovery. A protocol
+  upgrade or misleading read-only metadata can change permission, retry and freshness behavior.
+- **Mitigation:** Implement [REQ-MCP-001](PRD.md#req-mcp-001-predictable-tool-contracts) in the roadmap order. Preserve
+  stdio, explicit tools, stable errors and kernel authority; migrate protocol versions separately.
+- **State:** Open; envelope and sanitized handler-error regressions pass, broader contract/client checks pending
+- **Closure proof:** All registered results validate, cancellation/retry tests preserve committed-state semantics,
+  and both supported clients have evidence for the exact negotiated protocol and candidate.
+
 ## ASSUMPTION-001: Supported Clients Can Share Typed Outcomes
 
 - **Owner:** Client experience

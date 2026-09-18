@@ -74,6 +74,19 @@ Use existing CLI workflow, adapter, dependency-revision and customization tests 
 Run `npm run qualify:vnext` for product changes. Client behavior changes require separately authorized exact-client
 qualification before parity claims. Preserve all four review passes, deterministic rich output and human approval.
 
+### MCP Contract Follow-Up
+
+Owner: CLI adapter maintainers; acceptance: [REQ-MCP-001](PRD.md#req-mcp-001-predictable-tool-contracts).
+Implement before claiming paired-client readiness, in bounded slices:
+
+1. Fix string/list response envelopes and sanitized execution errors. Run SDK in-memory regressions first.
+2. Add canonical output schemas, strict arguments and staging-form validation; cover all registered tool results.
+3. Audit side effects, annotations and status purity; add mutation-aware retries, cancellation and disconnect tests.
+4. Run stdio/package checks and exact-client validation. Evaluate July 2026 protocol migration in Phase 6, separately
+   from these fixes. Do not add new protocol fields to the old SDK or build host discovery/code-mode infrastructure.
+
+Kernel-enforced user stop scopes require a separate explicit authorization design, not an MCP metadata shortcut.
+
 ### Optimization Recommendation Dispositions
 
 R-IDs refer to the token, quality and latency brief reviewed on 2026-09-15. This register owns delivery disposition;

@@ -310,6 +310,32 @@ Existing executable optimization gates and receipts remain unchanged by document
 implementation in a focused tested follow-up before running affected scenarios; never bypass checks or fabricate a
 receipt. Separately authorized maintenance remains bounded by its manifest and has no merge or deployment authority.
 
+### REQ-MCP-001: Predictable Tool Contracts
+
+The CLI MCP adapter exposes kernel-authorized operations, not a second workflow engine. Improve the current pinned
+SDK before considering a protocol migration. Acceptance:
+
+1. Every successful tool result validates through the supported SDK. Preserve existing object responses; wrap Markdown
+   and lists in named objects. Retain serialized text alongside structured results for compatible clients.
+2. Execution failures return `isError: true` and a stable, sanitized APEX code/message. Unexpected diagnostics, stacks,
+   raw provider errors and unreviewed details must not reach the model. Test stale, validation and internal failures.
+3. Publish output schemas, starting with intake, task context and bounded reads, reusing canonical contracts. Reject
+   unexpected arguments and ambiguous staging forms before mutation. Test every registered tool's response shape.
+4. Describe side effects truthfully and supply behavior annotations without treating them as authorization. Do not
+   mark task issuance or terminal bookkeeping as read-only or retry-safe. Prefer a genuinely read-only status path.
+5. Bound requests and propagate cancellation at safe operation boundaries. Test disconnects, committed partial effects
+   and recovery; a timeout must not imply rollback or permit blind mutation retries.
+6. Verify stdio cleanliness, initialization, negotiated versions and exact-client behavior. The current SDK supports
+   protocols through 2025-11-25; July 2026 SDK/protocol migration requires separate compatibility evidence in both clients.
+
+Progressive discovery, definition caching and programmatic tool calling belong to the host. Do not add a server-side
+search platform, arbitrary script execution or generic dispatch to implement client advice. Keep role-scoped tools.
+Kernel-enforced intake-only operation scopes need a separate authority design; prompt handoffs and `confirm: true`
+are not proof of such enforcement. Protocol caching hints must never substitute for kernel evidence freshness.
+
+References: [server guide](https://modelcontextprotocol.io/docs/2026-07-28/develop/build-server) and
+[client practices](https://modelcontextprotocol.io/docs/2026-07-28/develop/clients/client-best-practices).
+
 ### REQ-DEV-DIAGNOSTICS-001: Opt-In Development Evidence
 
 Separately authorized repository-development diagnostics support agent-led investigation without requiring a human

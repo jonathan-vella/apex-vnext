@@ -3,6 +3,18 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { ApexService, SUPPORTED_ARTIFACT_KINDS } from "./service.js";
 import { APEX_VERSION } from "./version.js";
+import { normalizeError, type ApexErrorCode } from "./errors.js";
+
+const errorMessages: Record<ApexErrorCode, string> = {
+  APEX_USAGE: "Invalid operation arguments; check the tool input contract.",
+  APEX_NOT_FOUND: "Requested APEX state was not found; refresh status and check the identifier.",
+  APEX_CONFLICT: "The operation conflicts with current state; refresh status before retrying.",
+  APEX_VALIDATION: "APEX validation failed; check the supplied input against the current task contract.",
+  APEX_STALE: "Task is stale or expired; refresh status before retrying.",
+  APEX_AUTHORIZATION:
+    "Operation is not authorized in the current workflow state; check status and approval requirements.",
+  APEX_INTERNAL: "APEX could not complete the operation.",
+};
 
 const artifactKind = z.enum(
   SUPPORTED_ARTIFACT_KINDS as [
@@ -145,15 +157,31 @@ const normalizeOutputs = (outputs: z.infer<typeof taskOutput>[]) =>
 
 export function createMcpServer(service: ApexService): McpServer {
   const server = new McpServer({ name: "apex", version: APEX_VERSION });
-  const result = (value: unknown) => ({
-    content: [{ type: "text" as const, text: JSON.stringify(value) }],
-    structuredContent: value as Record<string, unknown>,
-  });
+  const result = (value: unknown) => {
+    if (value === null || typeof value !== "object" || Array.isArray(value))
+      throw new Error("MCP success results require an object envelope");
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify(value) }],
+      structuredContent: value as Record<string, unknown>,
+    };
+  };
+  const registerTool = server.registerTool.bind(server);
+  server.registerTool = (name, config, callback) => {
+    const guarded = async (...args: Parameters<typeof callback>) => {
+      try {
+        return await Reflect.apply(callback, undefined, args);
+      } catch (error) {
+        const { code } = normalizeError(error);
+        return { ...result({ error: { code, message: errorMessages[code] } }), isError: true };
+      }
+    };
+    return registerTool(name, config, guarded as typeof callback);
+  };
   server.registerTool("status", { description: "Read selected APEX run status" }, async () =>
     result(await service.status()),
   );
   server.registerTool("capabilityList", { description: "Read capability pack availability" }, async () =>
-    result(await service.capabilityList()),
+    result({ packs: await service.capabilityList() }),
   );
   server.registerTool(
     "capabilityStatus",
@@ -193,7 +221,11 @@ export function createMcpServer(service: ApexService): McpServer {
   );
   server.registerTool(
     "recordInput",
-    { description: "Record answers for the exact pending kernel input request", inputSchema: inputSubmission },
+    {
+      description: "Record answers for the exact pending kernel input request",
+      inputSchema: inputSubmission,
+      outputSchema: z.object({ recorded: z.literal(true), requestId: z.string().min(1) }).strict(),
+    },
     async (input) => result(await service.recordInput(input)),
   );
   server.registerTool(
@@ -277,9 +309,11 @@ export function createMcpServer(service: ApexService): McpServer {
     },
     async ({ taskId, kind, value, summary, outputs }) => {
       if (outputs !== undefined)
-        return result(
-          await Promise.all(normalizeOutputs(outputs).map((output) => service.stageArtifact(taskId, output))),
-        );
+        return result({
+          artifacts: await Promise.all(
+            normalizeOutputs(outputs).map((output) => service.stageArtifact(taskId, output)),
+          ),
+        });
       if (kind === undefined) throw new Error("stageArtifact requires kind/value or outputs[]");
       return result(
         await service.stageArtifact(taskId, { kind, value, ...(summary === undefined ? {} : { summary }) }),
@@ -485,10 +519,10 @@ export function createMcpServer(service: ApexService): McpServer {
       ),
   );
   server.registerTool("improvementObservations", { description: "Read bounded observations" }, async () =>
-    result(await service.improvementObservations()),
+    result({ observations: await service.improvementObservations() }),
   );
   server.registerTool("improvementProposals", { description: "Read inert improvement proposals" }, async () =>
-    result(await service.improvementProposals()),
+    result({ proposals: await service.improvementProposals() }),
   );
   server.registerTool(
     "render",
@@ -496,8 +530,9 @@ export function createMcpServer(service: ApexService): McpServer {
       description:
         "Render the selected run's status, requirements, preview, approval, or inventory as a human-readable projection.",
       inputSchema: { kind: z.enum(["status", "requirements", "preview", "approval", "inventory"]) },
+      outputSchema: z.object({ markdown: z.string() }).strict(),
     },
-    async ({ kind }) => result(await service.render(kind)),
+    async ({ kind }) => result({ markdown: await service.render(kind) }),
   );
   server.registerTool(
     "promote",

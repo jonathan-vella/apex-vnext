@@ -50,6 +50,34 @@ The returned request ID, expected head, and owner epoch are required for `record
 `improvementObserve`, `improvementObservations`, and `improvementProposals` record and read bounded improvement data.
 Proposals are inert: they do not mutate instructions, policy, or runtime behavior automatically.
 
+## Response Contracts
+
+APEX currently pins TypeScript SDK 1.29.0, supporting MCP versions through 2025-11-25. It does not claim support for
+the 2026-07-28 protocol. Initialization/version negotiation is handled by the SDK; stdio stdout is protocol-only.
+
+Successful responses include an object in `structuredContent` and the same JSON serialized in a text content block.
+Existing object results are unchanged. Non-object service results use these envelopes:
+
+| Tool                           | Structured result        |
+| ------------------------------ | ------------------------ |
+| `render`                       | `{ "markdown": "..." }`  |
+| `capabilityList`               | `{ "packs": [] }`        |
+| `improvementObservations`      | `{ "observations": [] }` |
+| `improvementProposals`         | `{ "proposals": [] }`    |
+| `stageArtifact` with `outputs` | `{ "artifacts": [] }`    |
+
+Single-artifact staging still returns its existing artifact object. Bundle staging is not an atomic completion;
+use `completeTask` for atomic output acceptance. `render` and `recordInput` advertise output schemas; remaining schemas
+are planned under [REQ-MCP-001](../vnext/PRD.md#req-mcp-001-predictable-tool-contracts).
+
+Handler failures return `isError: true` with `{ "error": { "code": "APEX_STALE", "message": "..." } }` in both
+structured and text content. Messages are allowlisted recovery guidance, not raw exception messages. Stacks, causes
+and exception details are omitted. SDK argument-validation errors retain SDK handling. Clients must inspect `isError`,
+refresh stale state and avoid blindly retrying mutations; an error does not imply that all side effects were rolled back.
+
+`nextTask` can issue requests/tasks, and `status` can record terminal bookkeeping. Neither operation is currently
+guaranteed side-effect-free. Tool metadata and host permission prompts do not replace kernel authorization.
+
 ## Authority
 
 [`packages/cli/src/mcp.ts`](../../packages/cli/src/mcp.ts) is the executable tool inventory.
