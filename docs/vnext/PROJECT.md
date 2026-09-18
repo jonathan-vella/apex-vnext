@@ -137,6 +137,20 @@ bundle and client follow-ons have named phases in the
 [recommendation dispositions](ROADMAP.md#optimization-recommendation-dispositions). Deferred mechanisms, new telemetry,
 model downgrades and unsupported CLI worker shortcuts are not authorized by this planning update.
 
+## Development Diagnostics Checkpoint
+
+On 2026-09-18, separately authorized development tooling added workspace registration/disable, generated VS Code
+workspace settings, CLI capture launch, host Azure CLI authentication, and bounded local/Azure evidence packets.
+The user approved Monitoring Metrics Publisher for their Azure user at the dedicated Application Insights component
+scope. The host collector was verified by a synthetic log/trace round trip and the evidence reader retrieved both
+local and Azure records. Existing service-principal credentials remain untouched; Key Vault remains private.
+
+This does not qualify real client routing, custom-agent handoffs, desktop-app export, or unattended assessment.
+The next client proof is one real registered session per supported client, with tool/subagent activity and attributable
+evidence. No manual findings report should be required when the registered sources contain the necessary data.
+See [acceptance](PRD.md#req-dev-diagnostics-001-opt-in-development-evidence) and
+[setup and limitations](../how-to/debug-local.md#command-driven-session-assessment).
+
 ## Resume Protocol
 
 1. Verify the current `main` head and protected check state.

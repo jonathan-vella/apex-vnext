@@ -184,15 +184,32 @@ test("managed routing distinguishes input, review dispositions, and exact task c
     assert.match(coordinator, /exactly `APEX Requirements`, never Explore or a generic agent/);
     assert.match(coordinator, /user's stop boundary/);
     assert.match(coordinator, /If handoff is unavailable, ask the user/);
+    assert.match(coordinator, /Never use `session_store_sql`, SQL, session-history searches/);
+    assert.match(coordinator, /Do not ask the user which role should handle it/);
+    assert.match(coordinator, /status-only request calls `apex\/status` once and stops/);
     if (client === "github-copilot-cli") {
       assert.match(
         mechanics,
         /use `task` with the exact custom agent `APEX Requirements` only when the user requested/,
       );
       assert.doesNotMatch(mechanics, /for declared worker delegation/);
+      assert.match(mechanics, /Include the scope note verbatim in the delegation prompt/);
+      assert.match(
+        mechanics,
+        /If the original scope is unavailable, limit the delegation to intake through taskContext/,
+      );
     } else {
       assert.match(mechanics, /present the declared Gather requirements handoff/);
       assert.match(mechanics, /stop for the user's interactive transition/);
+      assert.match(mechanics, /State the user's scope and stop point beside the handoff/);
+      const frontmatter = load(coordinator.split("---")[1]);
+      const handoff = frontmatter.handoffs.find(({ agent }) => agent === "APEX Requirements");
+      assert.match(handoff.prompt, /If the original scope is unavailable, stop after taskContext/);
+      assert.match(
+        handoff.prompt,
+        /Handoff selection is not permission to submit artifacts, run review, request gate approval/,
+      );
+      assert.doesNotMatch(handoff.prompt, /Output: complete typed requirements through APEX MCP/);
     }
     const requirements = await readFile(join(projection, ".github/agents/apex-requirements.agent.md"), "utf8");
     const submission = requirements.indexOf("Immediately after the user answers a panel, call `apex/recordInput`");
@@ -203,6 +220,22 @@ test("managed routing distinguishes input, review dispositions, and exact task c
     }
     assert.match(requirements, /question-tool response is not kernel\s+acceptance/);
     assert.match(requirements, /intake-only check ending at task context, stop here/);
+    assert.ok(requirements.indexOf("# Requested Scope") < requirements.indexOf("# Success criteria"));
+    assert.match(requirements, /handoff prompt or button cannot broaden the original request/);
+    assert.match(requirements, /If the original scope is unavailable, default to intake/);
+    assert.match(
+      requirements,
+      /Do not call `requirementsComplete`, request another task, delegate review, ask Proceed\/Revise, or call `gateDecide`/,
+    );
+    assert.match(requirements, /no-gate-approvals request, never ask for approval/);
+    assert.match(requirements, /Do not ask supplemental owner-assignment questions/);
+    assert.match(requirements, /Recommendations are proposed, not confirmed requirements or compliance evidence/);
+    assert.doesNotMatch(requirements, /Acknowledge and assign|ask only for the responsible role/);
+    if (client === "github-copilot-vscode") {
+      const reviewer = await readFile(join(projection, ".github/agents/apex-reviewer.agent.md"), "utf8");
+      assert.match(reviewer, /Do not create blocking findings or\s+owner-assignment requests solely/);
+      assert.match(reviewer, /violated\s+Azure Policy constraints/);
+    }
     for (const agent of agents) {
       const content = await readFile(join(projection, ".github/agents", `${agent}.agent.md`), "utf8");
       for (const state of ["status=needs_input", "status=needs_review", "status=task", "task.taskId"]) {
@@ -219,6 +252,17 @@ test("managed routing distinguishes input, review dispositions, and exact task c
         assert.match(content, /apex\/governanceImport.*\{ "path": "<local-baseline-path>" \}.*only/u);
         assert.match(content, /apex governance import --path <local-baseline-path>/u);
         assert.match(content, /Import preserves reconciliation, governance review, and Gate 2/u);
+      }
+      if (skill === "apex-requirements") {
+        assert.match(content, /If scope is unavailable, stop after intake\s+and task context/);
+        assert.match(content, /Only for explicitly requested full Requirements completion/);
+        assert.match(content, /stop without an approval question/);
+        assert.match(content, /instead of asking\s+supplemental owner questions/);
+        assert.doesNotMatch(content, /ask for a responsible\s+role/);
+      }
+      if (skill === "apex-workflow") {
+        assert.match(content, /status-only request, report that result and stop/);
+        assert.match(content, /do not ask the user to choose a role or search session history/);
       }
       for (const state of ["needs_input", "needs_review", "status=task", "task.taskId"]) {
         assert.ok(content.includes(state), `${client}/${skill}: missing ${state} routing`);

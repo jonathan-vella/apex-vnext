@@ -62,7 +62,7 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
   if (clientId === "github-copilot-vscode") {
     const mechanics = [
       frontmatter.name === "APEX"
-        ? "For requirements intake, present the declared Gather requirements handoff to `APEX Requirements` and stop for the user's interactive transition. If unavailable, ask the user to select `APEX Requirements`. Use `vscode/askQuestions` only for project lifecycle or routing choices, never intake."
+        ? "For requirements intake, present the declared Gather requirements handoff to `APEX Requirements` and stop for the user's interactive transition. State the user's scope and stop point beside the handoff; do not ask a role-selection question when the kernel has selected the owner. If unavailable, ask the user to select `APEX Requirements`. Use `vscode/askQuestions` only for project lifecycle or routing choices, never intake."
         : Array.isArray(frontmatter.tools) && frontmatter.tools.includes("vscode/askQuestions")
           ? "Use `vscode/askQuestions` for kernel-owned input requests."
           : null,
@@ -113,7 +113,7 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
   };
   const mechanics = [
     frontmatter.name === "APEX"
-      ? `For requirements intake, use \`${inventory.interactiveTools.delegate}\` with the exact custom agent \`APEX Requirements\` only when the user requested that routing. Preserve the pending request and the user's stop boundary; never substitute Explore. If the exact agent is unavailable, ask the user to select it and stop. Use \`${inventory.interactiveTools.askUser}\` only for project lifecycle or routing choices, never intake.`
+      ? `For requirements intake, use \`${inventory.interactiveTools.delegate}\` with the exact custom agent \`APEX Requirements\` only when the user requested that routing. Preserve the pending request and the user's stop boundary; never substitute Explore. Include the scope note verbatim in the delegation prompt: requested outcome, stop point, and prohibited operations. If the original scope is unavailable, limit the delegation to intake through taskContext. Do not use session-history tools to discover or invoke agents. If the exact agent is unavailable, ask the user to select it and stop. Use \`${inventory.interactiveTools.askUser}\` only for project lifecycle or routing choices, never intake.`
       : tools.includes(inventory.interactiveTools.askUser)
         ? `Use \`${inventory.interactiveTools.askUser}\` for kernel-owned input requests.`
         : null,

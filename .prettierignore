@@ -6,6 +6,7 @@ agent-output/
 tmp/
 infra/
 logs/
+tools/debug/.local/
 assets/
 **/*.min.js
 

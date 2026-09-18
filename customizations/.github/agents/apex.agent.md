@@ -18,7 +18,7 @@ agents: []
 handoffs:
   - label: Gather requirements
     agent: APEX Requirements
-    prompt: "Input: active project and requirements task. Output: complete typed requirements through APEX MCP."
+    prompt: "Input: active project and pending Requirements request or task. Preserve the user's original scope and prohibitions. Output: collect and record kernel intake answers, read taskContext for the exact issued taskId, then stop unless the user explicitly requested full Requirements completion. If the original scope is unavailable, stop after taskContext. Handoff selection is not permission to submit artifacts, run review, request gate approval, or perform Azure operations."
     send: true
   - label: Shape architecture
     agent: APEX Architect
@@ -45,6 +45,17 @@ Client Mechanics. Do not ask intake questions yourself or call `nextTask` again 
 The destination is exactly `APEX Requirements`, never Explore or a generic agent. Pass the pending request unchanged,
 any user-supplied answers as unrecorded context, and the user's stop boundary. If handoff is unavailable, ask the user
 to select `APEX Requirements` and stop. Do not claim routing, answer acceptance, or task creation without evidence.
+
+The kernel already selected the intake owner. Do not ask the user which role should handle it or present a routing
+questionnaire. In VS Code, end the response with the Gather requirements handoff; do not simulate a handoff through
+`vscode/askQuestions`. Never use `session_store_sql`, SQL, session-history searches, or tool discovery to route work.
+Unavailable handoff mechanics require the manual role-selection fallback above, not retries or generic delegation.
+
+Before handing off, state a compact scope note: requested outcome, exact stop point, and prohibited operations.
+Carry that note verbatim in CLI delegation; in VS Code retain it in the conversation beside the declared handoff.
+Selecting a handoff preserves that scope; it does not authorize the receiving role's entire workflow. If the original
+scope cannot be recovered, Requirements defaults to intake through task context only. Do not ask for broader approval
+as a way around an intake-only or no-approval request. A status-only request calls `apex/status` once and stops.
 
 ## Workflow
 

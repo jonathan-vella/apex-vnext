@@ -16,6 +16,22 @@ Preserve working safety mechanisms; do not rebuild the runtime or create a gener
 | 6     | Finalize distribution and APEX MCP delivery  | Easy install/update/upgrade/rollback with compatible runtime versions    |
 | 7     | Qualify and release the final candidate      | Current evidence and explicit release authority                          |
 
+## Development Diagnostics
+
+Separately authorized on 2026-09-18 under
+[REQ-DEV-DIAGNOSTICS-001](PRD.md#req-dev-diagnostics-001-opt-in-development-evidence), not an expansion of the
+optimization first batch or its deferred telemetry recommendation:
+
+- Implement workspace registration/disable, isolated VS Code settings, process-scoped CLI launch, and a Linux/WSL
+  collector using Azure CLI credentials. Preserve consumer packaging and existing service-principal credentials.
+- Supply bounded, provenance-bearing local/Azure evidence for agent-led analysis. Missing capture remains a gap,
+  never a passing workflow outcome. No unattended model invocation or automatic improvement application.
+- Verify synthetic ingestion and local regressions first; retain real VS Code/CLI custom-agent session coverage as
+  a separate pending qualification item. No desktop-app export claim.
+
+See [current checkpoint](PROJECT.md#development-diagnostics-checkpoint) and
+[operator commands](../how-to/debug-local.md#command-driven-session-assessment).
+
 ## Phase 1: Align Without Rebuilding
 
 **Requirements:** `REQ-MAINTAINABILITY-001`, `REQ-OPTIMIZATION-001`, `REQ-WORKFLOW-001`, `REQ-GUIDANCE-001`, `REQ-DOCS-001`.

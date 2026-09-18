@@ -310,6 +310,31 @@ Existing executable optimization gates and receipts remain unchanged by document
 implementation in a focused tested follow-up before running affected scenarios; never bypass checks or fabricate a
 receipt. Separately authorized maintenance remains bounded by its manifest and has no merge or deployment authority.
 
+### REQ-DEV-DIAGNOSTICS-001: Opt-In Development Evidence
+
+Separately authorized repository-development diagnostics support agent-led investigation without requiring a human
+to reconstruct session failures. This is not consumer telemetry, a new kernel state machine, an optimization
+benchmark, or permission for autonomous remediation. It does not change `REQ-OPTIMIZATION-001` qualification gates.
+
+Acceptance:
+
+1. Commands register explicit development workspaces, generate isolated VS Code capture settings, launch CLI with
+   process-scoped metadata export, and disable capture without overwriting project settings or deleting history.
+2. Linux/WSL host collection can use the signed-in Azure CLI identity with resource-scoped ingestion permission.
+   Tokens remain with Azure CLI/in memory; no token cache mounts, silent credential fallback, role grants, or
+   service-principal credential revocation. Existing Azure Policy remains enforced.
+3. A bounded reader retrieves registered-workspace Azure telemetry and filtered local evidence automatically.
+   Extra client diagnostic directories require explicit registration and content access opt-in. Never scrape global
+   chat history or replay transcripts. Record source locations, identifiers, limits, missing evidence and partial reads.
+4. Evidence packets distinguish observed errors from root-cause hypotheses. Logs are untrusted data, not instructions.
+   Agent recommendations cite evidence and affected code plus a regression check; they cannot approve gates, change
+   models, deploy, or alter code without a separately authorized implementation task.
+5. Historical ingestion, reader correctness, and client behavior are separate proof obligations. Synthetic telemetry
+   validates the pipeline only. Real VS Code/CLI routing and custom-agent handoffs require exact-client evidence;
+   desktop-app capture and unattended model-driven assessment remain unqualified until tested and authorized.
+
+Implementation and operational instructions: [development logging](../how-to/debug-local.md).
+
 ### REQ-DOCS-001: Documentation And Lifecycle
 
 Installation, workflow, CLI, security, operations, testing, capability packs, upgrade, downgrade, rollback, uninstall,

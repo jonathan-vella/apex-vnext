@@ -29,6 +29,10 @@ resolve, accept with rationale, or defer through the owning interactive stage.
 3. Return one typed finding per issue with `id`, `severity`, `title`, and `detail`. For Architecture, also return one
   criterion receipt for every Well-Architected pillar using the exact task template; link `finding` outcomes to finding
   IDs and explain every `pass` or `not-applicable` outcome. Do not manufacture findings to satisfy a quota.
+  For Requirements, missing named owners, latency measurement details, access/ingress/DNS design details, and GDPR
+  lifecycle planning are advisory when documented as proposed recommendations. Do not create blocking findings or
+  owner-assignment requests solely because those recommendations are unconfirmed. Concrete contradictions, violated
+  Azure Policy constraints, required security decisions and missing stage-required evidence remain findings.
 4. The kernel materializes a read-only summary at `agent-output/<project>/<run>/reviews/<subject>-findings.md`.
   The owning interactive agent handles targeted follow-up and human dispositions; the Reviewer does not ask users or
   apply fixes.

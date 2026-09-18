@@ -5143,14 +5143,34 @@ export class ApexService {
       const values = ids.map(text).filter((value): value is string => value !== undefined);
       return values.length === 0 ? undefined : values.join("; ");
     };
+    const recommend = (value: string | undefined, recommendation: string): string =>
+      [value, `Recommendation (proposed, not confirmed): ${recommendation}`].filter(Boolean).join("\n\n");
+    const compliance = input?.compliance;
+    const gdpr =
+      typeof compliance === "object" &&
+      compliance !== null &&
+      !Array.isArray(compliance) &&
+      compliance.kind === "compliance" &&
+      compliance.scopes.includes("gdpr");
     const reviewFields = {
       businessContext: joinValues("industry", "delivery-scenario", "workload-pattern"),
-      successCriteria: text("scale"),
+      successCriteria: recommend(
+        text("scale"),
+        "Measure end-to-end latency at normal and peak load using p95 and p99, with error rate and test duration recorded. Use the stated latency target; do not invent an acceptance threshold. Suggested role: application team; no assignment is implied.",
+      ),
       nonFunctionalRequirements: text("availability-recovery") ?? text("recovery"),
-      securityAndCompliance: joinValues("security-controls", "compliance", "authentication", "data-sensitivity"),
+      securityAndCompliance: gdpr
+        ? recommend(
+            joinValues("security-controls", "compliance", "authentication", "data-sensitivity"),
+            "Inventory personal data, minimize collection and telemetry, and document retention/deletion and data-subject handling before production use. Suggested role: privacy/data owner; no assignment, retention period or GDPR compliance is asserted.",
+          )
+        : joinValues("security-controls", "compliance", "authentication", "data-sensitivity"),
       budgetAndOperations: joinValues("budget", "operations"),
       regionalConstraints: text("region"),
-      architectureHandoff: text("service-preferences"),
+      architectureHandoff: recommend(
+        text("service-preferences"),
+        "Have Architecture define authorized client access, identity, ingress and DNS using the confirmed security requirements and target Azure Policy. Prefer least privilege; do not infer public access. Suggested role: platform/application team; no assignment is implied.",
+      ),
     };
     return {
       requirements:

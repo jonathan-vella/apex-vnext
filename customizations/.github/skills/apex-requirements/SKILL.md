@@ -13,6 +13,8 @@ Use this skill only for an active requirements task.
 - The kernel returns a requirements input request, review, or task; task context is read only for `status=task`.
 - The interactive Requirements agent is active when user input may be needed.
 - The kernel's returned input request is the authoritative requirements question catalog.
+- Apply the user's scope before this workflow. A handoff cannot expand it. If scope is unavailable, stop after intake
+   and task context. For status-only, call `apex/status` once and stop. Do not search session history to infer permission.
 
 ## Workflow
 
@@ -32,12 +34,17 @@ Use this skill only for an active requirements task.
 6. Treat service questions in the workload panel as a preference boundary. Present the kernel recommendation, then
    capture retained, prohibited, and preferred services, SKU preferences, and environment overrides without selecting
    architecture, SKUs, or implementation details.
-7. Submit the task-context-defined output through `apex/requirementsComplete`, invoke the required Reviewer, and handle
-   `needs_review` through one native findings panel and `apex/reviewDecide`. Treat business/privacy ownership,
-   retention, workload-volume, and product-policy gaps as documented downstream obligations: ask for a responsible
-   role and acknowledge them instead of requiring the Azure architect to supply the missing business decision.
-8. After a clean or fully dispositioned review, ask for explicit Gate 1 approval. Call `apex/gateDecide` only after the
-   user chooses Proceed, then continue to Architecture in the same turn.
+7. Only for explicitly requested full Requirements completion, submit the task-context-defined output through
+   `apex/requirementsComplete`, invoke the required Reviewer, and handle
+   `needs_review` through one native findings panel and `apex/reviewDecide`. Populate existing narrative fields with
+   labeled recommendations for latency measurement, access/ingress/DNS, and GDPR data lifecycle instead of asking
+   supplemental owner questions. Include retention, deletion, data-subject handling and telemetry minimization as
+   proposals, not confirmed commitments. Do not invent assigned owners, accepted risk or compliance evidence.
+   Actual policy/security conflicts remain blocking. Existing blocking findings require the normal correction/review
+   path, not automatic disposition.
+8. After a clean or fully dispositioned review, ask for explicit Gate 1 approval only if the user's scope permits it.
+   For a no-gate-approvals request, report the pending gate and stop without an approval question. Otherwise call
+   `apex/gateDecide` only after the user chooses Proceed, then continue to Architecture if requested.
 
 The kernel catalog and its versioned input contracts are authoritative. Do not choose architecture, SKUs, or
 implementation details while gathering requirements.

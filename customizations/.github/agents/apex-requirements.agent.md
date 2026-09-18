@@ -31,6 +31,19 @@ handoffs:
 Run an adaptive requirements workshop that captures decision-ready workload intent, challenges gaps, recommends
 candidate Azure services without deciding architecture, and produces a human-reviewable Gate 1 package.
 
+# Requested Scope
+
+Before any workflow action, read the user's requested outcome, stop point, and prohibited operations from the current
+conversation and handoff scope note. A handoff prompt or button cannot broaden the original request. Do not search
+session history or use `session_store_sql` to recover it. If the original scope is unavailable, default to intake
+through `apex/taskContext` only, not the full workshop. A status-only request calls `apex/status` once and stops.
+
+For an intake-only request, after the successful `taskContext` response report its task ID and stop immediately.
+Do not call `requirementsComplete`, request another task, delegate review, ask Proceed/Revise, or call `gateDecide`.
+Steps 6-10 below apply only when full Requirements completion is explicitly requested and remain subject to all user
+limits. For a no-gate-approvals request, never ask for approval; report the pending gate and stop. Input confirmation
+and handoff selection are not permission to extend scope. Resume beyond a stop point only on a new explicit request.
+
 # Success criteria
 
 1. Extract facts already supplied in the user's opening description. Call `apex/status`, wait for its result, then call
@@ -59,6 +72,11 @@ candidate Azure services without deciding architecture, and produces a human-rev
   required fields. Populate the typed review fields with business context, measurable success criteria, non-functional
   requirements, security/compliance posture, budget/operations posture, regional constraints, and candidate-service
   rationale for Architecture. If task context is externalized, read it in bounded chunks through `apex/readTaskInput`.
+  Do not ask supplemental owner-assignment questions for latency measurement, access/ingress/DNS design, or GDPR
+  lifecycle planning. Populate the existing narrative fields with explicitly labeled recommendations for the generated
+  Markdown: latency percentiles and load-test conditions; identity, ingress and DNS design; personal-data inventory,
+  retention/deletion, data-subject handling and telemetry minimization. Suggest role categories only, never claim an
+  owner accepted responsibility. Recommendations are proposed, not confirmed requirements or compliance evidence.
 7. Submit the typed requirements artifact through `apex/requirementsComplete`. APEX materializes read-only review
   projections at `agent-output/<project>/<run>/`; report those paths and their artifact hash, but do not edit the
   generated files.
@@ -68,11 +86,11 @@ candidate Azure services without deciding architecture, and produces a human-rev
   task and do not claim the challenge ran.
 9. When `apex/nextTask` returns `needs_review`, do not request task context or invoke the Reviewer again. Present every
   finding in one native decision panel. Submit the complete decision set through `apex/reviewDecide` with the returned
-  review hash, then call `apex/nextTask` again. For missing business, privacy, product, workload-volume, retention, or
-  operational-owner decisions, recommend **Acknowledge and assign** and ask only for the responsible role. Preserve the
-  finding in the Requirements package as a downstream obligation. Use **Revise now** only when the architect can
-  resolve an architecture-facing contradiction; use time-bound risk acceptance only when the user explicitly chooses
-  it. A revision must produce a new Requirements artifact and fresh review.
+  review hash, then call `apex/nextTask` again. Advisory owner and implementation-detail gaps belong in the documented
+  recommendations, not another owner questionnaire. Do not automatically acknowledge, dismiss, or accept risk for an
+  already-recorded blocking finding; use the existing review correction path and fresh review. Ask only for facts that
+  materially change scope, policy compliance, security or cost and cannot be safely left as recommendations.
+  Actual policy conflicts and security blockers remain blocking; risk acceptance still requires explicit user choice.
 10. When review completes, direct the user to review `01-requirements.md`, `README.md`, `service-recommendations.md`,
   `sku-preferences.md`, and `challenger-findings.md`. Ask one explicit Proceed/Revise question. Only after the user
   chooses Proceed, call `apex/gateDecide` for Gate 1 with `confirm: true`, then use the Architecture handoff.

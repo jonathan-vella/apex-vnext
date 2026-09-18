@@ -848,8 +848,9 @@ test("typed input recording rejects premature, stale, malformed, duplicate, and 
 });
 
 test("requirements task context includes recorded input and stageable output templates", async () => {
-  const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const initialized = await service.init({ projectId: "demo" });
   await recordRequirementsRound(service, {
     workload: "ecommerce",
     industry: "retail",
@@ -944,7 +945,8 @@ test("requirements task context includes recorded input and stageable output tem
   );
   assert.deepEqual(template.unknowns, []);
   assert.equal(template.businessContext, "retail; greenfield; web-api");
-  assert.equal(template.successCriteria, "100 concurrent users");
+  assert.match(template.successCriteria!, /^100 concurrent users\n\nRecommendation \(proposed, not confirmed\):/);
+  assert.match(template.successCriteria!, /p95 and p99/);
   assert.equal(template.nonFunctionalRequirements, "availability-zones, automated-backups, point-in-time-restore");
   assert.equal(
     template.securityAndCompliance,
@@ -952,11 +954,46 @@ test("requirements task context includes recorded input and stageable output tem
   );
   assert.equal(template.budgetAndOperations, "USD 500 monthly; azure-monitor, application-insights, managed-alerts");
   assert.equal(template.regionalConstraints, "swedencentral");
-  assert.equal(template.architectureHandoff, "container-apps, azure-cosmos-db, application-insights");
+  assert.match(
+    template.architectureHandoff!,
+    /^container-apps, azure-cosmos-db, application-insights\n\nRecommendation/,
+  );
+  assert.match(template.architectureHandoff!, /no assignment is implied/);
   await service.stageArtifact(issued.task.taskId, {
     kind: "requirements",
     value: context.outputTemplates.requirements,
   });
+  await service.completeRequirements(
+    issued.task.taskId,
+    context.outputTemplates.requirements as Parameters<typeof service.completeRequirements>[1],
+  );
+  const document = await readFile(join(root, "agent-output", "demo", initialized.runId, "01-requirements.md"), "utf8");
+  assert.match(document, /p95 and p99/);
+  assert.match(document, /ingress and DNS/);
+  assert.match(document, /proposed, not confirmed/);
+});
+
+test("requirements recommendations document GDPR planning without confirmed obligations", async () => {
+  const service = new ApexService(await tempRoot());
+  const project = service as unknown as {
+    requirementsTemplateFromIntake(input: Record<string, InputValueV1>): {
+      requirements: Array<{ source: string; statement: string }>;
+      securityAndCompliance: string;
+    };
+  };
+  const template = project.requirementsTemplateFromIntake({ compliance: { kind: "compliance", scopes: ["gdpr"] } });
+  assert.match(template.securityAndCompliance, /Recommendation \(proposed, not confirmed\)/);
+  assert.match(template.securityAndCompliance, /retention\/deletion and data-subject handling/);
+  assert.match(template.securityAndCompliance, /no assignment, retention period or GDPR compliance is asserted/);
+  assert.deepEqual(template.requirements, [
+    {
+      id: "REQ-003",
+      statement: "Compliance: gdpr",
+      priority: "should",
+      status: "confirmed",
+      source: "intake:compliance",
+    },
+  ]);
 });
 
 test("task context rejects a task whose journal head changed", async () => {

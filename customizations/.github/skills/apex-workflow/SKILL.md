@@ -16,6 +16,7 @@ Use this skill to orient an interactive agent without reconstructing workflow st
 ## Workflow
 
 1. Call `apex/status` for the selected project.
+   For a status-only request, report that result and stop without calling `apex/nextTask`.
 2. If the selected project is wrong or absent, use the active client question mechanism to select a project, then repeat
    `apex/status`.
 3. If status identifies blockers, gates, or a terminal run, report that kernel state and do not infer a task.
@@ -24,6 +25,9 @@ Use this skill to orient an interactive agent without reconstructing workflow st
    it is not a new hidden-worker task. For `task`, route only to the returned task owner through the active client
    projection, preserving the exact `task.taskId`. Read task context only for `status=task`. Do not poll unresolved
    input or review results; obtain a fresh result after the owning role records answers or dispositions.
+   Preserve the user's requested outcome, stop point and prohibitions in every handoff. When `request.intake` is
+   present, the owner is `APEX Requirements`: do not ask the user to choose a role or search session history.
+   If the handoff is unavailable, name that role for manual selection and stop; do not simulate routing with questions.
 5. For resume, fetch fresh status instead of relying on an earlier conversation. On an `APEX_STALE` error, refresh
    status and do not reuse a task ID, request ID, journal head, or owner epoch.
 
