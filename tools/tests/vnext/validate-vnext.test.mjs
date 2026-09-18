@@ -71,6 +71,15 @@ test("rejects a subagent model escalation", () => {
   assert.ok(hasRule(result, "customization.model-escalation"));
 });
 
+test("CLI distinguishes interactive handoffs from supported subagent edges", () => {
+  const result = mutate((model) => {
+    model.customization.manifest.invocationEdges.find(
+      ({ from, to }) => from === "APEX" && to === "APEX Requirements",
+    ).type = "subagent";
+  });
+  assert.ok(hasRule(result, "customization.cli-delegation"));
+});
+
 test("rejects askQuestions on an autonomous subagent", () => {
   const result = mutate((model) => {
     model.customization.agents

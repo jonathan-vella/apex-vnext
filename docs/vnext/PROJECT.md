@@ -54,6 +54,13 @@ GitHub Issues and the repository project own day-to-day work selection. [ROADMAP
 
 ## Evidence Status
 
+On 2026-09-18, candidate `2e5d004` completed a bounded VS Code Local intake/context/stop and reload/status check.
+Local and Azure telemetry matched the tool sequence and the journal preserved the stop boundary; the run used
+Allow all, so this is not evidence for manual permission prompts or full lifecycle parity. The paired CLI test
+invoked Requirements through background `task` delegation but neither asked native questions nor recorded answers.
+The first request remains pending. The CLI projection now routes interactive roles through foreground selection;
+deterministic tests pass, but a new candidate needs a live CLI retry. Prior workspaces remain reproduction evidence.
+
 | Evidence                                                       | Status                                                    |
 | -------------------------------------------------------------- | --------------------------------------------------------- |
 | Contract, kernel, capability, renderer, CLI, and package tests | Required on every candidate                               |

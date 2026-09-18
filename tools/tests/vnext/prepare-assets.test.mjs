@@ -156,6 +156,8 @@ test("managed role projections retain required tools and exclude unrelated grant
         label,
       );
       const interactive = client === "github-copilot-cli" ? ["ask_user", "task"] : ["vscode/askQuestions", "agent"];
+      if (client === "github-copilot-cli")
+        assert.ok(!metadata.tools.includes("task"), `${label}: no supported worker edge`);
       const allowed = new Set([...apexTools, ...armTools, ...interactive]);
       for (const tool of metadata.tools) assert.ok(allowed.has(tool), `${label}: unexpected tool ${tool}`);
       for (const tool of [...arm.managedPolicy.denyBeforeTransport, ...arm.managedPolicy.deferredTools]) {
@@ -188,16 +190,11 @@ test("managed routing distinguishes input, review dispositions, and exact task c
     assert.match(coordinator, /Do not ask the user which role should handle it/);
     assert.match(coordinator, /status-only request calls `apex\/status` once and stops/);
     if (client === "github-copilot-cli") {
-      assert.match(
-        mechanics,
-        /use `task` with the exact custom agent `APEX Requirements` only when the user requested/,
-      );
+      assert.match(mechanics, /select `APEX Requirements` as the foreground agent/);
       assert.doesNotMatch(mechanics, /for declared worker delegation/);
-      assert.match(mechanics, /Include the scope note verbatim in the delegation prompt/);
-      assert.match(
-        mechanics,
-        /If the original scope is unavailable, limit the delegation to intake through taskContext/,
-      );
+      assert.match(mechanics, /Print the scope note verbatim for continuation/);
+      assert.match(mechanics, /Do not use `task` for interactive intake/);
+      assert.match(mechanics, /If the original scope is unavailable, limit continuation to intake through taskContext/);
     } else {
       assert.match(mechanics, /present the declared Gather requirements handoff/);
       assert.match(mechanics, /stop for the user's interactive transition/);
@@ -219,6 +216,11 @@ test("managed routing distinguishes input, review dispositions, and exact task c
       assert.ok(requirements.slice(submission, acknowledgment).includes(field), `Missing submission field ${field}`);
     }
     assert.match(requirements, /question-tool response is not kernel\s+acceptance/);
+    assert.match(requirements, /Never silently replace an invalid value with a default recommendation/);
+    if (client === "github-copilot-cli") {
+      assert.match(requirements, /foreground agent using `ask_user`, not as a delegated background task/);
+      assert.match(requirements, /If the question tool is unavailable, report the limitation and stop/);
+    }
     assert.match(requirements, /intake-only check ending at task context, stop here/);
     assert.ok(requirements.indexOf("# Requested Scope") < requirements.indexOf("# Success criteria"));
     assert.match(requirements, /handoff prompt or button cannot broaden the original request/);
@@ -556,7 +558,16 @@ test("asset generator rejects unsafe projection roots before generation", () => 
   }
 });
 
-test("CLI coordinator receives task delegation from semantic invocation edges", () => {
+test("CLI interactive handoffs do not grant background task delegation", () => {
+  const coordinator = { agent: "APEX", supportedTargets: ["vscode", "github-copilot"] };
+  const requirements = { agent: "APEX Requirements", supportedTargets: ["vscode", "github-copilot"] };
+  const delegates = roleDelegatesOnClient(
+    coordinator,
+    "github-copilot-cli",
+    [coordinator, requirements],
+    [{ from: "APEX", to: "APEX Requirements", type: "handoff" }],
+  );
+  assert.equal(delegates, false);
   const source = `---
 name: APEX
 description: Coordinate workflow.
@@ -579,9 +590,10 @@ Coordinate.
       workspaceServer: "apex",
       operationIds: ["status"],
     },
-    { delegates: true },
+    { delegates },
   );
-  assert.match(rendered, /\n\s+- task/u);
+  assert.doesNotMatch(rendered, /\n\s+- task/u);
+  assert.match(rendered, /foreground agent/);
 });
 
 test("asset lifecycle carries restored managed skills to both clients", async () => {

@@ -28,6 +28,12 @@ Both Copilot clients receive the coordinator and interactive specialist roles. V
 generation, review, and validation workers. Copilot CLI omits those workers because the qualified hidden-worker boundary
 is not available there; the coordinator must not claim otherwise.
 
+In Copilot CLI, run interactive specialists as foreground custom agents. The coordinator names the required role
+and supplies a continuation note with the user's scope; the user selects that role before continuing. Interactive
+handoff edges do not grant the background `task` tool. In Requirements, expect native `ask_user` questions followed
+by `recordInput` acceptance, not a text-form summary returned by a background agent. Invalid option values require
+user correction or confirmation; recommendations are never substituted silently.
+
 Required generation, review and validation outcomes still need a supported CLI path. A missing path blocks the complete
 workflow claim; the absence of hidden workers is not an exemption from the product goal.
 

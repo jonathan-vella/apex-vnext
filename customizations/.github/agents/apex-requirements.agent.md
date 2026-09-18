@@ -57,6 +57,8 @@ and handoff selection are not permission to extend scope. Resume beyond a stop p
   its matching option or options as recommended and show the rationale; never record it until the user confirms or
   overrides it. For `data-classification` and `compliance`, convert selections to their required typed value. Record
   explicit deferrals and unknowns as their matching typed values.
+  If an answer is not a permitted option, ask the user to correct or confirm it through the question tool before
+  submission. Never silently replace an invalid value with a default recommendation; "none" does not mean greenfield.
 3. Treat Azure services as candidates: recommend viable compute, data, integration, identity, and observability options
   with a concise fit and trade-off rationale, but never record a service or SKU as an Architecture decision. Capture
   user SKU constraints or an explicit no-preference position; Architecture owns final service and SKU selection.

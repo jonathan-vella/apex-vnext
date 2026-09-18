@@ -813,7 +813,14 @@ function validateCustomizations(model, findings) {
         repositoryPath,
       );
     }
-    const delegates = declaredEdges.some(({ from }) => from === role.agent);
+    const delegates = declaredEdges.some(
+      ({ from, to, type }) =>
+        from === role.agent &&
+        type === "subagent" &&
+        array(customization.manifest.roles).some(
+          (destination) => destination.agent === to && array(destination.supportedTargets).includes("github-copilot"),
+        ),
+    );
     if (tools.includes("task") !== delegates) {
       finding(
         findings,

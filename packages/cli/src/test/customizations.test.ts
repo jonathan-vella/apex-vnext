@@ -213,7 +213,8 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(requirementsAgent, /target: github-copilot/u);
   assert.match(requirementsAgent, /model: GPT-5\.6 Sol/u);
   assert.match(requirementsAgent, /- ask_user/u);
-  assert.match(requirementsAgent, /- task/u);
+  assert.doesNotMatch(requirementsAgent, /\n\s+- task\s*\n/u);
+  assert.match(requirementsAgent, /foreground agent using `ask_user`/u);
   assert.doesNotMatch(requirementsAgent, /vscode\/askQuestions|handoffs:|agents:/u);
   const plannerAgent = await readFile(join(root, ".github", "agents", "apex-planner.agent.md"), "utf8");
   assert.match(plannerAgent, /- apex\/planComplete/u);
@@ -226,7 +227,8 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(coordinatorAgent, /- apex\/projectCreate/u);
   assert.match(coordinatorAgent, /- apex\/gateDecide/u);
   assert.match(coordinatorAgent, /Use `ask_user` only for project lifecycle or routing choices, never intake/u);
-  assert.match(coordinatorAgent, /use `task` with the exact custom agent `APEX Requirements`/u);
+  assert.match(coordinatorAgent, /select `APEX Requirements` as the foreground agent/u);
+  assert.doesNotMatch(coordinatorAgent, /\n\s+- task\s*\n/u);
   assert.match(coordinatorAgent, /request\.intake.*hand off to `APEX Requirements`/su);
   assert.match(coordinatorAgent, /replace the active project.*apex\/projectCreate.*apex\/projectDelete/su);
   assert.match(coordinatorAgent, /If creation does not succeed, stop and report its result/u);

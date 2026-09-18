@@ -87,16 +87,19 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
   const sourceTools = Array.isArray(frontmatter.tools) ? frontmatter.tools : [];
   const tools = [
     ...new Set(
-      sourceTools.map((tool) => {
-        if (tool === "vscode/askQuestions") return inventory.interactiveTools.askUser;
-        if (tool === "agent") return inventory.interactiveTools.delegate;
-        if (typeof tool === "string" && tool.startsWith("apex/")) {
-          const operation = tool.slice("apex/".length);
-          if (!inventory.operationIds.includes(operation)) throw new Error(`Unpinned CLI APEX operation: ${operation}`);
-          return `${inventory.workspaceServer}/${operation}`;
-        }
-        return tool;
-      }),
+      sourceTools
+        .filter((tool) => tool !== "agent" || options.delegates !== false)
+        .map((tool) => {
+          if (tool === "vscode/askQuestions") return inventory.interactiveTools.askUser;
+          if (tool === "agent") return inventory.interactiveTools.delegate;
+          if (typeof tool === "string" && tool.startsWith("apex/")) {
+            const operation = tool.slice("apex/".length);
+            if (!inventory.operationIds.includes(operation))
+              throw new Error(`Unpinned CLI APEX operation: ${operation}`);
+            return `${inventory.workspaceServer}/${operation}`;
+          }
+          return tool;
+        }),
     ),
   ];
   if (options.delegates === true && !tools.includes(inventory.interactiveTools.delegate)) {
@@ -113,12 +116,15 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
   };
   const mechanics = [
     frontmatter.name === "APEX"
-      ? `For requirements intake, use \`${inventory.interactiveTools.delegate}\` with the exact custom agent \`APEX Requirements\` only when the user requested that routing. Preserve the pending request and the user's stop boundary; never substitute Explore. Include the scope note verbatim in the delegation prompt: requested outcome, stop point, and prohibited operations. If the original scope is unavailable, limit the delegation to intake through taskContext. Do not use session-history tools to discover or invoke agents. If the exact agent is unavailable, ask the user to select it and stop. Use \`${inventory.interactiveTools.askUser}\` only for project lifecycle or routing choices, never intake.`
+      ? `For requirements intake, direct the user to select \`APEX Requirements\` as the foreground agent, then stop. Do not use \`${inventory.interactiveTools.delegate}\` for interactive intake or substitute Explore. Print the scope note verbatim for continuation: requested outcome, stop point, and prohibited operations. If the original scope is unavailable, limit continuation to intake through taskContext. State that routing is pending until the user switches; do not claim the handoff or input submission completed. Do not collect intake answers or replace invalid choices with defaults. Use \`${inventory.interactiveTools.askUser}\` only for project lifecycle or routing choices, never intake.`
       : tools.includes(inventory.interactiveTools.askUser)
         ? `Use \`${inventory.interactiveTools.askUser}\` for kernel-owned input requests.`
         : null,
     frontmatter.name !== "APEX" && tools.includes(inventory.interactiveTools.delegate)
       ? `Use \`${inventory.interactiveTools.delegate}\` for declared worker delegation.`
+      : null,
+    frontmatter.name !== "APEX" && tools.includes(inventory.interactiveTools.askUser)
+      ? `Run user-facing questions as the foreground agent using \`${inventory.interactiveTools.askUser}\`, not as a delegated background task. For another interactive stage, ask the user to select its named agent and carry forward the scope note; do not delegate interactive work through \`${inventory.interactiveTools.delegate}\`. If the question tool is unavailable, report the limitation and stop without claiming answers were recorded.`
       : null,
   ].filter(Boolean);
   return serializeAgent(
@@ -292,8 +298,9 @@ export function roleSupportsClient(role, clientId) {
 
 export function roleDelegatesOnClient(role, clientId, roles, invocationEdges) {
   return invocationEdges.some(
-    ({ from, to }) =>
+    ({ from, to, type }) =>
       from === role.agent &&
+      (clientId !== "github-copilot-cli" || type === "subagent") &&
       roles.some(({ agent, supportedTargets }) => roleSupportsClient({ supportedTargets }, clientId) && agent === to),
   );
 }

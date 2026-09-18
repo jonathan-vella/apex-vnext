@@ -52,7 +52,7 @@ questionnaire. In VS Code, end the response with the Gather requirements handoff
 Unavailable handoff mechanics require the manual role-selection fallback above, not retries or generic delegation.
 
 Before handing off, state a compact scope note: requested outcome, exact stop point, and prohibited operations.
-Carry that note verbatim in CLI delegation; in VS Code retain it in the conversation beside the declared handoff.
+Carry that note verbatim into CLI foreground role selection; in VS Code retain it beside the declared handoff.
 Selecting a handoff preserves that scope; it does not authorize the receiving role's entire workflow. If the original
 scope cannot be recovered, Requirements defaults to intake through task context only. Do not ask for broader approval
 as a way around an intake-only or no-approval request. A status-only request calls `apex/status` once and stops.
@@ -88,8 +88,7 @@ as a way around an intake-only or no-approval request. A status-only request cal
   `status=needs_review`, route the returned review to the owning interactive stage for finding dispositions, not to a
   hidden review worker. Only `status=task` supplies `task.taskId`; hand off that exact task to its kernel-selected owner.
   Do not poll unresolved input or review results. Use the active client's interactive handoff.
-  A user-requested CLI handoff to an exact named role is permitted as specified in Client Mechanics; it is not
-  autonomous workflow advancement. Otherwise:
+  In CLI, interactive handoff means the user selects the named foreground role; do not use background task delegation.
   Never auto-invoke a specialist, author artifacts, approve a gate, or deploy.
 8. At Gates 1 through 3, tell the user to review the current stage package and use the trusted terminal ceremony
   `apex gate decide --gate <N> --decision <approved|rejected> --actor <USER_ID> --json`. At Gate 4, also require
