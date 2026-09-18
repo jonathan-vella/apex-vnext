@@ -150,6 +150,15 @@ test("docs-writer is manual-only and loads scoped unslop without recursion", () 
 
 test("context guidance uses current task authority without recall checkpoints", () => {
   const skill = readFileSync(".github/skills/context-management/SKILL.md", "utf8");
+  const frontmatter = parseFrontmatter(skill);
+  assert.equal(frontmatter["disable-model-invocation"], "true");
+  assert.equal(frontmatter["user-invocable"], "true");
+  assert.match(frontmatter.description, /WHEN: explicitly invoked as \/context-management/u);
+  assert.match(skill, /references to this skill are not invocation requests/u);
+  const vendorGuidance = readFileSync(".github/skills/vendor-prompting/references/claude-best-practices.md", "utf8");
+  const vendorRules = JSON.parse(readFileSync(".github/skills/vendor-prompting/rules.json", "utf8"));
+  assert.match(vendorGuidance, /does not invoke the manual-only/u);
+  assert.doesNotMatch(vendorRules.rules.find(({ id }) => id === "legacy-003").rationale, /activates|routing/u);
   assert.doesNotMatch(skill, /apex-recall|01-Orchestrator|hard-checkpoints\.md|compression-templates\.md/u);
   assert.match(skill, /apex-context\.instructions\.md/u);
   assert.match(skill, /expiry and writer authority/u);

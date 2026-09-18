@@ -57,9 +57,9 @@ contract.
 > long system prompts.
 
 **Rule** (`legacy-003`): Claude agents whose body exceeds 350 lines
-should include `<context_awareness>` to opt into the
-[context-management skill](../../context-management/SKILL.md) tier
-selection.
+should include `<context_awareness>` for bounded task inputs and
+on-demand reads. This does not invoke the manual-only
+[context-management skill](../../context-management/SKILL.md).
 
 ## Rule R-CL-4 — Migrate away from prefilled responses
 

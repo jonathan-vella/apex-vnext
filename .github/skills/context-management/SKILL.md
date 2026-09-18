@@ -1,10 +1,18 @@
 ---
 name: context-management
-description: '**UTILITY SKILL** - Diagnose vNext task-context and Copilot log issues. WHEN: "context optimization", "token budget", "log parsing", "handoff gaps". EXCLUDES infrastructure generation, deployment and automatic benchmarking.'
+user-invocable: true
+disable-model-invocation: true
+description: '**UTILITY SKILL** - Manual diagnostics for selected task context and Copilot logs. WHEN: explicitly invoked as /context-management. Do not auto-select for coding, CI, log inspection, handoffs or session resumes.'
 compatibility: Log parsing requires Python; runtime reads use the current APEX client.
 ---
 
 # Context Management
+
+## Invocation Boundary
+
+Run only when the user explicitly invokes `/context-management`. Routine context handling, session summaries,
+continuations, log inspection and CI troubleshooting do not authorize loading this skill. Follow ordinary repository
+instructions for those tasks; references to this skill are not invocation requests.
 
 ## Runtime Boundaries
 
