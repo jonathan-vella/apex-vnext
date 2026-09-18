@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { EventJournal, ObjectStore, sha256Json } from "@apexops/kernel";
@@ -15,6 +15,7 @@ import {
   planBundle,
   policyMap,
   prepareValidatedRun,
+  qualityReport,
   requirements,
   review,
   tempRoot,
@@ -31,6 +32,143 @@ async function recordRequirementsRound(service: ApexService, answers: Record<str
     expectedHead: pending.request.expectedHead,
     ownerEpoch: pending.request.ownerEpoch,
     answers: pending.request.questions.map(({ id }) => ({ questionId: id, value: answers[id]! })),
+  });
+}
+
+async function snapshotFiles(directory: string): Promise<unknown[]> {
+  const metadata = await stat(directory, { bigint: true });
+  const entries = await readdir(directory, { withFileTypes: true });
+  entries.sort((left, right) => left.name.localeCompare(right.name));
+  return [
+    metadata.mtimeNs,
+    metadata.ctimeNs,
+    await Promise.all(
+      entries.map(async (entry) => {
+        const path = join(directory, entry.name);
+        if (entry.isDirectory()) return [entry.name, await snapshotFiles(path)];
+        const metadata = await stat(path, { bigint: true });
+        return [entry.name, metadata.mtimeNs, metadata.ctimeNs, await readFile(path)];
+      }),
+    ),
+  ];
+}
+
+test("status is read-only across repeated active-run reads and restart", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const initialized = await service.init({ projectId: "demo" });
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"));
+  const events = await journal.replay();
+  const files = await snapshotFiles(root);
+  const status = await service.status();
+  assert.equal(status.task, "requirements");
+  assert.equal(status.head, events.at(-1)?.hash);
+  assert.equal(status.events, events.length);
+  assert.deepEqual(await service.status(), status);
+  assert.deepEqual(await new ApexService(root).status(), status);
+  assert.deepEqual(await journal.replay(), events);
+  assert.deepEqual(await snapshotFiles(root), files);
+});
+
+test("status leaves pending run transaction recovery to an advancing operation", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const initialized = await service.init({ projectId: "demo" });
+  const directory = join(root, ".apex", "projects", "demo", "runs", initialized.runId);
+  const journal = new EventJournal(join(directory, "journal"));
+  const events = await journal.replay();
+  await writeFile(join(directory, ".run-transaction.json"), JSON.stringify({ eventId: "uncommitted" }));
+  const files = await snapshotFiles(root);
+  for (const reader of [service, new ApexService(root)]) {
+    await assert.rejects(
+      reader.status(),
+      (error: unknown) => error instanceof ApexError && error.code === "APEX_CONFLICT",
+    );
+  }
+  assert.deepEqual(await journal.replay(), events);
+  assert.deepEqual(await snapshotFiles(root), files);
+  assert.equal((await service.nextTask()).status, "needs_input");
+  await assert.rejects(readFile(join(directory, ".run-transaction.json")), { code: "ENOENT" });
+});
+
+for (const interrupted of [false, true]) {
+  test(`status is read-only at terminal completion (${interrupted ? "interrupted" : "normal"})`, async (context) => {
+    const root = await tempRoot();
+    const service = new ApexService(root);
+    const { runId } = await service.init({ projectId: "demo" });
+    await prepareValidatedRun(service, runId, "bicep");
+    const preview = await service.preview({ operation: "apply", provider: "fake" });
+    await service.decideGateNumber(4, "approved", "tester");
+    const deployed = await service.deploy(preview.previewHash);
+    const diagnosis = await service.nextTask();
+    assert.equal(diagnosis.status, "task");
+    if (diagnosis.status !== "task") throw new Error("Expected diagnosis task");
+    assert.equal(diagnosis.task.taskType, "diagnosis");
+    await service.completeTaskOutputs(diagnosis.task.taskId, [
+      {
+        kind: "diagnosis",
+        value: {
+          schemaVersion: "1.0.0",
+          projectId: "demo",
+          runId,
+          diagnosedAt: deployed.inventory.collectedAt,
+          status: "healthy",
+          observations: ["deployed"],
+          causes: [],
+        },
+      },
+    ]);
+    const quality = await service.nextTask();
+    assert.equal(quality.status, "task");
+    if (quality.status !== "task") throw new Error("Expected quality task");
+    assert.equal(quality.task.taskType, "quality");
+    const report = await qualityReport(root, runId);
+    const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+    assert.equal(
+      (await journal.replay()).some(({ type }) => type === "workflow.completed"),
+      false,
+    );
+    const interruption = interrupted
+      ? context.mock.method(
+          service as unknown as { ensureTerminalCompletion(): Promise<EventV1[]> },
+          "ensureTerminalCompletion",
+          async () => {
+            throw new Error("Interrupted terminal bookkeeping");
+          },
+        )
+      : undefined;
+    const completion = service.completeTaskOutputs(quality.task.taskId, [{ kind: "quality-report", value: report }]);
+    if (interrupted) await assert.rejects(completion, /Interrupted terminal bookkeeping/u);
+    else await completion;
+    interruption?.mock.restore();
+
+    const events = await journal.replay();
+    assert.equal(events.filter(({ type }) => type === "workflow.completed").length, interrupted ? 0 : 1);
+    const files = await snapshotFiles(root);
+    const restarted = new ApexService(root);
+    const status = await restarted.status();
+    assert.equal(status.task, null);
+    assert.deepEqual(status.blockers, []);
+    assert.equal(status.head, events.at(-1)?.hash);
+    assert.equal(status.events, events.length);
+    assert.deepEqual(await restarted.status(), status);
+    assert.deepEqual(await service.status(), status);
+    assert.deepEqual(await journal.replay(), events);
+    assert.deepEqual(await snapshotFiles(root), files);
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await assert.rejects(
+        restarted.nextTask(),
+        (error: unknown) => error instanceof ApexError && error.code === "APEX_NOT_FOUND",
+      );
+    }
+    const finalEvents = await journal.replay();
+    assert.equal(finalEvents.length, events.length + (interrupted ? 1 : 0));
+    const completed = finalEvents.filter(({ type }) => type === "workflow.completed");
+    assert.equal(completed.length, 1);
+    assert.deepEqual((completed[0]!.payload as { validatorIds: string[] }).validatorIds, [
+      "terminal:run-evidence-complete",
+    ]);
   });
 }
 

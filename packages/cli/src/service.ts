@@ -1183,16 +1183,9 @@ export class ApexService {
     blockers: string[];
   }> {
     const selection = await this.selection();
-    const run = await this.run(selection);
-    let events = await this.journal(run).replay();
-    let route = await this.route(run, events);
-    if (route.task === undefined && route.blockers.length === 0) {
-      const completedEvents = await this.ensureTerminalCompletion(run, events);
-      if (completedEvents !== events) {
-        events = completedEvents;
-        route = await this.route(run, events);
-      }
-    }
+    const run = await this.run(selection, { readOnly: true });
+    const events = await this.journal(run).replay();
+    const route = await this.route(run, events);
     return {
       run,
       head: events.at(-1)?.hash ?? null,
@@ -1223,8 +1216,10 @@ export class ApexService {
     }
     if (route.blockers.length > 0)
       throw new ApexError("APEX_AUTHORIZATION", route.blockers.join("; "), EXIT_CODES.authorization, route.blockers);
-    if (route.task === undefined)
+    if (route.task === undefined) {
+      await this.ensureTerminalCompletion(run, events);
       throw new ApexError("APEX_NOT_FOUND", "No task is currently available", EXIT_CODES.notFound);
+    }
     if (route.task.id === "architecture") {
       const decision = this.architectureDecisionState(events, run.ownerEpoch);
       if (decision.pending !== undefined) return { status: "needs_input", request: decision.pending };
@@ -2230,6 +2225,12 @@ export class ApexService {
       }
     } else if (legacy && descriptor.id === "requirements") {
       await this.openRunGate(await this.currentRun(), 1, sha256Json(outputHashes));
+    }
+    const completedRun = await this.currentRun();
+    const completedEvents = await this.journal(completedRun).replay();
+    const route = await this.route(completedRun, completedEvents);
+    if (route.task === undefined && route.blockers.length === 0) {
+      await this.ensureTerminalCompletion(completedRun, completedEvents);
     }
     return { outputHashes, summary: outputs.map(({ kind }) => kind).join(", ") + " accepted" };
   }
@@ -4599,8 +4600,20 @@ export class ApexService {
     await this.recoverCustomizationTransaction();
     return this.run(await this.selection());
   }
-  private async run(selection: Selection): Promise<RunConfigV1> {
-    const run = await this.runRepository(selection).read();
+  private async run(selection: Selection, options: { readOnly?: boolean } = {}): Promise<RunConfigV1> {
+    const directory = this.projects.runDirectory(selection.projectId, selection.runId);
+    if (options.readOnly) {
+      const pending = await readFile(join(directory, ".run-transaction.json")).catch((error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+        throw error;
+      });
+      if (pending !== undefined) {
+        throw new ApexError("APEX_CONFLICT", "Run transaction recovery is required", EXIT_CODES.conflict);
+      }
+    }
+    const run = options.readOnly
+      ? (JSON.parse(await readFile(join(directory, "run.json"), "utf8")) as RunConfigV1)
+      : await this.runRepository(selection).read();
     const events = await this.journal(run).replay();
     this.assertRequirementsIntakeAdmitted(events, run.ownerEpoch);
     const retired = events.some((event) => {

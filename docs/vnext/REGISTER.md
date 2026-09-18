@@ -117,7 +117,8 @@ and the repository archives.
   upgrade or misleading read-only metadata can change permission, retry and freshness behavior.
 - **Mitigation:** Implement [REQ-MCP-001](PRD.md#req-mcp-001-predictable-tool-contracts) in the roadmap order. Preserve
   stdio, explicit tools, stable errors and kernel authority; migrate protocol versions separately.
-- **State:** Open; envelope and sanitized handler-error regressions pass, broader contract/client checks pending
+- **State:** Open for exact-client evidence; all-tool schema, safe-error, input-boundary, queue/cancellation and real
+  stdio regressions cover the current SDK. Protocol migration is separately pending.
 - **Closure proof:** All registered results validate, cancellation/retry tests preserve committed-state semantics,
   and both supported clients have evidence for the exact negotiated protocol and candidate.
 

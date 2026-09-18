@@ -640,7 +640,7 @@ test("MCP requires an atomic outputs bundle for every task", async () => {
     arguments: { taskId: "plan-task", kind: "implementation-intent", value: {} },
   });
   assert.equal(single.isError, true);
-  assert.match(JSON.stringify(single.content), /outputs/u);
+  assert.equal((single.structuredContent as { error: { code: string } }).error.code, "APEX_VALIDATION");
 
   const bundle = await client.callTool({
     name: "completeTask",

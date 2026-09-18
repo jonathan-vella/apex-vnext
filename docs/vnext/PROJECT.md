@@ -22,9 +22,13 @@ around vNext source authorities and Diátaxis navigation.
 ## Open Release Work
 
 - Complete the [MCP contract follow-up](ROADMAP.md#mcp-contract-follow-up). The 2026-09-18 review reproduced invalid
-  string/list results under SDK 1.29.0 and loss of stable error codes. Named object envelopes, sanitized handler errors
-  and initial `render`/`recordInput` output schemas now have SDK adapter regressions. Remaining output schemas, strict
-  inputs, metadata, cancellation and exact-client validation are pending, not implied by guidance.
+  string/list results under SDK 1.29.0 and loss of stable error codes. All 34 tools now have output contracts, strict
+  arguments and conservative annotations. Read-only status, bounded serialized dispatch, cancellation/expiry recovery,
+  all-handler tests and real stdio negotiation are implemented. Exact VS Code/Copilot CLI validation remains pending;
+  July 2026 protocol migration and kernel-enforced user stop scopes remain separate design work.
+- The completed MCP server follow-up passed `qualify:vnext` on 2026-09-18, including 143 validator tests and
+  29 packaging tests. Focused tests cover every registered handler and real stdio initialization/status/exit. This
+  evidence does not replace manual interaction tests in the supported clients, whose installed candidates are unchanged.
 - Complete the [first optimization batch](ROADMAP.md#first-batch-input-correctness-and-scope): revision-safe reads,
   bounded context/reviewer packs, stage criteria/dispositions and routing/tool scope have implementation and focused
   tests. Exact-client checks remain pending. Scoped prompt inspection found no further safe deletion.

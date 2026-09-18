@@ -87,6 +87,11 @@ Implement before claiming paired-client readiness, in bounded slices:
 
 Kernel-enforced user stop scopes require a separate explicit authorization design, not an MCP metadata shortcut.
 
+Implementation checkpoint: slices 1-3 have server code and focused regressions, including all 34 actual handlers,
+canonical output schemas, strict staging forms, omitted-argument compatibility, read-only status and cancellation
+before/after mutation. The stdio test negotiates 2025-11-25 and verifies clean process exit. Slice 4 still requires
+exact supported-client evidence; no July 2026 protocol or client-parity claim follows from these automated checks.
+
 ### Optimization Recommendation Dispositions
 
 R-IDs refer to the token, quality and latency brief reviewed on 2026-09-15. This register owns delivery disposition;
