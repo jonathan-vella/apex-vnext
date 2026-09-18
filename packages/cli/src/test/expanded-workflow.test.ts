@@ -1340,6 +1340,75 @@ test("imported governance validates actionable effects without inventing audit m
   assert.equal(registry.validate("business:policy-effect-coverage", context).valid, false);
 });
 
+test("plans reject policy mappings to absent resources and unresolved blocked controls", () => {
+  for (const track of ["bicep", "terraform"] as const) {
+    const registry = new ValidatorRegistry();
+    registerWorkflowValidators(registry);
+    const plan = planBundle("run-test", track);
+    const intent = plan[0]!.value as ImplementationIntentV1;
+    const policy = policyMap("run-test", "a".repeat(64)) as PolicyPropertyMapV1;
+    policy.mappings.push({
+      policyAssignmentId: "required-control",
+      effect: "deny",
+      logicalResourceId: "missing",
+      propertyPath: "httpsOnly",
+      expectedValue: true,
+      disposition: "planned",
+    });
+    const hash = sha256Json(policy);
+    const context = {
+      track,
+      artifacts: { "policy-property-map": policy },
+      artifactHashes: { "policy-property-map": hash },
+      outputs: { "implementation-intent": { ...intent, sourceHashes: { "policy-property-map": hash } } },
+    };
+    assert.equal(registry.validate("business:plan-source-coverage", context).valid, false);
+    policy.mappings[0]!.logicalResourceId = "api";
+    context.artifactHashes["policy-property-map"] = sha256Json(policy);
+    context.outputs["implementation-intent"].sourceHashes["policy-property-map"] = sha256Json(policy);
+    assert.equal(registry.validate("business:plan-source-coverage", context).valid, true);
+    policy.mappings[0]!.disposition = "blocked";
+    context.artifactHashes["policy-property-map"] = sha256Json(policy);
+    context.outputs["implementation-intent"].sourceHashes["policy-property-map"] = sha256Json(policy);
+    assert.equal(registry.validate("business:plan-source-coverage", context).valid, false);
+  }
+});
+
+test("policy mapping failures cannot complete planning or open Gate 3", async (context) => {
+  for (const track of ["bicep", "terraform"] as const) {
+    for (const failure of ["missing-resource", "blocked"] as const) {
+      await context.test(`${track}: ${failure}`, async () => {
+        const root = await tempRoot();
+        const service = new ApexService(root);
+        const { runId } = await service.init({ projectId: "demo", iacTool: track });
+        await assert.rejects(
+          reachCodegen(service, runId, track, undefined, false, undefined, (policy) => {
+            policy.mappings.push({
+              policyAssignmentId: "required-control",
+              effect: "deny",
+              logicalResourceId: failure === "missing-resource" ? "missing" : "api",
+              propertyPath: "httpsOnly",
+              expectedValue: true,
+              disposition: failure === "blocked" ? "blocked" : "planned",
+            });
+          }),
+          /business:plan-source-coverage validation failed/,
+        );
+        const events = await new EventJournal(
+          join(root, ".apex", "projects", "demo", "runs", runId, "journal"),
+        ).replay();
+        assert.equal(
+          events.some(
+            (event) => event.type === "task.completed" && (event.payload as { nodeId?: unknown }).nodeId === "plan",
+          ),
+          false,
+        );
+        assert.equal((await service.status()).run.gates[2]!.state, "closed");
+      });
+    }
+  }
+});
+
 test("native Terraform apply requires complete source-bound policy receipts before Gate 4", async () => {
   const root = await tempRoot();
   const now = new Date("2026-01-01T00:00:00.000Z");

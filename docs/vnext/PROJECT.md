@@ -58,8 +58,18 @@ On 2026-09-18, candidate `2e5d004` completed a bounded VS Code Local intake/cont
 Local and Azure telemetry matched the tool sequence and the journal preserved the stop boundary; the run used
 Allow all, so this is not evidence for manual permission prompts or full lifecycle parity. The paired CLI test
 invoked Requirements through background `task` delegation but neither asked native questions nor recorded answers.
-The first request remains pending. The CLI projection now routes interactive roles through foreground selection;
-deterministic tests pass, but a new candidate needs a live CLI retry. Prior workspaces remain reproduction evidence.
+That failed workspace's first request remains pending and is preserved as reproduction evidence. The CLI projection
+now routes interactive roles through foreground selection.
+
+Candidate `379ed96` passed the bounded foreground CLI retry: native questions, three uniquely recorded intake panels,
+one Requirements task and a final task-context read, with no completion/review/approval afterward. The user confirmed
+the first repeated question followed an accidental cancellation. Restart produced one status call and preserved run
+`542a9681-4ee2-4932-8ae3-94ea6f956d9f`, owner epoch 1 and journal head
+`cf87a2d45439a0bbde131f7cfe4e4309874c8fa0a7b2a4c53be3a05c672e1173`; all gates remained closed. Local and Azure
+records corroborated intake; the restart trace was local-only at assessment time. Telemetry lacks explicit APEX
+run/task attributes, so journal checks supply those identities. An additional final-panel question was observed;
+its content was not captured and is not classified as a defect. These different VS Code/CLI candidates do not establish
+same-candidate parity, manual permission prompting, automatic CLI handoff, or complete lifecycle qualification.
 
 | Evidence                                                       | Status                                                    |
 | -------------------------------------------------------------- | --------------------------------------------------------- |
@@ -115,6 +125,15 @@ The maintainer clarified that all generated code must comply with target Azure P
 blockers to resolve, not accepted compliance exceptions. Native Terraform previews now compare material changes with
 exact emitted managed addresses. Native Bicep previews resolve literal top-level IDs from accepted bindings and reject
 foreign mutations and existing-resource updates/deletes. AVM child ownership remains unresolved and blocked.
+
+The September 18 follow-up blocks explicitly incomplete Terraform plans and malformed change arrays, actions and
+status fields. Native-provider tests confirm incomplete saved plans cannot apply with or without policy mappings.
+Absent optional fields remain compatible with older Terraform JSON. Plan acceptance on both tracks now rejects
+policy mappings to absent resources and unresolved blocked controls before recording completion or opening Gate 3.
+These checks do not implement AVM child ownership or full effective-policy evaluation during code validation.
+The integration checkpoint passed `qualify:vnext`: 232 capability, 217 CLI, 20 contract, 45 kernel, 13 renderer,
+20 testkit, 144 validator and 29 packaging tests. A subsequent optional-field compatibility assertion passed its
+focused test; no production behavior changed after the checkpoint.
 
 Reviewer context includes locked stage criteria and current matching dispositions, with selective bounded retrieval
 for oversized metadata. The ownership/reviewer batch passed a dedicated final `qualify:vnext` run. An earlier run was

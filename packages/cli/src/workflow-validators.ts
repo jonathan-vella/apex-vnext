@@ -495,9 +495,28 @@ function planSourceCoverage(value: unknown): ValidationIssue[] {
     (kind) => context.artifactHashes[kind] !== undefined,
   );
   const invalid = requiredSources.filter((kind) => intent.sourceHashes[kind] !== context.artifactHashes[kind]);
-  return invalid.length === 0
-    ? []
-    : issue("/outputs/implementation-intent/sourceHashes", `Missing or stale source hashes: ${invalid.join(", ")}`);
+  const issues =
+    invalid.length === 0
+      ? []
+      : issue("/outputs/implementation-intent/sourceHashes", `Missing or stale source hashes: ${invalid.join(", ")}`);
+  const policy = context.artifacts["policy-property-map"] as PolicyPropertyMapV1 | undefined;
+  if (context.artifactHashes["policy-property-map"] !== undefined && policy === undefined) {
+    issues.push({ path: "/artifacts/policy-property-map", message: "Accepted policy mappings are required" });
+  }
+  const resources = new Set(intent.resources.map(({ id }) => id));
+  for (const mapping of policy?.mappings ?? []) {
+    if (!resources.has(mapping.logicalResourceId))
+      issues.push({
+        path: "/outputs/implementation-intent/resources",
+        message: "Policy mapping references a resource absent from the plan",
+      });
+    if (mapping.disposition === "blocked")
+      issues.push({
+        path: "/artifacts/policy-property-map/mappings",
+        message: "Blocked policy controls must be resolved before plan acceptance",
+      });
+  }
+  return issues;
 }
 
 function bindingTrackMatch(value: unknown): ValidationIssue[] {

@@ -150,6 +150,7 @@ async function nativePolicyFixture(context: TestContext, track: "bicep" | "terra
     invalid: false,
     unknown: false,
     compileFailed: false,
+    complete: true,
     configHash: hashes.iac,
     duringPreview: undefined as (() => Promise<void>) | undefined,
     duringShow: undefined as (() => Promise<void>) | undefined,
@@ -162,6 +163,7 @@ async function nativePolicyFixture(context: TestContext, track: "bicep" | "terra
           track === "bicep"
             ? { resources: { storage: { properties: { security: source.value } } } }
             : {
+                complete: source.complete,
                 resource_changes: [
                   {
                     address: "azurerm_storage_account.main",
@@ -788,6 +790,44 @@ test("normalizers block missing, duplicate, and malformed material change identi
     ],
   });
   assert.match(terraform.blockers.join("\n"), /no stable resource address|duplicate material|malformed/);
+});
+
+test("Terraform normalization cannot turn incomplete or malformed plan evidence into safe changes", () => {
+  for (const plan of [
+    { resource_changes: [], complete: false },
+    { resource_changes: "invalid" },
+    { resource_changes: [], deferred_changes: {} },
+    { resource_changes: [], complete: "true" },
+    { resource_changes: [], errored: "false" },
+    { resource_changes: [{ address: "azapi_resource.main", change: { actions: ["no-op", 42] } }] },
+    { resource_changes: [{ address: "azapi_resource.main", change: { actions: ["create", null] } }] },
+  ]) {
+    const normalized = normalizeTerraformPlan(plan);
+    assert.ok(normalized.blockers.length > 0, JSON.stringify(plan));
+  }
+  const noOp = normalizeTerraformPlan({ resource_changes: [], complete: true, errored: false });
+  assert.deepEqual(noOp, { changes: [], blockers: [] });
+  assert.deepEqual(normalizeTerraformPlan({ terraform_version: "1.7.5", format_version: "1.2" }), {
+    changes: [],
+    blockers: [],
+  });
+});
+
+test("native Terraform incomplete plans block apply even without policy mappings", async (context) => {
+  for (const withPolicy of [false, true]) {
+    await context.test(`policy=${withPolicy}`, async (child) => {
+      const fixture = await nativePolicyFixture(child, "terraform");
+      fixture.source.complete = false;
+      const provider = fixture.makeProvider();
+      const preview = await provider.previewApply(withPolicy ? fixture.policyRequest : request());
+      assert.match(preview.blockers.join("\n"), /plan is incomplete/);
+      await assert.rejects(
+        provider.apply(preview, approval(preview), authority),
+        (error) => error instanceof IacProviderError && error.code === "PREVIEW_BLOCKED",
+      );
+      assert.equal(fixture.executed(), false);
+    });
+  }
 });
 
 function stack(name: string, resourceGroup = "rg", resources: unknown[] = []) {
