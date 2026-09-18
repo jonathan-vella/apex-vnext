@@ -21,17 +21,21 @@ param credentialOwnerObjectId string
 @description('Service principal object ID permitted to ingest telemetry; empty during initial provisioning.')
 param publisherObjectId string = ''
 
-var tags = union({
-  environment: 'dev'
-  owner: 'jonathan'
-  costcenter: 'development'
-  application: 'apex-insights'
-  workload: 'agent-debugging'
-  sla: 'development'
-  'backup-policy': 'none'
-  'maint-window': 'ad-hoc'
-  'technical-contact': 'jonathan'
-}, resourceTags, { environment: 'dev' })
+var tags = union(
+  {
+    environment: 'dev'
+    owner: 'jonathan'
+    costcenter: 'development'
+    application: 'apex-insights'
+    workload: 'agent-debugging'
+    sla: 'development'
+    'backup-policy': 'none'
+    'maint-window': 'ad-hoc'
+    'technical-contact': 'jonathan'
+  },
+  resourceTags,
+  { environment: 'dev' }
+)
 
 module group 'br/public:avm/res/resources/resource-group:0.4.4' = {
   name: 'apex-insights-group'

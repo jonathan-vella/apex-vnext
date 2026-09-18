@@ -33,12 +33,14 @@ module workspace 'br/public:avm/res/operational-insights/workspace:0.16.1' = {
       disableLocalAuth: true
       immediatePurgeDataOn30Days: true
     }
-    diagnosticSettings: [{
-      name: 'workspace-diagnostics'
-      useThisWorkspace: true
-      logCategoriesAndGroups: [{ categoryGroup: 'allLogs' }]
-      metricCategories: [{ category: 'AllMetrics' }]
-    }]
+    diagnosticSettings: [
+      {
+        name: 'workspace-diagnostics'
+        useThisWorkspace: true
+        logCategoriesAndGroups: [{ categoryGroup: 'allLogs' }]
+        metricCategories: [{ category: 'AllMetrics' }]
+      }
+    ]
   }
 }
 
@@ -57,17 +59,23 @@ module insights 'br/public:avm/res/insights/component:0.8.0' = {
     retentionInDays: 30
     immediatePurgeDataOn30Days: true
     samplingPercentage: 100
-    roleAssignments: empty(publisherObjectId) ? [] : [{
-      principalId: publisherObjectId
-      principalType: 'ServicePrincipal'
-      roleDefinitionIdOrName: 'Monitoring Metrics Publisher'
-    }]
-    diagnosticSettings: [{
-      name: 'insights-metrics'
-      workspaceResourceId: workspace.outputs.resourceId
-      logCategoriesAndGroups: []
-      metricCategories: [{ category: 'AllMetrics' }]
-    }]
+    roleAssignments: empty(publisherObjectId)
+      ? []
+      : [
+          {
+            principalId: publisherObjectId
+            principalType: 'ServicePrincipal'
+            roleDefinitionIdOrName: 'Monitoring Metrics Publisher'
+          }
+        ]
+    diagnosticSettings: [
+      {
+        name: 'insights-metrics'
+        workspaceResourceId: workspace.outputs.resourceId
+        logCategoriesAndGroups: []
+        metricCategories: [{ category: 'AllMetrics' }]
+      }
+    ]
   }
 }
 
@@ -92,18 +100,22 @@ module vault 'br/public:avm/res/key-vault/vault:0.14.2' = {
       bypass: 'None'
       ipRules: []
     }
-    roleAssignments: [{
-      principalId: credentialOwnerObjectId
-      principalType: 'User'
-      roleDefinitionIdOrName: 'Key Vault Secrets Officer'
-    }]
-    diagnosticSettings: [{
-      name: 'vault-audit'
-      workspaceResourceId: workspace.outputs.resourceId
-      logAnalyticsDestinationType: 'Dedicated'
-      logCategoriesAndGroups: [{ categoryGroup: 'allLogs' }]
-      metricCategories: [{ category: 'AllMetrics' }]
-    }]
+    roleAssignments: [
+      {
+        principalId: credentialOwnerObjectId
+        principalType: 'User'
+        roleDefinitionIdOrName: 'Key Vault Secrets Officer'
+      }
+    ]
+    diagnosticSettings: [
+      {
+        name: 'vault-audit'
+        workspaceResourceId: workspace.outputs.resourceId
+        logAnalyticsDestinationType: 'Dedicated'
+        logCategoriesAndGroups: [{ categoryGroup: 'allLogs' }]
+        metricCategories: [{ category: 'AllMetrics' }]
+      }
+    ]
   }
 }
 
@@ -111,22 +123,24 @@ resource workspaceReference 'Microsoft.OperationalInsights/workspaces@2025-07-01
   name: workspaceName
 }
 
-resource appTables 'Microsoft.OperationalInsights/workspaces/tables@2025-07-01' = [for tableName in [
-  'AppDependencies'
-  'AppRequests'
-  'AppTraces'
-  'AppExceptions'
-  'AppEvents'
-  'AppMetrics'
-]: {
-  parent: workspaceReference
-  name: tableName
-  properties: {
-    retentionInDays: 30
-    totalRetentionInDays: 30
+resource appTables 'Microsoft.OperationalInsights/workspaces/tables@2025-07-01' = [
+  for tableName in [
+    'AppDependencies'
+    'AppRequests'
+    'AppTraces'
+    'AppExceptions'
+    'AppEvents'
+    'AppMetrics'
+  ]: {
+    parent: workspaceReference
+    name: tableName
+    properties: {
+      retentionInDays: 30
+      totalRetentionInDays: 30
+    }
+    dependsOn: [insights]
   }
-  dependsOn: [insights]
-}]
+]
 
 output workspaceResourceId string = workspace.outputs.resourceId
 output applicationInsightsResourceId string = insights.outputs.resourceId
