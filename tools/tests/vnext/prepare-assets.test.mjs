@@ -98,6 +98,7 @@ test("governance workflow is opt-in, protected, and publishes only a reviewed ba
   for (const step of job.steps) assert.doesNotMatch(step.run ?? "", /\$\{\{/u);
   const collection = job.steps.find(({ name }) => name === "Collect governance baseline");
   assert.match(collection.run, /collect-governance-baseline\.ps1 @parameters/u);
+  assert.match(collection.run, /IncludeDefenderAuto = \$true/u);
   assert.match(collection.run, /Test-Json .*governance-baseline\.schema\.json/u);
   assert.match(collection.run, /\*> \$null/u);
   const pullRequest = job.steps.find(({ uses }) => uses?.startsWith("peter-evans/create-pull-request@"));

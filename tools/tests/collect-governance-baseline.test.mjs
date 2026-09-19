@@ -775,6 +775,25 @@ for (const mode of ["Default", "DoNotEnforce", "Enroll", null]) {
   );
 }
 
+for (const root of [{ ManagementGroupId: "test-root" }, { SubscriptionId: subscriptionId }]) {
+  test(`consumer collection retains Defender constraints for ${Object.keys(root)[0]}`, powershellOptions, (context) => {
+    const responses = routes();
+    const policyId = "/providers/Microsoft.Authorization/policyDefinitions/defender";
+    const assigned = assignment(policyId, subscriptionScope);
+    assigned.properties.metadata = { assignedBy: "Microsoft Defender for Cloud" };
+    responses[assignmentsUrl].value = [assigned];
+    responses[definitionsUrl].value = [definition(policyId)];
+    const envelope = assertComplete(collect(context, responses, { root: { ...root, IncludeDefenderAuto: true } }))
+      .subscriptions[subscriptionId];
+    assert.equal(envelope.discovery_summary.defender_auto_filtered, 0);
+    assert.equal(envelope.assignment_inventory.length, 1);
+    assert.equal(envelope.findings.length, 1);
+    assert.equal(envelope.findings[0].assignment_id, assigned.id);
+    assert.equal(envelope.findings[0].effect, "deny");
+    assert.equal(envelope.findings[0].classification, "blocker");
+  });
+}
+
 test("enforcementMode does not reintroduce whole-scope excluded assignments", powershellOptions, (context) => {
   const responses = routes();
   const assigned = assignment("/providers/Microsoft.Authorization/policyDefinitions/excluded");
