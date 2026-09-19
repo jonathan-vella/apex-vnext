@@ -213,13 +213,24 @@ for (const track of ["bicep", "terraform"] as const) {
         previewDestroy: capturePreview,
       };
       const service = new ApexService(root, { providers: { [track]: provider } });
-      const initialized = await service.init({ projectId: "demo", iacTool: track });
+      const initialized = await service.init({
+        projectId: "demo",
+        iacTool: track,
+        targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
+      });
       const codegen = await reachCodegen(service, initialized.runId, track, (plan) => {
+        if (track === "bicep") configureNativeBicepPlan(plan);
         if (!mixedOwnership) return;
         const intent = plan.find(({ kind }) => kind === "implementation-intent")!.value as ImplementationIntentV1;
         intent.resources.push({ ...intent.resources[0]!, id: "managed", dependsOn: ["api"] });
         const binding = plan.find(({ kind }) => kind === "iac-binding")!.value as IacBindingV1;
-        binding.resourceBindings.managed = { ...binding.resourceBindings.api! };
+        binding.resourceBindings.managed = {
+          ...binding.resourceBindings.api!,
+          parameters: {
+            ...binding.resourceBindings.api!.parameters,
+            name: "manageddemo",
+          },
+        };
         binding.intentHash = sha256Json(intent);
       });
       const bundle = codegenBundle(initialized.runId, track, codegen.plan);
@@ -233,7 +244,7 @@ for (const track of ["bicep", "terraform"] as const) {
         manifest.resources.push({
           ...manifest.resources[0]!,
           logicalId: "managed",
-          implementationAddress: "managed",
+          implementationAddress: (codegen.plan[1]!.value as IacBindingV1).resourceBindings.managed!.implementation,
           executionAddress: track === "terraform" ? "azapi_resource.managed" : "managed",
           ownership: "managed",
           implementationKind: "resource",
@@ -1317,6 +1328,81 @@ for (const track of ["bicep", "terraform"] as const) {
     }
   });
 }
+
+test("Bicep AVM exact scope binds requests and rejects foreign inventory", async () => {
+  const root = await tempRoot();
+  const now = new Date("2026-01-01T00:00:00.000Z");
+  const targetScope = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test";
+  const primaryId = `${targetScope}/providers/Microsoft.Storage/storageAccounts/apidemo`;
+  const childId = `${primaryId}/blobServices/default`;
+  const base = bicepPreviewProvider(now);
+  let foreignInventory = true;
+  const provider: IacProvider = {
+    ...base,
+    async previewApply(request) {
+      assert.deepEqual(request.resources.map(({ resourceId }) => resourceId).sort(), [primaryId, childId].sort());
+      return base.previewApply(request);
+    },
+    async inventory(projectId, runId) {
+      const inventory = await base.inventory(projectId, runId);
+      return {
+        ...inventory,
+        resources: inventory.resources.map((resource, index) => ({
+          ...resource,
+          resourceId: foreignInventory && index === 1 ? `${primaryId}/blobServices/foreign` : resource.resourceId,
+        })),
+      };
+    },
+  };
+  const service = new ApexService(root, { clock: () => now, providers: { bicep: provider } });
+  const { runId } = await service.init({ projectId: "demo", iacTool: "bicep", targetScope });
+  const codegen = await reachCodegen(service, runId, "bicep", (plan) => {
+    configureNativeBicepPlan(plan);
+    const binding = (plan[1]!.value as IacBindingV1).resourceBindings.api!;
+    binding.implementation = "avm:br/public:avm/res/storage/storage-account@0.9.0";
+    binding.version = "0.9.0";
+    binding.physicalResources = [
+      { resourceId: primaryId, type: "Microsoft.Storage/storageAccounts", ownership: "managed", role: "primary" },
+      {
+        resourceId: childId,
+        type: "Microsoft.Storage/storageAccounts/blobServices",
+        ownership: "managed",
+        role: "ancillary",
+      },
+    ];
+  });
+  const bundle = codegenBundle(runId, "bicep", codegen.plan);
+  const manifest = bundle.find(({ kind }) => kind === "logical-resource-manifest")!.value as LogicalResourceManifestV1;
+  manifest.resources[0]!.implementationKind = "module";
+  (
+    bundle.find(({ kind }) => kind === "iac-handoff")!.value as { logicalResourceManifestHash: string }
+  ).logicalResourceManifestHash = sha256Json(manifest);
+  await service.completeTaskOutputs(codegen.taskId, bundle);
+  await complete(service, "validation-bicep", [
+    { kind: "validation-evidence", value: validationEvidence(runId, "bicep") },
+  ]);
+  const preview = await service.preview({ operation: "apply", provider: "bicep" });
+  const bindingDocument = await readFile(join(root, "agent-output", "demo", runId, "plan", "iac-binding.md"), "utf8");
+  assert.match(bindingDocument, /Physical Authorization Scope/);
+  assert.ok(bindingDocument.includes(childId));
+  await service.decideGateNumber(4, "approved", "tester");
+  await assert.rejects(service.deploy(preview.previewHash), /inventory.*ownership/i);
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+  assert.equal(
+    (await journal.replay()).some(({ type }) => type === "deployment.completed"),
+    false,
+  );
+  foreignInventory = false;
+  await service.reconcile();
+  const completed = await service.deploy(preview.previewHash);
+  assert.deepEqual(
+    completed.inventory.resources.map(({ resourceId }) => resourceId).sort(),
+    [primaryId, childId].sort(),
+  );
+  assert.ok(
+    completed.inventory.resources.some(({ logicalId, resourceId }) => logicalId === "api" && resourceId === primaryId),
+  );
+});
 
 test("native apply requires complete source-bound policy receipts before Gate 4", async () => {
   const root = await tempRoot();

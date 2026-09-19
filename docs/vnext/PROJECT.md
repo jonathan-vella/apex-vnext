@@ -124,7 +124,7 @@ policies were changed. Audit-only classifications remain visible summary evidenc
 The maintainer clarified that all generated code must comply with target Azure Policy. Unknown checks are deployment
 blockers to resolve, not accepted compliance exceptions. Native Terraform previews now compare material changes with
 exact emitted managed addresses. Native Bicep previews resolve literal top-level IDs from accepted bindings and reject
-foreign mutations and existing-resource updates/deletes. AVM child ownership remains unresolved and blocked.
+foreign mutations and existing-resource updates/deletes. Unresolved AVM child ownership remains blocked.
 
 The September 19 ownership follow-up carries Bicep resolver failures into preview coverage and explicitly blocks
 unresolved Terraform module descendants or missing managed execution addresses. Empty and no-op previews cannot hide
@@ -132,6 +132,12 @@ those failures; workflow regressions retain the journal head and closed Gate 4. 
 foreign material changes labelled no-op. These are safety fixes, not completed AVM support. Current Bicep evidence
 binds source and physical what-if IDs but does not attribute each ID to an accepted logical module. Terraform plan
 module metadata likewise needs a source-bound ownership contract before descendant operations can be authorized.
+
+A subsequent Bicep slice adds exact intended `physicalResources` to the accepted IaC binding. Plan validation rejects
+scope/type mismatches and physical collisions; the Gate 3 document displays the scope. Native request, what-if and
+observed inventory checks enforce that exact managed-ID set, including ancillary resources, while protecting existing
+IDs. This is authorization scope, not observed module attribution. Full AVM policy-property evaluation and Terraform
+module ownership remain open. See [the track contract](../reference/iac-tracks.md#exact-bicep-module-scope).
 
 The September 18 follow-up blocks explicitly incomplete Terraform plans and malformed change arrays, actions and
 status fields. Native-provider tests confirm incomplete saved plans cannot apply with or without policy mappings.

@@ -17,6 +17,7 @@ import {
   ExecutionPlanAttestationV1Schema,
   GovernanceConstraintsV1Schema,
   hasValidInputRequestQuestions,
+  IacBindingV1Schema,
   IacHandoffV1Schema,
   ImprovementDecisionV1Schema,
   ImprovementObservationV1Schema,
@@ -122,6 +123,71 @@ describe("Wave 1 contracts", () => {
     };
 
     assert.equal(Value.Check(RequirementsV1Schema, requirements), true);
+  });
+
+  it("validates optional strict bounded intended physical resource scope on bindings", () => {
+    const primary = {
+      resourceId:
+        "/subscriptions/11111111-2222-3333-4444-555555555555/resourceGroups/workload/providers/Microsoft.Storage/storageAccounts/storage",
+      type: "Microsoft.Storage/storageAccounts",
+      ownership: "managed",
+      role: "primary",
+    };
+    const resourceBinding = {
+      implementation: "avm:br/public:avm/res/storage/storage-account@0.9.0",
+      version: "0.9.0",
+      parameters: {},
+    };
+    const binding = {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: "demo",
+      runId: "run-test",
+      track: "bicep",
+      intentHash: hash,
+      resourceBindings: { storage: resourceBinding },
+    };
+    const withResources = (physicalResources: unknown) => ({
+      ...binding,
+      resourceBindings: { storage: { ...resourceBinding, physicalResources } },
+    });
+    assert.equal(Value.Check(IacBindingV1Schema, binding), true);
+    assert.equal(Value.Check(IacBindingV1Schema, withResources([primary])), true);
+    assert.equal(
+      Value.Check(
+        IacBindingV1Schema,
+        withResources([{ ...primary, resourceId: primary.resourceId.toUpperCase(), type: primary.type.toUpperCase() }]),
+      ),
+      true,
+    );
+    const bounded = Array.from({ length: 128 }, (_, index) => ({
+      ...primary,
+      resourceId: `${primary.resourceId}${index}`,
+      role: index === 0 ? "primary" : "ancillary",
+      ownership: index === 0 ? "managed" : "existing",
+    }));
+    assert.equal(Value.Check(IacBindingV1Schema, withResources(bounded)), true);
+    for (const physicalResources of [
+      [],
+      null,
+      {},
+      [primary, primary],
+      [...bounded, primary],
+      [{ ...primary, unexpected: true }],
+      [{ ...primary, ownership: "observed" }],
+      [{ ...primary, role: "secondary" }],
+      [{ ...primary, type: "" }],
+      [{ ...primary, type: `Microsoft.Storage/${"a".repeat(256)}` }],
+      [{ ...primary, resourceId: `${primary.resourceId}${"a".repeat(2048)}` }],
+      ...["*", "%2f", "?query", "#fragment", "[expression]", "${expression}", "\n", "\r\n"].map((suffix) => [
+        { ...primary, resourceId: `${primary.resourceId}${suffix}` },
+      ]),
+      [{ ...primary, type: `${primary.type}\n` }],
+      ...Object.keys(primary).map((key) => [
+        Object.fromEntries(Object.entries(primary).filter(([field]) => field !== key)),
+      ]),
+    ]) {
+      assert.equal(Value.Check(IacBindingV1Schema, withResources(physicalResources)), false);
+    }
   });
 
   it("validates strict onboarding configuration with optional defaults", () => {

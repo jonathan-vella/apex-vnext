@@ -26,6 +26,24 @@ This check validates manifest consistency, not the truth of an ownership claim o
 platform resource identities to approved intent, native preview changes and cleanup remains follow-on work. An accepted
 manifest does not grant authority to modify shared platform resources or bypass deployment approval.
 
+### Exact Bicep Module Scope
+
+Bicep AVM bindings can declare `physicalResources` as intended authorization scope. Each entry contains an exact
+`resourceId`, ARM `type`, `ownership` (`managed` or `existing`), and `role` (`primary` or `ancillary`). A map contains
+1-128 entries and exactly one managed primary matching the logical resource type. IDs must be within the run's exact
+subscription/resource group; case-insensitive duplicates, collisions with native resources, expressions and wildcards
+are rejected. Native bindings and Terraform bindings cannot use this field.
+
+The Gate 3 binding document displays this scope. Native Bicep requests include only approved managed IDs, and material
+what-if changes outside that exact set block preview. Observed deployment-stack inventory must contain only unique
+approved managed IDs before deployment completion is recorded. Protected existing IDs are never added to the managed
+set. Ancillary inventory entries retain distinct identities under their accepted logical parent.
+
+This declaration is not proof of resource existence, AVM expansion or policy compliance. Unknown child resources block
+preview instead of inheriting permission from their parent. Nonempty policy maps still require source-bound native
+property receipts; declaring physical IDs does not resolve module property expressions. Terraform module descendant
+ownership and full AVM policy evaluation remain unsupported. No live Azure qualification is implied by offline tests.
+
 ## Differences
 
 | Concern           | Bicep                               | Terraform                                                      |

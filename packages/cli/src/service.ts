@@ -2540,6 +2540,9 @@ export class ApexService {
       this.reviewMarkdownText(value.implementation),
       this.reviewMarkdownText(value.version),
       this.reviewMarkdownText(JSON.stringify(value.parameters)),
+      this.reviewMarkdownText(
+        value.physicalResources === undefined ? "Not declared" : JSON.stringify(value.physicalResources),
+      ),
     ]);
     const inputRows = Object.entries(inputs.inputs).map(([name, value]) => [
       this.reviewMarkdownText(name),
@@ -2569,7 +2572,7 @@ export class ApexService {
       atomicWriteBytes(
         join(directory, "iac-binding.md"),
         Buffer.from(
-          `# IaC Binding\n\n- Track: ${this.reviewMarkdownText(binding.track)}\n- Intent hash: ${binding.intentHash}\n\n${table(["Logical ID", "Implementation", "Version", "Parameters"], bindingRows)}\n`,
+          `# IaC Binding\n\n- Track: ${this.reviewMarkdownText(binding.track)}\n- Intent hash: ${binding.intentHash}\n\n${table(["Logical ID", "Implementation", "Version", "Parameters", "Physical Authorization Scope"], bindingRows)}\n\nPhysical scope declares intended managed and protected resources; it is not evidence of module expansion or resource existence.\n`,
           "utf8",
         ),
       ),
@@ -3155,13 +3158,16 @@ export class ApexService {
         inputHash: intentHash,
         iacHash: this.artifactHash(events, "iac-handoff") ?? sha256Json(intent.resources),
         policyHash: this.artifactHash(events, "policy-property-map") ?? run.runtimeLockHash,
-        resources: managedResources.map((resource) => ({
-          logicalId: resource.id,
-          resourceId: `${options.provider}://${run.environment}/${resource.id}`,
-          type: resource.type,
-          location: run.environment,
-          properties: { purpose: resource.purpose },
-        })),
+        resources:
+          options.provider === "bicep"
+            ? await this.nativeBicepManagedResources(run, events)
+            : managedResources.map((resource) => ({
+                logicalId: resource.id,
+                resourceId: `${options.provider}://${run.environment}/${resource.id}`,
+                type: resource.type,
+                location: run.environment,
+                properties: { purpose: resource.purpose },
+              })),
         blockers: [],
         ttlMs: options.expiresInMs ?? PREVIEW_TTL_MS,
         ...(policyValidation === undefined ? {} : { policyValidation }),
@@ -3670,6 +3676,28 @@ export class ApexService {
     const operationHash = await this.objects.putJson(operation);
     const inventory = await provider.inventory(run.projectId, run.runId);
     this.assertValid("inventory", inventory);
+    if (providerName === "bicep") {
+      const managed = new Map(
+        (await this.nativeBicepManagedResources(run, events)).map((resource) => [
+          resource.resourceId.toLowerCase(),
+          resource,
+        ]),
+      );
+      const seen = new Set<string>();
+      inventory.resources = inventory.resources.map((resource) => {
+        const identity = resource.resourceId.toLowerCase();
+        const accepted = managed.get(identity);
+        if (accepted === undefined || seen.has(identity)) {
+          throw new ApexError(
+            "APEX_VALIDATION",
+            "Native inventory violates accepted Bicep ownership",
+            EXIT_CODES.validation,
+          );
+        }
+        seen.add(identity);
+        return { ...resource, resourceId: accepted.resourceId, logicalId: accepted.logicalId };
+      });
+    }
     const inventoryValidatorIds = await this.validateInventoryValidators(run, preview, operation, inventory);
     const inventoryHash = await this.objects.putJson(inventory);
     const declaredValidatorIds = await this.deployValidatorIds(run);
@@ -5860,6 +5888,43 @@ export class ApexService {
     };
     for (const id of validatorIds) this.assertValid(id, context);
     return validatorIds;
+  }
+
+  private async nativeBicepManagedResources(
+    run: RunConfigV1,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+  ): Promise<ResourceInventoryV1["resources"]> {
+    const artifacts = this.acceptedArtifactHashes(events);
+    if (!artifacts["implementation-intent"] || !artifacts["iac-binding"] || !artifacts["logical-resource-manifest"])
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "preview:coverage requires accepted Bicep ownership inputs",
+        EXIT_CODES.validation,
+      );
+    const intent = await this.objects.getJson<ImplementationIntentV1>(artifacts["implementation-intent"]);
+    const binding = await this.objects.getJson<IacBindingV1>(artifacts["iac-binding"]);
+    const manifest = await this.objects.getJson<LogicalResourceManifestV1>(artifacts["logical-resource-manifest"]);
+    const ownership = resolveNativeBicepResourceOwnership({ intent, binding, manifest, targetScope: run.targetScope });
+    if (ownership.issues.length > 0)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "preview:coverage cannot resolve accepted Bicep ownership",
+        EXIT_CODES.validation,
+      );
+    return intent.resources.flatMap((resource) => {
+      const primaryId = ownership.resourceIdsByLogicalId[resource.id];
+      if (primaryId === undefined) return [];
+      const physical = binding.resourceBindings[resource.id]!.physicalResources;
+      return (
+        physical?.filter(({ ownership }) => ownership === "managed") ?? [{ resourceId: primaryId, type: resource.type }]
+      ).map(({ resourceId, type }) => ({
+        logicalId: resourceId.toLowerCase() === primaryId.toLowerCase() ? resource.id : `${resource.id}:${resourceId}`,
+        resourceId,
+        type,
+        location: run.environment,
+        properties: { purpose: resource.purpose },
+      }));
+    });
   }
 
   private async managedPreviewResources(
