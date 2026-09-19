@@ -137,12 +137,31 @@ an explicit operator action for automation and backward compatibility. Human gat
 
 After initial import, the same operation accepts a newer observation only when the complete selected subscription
 content is unchanged, excluding collection timestamps and legacy TTL fields. It records a separate observation receipt
-and preserves accepted governance, policy, plan and gate hashes. Material differences block renewal. A general consumer
-operation to reopen accepted governance for changed policy is not yet available; do not use `apex reconcile`, which
-handles deployment recovery, or edit accepted state to bypass the blocker. Unrelated subscription data is not copied
+and preserves accepted governance, policy, plan and gate hashes. Material differences block renewal; use the confirmed
+revision process below, not `apex reconcile`, which handles deployment recovery. Unrelated subscription data is not copied
 into run state. A replay of the exact accepted
 renewal is idempotent. The journal head advances, so active tasks may need reissuing; preview expiry and writer authority
-are not extended. Legacy snapshots without a content digest require migration/reconciliation instead of inferred equality.
+are not extended. Legacy snapshots without a content digest require a separately supported governance migration instead
+of inferred equality; deployment reconciliation cannot create the missing digest.
+
+### Changed Policy
+
+After reviewing a changed, complete and fresh baseline, explicitly authorize reopening governance:
+
+```bash
+apex governance revise --path .github/data/governance-policy-baseline.json --reason "Reviewed Azure policy changes" --yes --json
+apex governance import --path .github/data/governance-policy-baseline.json --json
+```
+
+Revision is a trusted CLI-only operation. It atomically invalidates the workflow's governance dependency closure and
+Gates 2-4, preserving requirements, architecture and historical evidence. It does not import the replacement, approve
+policy, or change Azure. The later import must match the exact confirmed path and bytes; a changed candidate requires
+new confirmation. Reconciliation, governance review, planning and affected approvals must run again.
+
+In-flight or indeterminate deployments block revision until their outcome is resolved. Do not bypass this by editing
+journal/state files. Legacy snapshots without content digests still require a separately supported migration path.
+The current deployment reconciliation path requires a recorded execution receipt. Without one, remain blocked for
+operator/provider-supported resolution; repeating `apex reconcile` or deployment does not establish the missing outcome.
 
 ## Decide Gates
 

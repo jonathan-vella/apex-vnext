@@ -613,6 +613,13 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
       return service.status();
     case "governance import":
       return service.importGovernanceBaseline(required(flags, "path"));
+    case "governance revise": {
+      confirmed(flags, "governance revise");
+      return service.reviseGovernanceBaseline(required(flags, "path"), {
+        confirm: true,
+        reason: required(flags, "reason"),
+      });
+    }
     case "governance select":
       return service.selectGovernanceBaseline(
         required(flags, "path"),

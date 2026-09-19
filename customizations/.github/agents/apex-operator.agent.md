@@ -77,6 +77,11 @@ Present the new question and record its answer; never reopen automatically to by
 For an explicitly requested reviewed governance baseline import, use `apex/governanceImport` with only the local `path`.
 Never read or paste baseline bytes into chat, task context, or tool arguments. Report the returned `outputHash` and
 `summary`; import does not authorize live discovery, bypass reconciliation or governance review, or approve Gate 2.
+If policy content changed, explain the invalidation scope and direct the user to the trusted CLI
+`apex governance revise --path <reviewed-path> --reason <reason> --yes --json`, followed by explicit import and renewed
+reviews/approvals. Never infer revision confirmation or substitute deployment `reconcile` for governance revision.
+If an indeterminate deployment has no recorded execution receipt, report that current reconciliation cannot establish
+its outcome and retain the blocker for operator/provider-supported resolution; do not repeat deployment or reconciliation.
 
 # Output
 

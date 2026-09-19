@@ -22,7 +22,7 @@ import {
 } from "@apexops/contracts";
 import { nativePolicyValidationBinding, validatePolicyProperties } from "@apexops/capabilities";
 import type { IacProvider, PreviewRequest } from "@apexops/capabilities";
-import { EventJournal, ObjectStore, ValidatorRegistry, sha256Bytes, sha256Json } from "@apexops/kernel";
+import { EventJournal, ObjectStore, RunRepository, ValidatorRegistry, sha256Bytes, sha256Json } from "@apexops/kernel";
 import { ApexError } from "../errors.js";
 import { dependencyRevision } from "../dependency-revision.js";
 import { createMcpServer } from "../mcp.js";
@@ -205,6 +205,20 @@ async function reachValidation(
     { kind: "validation-evidence", value: validationEvidence(runId, track) },
   ]);
 }
+
+test("material governance revision requires confirmation before accessing run or candidate", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await assert.rejects(service.reviseGovernanceBaseline("missing.json", { confirm: false, reason: "Policy changed" }), {
+    code: "APEX_AUTHORIZATION",
+  });
+  assert.deepEqual(await readdir(root), []);
+  await service.init({ projectId: "demo", iacTool: "bicep" });
+  await assert.rejects(
+    service.reviseGovernanceBaseline("missing.json", { confirm: true, reason: "Policy changed" }),
+    /requires accepted imported governance/,
+  );
+});
 
 test("governance baseline reader rejects parent swaps before and after reading", async () => {
   for (const swapAt of [2, 3]) {
@@ -2541,7 +2555,412 @@ function emptyGovernanceBaseline(subscriptionId: string, discoveredAt: string) {
   };
 }
 
+async function materialGovernanceFixture(track: "bicep" | "terraform", native = false) {
+  const root = await tempRoot();
+  const now = new Date("2026-09-19T00:00:00Z");
+  const subscriptionId = "11111111-1111-1111-1111-111111111111";
+  const path = join(root, "baseline.json");
+  const baseline = emptyGovernanceBaseline(subscriptionId, now.toISOString());
+  await writeJson(path, baseline);
+  const provider = track === "bicep" ? bicepPreviewProvider(now) : terraformPreviewProvider(now);
+  const service = new ApexService(root, { clock: () => now, ...(native ? { providers: { [track]: provider } } : {}) });
+  const { runId } = await service.init({
+    projectId: "demo",
+    iacTool: track,
+    targetScope: `/subscriptions/${subscriptionId}/resourceGroups/rg-test`,
+  });
+  const generated = await reachCodegen(
+    service,
+    runId,
+    track,
+    native && track === "bicep" ? configureNativeBicepPlan : undefined,
+    false,
+    path,
+  );
+  const directory = join(root, ".apex", "projects", "demo", "runs", runId);
+  const journal = new EventJournal(join(directory, "journal"));
+  const candidate = structuredClone(baseline);
+  candidate.subscriptions[subscriptionId]!.irrelevant_metadata = "MATERIAL_REVISION";
+  return {
+    root,
+    now,
+    path,
+    baseline,
+    candidate,
+    service,
+    runId,
+    generated,
+    directory,
+    journal,
+    subscriptionId,
+    provider,
+  };
+}
+
+test("material governance revision rejects unsafe, stale, incomplete, unchanged and unbound inputs without mutation", async () => {
+  const { root, now, path, baseline, candidate, service, directory, journal, subscriptionId } =
+    await materialGovernanceFixture("bicep");
+  const head = await journal.head();
+  const runBytes = await readFile(join(directory, "run.json"));
+  const reject = async (inputPath: string, pattern: RegExp | { code: string }, reason = "Policy changed") => {
+    await assert.rejects(service.reviseGovernanceBaseline(inputPath, { confirm: true, reason }), pattern);
+    assert.equal(await journal.head(), head);
+    assert.deepEqual(await readFile(join(directory, "run.json")), runBytes);
+  };
+  await reject(path, /unchanged.*normal import renewal/);
+  await reject(path, /requires a reason/, "  ");
+  await reject("../outside.json", /escapes its root/);
+  await symlink(path, join(root, "linked.json"));
+  await reject("linked.json", /symlink/);
+  for (const offset of [-30 * 86_400_000, 1]) {
+    const changed = structuredClone(candidate);
+    const observedAt = new Date(now.getTime() + offset).toISOString();
+    changed.subscriptions[subscriptionId]!.discovered_at = observedAt;
+    changed.subscriptions[subscriptionId]!.discovery_metadata.discovered_at = observedAt;
+    await writeJson(path, changed);
+    await reject(path, /stale|future|refresh/i);
+  }
+  await writeJson(path, { ...candidate, coverage_status: "INCOMPLETE" });
+  await reject(path, { code: "APEX_VALIDATION" });
+  await writeJson(path, emptyGovernanceBaseline("22222222-2222-2222-2222-222222222222", now.toISOString()));
+  await reject(path, { code: "APEX_VALIDATION" });
+  await writeJson(path, candidate);
+  const run = (await service.status()).run;
+  await writeJson(join(directory, "run.json"), { ...run, ownerEpoch: 2 });
+  await assert.rejects(
+    service.reviseGovernanceBaseline(path, { confirm: true, reason: "Policy changed" }),
+    /writer authority/i,
+  );
+  await writeJson(join(directory, "run.json"), run);
+  await writeJson(join(directory, "run.json"), {
+    ...run,
+    targetScope: `/subscriptions/${subscriptionId}/resourceGroups/different`,
+  });
+  await assert.rejects(
+    service.reviseGovernanceBaseline(path, { confirm: true, reason: "Policy changed" }),
+    /run and target/i,
+  );
+  await writeFile(join(directory, "run.json"), runBytes);
+  assert.equal(await journal.head(), head);
+  await writeJson(path, baseline);
+});
+
+test("material governance revision blocks synthetic and legacy accepted governance without guessing a digest", async () => {
+  const { path, candidate, service, journal, runId, root } = await materialGovernanceFixture("bicep");
+  await writeJson(path, candidate);
+  const run = (await service.status()).run;
+  const originalHash = service["acceptedArtifactHashes"](await journal.replay())["governance-constraints"]!;
+  const objects = new ObjectStore(root);
+  const original = await objects.getJson<GovernanceConstraintsV1>(originalHash);
+  const snapshot = await objects.getJson<Record<string, unknown>>(original.constraintsRef.digest);
+  delete snapshot.contentHash;
+  const digest = await objects.putJson(snapshot);
+  const legacy = {
+    ...original,
+    constraintsRef: {
+      ...original.constraintsRef,
+      digest,
+      uri: `apex-object:${digest}`,
+      bytes: (await objects.getBytes(digest)).length,
+    },
+  };
+  for (const [value, pattern] of [
+    [governance(runId), /synthetic/],
+    [legacy, /Legacy.*migration/],
+  ] as const) {
+    await service["append"](run, "task.completed", {
+      nodeId: "governance-discovery",
+      artifactHashes: { "governance-constraints": await objects.putJson(value) },
+    });
+    const head = await journal.head();
+    await assert.rejects(service.reviseGovernanceBaseline(path, { confirm: true, reason: "Policy changed" }), pattern);
+    assert.equal(await journal.head(), head);
+  }
+});
+
+test("material governance revision is permitted after native execution is reconciled", async () => {
+  const { path, candidate, service, runId, generated, provider, journal } = await materialGovernanceFixture(
+    "terraform",
+    true,
+  );
+  await service.completeTaskOutputs(generated.taskId, codegenBundle(runId, "terraform", generated.plan));
+  await complete(service, "validation-terraform", [
+    { kind: "validation-evidence", value: validationEvidence(runId, "terraform") },
+  ]);
+  const preview = await service.preview({ operation: "apply", provider: "terraform" });
+  await service.decideGateNumber(4, "approved", "tester");
+  const inventory = provider.inventory.bind(provider);
+  provider.inventory = async () => {
+    throw new Error("inventory unavailable");
+  };
+  await assert.rejects(service.deploy(preview.previewHash), /inventory unavailable/);
+  await writeJson(path, candidate);
+  const head = await journal.head();
+  await assert.rejects(
+    service.reviseGovernanceBaseline(path, { confirm: true, reason: "Policy changed" }),
+    /reconcile before governance revision/,
+  );
+  assert.equal(await journal.head(), head);
+  provider.inventory = inventory;
+  const reconciled = await service.reconcile();
+  const before = await journal.replay();
+  await service.reviseGovernanceBaseline(path, { confirm: true, reason: "Policy changed after reconciliation" });
+  assert.deepEqual((await journal.replay()).slice(0, -1), before);
+  assert.deepEqual(await service.inventory(), reconciled);
+});
+
+for (const stage of ["intent", "journal", "run", "cleanup"] as const) {
+  test(`material governance revision transaction recovers ${stage} failure without split gates`, async () => {
+    const { root, now, path, candidate, service, journal, directory } = await materialGovernanceFixture("bicep");
+    await writeJson(path, candidate);
+    const before = await journal.replay();
+    const beforeRun = (await service.status()).run;
+    service["runRepository"] = () =>
+      new RunRepository(directory, {
+        clock: () => now,
+        faultInjector: (actual) => {
+          if (actual === stage) throw new Error(`injected ${stage}`);
+        },
+      });
+    await assert.rejects(
+      service.reviseGovernanceBaseline(path, { confirm: true, reason: "Policy changed" }),
+      new RegExp(`injected ${stage}`),
+    );
+    const restarted = new ApexService(root, { clock: () => now });
+    const recovered = await restarted["currentRun"]();
+    if (stage === "intent") {
+      assert.deepEqual(await journal.replay(), before);
+      assert.deepEqual(recovered, beforeRun);
+      await restarted.reviseGovernanceBaseline(path, { confirm: true, reason: "Retry after rollback" });
+    } else {
+      assert.deepEqual((await journal.replay()).slice(0, -1), before);
+      assert.deepEqual(
+        recovered.gates.slice(1).map(({ state }) => state),
+        ["invalidated", "invalidated", "invalidated"],
+      );
+      assert.equal(restarted["acceptedArtifactHashes"](await journal.replay())["governance-constraints"], undefined);
+    }
+    assert.ok(!(await readdir(directory)).includes(".run-transaction.json"));
+    await restarted.importGovernanceBaseline(path);
+    await task(restarted, "governance-reconciliation");
+  });
+}
+
+for (const conflict of ["head", "writer"] as const) {
+  test(`material governance revision rejects concurrent ${conflict} CAS changes`, async () => {
+    const { path, candidate, service, journal, directory, now } = await materialGovernanceFixture("bicep");
+    await writeJson(path, candidate);
+    const beforeRun = (await service.status()).run;
+    const repository = new RunRepository(directory, { clock: () => now });
+    const mutate = repository.mutate.bind(repository);
+    repository.mutate = async (input) => {
+      if (conflict === "head") await service["append"](beforeRun, "test.concurrent", {});
+      else await writeJson(join(directory, "run.json"), { ...beforeRun, ownerEpoch: 2 });
+      return mutate(input);
+    };
+    service["runRepository"] = () => repository;
+    await assert.rejects(service.reviseGovernanceBaseline(path, { confirm: true, reason: "Policy changed" }), {
+      code: "APEX_STALE",
+    });
+    assert.equal((await journal.replay()).filter(({ type }) => type === "workflow.invalidated").length, 0);
+    assert.deepEqual((await repository.read()).gates, beforeRun.gates);
+    assert.ok(!(await readdir(directory)).includes(".run-transaction.json"));
+  });
+}
+
 for (const track of ["bicep", "terraform"] as const) {
+  test(`${track} material governance revision invalidates closure and binds explicit import without erasing history`, async () => {
+    const { root, now, path, candidate, service, runId, generated, journal } = await materialGovernanceFixture(track);
+    await service.completeTaskOutputs(generated.taskId, codegenBundle(runId, track, generated.plan));
+    await complete(service, `validation-${track}`, [
+      { kind: "validation-evidence", value: validationEvidence(runId, track) },
+    ]);
+    const preview = await service.preview({ operation: "apply", provider: "fake" });
+    await service.decideGateNumber(4, "approved", "tester");
+    const selected = await service.selectGovernanceBaseline(path);
+    if (selected.status !== "needs_input") throw new Error("Expected governance choice");
+    await service.recordInput({
+      schemaVersion: "1.0.0",
+      requestId: selected.request.requestId,
+      expectedHead: selected.request.expectedHead,
+      ownerEpoch: selected.request.ownerEpoch,
+      answers: [{ questionId: "governance-baseline-choice", value: "refresh" }],
+    });
+    const before = await journal.replay();
+    const beforeRun = (await service.status()).run;
+    const previousHashes = service["acceptedArtifactHashes"](before);
+    await writeJson(path, candidate);
+    const result = await service.reviseGovernanceBaseline(path, {
+      confirm: true,
+      reason: "  Policy materially changed  ",
+    });
+    assert.equal(result.previousGovernanceHash, previousHashes["governance-constraints"]);
+    assert.equal(result.candidateHash, sha256Bytes(await readFile(path)));
+    for (const node of [
+      "governance-discovery",
+      "governance-reconciliation",
+      "governance-review",
+      "gate-2",
+      "plan",
+      "plan-review",
+      "gate-3",
+      "codegen-bicep",
+      "codegen-terraform",
+      "validation-bicep",
+      "validation-terraform",
+      "preview-bicep",
+      "preview-terraform",
+      "gate-4",
+      "deploy-bicep",
+      "deploy-terraform",
+      "inventory",
+      "diagnosis",
+      "quality",
+    ])
+      assert.ok(result.invalidatedNodes.includes(node), node);
+    for (const node of ["requirements", "requirements-review", "gate-1", "architecture", "architecture-review"])
+      assert.ok(!result.invalidatedNodes.includes(node), node);
+    const after = await journal.replay();
+    assert.deepEqual(after.slice(0, -1), before);
+    assert.equal(after.at(-1)!.type, "workflow.invalidated");
+    assert.equal((after.at(-1)!.payload as { reason: string }).reason, "Policy materially changed");
+    assert.ok(!JSON.stringify(after.at(-1)).includes("MATERIAL_REVISION"));
+    const afterRun = (await service.status()).run;
+    assert.deepEqual(afterRun.gates[0], beforeRun.gates[0]);
+    assert.deepEqual(
+      afterRun.gates.slice(1).map(({ state }) => state),
+      ["invalidated", "invalidated", "invalidated"],
+    );
+    assert.notEqual(dependencyRevision(afterRun, after), dependencyRevision(beforeRun, before));
+    const remaining = service["acceptedArtifactHashes"](after);
+    for (const kind of ["requirements", "architecture", "cost-estimate", "workload-decision-manifest"])
+      assert.equal(remaining[kind], previousHashes[kind]);
+    assert.equal(remaining["governance-constraints"], undefined);
+    const architectureReview = before.findLast(
+      (event) =>
+        event.type === "task.completed" && (event.payload as { nodeId?: string }).nodeId === "architecture-review",
+    )!;
+    assert.equal(
+      remaining["review-findings"],
+      (architectureReview.payload as { artifactHashes: Record<string, string> }).artifactHashes["review-findings"],
+    );
+    await assert.rejects(service.taskContext(generated.taskId), /stale|head/i);
+    await assert.rejects(service.currentPreview());
+    await assert.rejects(service.deploy(preview.previewHash));
+    const restarted = new ApexService(root, { clock: () => now });
+    const discoveryTask = await task(restarted, "governance-discovery");
+    await assert.rejects(
+      restarted.completeTaskOutputs(discoveryTask, [{ kind: "governance-constraints", value: governance(runId) }]),
+      /requires explicit import/,
+    );
+    await writeJson(join(root, "other.json"), candidate);
+    await assert.rejects(restarted.importGovernanceBaseline("other.json"), /confirm a new material revision/);
+    await writeFile(path, JSON.stringify(candidate));
+    await assert.rejects(restarted.importGovernanceBaseline(path), /confirm a new material revision/);
+    await restarted.reviseGovernanceBaseline(path, { confirm: true, reason: "Confirm replacement bytes" });
+    await assert.rejects(restarted.taskContext(discoveryTask), /stale|head/i);
+    const imported = await restarted.importGovernanceBaseline(path);
+    assert.notEqual(imported.outputHash, result.previousGovernanceHash);
+    await task(restarted, "governance-reconciliation");
+    assert.deepEqual(
+      (await restarted.status()).run.gates.slice(1).map(({ state }) => state),
+      ["invalidated", "invalidated", "invalidated"],
+    );
+  });
+
+  test(`${track} material governance revision blocks in-flight and indeterminate native deployment`, async () => {
+    const { path, candidate, service, runId, generated, provider, journal, root, now } =
+      await materialGovernanceFixture(track, true);
+    await service.completeTaskOutputs(generated.taskId, codegenBundle(runId, track, generated.plan));
+    await complete(service, `validation-${track}`, [
+      { kind: "validation-evidence", value: validationEvidence(runId, track) },
+    ]);
+    const preview = await service.preview({ operation: "apply", provider: track });
+    await service.decideGateNumber(4, "approved", "tester");
+    const entered = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    provider.apply = async () => {
+      entered.resolve();
+      await release.promise;
+      throw new Error("Unknown provider outcome");
+    };
+    const deployment = assert.rejects(service.deploy(preview.previewHash), /Unknown provider outcome/);
+    await entered.promise;
+    await writeJson(path, candidate);
+    const inFlightHead = await journal.head();
+    try {
+      await assert.rejects(
+        service.reviseGovernanceBaseline(path, { confirm: true, reason: "Policy changed" }),
+        /in-flight or indeterminate.*reconcile/,
+      );
+      assert.equal(await journal.head(), inFlightHead);
+    } finally {
+      release.resolve();
+    }
+    await deployment;
+    const restarted = new ApexService(root, { clock: () => now, providers: { [track]: provider } });
+    const head = await journal.head();
+    await assert.rejects(
+      restarted.reviseGovernanceBaseline(path, { confirm: true, reason: "Policy changed" }),
+      /indeterminate.*reconcile/,
+    );
+    assert.equal(await journal.head(), head);
+    assert.ok((await journal.replay()).some(({ type }) => type === "deployment.indeterminate"));
+  });
+
+  test(`${track} material governance revision makes prior native preview and approval unusable`, async () => {
+    const { path, candidate, service, runId, generated, journal } = await materialGovernanceFixture(track, true);
+    await service.completeTaskOutputs(generated.taskId, codegenBundle(runId, track, generated.plan));
+    await complete(service, `validation-${track}`, [
+      { kind: "validation-evidence", value: validationEvidence(runId, track) },
+    ]);
+    const preview = await service.preview({ operation: "apply", provider: track });
+    const approval = await service.decideGateNumber(4, "approved", "tester");
+    await service.deploy(preview.previewHash);
+    const before = await journal.replay();
+    await writeJson(path, candidate);
+    await service.reviseGovernanceBaseline(path, { confirm: true, reason: "Policy changed" });
+    assert.deepEqual((await journal.replay()).slice(0, -1), before);
+    assert.deepEqual(await service.currentApproval(), approval);
+    await assert.rejects(service.currentPreview());
+    await assert.rejects(service.deploy(preview.previewHash));
+    await assert.rejects(service.decideGateNumber(4, "approved", "tester"));
+    const imported = await service.importGovernanceBaseline(path);
+    const policy = await complete(service, "governance-reconciliation", [
+      { kind: "policy-property-map", value: policyMap(runId, imported.outputHash) },
+    ]);
+    await complete(service, "governance-review", [
+      { kind: "review-findings", value: review(runId, "policy-property-map", policy["policy-property-map"]!) },
+    ]);
+    await service.decideGateNumber(2, "approved", "tester");
+    const hashes = service["acceptedArtifactHashes"](await journal.replay());
+    const plan = planBundle(
+      runId,
+      track,
+      {},
+      {
+        requirements: hashes.requirements!,
+        architecture: hashes.architecture!,
+        "governance-constraints": imported.outputHash,
+        "policy-property-map": policy["policy-property-map"]!,
+      },
+    );
+    if (track === "bicep") configureNativeBicepPlan(plan);
+    const planHashes = await complete(service, "plan", plan);
+    await complete(service, "plan-review", [
+      { kind: "review-findings", value: review(runId, "plan", planHashes["implementation-intent"]!) },
+    ]);
+    await service.decideGateNumber(3, "approved", "tester");
+    await complete(service, `codegen-${track}`, codegenBundle(runId, track, plan));
+    await complete(service, `validation-${track}`, [
+      { kind: "validation-evidence", value: validationEvidence(runId, track) },
+    ]);
+    await assert.rejects(
+      service.nextTask(),
+      /preview is required|Deployment and inventory are required|Gate 4 approval is required/,
+    );
+  });
+
   test(`${track} persists bounded governance refresh without collecting or completing`, async () => {
     const root = await tempRoot();
     const subscriptionId = "11111111-1111-1111-1111-111111111111";

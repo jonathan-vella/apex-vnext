@@ -82,6 +82,27 @@ test("CLI governance select forwards a path without importing or inventing a cho
   assert.deepEqual(selection.mock.calls[1]?.arguments, ["baseline.json", { reopen: true }]);
 });
 
+test("CLI governance revision requires explicit confirmation and reason before service calls", async (context) => {
+  const root = await tempRoot();
+  const expected = {
+    invalidatedNodes: ["governance-discovery"],
+    previousGovernanceHash: "a".repeat(64),
+    candidateHash: "b".repeat(64),
+  };
+  const revision = context.mock.method(ApexService.prototype, "reviseGovernanceBaseline", async () => expected);
+  await assert.rejects(
+    execute(["governance", "revise", "--path", "baseline.json", "--reason", "Policy changed"], root),
+    /--yes/,
+  );
+  await assert.rejects(execute(["governance", "revise", "--path", "baseline.json", "--yes"], root), /Missing --reason/);
+  assert.equal(revision.mock.callCount(), 0);
+  assert.deepEqual(
+    await execute(["governance", "revise", "--path", "baseline.json", "--reason", "Policy changed", "--yes"], root),
+    expected,
+  );
+  assert.deepEqual(revision.mock.calls[0]?.arguments, ["baseline.json", { confirm: true, reason: "Policy changed" }]);
+});
+
 test("CLI bootstrap validates onboarding files before initializing a selected client", async () => {
   const root = await tempRoot();
   const configPath = join(root, "onboarding.json");

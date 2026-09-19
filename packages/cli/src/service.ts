@@ -1812,6 +1812,8 @@ export class ApexService {
   ): Promise<{ request: InputRequestV1; choice?: "reuse" | "refresh"; fulfilled: boolean } | undefined> {
     const requestedIndex = events.findLastIndex(({ type }) => type === "governance.input-requested");
     if (requestedIndex < 0) return undefined;
+    if (events.slice(requestedIndex + 1).some((event) => this.governanceRevision(event) !== undefined))
+      return undefined;
     const request = this.governanceInputRequest(events[requestedIndex]!);
     for (const event of events.slice(requestedIndex + 1)) {
       if (event.type !== "governance.input-recorded") continue;
@@ -2104,6 +2106,179 @@ export class ApexService {
     return { status: "needs_input", request: this.governanceInputRequest(event) };
   }
 
+  private governanceRevision(event: EventV1) {
+    return event.type === "workflow.invalidated"
+      ? (
+          event.payload as {
+            governanceRevision?: {
+              previousGovernanceHash: string;
+              candidatePath: string;
+              candidateHash: string;
+              retainedReviewHash?: string;
+            };
+          }
+        ).governanceRevision
+      : undefined;
+  }
+
+  private pendingGovernanceRevision(events: EventV1[]) {
+    const index = events.findLastIndex((event) => this.governanceRevision(event) !== undefined);
+    if (index < 0 || this.acceptedArtifactHashes(events)["governance-constraints"] !== undefined) return undefined;
+    return this.governanceRevision(events[index]!);
+  }
+
+  private governanceWorkflowEvents(events: EventV1[]): EventV1[] {
+    const revisionIndex = events.findLastIndex((event) => this.governanceRevision(event) !== undefined);
+    if (revisionIndex < 0) return events;
+    const nodeIds = new Set((events[revisionIndex]!.payload as { nodeIds: string[] }).nodeIds);
+    return events.filter((event, index) => {
+      if (index >= revisionIndex) return true;
+      const payload = event.payload as { nodeId?: string; gate?: number };
+      if (event.type === "task.completed") return !nodeIds.has(payload.nodeId ?? "");
+      if (event.type.startsWith("gate.")) return !nodeIds.has(`gate-${payload.gate}`);
+      if (event.type === "preview.created") return ![...nodeIds].some((id) => id.startsWith("preview-"));
+      if (event.type.startsWith("deployment.")) return !nodeIds.has("inventory");
+      return event.type !== "workflow.completed";
+    });
+  }
+
+  async reviseGovernanceBaseline(
+    path: string,
+    options: { confirm: boolean; reason: string },
+  ): Promise<{ invalidatedNodes: string[]; previousGovernanceHash: string; candidateHash: string }> {
+    if (options?.confirm !== true)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Material governance revision requires explicit confirmation",
+        EXIT_CODES.authorization,
+      );
+    if (typeof options.reason !== "string" || options.reason.trim().length === 0)
+      throw new ApexError("APEX_VALIDATION", "Governance revision requires a reason", EXIT_CODES.validation);
+    const run = await this.currentRun();
+    const events = await this.journal(run).replay();
+    const transfers = new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock);
+    await this.assertCurrentWriterAuthority(run, transfers);
+    const pending = this.pendingGovernanceRevision(events);
+    const previousGovernanceHash =
+      this.acceptedArtifactHashes(events)["governance-constraints"] ?? pending?.previousGovernanceHash;
+    if (previousGovernanceHash === undefined)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Revision requires accepted imported governance",
+        EXIT_CODES.authorization,
+      );
+    const governance = await this.objects.getJson<GovernanceConstraintsV1>(previousGovernanceHash);
+    if (
+      !Value.Check(GovernanceConstraintsV1Schema, governance) ||
+      governance.constraintsRef.uri !== `apex-object:${governance.constraintsRef.digest}`
+    )
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Revision requires accepted imported governance, not synthetic evidence",
+        EXIT_CODES.validation,
+      );
+    const snapshot = await this.selectedGovernanceSnapshot(run, governance);
+    if (typeof snapshot.contentHash !== "string")
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Legacy governance snapshot has no content digest; explicit migration is required",
+        EXIT_CODES.validation,
+      );
+    for (const [index, event] of events.entries()) {
+      if (!["deployment.started", "deployment.executed", "deployment.indeterminate"].includes(event.type)) continue;
+      const previewHash = (event.payload as { previewHash?: string }).previewHash;
+      if (
+        !events
+          .slice(index + 1)
+          .some(
+            (entry) =>
+              entry.type === "deployment.completed" &&
+              (entry.payload as { previewHash?: string }).previewHash === previewHash,
+          )
+      )
+        throw new ApexError(
+          "APEX_CONFLICT",
+          "Deployment is in-flight or indeterminate; reconcile before governance revision",
+          EXIT_CODES.conflict,
+        );
+    }
+    const bytes = await this.readGovernanceBaselineBytes(path);
+    let selection: GovernanceBaselineSelection;
+    try {
+      selection = importGovernanceBaseline(
+        bytes,
+        this.governanceBaselineOptions(run),
+        await this.governanceBaselineValidator(),
+      );
+    } catch (error) {
+      if (!(error instanceof GovernanceBaselineError)) throw error;
+      throw new ApexError(
+        error.code === "stale" ? "APEX_STALE" : "APEX_VALIDATION",
+        error.message,
+        error.code === "stale" ? EXIT_CODES.stale : EXIT_CODES.validation,
+      );
+    }
+    if (selection.snapshot.contentHash === snapshot.contentHash)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Governance content is unchanged; use normal import renewal",
+        EXIT_CODES.validation,
+      );
+    const workflow = await this.lockedWorkflowEngine(run);
+    const nodeIds = new Set([
+      "governance-discovery",
+      ...workflow.invalidationPlan("governance-discovery", options.reason.trim()).map(({ nodeId }) => nodeId),
+    ]);
+    for (const descriptor of TASKS)
+      if (descriptor.reviewSubject !== undefined && nodeIds.has(descriptor.reviewSubject)) nodeIds.add(descriptor.id);
+    const invalidatedNodes = [...nodeIds];
+    const completed = this.completedNodeIds(events);
+    const retainedReview = events.findLast((event) => {
+      const payload = event.payload as { nodeId?: string; artifactHashes?: Record<string, string> };
+      return (
+        event.type === "task.completed" &&
+        payload.nodeId !== undefined &&
+        completed.has(payload.nodeId) &&
+        !nodeIds.has(payload.nodeId) &&
+        typeof payload.artifactHashes?.["review-findings"] === "string"
+      );
+    });
+    const retainedReviewHash = (retainedReview?.payload as { artifactHashes?: Record<string, string> } | undefined)
+      ?.artifactHashes?.["review-findings"];
+    const candidateHash = sha256Bytes(bytes);
+    const payload = {
+      reason: options.reason.trim(),
+      nodeIds: invalidatedNodes,
+      artifactKinds: [...new Set(TASKS.filter(({ id }) => nodeIds.has(id)).flatMap(({ outputs }) => outputs))],
+      governanceRevision: {
+        previousGovernanceHash,
+        candidatePath: relative(this.root, resolve(this.root, path)).split(sep).join("/"),
+        candidateHash,
+        ...(retainedReviewHash === undefined ? {} : { retainedReviewHash }),
+      },
+    };
+    const dependencyHash = this.dependencyRevision(run, [
+      ...events,
+      { type: "workflow.invalidated", payload } as EventV1,
+    ]);
+    await this.assertCurrentWriterAuthority(run, transfers);
+    if (!isGovernanceObservationCurrent(selection.constraints.discoveredAt, this.clock().toISOString()))
+      this.governanceRefreshRequired();
+    await this.mutateRun(
+      run,
+      {
+        ...run,
+        gates: run.gates.map((gate) =>
+          nodeIds.has(`gate-${gate.gate}`) ? invalidateGate(gate, dependencyHash, options.reason.trim()) : gate,
+        ),
+      },
+      "workflow.invalidated",
+      payload,
+      events.at(-1)?.hash ?? null,
+    );
+    return { invalidatedNodes, previousGovernanceHash, candidateHash };
+  }
+
   async importGovernanceBaseline(path: string): Promise<{ outputHash: string; summary: string }> {
     const run = await this.currentRun();
     const options = this.governanceBaselineOptions(run);
@@ -2113,6 +2288,17 @@ export class ApexService {
     await this.assertCurrentWriterAuthority(run, transfers);
     const state = await this.governanceInputState(run, events);
     const bytes = await this.readGovernanceBaselineBytes(path);
+    const revision = this.pendingGovernanceRevision(events);
+    if (
+      revision !== undefined &&
+      (revision.candidatePath !== relative(this.root, resolve(this.root, path)).split(sep).join("/") ||
+        revision.candidateHash !== sha256Bytes(bytes))
+    )
+      throw new ApexError(
+        "APEX_STALE",
+        "Governance candidate changed; confirm a new material revision before import",
+        EXIT_CODES.stale,
+      );
     if (state !== undefined && !state.fulfilled) {
       if (state.choice === undefined)
         throw new ApexError(
@@ -2287,9 +2473,12 @@ export class ApexService {
       );
     }
     const task = await this.issueTask(run, route.task, await this.inputRefs(run, events, route.task));
-    const completed = await this.completeTaskOutputs(task.taskId, [
-      { kind: "governance-constraints", value: constraints },
-    ]);
+    const completed = await this.acceptTaskOutputs(
+      task.taskId,
+      [{ kind: "governance-constraints", value: constraints }],
+      false,
+      revision,
+    );
     if (selectionMetadata !== undefined) {
       const completedEvents = await this.journal(run).replay();
       const metadata = { ...selectionMetadata, governanceHash: completed.outputHashes["governance-constraints"]! };
@@ -2666,6 +2855,7 @@ export class ApexService {
     taskId: string,
     outputs: TaskOutput[],
     legacy: boolean,
+    confirmedRevision?: ReturnType<ApexService["pendingGovernanceRevision"]>,
   ): Promise<{ outputHashes: Partial<Record<ArtifactKind, string>>; summary: string }> {
     outputs = [...outputs];
     const run = await this.currentRun();
@@ -2682,6 +2872,25 @@ export class ApexService {
     const descriptor = TASKS.find(({ id }) => id === task.taskType);
     if (descriptor === undefined)
       throw new ApexError("APEX_VALIDATION", `Unknown task type ${task.taskType}`, EXIT_CODES.validation);
+    if (descriptor.id === "governance-discovery") {
+      const pending = this.pendingGovernanceRevision(events);
+      if (
+        (pending !== undefined || confirmedRevision !== undefined) &&
+        (pending === undefined ||
+          confirmedRevision === undefined ||
+          sha256Json(pending) !== sha256Json(confirmedRevision))
+      )
+        throw new ApexError(
+          "APEX_AUTHORIZATION",
+          "Pending governance revision requires explicit import of the confirmed candidate",
+          EXIT_CODES.authorization,
+        );
+      if (pending !== undefined)
+        await this.assertCurrentWriterAuthority(
+          run,
+          new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock),
+        );
+    }
     const missing = descriptor.outputs.filter((kind) => !kinds.includes(kind));
     if (missing.length > 0) {
       if (legacy && descriptor.id === "plan" && kinds.length === 1 && kinds[0] === "implementation-intent") {
@@ -2721,26 +2930,33 @@ export class ApexService {
         : undefined;
     const reviewBlockers = descriptor.reviewSubject === undefined ? [] : this.openReviewFindings(outputs[0]!.value);
     const dependencyHash = sha256Json(outputHashes);
-    await this.append(run, "task.completed", {
-      taskId,
-      nodeId: descriptor.id,
-      artifactHashes: outputHashes,
-      ...(renderedDocument === undefined ? {} : { renderedDocuments: [renderedDocument] }),
-      validatorIds: validation.validatorIds,
-      ...(Object.keys(validation.evidenceRefs).length === 0 ? {} : { validatorEvidenceRefs: validation.evidenceRefs }),
-      ...(Object.keys(validation.evidenceModes).length === 0
-        ? {}
-        : { validatorEvidenceModes: validation.evidenceModes }),
-      reviewBlockers,
-      ...(descriptor.reviewSubject === undefined
-        ? {}
-        : {
-            reviewHash: outputHashes["review-findings"],
-            subjectHash: (outputs[0]!.value as ReviewFindingsV1).subjectHash,
-            dependencyHash,
-          }),
-      legacy,
-    });
+    await this.append(
+      run,
+      "task.completed",
+      {
+        taskId,
+        nodeId: descriptor.id,
+        artifactHashes: outputHashes,
+        ...(renderedDocument === undefined ? {} : { renderedDocuments: [renderedDocument] }),
+        validatorIds: validation.validatorIds,
+        ...(Object.keys(validation.evidenceRefs).length === 0
+          ? {}
+          : { validatorEvidenceRefs: validation.evidenceRefs }),
+        ...(Object.keys(validation.evidenceModes).length === 0
+          ? {}
+          : { validatorEvidenceModes: validation.evidenceModes }),
+        reviewBlockers,
+        ...(descriptor.reviewSubject === undefined
+          ? {}
+          : {
+              reviewHash: outputHashes["review-findings"],
+              subjectHash: (outputs[0]!.value as ReviewFindingsV1).subjectHash,
+              dependencyHash,
+            }),
+        legacy,
+      },
+      completionHead,
+    );
     if (descriptor.id === "requirements" && renderedDocument !== undefined) {
       await this.materializeRequirementsReviewPackage(
         run,
@@ -4072,7 +4288,9 @@ export class ApexService {
       .reverse()
       .find(
         (event) =>
-          (event.type === "deployment.executed" || event.type === "deployment.indeterminate") &&
+          (event.type === "deployment.started" ||
+            event.type === "deployment.executed" ||
+            event.type === "deployment.indeterminate") &&
           (event.payload as { previewHash?: unknown }).previewHash === previewHash,
       );
     if (incompleteExecution !== undefined) {
@@ -4150,6 +4368,14 @@ export class ApexService {
           `${providerName.provider} provider is no longer configured`,
           EXIT_CODES.validation,
         );
+      await this.assertCurrentWriterAuthority(run, transferStore);
+      await this.mutateRun(
+        run,
+        run,
+        "deployment.started",
+        { previewHash, approvalHash, provider: providerName.provider },
+        events.at(-1)?.hash ?? null,
+      );
       let operation: OperationRecordV1;
       try {
         operation =
@@ -4207,6 +4433,14 @@ export class ApexService {
         writerTransferClaimHash ?? undefined,
       );
     }
+    await this.assertCurrentWriterAuthority(run, transferStore);
+    await this.mutateRun(
+      run,
+      run,
+      "deployment.started",
+      { previewHash, approvalHash, provider: "fake" },
+      events.at(-1)?.hash ?? null,
+    );
     const now = this.clock().toISOString();
     const operation = {
       schemaVersion: CONTRACT_VERSION,
@@ -5369,7 +5603,7 @@ export class ApexService {
         event.type === "workflow.invalidated" &&
         ((event.payload as { artifactKinds?: unknown }).artifactKinds as unknown[])?.includes?.(kind)
       ) {
-        return undefined;
+        return kind === "review-findings" ? this.governanceRevision(event)?.retainedReviewHash : undefined;
       }
       if (event.type !== "task.completed") continue;
       const hashes = (event.payload as { artifactHashes?: Partial<Record<ArtifactKind, unknown>> }).artifactHashes;
@@ -5393,6 +5627,8 @@ export class ApexService {
       if (event.type === "workflow.invalidated") {
         const kinds = (event.payload as { artifactKinds?: unknown }).artifactKinds;
         if (Array.isArray(kinds)) for (const kind of kinds) if (typeof kind === "string") delete hashes[kind];
+        const retainedReviewHash = this.governanceRevision(event)?.retainedReviewHash;
+        if (retainedReviewHash !== undefined) hashes["review-findings"] = retainedReviewHash;
         continue;
       }
       if (event.type !== "task.completed") continue;
@@ -5413,6 +5649,7 @@ export class ApexService {
     events: Awaited<ReturnType<EventJournal["replay"]>>,
     descriptor: WorkflowTaskDescriptor,
   ): Promise<string[]> {
+    events = this.governanceWorkflowEvents(events);
     if (descriptor.id === "plan") await this.assertImportedGovernanceCurrent(run, events);
     const manifest = (await this.lockedWorkflowEngine(run)).manifest;
     const node = manifest.nodes.find(({ id }) => id === (descriptor.reviewSubject ?? descriptor.id));
@@ -6012,6 +6249,7 @@ export class ApexService {
     blockers: string[];
     reviewGate?: number;
   }> {
+    events = this.governanceWorkflowEvents(events);
     const completed = this.completedNodeIds(events);
     const legacy = events.some(
       (event) => event.type === "task.completed" && (event.payload as { legacy?: unknown }).legacy === true,
@@ -6106,6 +6344,7 @@ export class ApexService {
     run: RunConfigV1,
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): Promise<void> {
+    events = this.governanceWorkflowEvents(events);
     await this.assertImportedGovernanceCurrent(run, events);
     if (!this.gateApproved(run, 3))
       throw new ApexError("APEX_AUTHORIZATION", "Gate 3 approval is required before preview", EXIT_CODES.authorization);
@@ -6894,6 +7133,7 @@ export class ApexService {
     run: RunConfigV1,
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): Promise<Awaited<ReturnType<EventJournal["replay"]>>> {
+    events = this.governanceWorkflowEvents(events);
     if (events.some(({ type }) => type === "workflow.completed")) return events;
     const workflow = await this.lockedWorkflowEngine(run);
     const legacy = events.some(

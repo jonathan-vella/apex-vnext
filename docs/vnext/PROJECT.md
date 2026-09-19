@@ -79,6 +79,11 @@ real client interaction and consumer collection dispatch remain separate qualifi
 reconsidering a pending optional refresh without losing the original answer; it never permits stale reuse. Collection
 workflow, collector and schema ship from single canonical sources with verified hashes and existing update conflict handling.
 
+Material policy changes now have a confirmed CLI-only `governance revise` path. It binds the replacement file digest,
+atomically invalidates the locked governance dependency closure and Gates 2-4, retains requirements/architecture and
+history, and requires separate re-import and renewed reviews. In-flight or indeterminate deployment blocks revision.
+Dependency hashing consumes invalidation events so superseded artifacts cannot retain deployment authority.
+
 On 2026-09-18, candidate `2e5d004` completed a bounded VS Code Local intake/context/stop and reload/status check.
 Local and Azure telemetry matched the tool sequence and the journal preserved the stop boundary; the run used
 Allow all, so this is not evidence for manual permission prompts or full lifecycle parity. The paired CLI test
