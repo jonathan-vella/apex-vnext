@@ -366,6 +366,42 @@ test("validation returns deterministic command plans and only invokes an injecte
   assert.equal(calls.length, 3);
 });
 
+test("generated validation rejects failed or incomplete runner results and stops dependent commands", async () => {
+  const tree = generateTerraformTree(
+    intent(),
+    binding("terraform", "native:Microsoft.Storage/storageAccounts@2023-05-01", "2023-05-01", nativeParameters),
+  );
+  for (const failure of [
+    { exitCode: 1 },
+    { exitCode: null },
+    { signal: "SIGTERM" as const },
+    { timedOut: true },
+    { outputTruncated: true },
+  ]) {
+    let calls = 0;
+    const result = await validateGeneratedTree(tree, {
+      runner: {
+        async run() {
+          calls++;
+          return {
+            exitCode: 0,
+            signal: null,
+            stdout: "private command output",
+            stderr: "private diagnostics",
+            timedOut: false,
+            outputTruncated: false,
+            ...failure,
+          };
+        },
+      },
+    });
+    assert.equal(result.valid, false, JSON.stringify(failure));
+    assert.equal(calls, 1);
+    assert.equal(result.commandResults.length, 1);
+    assert.doesNotMatch(result.issues.join("\n"), /private/);
+  }
+});
+
 test("native generated trees compile with installed Bicep and Terraform tools", async (context) => {
   const root = await mkdtemp(join(tmpdir(), "apex-generated-compile-"));
   context.after(async () => rm(root, { recursive: true, force: true }));

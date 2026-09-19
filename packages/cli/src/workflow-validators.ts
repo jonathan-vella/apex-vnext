@@ -91,6 +91,7 @@ export interface WorkflowPreviewValidatorContext {
   readonly expectedResourceIds: readonly string[];
   readonly intendedExecutionRecipientIdentity: string;
   readonly ownershipIssues?: readonly ValidationIssue[];
+  readonly protectedResourceIds?: readonly string[];
   readonly attestation?: ExecutionPlanAttestationV1;
   readonly policyValidationBinding?: PolicyValidationBinding & { readonly receiptHash: string };
 }
@@ -980,6 +981,19 @@ function previewCoverage(value: unknown): ValidationIssue[] {
     }
   }
   if (context.provider === "bicep") {
+    const protectedIds = (context.protectedResourceIds ?? []).map((id) => id.toLowerCase());
+    if (
+      changes.some(
+        ({ resourceId, action }) =>
+          (action === "delete" || action === "replace") &&
+          protectedIds.some((id) => id === resourceId.toLowerCase() || id.startsWith(`${resourceId.toLowerCase()}/`)),
+      )
+    ) {
+      issues.push({
+        path: "/changes",
+        message: "Bicep destructive operation would remove a protected existing resource or its ancestor",
+      });
+    }
     const managedIds = new Set(context.expectedResourceIds.map((id) => id.toLowerCase()));
     if (
       changes.some(

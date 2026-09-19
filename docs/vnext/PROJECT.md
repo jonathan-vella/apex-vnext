@@ -139,6 +139,15 @@ observed inventory checks enforce that exact managed-ID set, including ancillary
 IDs. This is authorization scope, not observed module attribution. Full AVM policy-property evaluation and Terraform
 module ownership remain open. See [the track contract](../reference/iac-tracks.md#exact-bicep-module-scope).
 
+Validation follow-up adds the accepted policy-property map to both validation nodes' declared inputs and makes
+generated-tree validation reject unsuccessful, interrupted or truncated command results. This does not yet make
+validation-task evidence command-backed: `validateTask` stages artifacts and completion checks evidence entry labels.
+Connecting source-bound native execution and runtime-owned receipts to that acceptance boundary remains required;
+agent-submitted hashes alone must not be represented as proof of compiler execution or policy compliance.
+The validation-input/verdict checkpoint passed `qualify:vnext` with 233 capability and 235 CLI tests, plus the remaining
+contract, kernel, renderer, testkit, validator and packaging suites. A subsequent focused ownership regression also
+blocks delete/replace of managed ancestors containing protected existing children, including extension resources.
+
 The September 18 follow-up blocks explicitly incomplete Terraform plans and malformed change arrays, actions and
 status fields. Native-provider tests confirm incomplete saved plans cannot apply with or without policy mappings.
 Absent optional fields remain compatible with older Terraform JSON. Plan acceptance on both tracks now rejects

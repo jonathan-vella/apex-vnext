@@ -6016,6 +6016,7 @@ export class ApexService {
                 ({ id }) => `${provider}://${run.environment}/${id}`,
               ),
       intendedExecutionRecipientIdentity,
+      ...(bicepOwnership === undefined ? {} : { protectedResourceIds: bicepOwnership.protectedResourceIds }),
       ...(provider !== "terraform"
         ? {}
         : {

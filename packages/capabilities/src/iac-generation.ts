@@ -706,13 +706,16 @@ export async function validateGeneratedTree(
   const commandResults: ProcessResult[] = [];
   if (options.runner !== undefined) {
     for (const plan of plans) {
-      commandResults.push(
-        await options.runner.run({
-          ...plan,
-          timeoutMs: options.timeoutMs ?? 120_000,
-          maxOutputBytes: options.maxOutputBytes ?? 1_048_576,
-        }),
-      );
+      const result = await options.runner.run({
+        ...plan,
+        timeoutMs: options.timeoutMs ?? 120_000,
+        maxOutputBytes: options.maxOutputBytes ?? 1_048_576,
+      });
+      commandResults.push(result);
+      if (result.exitCode !== 0 || result.signal !== null || result.timedOut || result.outputTruncated) {
+        issues.push(`Validation command ${commandResults.length} failed or returned incomplete evidence`);
+        break;
+      }
     }
   }
   return { valid: issues.length === 0, issues, commandPlans: plans, commandResults };

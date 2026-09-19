@@ -538,6 +538,32 @@ test("Bicep ownership checks accepted artifact identity, coverage, type, and des
   }
 });
 
+test("destructive Bicep ancestors cannot bypass protected existing children", () => {
+  const registry = new ValidatorRegistry();
+  registerWorkflowValidators(registry);
+  for (const protectedId of [
+    `${managedId}/blobServices/default`,
+    `${managedId}/providers/Microsoft.Insights/diagnosticSettings/shared`,
+  ]) {
+    for (const action of ["delete", "replace"]) {
+      const context = {
+        provider: "bicep",
+        expectedResourceIds: [managedId],
+        protectedResourceIds: [protectedId.toUpperCase()],
+        preview: { changes: [{ resourceId: managedId, action, material: true }] },
+      };
+      assert.equal(registry.validate("preview:coverage", context).valid, false);
+      assert.equal(
+        registry.validate("preview:coverage", {
+          ...context,
+          protectedResourceIds: [protectedId.replace("acceptedname", "acceptedname-other")],
+        }).valid,
+        true,
+      );
+    }
+  }
+});
+
 test("ARM inventory coverage requires exact case-insensitive physical IDs", () => {
   const registry = new ValidatorRegistry();
   registerWorkflowValidators(registry);

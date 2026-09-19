@@ -38,6 +38,8 @@ The Gate 3 binding document displays this scope. Native Bicep requests include o
 what-if changes outside that exact set block preview. Observed deployment-stack inventory must contain only unique
 approved managed IDs before deployment completion is recorded. Protected existing IDs are never added to the managed
 set. Ancillary inventory entries retain distinct identities under their accepted logical parent.
+Delete and replace previews are also rejected when an approved managed ID is an ancestor of a protected existing ID;
+omitting the protected child from what-if does not authorize its implicit removal.
 
 This declaration is not proof of resource existence, AVM expansion or policy compliance. Unknown child resources block
 preview instead of inheriting permission from their parent. Nonempty policy maps still require source-bound native

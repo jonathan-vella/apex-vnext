@@ -566,6 +566,20 @@ function bicepPreviewProvider(now: Date): IacProvider {
   };
 }
 
+test("validation task inputs include the accepted policy map on both tracks", async () => {
+  for (const track of ["bicep", "terraform"] as const) {
+    const service = new ApexService(await tempRoot());
+    const { runId } = await service.init({ projectId: "demo", iacTool: track });
+    const generated = await reachCodegen(service, runId, track);
+    await service.completeTaskOutputs(generated.taskId, codegenBundle(runId, track, generated.plan));
+    const validationTask = await task(service, `validation-${track}`);
+    const context = await service.taskContext(validationTask);
+    const policyHash = (generated.plan[0]!.value as ImplementationIntentV1).sourceHashes["policy-property-map"]!;
+    assert.equal(context.artifactHashes["policy-property-map"], policyHash);
+    assert.ok(context.inputReferences.some(({ hash }) => hash === policyHash));
+  }
+});
+
 test("task completion records executed manifest validators in order", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
@@ -1337,11 +1351,17 @@ test("Bicep AVM exact scope binds requests and rejects foreign inventory", async
   const childId = `${primaryId}/blobServices/default`;
   const base = bicepPreviewProvider(now);
   let foreignInventory = true;
+  let deleteParent = true;
   const provider: IacProvider = {
     ...base,
     async previewApply(request) {
       assert.deepEqual(request.resources.map(({ resourceId }) => resourceId).sort(), [primaryId, childId].sort());
-      return base.previewApply(request);
+      const original = await base.previewApply(request);
+      if (!deleteParent) return original;
+      const { previewHash, ...body } = original;
+      assert.equal(previewHash, sha256Json(body));
+      const destructive = { ...body, changes: [{ resourceId: primaryId, action: "delete" as const, material: true }] };
+      return { ...destructive, previewHash: sha256Json(destructive) };
     },
     async inventory(projectId, runId) {
       const inventory = await base.inventory(projectId, runId);
@@ -1369,6 +1389,12 @@ test("Bicep AVM exact scope binds requests and rejects foreign inventory", async
         ownership: "managed",
         role: "ancillary",
       },
+      {
+        resourceId: `${primaryId}/providers/Microsoft.Insights/diagnosticSettings/shared`,
+        type: "Microsoft.Insights/diagnosticSettings",
+        ownership: "existing",
+        role: "ancillary",
+      },
     ];
   });
   const bundle = codegenBundle(runId, "bicep", codegen.plan);
@@ -1381,6 +1407,9 @@ test("Bicep AVM exact scope binds requests and rejects foreign inventory", async
   await complete(service, "validation-bicep", [
     { kind: "validation-evidence", value: validationEvidence(runId, "bicep") },
   ]);
+  await assert.rejects(service.preview({ operation: "apply", provider: "bicep" }), /preview:coverage/);
+  assert.equal((await service.status()).run.gates[3]!.state, "closed");
+  deleteParent = false;
   const preview = await service.preview({ operation: "apply", provider: "bicep" });
   const bindingDocument = await readFile(join(root, "agent-output", "demo", runId, "plan", "iac-binding.md"), "utf8");
   assert.match(bindingDocument, /Physical Authorization Scope/);
