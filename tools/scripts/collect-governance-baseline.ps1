@@ -199,6 +199,17 @@ function Get-Classification {
     return "informational"
 }
 
+function Get-EnforcementMode {
+    param($Assignment)
+    $property = $Assignment.properties.PSObject.Properties['enforcementMode']
+    if ($null -eq $property) { return "Default" }
+    $mode = $property.Value
+    if ($mode -isnot [string] -or $mode -cnotin @("Default", "DoNotEnforce")) {
+        throw "Unsupported assignment enforcementMode for $($Assignment.id)"
+    }
+    return $mode
+}
+
 function Test-IsDefenderAuto {
     param($Assignment)
     $props = $Assignment.properties
@@ -404,6 +415,7 @@ function Process-Subscription {
             }
         }
         if ($a.properties.resourceSelectors) { throw "Unsupported assignment resourceSelectors" }
+        $null = Get-EnforcementMode $a
         if ((Test-IsDefenderAuto $a) -and -not $IncludeDefenderAuto) {
             $filteredDefender += ($a.properties.displayName ?? $a.name ?? $a.id ?? "<unknown>")
         }
@@ -424,12 +436,14 @@ function Process-Subscription {
         $policyDefId = ($props.policyDefinitionId ?? "").ToLower()
         $assignmentId = ($a.id ?? "").ToLower()
         $assignmentType = if ($scope.ToLower() -match '/providers/microsoft.management/managementgroups/') { "management-group" } else { "subscription" }
+        $enforcementMode = Get-EnforcementMode $a
 
         $assignmentInventory += @{
             displayName = $display
             scope = $scope
             assignmentType = $assignmentType
             policyDefinitionId = $policyDefId
+            enforcementMode = $enforcementMode
         }
 
         if (-not $policyDefId) { throw "Missing policyDefinitionId for assignment $assignmentId" }
@@ -484,6 +498,7 @@ function Process-Subscription {
                 policy_id = $defn.id
                 display_name = $defn.properties.displayName ?? $defn.name ?? $defn.id
                 effect = $effectLower
+                enforcementMode = $enforcementMode
                 scope = $scope
                 assignment_display_name = $display
                 assignment_id = $a.id

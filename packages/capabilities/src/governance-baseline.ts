@@ -38,6 +38,7 @@ export interface GovernanceBaselineFinding {
   readonly displayName: string;
   readonly scope: string;
   readonly effect: "deny" | "audit" | "auditIfNotExists" | "append" | "modify" | "deployIfNotExists" | "disabled";
+  readonly enforcementMode?: "Default" | "DoNotEnforce";
   readonly classification: "blocker" | "auto-remediate" | "informational";
   readonly resourceTypes: readonly string[];
   readonly mappingStatus: "unmapped";
@@ -191,8 +192,16 @@ function scope(value: unknown, subscriptionId: string): string {
   return result;
 }
 
+function enforcementMode(source: Record<string, unknown>): GovernanceBaselineFinding["enforcementMode"] {
+  if (!Object.hasOwn(source, "enforcementMode")) return undefined;
+  const mode = source.enforcementMode;
+  if (mode !== "Default" && mode !== "DoNotEnforce") fail();
+  return mode;
+}
+
 function finding(value: unknown, subscriptionId: string): GovernanceBaselineFinding {
   const source = record(value);
+  const mode = enforcementMode(source);
   const effect = text(source.effect) as GovernanceBaselineFinding["effect"];
   if (!["deny", "audit", "auditIfNotExists", "append", "modify", "deployIfNotExists", "disabled"].includes(effect))
     fail();
@@ -235,6 +244,7 @@ function finding(value: unknown, subscriptionId: string): GovernanceBaselineFind
     displayName: text(source.display_name),
     scope: findingScope,
     effect,
+    ...(mode === undefined ? {} : { enforcementMode: mode }),
     classification,
     resourceTypes: strings(source.resource_types),
     mappingStatus: "unmapped",
@@ -289,6 +299,13 @@ function selectEntry(
     canonical([item.assignmentId.toLowerCase(), item.policyId.toLowerCase(), item.policyDefinitionReferenceId ?? null]),
   );
   if (new Set(findingIdentities).size !== findings.length) fail("incomplete");
+  const assignmentModes = new Map<string, GovernanceBaselineFinding["enforcementMode"]>();
+  for (const item of findings) {
+    if (item.enforcementMode === undefined) continue;
+    const mode = assignmentModes.get(item.assignmentId.toLowerCase());
+    if (mode !== undefined && mode !== item.enforcementMode) fail("incomplete");
+    assignmentModes.set(item.assignmentId.toLowerCase(), item.enforcementMode);
+  }
   findings.sort((left, right) =>
     canonical(left) < canonical(right) ? -1 : canonical(left) > canonical(right) ? 1 : 0,
   );
@@ -299,6 +316,7 @@ function selectEntry(
   }
   const inventory = array(entry.assignment_inventory).map((item) => {
     const assignment = record(item);
+    enforcementMode(assignment);
     const assignmentScope = scope(assignment.scope, subscriptionId);
     const inherited = /\/managementgroups\/([^/]+)$/iu.exec(assignmentScope)?.[1];
     if (inherited && !managementGroups.some((group) => group.toLowerCase() === inherited.toLowerCase()))

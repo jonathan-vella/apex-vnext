@@ -287,6 +287,101 @@ function inheritedBaseline() {
   return source;
 }
 
+test("enforcementMode preserves supported modes without weakening desired compliance", () => {
+  for (const mode of ["Default", "DoNotEnforce"]) {
+    const source = inheritedBaseline();
+    const entry = source.subscriptions[subscriptionId]!;
+    entry.assignment_inventory[0]!.enforcementMode = mode;
+    for (const item of entry.findings)
+      Object.assign(item, { enforcementMode: mode, classification: "blocker", exemption: null });
+    entry.policies = structuredClone(entry.findings);
+    Object.assign(entry.discovery_summary, { blocker_count: 2, informational_count: 0, exempted_count: 0 });
+    source.summary.total_blockers = 2;
+    const selected = importGovernanceBaseline(source, options, validate);
+    assert.equal(selected.constraints.summary.denyCount, 2);
+    for (const item of selected.snapshot.findings) {
+      assert.deepEqual(item, {
+        ...item,
+        enforcementMode: mode,
+        effect: "deny",
+        classification: "blocker",
+        exemption: null,
+      });
+    }
+    assert.deepEqual(importGovernanceBaseline(JSON.stringify(source), options, validate), selected);
+  }
+});
+
+test("enforcementMode leaves legacy absence unknown and does not guess inventory identities", () => {
+  const source = inheritedBaseline();
+  const entry = source.subscriptions[subscriptionId]!;
+  entry.assignment_inventory[0]!.enforcementMode = "Default";
+  entry.findings[0]!.enforcementMode = "DoNotEnforce";
+  entry.policies = structuredClone(entry.findings);
+  const findings = importGovernanceBaseline(source, options, validate).snapshot.findings;
+  assert.equal(
+    Object.hasOwn(
+      findings.find((item) => item.policyId === "policy-a")!,
+      "enforcementMode",
+    ),
+    false,
+  );
+  const explicit = findings.find((item) => item.policyId === "policy-b")!;
+  assert.deepEqual(explicit, { ...explicit, enforcementMode: "DoNotEnforce" });
+  assert.ok(
+    importGovernanceBaseline(inheritedBaseline(), options, validate).snapshot.findings.every(
+      (item) => !Object.hasOwn(item, "enforcementMode"),
+    ),
+  );
+});
+
+test("enforcementMode rejects unsupported and malformed explicit values in inventory and findings", () => {
+  for (const field of ["assignment_inventory", "findings"] as const) {
+    for (const mode of [
+      "Enroll",
+      "unknown",
+      "default",
+      "donotenforce",
+      "Default ",
+      "",
+      null,
+      false,
+      0,
+      [],
+      ["Default"],
+      {},
+    ]) {
+      const source = inheritedBaseline();
+      const entry = source.subscriptions[subscriptionId]!;
+      entry[field][0]!.enforcementMode = mode;
+      entry.policies = structuredClone(entry.findings);
+      rejected(source, "invalid-input");
+    }
+  }
+});
+
+test("enforcementMode rejects conflicting explicit modes for the same exact assignment ID", () => {
+  const source = inheritedBaseline();
+  const entry = source.subscriptions[subscriptionId]!;
+  entry.findings[0]!.enforcementMode = "Default";
+  entry.findings[1]!.enforcementMode = "DoNotEnforce";
+  entry.policies = structuredClone(entry.findings);
+  rejected(source, "incomplete");
+  entry.findings[1]!.assignment_id = String(entry.findings[1]!.assignment_id).toUpperCase();
+  entry.policies = structuredClone(entry.findings);
+  rejected(source, "incomplete");
+  entry.findings[1]!.assignment_id = `${managementScope}/providers/Microsoft.Authorization/policyAssignments/different`;
+  entry.assignment_inventory.push({ ...entry.assignment_inventory[0]! });
+  entry.discovery_metadata.page_counts.policyAssignments = 2;
+  Object.assign(entry.discovery_summary, {
+    assignment_total: 2,
+    assignment_kept: 2,
+    management_group_inherited_count: 2,
+  });
+  entry.policies = structuredClone(entry.findings);
+  assert.equal(importGovernanceBaseline(source, options, validate).snapshot.findings.length, 2);
+});
+
 test("preserves inherited findings and reported exemptions deterministically without granting mappings", () => {
   const source = inheritedBaseline();
   const selected = importGovernanceBaseline(source, options, validate);
@@ -375,6 +470,17 @@ test("content digest covers the entire selected raw envelope and root except obs
     importGovernanceBaseline(refreshed, options, validate).snapshot.contentHash,
     original.snapshot.contentHash,
   );
+  for (const field of ["assignment_inventory", "findings"] as const) {
+    const hashes = [original.snapshot.contentHash];
+    for (const mode of ["Default", "DoNotEnforce"]) {
+      const renewed = structuredClone(refreshed);
+      const renewedEntry = renewed.subscriptions[subscriptionId]!;
+      for (const item of renewedEntry[field]) item.enforcementMode = mode;
+      renewedEntry.policies = structuredClone(renewedEntry.findings);
+      hashes.push(importGovernanceBaseline(renewed, options, validate).snapshot.contentHash);
+    }
+    assert.equal(new Set(hashes).size, 3, `${field} mode changes must not become observation-only renewal`);
+  }
   const mutations: Array<(value: ReturnType<typeof inheritedBaseline>) => void> = [
     (value) => {
       value.management_group_id = "different-root";

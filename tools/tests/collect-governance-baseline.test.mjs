@@ -674,6 +674,119 @@ for (const explicit of [false, true]) {
   );
 }
 
+for (const mode of [undefined, "Default", "DoNotEnforce"]) {
+  for (const initiative of [false, true]) {
+    test(
+      `enforcementMode ${mode ?? "absent"} preserves ${initiative ? "initiative" : "direct"} constraints`,
+      powershellOptions,
+      (context) => {
+        const responses = routes();
+        const effects = ["Deny", "Modify", "DeployIfNotExists"];
+        const definitions = effects.map((effect) => {
+          const policy = definition(`/providers/Microsoft.Authorization/policyDefinitions/${effect}`);
+          policy.properties.policyRule.then.effect = effect;
+          return policy;
+        });
+        const setId = `${managementGroupScope}/providers/Microsoft.Authorization/policySetDefinitions/modes`;
+        responses[definitionsUrl].value = definitions;
+        responses[setsUrl].value = [
+          {
+            id: setId,
+            properties: {
+              policyDefinitions: definitions.map((policy, index) => ({
+                policyDefinitionId: policy.id,
+                policyDefinitionReferenceId: `member-${index}`,
+              })),
+            },
+          },
+        ];
+        responses[assignmentsUrl].value = (initiative ? [setId] : definitions.map((policy) => policy.id)).map(
+          (policyId, index) => {
+            const assigned = assignment(policyId, managementGroupScope, `mode-${index}`);
+            if (mode !== undefined) assigned.properties.enforcementMode = mode;
+            return assigned;
+          },
+        );
+        const envelope = assertComplete(collect(context, responses)).subscriptions[subscriptionId];
+        assert.ok(envelope.assignment_inventory.every((item) => item.enforcementMode === (mode ?? "Default")));
+        assert.deepEqual(
+          envelope.findings.map((item) => [item.effect, item.classification, item.enforcementMode]),
+          [
+            ["deny", "blocker", mode ?? "Default"],
+            ["modify", "auto-remediate", mode ?? "Default"],
+            ["deployIfNotExists", "auto-remediate", mode ?? "Default"],
+          ],
+        );
+        assert.deepEqual(envelope.policies, envelope.findings);
+        assert.equal(envelope.discovery_summary.blocker_count, 1);
+        assert.equal(envelope.discovery_summary.auto_remediate_count, 2);
+        assert.equal(envelope.discovery_summary.disabled_count, 0);
+        assert.equal(envelope.discovery_summary.audit_count, 0);
+      },
+    );
+  }
+}
+
+for (const mode of [
+  "Enroll",
+  "unknown",
+  "default",
+  "donotenforce",
+  "Default ",
+  "",
+  null,
+  false,
+  0,
+  [],
+  ["Default"],
+  {},
+]) {
+  test(`enforcementMode rejects ${JSON.stringify(mode)} before publication`, powershellOptions, (context) => {
+    const responses = routes();
+    const policyId = "/providers/Microsoft.Authorization/policyDefinitions/mode";
+    const assigned = assignment(policyId);
+    assigned.properties.enforcementMode = mode;
+    responses[assignmentsUrl].value = [assigned];
+    responses[definitionsUrl].value = [definition(policyId)];
+    assertAborted(collect(context, responses), /Unsupported assignment enforcementMode/);
+  });
+}
+
+for (const mode of ["Default", "DoNotEnforce", "Enroll", null]) {
+  test(
+    `enforcementMode ${JSON.stringify(mode)} is validated before Defender filtering`,
+    powershellOptions,
+    (context) => {
+      const responses = routes();
+      const assigned = assignment("/providers/Microsoft.Authorization/policyDefinitions/defender");
+      assigned.properties.enforcementMode = mode;
+      assigned.properties.metadata = { assignedBy: "Microsoft Defender for Cloud" };
+      responses[assignmentsUrl].value = [assigned];
+      const result = collect(context, responses);
+      if (mode === "Enroll" || mode === null) {
+        assertAborted(result, /Unsupported assignment enforcementMode/);
+      } else {
+        const envelope = assertComplete(result).subscriptions[subscriptionId];
+        assert.equal(envelope.discovery_summary.defender_auto_filtered, 1);
+        assert.deepEqual(envelope.assignment_inventory, []);
+        assert.deepEqual(envelope.findings, []);
+      }
+    },
+  );
+}
+
+test("enforcementMode does not reintroduce whole-scope excluded assignments", powershellOptions, (context) => {
+  const responses = routes();
+  const assigned = assignment("/providers/Microsoft.Authorization/policyDefinitions/excluded");
+  assigned.properties.notScopes = [subscriptionScope];
+  assigned.properties.enforcementMode = "Enroll";
+  responses[assignmentsUrl].value = [assigned];
+  const envelope = assertComplete(collect(context, responses)).subscriptions[subscriptionId];
+  assert.equal(envelope.discovery_summary.not_scope_excluded, 1);
+  assert.deepEqual(envelope.assignment_inventory, []);
+  assert.deepEqual(envelope.findings, []);
+});
+
 test("direct policy parameter defaults retain explicit assignment values", powershellOptions, (context) => {
   const responses = routes();
   const policyId = `${managementGroupScope}/providers/Microsoft.Authorization/policyDefinitions/parameters`;
