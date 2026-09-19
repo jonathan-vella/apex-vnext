@@ -40,6 +40,10 @@ effects; `DoNotEnforce` does not. Neither changes the desired constraint that AP
 The collector preserves both supported modes and rejects unsupported modes such as `Enroll`. Legacy imported findings
 without a mode remain unknown, not verified `Default`. A mode change is a content change, not timestamp-only renewal.
 
+Explicit assignment and initiative-member `definitionVersion` selectors are not yet resolved by the collector.
+Applicable selectors, including wildcards, stop collection rather than substitute an unversioned definition.
+Retain the prior baseline after failure; do not remove Azure version pins to make collection pass.
+
 ## Planning Handoff
 
 Project only applicable constraints into the typed decision:

@@ -794,6 +794,35 @@ for (const root of [{ ManagementGroupId: "test-root" }, { SubscriptionId: subscr
   });
 }
 
+for (const version of ["1.2.3", "1.*.*", "*", "", null, false, {}, []]) {
+  for (const initiative of [false, true]) {
+    test(
+      `definitionVersion rejects ${JSON.stringify(version)} on ${initiative ? "member" : "assignment"}`,
+      powershellOptions,
+      (context) => {
+        const responses = routes();
+        const policyId = "/providers/Microsoft.Authorization/policyDefinitions/versioned";
+        const setId = `${managementGroupScope}/providers/Microsoft.Authorization/policySetDefinitions/versioned`;
+        const assigned = assignment(initiative ? setId : policyId);
+        if (!initiative) assigned.properties.definitionVersion = version;
+        responses[assignmentsUrl].value = [assigned];
+        responses[definitionsUrl].value = [definition(policyId)];
+        responses[setsUrl].value = [
+          {
+            id: setId,
+            properties: {
+              policyDefinitions: [
+                { policyDefinitionId: policyId, policyDefinitionReferenceId: "versioned", definitionVersion: version },
+              ],
+            },
+          },
+        ];
+        assertAborted(collect(context, responses), /Unsupported (assignment|initiative member) definitionVersion/);
+      },
+    );
+  }
+}
+
 test("enforcementMode does not reintroduce whole-scope excluded assignments", powershellOptions, (context) => {
   const responses = routes();
   const assigned = assignment("/providers/Microsoft.Authorization/policyDefinitions/excluded");

@@ -415,6 +415,9 @@ function Process-Subscription {
             }
         }
         if ($a.properties.resourceSelectors) { throw "Unsupported assignment resourceSelectors" }
+        if ($null -ne $a.properties.PSObject.Properties['definitionVersion']) {
+            throw "Unsupported assignment definitionVersion"
+        }
         $null = Get-EnforcementMode $a
         if ((Test-IsDefenderAuto $a) -and -not $IncludeDefenderAuto) {
             $filteredDefender += ($a.properties.displayName ?? $a.name ?? $a.id ?? "<unknown>")
@@ -454,6 +457,9 @@ function Process-Subscription {
         if ($policyDefId -match '/policysetdefinitions/') {
             $policySet = Get-ArmPolicyDefinition -Id $policyDefId -Cache $sets -ResourceType "policySetDefinitions"
             foreach ($setMember in $policySet.properties.policyDefinitions) {
+                if ($null -ne $setMember.PSObject.Properties['definitionVersion']) {
+                    throw "Unsupported initiative member definitionVersion"
+                }
                 $memberDefinition = Get-ArmPolicyDefinition -Id $setMember.policyDefinitionId -Cache $defs
                 $members += @{ defn = $memberDefinition; memberRefId = $setMember.policyDefinitionReferenceId; parameters = $setMember.parameters }
             }
