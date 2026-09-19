@@ -13,7 +13,7 @@ const validate = new Ajv2020({ strict: false }).compile(
 const subscriptionId = "11111111-1111-1111-1111-111111111111";
 const otherId = "22222222-2222-2222-2222-222222222222";
 const discoveredAt = "2026-09-16T00:00:00Z";
-const options = { subscriptionId, now: "2026-09-16T01:00:00Z", maxAgeMs: 86_400_000 };
+const options = { subscriptionId, now: "2026-09-16T01:00:00Z" };
 const managementScope = "/providers/Microsoft.Management/managementGroups/root";
 
 function envelope(id = subscriptionId) {
@@ -87,7 +87,7 @@ test("selects only the active subscription and produces runtime-compatible compa
   assert.deepEqual(selected.snapshot.findings, []);
   assert.equal(selected.snapshot.reconciliationRequired, true);
   assert.equal(selected.snapshot.provenance.signatureStatus, "unverified");
-  assert.equal(selected.constraints.expiresAt, "2026-09-17T00:00:00.000Z");
+  assert.equal(selected.constraints.expiresAt, "2026-10-16T00:00:00.000Z");
   const validateConstraints = new Ajv2020({ strict: false, validateFormats: false }).compile(
     GovernanceConstraintsV1Schema,
   );
@@ -167,15 +167,36 @@ test("rejects incomplete empty evidence, errors and inconsistent counts", () => 
   rejected(source, "invalid-input");
 });
 
-test("rejects stale, future, expired TTL and invalid timestamps using explicit time", () => {
-  rejected(baseline(), "stale", { ...options, now: "2026-09-17T00:00:00Z" });
+test("allows reuse below 30 days and requires refresh at exactly 30 days independent of legacy TTL", () => {
+  for (const ttl of [1, 7, 30, 90]) {
+    const source = baseline();
+    source.subscriptions[subscriptionId]!.discovery_metadata.ttl_days = ttl;
+    const selected = importGovernanceBaseline(source, { ...options, now: "2026-10-15T23:59:59.999Z" }, validate);
+    assert.equal(selected.constraints.expiresAt, "2026-10-16T00:00:00.000Z");
+    rejected(source, "stale", { ...options, now: "2026-10-16T00:00:00Z" });
+    rejected(source, "stale", { ...options, now: "2026-10-17T00:00:00Z" });
+  }
+});
+
+test("rejects future and invalid timestamps using explicit time", () => {
   rejected(baseline(), "stale", { ...options, now: "2026-09-15T23:59:59Z" });
-  rejected(baseline(), "stale", { ...options, now: "2026-09-23T00:00:00Z", maxAgeMs: 90 * 86_400_000 });
   rejected(baseline(), "invalid-options", { ...options, now: "2026-02-30T00:00:00Z" });
-  rejected(baseline(), "invalid-options", { ...options, maxAgeMs: 0 });
   const source = baseline();
   source.subscriptions[subscriptionId]!.discovery_metadata.discovered_at = "2026-09-16T00:01:00Z";
   rejected(source, "incomplete");
+});
+
+test("successful unchanged observation renews age without changing selected policy content", () => {
+  const previous = baseline();
+  const refreshed = baseline();
+  refreshed.subscriptions[subscriptionId]!.discovered_at = "2026-09-17T00:00:00Z";
+  refreshed.subscriptions[subscriptionId]!.discovery_metadata.discovered_at = "2026-09-17T00:00:00Z";
+  const at = { ...options, now: "2026-09-17T01:00:00Z" };
+  const before = importGovernanceBaseline(previous, at, validate);
+  const after = importGovernanceBaseline(refreshed, at, validate);
+  assert.deepEqual(before.snapshot, after.snapshot);
+  assert.notEqual(before.constraints.discoveredAt, after.constraints.discoveredAt);
+  assert.equal(Date.parse(after.constraints.expiresAt) - Date.parse(before.constraints.expiresAt), 86_400_000);
 });
 
 test("rejects absent, mismatched and malformed other subscriptions", () => {
@@ -201,8 +222,8 @@ test("rejects duplicate IDs and stale or incomplete nonselected subscriptions", 
   source.subscriptions[otherId]!.discovery_status = "PARTIAL";
   rejected(source, "incomplete");
   source.subscriptions[otherId]!.discovery_status = "COMPLETE";
-  source.subscriptions[otherId]!.discovered_at = "2026-09-01T00:00:00Z";
-  source.subscriptions[otherId]!.discovery_metadata.discovered_at = "2026-09-01T00:00:00Z";
+  source.subscriptions[otherId]!.discovered_at = "2026-08-01T00:00:00Z";
+  source.subscriptions[otherId]!.discovery_metadata.discovered_at = "2026-08-01T00:00:00Z";
   rejected(source, "stale");
 });
 

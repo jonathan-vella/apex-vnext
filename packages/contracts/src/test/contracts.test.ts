@@ -17,6 +17,7 @@ import {
   ExecutionPlanAttestationV1Schema,
   GovernanceConstraintsV1Schema,
   hasValidInputRequestQuestions,
+  isGovernanceObservationCurrent,
   IacBindingV1Schema,
   IacHandoffV1Schema,
   ImprovementDecisionV1Schema,
@@ -92,6 +93,17 @@ FormatRegistry.Set(
 );
 
 describe("Wave 1 contracts", () => {
+  it("uses precise elapsed UTC age and rejects malformed governance observation dates", () => {
+    const observed = "2026-09-01T00:00:00Z";
+    assert.equal(isGovernanceObservationCurrent(observed, "2026-09-30T23:59:59.999Z"), true);
+    assert.equal(isGovernanceObservationCurrent(observed, "2026-10-01T00:00:00Z"), false);
+    assert.equal(isGovernanceObservationCurrent("2026-09-01T02:00:00+02:00", "2026-10-01T00:00:00Z"), false);
+    assert.equal(isGovernanceObservationCurrent(observed, "2026-08-31T23:59:59Z"), false);
+    for (const invalid of ["2026-09-01", "2026-09-01T00:00:00", "2026-02-30T00:00:00Z", "invalid"]) {
+      assert.equal(isGovernanceObservationCurrent(invalid, "2026-09-02T00:00:00Z"), false, invalid);
+      assert.equal(isGovernanceObservationCurrent(observed, invalid), false, invalid);
+    }
+  });
   it("requires Bicep format, build and lint rather than accepting build-only receipts", () => {
     assert.deepEqual(
       NATIVE_VALIDATION_COMMANDS.bicep.map(({ validatorId }) => validatorId),

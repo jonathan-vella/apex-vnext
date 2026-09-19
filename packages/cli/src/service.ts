@@ -31,6 +31,7 @@ import {
   hasValidCostArithmetic,
   hasValidLogicalResourceReferences,
   hasValidPolicyValidation,
+  isGovernanceObservationCurrent,
   hasValidNativeValidationReceipt,
   NATIVE_VALIDATION_COMMANDS,
   calculatePolicyValidationDigest,
@@ -1696,7 +1697,6 @@ export class ApexService {
         {
           subscriptionId: subscription[1]!,
           now: this.clock().toISOString(),
-          maxAgeMs: 7 * 24 * 60 * 60 * 1_000,
         },
         validate,
       );
@@ -2982,6 +2982,7 @@ export class ApexService {
     const gate = run.gates.find(({ gate }) => gate === gateNumber);
     if (gate === undefined) throw new ApexError("APEX_USAGE", `Unknown gate ${gateNumber}`, EXIT_CODES.usage);
     const events = await this.journal(run).replay();
+    if (gateNumber === 4 && decision === "approved") await this.assertImportedGovernanceCurrent(run, events);
     const previewHash = gateNumber === 4 ? this.latestPayloadHash(events, "preview.created", "previewHash") : undefined;
     if (gateNumber === 4 && previewHash === undefined) {
       throw new ApexError("APEX_VALIDATION", "Gate 4 requires a deployment preview", EXIT_CODES.validation);
@@ -4258,6 +4259,7 @@ export class ApexService {
     descriptor: WorkflowTaskDescriptor,
     inputRefs: string[] = [],
   ): Promise<TaskEnvelopeV1> {
+    if (descriptor.id === "plan") await this.assertImportedGovernanceCurrent(run, await this.journal(run).replay());
     const head = await this.journal(run).head();
     if (head === null)
       throw new ApexError("APEX_STALE", "Cannot issue a task before run initialization", EXIT_CODES.stale);
@@ -4831,6 +4833,7 @@ export class ApexService {
     events: Awaited<ReturnType<EventJournal["replay"]>>,
     descriptor: WorkflowTaskDescriptor,
   ): Promise<string[]> {
+    if (descriptor.id === "plan") await this.assertImportedGovernanceCurrent(run, events);
     const manifest = (await this.lockedWorkflowEngine(run)).manifest;
     const node = manifest.nodes.find(({ id }) => id === (descriptor.reviewSubject ?? descriptor.id));
     if (node === undefined)
@@ -4882,6 +4885,23 @@ export class ApexService {
     if (descriptor.reviewSubject === "governance-reconciliation") return "policy-property-map";
     if (descriptor.reviewSubject === "plan") return "implementation-intent";
     return descriptor.reviewSubject as ArtifactKind | undefined;
+  }
+
+  private async assertImportedGovernanceCurrent(
+    run: RunConfigV1,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+  ): Promise<void> {
+    const hash = this.acceptedArtifactHashes(events)["governance-constraints"];
+    if (hash === undefined) return;
+    const governance = await this.objects.getJson<GovernanceConstraintsV1>(hash);
+    if (governance.constraintsRef.uri !== `apex-object:${governance.constraintsRef.digest}`) return;
+    await this.selectedGovernanceSnapshot(run, governance);
+    if (!isGovernanceObservationCurrent(governance.discoveredAt, this.clock().toISOString()))
+      throw new ApexError(
+        "APEX_STALE",
+        "Governance snapshot requires refresh from Azure: observation is future-dated or at least 30 days old",
+        EXIT_CODES.stale,
+      );
   }
 
   private async selectedGovernanceSnapshot(
@@ -5456,6 +5476,7 @@ export class ApexService {
     run: RunConfigV1,
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): Promise<void> {
+    await this.assertImportedGovernanceCurrent(run, events);
     if (!this.gateApproved(run, 3))
       throw new ApexError("APEX_AUTHORIZATION", "Gate 3 approval is required before preview", EXIT_CODES.authorization);
     const engine = await this.lockedWorkflowEngine(run);
@@ -5630,6 +5651,7 @@ export class ApexService {
     }
     if (descriptor.id === "plan") {
       const intent = byKind["implementation-intent"] as ImplementationIntentV1;
+      await this.assertImportedGovernanceCurrent(run, events);
       const binding = byKind["iac-binding"] as IacBindingV1;
       const resourceIds = new Set(intent.resources.map(({ id }) => id));
       const bindingIds = Object.keys(binding.resourceBindings);

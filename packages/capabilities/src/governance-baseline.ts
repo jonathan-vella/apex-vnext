@@ -1,4 +1,4 @@
-import type { GovernanceConstraintsV1 } from "@apexops/contracts";
+import { GOVERNANCE_MAX_AGE_MS, type GovernanceConstraintsV1 } from "@apexops/contracts";
 
 export type GovernanceBaselineErrorCode =
   "invalid-input" | "invalid-options" | "incomplete" | "stale" | "target-mismatch";
@@ -13,7 +13,6 @@ export class GovernanceBaselineError extends Error {
 export interface GovernanceBaselineImportOptions {
   readonly subscriptionId: string;
   readonly now: string;
-  readonly maxAgeMs: number;
 }
 
 export type GovernanceBaselineValidator = (input: unknown) => boolean;
@@ -77,7 +76,6 @@ export interface GovernanceBaselineSelection {
 
 const SUBSCRIPTION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 const MAX_INPUT_BYTES = 20_000_000;
-const DAY_MS = 86_400_000;
 
 function fail(code: GovernanceBaselineErrorCode = "invalid-input"): never {
   throw new GovernanceBaselineError(code);
@@ -247,7 +245,6 @@ function selectEntry(
   subscriptionId: string,
   root: GovernanceBaselineRoot,
   now: number,
-  maxAgeMs: number,
 ): GovernanceBaselineSelection {
   const entry = record(value);
   if (entry.schema_version !== "governance-constraints-v1" || entry.source !== "github-actions-baseline") fail();
@@ -272,7 +269,7 @@ function selectEntry(
   if (timestamp(metadata.discovered_at) !== discoveredAt) fail("incomplete");
   const ttlDays = count(metadata.ttl_days);
   if (ttlDays < 1 || ttlDays > 90) fail();
-  const expiresAt = discoveredAt + Math.min(maxAgeMs, ttlDays * DAY_MS);
+  const expiresAt = discoveredAt + GOVERNANCE_MAX_AGE_MS;
   if (now < discoveredAt || now >= expiresAt) fail("stale");
   const signature = metadata.completeness_signature;
   if (typeof signature !== "string" || (signature !== "" && !/^sha256:[0-9a-f]{64}$/u.test(signature))) fail();
@@ -416,8 +413,7 @@ export function importGovernanceBaseline(
   try {
     subscriptionId = subscription(options.subscriptionId);
     now = timestamp(options.now);
-    if (!Number.isSafeInteger(options.maxAgeMs) || options.maxAgeMs <= 0 || typeof validateBaseline !== "function")
-      fail();
+    if (typeof validateBaseline !== "function") fail();
   } catch {
     return fail("invalid-options");
   }
@@ -458,7 +454,7 @@ export function importGovernanceBaseline(
   let totalAutoRemediate = 0;
   for (const [key, entry] of entries) {
     const currentId = subscription(key);
-    const result = selectEntry(entry, currentId, root, now, options.maxAgeMs);
+    const result = selectEntry(entry, currentId, root, now);
     totalFindings += result.snapshot.findings.length;
     totalBlockers += result.snapshot.findings.filter((item) => item.classification === "blocker").length;
     totalAutoRemediate += result.snapshot.findings.filter((item) => item.classification === "auto-remediate").length;

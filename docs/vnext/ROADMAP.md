@@ -134,6 +134,12 @@ benchmarks or telemetry to unlock them under this plan. Neither tool wire bytes 
 
 - Complete [issue #344](https://github.com/jonathan-vella/apex-vnext/issues/344) with its current implementation owner.
 - Reuse the collector/schema/parser and import only the active subscription from a reviewed committed baseline.
+- Deliver consumer-owned scheduled/manual collection and OIDC configuration before expanding local policy emulation.
+- Enforce the PRD's 30-day UTC age boundary at import, planning and new deployment approval. Retain a per-run optional
+  reuse/refresh choice below 30 days; test exact expiry, future time, failed refresh and restart behavior.
+- Renew observation time on every successful collection, including unchanged content. Separate observation receipts
+  from semantic policy identity before claiming timestamp-only refresh preserves planning and approval dependencies.
+- Package and qualify the consumer collect/import/plan path, then native validation and deployment enforcement.
 - Preserve discovery, reconciliation, governance review and Gate 2; no new agent, gate or delivery infrastructure.
 - Include effective-policy and evidenced-empty cases for standalone labs as well as management-group inheritance.
 - Test paging, exemptions, ordering, errors and full-baseline exclusion from model-facing surfaces. Carry mappings

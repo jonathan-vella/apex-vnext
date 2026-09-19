@@ -9,8 +9,8 @@
     set-definitions/exemptions per subscription, classifies findings,
     and writes a deterministic baseline.
 
-    discovered_at timestamps are preserved for unchanged subscriptions
-    to prevent no-op daily PR churn.
+    Every successful collection renews discovered_at timestamps,
+    including unchanged subscriptions.
 
 .PARAMETER ManagementGroupId
     The root Management Group ID to traverse; exclusive with SubscriptionId.
@@ -579,7 +579,7 @@ function Process-Subscription {
         # Left blank intentionally — render_cached_governance.py recomputes
         # this via the canonical _completeness_signature helper.
         completeness_signature = ""
-        ttl_days = 7
+        ttl_days = 30
     }
 
     return [ordered]@{
@@ -675,15 +675,7 @@ if ($eligibleSubs.Count -gt $MaxSubscriptions) {
 
 $coverageStatus = if ($subscriptionsSkipped.Count -gt 0) { "PARTIAL" } else { "COMPLETE" }
 
-# Read existing baseline for timestamp preservation
 $baselineFile = Join-Path $OutputDir "governance-policy-baseline.json"
-$existingBaseline = $null
-if (Test-Path $baselineFile) {
-    try {
-        $existingBaseline = Get-Content $baselineFile -Raw | ConvertFrom-Json
-    }
-    catch { Write-Warning "Could not parse existing baseline for timestamp preservation" }
-}
 
 # Process subscriptions
 $subscriptions = [ordered]@{}
@@ -697,22 +689,6 @@ foreach ($subId in $subsToProcess) {
     }
     catch {
         throw "Failed to process subscription $subId - $_"
-    }
-
-    # Timestamp preservation: if content is identical to prior run, keep old discovered_at
-    if ($existingBaseline -and $existingBaseline.subscriptions.$subId) {
-        $priorEntry = $existingBaseline.subscriptions.$subId
-        $priorCopy = $priorEntry | ConvertTo-Json -Depth 50 -Compress | ConvertFrom-Json
-        $currentCopy = $envelope | ConvertTo-Json -Depth 50 -Compress | ConvertFrom-Json
-        # Null out discovered_at for comparison
-        $priorCopy.discovered_at = ""
-        $currentCopy.discovered_at = ""
-        $priorJson = $priorCopy | ConvertTo-Json -Depth 50 -Compress
-        $currentJson = $currentCopy | ConvertTo-Json -Depth 50 -Compress
-        if ($priorJson -eq $currentJson) {
-            $envelope.discovered_at = $priorEntry.discovered_at
-            Write-Host "  Subscription $subId unchanged — preserving discovered_at"
-        }
     }
 
     $subscriptions[$subId] = $envelope
@@ -749,13 +725,26 @@ else { $baseline.management_group_id = $ManagementGroupId }
 
 # Write output
 New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
-$baselineJson = $baseline | ConvertTo-Json -Depth 50
-$baselineJson | Set-Content -Path $baselineFile -NoNewline
+$baselineFile = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($baselineFile)
+$stagingFile = Join-Path ([System.IO.Path]::GetDirectoryName($baselineFile)) ".governance-policy-baseline.$([guid]::NewGuid().ToString('N')).tmp"
+try {
+    $baselineJson = $baseline | ConvertTo-Json -Depth 50
+    $baselineJson | Set-Content -LiteralPath $stagingFile -NoNewline
+    [System.IO.File]::Move($stagingFile, $baselineFile, $true)
+}
+finally {
+    [System.IO.File]::Delete($stagingFile)
+}
 Write-Host "Wrote baseline: $baselineFile"
 
 # Write raw debug file (gitignored — not committed)
 $rawFile = Join-Path $OutputDir "governance-policy-raw.json"
-$baseline | ConvertTo-Json -Depth 100 | Set-Content -Path $rawFile -NoNewline
-Write-Host "Wrote raw debug: $rawFile (gitignored)"
+try {
+    $baseline | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $rawFile -NoNewline
+    Write-Host "Wrote raw debug: $rawFile (gitignored)"
+}
+catch {
+    Write-Warning "Could not write optional raw debug file: $_" -WarningAction Continue
+}
 
 Write-Host "Done. Coverage: $coverageStatus | Processed: $totalProcessed | Excluded: $($subscriptionsExcluded.Count) | Skipped: $($subscriptionsSkipped.Count)"

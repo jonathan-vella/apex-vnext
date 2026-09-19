@@ -627,6 +627,30 @@ export type CustomizationLockV1 = Static<typeof CustomizationLockV1Schema>;
 
 const arithmeticEqual = (left: number, right: number): boolean => Math.abs(left - right) <= 0.000001;
 
+export const GOVERNANCE_MAX_AGE_MS = 30 * 86_400_000;
+
+export function isGovernanceObservationCurrent(discoveredAt: string, now: string): boolean {
+  for (const value of [discoveredAt, now]) {
+    if (
+      !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$(?![\s\S])/.test(
+        value,
+      )
+    )
+      return false;
+    const date = value.slice(0, 10);
+    const dateValue = Date.parse(`${date}T00:00:00Z`);
+    if (!Number.isFinite(dateValue) || new Date(dateValue).toISOString().slice(0, 10) !== date) return false;
+  }
+  const observed = Date.parse(discoveredAt);
+  const current = Date.parse(now);
+  return (
+    Number.isFinite(observed) &&
+    Number.isFinite(current) &&
+    current >= observed &&
+    current - observed < GOVERNANCE_MAX_AGE_MS
+  );
+}
+
 export function hasValidCostArithmetic(estimate: CostEstimateV1): boolean {
   const linesAreValid = estimate.lineItems.every(
     (line) =>

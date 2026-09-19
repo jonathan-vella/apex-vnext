@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -42,7 +42,7 @@ function collect(context, responses, options = {}) {
   context.after(() => rmSync(output, { recursive: true, force: true }));
   const baselinePath = join(output, "governance-policy-baseline.json");
   const rawPath = join(output, "governance-policy-raw.json");
-  const prior = '{"previous":"baseline must survive failures"}';
+  const prior = options.prior ?? '{"previous":"baseline must survive failures"}';
   if (!options.fresh) {
     writeFileSync(baselinePath, prior);
     writeFileSync(rawPath, prior);
@@ -56,6 +56,36 @@ function collect(context, responses, options = {}) {
       "-Command",
       `
       $ErrorActionPreference = "Stop"
+      function ConvertTo-Json {
+        param([Parameter(ValueFromPipeline)]$InputObject, [int]$Depth, [switch]$Compress)
+        process {
+          if ($env:COLLECTOR_FAULT -eq "serialize" -and $Depth -eq 50 -and
+              $InputObject.schema_version -eq "governance-baseline-v1") {
+            throw "offline serialization failure"
+          }
+          Microsoft.PowerShell.Utility\\ConvertTo-Json -InputObject $InputObject -Depth $Depth -Compress:$Compress
+        }
+      }
+      function Set-Content {
+        param([Parameter(ValueFromPipeline)]$Value, [string]$Path, [string]$LiteralPath, [switch]$NoNewline)
+        process {
+          $target = if ($LiteralPath) { $LiteralPath } else { $Path }
+          $isRaw = [System.IO.Path]::GetFileName($target) -eq "governance-policy-raw.json"
+          if ([System.IO.Path]::GetFullPath([System.IO.Path]::GetDirectoryName($target)) -ne $env:COLLECTOR_OUTPUT) {
+            throw "Output must be staged in the destination directory"
+          }
+          if (($env:COLLECTOR_FAULT -eq "write" -and -not $isRaw) -or
+              ($env:COLLECTOR_FAULT -eq "raw" -and $isRaw)) {
+            Microsoft.PowerShell.Management\\Set-Content -LiteralPath $target -Value "partial write" -NoNewline
+            throw "offline write failure"
+          }
+          Microsoft.PowerShell.Management\\Set-Content -LiteralPath $target -Value $Value -NoNewline:$NoNewline
+          if ($env:COLLECTOR_FAULT -eq "rename" -and -not $isRaw -and
+              [System.IO.Path]::GetFileName($target) -ne "governance-policy-baseline.json") {
+            Remove-Item -LiteralPath $target -Force
+          }
+        }
+      }
         $responses = @{}
         foreach ($route in ($env:COLLECTOR_RESPONSES | ConvertFrom-Json -AsHashtable).GetEnumerator()) {
           $responses[$route.Key] = $route.Value
@@ -92,6 +122,7 @@ function collect(context, responses, options = {}) {
         COLLECTOR_ROOT: JSON.stringify(options.root ?? { ManagementGroupId: "test-root" }),
         COLLECTOR_TOKEN: JSON.stringify(options.token ?? { accessToken: "test-token" }),
         COLLECTOR_TOKEN_EXIT: String(options.tokenExit ?? 0),
+        COLLECTOR_FAULT: options.fault ?? "",
       },
     },
   );
@@ -99,7 +130,9 @@ function collect(context, responses, options = {}) {
     ...result,
     prior: options.fresh ? undefined : prior,
     baseline: existsSync(baselinePath) ? readFileSync(baselinePath, "utf8") : undefined,
+    baselineBytes: existsSync(baselinePath) ? readFileSync(baselinePath) : undefined,
     raw: existsSync(rawPath) ? readFileSync(rawPath, "utf8") : undefined,
+    files: readdirSync(output).sort(),
   };
 }
 
@@ -127,6 +160,47 @@ function assertComplete(result) {
   }
   return baseline;
 }
+
+for (const fresh of [false, true]) {
+  for (const fault of ["serialize", "write", "rename"]) {
+    test(
+      `atomic publication ${fault} failure preserves ${fresh ? "absent" : "prior"} baseline`,
+      powershellOptions,
+      (context) => {
+        const prior = '\uFEFF{ "previous": "unchanged bytes" }\r\n';
+        const result = collect(context, routes(), { fault, fresh, prior });
+        const message = {
+          serialize: /offline serialization failure/,
+          write: /offline write failure/,
+          rename: /Exception calling "Move"/,
+        }[fault];
+        assertAborted(result, message);
+        assert.deepEqual(result.baselineBytes, fresh ? undefined : Buffer.from(prior));
+        assert.deepEqual(result.files, fresh ? [] : ["governance-policy-baseline.json", "governance-policy-raw.json"]);
+        assert.doesNotMatch(result.stdout, /Wrote baseline:|Done\. Coverage:/);
+      },
+    );
+  }
+}
+
+test("atomic publication succeeds on first collection without staging litter", powershellOptions, (context) => {
+  const result = collect(context, routes(), { fresh: true });
+  assertComplete(result);
+  assert.deepEqual(result.files, ["governance-policy-baseline.json", "governance-policy-raw.json"]);
+});
+
+test("atomic publication remains successful when optional raw debug write fails", powershellOptions, (context) => {
+  const result = collect(context, routes(), { fault: "raw" });
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.notEqual(result.baseline, result.prior);
+  const baseline = JSON.parse(result.baseline);
+  assert.equal(validateBaseline(baseline), true, JSON.stringify(validateBaseline.errors));
+  assert.equal(baseline.coverage_status, "COMPLETE");
+  assert.match(result.stdout + result.stderr, /WARNING:.*raw debug.*offline write failure/i);
+  assert.match(result.stdout, /Done\. Coverage: COMPLETE/);
+  assert.deepEqual(result.files, ["governance-policy-baseline.json", "governance-policy-raw.json"]);
+});
 
 test(
   "standalone evidenced-empty collection has exclusive root and no descendant request",
@@ -268,6 +342,68 @@ function assignment(policyDefinitionId, scope = managementGroupScope, name = "in
     properties: { displayName: name, scope, policyDefinitionId },
   };
 }
+
+for (const ageDays of [29, 30, 31]) {
+  test(`unchanged ${ageDays}-day-old baseline renews freshness`, powershellOptions, (context) => {
+    const responses = routes();
+    const policyId = `${managementGroupScope}/providers/Microsoft.Authorization/policyDefinitions/inherited-deny`;
+    responses[assignmentsUrl].value = [assignment(policyId)];
+    responses[definitionsUrl].value = [definition(policyId)];
+    const prior = assertComplete(collect(context, responses));
+    const oldTimestamp = new Date(Date.now() - ageDays * 86_400_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+    const priorEnvelope = prior.subscriptions[subscriptionId];
+    priorEnvelope.discovered_at = oldTimestamp;
+    priorEnvelope.discovery_metadata.discovered_at = oldTimestamp;
+    priorEnvelope.discovery_metadata.ttl_days = 7;
+
+    const startedAt = Math.floor(Date.now() / 1000) * 1000;
+    const refreshed = assertComplete(collect(context, responses, { prior: JSON.stringify(prior) }));
+    const envelope = refreshed.subscriptions[subscriptionId];
+    assert.equal(envelope.discovery_metadata.discovered_at, envelope.discovered_at);
+    assert.ok(Date.parse(envelope.discovered_at) >= startedAt);
+    assert.ok(Date.parse(envelope.discovered_at) <= Date.now());
+    assert.notEqual(envelope.discovered_at, oldTimestamp);
+    assert.equal(envelope.discovery_metadata.ttl_days, 30);
+
+    priorEnvelope.discovered_at = envelope.discovered_at;
+    priorEnvelope.discovery_metadata.discovered_at = envelope.discovered_at;
+    priorEnvelope.discovery_metadata.ttl_days = 30;
+    assert.deepEqual(refreshed, prior);
+  });
+}
+
+test(
+  "failed refresh preserves old evidence with zero or partially completed subscriptions",
+  powershellOptions,
+  (context) => {
+    const responses = routes();
+    const policyId = `${managementGroupScope}/providers/Microsoft.Authorization/policyDefinitions/inherited-deny`;
+    responses[assignmentsUrl].value = [assignment(policyId)];
+    responses[definitionsUrl].value = [definition(policyId)];
+    const prior = assertComplete(collect(context, responses));
+    const envelope = prior.subscriptions[subscriptionId];
+    envelope.discovered_at = "2020-01-01T00:00:00Z";
+    envelope.discovery_metadata.discovered_at = envelope.discovered_at;
+    const priorJson = JSON.stringify(prior);
+
+    for (const url of [descendantsUrl, assignmentsUrl]) {
+      const failedResponses = structuredClone(responses);
+      failedResponses[url] = { failure: "offline refresh failure" };
+      assertAborted(collect(context, failedResponses, { prior: priorJson }), /offline refresh failure/);
+    }
+
+    const secondId = "22222222-2222-2222-2222-222222222222";
+    responses[descendantsUrl].value.push({
+      name: secondId,
+      type: "Microsoft.Management/managementGroups/subscriptions",
+    });
+    responses[`${arm}/subscriptions/${secondId}?api-version=2022-12-01`] = { state: "Enabled" };
+    responses[assignmentsUrl.replace(subscriptionId, secondId)] = { failure: "offline later refresh failure" };
+    const result = collect(context, responses, { prior: priorJson });
+    assertAborted(result, /offline later refresh failure/);
+    assert.ok(result.stdout.includes(`REQUEST ${exemptionsUrl}`));
+  },
+);
 
 for (const [initiative, standalone] of [
   [false, false],

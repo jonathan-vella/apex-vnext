@@ -73,6 +73,22 @@ The coordinator hands work to interactive specialists:
 Specialists delegate bounded code generation, review, and validation tasks when supported. Review findings return as a
 single decision panel; permitted risk acceptance is time-bound, while revision creates a fresh artifact and review.
 
+## Governance Freshness
+
+Before planning, import the reviewed JSON snapshot for the run's target through the governance-discovery task. Azure
+Policy remains authoritative; a snapshot is evidence, not permission to override a policy. The consumer owns the
+collection workflow and its GitHub configuration; do not commit Azure credentials.
+
+Imported snapshots less than 30 days old can be reused. Refresh is optional, including before deployment. The runtime
+measures age from successful Azure collection, not file download, import or commit time. At exactly 30 days, imported
+evidence blocks new planning, preview and deployment approval until refreshed evidence is accepted. Missing, incomplete,
+future-dated or wrong-scope evidence remains blocked independently of age; existing preview expiry rules still apply.
+
+The intended selection prompt shows the age and offers Use existing snapshot (default) or Refresh from Azure once per
+run. Durable choice recording and automatic consumer refresh orchestration are not yet implemented. Refresh through the
+consumer collection workflow, not an invented local discovery command. A successful unchanged collection renews its
+timestamps; timestamp-only acceptance without invalidating existing plans remains a separate implementation item.
+
 ## Decide Gates
 
 Inspect accepted artifacts and validation before each decision:

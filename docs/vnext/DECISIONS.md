@@ -144,6 +144,14 @@ import, existing governance reconciliation/review and Gate 2. Cover standalone s
 The full baseline never enters model context. Quota and regional availability remain assumptions, not Architecture
 evidence gates. Policy, security and deployment approval cannot be waived by an assumption or lab profile.
 
+## DECISION-028: Require Governance Refresh At Thirty Days
+
+Consumer clarification on 2026-09-19 fixes snapshot eligibility at less than 30 elapsed UTC days since successful Azure
+collection. Refresh below that age is optional; at 30 days it is mandatory before planning or new deployment approval.
+Display age and prefer reuse without repeated prompts. Observation renewal is separate from policy-content identity.
+Native checks and live Azure enforcement remain required. Acceptance and implementation boundaries are owned by
+[REQ-GOV-001](PRD.md#req-gov-001-governance-and-policy) and [Phase 2](ROADMAP.md#phase-2-finish-governance).
+
 ## DECISION-027: Optimize Current Inputs Before Changing Execution Mechanics
 
 Start with the [first roadmap batch](ROADMAP.md#first-batch-input-correctness-and-scope): repair revision-safe reads,

@@ -47,6 +47,16 @@ and the repository archives.
 - **State:** Open by design
 - **Closure proof:** Deterministic adversarial tests and live transfer scenarios pass on the candidate.
 
+### Governance Snapshot Freshness
+
+- **Owner:** Governance and kernel maintainers
+- **Impact:** Azure policy can change while a snapshot remains eligible for reuse below 30 days; collection failures or
+  timestamp churn can also masquerade as fresh policy or invalidate unchanged plans unnecessarily.
+- **Mitigation:** Apply [REQ-GOV-001](PRD.md#req-gov-001-governance-and-policy), display observation age, separate content
+  identity from freshness, fail closed at 30 days, and preserve live enforcement without bypassing policy on denial.
+- **State:** Open; consumer workflow distribution, persisted refresh choices and timestamp-only renewal require proof
+- **Closure proof:** Both tracks cover exact age boundaries, unchanged refresh, material drift and delayed outcomes.
+
 ## RISK-006: Imported Material Can Carry Wrong Authority
 
 - **Owner:** COE reuse and kernel maintainers

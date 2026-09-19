@@ -155,6 +155,25 @@ a scheduled/manual GitHub Actions collector exports effective management-group p
 exemptions, to one reviewed committed JSON baseline. Resolve the subscription from the run scope, import only its entry,
 and preserve discovery, reconciliation, governance review, then Gate 2.
 
+The consumer repository owns the collection workflow, variables and GitHub Secrets/environment settings. Prefer OIDC
+with a read-only collection identity separate from deployment authority; never commit credentials. Azure remains the
+policy source of truth. The JSON is observed evidence, not a policy override. Include referenced definitions,
+initiative members, effective parameters, inherited and target-scope applicability, exclusions and exemptions; preserve
+unsupported semantics as blockers rather than silently dropping them. No valid target snapshot means no IaC planning.
+
+Freshness is measured in UTC elapsed time since successful Azure collection: age below 30 days permits reuse; at
+exactly 30 days or older refresh is mandatory before IaC planning or a new deployment approval. Below 30 days show the
+collection date and age, offer Use existing snapshot (default) or Refresh from Azure, and retain the choice for the
+run instead of asking at each stage. Refresh is optional below the threshold, including before deployment. Failed
+optional refresh does not erase valid prior evidence. Missing, incomplete, future-dated or wrong-scope evidence is
+unusable regardless of age. Legacy collector TTL values cannot shorten or extend this age rule.
+
+A successful unchanged refresh renews collection time, not policy-content identity. Keep observation freshness separate
+from normalized policy-content hashes so timestamp-only renewal does not invalidate approved plans. Material constraint
+changes require reconciliation and affected approval renewal. Native preflight and live Azure enforcement always apply;
+known policy violations cannot be bypassed by choosing a cached snapshot. APEX must reconcile denial or partial outcomes
+without weakening policy. Audit and delayed policy-managed outcomes are not assumed compliant merely because apply succeeds.
+
 Reuse the baseline schema, parser, artifacts, object store, validators and gate. Add only a deterministic importer and
 path-only CLI/MCP operation. Carry Deny, Modify and DeployIfNotExists mappings into planning and code validation; other
 applicable effects need a mapped or explicit disposition. Missing, stale, unmapped or mismatched baseline evidence must

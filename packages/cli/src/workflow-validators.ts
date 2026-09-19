@@ -9,6 +9,7 @@ import {
   SECRET_FIELD_PATTERN,
   SECRET_VALUE_PATTERN,
   hasValidCostArithmetic,
+  isGovernanceObservationCurrent,
   type ApprovalEvidenceV1,
   type ArchitectureAvailabilityV1,
   type ArchitectureV1,
@@ -545,6 +546,11 @@ function governanceCompleteness(value: unknown): ValidationIssue[] {
 function governanceFreshness(value: unknown): ValidationIssue[] {
   const context = taskContext(value);
   const governance = context.outputs["governance-constraints"] as GovernanceConstraintsV1;
+  if (governance.constraintsRef.uri === `apex-object:${governance.constraintsRef.digest}`) {
+    return isGovernanceObservationCurrent(governance.discoveredAt, context.now)
+      ? []
+      : issue("/outputs/governance-constraints/discoveredAt", "Governance snapshot requires refresh at 30 days");
+  }
   const now = Date.parse(context.now);
   if (Date.parse(governance.discoveredAt) > now) {
     return issue("/outputs/governance-constraints/discoveredAt", "Governance discovery is from the future");

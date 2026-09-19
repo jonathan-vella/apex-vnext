@@ -65,7 +65,7 @@ async function reachCodegen(
   service: ApexService,
   runId: string,
   track: "bicep" | "terraform",
-  configurePlan?: (plan: ReturnType<typeof planBundle>) => void,
+  configurePlan?: (plan: ReturnType<typeof planBundle>) => void | Promise<void>,
   revisePlan = false,
   baselinePath?: string,
   configurePolicy?: (policy: PolicyPropertyMapV1) => void,
@@ -143,7 +143,7 @@ async function reachCodegen(
       "policy-property-map": policyHashes["policy-property-map"]!,
     },
   );
-  configurePlan?.(plan);
+  await configurePlan?.(plan);
   let planHashes = await complete(service, "plan", plan);
   if (revisePlan) {
     const reviewHashes = await complete(service, "plan-review", [
@@ -2477,7 +2477,8 @@ for (const track of ["bicep", "terraform"] as const) {
   test(`${track} imports an evidenced-empty standalone baseline through deployment without copying other data`, async () => {
     const root = await tempRoot();
     const subscriptionId = "11111111-1111-1111-1111-111111111111";
-    const discoveredAt = new Date(Date.now() - 2 * 24 * 60 * 60 * 1_000).toISOString();
+    let now = new Date("2026-09-19T00:00:00Z");
+    const discoveredAt = new Date(now.getTime() - 29 * 86_400_000).toISOString();
     const baseline = {
       schema_version: "governance-baseline-v1",
       subscription_id: subscriptionId,
@@ -2531,19 +2532,50 @@ for (const track of ["bicep", "terraform"] as const) {
     };
     const path = join(root, "baseline.json");
     await writeJson(path, baseline);
-    const service = new ApexService(root);
+    const service = new ApexService(root, { clock: () => now });
     const { runId } = await service.init({
       projectId: "demo",
       iacTool: track,
       targetScope: `/subscriptions/${subscriptionId}`,
     });
     await assert.rejects(service.importGovernanceBaseline(path), /active discovery task/);
-    const codegen = await reachCodegen(service, runId, track, undefined, false, path);
+    const expiry = Date.parse(discoveredAt) + 30 * 86_400_000;
+    const codegen = await reachCodegen(
+      service,
+      runId,
+      track,
+      async (plan) => {
+        const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+        const head = await journal.head();
+        now = new Date(expiry);
+        await assert.rejects(service.nextTask(), /governance.*refresh/i);
+        assert.equal(await journal.head(), head);
+        now = new Date(expiry - 1);
+        const planTask = await task(service, "plan");
+        const issuedHead = await journal.head();
+        now = new Date(expiry);
+        await assert.rejects(service.taskContext(planTask), /governance.*refresh/i);
+        await assert.rejects(service.completeTaskOutputs(planTask, plan), /governance.*refresh/i);
+        assert.equal(await journal.head(), issuedHead);
+        now = new Date(expiry - 1);
+      },
+      false,
+      path,
+    );
     await service.completeTaskOutputs(codegen.taskId, codegenBundle(runId, track, codegen.plan));
     await complete(service, `validation-${track}`, [
       { kind: "validation-evidence", value: validationEvidence(runId, track) },
     ]);
+    now = new Date(Date.parse(discoveredAt) + 30 * 86_400_000 - 1);
     const preview = await service.preview({ operation: "apply", provider: "fake" });
+    const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+    const head = await journal.head();
+    now = new Date(Date.parse(discoveredAt) + 30 * 86_400_000);
+    await assert.rejects(service.decideGateNumber(4, "approved", "tester"), /governance.*refresh/i);
+    await assert.rejects(service.preview({ operation: "apply", provider: "fake" }), /governance.*refresh/i);
+    assert.equal(await journal.head(), head);
+    assert.equal((await service.status()).run.gates[3]!.state, "open");
+    now = new Date(Date.parse(discoveredAt) + 30 * 86_400_000 - 1);
     await service.decideGateNumber(4, "approved", "tester");
     const deployed = await service.deploy(preview.previewHash);
     assert.equal(deployed.inventory.resources.length, 1);
