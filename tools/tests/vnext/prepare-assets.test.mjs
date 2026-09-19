@@ -29,6 +29,44 @@ const assessmentSkills = [
   "apex-azure-validate",
 ];
 
+test("governance collection files ship from canonical sources to both client projections", async () => {
+  await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
+  const assets = join(root, "packages/cli/assets");
+  const manifest = JSON.parse(await readFile(join(assets, "manifest.json"), "utf8"));
+  const customization = JSON.parse(await readFile(join(root, "customizations/manifest.json"), "utf8"));
+  const paths = [
+    ".github/workflows/governance-policy-baseline.yml",
+    "tools/scripts/collect-governance-baseline.ps1",
+    "tools/schemas/governance-baseline.schema.json",
+  ];
+  for (const path of paths) assert.ok(customization.sharedFiles.includes(path));
+  for (const path of paths) {
+    const bytes = await readFile(join(root, path));
+    const hash = createHash("sha256").update(bytes).digest("hex");
+    assert.ok(customization.managedFiles.includes(path));
+    await assert.rejects(readFile(join(root, "customizations", path)), { code: "ENOENT" });
+    for (const prefix of [
+      "customizations",
+      ...customization.clientProjections.map(({ generatedRoot }) => generatedRoot),
+    ]) {
+      const target = `${prefix}/${path}`;
+      assert.deepEqual(await readFile(join(assets, target)), bytes);
+      const entry = manifest.files.find(({ path: candidate }) => candidate === target);
+      assert.equal(entry.sha256, hash);
+      if (prefix === "customizations") {
+        assert.equal(entry.source.kind, "repository-file");
+        assert.equal(entry.source.path, path);
+        const mapping = manifest.composition.mappings.find(({ id }) => id === entry.source.mapping);
+        assert.equal(mapping.mode, "copy-entries");
+        assert.deepEqual(mapping.entries, [{ source: path, target }]);
+      } else {
+        assert.equal(entry.source.sourcePath, path);
+        assert.equal(entry.source.sourceHash, hash);
+      }
+    }
+  }
+});
+
 test("assessment skill mappings ship to managed client projections", async () => {
   await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
   const manifest = JSON.parse(await readFile(join(root, "customizations", "manifest.json"), "utf8"));
@@ -37,6 +75,73 @@ test("assessment skill mappings ship to managed client projections", async () =>
     const skillPath = `.github/skills/${skill}/SKILL.md`;
     assert.ok(manifest.managedFiles.includes(skillPath), `${skillPath} must be manifest-owned`);
   }
+});
+
+test("governance workflow is opt-in, protected, and publishes only a reviewed baseline", async () => {
+  const text = await readFile(join(root, ".github/workflows/governance-policy-baseline.yml"), "utf8");
+  const workflow = load(text);
+  assert.deepEqual(Object.keys(workflow.on).sort(), ["schedule", "workflow_dispatch"]);
+  const job = workflow.jobs["collect-baseline"];
+  assert.equal(job.if, "vars.GOVERNANCE_BASELINE_ENABLED == 'true'");
+  assert.equal(job.environment, "governance");
+  assert.equal(job.permissions["id-token"], "write");
+  const validation = job.steps.findIndex(({ name }) => name === "Validate collection configuration");
+  const login = job.steps.findIndex(({ uses }) => uses?.startsWith("azure/login@"));
+  assert.ok(validation >= 0 && login > validation);
+  for (const name of ["CLIENT", "TENANT", "SUBSCRIPTION"]) {
+    assert.equal(job.env[`AZURE_${name}_ID`], `\${{ vars.AZURE_${name}_ID || secrets.AZURE_${name}_ID }}`);
+    assert.equal(job.steps[login].with[`${name.toLowerCase()}-id`], `\${{ env.AZURE_${name}_ID }}`);
+  }
+  assert.equal(job.env.GOVERNANCE_MG_ID, "${{ vars.GOVERNANCE_MG_ID }}");
+  assert.equal(job.env.GOVERNANCE_SUBSCRIPTION_ID, "${{ vars.GOVERNANCE_SUBSCRIPTION_ID }}");
+  assert.equal(job.env.GOVERNANCE_MAX_SUBSCRIPTIONS, "${{ vars.GOVERNANCE_MAX_SUBSCRIPTIONS || '100' }}");
+  for (const step of job.steps) assert.doesNotMatch(step.run ?? "", /\$\{\{/u);
+  const collection = job.steps.find(({ name }) => name === "Collect governance baseline");
+  assert.match(collection.run, /collect-governance-baseline\.ps1 @parameters/u);
+  assert.match(collection.run, /Test-Json .*governance-baseline\.schema\.json/u);
+  assert.match(collection.run, /\*> \$null/u);
+  const pullRequest = job.steps.find(({ uses }) => uses?.startsWith("peter-evans/create-pull-request@"));
+  assert.equal(pullRequest.with["add-paths"], ".github/data/governance-policy-baseline.json");
+  assert.match(pullRequest.with.body, /Human review and manual merge are required/u);
+  assert.doesNotMatch(
+    text,
+    /upload-artifact|download-artifact|--auto|enable-auto-merge|AZURE_CREDENTIALS|CLIENT_SECRET|governance-policy-raw/u,
+  );
+});
+
+test("governance workflow rejects invalid scope and limits before any login", async () => {
+  const workflow = load(await readFile(join(root, ".github/workflows/governance-policy-baseline.yml"), "utf8"));
+  const validation = workflow.jobs["collect-baseline"].steps.find(
+    ({ name }) => name === "Validate collection configuration",
+  );
+  const guid = "11111111-1111-1111-1111-111111111111";
+  const valid = {
+    PATH: process.env.PATH,
+    AZURE_CLIENT_ID: guid,
+    AZURE_TENANT_ID: guid,
+    AZURE_SUBSCRIPTION_ID: guid,
+    GOVERNANCE_MG_ID: "test-mg",
+    GOVERNANCE_SUBSCRIPTION_ID: "",
+    GOVERNANCE_MAX_SUBSCRIPTIONS: "100",
+  };
+  const validate = (changes) =>
+    execFile("pwsh", ["-NoProfile", "-NonInteractive", "-Command", validation.run], {
+      env: { ...valid, ...changes },
+    });
+  await validate({});
+  await validate({ GOVERNANCE_MG_ID: "", GOVERNANCE_SUBSCRIPTION_ID: guid, GOVERNANCE_MAX_SUBSCRIPTIONS: "1" });
+  for (const changes of [
+    { GOVERNANCE_MG_ID: "" },
+    { GOVERNANCE_SUBSCRIPTION_ID: guid },
+    { GOVERNANCE_MG_ID: "../unsafe" },
+    { GOVERNANCE_MG_ID: "$(throw 'interpolated')" },
+    { GOVERNANCE_MG_ID: "", GOVERNANCE_SUBSCRIPTION_ID: "invalid" },
+    { AZURE_CLIENT_ID: "" },
+    { AZURE_TENANT_ID: "invalid" },
+    { AZURE_SUBSCRIPTION_ID: "invalid" },
+    ...["0", "-1", "1.5", "2147483648", "1; exit 0"].map((value) => ({ GOVERNANCE_MAX_SUBSCRIPTIONS: value })),
+  ])
+    await assert.rejects(validate(changes));
 });
 
 test("asset generator canonical JSON ignores object insertion order", () => {
@@ -109,6 +214,8 @@ test("managed role projections retain required tools and exclude unrelated grant
       "nextTask",
       "taskContext",
       "governanceImport",
+      "governanceSelect",
+      "recordInput",
       "preview",
       "reconcile",
       "inventory",

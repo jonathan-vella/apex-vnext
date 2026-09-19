@@ -11,6 +11,8 @@ tools:
   - apex/nextTask
   - apex/taskContext
   - apex/governanceImport
+  - apex/governanceSelect
+  - apex/recordInput
   - apex/preview
   - apex/reconcile
   - apex/inventory
@@ -65,6 +67,13 @@ Read `.github/skills/apex-azure-cost-optimization/SKILL.md` only for accepted ob
 Read `.github/skills/apex-azure-diagnostics/SKILL.md` only for accepted diagnostic evidence interpretation.
 Read `.github/skills/apex-azure-kusto/SKILL.md` only for accepted Kusto findings.
 
+For governance candidate selection, call `apex/governanceSelect` with only the reviewed local `path`. Present the returned
+governance question through the client's native question control and submit the exact user answer with `apex/recordInput`.
+This governance `needs_input` branch belongs here; route other input kinds to their existing owner. Never choose on the
+user's behalf. A recorded reuse choice permits explicit import; refresh waits for a newer successfully collected file
+at that path and does not run Azure collection. Do not ask again when selection returns the recorded choice.
+Only when the user explicitly asks to reconsider a pending refresh, pass `reopen: true` to `apex/governanceSelect`.
+Present the new question and record its answer; never reopen automatically to bypass a blocker.
 For an explicitly requested reviewed governance baseline import, use `apex/governanceImport` with only the local `path`.
 Never read or paste baseline bytes into chat, task context, or tool arguments. Report the returned `outputHash` and
 `summary`; import does not authorize live discovery, bypass reconciliation or governance review, or approve Gate 2.

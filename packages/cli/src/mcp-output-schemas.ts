@@ -205,6 +205,18 @@ export const MCP_OUTPUT_SCHEMAS = {
   ),
   recordInput: contract(object({ recorded: Type.Literal(true), requestId: NonEmptyStringSchema })),
   governanceImport: contract(object({ outputHash: Sha256Schema, summary: Type.String() })),
+  governanceSelect: contract(
+    Type.Union([
+      object({ status: Type.Literal("needs_input"), request: InputRequestV1Schema }),
+      object({
+        status: Type.Literal("selected"),
+        choice: Type.Union([Type.Literal("reuse"), Type.Literal("refresh")]),
+        candidateHash: Sha256Schema,
+        observedAt: IsoDateTimeSchema,
+        refreshRequired: Type.Boolean(),
+      }),
+    ]),
+  ),
   projectCreate: contract(selection),
   projectList: contract(
     object({ projects: Type.Array(object({ projectId: NonEmptyStringSchema, displayName: Type.String() })) }),

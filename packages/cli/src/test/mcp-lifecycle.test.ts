@@ -509,7 +509,7 @@ test(
     assert.equal(negotiated, "2025-11-25");
     assert.equal(client.getServerVersion()?.name, "apex");
     const { tools } = await client.listTools();
-    assert.equal(tools.length, 34);
+    assert.equal(tools.length, Object.keys(MCP_OUTPUT_SCHEMAS).length);
     assert.ok(tools.every((tool) => tool.outputSchema?.type === "object"));
     const response = await client.callTool({ name: "status", arguments: {} });
     assert.deepEqual(assertSuccess("status", response), expected);

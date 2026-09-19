@@ -65,6 +65,23 @@ test("CLI governance import requires a path and forwards only that path", async 
   assert.deepEqual(importer.mock.calls[0]?.arguments, [path]);
 });
 
+test("CLI governance select forwards a path without importing or inventing a choice", async (context) => {
+  const root = await tempRoot();
+  const expected = {
+    status: "selected" as const,
+    choice: "refresh" as const,
+    candidateHash: "a".repeat(64),
+    observedAt: "2026-09-01T00:00:00Z",
+    refreshRequired: false,
+  };
+  const selection = context.mock.method(ApexService.prototype, "selectGovernanceBaseline", async () => expected);
+  await assert.rejects(execute(["governance", "select"], root), /Missing --path/);
+  assert.deepEqual(await execute(["governance", "select", "--path", "baseline.json"], root), expected);
+  assert.deepEqual(selection.mock.calls[0]?.arguments, ["baseline.json"]);
+  await execute(["governance", "select", "--path", "baseline.json", "--reopen"], root);
+  assert.deepEqual(selection.mock.calls[1]?.arguments, ["baseline.json", { reopen: true }]);
+});
+
 test("CLI bootstrap validates onboarding files before initializing a selected client", async () => {
   const root = await tempRoot();
   const configPath = join(root, "onboarding.json");
@@ -321,6 +338,7 @@ test("MCP registers only narrow tools and calls the service", async () => {
     "gateDecide",
     "generateIac",
     "governanceImport",
+    "governanceSelect",
     "improvementObservations",
     "improvementObserve",
     "improvementProposals",

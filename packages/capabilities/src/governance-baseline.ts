@@ -247,6 +247,7 @@ function selectEntry(
   subscriptionId: string,
   root: GovernanceBaselineRoot,
   now: number,
+  requireFresh: boolean,
 ): GovernanceBaselineSelection {
   const entry = record(value);
   if (entry.schema_version !== "governance-constraints-v1" || entry.source !== "github-actions-baseline") fail();
@@ -272,7 +273,7 @@ function selectEntry(
   const ttlDays = count(metadata.ttl_days);
   if (ttlDays < 1 || ttlDays > 90) fail();
   const expiresAt = discoveredAt + GOVERNANCE_MAX_AGE_MS;
-  if (now < discoveredAt || now >= expiresAt) fail("stale");
+  if (now < discoveredAt || (requireFresh && now >= expiresAt)) fail("stale");
   const signature = metadata.completeness_signature;
   if (typeof signature !== "string" || (signature !== "" && !/^sha256:[0-9a-f]{64}$/u.test(signature))) fail();
   const apiVersions = record(metadata.api_versions);
@@ -424,10 +425,11 @@ function selectEntry(
   };
 }
 
-export function importGovernanceBaseline(
+function validateGovernanceBaseline(
   input: unknown,
   options: GovernanceBaselineImportOptions,
   validateBaseline: GovernanceBaselineValidator,
+  requireFresh: boolean,
 ): GovernanceBaselineSelection {
   let subscriptionId: string;
   let now: number;
@@ -475,7 +477,7 @@ export function importGovernanceBaseline(
   let totalAutoRemediate = 0;
   for (const [key, entry] of entries) {
     const currentId = subscription(key);
-    const result = selectEntry(entry, currentId, root, now);
+    const result = selectEntry(entry, currentId, root, now, requireFresh);
     totalFindings += result.snapshot.findings.length;
     totalBlockers += result.snapshot.findings.filter((item) => item.classification === "blocker").length;
     totalAutoRemediate += result.snapshot.findings.filter((item) => item.classification === "auto-remediate").length;
@@ -488,4 +490,24 @@ export function importGovernanceBaseline(
   )
     fail("incomplete");
   return selected ?? fail("target-mismatch");
+}
+
+export function importGovernanceBaseline(
+  input: unknown,
+  options: GovernanceBaselineImportOptions,
+  validateBaseline: GovernanceBaselineValidator,
+): GovernanceBaselineSelection {
+  return validateGovernanceBaseline(input, options, validateBaseline, true);
+}
+
+export function inspectGovernanceBaseline(
+  input: unknown,
+  options: GovernanceBaselineImportOptions,
+  validateBaseline: GovernanceBaselineValidator,
+): { observedAt: string; refreshRequired: boolean } {
+  const selection = validateGovernanceBaseline(input, options, validateBaseline, false);
+  return {
+    observedAt: selection.constraints.discoveredAt,
+    refreshRequired: Date.parse(options.now) >= Date.parse(selection.constraints.expiresAt),
+  };
 }

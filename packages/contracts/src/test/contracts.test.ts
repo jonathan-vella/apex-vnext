@@ -1043,6 +1043,45 @@ describe("target family contracts", () => {
       questions: [{ id: "region", prompt: "Which region?", options: ["sweden", "germany"] }],
     };
     assert.equal(Value.Check(InputRequestV1Schema, request), true);
+    const { intake: _intake, ...base } = request;
+    const governance = {
+      candidatePath: "governance/baseline.json",
+      candidateHash: hash,
+      observedAt: "2026-09-01T00:00:00Z",
+      requestedAt: "2026-09-19T00:00:00Z",
+      expiresAt: "2026-09-20T00:00:00Z",
+      targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111",
+      refreshRequired: false,
+    };
+    assert.equal(Value.Check(InputRequestV1Schema, { ...base, governance }), true);
+    assert.equal(Value.Check(InputRequestV1Schema, { ...request, governance }), false);
+    assert.equal(
+      Value.Check(InputRequestV1Schema, { ...base, governance, decision: { taskId: "task-1", id: "choice" } }),
+      false,
+    );
+    for (const candidatePath of [
+      "/baseline.json",
+      "C:/baseline.json",
+      "../baseline.json",
+      "dir/../baseline.json",
+      "./baseline.json",
+      "dir\\baseline.json",
+      "bad\u0000.json",
+      "a".repeat(4097),
+    ]) {
+      assert.equal(Value.Check(InputRequestV1Schema, { ...base, governance: { ...governance, candidatePath } }), false);
+    }
+    for (const extra of [
+      { candidateHash: "bad" },
+      { observedAt: "not-a-date" },
+      { requestedAt: undefined },
+      { requestedAt: null },
+      { requestedAt: "not-a-date" },
+      { refreshRequired: "false" },
+      { snapshot: {} },
+    ]) {
+      assert.equal(Value.Check(InputRequestV1Schema, { ...base, governance: { ...governance, ...extra } }), false);
+    }
     assert.equal(
       Value.Check(InputRequestV1Schema, {
         schemaVersion: CONTRACT_VERSION,

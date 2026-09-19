@@ -87,6 +87,7 @@ import {
   generateBicepTree,
   generateTerraformTree,
   importGovernanceBaseline,
+  inspectGovernanceBaseline,
   GovernanceBaselineError,
   nativePolicyValidationBinding,
   type GovernanceBaselineSelection,
@@ -1210,6 +1211,17 @@ export class ApexService {
     const run = await this.run(selection);
     const events = await this.journal(run).replay();
     const requirements = this.artifactHash(events, "requirements");
+    const governanceInput = await this.governanceInputState(run, events);
+    if (governanceInput !== undefined && !governanceInput.fulfilled) {
+      this.assertGovernanceInputBinding(run, governanceInput.request, governanceInput.choice === undefined);
+      if (governanceInput.choice === undefined) {
+        if (events.at(-1)?.hash !== governanceInput.request.expectedHead)
+          throw new ApexError("APEX_STALE", "Governance input journal head is stale", EXIT_CODES.stale);
+        return { status: "needs_input", request: governanceInput.request };
+      }
+      if (governanceInput.choice === "refresh") this.governanceRefreshRequired();
+      await this.assertGovernanceCandidate(run, governanceInput.request, "reuse");
+    }
     if (requirements === undefined) {
       const pending = this.nextRequirementsIntakeRound(events);
       if (pending !== undefined)
@@ -1272,7 +1284,10 @@ export class ApexService {
     const requested = [...events]
       .reverse()
       .find(
-        (event) => event.type === "requirements.input-requested" || event.type === "architecture.decision-requested",
+        (event) =>
+          event.type === "requirements.input-requested" ||
+          event.type === "architecture.decision-requested" ||
+          event.type === "governance.input-requested",
       );
     if (requested === undefined) {
       throw new ApexError("APEX_CONFLICT", "No input request is pending", EXIT_CODES.conflict);
@@ -1280,15 +1295,21 @@ export class ApexService {
     const request =
       requested.type === "requirements.input-requested"
         ? this.inputRequest(requested, run.ownerEpoch)
-        : this.architectureDecisionRequest(requested, run.ownerEpoch);
+        : requested.type === "governance.input-requested"
+          ? this.governanceInputRequest(requested)
+          : this.architectureDecisionRequest(requested, run.ownerEpoch);
     const recordedType =
       requested.type === "requirements.input-requested"
         ? "requirements.input-recorded"
-        : "architecture.decision-recorded";
+        : requested.type === "governance.input-requested"
+          ? "governance.input-recorded"
+          : "architecture.decision-recorded";
+    if (request.governance !== undefined) await this.governanceInputState(run, events);
     if (
       events.some(
         (event) =>
-          event.type === recordedType && (event.payload as { requestId?: unknown }).requestId === request.requestId,
+          event.type === recordedType &&
+          (event.payload as { requestId?: unknown } | null)?.requestId === request.requestId,
       )
     ) {
       throw new ApexError("APEX_CONFLICT", "Input request was already recorded", EXIT_CODES.conflict);
@@ -1312,13 +1333,25 @@ export class ApexService {
         EXIT_CODES.validation,
       );
     }
+    if (request.governance !== undefined) {
+      this.assertGovernanceInputBinding(run, request);
+      await this.assertCurrentWriterAuthority(
+        run,
+        new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock),
+      );
+      await this.assertGovernanceCandidate(run, request, normalizedAnswers[0]!.value === "reuse" ? "reuse" : "answer");
+    }
     try {
       await this.append(
         run,
         recordedType,
         {
           requestId: request.requestId,
-          ...("intake" in request ? { intake: request.intake } : { decision: request.decision }),
+          ...(request.governance !== undefined
+            ? { governance: request.governance }
+            : request.intake !== undefined
+              ? { intake: request.intake }
+              : { decision: request.decision! }),
           answers: normalizedAnswers,
         },
         request.expectedHead,
@@ -1641,28 +1674,11 @@ export class ApexService {
     return { taskId, kind: output.kind, path, bytes: bytes.byteLength, hash };
   }
 
-  async importGovernanceBaseline(path: string): Promise<{ outputHash: string; summary: string }> {
-    const run = await this.currentRun();
-    const subscription = /^\/subscriptions\/([0-9a-f-]{36})(?:\/resourceGroups\/[^/]+)?$/iu.exec(run.targetScope);
-    if (subscription === null)
-      throw new ApexError(
-        "APEX_VALIDATION",
-        "Governance import requires a subscription-scoped run target",
-        EXIT_CODES.validation,
-      );
-    const events = await this.journal(run).replay();
-    const governanceHash = this.acceptedArtifactHashes(events)["governance-constraints"];
-    const transfers = new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock);
-    if (governanceHash !== undefined) await this.assertCurrentWriterAuthority(run, transfers);
-    const next = governanceHash === undefined ? await this.nextTask() : undefined;
-    if (next !== undefined && (next.status !== "task" || next.task.taskType !== "governance-discovery"))
-      throw new ApexError(
-        "APEX_AUTHORIZATION",
-        "Governance import requires the active discovery task",
-        EXIT_CODES.authorization,
-      );
+  private async readGovernanceBaselineBytes(path: string): Promise<Buffer> {
     const sourcePath = resolve(this.root, path);
     await this.assertSafeDestination(this.root, sourcePath);
+    const canonicalRoot = await realpath(this.root);
+    const canonicalSource = await realpath(sourcePath);
     const metadata = await lstat(sourcePath);
     if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > 20_000_000)
       throw new ApexError(
@@ -1673,14 +1689,28 @@ export class ApexService {
     const handle = await open(sourcePath, constants.O_RDONLY | constants.O_NOFOLLOW);
     let bytes: Buffer;
     try {
-      const current = await handle.stat();
-      if (
-        !current.isFile() ||
-        current.dev !== metadata.dev ||
-        current.ino !== metadata.ino ||
-        current.size > 20_000_000
-      )
-        throw new ApexError("APEX_STALE", "Governance baseline file changed", EXIT_CODES.stale);
+      const assertUnchanged = async () => {
+        await this.assertSafeDestination(this.root, sourcePath);
+        const actual = await realpath(sourcePath);
+        const currentPath = await lstat(sourcePath);
+        const current = await handle.stat();
+        if (
+          actual !== canonicalSource ||
+          !actual.startsWith(`${canonicalRoot}${sep}`) ||
+          [currentPath, current].some(
+            (entry) =>
+              !entry.isFile() ||
+              entry.isSymbolicLink() ||
+              entry.dev !== metadata.dev ||
+              entry.ino !== metadata.ino ||
+              entry.size !== metadata.size ||
+              entry.mtimeMs !== metadata.mtimeMs ||
+              entry.ctimeMs !== metadata.ctimeMs,
+          )
+        )
+          throw new ApexError("APEX_STALE", "Governance baseline file changed", EXIT_CODES.stale);
+      };
+      await assertUnchanged();
       const buffer = Buffer.alloc(20_000_001);
       let length = 0;
       while (length < buffer.length) {
@@ -1690,23 +1720,425 @@ export class ApexService {
       }
       if (length > 20_000_000)
         throw new ApexError("APEX_VALIDATION", "Governance baseline exceeds the size limit", EXIT_CODES.validation);
+      await assertUnchanged();
       bytes = buffer.subarray(0, length);
     } finally {
       await handle.close();
     }
+    return bytes;
+  }
+
+  private async governanceBaselineValidator() {
     const assets = await resolveBundledAssets();
     const schema = JSON.parse(await readFile(join(assets.root, "schemas", "governance-baseline.schema.json"), "utf8"));
-    const validate = new Ajv2020({ strict: false }).compile(schema);
+    return new Ajv2020({ strict: false }).compile(schema);
+  }
+
+  private governanceBaselineOptions(run: RunConfigV1) {
+    const subscription = /^\/subscriptions\/([0-9a-f-]{36})(?:\/resourceGroups\/[^/]+)?$/iu.exec(run.targetScope);
+    if (subscription === null)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Governance import requires a subscription-scoped run target",
+        EXIT_CODES.validation,
+      );
+    return { subscriptionId: subscription[1]!, now: this.clock().toISOString() };
+  }
+
+  private governanceQuestions(
+    observedAt: string,
+    refreshRequired: boolean,
+    requestedAt: string,
+  ): InputRequestV1["questions"] {
+    return [
+      {
+        id: "governance-baseline-choice",
+        prompt: `Azure policy was collected ${Math.floor((Date.parse(requestedAt) - Date.parse(observedAt)) / 86_400_000)} days ago, at ${observedAt}. Use this snapshot or refresh it from Azure?`,
+        options: refreshRequired ? ["refresh"] : ["reuse", "refresh"],
+        recommendation: {
+          value: refreshRequired ? "refresh" : "reuse",
+          source: "derived",
+          rationale: refreshRequired
+            ? "The observation is at least 30 days old; refresh is required."
+            : "The successful observation is less than 30 days old.",
+        },
+      },
+    ];
+  }
+
+  private governanceInputRequest(event: EventV1): InputRequestV1 {
+    if (event.payload === null || typeof event.payload !== "object" || Array.isArray(event.payload))
+      throw new ApexError("APEX_VALIDATION", "Persisted governance input request is invalid", EXIT_CODES.validation);
+    const payload = event.payload as {
+      requestId: string;
+      governance: NonNullable<InputRequestV1["governance"]>;
+      questions: InputRequestV1["questions"];
+    };
+    const request = {
+      schemaVersion: CONTRACT_VERSION,
+      requestId: payload.requestId,
+      expectedHead: event.hash,
+      ownerEpoch: event.ownerEpoch,
+      governance: payload.governance,
+      questions: payload.questions,
+    };
+    if (
+      !Value.Check(InputRequestV1Schema, request) ||
+      !hasValidInputRequestQuestions(request.questions) ||
+      sha256Json(request.questions) !==
+        sha256Json(
+          this.governanceQuestions(
+            request.governance.observedAt,
+            request.governance.refreshRequired,
+            request.governance.requestedAt,
+          ),
+        ) ||
+      Date.parse(request.governance.requestedAt) > Date.parse(event.timestamp) ||
+      Date.parse(event.timestamp) - Date.parse(request.governance.requestedAt) >= 86_400_000 ||
+      Date.parse(request.governance.observedAt) > Date.parse(request.governance.requestedAt) ||
+      request.governance.refreshRequired !==
+        Date.parse(request.governance.requestedAt) - Date.parse(request.governance.observedAt) >=
+          GOVERNANCE_MAX_AGE_MS ||
+      Date.parse(request.governance.expiresAt) <= Date.parse(event.timestamp) ||
+      Date.parse(request.governance.expiresAt) !== Date.parse(request.governance.requestedAt) + 86_400_000
+    )
+      throw new ApexError("APEX_VALIDATION", "Persisted governance input request is invalid", EXIT_CODES.validation);
+    return request;
+  }
+
+  private async governanceInputState(
+    run: RunConfigV1,
+    events: EventV1[],
+  ): Promise<{ request: InputRequestV1; choice?: "reuse" | "refresh"; fulfilled: boolean } | undefined> {
+    const requestedIndex = events.findLastIndex(({ type }) => type === "governance.input-requested");
+    if (requestedIndex < 0) return undefined;
+    const request = this.governanceInputRequest(events[requestedIndex]!);
+    for (const event of events.slice(requestedIndex + 1)) {
+      if (event.type !== "governance.input-recorded") continue;
+      if (
+        event.payload === null ||
+        typeof event.payload !== "object" ||
+        Array.isArray(event.payload) ||
+        !Value.Check(InputSubmissionV1Schema, {
+          schemaVersion: CONTRACT_VERSION,
+          requestId: (event.payload as { requestId?: unknown }).requestId,
+          expectedHead: request.expectedHead,
+          ownerEpoch: event.ownerEpoch,
+          answers: (event.payload as { answers?: unknown }).answers,
+        })
+      )
+        throw new ApexError("APEX_VALIDATION", "Persisted governance choice is invalid", EXIT_CODES.validation);
+    }
+    const recordedIndex = events.findIndex(
+      (event, index) =>
+        index > requestedIndex &&
+        event.type === "governance.input-recorded" &&
+        (event.payload as { requestId?: string }).requestId === request.requestId,
+    );
+    if (recordedIndex < 0) return { request, fulfilled: false };
+    const recorded = events[recordedIndex]!;
+    const payload = recorded.payload as { governance: unknown; answers: InputSubmissionV1["answers"] };
+    let answers;
+    try {
+      answers = validateInputAnswers(request.questions, payload.answers);
+    } catch {
+      throw new ApexError("APEX_VALIDATION", "Persisted governance choice is invalid", EXIT_CODES.validation);
+    }
+    const choice = answers[0]?.value;
+    if (
+      (choice !== "reuse" && choice !== "refresh") ||
+      payload.governance == null ||
+      sha256Json(payload.governance) !== sha256Json(request.governance!) ||
+      recorded.ownerEpoch !== request.ownerEpoch ||
+      events[recordedIndex - 1]?.hash !== request.expectedHead
+    )
+      throw new ApexError("APEX_VALIDATION", "Persisted governance choice is invalid", EXIT_CODES.validation);
+    for (let index = recordedIndex + 1; index < events.length; index++) {
+      const event = events[index]!;
+      if (event.type !== "governance.selection-applied" && event.type !== "governance.observation-renewed") continue;
+      const metadata = event.payload as Record<string, unknown> | null;
+      const candidate = request.governance!;
+      if (
+        metadata === null ||
+        (event.type === "governance.selection-applied" ? metadata.requestId : metadata.selectionRequestId) !==
+          request.requestId ||
+        event.ownerEpoch !== request.ownerEpoch ||
+        metadata.selectedPath !== candidate.candidatePath ||
+        typeof metadata.rawSourceDigest !== "string" ||
+        !/^[0-9a-f]{64}$/u.test(metadata.rawSourceDigest) ||
+        typeof metadata.observedAt !== "string" ||
+        !isGovernanceObservationCurrent(metadata.observedAt, event.timestamp) ||
+        (choice === "refresh"
+          ? metadata.rawSourceDigest === candidate.candidateHash ||
+            Date.parse(metadata.observedAt) <= Date.parse(candidate.observedAt)
+          : metadata.rawSourceDigest !== candidate.candidateHash || metadata.observedAt !== candidate.observedAt)
+      )
+        continue;
+      const prior = events.slice(0, index + 1);
+      const governanceHash = this.acceptedArtifactHashes(prior)["governance-constraints"];
+      if (governanceHash === undefined || metadata.governanceHash !== governanceHash) continue;
+      const governance = await this.objects.getJson<GovernanceConstraintsV1>(governanceHash);
+      if (
+        !Value.Check(GovernanceConstraintsV1Schema, governance) ||
+        governance.constraintsRef.uri !== `apex-object:${governance.constraintsRef.digest}`
+      )
+        continue;
+      const snapshot = await this.selectedGovernanceSnapshot(run, governance);
+      const observation = await this.latestGovernanceObservation(run, prior, governanceHash, governance, snapshot);
+      if (metadata.observedAt !== (observation?.observedAt ?? governance.discoveredAt)) continue;
+      if (event.type === "governance.observation-renewed" && observation?.rawSourceDigest !== metadata.rawSourceDigest)
+        continue;
+      if (
+        choice === "refresh" &&
+        event.type === "governance.selection-applied" &&
+        !this.governanceInitialImportProof(prior, request.requestId, metadata) &&
+        !(
+          observation?.rawSourceDigest === metadata.rawSourceDigest &&
+          prior.some(
+            (entry) =>
+              entry.type === "governance.observation-renewed" &&
+              (entry.payload as { receiptHash?: unknown } | null)?.receiptHash === metadata.receiptHash &&
+              typeof metadata.receiptHash === "string",
+          )
+        )
+      )
+        continue;
+      return { request, choice, fulfilled: true };
+    }
+    return { request, choice, fulfilled: false };
+  }
+
+  private governanceInitialImportProof(
+    events: EventV1[],
+    requestId: string,
+    metadata: Record<string, unknown>,
+  ): boolean {
+    const prepared = events.findLastIndex((event) => {
+      const payload = event.payload as Record<string, unknown> | null;
+      return (
+        event.type === "governance.selection-importing" &&
+        payload?.selectionRequestId === requestId &&
+        ["governanceHash", "selectedPath", "rawSourceDigest", "observedAt"].every(
+          (key) => payload[key] === metadata[key],
+        )
+      );
+    });
+    return (
+      prepared >= 0 &&
+      events
+        .slice(prepared + 1)
+        .some(
+          (event) =>
+            event.type === "task.completed" &&
+            (event.payload as { nodeId?: string; artifactHashes?: Record<string, string> } | null)?.nodeId ===
+              "governance-discovery" &&
+            (event.payload as { artifactHashes?: Record<string, string> }).artifactHashes?.[
+              "governance-constraints"
+            ] === metadata.governanceHash,
+        )
+    );
+  }
+
+  private assertGovernanceInputBinding(run: RunConfigV1, request: InputRequestV1, answering = true): void {
+    if (request.ownerEpoch !== run.ownerEpoch || request.governance!.targetScope !== run.targetScope)
+      throw new ApexError("APEX_STALE", "Governance input target or owner epoch is stale", EXIT_CODES.stale);
+    if (answering && Date.parse(request.governance!.expiresAt) <= this.clock().getTime())
+      throw new ApexError(
+        "APEX_STALE",
+        "Governance input request expired; select the candidate again",
+        EXIT_CODES.stale,
+      );
+  }
+
+  private governanceRefreshRequired(): never {
+    throw new ApexError(
+      "APEX_STALE",
+      "Governance refresh required: collect a newer successful baseline, replace the selected file, then explicitly import it. No cloud collection has been performed.",
+      EXIT_CODES.stale,
+    );
+  }
+
+  private async assertGovernanceCandidate(
+    run: RunConfigV1,
+    request: InputRequestV1,
+    mode: "reuse" | "answer" | "refresh",
+    bytes?: Buffer,
+  ): Promise<void> {
+    this.assertGovernanceInputBinding(run, request, mode === "answer");
+    const candidate = request.governance!;
+    const raw = bytes ?? (await this.readGovernanceBaselineBytes(candidate.candidatePath));
+    const inspected = inspectGovernanceBaseline(
+      raw,
+      this.governanceBaselineOptions(run),
+      await this.governanceBaselineValidator(),
+    );
+    if (mode === "refresh") {
+      if (
+        sha256Bytes(raw) === candidate.candidateHash ||
+        Date.parse(inspected.observedAt) <= Date.parse(candidate.observedAt) ||
+        inspected.refreshRequired
+      )
+        this.governanceRefreshRequired();
+    } else {
+      if (sha256Bytes(raw) !== candidate.candidateHash || inspected.observedAt !== candidate.observedAt)
+        throw new ApexError(
+          "APEX_STALE",
+          "Governance candidate changed; reconcile the candidate before answering or importing",
+          EXIT_CODES.stale,
+        );
+      if (mode === "reuse" && inspected.refreshRequired) this.governanceRefreshRequired();
+    }
+  }
+
+  async selectGovernanceBaseline(
+    path: string,
+    options: { reopen?: boolean } = {},
+  ): Promise<
+    | { status: "needs_input"; request: InputRequestV1 }
+    | {
+        status: "selected";
+        choice: "reuse" | "refresh";
+        candidateHash: string;
+        observedAt: string;
+        refreshRequired: boolean;
+      }
+  > {
+    const run = await this.currentRun();
+    const events = await this.journal(run).replay();
+    await this.assertCurrentWriterAuthority(
+      run,
+      new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock),
+    );
+    const governanceHash = this.acceptedArtifactHashes(events)["governance-constraints"];
+    if (governanceHash === undefined) {
+      const route = await this.route(run, events);
+      if (route.task?.id !== "governance-discovery" || route.blockers.length > 0)
+        throw new ApexError(
+          "APEX_AUTHORIZATION",
+          "Governance selection requires the active discovery task or accepted imported governance",
+          EXIT_CODES.authorization,
+        );
+    } else {
+      const governance = await this.objects.getJson<GovernanceConstraintsV1>(governanceHash);
+      await this.selectedGovernanceSnapshot(run, governance);
+    }
+    const bytes = await this.readGovernanceBaselineBytes(path);
+    const candidatePath = relative(this.root, resolve(this.root, path)).split(sep).join("/");
+    const inspected = inspectGovernanceBaseline(
+      bytes,
+      this.governanceBaselineOptions(run),
+      await this.governanceBaselineValidator(),
+    );
+    const candidateHash = sha256Bytes(bytes);
+    const state = await this.governanceInputState(run, events);
+    if (options.reopen === true && (state === undefined || state.choice !== "refresh" || state.fulfilled))
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "Only a pending recorded refresh choice can be reopened",
+        EXIT_CODES.conflict,
+      );
+    if (state !== undefined) {
+      this.assertGovernanceInputBinding(run, state.request, false);
+      const same =
+        state.request.governance!.candidatePath === candidatePath &&
+        state.request.governance!.candidateHash === candidateHash;
+      if (!same && !state.fulfilled)
+        throw new ApexError(
+          "APEX_STALE",
+          "Governance candidate changed; explicitly import a newer refresh at the selected path or reconcile the candidate",
+          EXIT_CODES.stale,
+        );
+      if (
+        options.reopen !== true &&
+        same &&
+        state.choice !== undefined &&
+        !(state.choice === "reuse" && inspected.refreshRequired)
+      )
+        return {
+          status: "selected",
+          choice: state.choice,
+          candidateHash,
+          observedAt: inspected.observedAt,
+          refreshRequired: inspected.refreshRequired || state.choice === "refresh",
+        };
+      if (
+        same &&
+        state.choice === undefined &&
+        state.request.governance!.refreshRequired === inspected.refreshRequired &&
+        Date.parse(state.request.governance!.expiresAt) > this.clock().getTime()
+      ) {
+        if (events.at(-1)?.hash !== state.request.expectedHead)
+          throw new ApexError("APEX_STALE", "Governance input journal head is stale", EXIT_CODES.stale);
+        return { status: "needs_input", request: state.request };
+      }
+    }
+    const now = this.clock();
+    const governance = {
+      candidatePath,
+      candidateHash,
+      observedAt: inspected.observedAt,
+      requestedAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + 86_400_000).toISOString(),
+      targetScope: run.targetScope,
+      refreshRequired: now.getTime() - Date.parse(inspected.observedAt) >= GOVERNANCE_MAX_AGE_MS,
+    };
+    const questions = this.governanceQuestions(governance.observedAt, governance.refreshRequired, now.toISOString());
+    const requestId = this.idSource();
+    if (
+      !Value.Check(InputRequestV1Schema, {
+        schemaVersion: CONTRACT_VERSION,
+        requestId,
+        expectedHead: events.at(-1)?.hash,
+        ownerEpoch: run.ownerEpoch,
+        governance,
+        questions,
+      })
+    )
+      throw new ApexError("APEX_VALIDATION", "Governance input request is invalid", EXIT_CODES.validation);
+    const event = await this.append(
+      run,
+      "governance.input-requested",
+      { requestId, governance, questions },
+      events.at(-1)?.hash ?? null,
+    );
+    return { status: "needs_input", request: this.governanceInputRequest(event) };
+  }
+
+  async importGovernanceBaseline(path: string): Promise<{ outputHash: string; summary: string }> {
+    const run = await this.currentRun();
+    const options = this.governanceBaselineOptions(run);
+    const events = await this.journal(run).replay();
+    const governanceHash = this.acceptedArtifactHashes(events)["governance-constraints"];
+    const transfers = new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock);
+    await this.assertCurrentWriterAuthority(run, transfers);
+    const state = await this.governanceInputState(run, events);
+    const bytes = await this.readGovernanceBaselineBytes(path);
+    if (state !== undefined && !state.fulfilled) {
+      if (state.choice === undefined)
+        throw new ApexError(
+          "APEX_AUTHORIZATION",
+          "Governance selection requires an explicit input answer before import",
+          EXIT_CODES.authorization,
+        );
+      if (
+        relative(this.root, resolve(this.root, path)).split(sep).join("/") !== state.request.governance!.candidatePath
+      )
+        throw new ApexError("APEX_STALE", "Governance import must use the selected candidate path", EXIT_CODES.stale);
+      await this.assertGovernanceCandidate(run, state.request, state.choice, bytes);
+    }
+    if (governanceHash === undefined) {
+      const route = await this.route(run, events);
+      if (route.task?.id !== "governance-discovery" || route.blockers.length > 0)
+        throw new ApexError(
+          "APEX_AUTHORIZATION",
+          "Governance import requires the active discovery task",
+          EXIT_CODES.authorization,
+        );
+    }
+    const validate = await this.governanceBaselineValidator();
     let selection;
     try {
-      selection = importGovernanceBaseline(
-        bytes,
-        {
-          subscriptionId: subscription[1]!,
-          now: this.clock().toISOString(),
-        },
-        validate,
-      );
+      selection = importGovernanceBaseline(bytes, options, validate);
     } catch (error) {
       if (!(error instanceof GovernanceBaselineError)) throw error;
       throw new ApexError(
@@ -1716,6 +2148,15 @@ export class ApexService {
       );
     }
     const selectedSnapshot = { ...selection.snapshot, projectId: run.projectId, runId: run.runId };
+    const selectionMetadata =
+      state?.choice !== undefined && !state.fulfilled
+        ? {
+            selectionRequestId: state.request.requestId,
+            selectedPath: state.request.governance!.candidatePath,
+            rawSourceDigest: sha256Bytes(bytes),
+            observedAt: selection.constraints.discoveredAt,
+          }
+        : undefined;
     if (governanceHash !== undefined) {
       const governance = await this.objects.getJson<GovernanceConstraintsV1>(governanceHash);
       if (governance.constraintsRef.uri !== `apex-object:${governance.constraintsRef.digest}`)
@@ -1743,7 +2184,38 @@ export class ApexService {
       const latest = await this.latestGovernanceObservation(run, events, governanceHash, governance, snapshot);
       const observedAt = selection.constraints.discoveredAt;
       const rawSourceDigest = sha256Bytes(bytes);
-      if (latest?.observedAt === observedAt && latest.rawSourceDigest === rawSourceDigest) {
+      const initialProof =
+        state?.choice !== undefined &&
+        this.governanceInitialImportProof(events, state.request.requestId, {
+          selectedPath: relative(this.root, resolve(this.root, path)).split(sep).join("/"),
+          rawSourceDigest,
+          observedAt,
+          governanceHash,
+        });
+      if (
+        selectionMetadata !== undefined &&
+        observedAt === (latest?.observedAt ?? governance.discoveredAt) &&
+        (state?.choice === "reuse" || initialProof || latest?.rawSourceDigest === rawSourceDigest)
+      ) {
+        await this.assertCurrentWriterAuthority(run, transfers);
+        if (!isGovernanceObservationCurrent(observedAt, this.clock().toISOString())) this.governanceRefreshRequired();
+        await this.append(
+          run,
+          "governance.selection-applied",
+          {
+            ...selectionMetadata,
+            requestId: selectionMetadata.selectionRequestId,
+            governanceHash,
+            ...(latest === undefined ? {} : { receiptHash: sha256Json(latest) }),
+          },
+          events.at(-1)?.hash ?? null,
+        );
+        return { outputHash: governanceHash, summary: "Existing governance observation reused" };
+      }
+      if (
+        (latest?.observedAt === observedAt && latest.rawSourceDigest === rawSourceDigest) ||
+        (state?.fulfilled && initialProof && observedAt === governance.discoveredAt)
+      ) {
         await this.assertImportedGovernanceCurrent(run, events);
         return { outputHash: governanceHash, summary: "Governance observation already current" };
       }
@@ -1778,35 +2250,62 @@ export class ApexService {
       await this.append(
         run,
         "governance.observation-renewed",
-        { governanceHash, receiptHash },
+        { governanceHash, receiptHash, ...selectionMetadata },
         events.at(-1)?.hash ?? null,
       );
       return { outputHash: governanceHash, summary: "Unchanged governance observation renewed" };
     }
-    if (next?.status !== "task")
+    const route = await this.route(run, events);
+    if (route.task?.id !== "governance-discovery" || route.blockers.length > 0)
       throw new ApexError(
         "APEX_AUTHORIZATION",
         "Governance import requires the active discovery task",
         EXIT_CODES.authorization,
       );
     const digest = await this.objects.putJson(selectedSnapshot);
-    const completed = await this.completeTaskOutputs(next.task.taskId, [
-      {
-        kind: "governance-constraints",
-        value: {
-          ...selection.constraints,
-          projectId: run.projectId,
-          runId: run.runId,
-          targetScope: run.targetScope,
-          constraintsRef: {
-            mediaType: "application/json",
-            uri: `apex-object:${digest}`,
-            digest,
-            bytes: (await this.objects.getBytes(digest)).byteLength,
-          },
-        },
+    const constraints = {
+      ...selection.constraints,
+      projectId: run.projectId,
+      runId: run.runId,
+      targetScope: run.targetScope,
+      constraintsRef: {
+        mediaType: "application/json",
+        uri: `apex-object:${digest}`,
+        digest,
+        bytes: (await this.objects.getBytes(digest)).byteLength,
       },
+    };
+    if (selectionMetadata !== undefined) {
+      await this.append(
+        run,
+        "governance.selection-importing",
+        {
+          ...selectionMetadata,
+          governanceHash: sha256Json(constraints),
+        },
+        events.at(-1)?.hash ?? null,
+      );
+    }
+    const task = await this.issueTask(run, route.task, await this.inputRefs(run, events, route.task));
+    const completed = await this.completeTaskOutputs(task.taskId, [
+      { kind: "governance-constraints", value: constraints },
     ]);
+    if (selectionMetadata !== undefined) {
+      const completedEvents = await this.journal(run).replay();
+      const metadata = { ...selectionMetadata, governanceHash: completed.outputHashes["governance-constraints"]! };
+      if (!this.governanceInitialImportProof(completedEvents, selectionMetadata.selectionRequestId, metadata))
+        throw new ApexError("APEX_STALE", "Governance import completion proof is missing", EXIT_CODES.stale);
+      await this.assertCurrentWriterAuthority(run, transfers);
+      await this.append(
+        run,
+        "governance.selection-applied",
+        {
+          ...metadata,
+          requestId: selectionMetadata.selectionRequestId,
+        },
+        completedEvents.at(-1)?.hash ?? null,
+      );
+    }
     return { outputHash: completed.outputHashes["governance-constraints"]!, summary: completed.summary };
   }
 
@@ -4972,6 +5471,18 @@ export class ApexService {
     run: RunConfigV1,
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): Promise<void> {
+    const selection = await this.governanceInputState(run, events);
+    if (selection !== undefined && !selection.fulfilled) {
+      this.assertGovernanceInputBinding(run, selection.request, selection.choice === undefined);
+      if (selection.choice === undefined)
+        throw new ApexError(
+          "APEX_AUTHORIZATION",
+          "Governance selection requires an explicit input answer",
+          EXIT_CODES.authorization,
+        );
+      if (selection.choice === "refresh") this.governanceRefreshRequired();
+      await this.assertGovernanceCandidate(run, selection.request, "reuse");
+    }
     const hash = this.acceptedArtifactHashes(events)["governance-constraints"];
     if (hash === undefined) return;
     const governance = await this.objects.getJson<GovernanceConstraintsV1>(hash);

@@ -395,6 +395,16 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
     async ({ path }) => result(await service.importGovernanceBaseline(path)),
   );
   server.registerTool(
+    "governanceSelect",
+    {
+      description:
+        "Prepare or recall the target governance snapshot reuse/refresh question; only a local path is accepted. Does not import or collect Azure policy.",
+      inputSchema: { path: z.string().min(1), reopen: z.boolean().optional() },
+    },
+    async ({ path, reopen }) =>
+      result(await service.selectGovernanceBaseline(path, ...(reopen === undefined ? [] : [{ reopen }]))),
+  );
+  server.registerTool(
     "projectCreate",
     {
       description: "Create and select a new project with its initial environment run",

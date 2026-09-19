@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { GovernanceConstraintsV1Schema, PolicyPropertyMapV1Schema } from "@apexops/contracts";
-import { GovernanceBaselineError, importGovernanceBaseline } from "../index.js";
+import { GovernanceBaselineError, importGovernanceBaseline, inspectGovernanceBaseline } from "../index.js";
 
 const validate = new Ajv2020({ strict: false }).compile(
   JSON.parse(
@@ -165,6 +165,31 @@ test("rejects incomplete empty evidence, errors and inconsistent counts", () => 
   const source = baseline();
   delete (source.subscriptions[subscriptionId] as Record<string, unknown>).discovery_metadata;
   rejected(source, "invalid-input");
+});
+
+test("inspection admits old metadata only while preserving all non-age validation", () => {
+  const old = { ...options, now: new Date(Date.parse(discoveredAt) + 30 * 86_400_000).toISOString() };
+  assert.deepEqual(inspectGovernanceBaseline(baseline(), old, validate), {
+    observedAt: new Date(discoveredAt).toISOString(),
+    refreshRequired: true,
+  });
+  assert.deepEqual(inspectGovernanceBaseline(baseline(), options, validate), {
+    observedAt: new Date(discoveredAt).toISOString(),
+    refreshRequired: false,
+  });
+  assert.throws(() => importGovernanceBaseline(baseline(), old, validate), /stale/);
+  assert.throws(
+    () => inspectGovernanceBaseline(baseline(), { ...options, now: "2026-09-15T00:00:00Z" }, validate),
+    /stale/,
+  );
+  assert.throws(
+    () => inspectGovernanceBaseline(baseline(), { ...old, subscriptionId: otherId }, validate),
+    /target-mismatch/,
+  );
+  const partial = baseline();
+  partial.coverage_status = "PARTIAL";
+  assert.throws(() => inspectGovernanceBaseline(partial, old, validate), /incomplete|invalid-input/);
+  assert.throws(() => inspectGovernanceBaseline("{", old, validate), /invalid-input/);
 });
 
 test("allows reuse below 30 days and requires refresh at exactly 30 days independent of legacy TTL", () => {

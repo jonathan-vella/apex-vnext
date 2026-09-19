@@ -145,6 +145,12 @@ benchmarks or telemetry to unlock them under this plan. Neither tool wire bytes 
 - Test paging, exemptions, ordering, errors and full-baseline exclusion from model-facing surfaces. Carry mappings
   through both IaC tracks, preview and deployment tests. Azure Policy always wins.
 
+Consumer-governance implementation checkpoint: the 30-day guards, unchanged-observation renewal, typed persisted
+reuse/refresh selection and explicit reconsideration are implemented. Both client bundles include the single-source
+collector, schema and disabled-by-default GitHub workflow with normal update-conflict handling. Consumer identity and
+environment setup, live collection, exact-client choice interaction, material-policy reconciliation, and the remaining
+both-track policy/ownership qualification are still required; packaging tests do not establish those outcomes.
+
 ## Phase 3: Profiles, Import And Change
 
 **Requirements:** `REQ-REUSE-001`, `REQ-CHANGE-001`, `REQ-REQUIREMENTS-001`, `REQ-STATE-001`, `REQ-CONTRACT-001`.

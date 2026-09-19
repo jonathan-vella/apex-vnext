@@ -59,9 +59,9 @@
       "path": ".github/workflows/governance-policy-baseline.yml",
       "name": "Governance Policy Baseline",
       "triggerDigest": "37f673b0e102c919b3f5ca1275e591d4b46b9b44f0e7a9b02d1497725ece322c",
-      "permissionsDigest": "e780d99acb8992dbb7dd375a4e4167b135d1ace462209423726fdfe650ac01c7",
+      "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "ca128029c3a978503c43d2751a4ef3ad47011a59c33e1b2ded221e0d0a227031",
+      "jobsDigest": "180e93fee69b010f461f97510d8fcb0395e6fc6016c65947249b02adcdec7620",
       "jobs": {
         "collect-baseline": "collect-baseline"
       }

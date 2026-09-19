@@ -1,4 +1,8 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { test } from "node:test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,6 +29,51 @@ test("repository model satisfies vNext contracts", () => {
   assert.ok(Object.values(generateManagedFileHashInventory(baseline)).every((hash) => /^[a-f0-9]{64}$/.test(hash)));
 });
 
+test("generated shared governance source inventory remains exact and canonical", () => {
+  const hashes = generateManagedFileHashInventory(baseline);
+  for (const source of [
+    ".github/workflows/governance-policy-baseline.yml",
+    "tools/scripts/collect-governance-baseline.ps1",
+    "tools/schemas/governance-baseline.schema.json",
+  ]) {
+    assert.equal(
+      hashes[source],
+      createHash("sha256")
+        .update(readFileSync(path.join(root, source)))
+        .digest("hex"),
+    );
+    assert.ok(
+      hasRule(
+        mutate((model) => {
+          model.customization.manifest.sharedFiles = model.customization.manifest.sharedFiles.filter(
+            (file) => file !== source,
+          );
+        }),
+        "customization.shared-coverage",
+      ),
+    );
+    assert.ok(
+      hasRule(
+        mutate((model) => {
+          model.customization.manifest.managedFiles = model.customization.manifest.managedFiles.filter(
+            (file) => file !== source,
+          );
+        }),
+        "customization.coverage",
+      ),
+    );
+  }
+  assert.ok(
+    hasRule(
+      mutate((model) => {
+        model.customization.manifest.sharedFiles.push("tools/scripts/unreviewed.ps1");
+        model.customization.manifest.managedFiles.push("tools/scripts/unreviewed.ps1");
+      }),
+      "customization.shared-coverage",
+    ),
+  );
+});
+
 test("projection frontmatter parsing fails closed", () => {
   assert.deepEqual(parseProjectionFrontmatter("body only"), {
     frontmatter: null,
@@ -38,6 +87,29 @@ test("projection frontmatter parsing fails closed", () => {
     frontmatter: null,
     error: "frontmatter must be a YAML object",
   });
+});
+
+test("canonical managed source inventory rejects symlinked ancestors and duplicate maintained copies", async (context) => {
+  const temporaryRoot = await mkdtemp(path.join(tmpdir(), "apex-source-inventory-"));
+  context.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const repository = path.join(temporaryRoot, "repo");
+  const outside = path.join(temporaryRoot, "outside");
+  const source = "tools/scripts/collect-governance-baseline.ps1";
+  const model = structuredClone(baseline);
+  model.root = repository;
+  model.customization.manifest.managedFiles = [source];
+  await mkdir(path.join(repository, "tools/scripts"), { recursive: true });
+  await mkdir(path.join(outside, "scripts"), { recursive: true });
+  await writeFile(path.join(repository, source), "canonical\n");
+  await writeFile(path.join(outside, "scripts/collect-governance-baseline.ps1"), "outside\n");
+  assert.equal(Object.keys(generateManagedFileHashInventory(model)).length, 1);
+  await mkdir(path.join(repository, "customizations/tools/scripts"), { recursive: true });
+  await writeFile(path.join(repository, "customizations", source), "duplicate\n");
+  assert.throws(() => generateManagedFileHashInventory(model), /Unsafe managed path/u);
+  await rm(path.join(repository, "customizations"), { recursive: true });
+  await rm(path.join(repository, "tools"), { recursive: true });
+  await symlink(outside, path.join(repository, "tools"), "dir");
+  assert.throws(() => generateManagedFileHashInventory(model), /Unsafe managed path/u);
 });
 
 test("rejects CI lint before the vNext build", () => {

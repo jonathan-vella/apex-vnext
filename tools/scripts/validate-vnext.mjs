@@ -13,6 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
 import * as yaml from "js-yaml";
+import { GENERATED_SHARED_FILES } from "../../packages/cli/scripts/prepare-assets.mjs";
 
 const REQUIRED_PACKAGES = ["contracts", "kernel", "capabilities", "renderers", "testkit", "cli"];
 const CORE_PACKAGES = new Set(["kernel", "capabilities", "renderers"]);
@@ -568,6 +569,7 @@ function validateCustomizations(model, findings) {
     return;
   }
   const expectedSharedFiles = new Set([
+    ...GENERATED_SHARED_FILES,
     ...customization.skills.map(({ path: file }) => file),
     ".github/copilot-instructions.md",
   ]);
@@ -1009,18 +1011,24 @@ function validateMcp(model, findings) {
 }
 
 export function generateManagedFileHashInventory(model) {
-  const base = path.join(model.root, "customizations");
   return Object.fromEntries(
     array(model.customization.manifest.managedFiles).map((managedPath) => {
+      const generated = GENERATED_SHARED_FILES.includes(managedPath);
+      const base = generated ? model.root : path.join(model.root, "customizations");
       const absolute = path.resolve(base, managedPath);
       const inside = absolute.startsWith(`${path.resolve(base)}${path.sep}`);
       if (
         !inside ||
+        (generated && existsSync(path.join(model.root, "customizations", managedPath))) ||
         !existsSync(absolute) ||
+        !lstatSync(absolute).isFile() ||
         lstatSync(absolute).isSymbolicLink() ||
         !realpathSync(absolute).startsWith(`${realpathSync(base)}${path.sep}`)
       )
         throw new Error(`Unsafe managed path: ${managedPath}`);
+      for (let ancestor = path.dirname(absolute); ancestor !== path.resolve(base); ancestor = path.dirname(ancestor)) {
+        if (lstatSync(ancestor).isSymbolicLink()) throw new Error(`Unsafe managed path: ${managedPath}`);
+      }
       return [managedPath, createHash("sha256").update(readFileSync(absolute)).digest("hex")];
     }),
   );

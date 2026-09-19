@@ -141,6 +141,13 @@ const fixtures: Record<ToolName, Record<string, unknown>> = {
   readTaskInput: { subjectHash: hash, content: "{}", offset: 0 },
   recordInput: { recorded: true, requestId: "request-1" },
   governanceImport: { outputHash: hash, summary: "Imported" },
+  governanceSelect: {
+    status: "selected",
+    choice: "reuse",
+    candidateHash: hash,
+    observedAt: timestamp,
+    refreshRequired: false,
+  },
   projectCreate: selection,
   projectList: { projects: [{ projectId: "demo", displayName: "Demo" }] },
   projectUse: selection,
@@ -312,7 +319,7 @@ test("canonical inventory contract remains precise after the Zod bridge", () => 
   );
 });
 
-test("output schema coverage matches all 34 registered MCP tools", async () => {
+test("output schema coverage matches every registered MCP tool", async () => {
   const server = createMcpServer(new ApexService(await tempRoot()));
   const client = new Client({ name: "output-coverage", version: "1.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -320,7 +327,7 @@ test("output schema coverage matches all 34 registered MCP tools", async () => {
   await client.connect(clientTransport);
   try {
     const { tools } = await client.listTools();
-    assert.equal(tools.length, 34);
+    assert.equal(tools.length, Object.keys(MCP_OUTPUT_SCHEMAS).length);
     assert.deepEqual(Object.keys(MCP_OUTPUT_SCHEMAS).sort(), tools.map(({ name }) => name).sort());
     for (const tool of tools) {
       assert.equal(tool.outputSchema?.type, "object", tool.name);
@@ -393,6 +400,7 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
     readTaskInput: { method: "readTaskInput", input: { taskId }, args: [taskId, undefined, undefined, undefined] },
     recordInput: { method: "recordInput", input: submission, args: [submission] },
     governanceImport: { method: "importGovernanceBaseline", input: { path: "baseline.json" }, args: ["baseline.json"] },
+    governanceSelect: { method: "selectGovernanceBaseline", input: { path: "baseline.json" }, args: ["baseline.json"] },
     projectCreate: { method: "createProject", input: project, args: [project] },
     projectList: { method: "listProjects", input: {}, args: [] },
     projectUse: { method: "use", input: { projectId: "demo" }, args: ["demo", undefined] },

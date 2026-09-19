@@ -2,9 +2,6 @@ name: Governance Policy Baseline
 
 on:
   schedule:
-    # Weekly on Monday at 05:00 UTC. Moved from daily-04:00 (May 2026) because
-    # every drift PR now requires human review (auto-merge dropped, see
-    # workflows/README.md). Weekly is enough to keep the baseline fresh.
     - cron: "0 5 * * 1"
   workflow_dispatch:
 
@@ -13,111 +10,92 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
-  pull-requests: write
-  id-token: write
+  contents: read
 
 jobs:
   collect-baseline:
-    if: vars.GOVERNANCE_BASELINE_ENABLED != 'false'
+    if: vars.GOVERNANCE_BASELINE_ENABLED == 'true'
     runs-on: ubuntu-latest
+    environment: governance
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    env:
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID || secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID || secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID || secrets.AZURE_SUBSCRIPTION_ID }}
+      GOVERNANCE_MG_ID: ${{ vars.GOVERNANCE_MG_ID }}
+      GOVERNANCE_SUBSCRIPTION_ID: ${{ vars.GOVERNANCE_SUBSCRIPTION_ID }}
+      GOVERNANCE_MAX_SUBSCRIPTIONS: ${{ vars.GOVERNANCE_MAX_SUBSCRIPTIONS || '100' }}
     steps:
+      - name: Validate collection configuration
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $hasManagementGroup = -not [string]::IsNullOrEmpty($env:GOVERNANCE_MG_ID)
+          $hasSubscription = -not [string]::IsNullOrEmpty($env:GOVERNANCE_SUBSCRIPTION_ID)
+          if ($hasManagementGroup -eq $hasSubscription) {
+            throw 'Configure exactly one governance management group or subscription.'
+          }
+          if ($hasManagementGroup -and $env:GOVERNANCE_MG_ID -cnotmatch '\A[a-zA-Z0-9](?:[a-zA-Z0-9_().-]{0,88}[a-zA-Z0-9_()-])?\z') {
+            throw 'Invalid governance management group ID.'
+          }
+          $guidPattern = '\A[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\z'
+          if ($hasSubscription -and $env:GOVERNANCE_SUBSCRIPTION_ID -cnotmatch $guidPattern) {
+            throw 'Invalid governance subscription ID.'
+          }
+          foreach ($value in @($env:AZURE_CLIENT_ID, $env:AZURE_TENANT_ID, $env:AZURE_SUBSCRIPTION_ID)) {
+            if ([string]::IsNullOrEmpty($value) -or $value -cnotmatch $guidPattern) {
+              throw 'Configure valid Azure OIDC client, tenant, and login subscription IDs.'
+            }
+          }
+          $maximum = 0
+          if ($env:GOVERNANCE_MAX_SUBSCRIPTIONS -cnotmatch '\A[0-9]+\z' -or
+              -not [int]::TryParse($env:GOVERNANCE_MAX_SUBSCRIPTIONS, [ref]$maximum) -or $maximum -lt 1) {
+            throw 'Maximum subscriptions must be an integer from 1 through 2147483647.'
+          }
+
       - name: Checkout repository
         uses: actions/checkout@v7
 
       - name: Azure Login (OIDC)
         uses: azure/login@v3
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
 
       - name: Collect governance baseline
+        shell: pwsh
         run: |
-          pwsh tools/scripts/collect-governance-baseline.ps1 \
-            -ManagementGroupId "${{ vars.GOVERNANCE_MG_ID }}" \
-            -MaxSubscriptions "${{ vars.GOVERNANCE_MAX_SUBSCRIPTIONS || '100' }}"
-
-      - name: Stage baseline file
-        id: changes
-        run: |
-          git add .github/data/governance-policy-baseline.json
-          if git diff --cached --quiet; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Detect MG ID change
-        if: steps.changes.outputs.changed == 'true'
-        id: mg-check
-        run: |
-          CURRENT_MG=$(jq -r '.management_group_id' .github/data/governance-policy-baseline.json)
-          PRIOR_MG=$(git show HEAD:.github/data/governance-policy-baseline.json 2>/dev/null | jq -r '.management_group_id' 2>/dev/null || echo "")
-          if [[ -n "$PRIOR_MG" && "$CURRENT_MG" != "$PRIOR_MG" ]]; then
-            echo "mg_changed=true" >> "$GITHUB_OUTPUT"
-            echo "::warning::Management Group ID changed: $PRIOR_MG → $CURRENT_MG"
-          else
-            echo "mg_changed=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Read baseline summary
-        if: steps.changes.outputs.changed == 'true'
-        id: summary
-        run: |
-          COVERAGE=$(jq -r '.coverage_status' .github/data/governance-policy-baseline.json)
-          PROCESSED=$(jq -r '.subscriptions_processed' .github/data/governance-policy-baseline.json)
-          SKIPPED=$(jq -r '.subscriptions_skipped | length' .github/data/governance-policy-baseline.json)
-          EXCLUDED=$(jq -r '.subscriptions_excluded | length' .github/data/governance-policy-baseline.json)
-          MG_ID=$(jq -r '.management_group_id' .github/data/governance-policy-baseline.json)
-          echo "coverage=$COVERAGE" >> "$GITHUB_OUTPUT"
-          echo "processed=$PROCESSED" >> "$GITHUB_OUTPUT"
-          echo "skipped=$SKIPPED" >> "$GITHUB_OUTPUT"
-          echo "excluded=$EXCLUDED" >> "$GITHUB_OUTPUT"
-          echo "mg_id=$MG_ID" >> "$GITHUB_OUTPUT"
+          $ErrorActionPreference = 'Stop'
+          $parameters = @{ MaxSubscriptions = [int]$env:GOVERNANCE_MAX_SUBSCRIPTIONS }
+          if ($env:GOVERNANCE_MG_ID) {
+            $parameters.ManagementGroupId = $env:GOVERNANCE_MG_ID
+          } else {
+            $parameters.SubscriptionId = $env:GOVERNANCE_SUBSCRIPTION_ID
+          }
+          try {
+            & ./tools/scripts/collect-governance-baseline.ps1 @parameters *> $null
+            $baseline = Get-Content -LiteralPath '.github/data/governance-policy-baseline.json' -Raw
+            if (-not (Test-Json -Json $baseline -SchemaFile './tools/schemas/governance-baseline.schema.json' -ErrorAction Stop)) {
+              throw 'Invalid baseline.'
+            }
+          } catch {
+            throw 'Governance collection or schema validation failed; no baseline PR will be created.'
+          }
 
       - name: Create pull request
-        if: steps.changes.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          add-paths: .github/data/governance-policy-baseline.json
           commit-message: "chore(data): Update governance policy baseline"
           branch: "chore/governance-baseline-update"
           delete-branch: true
           title: "chore(data): Update governance policy baseline"
           body: |
-            Automated update of `.github/data/governance-policy-baseline.json` from Management Group `${{ steps.summary.outputs.mg_id }}`.
-
-            | Metric | Value |
-            | --- | --- |
-            | Coverage | ${{ steps.summary.outputs.coverage }} |
-            | Subscriptions Processed | ${{ steps.summary.outputs.processed }} |
-            | Subscriptions Skipped | ${{ steps.summary.outputs.skipped }} |
-            | Subscriptions Excluded | ${{ steps.summary.outputs.excluded }} |
-            | MG ID Changed | ${{ steps.mg-check.outputs.mg_changed }} |
-
-            Generated by `Governance Policy Baseline` workflow.
-          labels: |
-            automation
-            governance
-            ${{ steps.mg-check.outputs.mg_changed == 'true' && 'needs-human-review' || '' }}
-        id: cpr
-
-      # Auto-merge is intentionally NOT enabled: GitHub Free private repos
-      # do not support `gh pr merge --auto`. Every baseline-drift PR stays
-      # open for human review. MG ID changes are still surfaced via the
-      # `needs-human-review` label above + the warning log below.
-      - name: Log MG change warning
-        if: steps.cpr.outputs.pull-request-number != '' && steps.mg-check.outputs.mg_changed == 'true'
-        run: |
-          echo "⚠️ Management Group ID changed — PR carries the 'needs-human-review' label."
-
-      - name: Log pull request
-        if: steps.cpr.outputs.pull-request-number != ''
-        run: |
-          echo "✅ Opened/updated PR #${{ steps.cpr.outputs.pull-request-number }} — manual review + merge required."
-          echo "🔗 ${{ steps.cpr.outputs.pull-request-url }}"
-
-      - name: Log no changes
-        if: steps.changes.outputs.changed == 'false'
-        run: echo "ℹ️ No governance baseline changes detected — no PR created."
+            Updates only `.github/data/governance-policy-baseline.json`.
+            Human review and manual merge are required. Review scope, coverage,
+            exclusions, and policy changes before approving this baseline.

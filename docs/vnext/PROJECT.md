@@ -56,8 +56,9 @@ GitHub Issues and the repository project own day-to-day work selection. [ROADMAP
 
 The September 19 consumer clarification prioritizes collect/import/plan/deploy governance over broader local policy
 emulation. [REQ-GOV-001](PRD.md#req-gov-001-governance-and-policy) now requires optional refresh below 30 days and
-mandatory refresh at 30 days, measured from successful collection. Consumer-owned workflow installation and remembered
-reuse/refresh choices remain backlog acceptance items, not shipped claims.
+mandatory refresh at 30 days, measured from successful collection. Consumer workflow assets are now included in both
+client installations but remain disabled pending consumer OIDC/environment configuration. Live collection and exact-client
+qualification remain pending, not implied by packaging tests.
 The initial implementation enforces the fixed age at import, plan issuance/context/completion, preview and new Gate 4
 approval for imported snapshots. Collection renews observation timestamps even without policy changes and publishes
 atomically; failed publication preserves the prior authoritative file. The full integration checkpoint passed before
@@ -69,6 +70,14 @@ receipt bound to the accepted governance and target. Accepted artifact hashes, a
 unchanged. Changed content, legacy snapshots without content digests, stale or future observations and wrong scope
 are rejected; active-task CAS, preview expiry and writer authority remain intact. Both tracks have restart, replay,
 drift-rejection and concurrency regression coverage.
+
+The path-only `governance select` / `governanceSelect` operation now issues a bounded age-and-choice request through
+the existing input contract. `recordInput` persists the exact answer with head/epoch checks. Reuse and refresh choices
+survive restart; reuse expires at 30 days, and refresh never fabricates collection. Pending choices block bypass through
+preview or new approval. CLI/MCP schemas, managed Operator grants and both client projections are covered by tests;
+real client interaction and consumer collection dispatch remain separate qualification work. Explicit `--reopen` permits
+reconsidering a pending optional refresh without losing the original answer; it never permits stale reuse. Collection
+workflow, collector and schema ship from single canonical sources with verified hashes and existing update conflict handling.
 
 On 2026-09-18, candidate `2e5d004` completed a bounded VS Code Local intake/context/stop and reload/status check.
 Local and Azure telemetry matched the tool sequence and the journal preserved the stop boundary; the run used

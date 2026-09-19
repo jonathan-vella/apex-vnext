@@ -27,7 +27,14 @@ Use this skill only in the interactive Operator agent.
 4. Direct the user to `apex gate decide` and `apex deploy`; those trusted CLI ceremonies are not MCP tools.
 5. Report provider and kernel results without claiming transactional rollback, live Azure diagnostics, or a diagnosis
    beyond the returned bounded status and doctor checks.
-6. For reviewed governance baseline import, call `apex/governanceImport` with `{ "path": "<local-baseline-path>" }` only.
+6. For governance selection, call `apex/governanceSelect` with the local reviewed path. Present `request.governance`
+   questions and record the exact answer with `apex/recordInput`. Reuse is recommended below 30 days; refresh remains
+   optional there and is the only option at 30 days. Remembered choices return `status=selected`; do not re-ask.
+   Refresh records intent only and blocks progression until a newer collected file is explicitly imported. Do not
+   invoke local discovery, claim collection succeeded or synthesize consent. The CLI route is `apex governance select`.
+   An explicit request to reconsider refresh can use `reopen: true` (CLI `--reopen`) for the same candidate; it asks
+   again without selecting an answer. At 30 days reuse remains unavailable. Never reopen automatically.
+7. For reviewed governance baseline import, call `apex/governanceImport` with `{ "path": "<local-baseline-path>" }` only.
    The trusted CLI equivalent is `apex governance import --path <local-baseline-path>`. Return the service's `outputHash`
    and `summary`, never baseline bytes. Import preserves reconciliation, governance review, and Gate 2; it does not
    perform live discovery or authorize deployment.

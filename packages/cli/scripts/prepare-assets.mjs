@@ -12,6 +12,11 @@ const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
 const CLIENT_ADAPTER_VERSION = "1.1.0";
+export const GENERATED_SHARED_FILES = [
+  ".github/workflows/governance-policy-baseline.yml",
+  "tools/scripts/collect-governance-baseline.ps1",
+  "tools/schemas/governance-baseline.schema.json",
+];
 const PROJECTION_TARGETS = new Map([
   ["github-copilot-vscode", "vscode"],
   ["github-copilot-cli", "github-copilot"],
@@ -249,7 +254,7 @@ export function validateClientProjectionDeclarations(customizationManifest) {
   const roles = customizationManifest.roles;
   if (
     !Array.isArray(sharedFiles) ||
-    sharedFiles.some((path) => typeof path !== "string") ||
+    sharedFiles.some((path) => !safeRelativePath(path)) ||
     sharedFiles.length !== new Set(sharedFiles).size ||
     !Array.isArray(sharedDirectories) ||
     sharedDirectories.some((path) => typeof path !== "string" || !safeRelativePath(path)) ||
@@ -348,7 +353,7 @@ function validateCliToolInventory(value) {
   return value;
 }
 
-async function prepareClientProjections(customizationManifest, pinnedCustomizations, inventory) {
+async function prepareClientProjections(customizationManifest, pinnedCustomizations, inventory, generatedSharedFiles) {
   const { sharedFiles, sharedDirectories, clientProjections, roles } =
     validateClientProjectionDeclarations(customizationManifest);
   const toolInventoryPath = join(repositoryRoot, "tools", "registry", "copilot-cli-agent-tools.json");
@@ -390,10 +395,9 @@ async function prepareClientProjections(customizationManifest, pinnedCustomizati
       (path) => !roleSources.has(path),
     );
     for (const relativePath of sources) {
-      const bytes = await readSourceFile(
-        pinnedCustomizations.resolvedRoot,
-        join(repositoryRoot, "customizations", relativePath),
-      );
+      const bytes =
+        generatedSharedFiles.get(relativePath) ??
+        (await readSourceFile(pinnedCustomizations.resolvedRoot, join(repositoryRoot, "customizations", relativePath)));
       const sourceHash = createHash("sha256").update(bytes).digest("hex");
       const destination = join(generatedRoot, relativePath);
       assertContained(generatedRoot, destination);
@@ -496,6 +500,13 @@ async function prepareAssets() {
   const runtimeBundle = JSON.parse(await readFile(join(repositoryRoot, "config", "runtime-bundle.v1.json"), "utf8"));
   const bundleDeclaration = validateBundleDeclarations(customizationManifest, runtimeBundle);
   validateClientProjectionDeclarations(customizationManifest);
+  if (
+    GENERATED_SHARED_FILES.some(
+      (path) => !customizationManifest.sharedFiles.includes(path) || !customizationManifest.managedFiles.includes(path),
+    )
+  ) {
+    throw new Error("Generated shared assets must be declared as shared managed files");
+  }
   const sourceRoots = [
     { name: "customizations", root: join(repositoryRoot, "customizations") },
     { name: "config", root: join(repositoryRoot, "config") },
@@ -536,10 +547,44 @@ async function prepareAssets() {
     }
   }
 
+  const generatedSharedFiles = new Map();
+  const generatedSharedMappings = [];
+  for (const [index, sourcePath] of GENERATED_SHARED_FILES.entries()) {
+    const sourceRoot = dirname(sourcePath);
+    const sourceDirectory = join(repositoryRoot, sourceRoot);
+    const pinnedSource = await pinSourceRoot(sourceDirectory);
+    assertContained(await realpath(repositoryRoot), pinnedSource.resolvedRoot);
+    const bytes = await readSourceFile(pinnedSource.resolvedRoot, join(repositoryRoot, sourcePath));
+    const target = `customizations/${sourcePath}`;
+    if (inventory.some(({ path }) => path === target)) {
+      throw new Error(`Generated shared asset has a duplicate maintained source: ${sourcePath}`);
+    }
+    const destination = join(assetsRoot, target);
+    assertContained(assetsRoot, destination);
+    await mkdir(dirname(destination), { recursive: true });
+    await writeFile(destination, bytes);
+    const mapping = `governance-shared-${index}`;
+    generatedSharedMappings.push({
+      id: mapping,
+      mode: "copy-entries",
+      sourceRoot,
+      generatedRoot: `customizations/${sourceRoot}`,
+      entries: [{ source: sourcePath, target }],
+    });
+    generatedSharedFiles.set(sourcePath, bytes);
+    inventory.push({
+      path: target,
+      source: { kind: "repository-file", path: sourcePath, mapping },
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      bytes: bytes.byteLength,
+    });
+  }
+
   await prepareClientProjections(
     customizationManifest,
     sources.find(({ name }) => name === "customizations").pinnedRoot,
     inventory,
+    generatedSharedFiles,
   );
   await prepareCapabilityPacks(inventory);
 
@@ -578,6 +623,7 @@ async function prepareAssets() {
         generatedRoot: bundleDeclaration.generatedRoot,
       },
       { id: "config", mode: "copy-tree", sourceRoot: "config", generatedRoot: "config" },
+      ...generatedSharedMappings,
       {
         id: "governance-baseline-schema",
         mode: "copy-entries",

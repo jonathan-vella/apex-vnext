@@ -85,6 +85,8 @@ as a way around an intake-only or no-approval request. A status-only request cal
 7. When `nextTask` returns `status=needs_input` with `request.intake`, immediately use the active client's interactive
   delegation mechanism to hand off to `APEX Requirements`; do not ask, answer, summarize, or record any intake
   question in the coordinator. Route other `status=needs_input` requests to their owning interactive role. For
+  `request.governance`, the owner is `APEX Operator`; hand off the exact request and preserve the user's stop scope.
+  Do not answer the governance question or treat refresh selection as cloud authorization. For
   `status=needs_review`, route the returned review to the owning interactive stage for finding dispositions, not to a
   hidden review worker. Only `status=task` supplies `task.taskId`; hand off that exact task to its kernel-selected owner.
   Do not poll unresolved input or review results. Use the active client's interactive handoff.

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, readdir, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -71,6 +71,7 @@ async function reachCodegen(
   revisePlan = false,
   baselinePath?: string,
   configurePolicy?: (policy: PolicyPropertyMapV1) => void,
+  beforeGovernanceImport?: () => Promise<void>,
 ): Promise<{ taskId: string; plan: ReturnType<typeof planBundle> }> {
   await service.nextTask();
   const requirementValues: TaskOutput[] = [{ kind: "requirements", value: requirements() }];
@@ -101,6 +102,7 @@ async function reachCodegen(
     { kind: "review-findings", value: review(runId, "architecture", architectureHashes.architecture!) },
   ]);
   const governanceValue = governance(runId);
+  await beforeGovernanceImport?.();
   if (baselinePath !== undefined) {
     await assert.rejects(service.importGovernanceBaseline("../outside-baseline.json"), /escapes its root/);
     const link = join(baselinePath, "..", "linked-baseline");
@@ -203,6 +205,28 @@ async function reachValidation(
     { kind: "validation-evidence", value: validationEvidence(runId, track) },
   ]);
 }
+
+test("governance baseline reader rejects parent swaps before and after reading", async () => {
+  for (const swapAt of [2, 3]) {
+    const root = await tempRoot();
+    const outside = await tempRoot();
+    const parent = join(root, "parent");
+    await mkdir(parent);
+    await writeFile(join(parent, "baseline.json"), "{}");
+    await writeFile(join(outside, "baseline.json"), "{}");
+    const service = new ApexService(root);
+    const assertSafe = service["assertSafeDestination"].bind(service);
+    let checks = 0;
+    service["assertSafeDestination"] = async (...args) => {
+      if (++checks === swapAt) {
+        await rename(parent, join(root, "original"));
+        await symlink(outside, parent);
+      }
+      return assertSafe(...args);
+    };
+    await assert.rejects(service["readGovernanceBaselineBytes"]("parent/baseline.json"), { code: "APEX_VALIDATION" });
+  }
+});
 
 for (const track of ["bicep", "terraform"] as const) {
   for (const mixedOwnership of [false, true]) {
@@ -2463,7 +2487,387 @@ test("restricted staging and generateIac produce a real accepted tree", async ()
   assert.match(generated.outputHashes["iac-handoff"]!, /^[0-9a-f]{64}$/);
 });
 
+function emptyGovernanceBaseline(subscriptionId: string, discoveredAt: string) {
+  return {
+    schema_version: "governance-baseline-v1",
+    subscription_id: subscriptionId,
+    coverage_status: "COMPLETE",
+    subscriptions_discovered: 1,
+    subscriptions_processed: 1,
+    subscriptions_skipped: [],
+    subscriptions_excluded: [],
+    summary: { total_findings: 0, total_blockers: 0, total_auto_remediate: 0, subscriptions_complete: 1 },
+    subscriptions: {
+      [subscriptionId]: {
+        schema_version: "governance-constraints-v1",
+        subscription_id: subscriptionId,
+        discovered_at: discoveredAt,
+        source: "github-actions-baseline",
+        discovery_status: "COMPLETE",
+        discovery_metadata: {
+          discovery_status: "COMPLETE",
+          discovered_at: discoveredAt,
+          scope: { subscription_id: subscriptionId, management_groups: [] },
+          api_versions: {
+            policyAssignments: "2022-06-01",
+            policyDefinitions: "2021-06-01",
+            policyExemptions: "2022-07-01-preview",
+          },
+          page_counts: { policyAssignments: 0, policyDefinitions: 0, policyExemptions: 0 },
+          completeness_signature: "",
+          ttl_days: 7,
+        },
+        discovery_summary: {
+          assignment_total: 0,
+          assignment_kept: 0,
+          defender_auto_filtered: 0,
+          subscription_scope_count: 0,
+          management_group_inherited_count: 0,
+          blocker_count: 0,
+          auto_remediate_count: 0,
+          informational_count: 0,
+          audit_count: 0,
+          disabled_count: 0,
+          exempted_count: 0,
+        },
+        assignment_inventory: [],
+        findings: [],
+        policies: [],
+        tags_required: [],
+        allowed_locations: [],
+        irrelevant_metadata: "UNSELECTED_BASELINE_MARKER",
+      },
+    },
+  };
+}
+
 for (const track of ["bicep", "terraform"] as const) {
+  test(`${track} persists bounded governance refresh without collecting or completing`, async () => {
+    const root = await tempRoot();
+    const subscriptionId = "11111111-1111-1111-1111-111111111111";
+    let now = new Date("2026-09-19T00:00:00Z");
+    const observedAt = new Date(now.getTime() - 29 * 86_400_000).toISOString();
+    const baseline = emptyGovernanceBaseline(subscriptionId, observedAt);
+    const path = join(root, "baseline.json");
+    await writeJson(path, baseline);
+    const service = new ApexService(root, { clock: () => now });
+    const { runId } = await service.init({
+      projectId: "demo",
+      iacTool: track,
+      targetScope: `/subscriptions/${subscriptionId}`,
+    });
+    const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+    const initialHead = await journal.head();
+    await assert.rejects(service.selectGovernanceBaseline(path), /active discovery task/);
+    assert.equal(await journal.head(), initialHead);
+    await reachCodegen(service, runId, track, undefined, false, path, undefined, async () => {
+      const beforeSelection = await journal.head();
+      for (const malformed of ["null", "{}", "not JSON"]) {
+        await writeFile(path, malformed);
+        await assert.rejects(service.selectGovernanceBaseline(path));
+        await assert.rejects(service.importGovernanceBaseline(path));
+        assert.equal(await journal.head(), beforeSelection);
+      }
+      const missing = join(root, "missing-baseline.json");
+      await assert.rejects(service.selectGovernanceBaseline(missing));
+      await assert.rejects(service.importGovernanceBaseline(missing));
+      await writeJson(
+        path,
+        emptyGovernanceBaseline(subscriptionId, new Date(now.getTime() - 30 * 86_400_000).toISOString()),
+      );
+      await assert.rejects(service.importGovernanceBaseline(path), /stale/);
+      assert.equal(await journal.head(), beforeSelection);
+      await writeJson(path, baseline);
+      const selected = await service.selectGovernanceBaseline(path);
+      if (selected.status !== "needs_input") throw new Error("Expected governance input");
+      const request = selected.request;
+      assert.equal(request.governance!.candidatePath, "baseline.json");
+      assert.equal(request.governance!.candidateHash, sha256Bytes(await readFile(path)));
+      assert.doesNotMatch(JSON.stringify(selected), /UNSELECTED_BASELINE_MARKER|"snapshot":|"findings":/);
+      assert.match(selected.request.questions[0]!.prompt, /29 days ago/);
+      const requestedEvent = (await journal.replay()).at(-1)!;
+      const boundaryGovernance = {
+        ...request.governance!,
+        requestedAt: new Date(now.getTime() - 1).toISOString(),
+        expiresAt: new Date(now.getTime() - 1 + 86_400_000).toISOString(),
+      };
+      const boundaryEvent = {
+        ...requestedEvent,
+        payload: {
+          requestId: request.requestId,
+          governance: boundaryGovernance,
+          questions: service["governanceQuestions"](observedAt, false, boundaryGovernance.requestedAt),
+        },
+      };
+      assert.match(service["governanceInputRequest"](boundaryEvent).questions[0]!.prompt, /28 days ago/);
+      for (const requestedAt of [
+        new Date(now.getTime() + 1).toISOString(),
+        new Date(now.getTime() - 86_400_000).toISOString(),
+      ]) {
+        assert.throws(
+          () =>
+            service["governanceInputRequest"]({
+              ...boundaryEvent,
+              payload: { ...boundaryEvent.payload, governance: { ...boundaryGovernance, requestedAt } },
+            }),
+          { code: "APEX_VALIDATION" },
+        );
+      }
+      const answer = {
+        schemaVersion: "1.0.0" as const,
+        requestId: request.requestId,
+        expectedHead: request.expectedHead,
+        ownerEpoch: request.ownerEpoch,
+        answers: [{ questionId: request.questions[0]!.id, value: "reuse" }],
+      };
+      const head = await journal.head();
+      await assert.rejects(service.importGovernanceBaseline(path), /explicit input answer/);
+      await assert.rejects(service.recordInput({ ...answer, expectedHead: "0".repeat(64) }), /head is stale/);
+      await assert.rejects(service.recordInput({ ...answer, ownerEpoch: answer.ownerEpoch + 1 }), /epoch is stale/);
+      await assert.rejects(service.recordInput({ ...answer, requestId: "wrong-request" }), /ID does not match/);
+      await assert.rejects(
+        service.recordInput({ ...answer, answers: [...answer.answers, ...answer.answers] }),
+        /duplicate|once/i,
+      );
+      await assert.rejects(
+        service.recordInput({ ...answer, answers: [{ questionId: "unknown", value: "reuse" }] }),
+        /unknown|missing/i,
+      );
+      await writeFile(path, JSON.stringify(baseline));
+      await assert.rejects(service.recordInput(answer), /candidate changed/);
+      await assert.rejects(service.selectGovernanceBaseline(path), /candidate changed/);
+      await writeJson(path, baseline);
+      assert.equal(await journal.head(), head);
+      now = new Date(Date.parse(observedAt) + 30 * 86_400_000 - 1);
+      const renewedRequest = await service.selectGovernanceBaseline(path);
+      assert.deepEqual(renewedRequest, selected);
+      now = new Date(Date.parse(observedAt) + 30 * 86_400_000);
+      await assert.rejects(service.recordInput(answer), /expired|refresh/);
+      const refresh = await service.selectGovernanceBaseline(path);
+      if (refresh.status !== "needs_input") throw new Error("Expected refresh input");
+      assert.deepEqual(refresh.request.questions[0]!.options, ["refresh"]);
+      assert.equal(refresh.request.governance!.refreshRequired, true);
+      const refreshAnswer = {
+        ...answer,
+        requestId: refresh.request.requestId,
+        expectedHead: refresh.request.expectedHead,
+        answers: [{ questionId: refresh.request.questions[0]!.id, value: "refresh" }],
+      };
+      await assert.rejects(service.recordInput({ ...refreshAnswer, answers: answer.answers }), /option|allowed/i);
+      const restarted = new ApexService(root, { clock: () => now });
+      assert.deepEqual(await restarted.nextTask(), refresh);
+      const beforeAnswer = await journal.replay();
+      await restarted.recordInput(refreshAnswer);
+      const afterAnswer = await journal.replay();
+      assert.equal(afterAnswer.length, beforeAnswer.length + 1);
+      assert.equal(afterAnswer.at(-1)!.type, "governance.input-recorded");
+      assert.doesNotMatch(JSON.stringify(afterAnswer.at(-1)), /UNSELECTED_BASELINE_MARKER|snapshot|findings/);
+      const currentRun = (await restarted.status()).run;
+      for (const unrelated of [
+        { type: "governance.observation-renewed", payload: {} },
+        { type: "task.completed", payload: { nodeId: "governance-discovery" } },
+        { type: "governance.selection-applied", payload: { requestId: refresh.request.requestId } },
+      ]) {
+        const state = await restarted["governanceInputState"](currentRun, [
+          ...afterAnswer,
+          { ...afterAnswer.at(-1)!, ...unrelated },
+        ]);
+        assert.equal(state?.fulfilled, false, unrelated.type);
+      }
+      for (const type of ["governance.input-requested", "governance.input-recorded"]) {
+        await assert.rejects(
+          async () =>
+            restarted["governanceInputState"](currentRun, [
+              ...afterAnswer.slice(0, -1),
+              { ...afterAnswer.at(-1)!, type, payload: null },
+            ]),
+          { code: "APEX_VALIDATION" },
+        );
+      }
+      await assert.rejects(restarted.recordInput(refreshAnswer), /already recorded/);
+      const selectedRefresh = {
+        status: "selected",
+        choice: "refresh",
+        candidateHash: refresh.request.governance!.candidateHash,
+        observedAt,
+        refreshRequired: true,
+      };
+      assert.deepEqual(
+        await new ApexService(root, { clock: () => now }).selectGovernanceBaseline(path),
+        selectedRefresh,
+      );
+      const refreshHead = await journal.head();
+      await assert.rejects(restarted.nextTask(), /Governance refresh required/);
+      await assert.rejects(restarted.importGovernanceBaseline(path), /Governance refresh required/);
+      const unrelated = join(root, "unrelated.json");
+      await writeJson(unrelated, emptyGovernanceBaseline(subscriptionId, now.toISOString()));
+      await assert.rejects(restarted.importGovernanceBaseline(unrelated), /selected candidate path/);
+      await assert.rejects(restarted.selectGovernanceBaseline(unrelated), /candidate changed/);
+      await writeFile(path, JSON.stringify(baseline));
+      await assert.rejects(restarted.importGovernanceBaseline(path), /Governance refresh required/);
+      assert.equal(await journal.head(), refreshHead);
+      now = new Date(now.getTime() + 2 * 86_400_000);
+      await writeJson(path, emptyGovernanceBaseline(subscriptionId, now.toISOString()));
+      await assert.rejects(restarted.nextTask(), /Governance refresh required/);
+      assert.equal(await journal.head(), refreshHead);
+      const append = service["append"].bind(service);
+      service["append"] = async (...args) => {
+        if (args[1] === "governance.selection-applied") throw new Error("Interrupted selection marker");
+        return append(...args);
+      };
+      try {
+        await assert.rejects(service.importGovernanceBaseline(path), /Interrupted selection marker/);
+      } finally {
+        service["append"] = append;
+      }
+      const interrupted = await journal.replay();
+      assert.equal((await restarted["governanceInputState"](currentRun, interrupted))?.fulfilled, false);
+      await assert.rejects(restarted.nextTask(), /Governance refresh required/);
+      await restarted.importGovernanceBaseline(path);
+      const recovered = await journal.replay();
+      assert.equal(recovered.length, interrupted.length + 1);
+      assert.equal(recovered.at(-1)!.type, "governance.selection-applied");
+      const imported = recovered.at(-1)!.payload as Record<string, string>;
+      assert.equal(imported.rawSourceDigest, sha256Bytes(await readFile(path)));
+      assert.notEqual(imported.rawSourceDigest, refresh.request.governance!.candidateHash);
+      assert.equal(imported.selectedPath, "baseline.json");
+      assert.equal(imported.requestId, refresh.request.requestId);
+      assert.equal((await restarted["governanceInputState"](currentRun, recovered))?.fulfilled, true);
+      await restarted.importGovernanceBaseline(path);
+      assert.equal(await journal.head(), recovered.at(-1)!.hash);
+    });
+    const events = await journal.replay();
+    assert.equal(events.filter(({ type }) => type === "governance.input-requested").length, 2);
+    assert.equal(events.filter(({ type }) => type === "governance.input-recorded").length, 1);
+    assert.ok(
+      events.some(
+        (event) =>
+          event.type === "task.completed" && (event.payload as { nodeId?: string }).nodeId === "governance-discovery",
+      ),
+    );
+    const pending = await service.selectGovernanceBaseline(path);
+    if (pending.status !== "needs_input") throw new Error("Expected accepted-run governance input");
+    const pendingAnswer = {
+      schemaVersion: "1.0.0" as const,
+      requestId: pending.request.requestId,
+      expectedHead: pending.request.expectedHead,
+      ownerEpoch: pending.request.ownerEpoch,
+      answers: [{ questionId: pending.request.questions[0]!.id, value: "reuse" }],
+    };
+    const runPath = join(root, ".apex", "projects", "demo", "runs", runId, "run.json");
+    const originalRun = (await service.status()).run;
+    await writeJson(runPath, { ...originalRun, ownerEpoch: originalRun.ownerEpoch + 1 });
+    await assert.rejects(service.recordInput(pendingAnswer), /epoch is stale/);
+    await writeJson(runPath, originalRun);
+    await journal.append({
+      eventId: crypto.randomUUID(),
+      projectId: "demo",
+      runId,
+      type: "test.head-advanced",
+      timestamp: now.toISOString(),
+      ownerEpoch: originalRun.ownerEpoch,
+      expectedHead: await journal.head(),
+      payload: {},
+    });
+    await assert.rejects(service.recordInput(pendingAnswer), /head is stale/);
+    await assert.rejects(service.nextTask(), /head is stale/);
+    const malformed = await journal.append({
+      eventId: crypto.randomUUID(),
+      projectId: "demo",
+      runId,
+      type: "governance.input-requested",
+      timestamp: now.toISOString(),
+      ownerEpoch: originalRun.ownerEpoch,
+      expectedHead: await journal.head(),
+      payload: {
+        requestId: "malformed-governance",
+        governance: pending.request.governance!,
+        questions: [{ id: "governance-baseline-choice", prompt: "Pick", options: ["reuse", "refresh", "skip"] }],
+      },
+    });
+    await assert.rejects(service.nextTask(), /Persisted governance input request is invalid/);
+    await assert.rejects(
+      service.recordInput({ ...pendingAnswer, requestId: "malformed-governance", expectedHead: malformed.hash }),
+      /Persisted governance input request is invalid/,
+    );
+    for (const type of ["governance.input-requested", "governance.input-recorded"]) {
+      await journal.append({
+        eventId: crypto.randomUUID(),
+        projectId: "demo",
+        runId,
+        type: "governance.input-requested",
+        timestamp: now.toISOString(),
+        ownerEpoch: originalRun.ownerEpoch,
+        expectedHead: await journal.head(),
+        payload: {
+          requestId: pending.request.requestId,
+          governance: pending.request.governance!,
+          questions: pending.request.questions,
+        },
+      });
+      const invalid = await journal.append({
+        eventId: crypto.randomUUID(),
+        projectId: "demo",
+        runId,
+        type,
+        timestamp: now.toISOString(),
+        ownerEpoch: originalRun.ownerEpoch,
+        expectedHead: await journal.head(),
+        payload: null,
+      });
+      await assert.rejects(service.nextTask(), { code: "APEX_VALIDATION" });
+      await assert.rejects(service.recordInput(pendingAnswer), { code: "APEX_VALIDATION" });
+      assert.equal(await journal.head(), invalid.hash);
+    }
+  });
+
+  test(`${track} pending optional refresh blocks preview and approval while accepted evidence is fresh`, async () => {
+    const root = await tempRoot();
+    const now = new Date("2026-09-19T00:00:00Z");
+    const subscriptionId = "11111111-1111-1111-1111-111111111111";
+    const path = join(root, "baseline.json");
+    await writeJson(path, emptyGovernanceBaseline(subscriptionId, now.toISOString()));
+    const service = new ApexService(root, { clock: () => now });
+    const { runId } = await service.init({
+      projectId: "demo",
+      iacTool: track,
+      targetScope: `/subscriptions/${subscriptionId}`,
+    });
+    const generated = await reachCodegen(service, runId, track, undefined, false, path);
+    await service.completeTaskOutputs(generated.taskId, codegenBundle(runId, track, generated.plan));
+    await complete(service, `validation-${track}`, [
+      { kind: "validation-evidence", value: validationEvidence(runId, track) },
+    ]);
+    await service.preview({ operation: "apply", provider: "fake" });
+    const selected = await service.selectGovernanceBaseline(path);
+    if (selected.status !== "needs_input") throw new Error("Expected governance question");
+    await service.recordInput({
+      schemaVersion: "1.0.0",
+      requestId: selected.request.requestId,
+      expectedHead: selected.request.expectedHead,
+      ownerEpoch: selected.request.ownerEpoch,
+      answers: [{ questionId: "governance-baseline-choice", value: "refresh" }],
+    });
+    const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+    const head = await journal.head();
+    await assert.rejects(service.preview({ operation: "apply", provider: "fake" }), /Governance refresh required/);
+    await assert.rejects(service.decideGateNumber(4, "approved", "tester"), /Governance refresh required/);
+    assert.equal(await journal.head(), head);
+    const reopened = await service.selectGovernanceBaseline(path, { reopen: true });
+    if (reopened.status !== "needs_input") throw new Error("Expected reopened choice");
+    assert.notEqual(reopened.request.requestId, selected.request.requestId);
+    assert.deepEqual(reopened.request.questions[0]!.options, ["reuse", "refresh"]);
+    await service.recordInput({
+      schemaVersion: "1.0.0",
+      requestId: reopened.request.requestId,
+      expectedHead: reopened.request.expectedHead,
+      ownerEpoch: reopened.request.ownerEpoch,
+      answers: [{ questionId: "governance-baseline-choice", value: "reuse" }],
+    });
+    await service.importGovernanceBaseline(path);
+    await service.preview({ operation: "apply", provider: "fake" });
+  });
+
   test(`${track} generates the replacement intent after plan review revision`, async () => {
     const root = await tempRoot();
     const service = new ApexService(root);
@@ -2481,57 +2885,7 @@ for (const track of ["bicep", "terraform"] as const) {
     const subscriptionId = "11111111-1111-1111-1111-111111111111";
     let now = new Date("2026-09-19T00:00:00Z");
     const discoveredAt = new Date(now.getTime() - 29 * 86_400_000).toISOString();
-    const baseline = {
-      schema_version: "governance-baseline-v1",
-      subscription_id: subscriptionId,
-      coverage_status: "COMPLETE",
-      subscriptions_discovered: 1,
-      subscriptions_processed: 1,
-      subscriptions_skipped: [],
-      subscriptions_excluded: [],
-      summary: { total_findings: 0, total_blockers: 0, total_auto_remediate: 0, subscriptions_complete: 1 },
-      subscriptions: {
-        [subscriptionId]: {
-          schema_version: "governance-constraints-v1",
-          subscription_id: subscriptionId,
-          discovered_at: discoveredAt,
-          source: "github-actions-baseline",
-          discovery_status: "COMPLETE",
-          discovery_metadata: {
-            discovery_status: "COMPLETE",
-            discovered_at: discoveredAt,
-            scope: { subscription_id: subscriptionId, management_groups: [] },
-            api_versions: {
-              policyAssignments: "2022-06-01",
-              policyDefinitions: "2021-06-01",
-              policyExemptions: "2022-07-01-preview",
-            },
-            page_counts: { policyAssignments: 0, policyDefinitions: 0, policyExemptions: 0 },
-            completeness_signature: "",
-            ttl_days: 7,
-          },
-          discovery_summary: {
-            assignment_total: 0,
-            assignment_kept: 0,
-            defender_auto_filtered: 0,
-            subscription_scope_count: 0,
-            management_group_inherited_count: 0,
-            blocker_count: 0,
-            auto_remediate_count: 0,
-            informational_count: 0,
-            audit_count: 0,
-            disabled_count: 0,
-            exempted_count: 0,
-          },
-          assignment_inventory: [],
-          findings: [],
-          policies: [],
-          tags_required: [],
-          allowed_locations: [],
-          irrelevant_metadata: "UNSELECTED_BASELINE_MARKER",
-        },
-      },
-    };
+    const baseline = emptyGovernanceBaseline(subscriptionId, discoveredAt);
     const path = join(root, "baseline.json");
     await writeJson(path, baseline);
     const service = new ApexService(root, { clock: () => now });
@@ -2563,6 +2917,45 @@ for (const track of ["bicep", "terraform"] as const) {
       },
       false,
       path,
+      undefined,
+      async () => {
+        const selected = await service.selectGovernanceBaseline(path);
+        assert.equal(selected.status, "needs_input");
+        if (selected.status !== "needs_input") throw new Error("Expected governance input");
+        assert.deepEqual(selected.request.questions[0]!.options, ["reuse", "refresh"]);
+        assert.equal(selected.request.questions[0]!.recommendation?.value, "reuse");
+        assert.equal(selected.request.governance?.observedAt, discoveredAt);
+        const restarted = new ApexService(root, { clock: () => now });
+        assert.deepEqual(await restarted.nextTask(), selected);
+        await restarted.recordInput({
+          schemaVersion: "1.0.0",
+          requestId: selected.request.requestId,
+          expectedHead: selected.request.expectedHead,
+          ownerEpoch: selected.request.ownerEpoch,
+          answers: [{ questionId: selected.request.questions[0]!.id, value: "reuse" }],
+        });
+        assert.deepEqual(await restarted.selectGovernanceBaseline(path), {
+          status: "selected",
+          choice: "reuse",
+          candidateHash: selected.request.governance!.candidateHash,
+          observedAt: discoveredAt,
+          refreshRequired: false,
+        });
+        const answerTime = now;
+        const head = await new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal")).head();
+        now = new Date(expiry);
+        await assert.rejects(restarted.nextTask(), /Governance refresh required/);
+        await assert.rejects(restarted.importGovernanceBaseline(path), /Governance refresh required/);
+        now = answerTime;
+        await writeFile(path, JSON.stringify(baseline));
+        await assert.rejects(restarted.importGovernanceBaseline(path), /candidate changed/);
+        await assert.rejects(restarted.nextTask(), /candidate changed/);
+        await writeJson(path, baseline);
+        assert.equal(
+          await new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal")).head(),
+          head,
+        );
+      },
     );
     await service.completeTaskOutputs(codegen.taskId, codegenBundle(runId, track, codegen.plan));
     await complete(service, `validation-${track}`, [
@@ -2719,12 +3112,65 @@ for (const track of ["bicep", "terraform"] as const) {
     now = new Date(renewalTime);
     await restarted.decideGateNumber(4, "approved", "tester");
     const approvedRun = (await restarted.status()).run;
+    const currentChoice = await restarted.selectGovernanceBaseline(path);
+    if (currentChoice.status !== "needs_input") throw new Error("Expected existing observation choice");
+    await restarted.recordInput({
+      schemaVersion: "1.0.0",
+      requestId: currentChoice.request.requestId,
+      expectedHead: currentChoice.request.expectedHead,
+      ownerEpoch: currentChoice.request.ownerEpoch,
+      answers: [{ questionId: currentChoice.request.questions[0]!.id, value: "reuse" }],
+    });
+    const beforeReuse = await journal.replay();
+    assert.equal((await restarted.importGovernanceBaseline(path)).outputHash, renewed.outputHash);
+    const afterReuse = await journal.replay();
+    assert.equal(afterReuse.length, beforeReuse.length + 1);
+    assert.equal(afterReuse.at(-1)!.type, "governance.selection-applied");
+    assert.equal(
+      afterReuse.filter(({ type }) => type === "governance.observation-renewed").length,
+      beforeReuse.filter(({ type }) => type === "governance.observation-renewed").length,
+    );
+    assert.deepEqual((await restarted.status()).run, approvedRun);
+    await writeJson(path, baseline);
+    const acceptedChoice = await restarted.selectGovernanceBaseline(path);
+    if (acceptedChoice.status !== "needs_input") throw new Error("Expected accepted-run refresh choice");
+    await restarted.recordInput({
+      schemaVersion: "1.0.0",
+      requestId: acceptedChoice.request.requestId,
+      expectedHead: acceptedChoice.request.expectedHead,
+      ownerEpoch: acceptedChoice.request.ownerEpoch,
+      answers: [{ questionId: acceptedChoice.request.questions[0]!.id, value: "refresh" }],
+    });
+    const acceptedChoiceHead = await journal.head();
+    await assert.rejects(restarted.nextTask(), /Governance refresh required/);
+    await assert.rejects(restarted.importGovernanceBaseline(path), /Governance refresh required/);
+    assert.equal(await journal.head(), acceptedChoiceHead);
     now = new Date(renewalTime + 1);
     baseline.subscriptions[subscriptionId]!.discovered_at = baseline.subscriptions[
       subscriptionId
     ]!.discovery_metadata.discovered_at = now.toISOString();
     await writeJson(path, baseline);
     await restarted.importGovernanceBaseline(path);
+    const refreshEvents = await journal.replay();
+    const renewal = refreshEvents.at(-1)!;
+    assert.equal(renewal.type, "governance.observation-renewed");
+    const renewedSelection = renewal.payload as Record<string, string>;
+    assert.equal(renewedSelection.selectionRequestId, acceptedChoice.request.requestId);
+    assert.equal(renewedSelection.selectedPath, "baseline.json");
+    assert.equal(renewedSelection.rawSourceDigest, sha256Bytes(await readFile(path)));
+    assert.notEqual(renewedSelection.rawSourceDigest, acceptedChoice.request.governance!.candidateHash);
+    assert.equal((await restarted["governanceInputState"](approvedRun, refreshEvents))?.fulfilled, true);
+    for (const changes of [
+      { selectionRequestId: "unrelated" },
+      { selectedPath: "other.json" },
+      { rawSourceDigest: acceptedChoice.request.governance!.candidateHash },
+      { rawSourceDigest: "a".repeat(64) },
+      { observedAt: acceptedChoice.request.governance!.observedAt },
+      { governanceHash: "b".repeat(64) },
+    ]) {
+      const altered = [...refreshEvents.slice(0, -1), { ...renewal, payload: { ...renewedSelection, ...changes } }];
+      assert.equal((await restarted["governanceInputState"](approvedRun, altered))?.fulfilled, false);
+    }
     assert.deepEqual((await restarted.status()).run, approvedRun);
     const approvedHead = await journal.head();
     now = new Date(storedPreview.expiresAt);

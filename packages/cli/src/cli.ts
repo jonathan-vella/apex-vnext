@@ -613,6 +613,11 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
       return service.status();
     case "governance import":
       return service.importGovernanceBaseline(required(flags, "path"));
+    case "governance select":
+      return service.selectGovernanceBaseline(
+        required(flags, "path"),
+        ...(flags.reopen === true ? [{ reopen: true }] : []),
+      );
     case "task next":
       return service.nextTask();
     case "task context":

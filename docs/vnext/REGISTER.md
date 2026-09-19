@@ -54,7 +54,8 @@ and the repository archives.
   timestamp churn can also masquerade as fresh policy or invalidate unchanged plans unnecessarily.
 - **Mitigation:** Apply [REQ-GOV-001](PRD.md#req-gov-001-governance-and-policy), display observation age, separate content
   identity from freshness, fail closed at 30 days, and preserve live enforcement without bypassing policy on denial.
-- **State:** Open; consumer workflow distribution, persisted refresh choices and timestamp-only renewal require proof
+- **State:** Open; distribution, persisted choices and unchanged renewal have deterministic coverage; consumer OIDC
+  setup, live collection, material reconciliation and exact-client interaction still require qualification
 - **Closure proof:** Both tracks cover exact age boundaries, unchanged refresh, material drift and delayed outcomes.
 
 ## RISK-006: Imported Material Can Carry Wrong Authority

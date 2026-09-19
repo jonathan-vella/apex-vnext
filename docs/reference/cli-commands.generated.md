@@ -26,6 +26,7 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 - `evidence accept`
 - `gate decide`
 - `governance import`
+- `governance select`
 - `init`
 - `inventory`
 - `mcp serve`
