@@ -56,13 +56,19 @@ GitHub Issues and the repository project own day-to-day work selection. [ROADMAP
 
 The September 19 consumer clarification prioritizes collect/import/plan/deploy governance over broader local policy
 emulation. [REQ-GOV-001](PRD.md#req-gov-001-governance-and-policy) now requires optional refresh below 30 days and
-mandatory refresh at 30 days, measured from successful collection. Consumer-owned workflow installation, remembered
-reuse/refresh choices and timestamp-only renewal without plan invalidation remain backlog acceptance items, not shipped
-claims. Implementation begins with importer age enforcement and collector timestamp correctness.
+mandatory refresh at 30 days, measured from successful collection. Consumer-owned workflow installation and remembered
+reuse/refresh choices remain backlog acceptance items, not shipped claims.
 The initial implementation enforces the fixed age at import, plan issuance/context/completion, preview and new Gate 4
 approval for imported snapshots. Collection renews observation timestamps even without policy changes and publishes
 atomically; failed publication preserves the prior authoritative file. The full integration checkpoint passed before
 focused resume/timestamp and atomic-publication follow-ups, which have their own regression checks.
+
+Unchanged renewal now reuses the path-only import operation after initial discovery. It compares complete selected
+subscription content, excluding only collection timestamps and legacy TTL fields, and records a typed observation
+receipt bound to the accepted governance and target. Accepted artifact hashes, approval dependencies and gates stay
+unchanged. Changed content, legacy snapshots without content digests, stale or future observations and wrong scope
+are rejected; active-task CAS, preview expiry and writer authority remain intact. Both tracks have restart, replay,
+drift-rejection and concurrency regression coverage.
 
 On 2026-09-18, candidate `2e5d004` completed a bounded VS Code Local intake/context/stop and reload/status check.
 Local and Azure telemetry matched the tool sequence and the journal preserved the stop boundary; the run used

@@ -283,7 +283,9 @@ test("preserves inherited findings and reported exemptions deterministically wit
   const entry = source.subscriptions[subscriptionId]!;
   entry.findings.reverse();
   entry.policies.reverse();
-  assert.deepEqual(importGovernanceBaseline(source, options, validate), selected);
+  const reordered = importGovernanceBaseline(source, options, validate);
+  assert.deepEqual(reordered.snapshot.findings, selected.snapshot.findings);
+  assert.notEqual(reordered.snapshot.contentHash, selected.snapshot.contentHash);
   assert.deepEqual(
     (source.subscriptions[subscriptionId]!.findings[0]!.exemption as Record<string, unknown>)
       .policyDefinitionReferenceIds,
@@ -334,6 +336,64 @@ test("different enforced values remain distinct and absent values differ from nu
     entry.policies = structuredClone(entry.findings);
     assert.notDeepEqual(importGovernanceBaseline(source, options, validate), first);
   }
+});
+
+test("content digest covers the entire selected raw envelope and root except observation timestamps and TTL", () => {
+  const source = inheritedBaseline();
+  const original = importGovernanceBaseline(source, options, validate);
+  const refreshed = structuredClone(source);
+  const entry = refreshed.subscriptions[subscriptionId]!;
+  entry.discovered_at = entry.discovery_metadata.discovered_at = options.now;
+  entry.discovery_metadata.ttl_days = 90;
+  Object.assign(entry, { ttl_days: 30 });
+  assert.equal(
+    importGovernanceBaseline(refreshed, options, validate).snapshot.contentHash,
+    original.snapshot.contentHash,
+  );
+  const mutations: Array<(value: ReturnType<typeof inheritedBaseline>) => void> = [
+    (value) => {
+      value.management_group_id = "different-root";
+    },
+    (value) => {
+      value.subscriptions[subscriptionId]!.assignment_inventory[0]!.displayName = "changed";
+    },
+    (value) => {
+      Object.assign(value.subscriptions[subscriptionId]!.discovery_summary, { audit_notes: "changed" });
+    },
+    (value) => {
+      Object.assign(value.subscriptions[subscriptionId]!.discovery_metadata, { collector: "changed" });
+    },
+    (value) => {
+      Object.assign(value.subscriptions[subscriptionId]!, { unrelated: "changed" });
+    },
+    (value) => {
+      value.subscriptions[subscriptionId]!.findings[0]!.required_value = false;
+      value.subscriptions[subscriptionId]!.policies = structuredClone(value.subscriptions[subscriptionId]!.findings);
+    },
+    (value) => {
+      value.subscriptions[subscriptionId]!.findings[0]!.audit = { discovered_at: "not-a-collection-time", ttl_days: 2 };
+      value.subscriptions[subscriptionId]!.policies = structuredClone(value.subscriptions[subscriptionId]!.findings);
+    },
+  ];
+  for (const mutate of mutations) {
+    const changed = structuredClone(source);
+    mutate(changed);
+    assert.notEqual(
+      importGovernanceBaseline(changed, options, validate).snapshot.contentHash,
+      original.snapshot.contentHash,
+    );
+  }
+  const reorderedKeys = JSON.parse(
+    JSON.stringify(source, (_key, value: unknown) =>
+      value !== null && typeof value === "object" && !Array.isArray(value)
+        ? Object.fromEntries(Object.entries(value).reverse())
+        : value,
+    ),
+  );
+  assert.equal(
+    importGovernanceBaseline(reorderedKeys, options, validate).snapshot.contentHash,
+    original.snapshot.contentHash,
+  );
 });
 
 test("rejects nonfinite and oversized effective JSON constraints", () => {

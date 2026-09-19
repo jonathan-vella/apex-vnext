@@ -1,4 +1,5 @@
 import { GOVERNANCE_MAX_AGE_MS, type GovernanceConstraintsV1 } from "@apexops/contracts";
+import { createHash } from "node:crypto";
 
 export type GovernanceBaselineErrorCode =
   "invalid-input" | "invalid-options" | "incomplete" | "stale" | "target-mismatch";
@@ -51,6 +52,7 @@ export interface GovernanceBaselineSelection {
   readonly snapshot: {
     readonly schemaVersion: "governance-baseline-selection-v1";
     readonly subscriptionId: string;
+    readonly contentHash: string;
     readonly provenance: {
       readonly root: GovernanceBaselineRoot;
       readonly source: "github-actions-baseline";
@@ -374,6 +376,25 @@ function selectEntry(
     snapshot: {
       schemaVersion: "governance-baseline-selection-v1",
       subscriptionId,
+      contentHash: createHash("sha256")
+        .update(
+          canonical({
+            root,
+            entry: Object.fromEntries(
+              Object.entries(entry)
+                .filter(([key]) => key !== "discovered_at" && key !== "ttl_days")
+                .map(([key, value]) => [
+                  key,
+                  key === "discovery_metadata"
+                    ? Object.fromEntries(
+                        Object.entries(metadata).filter(([field]) => field !== "discovered_at" && field !== "ttl_days"),
+                      )
+                    : value,
+                ]),
+            ),
+          }),
+        )
+        .digest("hex"),
       provenance: {
         root,
         source: "github-actions-baseline",

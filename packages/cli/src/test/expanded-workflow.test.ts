@@ -7,6 +7,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type {
   DeploymentPreviewV1,
   ExecutionPlanAttestationV1,
+  GovernanceConstraintsV1,
   IacBindingV1,
   ImplementationIntentV1,
   LogicalResourceManifestV1,
@@ -21,8 +22,9 @@ import {
 } from "@apexops/contracts";
 import { nativePolicyValidationBinding, validatePolicyProperties } from "@apexops/capabilities";
 import type { IacProvider, PreviewRequest } from "@apexops/capabilities";
-import { EventJournal, ObjectStore, ValidatorRegistry, sha256Json } from "@apexops/kernel";
+import { EventJournal, ObjectStore, ValidatorRegistry, sha256Bytes, sha256Json } from "@apexops/kernel";
 import { ApexError } from "../errors.js";
+import { dependencyRevision } from "../dependency-revision.js";
 import { createMcpServer } from "../mcp.js";
 import { ApexService, type TaskOutput } from "../service.js";
 import { registerWorkflowValidators } from "../workflow-validators.js";
@@ -2575,10 +2577,242 @@ for (const track of ["bicep", "terraform"] as const) {
     await assert.rejects(service.preview({ operation: "apply", provider: "fake" }), /governance.*refresh/i);
     assert.equal(await journal.head(), head);
     assert.equal((await service.status()).run.gates[3]!.state, "open");
-    now = new Date(Date.parse(discoveredAt) + 30 * 86_400_000 - 1);
-    await service.decideGateNumber(4, "approved", "tester");
-    const deployed = await service.deploy(preview.previewHash);
+    baseline.subscriptions[subscriptionId]!.discovered_at = now.toISOString();
+    baseline.subscriptions[subscriptionId]!.discovery_metadata.discovered_at = now.toISOString();
+    const beforeRenewal = (await service.status()).run;
+    const beforeEvents = await journal.replay();
+    const objectStore = new ObjectStore(root);
+    const previewObjectHash = (
+      beforeEvents.findLast(({ type }) => type === "preview.created")!.payload as { previewObjectHash: string }
+    ).previewObjectHash;
+    const storedPreview = await objectStore.getJson<DeploymentPreviewV1>(previewObjectHash);
+    const planBytes = await readFile(join(root, ".apex", "projects", "demo", "runs", runId, "run.json"));
+    const rejectRenewal = async (changed: typeof baseline, reason: RegExp) => {
+      const previousHead = await journal.head();
+      await writeJson(path, changed);
+      await assert.rejects(service.importGovernanceBaseline(path), reason);
+      assert.equal(await journal.head(), previousHead);
+      assert.deepEqual((await service.status()).run, beforeRenewal);
+    };
+    for (const mutate of [
+      (value: typeof baseline) => {
+        value.subscriptions[subscriptionId]!.irrelevant_metadata = "changed";
+      },
+      (value: typeof baseline) => {
+        Object.assign(value.subscriptions[subscriptionId]!.discovery_metadata, { collector: "changed" });
+      },
+      (value: typeof baseline) => {
+        Object.assign(value.subscriptions[subscriptionId]!.discovery_summary, { audit_notes: "changed" });
+      },
+      (value: typeof baseline) => {
+        const entry = value.subscriptions[subscriptionId]!;
+        Object.assign(entry, {
+          assignment_inventory: [
+            {
+              scope: `/subscriptions/${subscriptionId}`,
+              assignmentType: "subscription",
+              displayName: "audit",
+              policyDefinitionId: "audit-policy",
+            },
+          ],
+        });
+        Object.assign(entry.discovery_summary, {
+          assignment_total: 1,
+          assignment_kept: 1,
+          subscription_scope_count: 1,
+          audit_count: 1,
+        });
+        entry.discovery_metadata.page_counts.policyAssignments = 1;
+      },
+    ]) {
+      const changed = structuredClone(baseline);
+      mutate(changed);
+      await rejectRenewal(changed, /content changed.*reconcile/i);
+    }
+    const incomplete = structuredClone(baseline);
+    for (const requiredValue of [true, false]) {
+      const changed = structuredClone(baseline);
+      const entry = changed.subscriptions[subscriptionId]!;
+      const finding = {
+        policy_id: "policy",
+        display_name: "Policy",
+        effect: "deny",
+        scope: `/subscriptions/${subscriptionId}`,
+        assignment_id: `/subscriptions/${subscriptionId}/providers/Microsoft.Authorization/policyAssignments/policy`,
+        classification: "informational",
+        resource_types: ["Microsoft.Storage/storageAccounts"],
+        exemption: null,
+        required_value: requiredValue,
+      };
+      Object.assign(entry, {
+        findings: [finding],
+        policies: [finding],
+        assignment_inventory: [
+          { scope: finding.scope, assignmentType: "subscription", displayName: "Policy", policyDefinitionId: "policy" },
+        ],
+      });
+      Object.assign(entry.discovery_summary, {
+        assignment_total: 1,
+        assignment_kept: 1,
+        subscription_scope_count: 1,
+        informational_count: 1,
+      });
+      entry.discovery_metadata.page_counts.policyAssignments = 1;
+      changed.summary.total_findings = 1;
+      await rejectRenewal(changed, /content changed.*reconcile/i);
+    }
+    incomplete.coverage_status = "PARTIAL";
+    await rejectRenewal(incomplete, /incomplete|invalid-input/);
+    const wrongTarget = structuredClone(baseline);
+    wrongTarget.subscriptions[subscriptionId]!.discovery_metadata.scope.subscription_id =
+      "22222222-2222-2222-2222-222222222222";
+    await rejectRenewal(wrongTarget, /target-mismatch/);
+    for (const invalidTime of [discoveredAt, new Date(now.getTime() + 1).toISOString()]) {
+      const invalid = structuredClone(baseline);
+      invalid.subscriptions[subscriptionId]!.discovered_at = invalid.subscriptions[
+        subscriptionId
+      ]!.discovery_metadata.discovered_at = invalidTime;
+      await rejectRenewal(invalid, /stale/);
+    }
+    await writeJson(path, baseline);
+    const renewed = await service.importGovernanceBaseline(path);
+    const afterEvents = await journal.replay();
+    assert.equal(afterEvents.length, beforeEvents.length + 1);
+    assert.equal(afterEvents.at(-1)!.type, "governance.observation-renewed");
+    assert.notEqual(await journal.head(), head);
+    assert.equal(dependencyRevision(beforeRenewal, afterEvents), dependencyRevision(beforeRenewal, beforeEvents));
+    assert.deepEqual((await service.status()).run, beforeRenewal);
+    assert.deepEqual(await readFile(join(root, ".apex", "projects", "demo", "runs", runId, "run.json")), planBytes);
+    assert.deepEqual(await objectStore.getJson(previewObjectHash), storedPreview);
+    const receiptHash = (afterEvents.at(-1)!.payload as { receiptHash: string }).receiptHash;
+    const receipt = await objectStore.getJson<Record<string, string>>(receiptHash);
+    assert.equal(receipt.governanceHash, renewed.outputHash);
+    assert.equal(receipt.observedAt, now.toISOString());
+    assert.equal(receipt.projectId, "demo");
+    assert.equal(receipt.runId, runId);
+    assert.equal(receipt.targetScope, beforeRenewal.targetScope);
+    assert.equal(receipt.rawSourceDigest, sha256Bytes(await readFile(path)));
+    assert.equal(Date.parse(receipt.expiresAt!) - Date.parse(receipt.observedAt!), 30 * 86_400_000);
+    const acceptedGovernance = await objectStore.getJson<GovernanceConstraintsV1>(renewed.outputHash);
+    assert.equal(receipt.snapshotDigest, acceptedGovernance.constraintsRef.digest);
+    const acceptedSnapshot = await objectStore.getJson<Record<string, unknown>>(receipt.snapshotDigest!);
+    assert.equal(receipt.contentHash, acceptedSnapshot.contentHash);
+    const renewedHead = await journal.head();
+    const restarted = new ApexService(root, { clock: () => now });
+    assert.equal((await restarted.importGovernanceBaseline(path)).outputHash, renewed.outputHash);
+    assert.equal(await journal.head(), renewedHead);
+    const older = structuredClone(baseline);
+    older.subscriptions[subscriptionId]!.discovered_at = older.subscriptions[
+      subscriptionId
+    ]!.discovery_metadata.discovered_at = new Date(now.getTime() - 1).toISOString();
+    await writeJson(path, older);
+    await assert.rejects(restarted.importGovernanceBaseline(path), /newer successful/);
+    assert.equal(await journal.head(), renewedHead);
+    await writeFile(path, JSON.stringify(baseline));
+    await assert.rejects(restarted.importGovernanceBaseline(path), /newer successful/);
+    assert.equal(await journal.head(), renewedHead);
+    const renewalTime = now.getTime();
+    now = new Date(renewalTime + 30 * 86_400_000);
+    await assert.rejects(restarted.preview({ operation: "apply", provider: "fake" }), /governance.*refresh/i);
+    await assert.rejects(restarted.importGovernanceBaseline(path), /stale/);
+    assert.equal(await journal.head(), renewedHead);
+    now = new Date(renewalTime);
+    await restarted.decideGateNumber(4, "approved", "tester");
+    const approvedRun = (await restarted.status()).run;
+    now = new Date(renewalTime + 1);
+    baseline.subscriptions[subscriptionId]!.discovered_at = baseline.subscriptions[
+      subscriptionId
+    ]!.discovery_metadata.discovered_at = now.toISOString();
+    await writeJson(path, baseline);
+    await restarted.importGovernanceBaseline(path);
+    assert.deepEqual((await restarted.status()).run, approvedRun);
+    const approvedHead = await journal.head();
+    now = new Date(storedPreview.expiresAt);
+    await assert.rejects(restarted.deploy(preview.previewHash), /preview has expired/i);
+    assert.equal(await journal.head(), approvedHead);
+    now = new Date(renewalTime + 1);
+    const runPath = join(root, ".apex", "projects", "demo", "runs", runId, "run.json");
+    await writeJson(runPath, { ...approvedRun, ownerEpoch: approvedRun.ownerEpoch + 1 });
+    await assert.rejects(restarted.importGovernanceBaseline(path), /writer authority/i);
+    await assert.rejects(restarted.deploy(preview.previewHash), /writer authority|epoch/i);
+    assert.equal(await journal.head(), approvedHead);
+    await writeJson(runPath, approvedRun);
+    const deployed = await restarted.deploy(preview.previewHash);
     assert.equal(deployed.inventory.resources.length, 1);
+    const diagnosisId = await task(restarted, "diagnosis");
+    const taskPath = join(root, ".apex", "projects", "demo", "runs", runId, "tasks", `${diagnosisId}.json`);
+    const originalTask = await readFile(taskPath);
+    now = new Date(renewalTime + 2 * 86_400_000);
+    baseline.subscriptions[subscriptionId]!.discovered_at = baseline.subscriptions[
+      subscriptionId
+    ]!.discovery_metadata.discovered_at = now.toISOString();
+    await writeJson(path, baseline);
+    const beforeRace = await journal.replay();
+    const competing = await Promise.allSettled([
+      restarted.importGovernanceBaseline(path),
+      new ApexService(root, { clock: () => now }).importGovernanceBaseline(path),
+    ]);
+    assert.ok(competing.some(({ status }) => status === "fulfilled"));
+    for (const result of competing) {
+      if (result.status === "fulfilled") assert.equal(result.value.outputHash, renewed.outputHash);
+      else assert.match(String(result.reason), /stale journal head|mutation is already in progress/i);
+    }
+    assert.equal((await journal.replay()).length, beforeRace.length + 1);
+    assert.deepEqual(await readFile(taskPath), originalTask);
+    await assert.rejects(restarted.taskContext(diagnosisId), /expired|stale|head/i);
+    const appendEvidence = async (type: string, payload: { [key: string]: string | { [key: string]: string } }) =>
+      journal.append({
+        eventId: crypto.randomUUID(),
+        projectId: "demo",
+        runId,
+        type,
+        timestamp: now.toISOString(),
+        ownerEpoch: approvedRun.ownerEpoch,
+        expectedHead: await journal.head(),
+        payload,
+      });
+    const replaceGovernance = async (
+      snapshot: Record<string, unknown>,
+      extra: Partial<GovernanceConstraintsV1> = {},
+    ) => {
+      const digest = await objectStore.putJson(snapshot);
+      const changedHash = await objectStore.putJson({
+        ...acceptedGovernance,
+        ...extra,
+        constraintsRef: {
+          ...acceptedGovernance.constraintsRef,
+          digest,
+          uri: `apex-object:${digest}`,
+          bytes: (await objectStore.getBytes(digest)).byteLength,
+        },
+      });
+      await appendEvidence("task.completed", { artifactHashes: { "governance-constraints": changedHash } });
+      return changedHash;
+    };
+    const changedHash = await replaceGovernance(acceptedSnapshot, {
+      summary: { ...acceptedGovernance.summary, auditCount: 1 },
+    });
+    const replacedHead = await journal.head();
+    await assert.rejects(restarted.preview({ operation: "apply", provider: "fake" }), /governance.*refresh/i);
+    assert.equal(await journal.head(), replacedHead);
+    await appendEvidence("governance.observation-renewed", { governanceHash: changedHash, receiptHash });
+    const mismatchedHead = await journal.head();
+    await assert.rejects(restarted.preview({ operation: "apply", provider: "fake" }), /receipt.*match/i);
+    assert.equal(await journal.head(), mismatchedHead);
+    const legacySnapshot = { ...acceptedSnapshot };
+    delete legacySnapshot.contentHash;
+    await replaceGovernance(legacySnapshot);
+    const legacyHead = await journal.head();
+    await assert.rejects(restarted.importGovernanceBaseline(path), /migrate.*reconcile/i);
+    assert.equal(await journal.head(), legacyHead);
+    await replaceGovernance({ ...acceptedSnapshot, allowedLocations: ["changed"] });
+    const semanticHead = await journal.head();
+    await assert.rejects(restarted.importGovernanceBaseline(path), /content changed.*reconcile/i);
+    assert.equal(await journal.head(), semanticHead);
+    await replaceGovernance({ ...acceptedSnapshot, runId: "foreign-run" });
+    const foreignHead = await journal.head();
+    await assert.rejects(restarted.importGovernanceBaseline(path), /does not belong/i);
+    assert.equal(await journal.head(), foreignHead);
     for (const file of await readdir(join(root, ".apex"), { recursive: true, withFileTypes: true })) {
       if (!file.isFile()) continue;
       assert.equal(

@@ -19,6 +19,16 @@ const artifactEvent = {
 
 test("dependency revision ignores ownership but binds target, runtime, and artifacts", () => {
   const original = dependencyRevision(run, [artifactEvent]);
+  assert.equal(
+    dependencyRevision(run, [
+      artifactEvent,
+      {
+        type: "governance.observation-renewed",
+        payload: { governanceHash: "c".repeat(64), receiptHash: "d".repeat(64) },
+      } as EventV1,
+    ]),
+    original,
+  );
   const transferredRun: RunConfigV1 = { ...run, ownerEpoch: 2 };
   assert.equal(dependencyRevision(transferredRun, [artifactEvent]), original);
   assert.notEqual(dependencyRevision({ ...run, targetScope: "scope-b" }, [artifactEvent]), original);

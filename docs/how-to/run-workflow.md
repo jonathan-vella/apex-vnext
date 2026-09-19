@@ -86,8 +86,18 @@ future-dated or wrong-scope evidence remains blocked independently of age; exist
 
 The intended selection prompt shows the age and offers Use existing snapshot (default) or Refresh from Azure once per
 run. Durable choice recording and automatic consumer refresh orchestration are not yet implemented. Refresh through the
-consumer collection workflow, not an invented local discovery command. A successful unchanged collection renews its
-timestamps; timestamp-only acceptance without invalidating existing plans remains a separate implementation item.
+consumer collection workflow, not an invented local discovery command. Import a successfully refreshed JSON file with:
+
+```bash
+apex governance import --path .github/data/governance-policy-baseline.json --json
+```
+
+After initial import, the same operation accepts a newer observation only when the complete selected subscription
+content is unchanged, excluding collection timestamps and legacy TTL fields. It records a separate observation receipt
+and preserves accepted governance, policy, plan and gate hashes. Material differences block renewal and require explicit
+governance reconciliation; unrelated subscription data is not copied into run state. A replay of the exact accepted
+renewal is idempotent. The journal head advances, so active tasks may need reissuing; preview expiry and writer authority
+are not extended. Legacy snapshots without a content digest require migration/reconciliation instead of inferred equality.
 
 ## Decide Gates
 

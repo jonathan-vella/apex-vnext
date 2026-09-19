@@ -16,6 +16,7 @@ import {
   EnvironmentInputsV1Schema,
   ExecutionPlanAttestationV1Schema,
   GovernanceConstraintsV1Schema,
+  GovernanceObservationReceiptV1Schema,
   hasValidInputRequestQuestions,
   isGovernanceObservationCurrent,
   IacBindingV1Schema,
@@ -93,6 +94,35 @@ FormatRegistry.Set(
 );
 
 describe("Wave 1 contracts", () => {
+  it("requires compact, strictly typed governance observation bindings without raw baseline data", () => {
+    const receipt = {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: "demo",
+      runId: "run-1",
+      targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111",
+      governanceHash: hash,
+      snapshotDigest: otherHash,
+      contentHash: hash,
+      observedAt: timestamp,
+      expiresAt: expiry,
+      rawSourceDigest: otherHash,
+    };
+    assert.equal(Value.Check(GovernanceObservationReceiptV1Schema, receipt), true);
+    for (const field of Object.keys(receipt)) {
+      const incomplete = { ...receipt } as Record<string, unknown>;
+      delete incomplete[field];
+      assert.equal(Value.Check(GovernanceObservationReceiptV1Schema, incomplete), false, field);
+    }
+    for (const invalid of [
+      { ...receipt, baseline: {} },
+      { ...receipt, rawSourceDigest: "invalid" },
+      { ...receipt, observedAt: "invalid" },
+      { ...receipt, targetScope: "" },
+    ])
+      assert.equal(Value.Check(GovernanceObservationReceiptV1Schema, invalid), false);
+    assert.equal(schemaById[GovernanceObservationReceiptV1Schema.$id!], GovernanceObservationReceiptV1Schema);
+    assert.equal(contractMetadata[GovernanceObservationReceiptV1Schema.$id!]?.maxBytes, 16_384);
+  });
   it("uses precise elapsed UTC age and rejects malformed governance observation dates", () => {
     const observed = "2026-09-01T00:00:00Z";
     assert.equal(isGovernanceObservationCurrent(observed, "2026-09-30T23:59:59.999Z"), true);

@@ -10,6 +10,8 @@ import {
   EvidenceManifestV1Schema,
   ExecutionPlanAttestationV1Schema,
   GovernanceConstraintsV1Schema,
+  GovernanceObservationReceiptV1Schema,
+  GOVERNANCE_MAX_AGE_MS,
   IacBindingV1Schema,
   IacHandoffV1Schema,
   InputRequestV1Schema,
@@ -43,6 +45,7 @@ import {
   type DeploymentPreviewV1,
   type EnvironmentInputsV1,
   type GovernanceConstraintsV1,
+  type GovernanceObservationReceiptV1,
   type PolicyPropertyMapV1,
   type EvidenceManifestV1,
   type IacBindingV1,
@@ -1647,8 +1650,12 @@ export class ApexService {
         "Governance import requires a subscription-scoped run target",
         EXIT_CODES.validation,
       );
-    const next = await this.nextTask();
-    if (next.status !== "task" || next.task.taskType !== "governance-discovery")
+    const events = await this.journal(run).replay();
+    const governanceHash = this.acceptedArtifactHashes(events)["governance-constraints"];
+    const transfers = new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock);
+    if (governanceHash !== undefined) await this.assertCurrentWriterAuthority(run, transfers);
+    const next = governanceHash === undefined ? await this.nextTask() : undefined;
+    if (next !== undefined && (next.status !== "task" || next.task.taskType !== "governance-discovery"))
       throw new ApexError(
         "APEX_AUTHORIZATION",
         "Governance import requires the active discovery task",
@@ -1708,7 +1715,81 @@ export class ApexService {
         error.code === "stale" ? EXIT_CODES.stale : EXIT_CODES.validation,
       );
     }
-    const digest = await this.objects.putJson({ ...selection.snapshot, projectId: run.projectId, runId: run.runId });
+    const selectedSnapshot = { ...selection.snapshot, projectId: run.projectId, runId: run.runId };
+    if (governanceHash !== undefined) {
+      const governance = await this.objects.getJson<GovernanceConstraintsV1>(governanceHash);
+      if (governance.constraintsRef.uri !== `apex-object:${governance.constraintsRef.digest}`)
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Governance is not an imported snapshot; reconcile governance before importing",
+          EXIT_CODES.validation,
+        );
+      const snapshot = await this.selectedGovernanceSnapshot(run, governance);
+      if (typeof snapshot.contentHash !== "string")
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Legacy governance snapshot has no content digest; migrate and reconcile governance before renewal",
+          EXIT_CODES.validation,
+        );
+      if (
+        snapshot.contentHash !== selection.snapshot.contentHash ||
+        governance.constraintsRef.digest !== sha256Json(selectedSnapshot)
+      )
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Governance content changed; reconcile governance and obtain new policy, plan and gate approvals before proceeding",
+          EXIT_CODES.validation,
+        );
+      const latest = await this.latestGovernanceObservation(run, events, governanceHash, governance, snapshot);
+      const observedAt = selection.constraints.discoveredAt;
+      const rawSourceDigest = sha256Bytes(bytes);
+      if (latest?.observedAt === observedAt && latest.rawSourceDigest === rawSourceDigest) {
+        await this.assertImportedGovernanceCurrent(run, events);
+        return { outputHash: governanceHash, summary: "Governance observation already current" };
+      }
+      if (Date.parse(observedAt) <= Date.parse(latest?.observedAt ?? governance.discoveredAt))
+        throw new ApexError(
+          "APEX_STALE",
+          "Governance renewal requires a newer successful Azure observation",
+          EXIT_CODES.stale,
+        );
+      const receipt: GovernanceObservationReceiptV1 = {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: run.projectId,
+        runId: run.runId,
+        targetScope: run.targetScope,
+        governanceHash,
+        snapshotDigest: governance.constraintsRef.digest,
+        contentHash: snapshot.contentHash,
+        observedAt,
+        expiresAt: selection.constraints.expiresAt,
+        rawSourceDigest,
+      };
+      if (!Value.Check(GovernanceObservationReceiptV1Schema, receipt))
+        throw new ApexError("APEX_VALIDATION", "Invalid governance observation receipt", EXIT_CODES.validation);
+      const receiptHash = await this.objects.putJson(receipt);
+      await this.assertCurrentWriterAuthority(run, transfers);
+      if (!isGovernanceObservationCurrent(observedAt, this.clock().toISOString()))
+        throw new ApexError(
+          "APEX_STALE",
+          "Governance observation expired during renewal; refresh from Azure",
+          EXIT_CODES.stale,
+        );
+      await this.append(
+        run,
+        "governance.observation-renewed",
+        { governanceHash, receiptHash },
+        events.at(-1)?.hash ?? null,
+      );
+      return { outputHash: governanceHash, summary: "Unchanged governance observation renewed" };
+    }
+    if (next?.status !== "task")
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Governance import requires the active discovery task",
+        EXIT_CODES.authorization,
+      );
+    const digest = await this.objects.putJson(selectedSnapshot);
     const completed = await this.completeTaskOutputs(next.task.taskId, [
       {
         kind: "governance-constraints",
@@ -4895,13 +4976,51 @@ export class ApexService {
     if (hash === undefined) return;
     const governance = await this.objects.getJson<GovernanceConstraintsV1>(hash);
     if (governance.constraintsRef.uri !== `apex-object:${governance.constraintsRef.digest}`) return;
-    await this.selectedGovernanceSnapshot(run, governance);
-    if (!isGovernanceObservationCurrent(governance.discoveredAt, this.clock().toISOString()))
+    const snapshot = await this.selectedGovernanceSnapshot(run, governance);
+    const latest = await this.latestGovernanceObservation(run, events, hash, governance, snapshot);
+    if (!isGovernanceObservationCurrent(latest?.observedAt ?? governance.discoveredAt, this.clock().toISOString()))
       throw new ApexError(
         "APEX_STALE",
         "Governance snapshot requires refresh from Azure: observation is future-dated or at least 30 days old",
         EXIT_CODES.stale,
       );
+  }
+
+  private async latestGovernanceObservation(
+    run: RunConfigV1,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+    governanceHash: string,
+    governance: GovernanceConstraintsV1,
+    snapshot: GovernanceBaselineSelection["snapshot"],
+  ): Promise<GovernanceObservationReceiptV1 | undefined> {
+    let latest: GovernanceObservationReceiptV1 | undefined;
+    for (const event of events) {
+      if (event.type !== "governance.observation-renewed") continue;
+      const payload = event.payload as { governanceHash?: unknown; receiptHash?: unknown };
+      if (payload.governanceHash !== governanceHash) continue;
+      if (typeof payload.receiptHash !== "string" || !/^[0-9a-f]{64}$/u.test(payload.receiptHash))
+        throw new ApexError("APEX_STALE", "Governance observation receipt reference is invalid", EXIT_CODES.stale);
+      const receipt = await this.objects.getJson<GovernanceObservationReceiptV1>(payload.receiptHash);
+      if (
+        !Value.Check(GovernanceObservationReceiptV1Schema, receipt) ||
+        receipt.projectId !== run.projectId ||
+        receipt.runId !== run.runId ||
+        receipt.targetScope !== run.targetScope ||
+        receipt.governanceHash !== governanceHash ||
+        receipt.snapshotDigest !== governance.constraintsRef.digest ||
+        receipt.contentHash !== snapshot.contentHash ||
+        !isGovernanceObservationCurrent(receipt.observedAt, event.timestamp) ||
+        Date.parse(receipt.expiresAt) - Date.parse(receipt.observedAt) !== GOVERNANCE_MAX_AGE_MS ||
+        Date.parse(receipt.observedAt) <= Date.parse(latest?.observedAt ?? governance.discoveredAt)
+      )
+        throw new ApexError(
+          "APEX_STALE",
+          "Governance observation receipt does not match accepted governance and target; reconcile governance",
+          EXIT_CODES.stale,
+        );
+      latest = receipt;
+    }
+    return latest;
   }
 
   private async selectedGovernanceSnapshot(
