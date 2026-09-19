@@ -31,6 +31,8 @@ import {
   hasValidCostArithmetic,
   hasValidLogicalResourceReferences,
   hasValidPolicyValidation,
+  hasValidNativeValidationReceipt,
+  NATIVE_VALIDATION_COMMANDS,
   calculatePolicyValidationDigest,
   type PolicyValidationBinding,
   type ApprovalEvidenceV1,
@@ -2085,6 +2087,7 @@ export class ApexService {
     outputs: TaskOutput[],
     legacy: boolean,
   ): Promise<{ outputHashes: Partial<Record<ArtifactKind, string>>; summary: string }> {
+    outputs = [...outputs];
     const run = await this.currentRun();
     const task = await this.readTask(run, taskId);
     const events = await this.journal(run).replay();
@@ -2217,7 +2220,12 @@ export class ApexService {
       await this.materializeReviewerSummary(run, descriptor.reviewSubject, outputs[0]!.value as ReviewFindingsV1);
     }
     if (descriptor.id === "validation-bicep" || descriptor.id === "validation-terraform") {
-      await this.materializeValidationReport(run, outputs[0]!.value as EvidenceManifestV1, descriptor.id);
+      await this.materializeValidationReport(
+        run,
+        outputs[0]!.value as EvidenceManifestV1,
+        descriptor.id,
+        validation.evidenceModes,
+      );
     }
     if (descriptor.reviewSubject !== undefined) {
       if (reviewBlockers.length === 0 && descriptor.gate !== undefined) {
@@ -2634,6 +2642,7 @@ export class ApexService {
     run: RunConfigV1,
     evidence: EvidenceManifestV1,
     taskType: "validation-bicep" | "validation-terraform",
+    evidenceModes: Readonly<Record<string, string>>,
   ): Promise<void> {
     const directory = join(this.root, "agent-output", run.projectId, run.runId, "validation");
     const entries =
@@ -2642,14 +2651,14 @@ export class ApexService {
         : evidence.entries
             .map(
               ({ kind, hash, bytes, required, retention }) =>
-                `- ${this.reviewMarkdownText(kind)}: ${hash} (${bytes} bytes; ${required ? "required" : "optional"}; ${this.reviewMarkdownText(retention)})`,
+                `- ${this.reviewMarkdownText(kind)}: ${hash} (${bytes} bytes; ${required ? "required" : "optional"}; ${this.reviewMarkdownText(retention)}; ${this.reviewMarkdownText(evidenceModes[kind] ?? "simulated")})`,
             )
             .join("\n");
     await mkdir(directory, { recursive: true });
     await atomicWriteBytes(
       join(directory, "validation-report.md"),
       Buffer.from(
-        `# Validation Report\n\n- Task: ${this.reviewMarkdownText(taskType)}\n- Track: ${this.reviewMarkdownText(run.iacTool)}\n- Created: ${this.reviewMarkdownText(evidence.createdAt)}\n- Verdict: accepted deterministic validation evidence\n\n## Validator Evidence\n\n${entries}\n\nThe Validator reports evidence only. Artifact repair, risk acceptance, and gate decisions remain with their authorized owners.\n`,
+        `# Validation Report\n\n- Task: ${this.reviewMarkdownText(taskType)}\n- Track: ${this.reviewMarkdownText(run.iacTool)}\n- Created: ${this.reviewMarkdownText(evidence.createdAt)}\n- Verdict: accepted evidence with per-check execution modes\n\n## Validator Evidence\n\n${entries}\n\nOnly native entries reference runtime-executed source-bound command receipts. Simulated entries do not prove command execution or policy compliance. Artifact repair, risk acceptance, and gate decisions remain with their authorized owners.\n`,
         "utf8",
       ),
     );
@@ -3136,6 +3145,52 @@ export class ApexService {
           : undefined;
       const handoffHash = this.artifactHash(events, "iac-handoff");
       const handoff = handoffHash === undefined ? undefined : await this.objects.getJson<IacHandoffV1>(handoffHash);
+      if (provider.validateSource === undefined && provider.validationMode !== "simulated")
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Configured adapter does not support native source validation",
+          EXIT_CODES.validation,
+        );
+      if (provider.validateSource !== undefined) {
+        const completed = [...events]
+          .reverse()
+          .find(
+            (event) =>
+              event.type === "task.completed" &&
+              (event.payload as { nodeId?: string }).nodeId === `validation-${run.iacTool}`,
+          );
+        const payload = completed?.payload as
+          | { validatorEvidenceRefs?: Record<string, string>; validatorEvidenceModes?: Record<string, string> }
+          | undefined;
+        if (handoff === undefined || handoffHash === undefined || policyHash === undefined)
+          throw new ApexError(
+            "APEX_VALIDATION",
+            "Preview requires runtime-owned native validation",
+            EXIT_CODES.validation,
+          );
+        const binding = {
+          projectId: run.projectId,
+          runId: run.runId,
+          track: run.iacTool,
+          sourceHash: handoffHash,
+          treeHash: handoff.treeHash,
+          policyHash,
+          inputHash: intentHash,
+        };
+        for (const { validatorId } of NATIVE_VALIDATION_COMMANDS[run.iacTool]) {
+          const receiptHash = payload?.validatorEvidenceRefs?.[validatorId];
+          if (
+            payload?.validatorEvidenceModes?.[validatorId] !== "native" ||
+            receiptHash === undefined ||
+            !hasValidNativeValidationReceipt(await this.objects.getJson(receiptHash), binding)
+          )
+            throw new ApexError(
+              "APEX_VALIDATION",
+              "Preview requires current runtime-owned native validation",
+              EXIT_CODES.validation,
+            );
+        }
+      }
       const generatedRoot = handoff === undefined ? undefined : resolve(this.root, handoff.rootPath);
       if (options.operation === "apply") {
         if (generatedRoot === undefined || handoff === undefined)
@@ -5747,7 +5802,7 @@ export class ApexService {
         this.assertValid("inventory", deploymentInventory);
       }
     }
-    const context: WorkflowTaskValidatorContext = {
+    let context: WorkflowTaskValidatorContext = {
       nodeId,
       now: this.clock().toISOString(),
       track: run.iacTool,
@@ -5762,14 +5817,83 @@ export class ApexService {
       ...(importedPolicyEffects === undefined ? {} : { importedPolicyEffects }),
       ...(nodeId === "quality" ? await this.qualityValidatorContext(run) : {}),
     };
+    const nativeEvidenceRefs: Record<string, string> = {};
+    const nativeEvidenceModes: Record<string, "native" | "simulated"> = {};
+    if (descriptor.id === `validation-${run.iacTool}`) {
+      for (const id of validatorIds) nativeEvidenceModes[id] = "simulated";
+      const provider = this.providers[run.iacTool];
+      if (provider !== undefined && provider.validateSource === undefined && provider.validationMode !== "simulated")
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Configured adapter does not support native source validation",
+          EXIT_CODES.validation,
+        );
+      if (provider?.validateSource !== undefined) {
+        const handoff = artifacts["iac-handoff"] as IacHandoffV1 | undefined;
+        const sourceHash = artifactHashes["iac-handoff"];
+        const inputHash = artifactHashes["implementation-intent"];
+        const policyHash = artifactHashes["policy-property-map"];
+        if (handoff === undefined || sourceHash === undefined || inputHash === undefined || policyHash === undefined)
+          throw new ApexError(
+            "APEX_VALIDATION",
+            "Native validation requires accepted source, intent and policy inputs",
+            EXIT_CODES.validation,
+          );
+        const rootPath = resolve(this.root, handoff.rootPath);
+        await this.assertSafeDestination(this.root, rootPath);
+        const binding = {
+          projectId: run.projectId,
+          runId: run.runId,
+          track: run.iacTool,
+          sourceHash,
+          treeHash: handoff.treeHash,
+          inputHash,
+          policyHash,
+        };
+        const receipt = await provider.validateSource({
+          ...binding,
+          generatedSource: { rootPath, treeHash: handoff.treeHash },
+        });
+        if (!hasValidNativeValidationReceipt(receipt, binding))
+          throw new ApexError(
+            "APEX_VALIDATION",
+            "Native validation receipt is invalid or stale",
+            EXIT_CODES.validation,
+          );
+        const receiptHash = await this.objects.putJson(receipt);
+        const receiptBytes = Buffer.byteLength(JSON.stringify(receipt));
+        const executed = new Set<string>(receipt.commands.map(({ validatorId }) => validatorId));
+        for (const id of validatorIds) {
+          if (executed.has(id)) {
+            nativeEvidenceRefs[id] = receiptHash;
+            nativeEvidenceModes[id] = "native";
+          }
+        }
+        const index = outputs.findIndex(({ kind }) => kind === "validation-evidence");
+        const evidence = outputs[index]!.value as EvidenceManifestV1;
+        const acceptedEvidence = {
+          ...evidence,
+          entries: evidence.entries.map((entry) =>
+            executed.has(entry.kind) ? { ...entry, hash: receiptHash, bytes: receiptBytes } : entry,
+          ),
+        };
+        outputs[index] = { ...outputs[index]!, value: acceptedEvidence };
+        context = { ...context, outputs: { ...context.outputs, "validation-evidence": acceptedEvidence } };
+      }
+    }
     for (const id of validatorIds) {
       this.assertValid(id, taskWorkflowValidatorInput(id, context));
     }
     return {
       validatorIds,
-      evidenceRefs: availabilityHash === undefined ? {} : { "business:availability-current": availabilityHash },
-      evidenceModes:
-        availabilityEvidence === undefined ? {} : { "business:availability-current": availabilityEvidence.mode },
+      evidenceRefs: {
+        ...nativeEvidenceRefs,
+        ...(availabilityHash === undefined ? {} : { "business:availability-current": availabilityHash }),
+      },
+      evidenceModes: {
+        ...nativeEvidenceModes,
+        ...(availabilityEvidence === undefined ? {} : { "business:availability-current": availabilityEvidence.mode }),
+      },
     };
   }
 

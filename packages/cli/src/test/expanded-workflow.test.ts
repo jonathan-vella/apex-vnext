@@ -13,7 +13,12 @@ import type {
   PolicyPropertyMapV1,
   PolicyValidationV1,
 } from "@apexops/contracts";
-import { calculatePolicyValidationHash } from "@apexops/contracts";
+import {
+  calculatePolicyValidationHash,
+  calculateNativeValidationCommandHash,
+  calculateNativeValidationReceiptHash,
+  NATIVE_VALIDATION_COMMANDS,
+} from "@apexops/contracts";
 import { nativePolicyValidationBinding, validatePolicyProperties } from "@apexops/capabilities";
 import type { IacProvider, PreviewRequest } from "@apexops/capabilities";
 import { EventJournal, ObjectStore, ValidatorRegistry, sha256Json } from "@apexops/kernel";
@@ -419,6 +424,7 @@ function terraformPreviewProvider(
   };
   return {
     track: "terraform",
+    validationMode: "simulated",
     validate: async () => [],
     previewApply: createPreview,
     previewDestroy: createPreview,
@@ -518,6 +524,7 @@ function bicepPreviewProvider(now: Date): IacProvider {
   };
   return {
     track: "bicep",
+    validationMode: "simulated",
     validate: async () => [],
     previewApply: createPreview,
     previewDestroy: createPreview,
@@ -565,6 +572,176 @@ function bicepPreviewProvider(now: Date): IacProvider {
       executionEvidence?.operationId === operationId ? executionEvidence : undefined,
   };
 }
+
+test("validation completion executes configured native checks instead of trusting submitted hashes", async () => {
+  const root = await tempRoot();
+  let calls = 0;
+  const service = new ApexService(root, {
+    providers: {
+      bicep: {
+        ...bicepPreviewProvider(new Date()),
+        async validateSource(request) {
+          calls++;
+          assert.equal(request.projectId, "demo");
+          assert.ok(request.generatedSource.rootPath.startsWith(root));
+          throw new Error("native source validation failed");
+        },
+      },
+    },
+  });
+  const { runId } = await service.init({ projectId: "demo", iacTool: "bicep" });
+  const generated = await reachCodegen(service, runId, "bicep");
+  await service.completeTaskOutputs(generated.taskId, codegenBundle(runId, "bicep", generated.plan));
+  const validationTask = await task(service, "validation-bicep");
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+  const head = await journal.head();
+  await assert.rejects(
+    service.completeTaskOutputs(validationTask, [
+      { kind: "validation-evidence", value: validationEvidence(runId, "bicep") },
+    ]),
+    /native source validation failed/,
+  );
+  assert.equal(calls, 1);
+  assert.equal(await journal.head(), head);
+});
+
+test("native adapters cannot silently fall back to simulated validation", async () => {
+  const root = await tempRoot();
+  const provider = bicepPreviewProvider(new Date());
+  Reflect.deleteProperty(provider, "validationMode");
+  const service = new ApexService(root, { providers: { bicep: provider } });
+  const { runId } = await service.init({ projectId: "demo", iacTool: "bicep" });
+  const generated = await reachCodegen(service, runId, "bicep");
+  await service.completeTaskOutputs(generated.taskId, codegenBundle(runId, "bicep", generated.plan));
+  await assert.rejects(
+    complete(service, "validation-bicep", [{ kind: "validation-evidence", value: validationEvidence(runId, "bicep") }]),
+    /does not support native source validation/,
+  );
+});
+
+test("native validation receipts are source-bound, runtime-owned and distinguish unexecuted checks", async () => {
+  for (const track of ["bicep", "terraform"] as const) {
+    const root = await tempRoot();
+    let stale = true;
+    const provider: IacProvider = {
+      ...(track === "bicep" ? bicepPreviewProvider(new Date()) : terraformPreviewProvider(new Date())),
+      async validateSource(request) {
+        const receipt = {
+          schemaVersion: "1.0.0" as const,
+          projectId: request.projectId,
+          runId: request.runId,
+          track,
+          sourceHash: stale ? "f".repeat(64) : request.sourceHash,
+          treeHash: request.generatedSource.treeHash,
+          inputHash: request.inputHash,
+          policyHash: request.policyHash,
+          outcome: "pass" as const,
+          commands: NATIVE_VALIDATION_COMMANDS[track].map((command) => ({
+            validatorId: command.validatorId,
+            commandHash: calculateNativeValidationCommandHash(command),
+            exitCode: 0 as const,
+            signal: null,
+            timedOut: false as const,
+            outputTruncated: false as const,
+          })),
+        };
+        return { ...receipt, receiptHash: calculateNativeValidationReceiptHash(receipt) };
+      },
+    };
+    const service = new ApexService(root, { providers: { [track]: provider } });
+    const { runId } = await service.init({
+      projectId: "demo",
+      iacTool: track,
+      targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
+    });
+    const generated = await reachCodegen(
+      service,
+      runId,
+      track,
+      track === "bicep" ? configureNativeBicepPlan : undefined,
+    );
+    const generatedHashes = await service.completeTaskOutputs(
+      generated.taskId,
+      codegenBundle(runId, track, generated.plan),
+    );
+    const validationTask = await task(service, `validation-${track}`);
+    const submitted = validationEvidence(runId, track);
+    const original = structuredClone(submitted);
+    const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+    const head = await journal.head();
+    await assert.rejects(
+      service.completeTaskOutputs(validationTask, [{ kind: "validation-evidence", value: submitted }]),
+      /receipt is invalid or stale/,
+    );
+    assert.equal(await journal.head(), head);
+    stale = false;
+    const submittedOutputs: TaskOutput[] = [{ kind: "validation-evidence", value: submitted }];
+    Object.freeze(submittedOutputs);
+    const accepted = await service.completeTaskOutputs(validationTask, submittedOutputs);
+    assert.equal(submittedOutputs[0]!.value, submitted);
+    assert.deepEqual(submitted, original);
+    const completion = (await journal.replay()).findLast((event) => event.type === "task.completed")!;
+    const payload = completion.payload as {
+      validatorEvidenceRefs: Record<string, string>;
+      validatorEvidenceModes: Record<string, string>;
+    };
+    const objects = new ObjectStore(root);
+    for (const { validatorId } of NATIVE_VALIDATION_COMMANDS[track]) {
+      assert.equal(payload.validatorEvidenceModes[validatorId], "native");
+      const receipt = await objects.getJson<{ sourceHash: string }>(payload.validatorEvidenceRefs[validatorId]!);
+      assert.equal(receipt.sourceHash, generatedHashes.outputHashes["iac-handoff"]);
+    }
+    assert.equal(payload.validatorEvidenceModes["business:policy-property-map"], "simulated");
+    assert.equal(payload.validatorEvidenceRefs["business:policy-property-map"], undefined);
+    const evidence = await objects.getJson<ReturnType<typeof validationEvidence>>(
+      accepted.outputHashes["validation-evidence"]!,
+    );
+    for (const { validatorId } of NATIVE_VALIDATION_COMMANDS[track]) {
+      assert.equal(
+        evidence.entries.find(({ kind }) => kind === validatorId)!.hash,
+        payload.validatorEvidenceRefs[validatorId],
+      );
+    }
+    const report = await readFile(
+      join(root, "agent-output", "demo", runId, "validation", "validation-report.md"),
+      "utf8",
+    );
+    assert.match(report, /immutable; native/);
+    assert.match(report, /immutable; simulated/);
+    const restarted = new ApexService(root, { providers: { [track]: provider } });
+    await restarted.preview({ operation: "apply", provider: track });
+    assert.equal((await restarted.status()).run.gates[3]!.state, "open");
+  }
+});
+
+test("native preview refuses historical label-only validation when source checks are available", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({
+    projectId: "demo",
+    iacTool: "bicep",
+    targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
+  });
+  await reachValidation(service, runId, "bicep", configureNativeBicepPlan);
+  let previewCalls = 0;
+  const restarted = new ApexService(root, {
+    providers: {
+      bicep: {
+        ...bicepPreviewProvider(new Date()),
+        async validateSource() {
+          throw new Error("must not run validation during preview");
+        },
+        async previewApply() {
+          previewCalls++;
+          throw new Error("preview must not execute");
+        },
+      },
+    },
+  });
+  await assert.rejects(restarted.preview({ operation: "apply", provider: "bicep" }), /runtime-owned native validation/);
+  assert.equal(previewCalls, 0);
+  assert.equal((await restarted.status()).run.gates[3]!.state, "closed");
+});
 
 test("validation task inputs include the accepted policy map on both tracks", async () => {
   for (const track of ["bicep", "terraform"] as const) {

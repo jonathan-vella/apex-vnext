@@ -27,6 +27,11 @@ import {
   InputRequestV1Schema,
   InputSubmissionV1Schema,
   LogicalResourceManifestV1Schema,
+  NativeValidationReceiptV1Schema,
+  NATIVE_VALIDATION_COMMANDS,
+  calculateNativeValidationCommandHash,
+  calculateNativeValidationReceiptHash,
+  hasValidNativeValidationReceipt,
   LiveQualificationV1Schema,
   LIVE_QUALIFICATION_SCENARIO_IDS,
   OnboardingConfigV1Schema,
@@ -60,6 +65,7 @@ import {
   type EnvironmentInputsV1,
   type ExecutionPlanAttestationV1,
   type LogicalResourceManifestV1,
+  type NativeValidationReceiptV1,
   type LiveQualificationV1,
   type PricingEvidenceV1,
   type PricingRequestV1,
@@ -86,6 +92,94 @@ FormatRegistry.Set(
 );
 
 describe("Wave 1 contracts", () => {
+  for (const track of ["bicep", "terraform"] as const) {
+    it(`validates strict source-bound native validation receipts for ${track}`, () => {
+      const body: Omit<NativeValidationReceiptV1, "receiptHash"> = {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: "project",
+        runId: "run",
+        track,
+        sourceHash: hash,
+        treeHash: otherHash,
+        policyHash: hash,
+        inputHash: hash,
+        outcome: "pass",
+        commands: NATIVE_VALIDATION_COMMANDS[track].map((command) => ({
+          validatorId: command.validatorId,
+          commandHash: calculateNativeValidationCommandHash(command),
+          exitCode: 0,
+          signal: null,
+          timedOut: false,
+          outputTruncated: false,
+        })),
+      };
+      const receipt = { ...body, receiptHash: calculateNativeValidationReceiptHash(body) };
+      assert.equal(Value.Check(NativeValidationReceiptV1Schema, receipt), true);
+      assert.equal(hasValidNativeValidationReceipt(receipt, body), true);
+      assert.equal(schemaById[NativeValidationReceiptV1Schema.$id!], NativeValidationReceiptV1Schema);
+      assert.equal(contractMetadata[NativeValidationReceiptV1Schema.$id!]?.maxBytes, 16_384);
+      assert.equal(
+        calculateNativeValidationReceiptHash(Object.fromEntries(Object.entries(body).reverse()) as typeof body),
+        receipt.receiptHash,
+      );
+      for (const key of ["projectId", "runId", "track", "sourceHash", "treeHash", "policyHash", "inputHash"] as const) {
+        assert.equal(hasValidNativeValidationReceipt(receipt, { ...body, [key]: "different" }), false, key);
+        assert.equal(hasValidNativeValidationReceipt({ ...receipt, [key]: "different" }, body), false, key);
+      }
+      for (const invalid of [
+        { ...receipt, receiptHash: otherHash },
+        { ...receipt, schemaVersion: "2.0.0" },
+        { ...receipt, stdout: "private-source" },
+        { ...receipt, rootPath: "/private/path" },
+        { ...receipt, compliance: "pass" },
+        { ...receipt, outcome: "block" },
+        { ...receipt, commands: [] },
+        { ...receipt, commands: [...receipt.commands, ...receipt.commands, ...receipt.commands, ...receipt.commands] },
+        ...[
+          { stdout: "private-source" },
+          { stderr: "private-diagnostic" },
+          { path: "/private/path" },
+          { exitCode: 1 },
+          { signal: "SIGTERM" },
+          { timedOut: true },
+          { outputTruncated: true },
+          { validatorId: "bicep:lint" },
+          { commandHash: "invalid" },
+        ].map((extra) => ({
+          ...receipt,
+          commands: [{ ...receipt.commands[0], ...extra }, ...receipt.commands.slice(1)],
+        })),
+      ]) {
+        assert.equal(hasValidNativeValidationReceipt(invalid, body), false);
+      }
+      for (const commands of [
+        body.commands.slice(1),
+        [...body.commands, body.commands[0]!],
+        body.commands.map((command) => ({ ...command, commandHash: otherHash })),
+        body.commands.map((command) => ({ ...command, validatorId: "terraform:validate" as const })),
+      ]) {
+        const tampered = { ...body, commands };
+        assert.equal(
+          hasValidNativeValidationReceipt(
+            { ...tampered, receiptHash: calculateNativeValidationReceiptHash(tampered) },
+            body,
+          ),
+          false,
+        );
+      }
+      if (track === "terraform") {
+        const reordered = { ...body, commands: [...body.commands].reverse() };
+        assert.equal(
+          hasValidNativeValidationReceipt(
+            { ...reordered, receiptHash: calculateNativeValidationReceiptHash(reordered) },
+            body,
+          ),
+          false,
+        );
+      }
+    });
+  }
+
   it("uses one explicit persisted contract version", () => {
     const lock: RuntimeBundleLockV1 = {
       schemaVersion: CONTRACT_VERSION,

@@ -62,6 +62,24 @@ recipient, generated IaC, or provider change invalidates stale proof.
 
 ## Support Boundary
 
+### Native Validation Receipts
+
+With an official native provider configured, validation-task completion executes fixed local checks against an isolated
+copy of the accepted source. Bicep runs `build main.bicep --stdout`; Terraform runs `init -backend=false -input=false`,
+`fmt -check`, and `validate`. Dependency downloads may occur, but these commands do not invoke Azure deployment or
+Terraform plan/apply. Original and temporary source bytes are checked before and after commands, and temporary outputs
+are removed. Failed, interrupted, truncated or stale results cannot complete the task.
+
+The runtime stores a digest-only receipt bound to project, run, track, handoff, tree, intent and policy-map hashes.
+Submitted evidence hashes do not replace this execution. Native preview requires the matching runtime-recorded receipt;
+historical label-only validation must be invalidated and rerun before using an official native provider. Providers
+without source-validation support must explicitly declare simulated validation to remain usable as test adapters.
+
+Validation reports distinguish `native` and `simulated` entries. Only the commands listed above are proved by these
+receipts; Bicep format/lint, security checks and policy evaluation are not proved by a command receipt. Policy-map hashes
+bind inputs, not compliance outcomes. Source-bound policy-property receipts remain required at native preview for
+nonempty maps. `validateTask` still stages and checks artifacts; command execution occurs at task completion.
+
 Deterministic and package qualification cover both tracks. Current-candidate live Azure qualification remains required
 before claiming production readiness or release acceptance.
 

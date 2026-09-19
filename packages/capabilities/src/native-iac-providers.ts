@@ -1,12 +1,20 @@
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, open, opendir, readFile, realpath, rm } from "node:fs/promises";
-import { isAbsolute, relative, resolve, sep } from "node:path";
-import { hasValidPolicyValidation } from "@apexops/contracts";
+import { lstat, mkdir, mkdtemp, open, opendir, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import {
+  hasValidPolicyValidation,
+  NATIVE_VALIDATION_COMMANDS,
+  calculateNativeValidationCommandHash,
+  calculateNativeValidationReceiptHash,
+  hasValidNativeValidationReceipt,
+} from "@apexops/contracts";
 import type {
   ApprovalEvidenceV1,
   DeploymentPreviewV1,
   ExecutionPlanAttestationV1,
+  NativeValidationReceiptV1,
   OperationRecordV1,
   PolicyValidationBinding,
   PolicyValidationV1,
@@ -25,6 +33,7 @@ import {
   sha256,
   type CurrentDeploymentAuthority,
   type IacProvider,
+  type NativeValidationRequest,
   type ProviderExecutionEvidence,
   type PreviewRequest,
 } from "./iac.js";
@@ -145,6 +154,7 @@ interface GeneratedSourceSnapshot {
   readonly treeHash: string;
   readonly paths: ReadonlySet<string>;
   readonly fileHashes: ReadonlyMap<string, string>;
+  readonly fileContents: ReadonlyMap<string, Buffer>;
 }
 
 function sourceBindingError(): IacProviderError {
@@ -170,6 +180,7 @@ async function readGeneratedSource(
     let entries = 0;
     const files: Array<{ path: string; content: string }> = [];
     const fileHashes = new Map<string, string>();
+    const fileContents = new Map<string, Buffer>();
     const visit = async (directory: string, depth: number): Promise<void> => {
       if (depth > 64) throw sourceBindingError();
       const handle = await opendir(directory);
@@ -180,11 +191,11 @@ async function readGeneratedSource(
           throw sourceBindingError();
         }
         const metadata = await lstat(filePath);
-        if (metadata.isSymbolicLink()) throw sourceBindingError();
+        if (metadata.isSymbolicLink() || (metadata.isFile() && metadata.nlink !== 1)) throw sourceBindingError();
         const path = relative(rootPath, filePath).split(sep).join("/");
         const isAccepted = accepted?.paths.has(path) === true;
         if (accepted !== undefined && !isAccepted && outputs.has(filePath)) {
-          if (metadata.isFile() || (path === ".terraform" && metadata.isDirectory())) continue;
+          if (path === ".terraform" ? metadata.isDirectory() : metadata.isFile()) continue;
           throw sourceBindingError();
         }
         if (metadata.isDirectory()) {
@@ -194,7 +205,8 @@ async function readGeneratedSource(
         if (!metadata.isFile() || metadata.size > maxGeneratedSourceBytes - bytes) throw sourceBindingError();
         const input = await open(filePath, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
         try {
-          if (!(await input.stat()).isFile()) throw sourceBindingError();
+          const opened = await input.stat();
+          if (!opened.isFile() || opened.nlink !== 1) throw sourceBindingError();
           const chunks: Buffer[] = [];
           for (;;) {
             const chunk = Buffer.alloc(Math.min(64 * 1024, maxGeneratedSourceBytes - bytes + 1));
@@ -208,6 +220,7 @@ async function readGeneratedSource(
           const content = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(buffer);
           files.push({ path, content });
           fileHashes.set(path, createHash("sha256").update(buffer).digest("hex"));
+          fileContents.set(path, buffer);
         } finally {
           await input.close();
         }
@@ -216,20 +229,28 @@ async function readGeneratedSource(
     await visit(rootPath, 0);
     files.sort((left, right) => left.path.localeCompare(right.path));
     if (sha256(files) !== source.treeHash) throw sourceBindingError();
-    return { rootPath, treeHash: source.treeHash, paths: new Set(files.map(({ path }) => path)), fileHashes };
+    return {
+      rootPath,
+      treeHash: source.treeHash,
+      paths: new Set(files.map(({ path }) => path)),
+      fileHashes,
+      fileContents,
+    };
   } catch {
     throw sourceBindingError();
   }
 }
 
 async function bindGeneratedSource(
-  request: PreviewRequest,
+  request: Pick<PreviewRequest, "generatedSource">,
   cwd: string | undefined,
   templateFile?: string,
   parametersFile?: string,
+  accepted?: GeneratedSourceSnapshot,
+  outputs?: ReadonlySet<string>,
 ): Promise<GeneratedSourceSnapshot | undefined> {
   if (request.generatedSource === undefined) return undefined;
-  const source = await readGeneratedSource({ ...request.generatedSource });
+  const source = await readGeneratedSource({ ...request.generatedSource }, accepted, outputs);
   if (resolve(cwd ?? process.cwd()) !== source.rootPath) throw sourceBindingError();
   if (templateFile !== undefined && resolve(source.rootPath, templateFile) !== resolve(source.rootPath, "main.bicep")) {
     throw sourceBindingError();
@@ -273,6 +294,118 @@ abstract class NativeProviderBase {
       maxOutputBytes: this.#maxOutputBytes,
     });
     return result.stdout;
+  }
+
+  protected async validateBoundSource(
+    request: NativeValidationRequest,
+    track: "bicep" | "terraform",
+    cwd: () => string | undefined,
+    templateFile?: string,
+  ): Promise<NativeValidationReceiptV1> {
+    if (request.generatedSource === undefined || cwd() === undefined) throw sourceBindingError();
+    const generatedSource = { ...request.generatedSource };
+    const commands = NATIVE_VALIDATION_COMMANDS[track];
+    let receipt: NativeValidationReceiptV1;
+    try {
+      const body: Omit<NativeValidationReceiptV1, "receiptHash"> = {
+        schemaVersion: "1.0.0",
+        projectId: request.projectId,
+        runId: request.runId,
+        track,
+        sourceHash: request.sourceHash,
+        treeHash: generatedSource.treeHash,
+        policyHash: request.policyHash,
+        inputHash: request.inputHash,
+        outcome: "pass",
+        commands: commands.map((command) => ({
+          validatorId: command.validatorId,
+          commandHash: calculateNativeValidationCommandHash(command),
+          exitCode: 0,
+          signal: null,
+          timedOut: false,
+          outputTruncated: false,
+        })),
+      };
+      receipt = { ...body, receiptHash: calculateNativeValidationReceiptHash(body) };
+      if (!hasValidNativeValidationReceipt(receipt, body)) throw new Error();
+    } catch {
+      throw new IacProviderError("NATIVE_VALIDATION_INPUT_INVALID", "Native validation inputs are invalid");
+    }
+    const source = await bindGeneratedSource({ generatedSource }, cwd(), templateFile);
+    if (source === undefined) throw sourceBindingError();
+    if (track === "terraform") {
+      const cache = resolve(source.rootPath, ".terraform");
+      const existing = await lstat(cache).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return undefined;
+        throw sourceBindingError();
+      });
+      if (existing !== undefined) throw sourceBindingError();
+    }
+    let scratchRoot: string | undefined;
+    try {
+      try {
+        scratchRoot = await mkdtemp(resolve(await realpath(tmpdir()), "apex-native-validation-"));
+        for (const path of source.paths) {
+          const destination = resolve(scratchRoot, path);
+          if (!destination.startsWith(`${scratchRoot}${sep}`)) throw sourceBindingError();
+          await mkdir(dirname(destination), { recursive: true, mode: 0o700 });
+          await writeFile(destination, source.fileContents.get(path)!, { flag: "wx", mode: 0o600 });
+        }
+      } catch {
+        throw sourceBindingError();
+      }
+      const scratch = await readGeneratedSource({ rootPath: scratchRoot, treeHash: source.treeHash });
+      const outputs = new Set<string>();
+      if (track === "terraform") {
+        outputs.add(resolve(scratchRoot, ".terraform"));
+        outputs.add(resolve(scratchRoot, ".terraform.lock.hcl"));
+      }
+      const verify = async (): Promise<void> => {
+        if (cwd() === undefined) throw sourceBindingError();
+        await bindGeneratedSource({ generatedSource }, cwd(), templateFile);
+        if (track === "terraform") {
+          for (const path of [".terraform", ".terraform.lock.hcl"]) {
+            if (source.paths.has(path)) continue;
+            const metadata = await lstat(resolve(source.rootPath, path)).catch((error: NodeJS.ErrnoException) => {
+              if (error.code === "ENOENT") return undefined;
+              throw sourceBindingError();
+            });
+            if (metadata !== undefined) throw sourceBindingError();
+          }
+        }
+        await readGeneratedSource(scratch, scratch, outputs);
+      };
+      for (const command of commands) {
+        await verify();
+        try {
+          const result = await this.runner.run({
+            executable: command.executable,
+            args: [...command.args],
+            cwd: scratchRoot,
+            timeoutMs: this.#timeoutMs,
+            maxOutputBytes: this.#maxOutputBytes,
+          });
+          if (
+            result.exitCode !== 0 ||
+            result.signal !== null ||
+            result.timedOut !== false ||
+            result.outputTruncated !== false
+          )
+            throw new Error();
+        } catch {
+          throw new IacProviderError("NATIVE_VALIDATION_FAILED", "Native validation command failed");
+        } finally {
+          await verify();
+        }
+      }
+      return receipt;
+    } finally {
+      if (scratchRoot !== undefined) {
+        await rm(scratchRoot, { recursive: true, force: true }).catch(() => {
+          throw sourceBindingError();
+        });
+      }
+    }
   }
 
   protected async authorize(
@@ -473,6 +606,10 @@ export class NativeBicepProvider extends NativeProviderBase implements IacProvid
   async validate(): Promise<readonly string[]> {
     await this.#compiledTemplate();
     return [];
+  }
+
+  async validateSource(request: NativeValidationRequest): Promise<NativeValidationReceiptV1> {
+    return await this.validateBoundSource(request, this.track, () => this.#target.cwd, this.#target.templateFile);
   }
 
   async previewApply(request: PreviewRequest): Promise<DeploymentPreviewV1> {
@@ -741,6 +878,10 @@ export class NativeTerraformProvider extends NativeProviderBase implements IacPr
       await this.run(command);
     }
     return [];
+  }
+
+  async validateSource(request: NativeValidationRequest): Promise<NativeValidationReceiptV1> {
+    return await this.validateBoundSource(request, this.track, () => this.#target.cwd);
   }
 
   async previewApply(request: PreviewRequest): Promise<DeploymentPreviewV1> {

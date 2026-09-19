@@ -140,10 +140,12 @@ IDs. This is authorization scope, not observed module attribution. Full AVM poli
 module ownership remain open. See [the track contract](../reference/iac-tracks.md#exact-bicep-module-scope).
 
 Validation follow-up adds the accepted policy-property map to both validation nodes' declared inputs and makes
-generated-tree validation reject unsuccessful, interrupted or truncated command results. This does not yet make
-validation-task evidence command-backed: `validateTask` stages artifacts and completion checks evidence entry labels.
-Connecting source-bound native execution and runtime-owned receipts to that acceptance boundary remains required;
-agent-submitted hashes alone must not be represented as proof of compiler execution or policy compliance.
+generated-tree validation reject unsuccessful, interrupted or truncated command results. A subsequent receipt slice
+connects configured native providers to validation-task completion: fixed local commands run against isolated source
+copies, and runtime-owned digest receipts bind the accepted handoff, tree, intent and policy map. Native preview checks
+the recorded receipts; label-only adapters require explicit simulation mode. `validateTask` remains artifact staging.
+Reports label unexecuted checks simulated. These receipts prove only Bicep build or Terraform init/format/validate;
+Bicep format/lint and earlier security/policy evaluation remain open, not inferred from receipt input hashes.
 The validation-input/verdict checkpoint passed `qualify:vnext` with 233 capability and 235 CLI tests, plus the remaining
 contract, kernel, renderer, testkit, validator and packaging suites. A subsequent focused ownership regression also
 blocks delete/replace of managed ancestors containing protected existing children, including extension resources.

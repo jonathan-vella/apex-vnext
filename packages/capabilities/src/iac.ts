@@ -3,6 +3,7 @@ import type {
   ApprovalEvidenceV1,
   DeploymentPreviewV1,
   IacTool,
+  NativeValidationReceiptV1,
   Operation,
   OperationRecordV1,
   PolicyPropertyMapV1,
@@ -18,6 +19,8 @@ export type IacProviderErrorCode =
   | "APPROVAL_RECIPIENT_MISMATCH"
   | "APPROVAL_REJECTED"
   | "APPROVAL_WRITER_EPOCH_MISMATCH"
+  | "NATIVE_VALIDATION_FAILED"
+  | "NATIVE_VALIDATION_INPUT_INVALID"
   | "PREVIEW_BLOCKED"
   | "PREVIEW_EXPIRED"
   | "PREVIEW_HASH_MISMATCH"
@@ -67,6 +70,15 @@ export interface PreviewRequest {
   readonly resources: readonly IacResourceSpec[];
   readonly blockers?: readonly string[];
   readonly ttlMs: number;
+}
+
+export interface NativeValidationRequest {
+  readonly projectId: string;
+  readonly runId: string;
+  readonly sourceHash: string;
+  readonly generatedSource: NonNullable<PreviewRequest["generatedSource"]>;
+  readonly policyHash: string;
+  readonly inputHash: string;
 }
 
 export interface CurrentDeploymentAuthority {
@@ -162,7 +174,9 @@ export function authorizeDeploymentPreview(context: PreviewAuthorizationContext)
 
 export interface IacProvider {
   readonly track: IacTool;
+  readonly validationMode?: "simulated";
   validate(request: PreviewRequest): Promise<readonly string[]>;
+  validateSource?(request: NativeValidationRequest): Promise<NativeValidationReceiptV1>;
   previewApply(request: PreviewRequest): Promise<DeploymentPreviewV1>;
   previewDestroy(request: PreviewRequest): Promise<DeploymentPreviewV1>;
   apply(
