@@ -10,6 +10,7 @@ import {
   cliEnvironment,
   endpointPort,
   DebugRegistrationError,
+  vscodeUserSettings,
 } from "../scripts/_lib/debug-workspaces.mjs";
 import { collectorEnvironment, hostConfiguration } from "../scripts/_lib/debug-collector.mjs";
 import * as yaml from "js-yaml";
@@ -164,19 +165,41 @@ test("registration is idempotent and disabling preserves project settings and wo
   const original = '{ // user setting\n "editor.tabSize": 4,\n}\n';
   fs.writeFileSync(path.join(workspace, ".vscode/settings.json"), original);
   const registered = registerWorkspace(local, workspace);
+  assert.equal(
+    Object.keys(readJson(registered.file).settings).some((key) => key.startsWith("github.copilot.chat.otel.")),
+    false,
+  );
   assert.deepEqual(registerWorkspace(local, workspace), registered);
   fs.writeFileSync(
     registered.file,
     fs
       .readFileSync(registered.file, "utf8")
-      .replace('"settings": {', '"settings": {\n // keep me\n "editor.wordWrap": "on",'),
+      .replace(
+        '"settings": {',
+        '"settings": {\n // keep me\n "editor.wordWrap": "on",\n "github.copilot.chat.otel.enabled": true,',
+      ),
   );
+  assert.deepEqual(registerWorkspace(local, workspace), registered);
+  assert.equal(readJson(registered.file).settings["github.copilot.chat.otel.enabled"], undefined);
   disableWorkspace(local, workspace);
-  assert.equal(readJson(registered.file).settings["github.copilot.chat.otel.enabled"], false);
+  assert.equal(readJson(registered.file).settings["github.copilot.chat.otel.enabled"], undefined);
   assert.equal(readJson(registered.file).settings["editor.wordWrap"], "on");
   assert.match(fs.readFileSync(registered.file, "utf8"), /keep me/u);
   assert.equal(fs.readFileSync(path.join(workspace, ".vscode/settings.json"), "utf8"), original);
   assert.equal(fs.statSync(registered.file).mode & 0o777, 0o600);
+  const reenabled = registerWorkspace(local, workspace);
+  assert.equal(readJson(reenabled.file).settings["github.copilot.chat.otel.enabled"], undefined);
+  assert.equal(readJson(reenabled.file).settings["editor.wordWrap"], "on");
+});
+
+test("VS Code setup supplies application-scoped metadata-only settings for the registered port", () => {
+  assert.deepEqual(vscodeUserSettings(14322), {
+    "github.copilot.chat.otel.enabled": true,
+    "github.copilot.chat.otel.exporterType": "otlp-http",
+    "github.copilot.chat.otel.otlpEndpoint": "http://127.0.0.1:14322",
+    "github.copilot.chat.otel.captureContent": false,
+  });
+  assert.throws(() => vscodeUserSettings("14322/path"), /Port must/);
 });
 
 test("CLI launch removes inherited exporters, secrets in headers, and content capture overrides", () => {

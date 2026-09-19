@@ -17,10 +17,12 @@ npm run debug:collector -- --workspace /path/to/apex-test --install
 ```
 
 `enable` registers the canonical workspace path locally and prints a generated
-`.code-workspace` path. Open that file in **WSL VS Code** to enable capture there.
-It does not rewrite the project's settings or configure all VS Code windows.
-Existing folder settings, environment variables, and managed policy can override
-workspace settings; verify the effective OTel endpoint and content-capture setting.
+`.code-workspace` path and the required User settings. Registration alone does not
+enable capture. Copilot OTel settings are application-scoped: open a dedicated
+VS Code instance with `--user-data-dir`, set the printed values in that instance's
+**User settings**, open the generated workspace in WSL, and reload. A workspace
+file or profile alone cannot isolate these settings. The command does not modify
+User settings or consumer files. Verify environment/policy overrides and real export.
 The host receiver defaults to localhost port 14318, separate from the legacy Docker
 collector on 4318. Give each additional workspace a unique `--port`.
 
@@ -104,8 +106,10 @@ to change code, gates, models, or infrastructure. No scheduled model worker is i
 npm run debug:disable -- --workspace /path/to/apex-test
 ```
 
-Disable sets capture off in the generated workspace while preserving other edits.
-Reload that VS Code workspace and exit launched CLI sessions. The managed host
+Disable withdraws the registration and removes obsolete workspace-level OTel keys
+while preserving other edits. It cannot change application-scoped User settings:
+turn off `github.copilot.chat.otel.enabled` in the dedicated instance and reload,
+or close that instance. Exit launched CLI sessions. The managed host
 collector notices registration withdrawal and stops within a few seconds. History
 and Azure credentials remain; inherited policy or separately configured exporters
 are not modified. Re-enable and restart explicitly when needed.
@@ -273,10 +277,12 @@ cleanup. No unattended renewal job is installed.
 
 ## Enable Development Clients
 
-Use a dedicated development VS Code workspace/profile and session-scoped CLI
+Use a dedicated development VS Code `--user-data-dir` instance and session-scoped CLI
 environment. Do not ship these settings in consumer customizations.
 
-VS Code development workspace settings:
+VS Code **User settings** in that dedicated instance (not workspace settings).
+This example uses the legacy Docker collector; use the registration's port for
+the host collector:
 
 ```json
 {

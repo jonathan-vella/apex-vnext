@@ -13,6 +13,7 @@ import {
   readJson,
   savePrivate,
   DebugRegistrationError,
+  vscodeUserSettings,
 } from "./_lib/debug-workspaces.mjs";
 import { prepareCollector, runCollector } from "./_lib/debug-collector.mjs";
 import { assessmentPacket, readLocalEvidence, readAzureEvidence } from "./_lib/debug-evidence.mjs";
@@ -78,7 +79,7 @@ async function main(args) {
       console.log("Collector not running for this registration yet.");
     }
     console.log(
-      `Registered ${registration.workspace}\nOpen in WSL VS Code: code "${registration.file}"\nStart capture in another terminal: npm run debug:collector -- --workspace "${registration.workspace}" --install\nNo project settings or consumer files changed. Opening the generated workspace enables metadata export; reload any already-open copy. Environment/policy overrides must be checked in the client.`,
+      `Registered ${registration.workspace}\nWorkspace file: ${registration.file}\nStart capture in another terminal: npm run debug:collector -- --workspace "${registration.workspace}" --install\nRegistration does not enable VS Code capture. Copilot OTel settings are application-scoped: use a dedicated --user-data-dir instance, configure the following in its User settings, then open the workspace and reload. Workspace or profile settings alone are insufficient. No User settings, project settings or consumer files were changed. Verify environment/policy overrides and real client export.\n${JSON.stringify(vscodeUserSettings(registration.port), null, 2)}`,
     );
     return;
   }
@@ -93,7 +94,7 @@ async function main(args) {
   if (action === "disable") {
     disableWorkspace(local, registration.workspace);
     console.log(
-      "Registration disabled. Reload the generated VS Code workspace and exit any CLI launched for it. The managed host collector will stop; history is retained. Organization policy or other exporters are not changed.",
+      "Registration disabled. Turn off github.copilot.chat.otel.enabled in the dedicated VS Code instance's User settings and reload, or close that instance. Exit any CLI launched for this registration. The managed host collector will stop; history is retained. User settings, organization policy and other exporters are not changed.",
     );
     return;
   }

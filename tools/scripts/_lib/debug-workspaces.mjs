@@ -54,6 +54,15 @@ export class DebugRegistrationError extends Error {
   }
 }
 
+export function vscodeUserSettings(port) {
+  return {
+    "github.copilot.chat.otel.enabled": true,
+    "github.copilot.chat.otel.exporterType": "otlp-http",
+    "github.copilot.chat.otel.otlpEndpoint": `http://127.0.0.1:${endpointPort(port)}`,
+    "github.copilot.chat.otel.captureContent": false,
+  };
+}
+
 export function registerWorkspace(local, workspace, { port = 14318, logRoot } = {}) {
   workspace = fs.realpathSync(workspace);
   if (!fs.statSync(workspace).isDirectory()) throw new Error("Workspace must be a directory");
@@ -66,7 +75,6 @@ export function registerWorkspace(local, workspace, { port = 14318, logRoot } = 
   if (previous?.enabled) {
     if (previous.port !== port || (logRoot && fs.realpathSync(logRoot) !== previous.logRoot))
       throw new Error("Disable before changing a registration's port or diagnostic source");
-    return previous;
   }
   const directory = path.join(local, "workspaces", id);
   privateDirectory(directory);
@@ -77,24 +85,19 @@ export function registerWorkspace(local, workspace, { port = 14318, logRoot } = 
     if (!fs.statSync(logRoot).isDirectory())
       throw new Error("Diagnostic root must be a directory dedicated to this workspace");
   }
-  const settings = {
-    "github.copilot.chat.otel.enabled": true,
-    "github.copilot.chat.otel.exporterType": "otlp-http",
-    "github.copilot.chat.otel.otlpEndpoint": `http://127.0.0.1:${port}`,
-    "github.copilot.chat.otel.captureContent": false,
-  };
   const file = path.join(directory, "development.code-workspace");
   let document = fs.existsSync(file)
     ? fs.readFileSync(file, "utf8")
     : JSON.stringify({ folders: [{ path: workspace }], settings: {} }, null, 2);
   if (fs.existsSync(file)) readJson(file);
-  for (const [key, value] of Object.entries(settings)) {
+  for (const key of Object.keys(vscodeUserSettings(port))) {
     document = applyEdits(
       document,
-      modify(document, ["settings", key], value, { formattingOptions: { insertSpaces: true, tabSize: 2 } }),
+      modify(document, ["settings", key], undefined, { formattingOptions: { insertSpaces: true, tabSize: 2 } }),
     );
   }
   savePrivate(file, document);
+  if (previous?.enabled) return previous;
   const registration = {
     id,
     workspace,
@@ -113,17 +116,17 @@ export function disableWorkspace(local, workspace) {
   const registry = loadRegistry(local);
   const registration = registry.workspaces.find((entry) => entry.id === workspaceId(workspace));
   if (!registration) throw new Error("Workspace is not registered");
-  const document = fs.readFileSync(registration.file, "utf8");
+  let document = fs.readFileSync(registration.file, "utf8");
   readJson(registration.file);
-  savePrivate(
-    registration.file,
-    applyEdits(
+  for (const key of Object.keys(vscodeUserSettings(registration.port))) {
+    document = applyEdits(
       document,
-      modify(document, ["settings", "github.copilot.chat.otel.enabled"], false, {
+      modify(document, ["settings", key], undefined, {
         formattingOptions: { insertSpaces: true, tabSize: 2 },
       }),
-    ),
-  );
+    );
+  }
+  savePrivate(registration.file, document);
   registration.enabled = false;
   registration.disabledAt = new Date().toISOString();
   savePrivate(path.join(local, "workspaces.json"), registry);
