@@ -7,8 +7,6 @@
 
 export const AGENTS_DIR = "customizations/.github/agents";
 export const SUBAGENTS_DIR = "customizations/.github/agents/_subagents";
-export const LEGACY_AGENTS_DIR = ".archive/legacy-agents-v0.10/.github/agents";
-export const LEGACY_SUBAGENTS_DIR = ".archive/legacy-agents-v0.10/.github/agents/_subagents";
 export const SKILLS_DIR = ".github/skills";
 export const INSTRUCTIONS_DIR = "customizations/.github/instructions";
 export const AGENT_OUTPUT_DIR = "agent-output";

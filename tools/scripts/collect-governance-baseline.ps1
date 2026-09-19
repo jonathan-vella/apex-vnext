@@ -1,19 +1,22 @@
 <#
 .SYNOPSIS
     Collects Azure Policy assignments across all subscriptions under a
-    Management Group and writes a deterministic governance-baseline-v1 JSON.
+    Management Group or one subscription and writes a governance-baseline-v1 JSON.
 
 .DESCRIPTION
     Authenticates via the workflow's azure/login@v2 context, discovers
     descendant subscriptions, collects policy assignments/definitions/
-    set-definitions/exemptions per subscription, classifies findings
-    identically to discover.py, and writes a deterministic baseline.
+    set-definitions/exemptions per subscription, classifies findings,
+    and writes a deterministic baseline.
 
-    discovered_at timestamps are preserved for unchanged subscriptions
-    to prevent no-op daily PR churn.
+    Every successful collection renews discovered_at timestamps,
+    including unchanged subscriptions.
 
 .PARAMETER ManagementGroupId
-    Required. The root Management Group ID to traverse.
+    The root Management Group ID to traverse; exclusive with SubscriptionId.
+
+.PARAMETER SubscriptionId
+    Collect one subscription, including inherited policy, without MG discovery.
 
 .PARAMETER OutputDir
     Output directory for baseline files. Default: .github/data
@@ -24,15 +27,22 @@
 .PARAMETER MaxSubscriptions
     Maximum subscriptions to process. Default: 100.
 #>
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = "ManagementGroup")]
 param(
-    [Parameter(Mandatory)]
+    [Parameter(Mandatory, ParameterSetName = "ManagementGroup")]
+    [ValidateNotNullOrEmpty()]
+    [ValidatePattern('\A[a-zA-Z0-9](?:[a-zA-Z0-9_().-]{0,88}[a-zA-Z0-9_()-])?\z')]
     [string]$ManagementGroupId,
+
+    [Parameter(Mandatory, ParameterSetName = "Subscription")]
+    [ValidatePattern('^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')]
+    [string]$SubscriptionId,
 
     [string]$OutputDir = ".github/data",
 
     [switch]$IncludeDefenderAuto,
 
+    [ValidateRange(1, [int]::MaxValue)]
     [int]$MaxSubscriptions = 100
 )
 
@@ -41,7 +51,7 @@ param(
 # failures. Error handling is via try/catch + ErrorActionPreference Stop.
 $ErrorActionPreference = "Stop"
 
-# ─── Constants (mirroring discover.py) ───────────────────────────────────────
+# ─── Constants ─────────────────────────────────────────────────────────────
 $ARM = "https://management.azure.com"
 $API_ASSIGNMENTS = "2022-06-01"
 $API_DEFINITIONS = "2021-06-01"
@@ -56,8 +66,9 @@ $DEFENDER_ASSIGNED_BY = @("Security Center", "Microsoft Defender for Cloud")
 # ─── ARM Token ───────────────────────────────────────────────────────────────
 function Get-ArmToken {
     $tokenJson = az account get-access-token --resource "$ARM" -o json 2>$null
-    if (-not $tokenJson) { throw "Failed to acquire ARM token via az account get-access-token" }
+    if ($LASTEXITCODE -ne 0 -or -not $tokenJson) { throw "Failed to acquire ARM token via az account get-access-token" }
     $token = $tokenJson | ConvertFrom-Json
+    if ([string]::IsNullOrWhiteSpace($token.accessToken)) { throw "ARM access token is empty" }
     return $token.accessToken
 }
 
@@ -66,16 +77,30 @@ function Invoke-ArmRest {
     $headers = @{ Authorization = "Bearer $Token"; "Content-Type" = "application/json" }
     $allValues = @()
     $currentUrl = $Url
+    $visited = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
     do {
+        $requestUri = $null
+        if (-not [uri]::TryCreate($currentUrl, [UriKind]::Absolute, [ref]$requestUri) -or
+            $requestUri.Scheme -ne "https" -or $requestUri.Authority -ne ([uri]$ARM).Authority -or
+            $requestUri.UserInfo -or $requestUri.Fragment) {
+            throw "Invalid ARM pagination URL: $currentUrl"
+        }
+        if (-not $visited.Add($requestUri.AbsoluteUri)) { throw "Repeated ARM pagination URL: $currentUrl" }
         try {
             $response = Invoke-RestMethod -Uri $currentUrl -Headers $headers -Method Get -ErrorAction Stop
         }
         catch {
-            Write-Warning "ARM REST call failed: $currentUrl — $_"
-            return $allValues
+            throw "ARM REST call failed: $currentUrl - $_"
         }
-        if ($response.PSObject.Properties['value']) { $allValues += $response.value }
-        $currentUrl = if ($response.PSObject.Properties['nextLink']) { $response.nextLink } else { $null }
+        if ($null -eq $response -or $response.value -isnot [array]) {
+            throw "Invalid ARM list response: $currentUrl"
+        }
+        $allValues += $response.value
+        $nextLink = $response.nextLink
+        if ($null -ne $nextLink -and $nextLink -isnot [string]) {
+            throw "Invalid ARM nextLink: $currentUrl"
+        }
+        $currentUrl = $nextLink
     } while ($currentUrl)
     return $allValues
 }
@@ -87,32 +112,84 @@ function Invoke-ArmRestSingle {
         return Invoke-RestMethod -Uri $Url -Headers $headers -Method Get -ErrorAction Stop
     }
     catch {
-        Write-Warning "ARM REST single fetch failed: $Url — $_"
-        return $null
+        throw "ARM REST single fetch failed: $Url - $_"
     }
 }
 
-# ─── Classification (mirrors discover.py exactly) ───────────────────────────
-function Get-EffectOf {
-    param($Defn)
-    $props = $Defn.properties
-    if (-not $props) { return $null }
-    $rule = $props.policyRule
-    if (-not $rule) { return $null }
-    $then = $rule.then
-    if (-not $then) { return $null }
-    $eff = $then.effect
-    if (-not $eff) { return $null }
-    # Resolve parameterized effects
-    if ($eff -match '^\[parameters\(') {
-        $paramName = $eff -replace "^\[parameters\('", "" -replace "'\)\]$", ""
-        $paramDef = $props.parameters.$paramName
-        if ($paramDef -and $paramDef.defaultValue) {
-            return [string]$paramDef.defaultValue
-        }
-        return $null
+function Get-ArmPolicyDefinition {
+    param([string]$Id, [hashtable]$Cache, [string]$ResourceType = "policyDefinitions")
+
+    $idPattern = "^(?:/subscriptions/[^/?#]+|/providers/Microsoft.Management/managementGroups/[^/?#]+)?/providers/Microsoft.Authorization/$ResourceType/[^/?#]+$"
+    if ($Id -notmatch $idPattern) { throw "Invalid $ResourceType resource ID: $Id" }
+    $cacheKey = $Id.ToLowerInvariant()
+    if (-not $Cache.ContainsKey($cacheKey)) {
+        $Cache[$cacheKey] = Invoke-ArmRestSingle -Url "$ARM${Id}?api-version=$API_DEFINITIONS" -Token $Token
     }
-    return [string]$eff
+    $definition = $Cache[$cacheKey]
+    if ($null -eq $definition -or $definition.id -ine $Id -or $null -eq $definition.properties) {
+        throw "Invalid $ResourceType response for $Id"
+    }
+    if ($ResourceType -eq "policySetDefinitions") {
+        if ($definition.properties.policyDefinitions -isnot [array]) { throw "Invalid initiative members for $Id" }
+    }
+    elseif (-not $definition.properties.policyRule.then.effect) {
+        throw "Missing policy effect for $Id"
+    }
+    return $definition
+}
+
+# ─── Classification ────────────────────────────────────────────────────────
+function Get-EffectOf {
+    param($Defn, $Parameters, $Initiative, $Assignment, $MemberRefId)
+    $props = $Defn.properties
+    $eff = $props.policyRule.then.effect
+    $overridden = $false
+    $appliedOverride = $null
+    if ($null -ne $Assignment.properties.overrides -and $Assignment.properties.overrides -isnot [array]) {
+        throw "Invalid assignment overrides"
+    }
+    foreach ($override in $Assignment.properties.overrides) {
+        if ($override.kind -ne "policyEffect") { throw "Unsupported assignment override kind: $($override.kind)" }
+        if ($null -ne $override.selectors -and $override.selectors -isnot [array]) { throw "Invalid policy effect override selectors" }
+        $applies = $true
+        foreach ($selector in $override.selectors) {
+            if ($selector.kind -ne "policyDefinitionReferenceId" -or -not $Initiative) {
+                throw "Unsupported policy effect override selector: $($selector.kind)"
+            }
+            if (($null -ne $selector.in -and $selector.in -isnot [array]) -or
+                ($null -ne $selector.notIn -and $selector.notIn -isnot [array]) -or
+                ($null -eq $selector.in -and $null -eq $selector.notIn)) {
+                throw "Invalid policy effect override selector"
+            }
+            if ($null -ne $selector.in -and $MemberRefId -notin $selector.in) { $applies = $false }
+            if ($null -ne $selector.notIn -and $MemberRefId -in $selector.notIn) { $applies = $false }
+        }
+        if ($applies) {
+            if ($overridden) { throw "Overlapping policy effect overrides for $($Defn.id)" }
+            $eff = $override.value
+            $overridden = $true
+            $appliedOverride = $override
+        }
+    }
+    if (-not $overridden -and $eff -match "^\[parameters\('([^']+)'\)\]$") {
+        $paramName = $Matches[1]
+        $binding = if ($null -ne $Parameters) { $Parameters.PSObject.Properties[$paramName] } else { $null }
+        if ($null -ne $binding) {
+            $eff = $binding.Value.value
+            if ($Initiative -and $eff -is [string] -and $eff -match "^\[parameters\('([^']+)'\)\]$") {
+                $initiativeParamName = $Matches[1]
+                $assignmentParameters = $Assignment.properties.parameters
+                $assignmentBinding = if ($null -ne $assignmentParameters) { $assignmentParameters.PSObject.Properties[$initiativeParamName] } else { $null }
+                if ($null -ne $assignmentBinding) { $eff = $assignmentBinding.Value.value }
+                else { $eff = $Initiative.properties.parameters.$initiativeParamName.defaultValue }
+            }
+        }
+        else { $eff = $props.parameters.$paramName.defaultValue }
+    }
+    if ($eff -isnot [string] -or $eff -notin @("Deny", "DeployIfNotExists", "Modify", "Disabled", "Audit", "AuditIfNotExists", "Append", "Manual", "DenyAction", "Mutate")) {
+        throw "Unresolved or unsupported policy effect for $($Defn.id): $eff"
+    }
+    return @{ effect = [string]$eff; override = $appliedOverride }
 }
 
 function Get-Classification {
@@ -120,6 +197,17 @@ function Get-Classification {
     if ($BLOCKER_EFFECTS -contains $Effect) { return "blocker" }
     if ($AUTO_REMEDIATE_EFFECTS -contains $Effect) { return "auto-remediate" }
     return "informational"
+}
+
+function Get-EnforcementMode {
+    param($Assignment)
+    $property = $Assignment.properties.PSObject.Properties['enforcementMode']
+    if ($null -eq $property) { return "Default" }
+    $mode = $property.Value
+    if ($mode -isnot [string] -or $mode -cnotin @("Default", "DoNotEnforce")) {
+        throw "Unsupported assignment enforcementMode for $($Assignment.id)"
+    }
+    return $mode
 }
 
 function Test-IsDefenderAuto {
@@ -270,17 +358,67 @@ function Process-Subscription {
 
     # Build exemption map
     $exemptionMap = @{}
+    $collectionTime = [DateTimeOffset]::UtcNow
+    $expiredExemptionCount = 0
     foreach ($ex in $exemptions) {
         $exProps = $ex.properties
-        if (-not $exProps) { continue }
+        if (-not $exProps -or -not $exProps.policyAssignmentId -or $exProps.exemptionCategory -notin @("Waiver", "Mitigated")) {
+            throw "Invalid policy exemption"
+        }
+        if ($null -ne $exProps.expiresOn) {
+            $expiresAt = [DateTimeOffset]::MinValue
+            if ($exProps.expiresOn -is [datetime]) {
+                if ($exProps.expiresOn.Kind -eq [DateTimeKind]::Unspecified) { throw "Invalid policy exemption expiresOn timezone" }
+                $expiresAt = [DateTimeOffset]$exProps.expiresOn
+            }
+            elseif ($exProps.expiresOn -isnot [string] -or
+                $exProps.expiresOn -notmatch '^\d{4}-\d{2}-\d{2}T.+(?:Z|[+-]\d{2}:\d{2})$' -or
+                -not [DateTimeOffset]::TryParse($exProps.expiresOn, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$expiresAt)) {
+                throw "Invalid policy exemption expiresOn"
+            }
+            if ($expiresAt -le $collectionTime) { $expiredExemptionCount++; continue }
+        }
+        if ($exProps.resourceSelectors) { throw "Unsupported policy exemption resourceSelectors" }
+        if ($null -ne $exProps.policyDefinitionReferenceIds -and $exProps.policyDefinitionReferenceIds -isnot [array]) {
+            throw "Invalid policy exemption member references"
+        }
         $asgId = ($exProps.policyAssignmentId -replace '\s', '').ToLower()
-        if ($asgId) { $exemptionMap[$asgId] = @{ category = $exProps.exemptionCategory; policyDefinitionReferenceIds = $exProps.policyDefinitionReferenceIds } }
+        $exemptionMap[$asgId] = @($exemptionMap[$asgId]) + @(@{ category = $exProps.exemptionCategory; policyDefinitionReferenceIds = $exProps.policyDefinitionReferenceIds })
     }
 
     # Filter Defender auto-assignments
     $filteredDefender = @()
     $keptAssignments = @()
+    $notScopeExcludedCount = 0
+    $targetScope = "/subscriptions/$SubId"
     foreach ($a in $assignments) {
+        $notScopes = $a.properties.notScopes
+        if ($null -ne $notScopes -and $notScopes -isnot [array]) { throw "Invalid assignment notScopes" }
+        $normalizedNotScopes = @(
+            foreach ($excludedScope in $notScopes) {
+                if ($excludedScope -isnot [string] -or $excludedScope -notmatch '^/(?:subscriptions/[0-9a-f-]{36}(?:/[^?#]+)?|providers/Microsoft.Management/managementGroups/[^/?#]+?)/?$') {
+                    throw "Invalid assignment notScopes entry"
+                }
+                $excludedScope.TrimEnd('/')
+            }
+        )
+        if ($targetScope -in $normalizedNotScopes -or $a.properties.scope -in $normalizedNotScopes) {
+            $notScopeExcludedCount++
+            continue
+        }
+        foreach ($excludedScope in $normalizedNotScopes) {
+            if ($excludedScope.StartsWith("$targetScope/", [StringComparison]::OrdinalIgnoreCase)) {
+                throw "Partial subscription notScopes cannot be represented: $excludedScope"
+            }
+            if ($excludedScope -notmatch '^/subscriptions/') {
+                throw "Unresolved management group notScopes: $excludedScope"
+            }
+        }
+        if ($a.properties.resourceSelectors) { throw "Unsupported assignment resourceSelectors" }
+        if ($null -ne $a.properties.PSObject.Properties['definitionVersion']) {
+            throw "Unsupported assignment definitionVersion"
+        }
+        $null = Get-EnforcementMode $a
         if ((Test-IsDefenderAuto $a) -and -not $IncludeDefenderAuto) {
             $filteredDefender += ($a.properties.displayName ?? $a.name ?? $a.id ?? "<unknown>")
         }
@@ -291,6 +429,8 @@ function Process-Subscription {
     $findings = @()
     $auditCount = 0
     $disabledCount = 0
+    $classifiedPolicyCount = 0
+    $otherEffectCount = 0
 
     foreach ($a in $keptAssignments) {
         $props = $a.properties
@@ -299,41 +439,45 @@ function Process-Subscription {
         $policyDefId = ($props.policyDefinitionId ?? "").ToLower()
         $assignmentId = ($a.id ?? "").ToLower()
         $assignmentType = if ($scope.ToLower() -match '/providers/microsoft.management/managementgroups/') { "management-group" } else { "subscription" }
+        $enforcementMode = Get-EnforcementMode $a
 
         $assignmentInventory += @{
             displayName = $display
             scope = $scope
             assignmentType = $assignmentType
             policyDefinitionId = $policyDefId
+            enforcementMode = $enforcementMode
         }
 
-        if (-not $policyDefId) { continue }
+        if (-not $policyDefId) { throw "Missing policyDefinitionId for assignment $assignmentId" }
 
         # Resolve members
         $members = @()
-        if ($policyDefId -match '/policysetdefinitions/' -and $sets.ContainsKey($policyDefId)) {
-            $setMembers = $sets[$policyDefId].properties.policyDefinitions
-            if ($setMembers) {
-                foreach ($m in $setMembers) {
-                    $mid = ($m.policyDefinitionId ?? "").ToLower()
-                    if ($defs.ContainsKey($mid)) {
-                        $members += @{ defn = $defs[$mid]; memberRefId = $m.policyDefinitionReferenceId }
-                    }
+        $policySet = $null
+        if ($policyDefId -match '/policysetdefinitions/') {
+            $policySet = Get-ArmPolicyDefinition -Id $policyDefId -Cache $sets -ResourceType "policySetDefinitions"
+            foreach ($setMember in $policySet.properties.policyDefinitions) {
+                if ($null -ne $setMember.PSObject.Properties['definitionVersion']) {
+                    throw "Unsupported initiative member definitionVersion"
                 }
+                $memberDefinition = Get-ArmPolicyDefinition -Id $setMember.policyDefinitionId -Cache $defs
+                $members += @{ defn = $memberDefinition; memberRefId = $setMember.policyDefinitionReferenceId; parameters = $setMember.parameters }
             }
         }
-        elseif ($defs.ContainsKey($policyDefId)) {
-            $members += @{ defn = $defs[$policyDefId]; memberRefId = $null }
+        else {
+            $policyDefinition = Get-ArmPolicyDefinition -Id $policyDefId -Cache $defs
+            $members += @{ defn = $policyDefinition; memberRefId = $null; parameters = $props.parameters }
         }
 
         foreach ($member in $members) {
             $defn = $member.defn
             $memberRefId = $member.memberRefId
-            $eff = Get-EffectOf $defn
-            if (-not $eff) { continue }
+            $effectivePolicy = Get-EffectOf -Defn $defn -Parameters $member.parameters -Initiative $policySet -Assignment $a -MemberRefId $memberRefId
+            $eff = $effectivePolicy.effect
+            $classifiedPolicyCount++
             if ($eff -eq "Disabled") { $disabledCount++; continue }
             if ($eff -in @("Audit", "AuditIfNotExists")) { $auditCount++; continue }
-            if ($eff -notin $RELEVANT_EFFECTS) { continue }
+            if ($eff -notin $RELEVANT_EFFECTS) { $otherEffectCount++; continue }
 
             $rtypes = Get-ResourceTypes $defn
             $paths = Get-PropertyPaths $defn $rtypes
@@ -341,15 +485,18 @@ function Process-Subscription {
 
             $exemption = $null
             if ($exemptionMap.ContainsKey($assignmentId)) {
-                $candidate = $exemptionMap[$assignmentId]
-                $refIds = $candidate.policyDefinitionReferenceIds
-                if (-not $refIds -or $memberRefId -in $refIds) {
-                    $exemption = $candidate
+                foreach ($candidate in $exemptionMap[$assignmentId]) {
+                    if ($null -eq $candidate) { continue }
+                    $refIds = $candidate.policyDefinitionReferenceIds
+                    if (-not $refIds -or $memberRefId -in $refIds) {
+                        $exemption = $candidate
+                        break
+                    }
                 }
             }
 
             $classification = Get-Classification $eff
-            if ($exemption -and $classification -eq "blocker") { $classification = "informational" }
+            if ($exemption) { $classification = "informational" }
 
             $effectLower = $eff.Substring(0,1).ToLower() + $eff.Substring(1)
 
@@ -357,6 +504,7 @@ function Process-Subscription {
                 policy_id = $defn.id
                 display_name = $defn.properties.displayName ?? $defn.name ?? $defn.id
                 effect = $effectLower
+                enforcementMode = $enforcementMode
                 scope = $scope
                 assignment_display_name = $display
                 assignment_id = $a.id
@@ -367,28 +515,48 @@ function Process-Subscription {
                 azurePropertyPath = $paths.azurePropertyPath
                 bicepPropertyPath = $paths.bicepPropertyPath
                 exemption = $exemption
-                override = $null
+                override = $effectivePolicy.override
             }
+            if ($policySet) { $finding.policyDefinitionReferenceId = $memberRefId }
 
             # Assignment parameters
             $assignmentParams = $props.parameters
-            if ($assignmentParams) {
-                $paramValues = [ordered]@{}
-                foreach ($key in ($assignmentParams | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name)) {
-                    $val = $assignmentParams.$key.value
-                    if ($null -ne $val) { $paramValues[$key] = $val }
+            $paramValues = [ordered]@{}
+            $parameterSource = if ($policySet) { $policySet } else { $defn }
+            foreach ($parameter in $parameterSource.properties.parameters.PSObject.Properties) {
+                if ($parameter.Value.PSObject.Properties['defaultValue']) {
+                    $paramValues[$parameter.Name] = $parameter.Value.defaultValue
                 }
-                if ($paramValues.Count -gt 0) { $finding.assignment_parameters = $paramValues }
             }
+            foreach ($parameter in $assignmentParams.PSObject.Properties) {
+                $paramValues[$parameter.Name] = $parameter.Value.value
+            }
+            if ($policySet) {
+                $memberValues = [ordered]@{}
+                foreach ($parameter in $defn.properties.parameters.PSObject.Properties) {
+                    if ($parameter.Value.PSObject.Properties['defaultValue']) {
+                        $memberValues[$parameter.Name] = $parameter.Value.defaultValue
+                    }
+                }
+                foreach ($parameter in $member.parameters.PSObject.Properties) {
+                    $val = $parameter.Value.value
+                    if ($val -is [string] -and $val -match "^\[parameters\('([^']+)'\)\]$" -and $paramValues.Contains($Matches[1])) {
+                        $val = $paramValues[$Matches[1]]
+                    }
+                    $memberValues[$parameter.Name] = $val
+                }
+                foreach ($key in $memberValues.Keys) { $paramValues[$key] = $memberValues[$key] }
+            }
+            if ($paramValues.Count -gt 0) { $finding.assignment_parameters = $paramValues }
             if ($paths.pathSemantics) { $finding.pathSemantics = $paths.pathSemantics }
             $findings += $finding
         }
     }
 
-    $blockerCount = ($findings | Where-Object { $_.classification -eq "blocker" }).Count
-    $autoRemediateCount = ($findings | Where-Object { $_.classification -eq "auto-remediate" }).Count
-    $exemptedCount = ($findings | Where-Object { $null -ne $_.exemption }).Count
-    $infoCount = ($findings | Where-Object { $_.classification -eq "informational" }).Count
+    $blockerCount = @($findings | Where-Object { $_.classification -eq "blocker" }).Count
+    $autoRemediateCount = @($findings | Where-Object { $_.classification -eq "auto-remediate" }).Count
+    $exemptedCount = @($findings | Where-Object { $null -ne $_.exemption }).Count
+    $infoCount = @($findings | Where-Object { $_.classification -eq "informational" }).Count
     $subScopeCount = ($keptAssignments | Where-Object { $_.properties.scope -and $_.properties.scope.ToLower() -notmatch '/providers/microsoft.management/' }).Count
     $mgInheritedCount = ($keptAssignments | Where-Object { $_.properties.scope -and $_.properties.scope.ToLower() -match '/providers/microsoft.management/' }).Count
 
@@ -432,7 +600,7 @@ function Process-Subscription {
         # Left blank intentionally — render_cached_governance.py recomputes
         # this via the canonical _completeness_signature helper.
         completeness_signature = ""
-        ttl_days = 7
+        ttl_days = 30
     }
 
     return [ordered]@{
@@ -446,6 +614,8 @@ function Process-Subscription {
             assignment_total = $assignments.Count
             assignment_kept = $keptAssignments.Count
             defender_auto_filtered = $filteredDefender.Count
+            not_scope_excluded = $notScopeExcludedCount
+            expired_exemption_count = $expiredExemptionCount
             subscription_scope_count = $subScopeCount
             management_group_inherited_count = $mgInheritedCount
             blocker_count = $blockerCount
@@ -453,6 +623,8 @@ function Process-Subscription {
             informational_count = $infoCount
             audit_count = $auditCount
             disabled_count = $disabledCount
+            classified_policy_count = $classifiedPolicyCount
+            other_effect_count = $otherEffectCount
             exempted_count = $exemptedCount
         }
         assignment_inventory = @($assignmentInventory)
@@ -464,17 +636,22 @@ function Process-Subscription {
 }
 
 # ─── Main ────────────────────────────────────────────────────────────────────
-Write-Host "Governance Baseline Collector — MG: $ManagementGroupId"
+$standalone = $PSCmdlet.ParameterSetName -eq "Subscription"
+Write-Host "Governance Baseline Collector: $(if ($standalone) { $SubscriptionId } else { $ManagementGroupId })"
 
 $token = Get-ArmToken
 Write-Host "ARM token acquired"
 
 # Discover descendant subscriptions
-$descendantsUrl = "$ARM/providers/Microsoft.Management/managementGroups/$ManagementGroupId/descendants?api-version=$API_MG_DESCENDANTS"
-$descendants = Invoke-ArmRest -Url $descendantsUrl -Token $token
-$allSubs = $descendants | Where-Object { $_.type -eq "Microsoft.Management/managementGroups/subscriptions" }
-$allSubs = $allSubs | Sort-Object { $_.name }
-Write-Host "Discovered $($allSubs.Count) subscriptions under MG: $ManagementGroupId"
+if ($standalone) {
+    $allSubs = @([pscustomobject]@{ name = $SubscriptionId })
+}
+else {
+    $descendantsUrl = "$ARM/providers/Microsoft.Management/managementGroups/$ManagementGroupId/descendants?api-version=$API_MG_DESCENDANTS"
+    $descendants = Invoke-ArmRest -Url $descendantsUrl -Token $token
+    $allSubs = @($descendants | Where-Object { $_.type -eq "Microsoft.Management/managementGroups/subscriptions" } | Sort-Object { $_.name })
+    Write-Host "Discovered $($allSubs.Count) subscriptions under MG: $ManagementGroupId"
+}
 
 # Exclusion checks
 $subscriptionsExcluded = @()
@@ -487,11 +664,12 @@ foreach ($sub in $allSubs) {
             -Method Get -ErrorAction Stop
     }
     catch {
-        $subscriptionsExcluded += [ordered]@{ subscription_id = $subId; reason = "unreadable"; detail = "$_" }
-        Write-Warning "Excluding $subId — unreadable: $_"
-        continue
+        throw "Failed to read subscription $subId - $_"
     }
     $state = $subDetail.subscriptionPolicies.spendingLimit ?? $subDetail.state ?? "Unknown"
+    if ($standalone -and $subDetail.state -ne "Enabled") {
+        throw "Standalone subscription $subId is not enabled"
+    }
     if ($subDetail.state -eq "Disabled") {
         $subscriptionsExcluded += [ordered]@{ subscription_id = $subId; reason = "disabled" }
         Write-Warning "Excluding $subId — disabled"
@@ -499,6 +677,7 @@ foreach ($sub in $allSubs) {
     }
     $quotaId = $subDetail.subscriptionPolicies.quotaId ?? ""
     if ($quotaId -like "AAD_*") {
+        if ($standalone) { throw "Standalone subscription $subId has AAD quota: $quotaId" }
         $subscriptionsExcluded += [ordered]@{ subscription_id = $subId; reason = "AAD_quota"; quota_id = $quotaId }
         Write-Warning "Excluding $subId — AAD quota: $quotaId"
         continue
@@ -517,15 +696,7 @@ if ($eligibleSubs.Count -gt $MaxSubscriptions) {
 
 $coverageStatus = if ($subscriptionsSkipped.Count -gt 0) { "PARTIAL" } else { "COMPLETE" }
 
-# Read existing baseline for timestamp preservation
 $baselineFile = Join-Path $OutputDir "governance-policy-baseline.json"
-$existingBaseline = $null
-if (Test-Path $baselineFile) {
-    try {
-        $existingBaseline = Get-Content $baselineFile -Raw | ConvertFrom-Json
-    }
-    catch { Write-Warning "Could not parse existing baseline for timestamp preservation" }
-}
 
 # Process subscriptions
 $subscriptions = [ordered]@{}
@@ -538,25 +709,7 @@ foreach ($subId in $subsToProcess) {
         $envelope = Process-Subscription -SubId $subId -Token $token
     }
     catch {
-        Write-Warning "Failed to process subscription $subId — $_"
-        $subscriptionsExcluded += [ordered]@{ subscription_id = $subId; reason = "processing_error"; detail = "$_" }
-        continue
-    }
-
-    # Timestamp preservation: if content is identical to prior run, keep old discovered_at
-    if ($existingBaseline -and $existingBaseline.subscriptions.$subId) {
-        $priorEntry = $existingBaseline.subscriptions.$subId
-        $priorCopy = $priorEntry | ConvertTo-Json -Depth 50 -Compress | ConvertFrom-Json
-        $currentCopy = $envelope | ConvertTo-Json -Depth 50 -Compress | ConvertFrom-Json
-        # Null out discovered_at for comparison
-        $priorCopy.discovered_at = ""
-        $currentCopy.discovered_at = ""
-        $priorJson = $priorCopy | ConvertTo-Json -Depth 50 -Compress
-        $currentJson = $currentCopy | ConvertTo-Json -Depth 50 -Compress
-        if ($priorJson -eq $currentJson) {
-            $envelope.discovered_at = $priorEntry.discovered_at
-            Write-Host "  Subscription $subId unchanged — preserving discovered_at"
-        }
+        throw "Failed to process subscription $subId - $_"
     }
 
     $subscriptions[$subId] = $envelope
@@ -575,7 +728,6 @@ foreach ($sub in $subscriptions.Values) {
 
 $baseline = [ordered]@{
     schema_version = "governance-baseline-v1"
-    management_group_id = $ManagementGroupId
     coverage_status = $coverageStatus
     subscriptions_discovered = $allSubs.Count
     subscriptions_processed = $totalProcessed
@@ -589,16 +741,31 @@ $baseline = [ordered]@{
     }
     subscriptions = $subscriptions
 }
+if ($standalone) { $baseline.subscription_id = $SubscriptionId }
+else { $baseline.management_group_id = $ManagementGroupId }
 
 # Write output
 New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
-$baselineJson = $baseline | ConvertTo-Json -Depth 50
-$baselineJson | Set-Content -Path $baselineFile -NoNewline
+$baselineFile = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($baselineFile)
+$stagingFile = Join-Path ([System.IO.Path]::GetDirectoryName($baselineFile)) ".governance-policy-baseline.$([guid]::NewGuid().ToString('N')).tmp"
+try {
+    $baselineJson = $baseline | ConvertTo-Json -Depth 50
+    $baselineJson | Set-Content -LiteralPath $stagingFile -NoNewline
+    [System.IO.File]::Move($stagingFile, $baselineFile, $true)
+}
+finally {
+    [System.IO.File]::Delete($stagingFile)
+}
 Write-Host "Wrote baseline: $baselineFile"
 
 # Write raw debug file (gitignored — not committed)
 $rawFile = Join-Path $OutputDir "governance-policy-raw.json"
-$baseline | ConvertTo-Json -Depth 100 | Set-Content -Path $rawFile -NoNewline
-Write-Host "Wrote raw debug: $rawFile (gitignored)"
+try {
+    $baseline | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $rawFile -NoNewline
+    Write-Host "Wrote raw debug: $rawFile (gitignored)"
+}
+catch {
+    Write-Warning "Could not write optional raw debug file: $_" -WarningAction Continue
+}
 
 Write-Host "Done. Coverage: $coverageStatus | Processed: $totalProcessed | Excluded: $($subscriptionsExcluded.Count) | Skipped: $($subscriptionsSkipped.Count)"

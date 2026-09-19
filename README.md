@@ -4,6 +4,17 @@ APEX vNext is the standalone development repository for the deterministic APEX
 runtime, CLI, managed Copilot customizations, qualification infrastructure, and
 release controls.
 
+The product goal is a workload platform factory: a COE builds documented, coded
+archetypes, and consumers reuse independent copies and adapt them through APEX.
+Preserve rich output while minimizing repeated input and keeping one owner per
+fact. Both ALZ-backed workloads and standalone labs/demos are initial scope.
+
+The target user experience is VS Code and Copilot CLI on Windows via WSL2,
+without a devcontainer. npm remains the current implementation; Agent Plugins
+and APEX MCP redistribution are evaluated at the end of feature delivery.
+See the [PRD](docs/vnext/PRD.md) and [roadmap](docs/vnext/ROADMAP.md) for planned
+scope, and the [checkpoint](docs/vnext/PROJECT.md) for implementation status.
+
 > [!WARNING]
 > This repository is a pre-cutover release line with no current release
 > candidate. The `0.10.0` contract is being re-baselined for GitHub Copilot in
@@ -11,12 +22,15 @@ release controls.
 
 ## Start Here
 
-Install the locked dependencies and run deterministic qualification:
+For repository development, install locked dependencies and run qualification:
 
 ```bash
 npm ci
 npm run qualify:vnext
 ```
+
+Consumer onboarding starts with the [WSL2 runbook](docs/tutorials/wsl2-vscode-consumer-runbook.md),
+not a clone of this development repository. No token-baseline project is required now.
 
 Use focused commands while developing:
 
@@ -45,15 +59,15 @@ does not include or publish an Astro site.
 
 ## Repository Structure
 
-| Path | Purpose |
-| ---- | ------- |
-| `packages/` | TypeScript contracts, kernel, capabilities, renderers, testkit, and CLI |
-| `customizations/` | Canonical managed source for supported Copilot client projections |
-| `config/` | Runtime, workflow, capability-pack, toolchain, and scorecard contracts |
-| `infra/` | Bicep and Terraform qualification infrastructure |
-| `tools/` | Validators, packaging, live qualification, MCP servers, and project utilities |
-| `docs/tutorials/`, `docs/how-to/`, `docs/explanation/`, `docs/reference/` | vNext product documentation |
-| `docs/vnext/` | Product scope, roadmap, decisions, risks, and qualification procedures |
+| Path                                                                      | Purpose                                                                       |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `packages/`                                                               | TypeScript contracts, kernel, capabilities, renderers, testkit, and CLI       |
+| `customizations/`                                                         | Canonical managed source for supported Copilot client projections             |
+| `config/`                                                                 | Runtime, workflow, capability-pack, toolchain, and scorecard contracts        |
+| `infra/`                                                                  | Bicep and Terraform qualification infrastructure                              |
+| `tools/`                                                                  | Validators, packaging, live qualification, MCP servers, and project utilities |
+| `docs/tutorials/`, `docs/how-to/`, `docs/explanation/`, `docs/reference/` | vNext product documentation                                                   |
+| `docs/vnext/`                                                             | Product scope, roadmap, decisions, risks, and qualification procedures        |
 
 ## Release Safety
 
@@ -61,10 +75,6 @@ Cloud deployment, GitHub Environment approval, package publication, tags, and
 release cutover remain explicit maintainer-authorized operations. Local tests do
 not substitute for the live evidence required by the
 [product acceptance criteria](docs/vnext/PRD.md#cutover-acceptance).
-
-## Provenance
-
-See [Migration](docs/MIGRATION.md) and [SOURCE_PROVENANCE.json](SOURCE_PROVENANCE.json) for extraction provenance.
 
 ## License
 

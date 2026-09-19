@@ -26,7 +26,7 @@ Do not claim completion when required automated or manual evidence is unavailabl
 Follow `docs/vnext/PRD.md`, `docs/vnext/DECISIONS.md`, and `docs/vnext/ROADMAP.md` as the binding product, decision, and
 delivery authorities.
 Do not expand a slice into unrelated cleanup, a mass rewrite, or autonomous self-modification.
-Use this repository's `main` as the vNext integration line. Keep the original APEX `main` untouched as the v1 line.
+Use this repository's `main` as the vNext integration line. Do not mutate other repositories.
 Stop before any merge, auto-merge, release, tag, publication, deployment, or cutover action.
 </scope_fencing>
 
@@ -57,13 +57,11 @@ Read these first, without re-reading a file already loaded in the current sessio
 
 1. `AGENTS.md` and `.github/copilot-instructions.md`.
 2. `docs/vnext/PRD.md`, `docs/vnext/DECISIONS.md`, and `docs/vnext/ROADMAP.md` as binding authorities.
-3. `docs/vnext/PROJECT.md`, `docs/vnext/REGISTER.md`, and `docs/vnext/MODERNIZATION-INVENTORY.md` for the current
-   checkpoint, risks, and ownership gates.
-4. The two `plan-*.prompt.md` files only when tracing historical intent; they are superseded and nonbinding.
-5. Applicable path-scoped instruction files for files that the selected slice will change.
-6. The active GitHub issue and its latest resumable checkpoint comment, when one exists.
+3. `docs/vnext/PROJECT.md` and `docs/vnext/REGISTER.md` for the current checkpoint and risks.
+4. Applicable path-scoped instruction files for files that the selected slice will change.
+5. The active GitHub issue and its latest resumable checkpoint comment, when one exists.
 
-Treat `docs/vnext/phase-0a/**` as immutable evidence. Treat `.apex/**` as product-run state, never as vNext engineering
+Treat `.apex/**` as product-run state, never as vNext engineering
 project state.
 
 ## Fresh-State Verification
@@ -80,8 +78,7 @@ Before selecting work:
 6. Record material differences from the latest `docs/vnext/PROJECT.md` checkpoint instead of silently correcting
    history.
 
-The source SHA in `SOURCE_PROVENANCE.json` is evidence, not a permanent base. Always use the currently verified
-`origin/main` head when creating a new slice branch.
+Use the currently verified `origin/main` head when creating an authorized new slice branch.
 
 ## Worktree Routing
 

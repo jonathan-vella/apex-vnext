@@ -15,17 +15,10 @@
   },
   "activeConsumers": [
     {
-      "id": "workflow-graph",
-      "path": ".github/skills/workflow-engine/templates/workflow-graph.json",
+      "id": "artifact-presentations",
+      "path": "customizations/.github/skills/apex-artifacts/SKILL.md",
       "outputClass": "workflow",
-      "requiredMarkers": [
-        "03-des-diagram.py",
-        "03-des-diagram.png",
-        "03-des-diagram.svg",
-        "07-ab-diagram.py",
-        "07-ab-diagram.png",
-        "07-ab-diagram.svg"
-      ]
+      "requiredMarkers": ["Python, SVG, and PNG", "accepted typed sources", "document registry"]
     },
     {
       "id": "as-built-design-template",

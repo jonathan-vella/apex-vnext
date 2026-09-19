@@ -124,7 +124,7 @@ const QUALIFICATION_RUNTIME_LAUNCHER =
   'for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal));\n' +
   'child.once("error", (error) => { console.error(error.message); process.exit(1); });\n' +
   'child.once("exit", (code, signal) => process.exit(code ?? { SIGINT: 130, SIGTERM: 143 }[signal] ?? 1));\n';
-const APPROVED_NPM_REGISTRY = "https://packagefeedproxy.microsoft.io/npm/";
+const APPROVED_NPM_REGISTRY = "https://registry.npmjs.org/";
 
 async function installQualifiedRuntime(workspace, options, root = ROOT) {
   const releaseManifestPath = candidateInputPath(root, required(options, "release-manifest"));
@@ -208,6 +208,11 @@ async function lifecycleClient(root, clientId, projectId, serviceFactory) {
 
 async function prepareClient(root, clientId, projectId, serviceFactory, installRuntime, options) {
   await mkdir(root, { recursive: false });
+  execFileSync("git", ["init", "--quiet", "--template=", root], {
+    encoding: "utf8",
+    timeout: 30_000,
+    maxBuffer: MAX_CLI_OUTPUT_BYTES,
+  });
   const initialized = await serviceFactory(root).init({ projectId, clientId });
   await installRuntime(root, options);
   const launcher = join(root, QUALIFICATION_RUNTIME_LAUNCHER_PATH);
@@ -437,7 +442,7 @@ async function assertPreparedWorkspaceInventory(root, managedFiles) {
       entryCount += 1;
       if (entryCount > 4096) throw new Error("Prepared workspace inventory is too large");
       const relativePath = relativeDirectory === "" ? name : `${relativeDirectory}/${name}`;
-      if (relativePath === ".apex") {
+      if (relativePath === ".apex" || relativePath === ".git") {
         await assertRuntimeDirectory(join(root, relativePath), "Prepared workspace runtime directory");
         continue;
       }

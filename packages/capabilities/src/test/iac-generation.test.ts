@@ -64,6 +64,27 @@ const nativeParameters = {
   properties: { accessTier: "Hot" },
 };
 
+function assertExecutionAddresses(tree: GeneratedVirtualTree, sourceBinding: IacBindingV1): void {
+  for (const resource of tree.logicalManifest.resources) {
+    const source = tree.files.find(({ path }) => path === resource.sourcePath);
+    assert.ok(source);
+    const declarations =
+      tree.logicalManifest.track === "bicep"
+        ? [...source.content.matchAll(/^(?:resource|module) (\w+) '/gm)].map((match) => match[1])
+        : [...source.content.matchAll(/^(resource|data|module) "([^"]+)"(?: "([^"]+)")? \{/gm)].map((match) =>
+            match[1] === "module"
+              ? `module.${match[2]}`
+              : `${match[1] === "data" ? "data." : ""}${match[2]}.${match[3]}`,
+          );
+    assert.ok(declarations.includes(resource.executionAddress), `${resource.logicalId}: ${resource.executionAddress}`);
+    assert.equal(resource.implementationAddress, sourceBinding.resourceBindings[resource.logicalId]!.implementation);
+  }
+  assert.equal(
+    new Set(tree.logicalManifest.resources.map(({ executionAddress }) => executionAddress)).size,
+    tree.logicalManifest.resources.length,
+  );
+}
+
 test("native generators are byte deterministic and enforce secure storage defaults", async () => {
   const sourceIntent = intent();
   const bicepBinding = binding(
@@ -85,6 +106,7 @@ test("native generators are byte deterministic and enforce secure storage defaul
   assert.match(first.files[0]!.content, /minimumTlsVersion: 'TLS1_2'/);
   assert.match(first.files[0]!.content, /allowSharedKeyAccess: false/);
   assert.equal(first.treeHash, sha256(first.files));
+  assertExecutionAddresses(first, bicepBinding);
 
   const terraform = generateTerraformTree(sourceIntent, terraformBinding, {
     azurermProviderConstraint: "4.31.0",
@@ -98,6 +120,7 @@ test("native generators are byte deterministic and enforce secure storage defaul
     }),
   );
   assert.match(terraform.files.find(({ path }) => path === "versions.tf")!.content, /version = "= 4\.31\.0"/);
+  assertExecutionAddresses(terraform, terraformBinding);
   assert.doesNotMatch(terraform.files.find(({ path }) => path === "main.tf")!.content, /jsonencode\(/);
   assert.match(terraform.files.find(({ path }) => path === "main.tf")!.content, /allowSharedKeyAccess/);
   assert.equal(
@@ -156,25 +179,27 @@ test("storage validation remains bounded for repeated near-miss properties", asy
 
 test("AVM generators preserve exact pins, harden storage, and only include supplied lock data", () => {
   const sourceIntent = intent();
-  const bicep = generateBicepTree(
-    sourceIntent,
-    binding("bicep", "avm:br/public:avm/res/storage/storage-account@0.31.0", "0.31.0", {
-      name: "stexample",
-      location: "swedencentral",
-    }),
-  );
+  const bicepBinding = binding("bicep", "avm:br/public:avm/res/storage/storage-account@0.31.0", "0.31.0", {
+    name: "stexample",
+    location: "swedencentral",
+  });
+  const bicep = generateBicepTree(sourceIntent, bicepBinding);
+  assertExecutionAddresses(bicep, bicepBinding);
   assert.match(bicep.files[0]!.content, /br\/public:avm\/res\/storage\/storage-account:0\.31\.0/);
   assert.match(bicep.files[0]!.content, /allowBlobPublicAccess: false/);
 
   const lock = "provider lock bytes\n";
-  const terraform = generateTerraformTree(
-    sourceIntent,
-    binding("terraform", "avm:registry.terraform.io/Azure/avm-res-storage-storageaccount/azurerm@0.6.3", "0.6.3", {
+  const terraformBinding = binding(
+    "terraform",
+    "avm:registry.terraform.io/Azure/avm-res-storage-storageaccount/azurerm@0.6.3",
+    "0.6.3",
+    {
       name: "stexample",
       location: "swedencentral",
-    }),
-    { lockFileContent: lock },
+    },
   );
+  const terraform = generateTerraformTree(sourceIntent, terraformBinding, { lockFileContent: lock });
+  assertExecutionAddresses(terraform, terraformBinding);
   assert.match(terraform.files.find(({ path }) => path === "main.tf")!.content, /version = "0\.6\.3"/);
   assert.match(terraform.files.find(({ path }) => path === "main.tf")!.content, /shared_access_key_enabled = false/);
   assert.equal(terraform.files.find(({ path }) => path === ".terraform.lock.hcl")!.content, lock);
@@ -298,6 +323,8 @@ test("generators render dependencies and native existing-resource semantics", ()
     { existingResources: ["storage"] },
   );
   assert.match(bicep.files[0]!.content, /resource storage .* existing/);
+  assertExecutionAddresses(bicep, { ...binding("bicep", "native:x@y", "legacy", {}), resourceBindings });
+  assertExecutionAddresses(terraform, { ...binding("terraform", "native:x@y", "legacy", {}), resourceBindings });
   assert.match(terraform.files.find(({ path }) => path === "main.tf")!.content, /data "azapi_resource" "storage"/);
   assert.match(
     terraform.files.find(({ path }) => path === "main.tf")!.content,
@@ -337,6 +364,42 @@ test("validation returns deterministic command plans and only invokes an injecte
   });
   assert.equal(withRunner.valid, true);
   assert.equal(calls.length, 3);
+});
+
+test("generated validation rejects failed or incomplete runner results and stops dependent commands", async () => {
+  const tree = generateTerraformTree(
+    intent(),
+    binding("terraform", "native:Microsoft.Storage/storageAccounts@2023-05-01", "2023-05-01", nativeParameters),
+  );
+  for (const failure of [
+    { exitCode: 1 },
+    { exitCode: null },
+    { signal: "SIGTERM" as const },
+    { timedOut: true },
+    { outputTruncated: true },
+  ]) {
+    let calls = 0;
+    const result = await validateGeneratedTree(tree, {
+      runner: {
+        async run() {
+          calls++;
+          return {
+            exitCode: 0,
+            signal: null,
+            stdout: "private command output",
+            stderr: "private diagnostics",
+            timedOut: false,
+            outputTruncated: false,
+            ...failure,
+          };
+        },
+      },
+    });
+    assert.equal(result.valid, false, JSON.stringify(failure));
+    assert.equal(calls, 1);
+    assert.equal(result.commandResults.length, 1);
+    assert.doesNotMatch(result.issues.join("\n"), /private/);
+  }
 });
 
 test("native generated trees compile with installed Bicep and Terraform tools", async (context) => {

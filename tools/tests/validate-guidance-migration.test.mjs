@@ -64,6 +64,17 @@ test("accepts a complete mapping with packaged targets", () => {
   assert.deepEqual(validateGuidanceMigration(inputs()), []);
 });
 
+test("current managed instruction coverage does not require historical files", () => {
+  const repositoryInputs = collectGuidanceMigrationInputs(root);
+  assert.deepEqual(validateGuidanceMigration(repositoryInputs), []);
+  repositoryInputs.consumerInstructions.add("apex-unmapped.instructions.md");
+  assert.ok(
+    validateGuidanceMigration(repositoryInputs).includes(
+      "Managed instruction has no owning mapping: apex-unmapped.instructions.md",
+    ),
+  );
+});
+
 test("scoped parity mappings are complete with explicit source dispositions and managed consumer skills", () => {
   const scopedSources = [
     "azure-artifacts",

@@ -11,8 +11,7 @@ const CONTRACT_PATH = "tools/registry/github-workflow-contract.json";
 const SCHEMA_PATH = "tools/registry/schemas/github-workflow-contract.schema.json";
 const WORKFLOW_DIRECTORY = ".github/workflows";
 
-export const EXPECTED_REQUIRED_CONTEXTS = ["ci", "External Python tests (apex-recall)", "CodeQL"];
-const EXTERNAL_PYTHON_CONTEXT = "External Python tests (apex-recall)";
+export const EXPECTED_REQUIRED_CONTEXTS = ["ci", "CodeQL"];
 
 function canonicalJson(value) {
   if (value === null || typeof value === "boolean" || typeof value === "number" || typeof value === "string") {
@@ -104,7 +103,6 @@ function validatePythonSetupAction(text) {
   const [setup, install] = steps;
   const expectedInstall = [
     "python -m pip install --require-hashes --only-binary=:all: -r .github/python-validation-requirements.txt",
-    "python -m pip install --no-deps --no-build-isolation -e tools/apex-recall",
   ];
   const actualInstall = String(install?.run ?? "")
     .split(/\r?\n/u)
@@ -352,8 +350,8 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
   }
 
   const ci = values.get("ci");
-  if (ci?.jobs?.ci?.name !== "ci" || ci?.jobs?.["external-tests"]?.name !== EXTERNAL_PYTHON_CONTEXT) {
-    errors.push("ci workflow must preserve separate required Node and external Python checks");
+  if (ci?.jobs?.ci?.name !== "ci" || Object.keys(ci?.jobs ?? {}).join() !== "ci") {
+    errors.push("ci workflow must preserve the required vNext job without retired external jobs");
   }
 
   const release = values.get("release-candidate-qualification");

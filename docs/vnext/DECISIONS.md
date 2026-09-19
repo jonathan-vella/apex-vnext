@@ -1,7 +1,7 @@
 # APEX vNext Decision Register
 
-Stable IDs remain available for requirements, risks, ADRs, and issue references. Detailed migration provenance is kept in
-[Migration](../MIGRATION.md); consequential architecture records live in [ADRs](adrs/README.md).
+Stable IDs remain available for requirements, risks, ADRs, and issue references. Consequential architecture records
+live in [ADRs](adrs/README.md).
 
 ## DECISION-001: Use Hybrid Project Governance
 
@@ -33,15 +33,16 @@ vNext regressions use the repository bug form with integration head, failed chec
 
 Current requirements, roadmap, decisions, risks, source packages, and versioned configuration are authoritative.
 
-## DECISION-008: Keep Migration History Separate From Product Documentation
+## DECISION-008: Keep Product Documentation Self-Contained
 
-Extraction and predecessor history lives in [Migration](../MIGRATION.md), frozen evidence, and archives. Active product
-documentation is vNext-only.
+Current source, contracts and requirements own product behavior. No historical record is required to build, test,
+install or operate vNext. Supported vNext version transitions retain their explicit contract guarantees.
 
 ## DECISION-009: Do Not Run Devcontainer CI
 
-The disabled container workflow remains archived. Static contracts, focused checks, and deliberate local rebuilds own
-container validation.
+The disabled container workflow remains archived. Repository maintenance on 2026-09-16 also retired the remaining
+container setup in favor of the WSL2 setup scripts. Workspace editor and hook validation remain active. Historical
+materials are optional retention only: current checks do not depend on their presence.
 
 ## DECISION-010: Keep Deployment Approval In APEX Gate 4
 
@@ -76,8 +77,9 @@ reintroduction check.
 
 ## DECISION-016: Keep Npm As The Sole Distribution Authority
 
-The CLI package, exact runtime dependencies, release manifest, SBOM, and provenance define distribution. No second
-package manager or customization distribution authority is supported.
+Current implementation remains npm-owned: CLI packages, exact dependencies, release manifest, SBOM and provenance.
+The permanent npm-only product restriction is superseded by DECISION-024. No distribution migration has been selected
+or implemented by revising the plan.
 
 ## DECISION-017: Operationalize Bounded Improvement Without Promotion Authority
 
@@ -98,3 +100,67 @@ than active product instructions.
 
 Repository maintenance may use a separately authorized local controller with exact scope, commands, budgets, checks,
 expiry, checkpoints, and stop conditions. It has no merge, release, or deployment authority.
+
+Its availability does not require a new repository-wide optimization campaign. DECISION-025 supersedes the blanket
+pre-agent product prerequisite, without bypassing executable gates or changing historical receipts.
+
+## DECISION-021: Build A Workload Factory With Two Profiles
+
+ALZ-backed workloads and standalone single-subscription labs/demos are both day-one requirements. Use one workflow with
+explicit profile and ownership data. Outside labs, application services consume supplied networking, identity and
+monitoring by default. Labs can create their workload support resources without creating an ALZ platform. Azure Policy
+always wins. [PRD workload boundary](PRD.md#workload-boundary) owns the detailed scope.
+
+## DECISION-022: Reuse Independent Archetypes And Adapt In Conversation
+
+Import one selected COE archetype as an independent snapshot with source revision, not a continuously linked product.
+Reuse existing contracts and parameters, with one authoritative owner per fact. Ask relevant change questions, confirm
+consequences and manual-edit conflicts, then update affected outputs. Do not copy source deployment authority or create
+a generic synchronization engine. Requirements `REQ-REUSE-001` and `REQ-CHANGE-001` own acceptance.
+
+## DECISION-023: Preserve Rich Output Without Repeated Authoring
+
+Use [the PRD quality reference](PRD.md#output-quality-reference) to assess useful design reasoning, visuals and
+operational guidance. Reuse accepted decisions in existing renderers. Infrastructure outputs, deployment guidance and
+operational readiness are mandatory; application pipelines and application-specific deployment configuration are later
+optional work. Quality is not document length or a numeric score copied from a reference workload.
+
+## DECISION-024: Use WSL2 And Decide Distribution Last
+
+Windows via WSL2 is the initial host path; consumers do not require Docker or a devcontainer. Keep npm usable now.
+Evaluate Agent Plugins together with APEX MCP redistribution only after functional delivery, then qualify the chosen
+lifecycle in both clients. The choice remains open; avoid competing runtime owners, updaters and custom frameworks.
+
+## DECISION-025: Minimize Input Without A Token Baseline Now
+
+Use compact task inputs, scoped guidance, relevant questions and unchanged-decision reuse. No token baseline, comparative
+benchmark or new measurement framework is current work. Preserve existing safety tests and measurement utilities.
+Reconcile conflicting executable gate contracts through focused tested changes before affected scenarios; no bypasses.
+
+## DECISION-026: Use Reviewed Policy Baselines And Explicit Assumptions
+
+Implement [issue #344](https://github.com/jonathan-vella/apex-vnext/issues/344) through deterministic subscription-only
+import, existing governance reconciliation/review and Gate 2. Cover standalone subscriptions through the same contract.
+The full baseline never enters model context. Quota and regional availability remain assumptions, not Architecture
+evidence gates. Policy, security and deployment approval cannot be waived by an assumption or lab profile.
+
+## DECISION-028: Require Governance Refresh At Thirty Days
+
+Consumer clarification on 2026-09-19 fixes snapshot eligibility at less than 30 elapsed UTC days since successful Azure
+collection. Refresh below that age is optional; at 30 days it is mandatory before planning or new deployment approval.
+Display age and prefer reuse without repeated prompts. Observation renewal is separate from policy-content identity.
+Native checks and live Azure enforcement remain required. Acceptance and implementation boundaries are owned by
+[REQ-GOV-001](PRD.md#req-gov-001-governance-and-policy) and [Phase 2](ROADMAP.md#phase-2-finish-governance).
+
+## DECISION-027: Optimize Current Inputs Before Changing Execution Mechanics
+
+Start with the [first roadmap batch](ROADMAP.md#first-batch-input-correctness-and-scope): repair revision-safe reads,
+bound task/reviewer context, correct routing and tool scope, then remove proven prompt duplication. Acceptance remains
+in `REQ-OPTIMIZATION-001`; recommendation dispositions remain in the roadmap. Retain requirements-review,
+architecture-review, governance-review and plan-review, equivalent client outcomes, and rich deterministic output.
+
+Reuse confirmed requirements, decisions and pricing evidence in the existing delivery phases. This does not authorize
+model downgrades, new telemetry, persistent snapshots, concurrent review commits, ID-only invalidation, asynchronous
+rendering or structured-only MCP results. Those proposals require the evidence and boundaries in the roadmap before
+adoption. Preserve DECISION-025, CLI worker restrictions, journal integrity and human approval; changing documentation
+does not alter executable gates or close historical findings.

@@ -211,6 +211,30 @@ async function writeReleaseSecurityArtifacts(outputDirectory, releaseManifest) {
   };
 }
 
+export function parseNpmPackResult(stdout, packageName) {
+  let result;
+  try {
+    result = JSON.parse(stdout);
+  } catch (error) {
+    throw new Error(`npm pack returned invalid JSON for ${packageName}`, { cause: error });
+  }
+  const entries = Array.isArray(result)
+    ? result.filter((entry) => entry?.name === packageName)
+    : result !== null && typeof result === "object" && Object.hasOwn(result, packageName)
+      ? [result[packageName]]
+      : [];
+  const entry = entries[0];
+  if (
+    entries.length !== 1 ||
+    entry?.name !== packageName ||
+    typeof entry.filename !== "string" ||
+    entry.filename.length === 0
+  ) {
+    throw new Error(`npm pack did not return a unique filename for ${packageName}`);
+  }
+  return entry;
+}
+
 async function packWorkspace(packageName, stagingDirectory) {
   const { stdout } = await run("npm", [
     "pack",
@@ -220,14 +244,7 @@ async function packWorkspace(packageName, stagingDirectory) {
     "--pack-destination",
     stagingDirectory,
   ]);
-  let result;
-  try {
-    result = JSON.parse(stdout);
-  } catch (error) {
-    throw new Error(`npm pack returned invalid JSON for @apexops/${packageName}: ${stdout}`, { cause: error });
-  }
-  const filename = result[0]?.filename;
-  if (typeof filename !== "string") throw new Error(`npm pack did not return a filename for @apexops/${packageName}`);
+  const { filename } = parseNpmPackResult(stdout, `@apexops/${packageName}`);
   return resolve(stagingDirectory, basename(filename));
 }
 

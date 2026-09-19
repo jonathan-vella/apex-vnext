@@ -16,7 +16,10 @@ import {
   EnvironmentInputsV1Schema,
   ExecutionPlanAttestationV1Schema,
   GovernanceConstraintsV1Schema,
+  GovernanceObservationReceiptV1Schema,
   hasValidInputRequestQuestions,
+  isGovernanceObservationCurrent,
+  IacBindingV1Schema,
   IacHandoffV1Schema,
   ImprovementDecisionV1Schema,
   ImprovementObservationV1Schema,
@@ -26,6 +29,11 @@ import {
   InputRequestV1Schema,
   InputSubmissionV1Schema,
   LogicalResourceManifestV1Schema,
+  NativeValidationReceiptV1Schema,
+  NATIVE_VALIDATION_COMMANDS,
+  calculateNativeValidationCommandHash,
+  calculateNativeValidationReceiptHash,
+  hasValidNativeValidationReceipt,
   LiveQualificationV1Schema,
   LIVE_QUALIFICATION_SCENARIO_IDS,
   OnboardingConfigV1Schema,
@@ -59,6 +67,7 @@ import {
   type EnvironmentInputsV1,
   type ExecutionPlanAttestationV1,
   type LogicalResourceManifestV1,
+  type NativeValidationReceiptV1,
   type LiveQualificationV1,
   type PricingEvidenceV1,
   type PricingRequestV1,
@@ -85,6 +94,141 @@ FormatRegistry.Set(
 );
 
 describe("Wave 1 contracts", () => {
+  it("requires compact, strictly typed governance observation bindings without raw baseline data", () => {
+    const receipt = {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: "demo",
+      runId: "run-1",
+      targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111",
+      governanceHash: hash,
+      snapshotDigest: otherHash,
+      contentHash: hash,
+      observedAt: timestamp,
+      expiresAt: expiry,
+      rawSourceDigest: otherHash,
+    };
+    assert.equal(Value.Check(GovernanceObservationReceiptV1Schema, receipt), true);
+    for (const field of Object.keys(receipt)) {
+      const incomplete = { ...receipt } as Record<string, unknown>;
+      delete incomplete[field];
+      assert.equal(Value.Check(GovernanceObservationReceiptV1Schema, incomplete), false, field);
+    }
+    for (const invalid of [
+      { ...receipt, baseline: {} },
+      { ...receipt, rawSourceDigest: "invalid" },
+      { ...receipt, observedAt: "invalid" },
+      { ...receipt, targetScope: "" },
+    ])
+      assert.equal(Value.Check(GovernanceObservationReceiptV1Schema, invalid), false);
+    assert.equal(schemaById[GovernanceObservationReceiptV1Schema.$id!], GovernanceObservationReceiptV1Schema);
+    assert.equal(contractMetadata[GovernanceObservationReceiptV1Schema.$id!]?.maxBytes, 16_384);
+  });
+  it("uses precise elapsed UTC age and rejects malformed governance observation dates", () => {
+    const observed = "2026-09-01T00:00:00Z";
+    assert.equal(isGovernanceObservationCurrent(observed, "2026-09-30T23:59:59.999Z"), true);
+    assert.equal(isGovernanceObservationCurrent(observed, "2026-10-01T00:00:00Z"), false);
+    assert.equal(isGovernanceObservationCurrent("2026-09-01T02:00:00+02:00", "2026-10-01T00:00:00Z"), false);
+    assert.equal(isGovernanceObservationCurrent(observed, "2026-08-31T23:59:59Z"), false);
+    for (const invalid of ["2026-09-01", "2026-09-01T00:00:00", "2026-02-30T00:00:00Z", "invalid"]) {
+      assert.equal(isGovernanceObservationCurrent(invalid, "2026-09-02T00:00:00Z"), false, invalid);
+      assert.equal(isGovernanceObservationCurrent(observed, invalid), false, invalid);
+    }
+  });
+  it("requires Bicep format, build and lint rather than accepting build-only receipts", () => {
+    assert.deepEqual(
+      NATIVE_VALIDATION_COMMANDS.bicep.map(({ validatorId }) => validatorId),
+      ["bicep:format", "bicep:build", "bicep:lint"],
+    );
+  });
+  for (const track of ["bicep", "terraform"] as const) {
+    it(`validates strict source-bound native validation receipts for ${track}`, () => {
+      const body: Omit<NativeValidationReceiptV1, "receiptHash"> = {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: "project",
+        runId: "run",
+        track,
+        sourceHash: hash,
+        treeHash: otherHash,
+        policyHash: hash,
+        inputHash: hash,
+        outcome: "pass",
+        commands: NATIVE_VALIDATION_COMMANDS[track].map((command) => ({
+          validatorId: command.validatorId,
+          commandHash: calculateNativeValidationCommandHash(command),
+          exitCode: 0,
+          signal: null,
+          timedOut: false,
+          outputTruncated: false,
+        })),
+      };
+      const receipt = { ...body, receiptHash: calculateNativeValidationReceiptHash(body) };
+      assert.equal(Value.Check(NativeValidationReceiptV1Schema, receipt), true);
+      assert.equal(hasValidNativeValidationReceipt(receipt, body), true);
+      assert.equal(schemaById[NativeValidationReceiptV1Schema.$id!], NativeValidationReceiptV1Schema);
+      assert.equal(contractMetadata[NativeValidationReceiptV1Schema.$id!]?.maxBytes, 16_384);
+      assert.equal(
+        calculateNativeValidationReceiptHash(Object.fromEntries(Object.entries(body).reverse()) as typeof body),
+        receipt.receiptHash,
+      );
+      for (const key of ["projectId", "runId", "track", "sourceHash", "treeHash", "policyHash", "inputHash"] as const) {
+        assert.equal(hasValidNativeValidationReceipt(receipt, { ...body, [key]: "different" }), false, key);
+        assert.equal(hasValidNativeValidationReceipt({ ...receipt, [key]: "different" }, body), false, key);
+      }
+      for (const invalid of [
+        { ...receipt, receiptHash: otherHash },
+        { ...receipt, schemaVersion: "2.0.0" },
+        { ...receipt, stdout: "private-source" },
+        { ...receipt, rootPath: "/private/path" },
+        { ...receipt, compliance: "pass" },
+        { ...receipt, outcome: "block" },
+        { ...receipt, commands: [] },
+        { ...receipt, commands: [...receipt.commands, ...receipt.commands, ...receipt.commands, ...receipt.commands] },
+        ...[
+          { stdout: "private-source" },
+          { stderr: "private-diagnostic" },
+          { path: "/private/path" },
+          { exitCode: 1 },
+          { signal: "SIGTERM" },
+          { timedOut: true },
+          { outputTruncated: true },
+          { validatorId: "bicep:lint" },
+          { commandHash: "invalid" },
+        ].map((extra) => ({
+          ...receipt,
+          commands: [{ ...receipt.commands[0], ...extra }, ...receipt.commands.slice(1)],
+        })),
+      ]) {
+        assert.equal(hasValidNativeValidationReceipt(invalid, body), false);
+      }
+      for (const commands of [
+        body.commands.slice(1),
+        body.commands.filter(({ validatorId }) => validatorId === "bicep:build"),
+        [...body.commands, body.commands[0]!],
+        body.commands.map((command) => ({ ...command, commandHash: otherHash })),
+        body.commands.map((command) => ({ ...command, validatorId: "terraform:validate" as const })),
+      ]) {
+        const tampered = { ...body, commands };
+        assert.equal(
+          hasValidNativeValidationReceipt(
+            { ...tampered, receiptHash: calculateNativeValidationReceiptHash(tampered) },
+            body,
+          ),
+          false,
+        );
+      }
+      if (body.commands.length > 1) {
+        const reordered = { ...body, commands: [...body.commands].reverse() };
+        assert.equal(
+          hasValidNativeValidationReceipt(
+            { ...reordered, receiptHash: calculateNativeValidationReceiptHash(reordered) },
+            body,
+          ),
+          false,
+        );
+      }
+    });
+  }
+
   it("uses one explicit persisted contract version", () => {
     const lock: RuntimeBundleLockV1 = {
       schemaVersion: CONTRACT_VERSION,
@@ -122,6 +266,71 @@ describe("Wave 1 contracts", () => {
     };
 
     assert.equal(Value.Check(RequirementsV1Schema, requirements), true);
+  });
+
+  it("validates optional strict bounded intended physical resource scope on bindings", () => {
+    const primary = {
+      resourceId:
+        "/subscriptions/11111111-2222-3333-4444-555555555555/resourceGroups/workload/providers/Microsoft.Storage/storageAccounts/storage",
+      type: "Microsoft.Storage/storageAccounts",
+      ownership: "managed",
+      role: "primary",
+    };
+    const resourceBinding = {
+      implementation: "avm:br/public:avm/res/storage/storage-account@0.9.0",
+      version: "0.9.0",
+      parameters: {},
+    };
+    const binding = {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: "demo",
+      runId: "run-test",
+      track: "bicep",
+      intentHash: hash,
+      resourceBindings: { storage: resourceBinding },
+    };
+    const withResources = (physicalResources: unknown) => ({
+      ...binding,
+      resourceBindings: { storage: { ...resourceBinding, physicalResources } },
+    });
+    assert.equal(Value.Check(IacBindingV1Schema, binding), true);
+    assert.equal(Value.Check(IacBindingV1Schema, withResources([primary])), true);
+    assert.equal(
+      Value.Check(
+        IacBindingV1Schema,
+        withResources([{ ...primary, resourceId: primary.resourceId.toUpperCase(), type: primary.type.toUpperCase() }]),
+      ),
+      true,
+    );
+    const bounded = Array.from({ length: 128 }, (_, index) => ({
+      ...primary,
+      resourceId: `${primary.resourceId}${index}`,
+      role: index === 0 ? "primary" : "ancillary",
+      ownership: index === 0 ? "managed" : "existing",
+    }));
+    assert.equal(Value.Check(IacBindingV1Schema, withResources(bounded)), true);
+    for (const physicalResources of [
+      [],
+      null,
+      {},
+      [primary, primary],
+      [...bounded, primary],
+      [{ ...primary, unexpected: true }],
+      [{ ...primary, ownership: "observed" }],
+      [{ ...primary, role: "secondary" }],
+      [{ ...primary, type: "" }],
+      [{ ...primary, type: `Microsoft.Storage/${"a".repeat(256)}` }],
+      [{ ...primary, resourceId: `${primary.resourceId}${"a".repeat(2048)}` }],
+      ...["*", "%2f", "?query", "#fragment", "[expression]", "${expression}", "\n", "\r\n"].map((suffix) => [
+        { ...primary, resourceId: `${primary.resourceId}${suffix}` },
+      ]),
+      [{ ...primary, type: `${primary.type}\n` }],
+      ...Object.keys(primary).map((key) => [
+        Object.fromEntries(Object.entries(primary).filter(([field]) => field !== key)),
+      ]),
+    ]) {
+      assert.equal(Value.Check(IacBindingV1Schema, withResources(physicalResources)), false);
+    }
   });
 
   it("validates strict onboarding configuration with optional defaults", () => {
@@ -834,6 +1043,45 @@ describe("target family contracts", () => {
       questions: [{ id: "region", prompt: "Which region?", options: ["sweden", "germany"] }],
     };
     assert.equal(Value.Check(InputRequestV1Schema, request), true);
+    const { intake: _intake, ...base } = request;
+    const governance = {
+      candidatePath: "governance/baseline.json",
+      candidateHash: hash,
+      observedAt: "2026-09-01T00:00:00Z",
+      requestedAt: "2026-09-19T00:00:00Z",
+      expiresAt: "2026-09-20T00:00:00Z",
+      targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111",
+      refreshRequired: false,
+    };
+    assert.equal(Value.Check(InputRequestV1Schema, { ...base, governance }), true);
+    assert.equal(Value.Check(InputRequestV1Schema, { ...request, governance }), false);
+    assert.equal(
+      Value.Check(InputRequestV1Schema, { ...base, governance, decision: { taskId: "task-1", id: "choice" } }),
+      false,
+    );
+    for (const candidatePath of [
+      "/baseline.json",
+      "C:/baseline.json",
+      "../baseline.json",
+      "dir/../baseline.json",
+      "./baseline.json",
+      "dir\\baseline.json",
+      "bad\u0000.json",
+      "a".repeat(4097),
+    ]) {
+      assert.equal(Value.Check(InputRequestV1Schema, { ...base, governance: { ...governance, candidatePath } }), false);
+    }
+    for (const extra of [
+      { candidateHash: "bad" },
+      { observedAt: "not-a-date" },
+      { requestedAt: undefined },
+      { requestedAt: null },
+      { requestedAt: "not-a-date" },
+      { refreshRequired: "false" },
+      { snapshot: {} },
+    ]) {
+      assert.equal(Value.Check(InputRequestV1Schema, { ...base, governance: { ...governance, ...extra } }), false);
+    }
     assert.equal(
       Value.Check(InputRequestV1Schema, {
         schemaVersion: CONTRACT_VERSION,
@@ -936,6 +1184,20 @@ describe("target family contracts", () => {
     );
   });
 
+  it("accepts optional non-empty execution addresses without changing binding descriptors", () => {
+    const manifest = fixtures[7][1] as unknown as LogicalResourceManifestV1;
+    assert.equal(Value.Check(LogicalResourceManifestV1Schema, manifest), true);
+    for (const executionAddress of ["plan", "azapi_resource.plan", "data.azapi_resource.plan", "module.plan", "", 42]) {
+      assert.equal(
+        Value.Check(LogicalResourceManifestV1Schema, {
+          ...manifest,
+          resources: manifest.resources.map((resource) => ({ ...resource, executionAddress })),
+        }),
+        typeof executionAddress === "string" && executionAddress.length > 0,
+      );
+    }
+  });
+
   it("requires unique logical IDs and resolvable dependency references", () => {
     const manifest = fixtures[7][1] as unknown as LogicalResourceManifestV1;
     assert.equal(hasValidLogicalResourceReferences(manifest), true);
@@ -958,6 +1220,30 @@ describe("target family contracts", () => {
       }),
       false,
     );
+  });
+
+  it("requires track-specific read-only declarations for existing resource ownership", () => {
+    const manifest = fixtures[7][1] as unknown as LogicalResourceManifestV1;
+    for (const track of ["bicep", "terraform"] as const) {
+      for (const implementationKind of ["resource", "module", "data", "existing"] as const) {
+        for (const ownership of ["managed", "existing"] as const) {
+          const referenceKind = track === "bicep" ? "existing" : "data";
+          const expected =
+            ownership === "existing"
+              ? implementationKind === referenceKind
+              : implementationKind === "resource" || implementationKind === "module";
+          assert.equal(
+            hasValidLogicalResourceReferences({
+              ...manifest,
+              track,
+              resources: manifest.resources.map((resource) => ({ ...resource, implementationKind, ownership })),
+            }),
+            expected,
+            `${track}: ${implementationKind} with ${ownership} ownership`,
+          );
+        }
+      }
+    }
   });
 
   it("binds encrypted plan attestations to the preview and approval recipient", () => {

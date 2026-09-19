@@ -64,9 +64,7 @@ Brief description of what will be implemented.
 
 - ✅ `satisfied` — property is wired in the plan with the required value
 - ⚠️ `pending` — property declared but value not yet finalised
-- ❌ `unsatisfiable` — no plan shape satisfies this Deny; **return to
-  04g-Governance** via `▶ Refresh Governance` per
-  [governance-drift-routing.md](../../.github/skills/iac-common/references/governance-drift-routing.md)
+- ❌ `unsatisfiable` — no plan shape satisfies this Deny; return a blocker to the owning governance reconciliation task.
 
 **Coverage check**: every Deny policy in
 `04-governance-constraints.json` MUST appear in at least one row. The
@@ -185,7 +183,7 @@ is explicit about coverage.)\_
   parameters absent from this list.
 - If a needed input is missing, CodeGen returns to Planner via
   `↩ Return to Step 4` per
-  [governance-drift-routing.md](../../.github/skills/iac-common/references/governance-drift-routing.md).
+  [governance-drift-routing.md](../../customizations/.github/skills/apex-azure-deploy/SKILL.md).
 
 ---
 

@@ -10,6 +10,9 @@ tools:
   - apex/status
   - apex/nextTask
   - apex/taskContext
+  - apex/governanceImport
+  - apex/governanceSelect
+  - apex/recordInput
   - apex/preview
   - apex/reconcile
   - apex/inventory
@@ -48,17 +51,37 @@ for preview, approval, inventory, reconciliation, and diagnosis.
 
 # Constraints
 
-Call `apex/status`, `apex/nextTask`, and `apex/taskContext` before an operation. Use only the narrow APEX MCP operation
-that matches the task. ARM MCP access is read-only. Do not invoke shell, filesystem, Git, mutation, deployment, Bicep,
-or Terraform tools directly. Use workers only when the task envelope explicitly requests review or validation.
+Call `apex/status` first. Status, current preview, and recorded inventory reads do not require a task. For a task-backed
+operation, call `apex/nextTask` after status returns. Route `status=needs_input` or `status=needs_review` to the owning
+interactive stage; do not request task context, resolve findings here, or poll an unresolved result. Only `status=task`
+supplies `task.taskId`; call `apex/taskContext` with that exact ID for an operations task before its matching APEX
+operation. Route other tasks to their kernel-selected owner. ARM MCP access is read-only. Do not invoke shell,
+filesystem, Git, mutation, deployment, Bicep, or Terraform tools directly. Use workers only when the task envelope
+explicitly requests review or validation and the active client supports the worker.
 
 Read `.github/skills/apex-operations/SKILL.md` only when the selected task needs preview explanation, reconciliation,
-inventory, or diagnosis guidance.
+inventory, diagnosis, or reviewed governance baseline import guidance.
 Read `.github/skills/apex-azure-deploy/SKILL.md` only to explain an exact approved deployment lifecycle.
 Read `.github/skills/apex-azure-resources/SKILL.md` only for accepted inventory evidence interpretation.
 Read `.github/skills/apex-azure-cost-optimization/SKILL.md` only for accepted observed-cost analysis.
 Read `.github/skills/apex-azure-diagnostics/SKILL.md` only for accepted diagnostic evidence interpretation.
 Read `.github/skills/apex-azure-kusto/SKILL.md` only for accepted Kusto findings.
+
+For governance candidate selection, call `apex/governanceSelect` with only the reviewed local `path`. Present the returned
+governance question through the client's native question control and submit the exact user answer with `apex/recordInput`.
+This governance `needs_input` branch belongs here; route other input kinds to their existing owner. Never choose on the
+user's behalf. A recorded reuse choice permits explicit import; refresh waits for a newer successfully collected file
+at that path and does not run Azure collection. Do not ask again when selection returns the recorded choice.
+Only when the user explicitly asks to reconsider a pending refresh, pass `reopen: true` to `apex/governanceSelect`.
+Present the new question and record its answer; never reopen automatically to bypass a blocker.
+For an explicitly requested reviewed governance baseline import, use `apex/governanceImport` with only the local `path`.
+Never read or paste baseline bytes into chat, task context, or tool arguments. Report the returned `outputHash` and
+`summary`; import does not authorize live discovery, bypass reconciliation or governance review, or approve Gate 2.
+If policy content changed, explain the invalidation scope and direct the user to the trusted CLI
+`apex governance revise --path <reviewed-path> --reason <reason> --yes --json`, followed by explicit import and renewed
+reviews/approvals. Never infer revision confirmation or substitute deployment `reconcile` for governance revision.
+If an indeterminate deployment has no recorded execution receipt, report that current reconciliation cannot establish
+its outcome and retain the blocker for operator/provider-supported resolution; do not repeat deployment or reconciliation.
 
 # Output
 

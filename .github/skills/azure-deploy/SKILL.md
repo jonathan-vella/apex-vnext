@@ -65,7 +65,7 @@ Activate this skill when user wants to:
 
 ## References
 
-- [azd vs deploy.ps1 guide](../iac-common/references/azd-vs-deploy-guide.md) - Comparison, conventions, workflow
+- [azd vs deploy.ps1 guide](../../../customizations/.github/skills/apex-azure-deploy/SKILL.md) - Comparison, conventions, workflow
 - [Troubleshooting](references/troubleshooting.md) - Common issues and solutions
 - [Post-Deployment Steps](references/recipes/azd/post-deployment.md) - SQL + EF Core setup
 

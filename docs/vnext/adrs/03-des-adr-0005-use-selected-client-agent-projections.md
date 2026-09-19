@@ -8,6 +8,13 @@
 > Date: 2026-07-28
 > Deciders: APEX maintainers
 
+## Current Scope Note
+
+This record describes the selected-client projection design and its dated client evidence. The shared-source boundary
+remains applicable. [DECISION-024](../DECISIONS.md#decision-024-use-wsl2-and-decide-distribution-last) leaves final delivery
+open for an end-of-roadmap Agent Plugins/APEX MCP evaluation; this ADR is not a permanent npm-only restriction or proof
+of current plugin compatibility. Preserve existing projections until a qualified replacement is selected.
+
 ## 🔍 Context
 
 DECISION-012 requires equivalent governed outcomes in GitHub Copilot for VS Code and GitHub Copilot CLI. Issue

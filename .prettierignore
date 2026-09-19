@@ -6,6 +6,7 @@ agent-output/
 tmp/
 infra/
 logs/
+tools/debug/.local/
 assets/
 **/*.min.js
 
@@ -60,8 +61,7 @@ customizations/.vscode/
 customizations/manifest.json
 
 # Expected-output test fixtures (reformatting would break replay assertions).
-tests/fixtures/
+tools/tests/fixtures/
 
 # Repo markdown docs are markdownlint-owned (proseWrap=preserve still reflows
 # tables); keep Prettier off long-form docs with hand-aligned tables.
-tools/apex-recall/docs/decision-keys.md

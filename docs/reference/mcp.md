@@ -50,6 +50,56 @@ The returned request ID, expected head, and owner epoch are required for `record
 `improvementObserve`, `improvementObservations`, and `improvementProposals` record and read bounded improvement data.
 Proposals are inert: they do not mutate instructions, policy, or runtime behavior automatically.
 
+## Response Contracts
+
+APEX currently pins TypeScript SDK 1.29.0, supporting MCP versions through 2025-11-25. It does not claim support for
+the 2026-07-28 protocol. Initialization/version negotiation is handled by the SDK; stdio stdout is protocol-only.
+
+Successful responses include an object in `structuredContent` and the same JSON serialized in a text content block.
+Existing object results are unchanged. Non-object service results use these envelopes:
+
+| Tool                           | Structured result        |
+| ------------------------------ | ------------------------ |
+| `render`                       | `{ "markdown": "..." }`  |
+| `preview`                      | `{ "markdown": "..." }`  |
+| `capabilityList`               | `{ "packs": [] }`        |
+| `improvementObservations`      | `{ "observations": [] }` |
+| `improvementProposals`         | `{ "proposals": [] }`    |
+| `stageArtifact` with `outputs` | `{ "artifacts": [] }`    |
+
+Single-artifact staging still returns its existing artifact object. Bundle staging is not an atomic completion;
+use `completeTask` for atomic output acceptance. All 34 tools advertise output schemas derived from the canonical
+contracts and explicit adapter envelopes. Success and structured error branches are validated, including by SDK clients.
+See [REQ-MCP-001](../vnext/PRD.md#req-mcp-001-predictable-tool-contracts) for acceptance.
+
+Handler failures return `isError: true` with `{ "error": { "code": "APEX_STALE", "message": "..." } }` in both
+structured and text content. Messages are allowlisted recovery guidance, not raw exception messages. Stacks, causes
+and exception details are omitted. Tool argument-validation failures use the same sanitized envelope; malformed JSON-RPC
+requests and unknown methods remain SDK concerns. Clients must inspect `isError`,
+refresh stale state and avoid blindly retrying mutations; an error does not imply that all side effects were rolled back.
+
+## Inputs And Lifecycle
+
+Tool arguments are strict objects: unknown fields and ambiguous staging forms are rejected before service invocation.
+Parameterless tools accept omitted arguments or `{}`. Stage a single `kind`/`value` or a nonempty `outputs` bundle,
+never both. Bundle kinds must be unique; bundles have at most 32 items. Validation-only calls may omit both forms.
+
+The adapter limits argument and structured-result JSON to 4 MiB, depth 64 and 100,000 nodes. These are transport-facing
+safeguards, not replacements for smaller locked task/evidence budgets. Each server permits 240 tool calls per minute
+and at most 32 active/queued calls; excess work returns a conflict without executing. Dispatch is serialized per server.
+Queued calls expire after 30 seconds and cancellation/disconnect reclaims their slots before execution.
+
+An active mutation is allowed to settle; cancellation is not rollback. Staging/validation bundles check cancellation
+between items and preserve already-written items on later failure. The adapter never retries mutations automatically.
+Long-running underlying operations retain their own bounded process/provider timeouts. After interruption, reconnect
+and inspect authoritative state before deciding whether to resubmit; do not treat a missing reply as proof of no commit.
+
+`status` and `projectList` are read-only and carry corresponding read-only/idempotent hints. Status refuses pending
+transaction recovery instead of writing it. Explicit advancement/final completion owns terminal bookkeeping. Other
+tools are conservatively marked non-read-only/non-idempotent because even read-like service paths can recover state.
+`nextTask` explicitly warns that issuance writes state and is not retry-safe. Tool metadata and host permission prompts
+do not replace kernel authorization. The fixed, deterministically ordered catalog does not change with workflow state.
+
 ## Authority
 
 [`packages/cli/src/mcp.ts`](../../packages/cli/src/mcp.ts) is the executable tool inventory.

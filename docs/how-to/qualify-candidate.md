@@ -42,11 +42,20 @@ restart/resume, lifecycle behavior, and normalized outcomes.
 VS Code and Copilot CLI outcomes are compared only where both clients support the same interaction. Intentional worker
 asymmetry is not a parity failure.
 
+Use Windows via WSL2 without a devcontainer and cover both ALZ-backed and standalone lab/demo profiles. COE import,
+relevant change questions, conflict handling and selective regeneration are required target outcomes; missing
+implementation must be recorded as a gap. Worker asymmetry cannot excuse missing generation, review or validation.
+Review output using the [PRD checklist](../vnext/PRD.md#output-quality-reference), not a new token benchmark.
+
+Run basic interaction checks alongside features when executable controls permit. Final distribution and APEX MCP
+redistribution are evaluated last; repeat affected package and client qualification after that decision is implemented.
+
 ## Prepare Live Azure Qualification
 
-Live qualification requires explicit human authorization, isolated subscriptions or resource groups, governance and
-quota discovery, current pricing/availability evidence, authenticated tools, cleanup ownership, and exact preview
-approval. Run Bicep and Terraform separately and bind evidence to the candidate.
+Live qualification requires explicit human authorization, isolated targets, reviewed target-subscription policy,
+pricing evidence, authenticated tools, cleanup ownership and exact preview approval. Quota and regional availability
+remain assumptions, not separate evidence gates. Run Bicep and Terraform separately, preserve supplied platform
+resources, and bind evidence to the candidate. Follow [the live procedure](../vnext/LIVE-QUALIFICATION.md).
 
 ## Interpret Results
 

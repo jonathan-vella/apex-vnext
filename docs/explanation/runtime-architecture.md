@@ -4,6 +4,9 @@
 
 ## Kernel Authority
 
+The runtime supports the [workload-factory product direction](../vnext/PRD.md); it is not a new platform landing-zone
+manager or application framework. Planned COE/profile support should reuse these boundaries rather than add engines.
+
 `packages/kernel` owns deterministic state transitions, task issuance, gates, authorization, journals, evidence, and
 bounded improvement decisions. Any state-changing operation must pass through this boundary.
 
@@ -26,6 +29,9 @@ authorization.
 `packages/cli` is the lifecycle and terminal boundary. It installs managed customizations, selects projects and runs,
 translates commands into service calls, and exposes a narrow MCP facade. The CLI does not create a second state machine.
 
+`ApexService` and its workflow validators coordinate acceptance and business checks using kernel primitives. New
+import/change behavior belongs in that existing path with typed contracts, not an agent-maintained parallel workflow.
+
 ## Renderers And Testkit
 
 `packages/renderers` turns typed contracts into deterministic Markdown and bounded documentation diagrams. Architecture,
@@ -43,6 +49,11 @@ inputs, and invoke kernel tools. They may not bypass gates, mutate `.apex` direc
 Consumer-project state lives under `.apex/`. Journals are append-only and hash-linked; objects are content-addressed.
 Approvals, execution attestations, and operation records are immutable evidence. Derived views can be rebuilt from
 verified source state.
+
+Planned archetype reuse transfers selected intent and code, not this execution history. Existing contract shapes and
+parameter bindings should carry portable decisions with one owner per fact. The ALZ and standalone profiles distinguish
+supplied resources from workload-owned resources; both preserve policy and deployment approval. See
+[workflow and change behavior](workflow-and-gates.md#planned-coe-reuse-and-change) for the planned user experience.
 
 ## Related
 

@@ -611,6 +611,20 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
     }
     case "status":
       return service.status();
+    case "governance import":
+      return service.importGovernanceBaseline(required(flags, "path"));
+    case "governance revise": {
+      confirmed(flags, "governance revise");
+      return service.reviseGovernanceBaseline(required(flags, "path"), {
+        confirm: true,
+        reason: required(flags, "reason"),
+      });
+    }
+    case "governance select":
+      return service.selectGovernanceBaseline(
+        required(flags, "path"),
+        ...(flags.reopen === true ? [{ reopen: true }] : []),
+      );
     case "task next":
       return service.nextTask();
     case "task context":

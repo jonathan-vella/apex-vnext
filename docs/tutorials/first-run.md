@@ -5,6 +5,10 @@
 This tutorial uses the repository build and the fake provider boundary. It does not deploy infrastructure or grant
 release authority.
 
+This source-build tutorial is for local candidate evaluation. Normal consumers use the
+[WSL2 consumer runbook](wsl2-vscode-consumer-runbook.md) and an available package without a devcontainer or source clone.
+The fake provider is not evidence of either an ALZ-backed or standalone Azure deployment.
+
 ## Prerequisites
 
 - Node.js 24 or newer

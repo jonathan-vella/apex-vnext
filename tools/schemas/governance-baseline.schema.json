@@ -6,7 +6,6 @@
   "type": "object",
   "required": [
     "schema_version",
-    "management_group_id",
     "coverage_status",
     "subscriptions_discovered",
     "subscriptions_processed",
@@ -16,6 +15,16 @@
     "subscriptions"
   ],
   "additionalProperties": false,
+  "oneOf": [
+    {
+      "required": ["management_group_id"],
+      "not": { "required": ["subscription_id"] }
+    },
+    {
+      "required": ["subscription_id"],
+      "not": { "required": ["management_group_id"] }
+    }
+  ],
   "properties": {
     "schema_version": {
       "type": "string",
@@ -24,6 +33,11 @@
     "management_group_id": {
       "type": "string",
       "minLength": 1
+    },
+    "subscription_id": {
+      "description": "Standalone collection root; mutually exclusive with management_group_id.",
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
     },
     "coverage_status": {
       "type": "string",

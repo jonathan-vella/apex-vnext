@@ -17,8 +17,49 @@ const artifactEvent = {
   payload: { artifactHashes: { requirements: "b".repeat(64) } },
 } as EventV1;
 
+test("dependency revision clears invalidated artifacts and retains the unaffected review owner", () => {
+  const accepted = {
+    type: "task.completed",
+    payload: {
+      artifactHashes: {
+        requirements: "b".repeat(64),
+        "governance-constraints": "c".repeat(64),
+        "review-findings": "d".repeat(64),
+      },
+    },
+  } as EventV1;
+  const invalidated = {
+    type: "workflow.invalidated",
+    payload: {
+      artifactKinds: ["governance-constraints", "review-findings"],
+      governanceRevision: { retainedReviewHash: "e".repeat(64) },
+    },
+  } as EventV1;
+  assert.notEqual(dependencyRevision(run, [accepted]), dependencyRevision(run, [accepted, invalidated]));
+  assert.equal(
+    dependencyRevision(run, [accepted, invalidated]),
+    dependencyRevision(run, [
+      {
+        type: "task.completed",
+        payload: { artifactHashes: { requirements: "b".repeat(64), "review-findings": "e".repeat(64) } },
+      } as EventV1,
+    ]),
+  );
+  assert.equal(dependencyRevision(run, [accepted, invalidated, accepted]), dependencyRevision(run, [accepted]));
+});
+
 test("dependency revision ignores ownership but binds target, runtime, and artifacts", () => {
   const original = dependencyRevision(run, [artifactEvent]);
+  assert.equal(
+    dependencyRevision(run, [
+      artifactEvent,
+      {
+        type: "governance.observation-renewed",
+        payload: { governanceHash: "c".repeat(64), receiptHash: "d".repeat(64) },
+      } as EventV1,
+    ]),
+    original,
+  );
   const transferredRun: RunConfigV1 = { ...run, ownerEpoch: 2 };
   assert.equal(dependencyRevision(transferredRun, [artifactEvent]), original);
   assert.notEqual(dependencyRevision({ ...run, targetScope: "scope-b" }, [artifactEvent]), original);

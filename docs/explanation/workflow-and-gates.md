@@ -46,6 +46,33 @@ immutable history. Task IDs and owner epochs prevent stale completion.
 The workflow branches by selected track for code generation, validation, preview, and deployment, then converges on the
 same operation, inventory, diagnosis, and quality contracts.
 
+## Planned COE Reuse And Change
+
+The following is the target experience in [the PRD](../vnext/PRD.md#req-reuse-001-coe-archetype-import), not a claim that
+new import commands or conflict-aware regeneration already exist:
+
+1. The user identifies a COE repository; APEX inspects available archetypes and asks which whole workload to import.
+2. APEX creates an independent consumer copy with source revision and selected paths, excluding source credentials,
+   runtime state, writer claims and deployment approval authority.
+3. APEX recovers reusable intent from existing contracts and parameters. For older or manually copied projects, it
+   inspects relevant code/documents once and asks the user to confirm recovered decisions.
+4. The user requests changes. APEX asks only relevant missing questions, explains consequences and confirms the change.
+5. Existing dependency and invalidation mechanisms update affected decisions, code and documents. Manual conflicts
+   require confirmation; unrelated files and decisions remain intact.
+6. Consumer governance, validation, preview and approval are bound to the new target before deployment.
+
+Both environment profiles are required: ALZ-backed workloads consume supplied networking, identity and monitoring by
+default; standalone labs/demos can provision their own workload support resources. Both obey applicable policy and
+security. They are profile/ownership choices in one workflow, not separate engines or inferred from subscription count.
+
+## Output And Handoff
+
+Design reasoning belongs in accepted sources, not repeatedly recreated from generated prose. Renderers should produce
+consistent, navigable design/ADR and operational documents from those sources and observed deployment evidence. Follow
+the [quality checklist](../vnext/PRD.md#output-quality-reference), distinguishing assumptions from tested outcomes.
+Infrastructure outputs, deployment guidance and operational readiness are mandatory. Application pipelines and
+application-specific deployment configuration are optional later work; APEX does not develop application code.
+
 ## Related
 
 - [Run the workflow](../how-to/run-workflow.md)

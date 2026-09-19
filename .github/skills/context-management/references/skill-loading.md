@@ -12,6 +12,5 @@ no digest or minimal variant. To stay under context budget:
 3. **Defer `references/*.md`** — load on demand only when the SKILL.md body
    explicitly points to one.
 
-The runtime compression tier system (full / summarized / minimal) applies
-to artifacts in `agent-output/`, not to skills. Skills are always loaded
-in their canonical single-tier form.
+Task input limits and authorized reads belong to the kernel. Do not invent alternate skill variants or discard required
+artifact evidence to satisfy a prose summary target.

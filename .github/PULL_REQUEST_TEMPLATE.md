@@ -74,7 +74,7 @@ If YES, expected impact:
 
 - [ ] Pre-commit hook passed (`npm run lint:md`)
 - [ ] Agent YAML frontmatter validates
-- [ ] MCP server tests pass (`pytest tests/`)
+- [ ] Owning-package and focused regression checks pass (validation scope follows `AGENTS.md`)
 
 ## Well-Architected Framework Alignment
 

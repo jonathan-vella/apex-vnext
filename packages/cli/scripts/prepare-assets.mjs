@@ -12,6 +12,11 @@ const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
 const CLIENT_ADAPTER_VERSION = "1.1.0";
+export const GENERATED_SHARED_FILES = [
+  ".github/workflows/governance-policy-baseline.yml",
+  "tools/scripts/collect-governance-baseline.ps1",
+  "tools/schemas/governance-baseline.schema.json",
+];
 const PROJECTION_TARGETS = new Map([
   ["github-copilot-vscode", "vscode"],
   ["github-copilot-cli", "github-copilot"],
@@ -61,9 +66,11 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
   if ("target" in frontmatter) throw new Error("Shared agent source must not declare target");
   if (clientId === "github-copilot-vscode") {
     const mechanics = [
-      Array.isArray(frontmatter.tools) && frontmatter.tools.includes("vscode/askQuestions")
-        ? "Use `vscode/askQuestions` for kernel-owned input requests."
-        : null,
+      frontmatter.name === "APEX"
+        ? "For requirements intake, present the declared Gather requirements handoff to `APEX Requirements` and stop for the user's interactive transition. State the user's scope and stop point beside the handoff; do not ask a role-selection question when the kernel has selected the owner. If unavailable, ask the user to select `APEX Requirements`. Use `vscode/askQuestions` only for project lifecycle or routing choices, never intake."
+        : Array.isArray(frontmatter.tools) && frontmatter.tools.includes("vscode/askQuestions")
+          ? "Use `vscode/askQuestions` for kernel-owned input requests."
+          : null,
       Array.isArray(frontmatter.handoffs) && frontmatter.handoffs.length > 0
         ? "Use the declared direct handoffs for interactive transitions."
         : null,
@@ -85,16 +92,19 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
   const sourceTools = Array.isArray(frontmatter.tools) ? frontmatter.tools : [];
   const tools = [
     ...new Set(
-      sourceTools.map((tool) => {
-        if (tool === "vscode/askQuestions") return inventory.interactiveTools.askUser;
-        if (tool === "agent") return inventory.interactiveTools.delegate;
-        if (typeof tool === "string" && tool.startsWith("apex/")) {
-          const operation = tool.slice("apex/".length);
-          if (!inventory.operationIds.includes(operation)) throw new Error(`Unpinned CLI APEX operation: ${operation}`);
-          return `${inventory.workspaceServer}/${operation}`;
-        }
-        return tool;
-      }),
+      sourceTools
+        .filter((tool) => tool !== "agent" || options.delegates !== false)
+        .map((tool) => {
+          if (tool === "vscode/askQuestions") return inventory.interactiveTools.askUser;
+          if (tool === "agent") return inventory.interactiveTools.delegate;
+          if (typeof tool === "string" && tool.startsWith("apex/")) {
+            const operation = tool.slice("apex/".length);
+            if (!inventory.operationIds.includes(operation))
+              throw new Error(`Unpinned CLI APEX operation: ${operation}`);
+            return `${inventory.workspaceServer}/${operation}`;
+          }
+          return tool;
+        }),
     ),
   ];
   if (options.delegates === true && !tools.includes(inventory.interactiveTools.delegate)) {
@@ -110,11 +120,16 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
     tools,
   };
   const mechanics = [
-    tools.includes(inventory.interactiveTools.askUser)
-      ? `Use \`${inventory.interactiveTools.askUser}\` for kernel-owned input requests.`
-      : null,
-    tools.includes(inventory.interactiveTools.delegate)
+    frontmatter.name === "APEX"
+      ? `For requirements intake, direct the user to select \`APEX Requirements\` as the foreground agent, then stop. Do not use \`${inventory.interactiveTools.delegate}\` for interactive intake or substitute Explore. Print the scope note verbatim for continuation: requested outcome, stop point, and prohibited operations. If the original scope is unavailable, limit continuation to intake through taskContext. State that routing is pending until the user switches; do not claim the handoff or input submission completed. Do not collect intake answers or replace invalid choices with defaults. Use \`${inventory.interactiveTools.askUser}\` only for project lifecycle or routing choices, never intake.`
+      : tools.includes(inventory.interactiveTools.askUser)
+        ? `Use \`${inventory.interactiveTools.askUser}\` for kernel-owned input requests.`
+        : null,
+    frontmatter.name !== "APEX" && tools.includes(inventory.interactiveTools.delegate)
       ? `Use \`${inventory.interactiveTools.delegate}\` for declared worker delegation.`
+      : null,
+    frontmatter.name !== "APEX" && tools.includes(inventory.interactiveTools.askUser)
+      ? `Run user-facing questions as the foreground agent using \`${inventory.interactiveTools.askUser}\`, not as a delegated background task. For another interactive stage, ask the user to select its named agent and carry forward the scope note; do not delegate interactive work through \`${inventory.interactiveTools.delegate}\`. If the question tool is unavailable, report the limitation and stop without claiming answers were recorded.`
       : null,
   ].filter(Boolean);
   return serializeAgent(
@@ -239,7 +254,7 @@ export function validateClientProjectionDeclarations(customizationManifest) {
   const roles = customizationManifest.roles;
   if (
     !Array.isArray(sharedFiles) ||
-    sharedFiles.some((path) => typeof path !== "string") ||
+    sharedFiles.some((path) => !safeRelativePath(path)) ||
     sharedFiles.length !== new Set(sharedFiles).size ||
     !Array.isArray(sharedDirectories) ||
     sharedDirectories.some((path) => typeof path !== "string" || !safeRelativePath(path)) ||
@@ -288,8 +303,9 @@ export function roleSupportsClient(role, clientId) {
 
 export function roleDelegatesOnClient(role, clientId, roles, invocationEdges) {
   return invocationEdges.some(
-    ({ from, to }) =>
+    ({ from, to, type }) =>
       from === role.agent &&
+      (clientId !== "github-copilot-cli" || type === "subagent") &&
       roles.some(({ agent, supportedTargets }) => roleSupportsClient({ supportedTargets }, clientId) && agent === to),
   );
 }
@@ -337,7 +353,7 @@ function validateCliToolInventory(value) {
   return value;
 }
 
-async function prepareClientProjections(customizationManifest, pinnedCustomizations, inventory) {
+async function prepareClientProjections(customizationManifest, pinnedCustomizations, inventory, generatedSharedFiles) {
   const { sharedFiles, sharedDirectories, clientProjections, roles } =
     validateClientProjectionDeclarations(customizationManifest);
   const toolInventoryPath = join(repositoryRoot, "tools", "registry", "copilot-cli-agent-tools.json");
@@ -379,10 +395,9 @@ async function prepareClientProjections(customizationManifest, pinnedCustomizati
       (path) => !roleSources.has(path),
     );
     for (const relativePath of sources) {
-      const bytes = await readSourceFile(
-        pinnedCustomizations.resolvedRoot,
-        join(repositoryRoot, "customizations", relativePath),
-      );
+      const bytes =
+        generatedSharedFiles.get(relativePath) ??
+        (await readSourceFile(pinnedCustomizations.resolvedRoot, join(repositoryRoot, "customizations", relativePath)));
       const sourceHash = createHash("sha256").update(bytes).digest("hex");
       const destination = join(generatedRoot, relativePath);
       assertContained(generatedRoot, destination);
@@ -461,126 +476,12 @@ async function walkFiles(root, directory = root, expectedIdentity) {
   return files;
 }
 
-async function fileDigest(path) {
-  return createHash("sha256")
-    .update(await readFile(path))
-    .digest("hex");
-}
-
-async function treeDigest(root) {
-  const hash = createHash("sha256");
-  const visit = async (directory) => {
-    const entries = (await readdir(directory, { withFileTypes: true })).sort((left, right) =>
-      bytewise(left.name, right.name),
-    );
-    for (const entry of entries) {
-      const path = join(directory, entry.name);
-      const name = portablePath(relative(root, path));
-      const metadata = await lstat(path);
-      if (metadata.isSymbolicLink()) throw new Error(`Asset source contains a symlink: ${path}`);
-      hash.update(metadata.isDirectory() ? `d:${name}\0` : `f:${name}\0`);
-      if (metadata.isDirectory()) await visit(path);
-      else if (metadata.isFile()) hash.update(await readFile(path));
-      else throw new Error(`Unsupported asset source entry: ${path}`);
-    }
-  };
-  await visit(root);
-  return hash.digest("hex");
-}
-
-async function copyEntry(sourceRoot, pinnedRoot, destinationRoot, sourceRelative, mapping, inventory) {
-  const sourceRootMetadata = await lstat(sourceRoot, { bigint: true });
-  if (
-    !sourceRootMetadata.isDirectory() ||
-    sourceRootMetadata.isSymbolicLink() ||
-    sourceRootMetadata.dev !== pinnedRoot.identity.dev ||
-    sourceRootMetadata.ino !== pinnedRoot.identity.ino
-  ) {
-    throw new Error(`Asset source directory changed during generation: ${sourceRoot}`);
-  }
-  const source = join(sourceRoot, sourceRelative);
-  const metadata = await lstat(source, { bigint: true });
-  if (metadata.isSymbolicLink()) throw new Error(`Asset source contains a symlink: ${source}`);
-  const files = metadata.isDirectory()
-    ? await walkFiles(source, source, { dev: metadata.dev, ino: metadata.ino })
-    : [{ path: source, identity: { dev: metadata.dev, ino: metadata.ino } }];
-  for (const sourceFile of files) {
-    const destinationRelative = metadata.isDirectory()
-      ? join(sourceRelative, relative(source, sourceFile.path))
-      : sourceRelative;
-    const destination = join(destinationRoot, destinationRelative);
-    assertContained(destinationRoot, destination);
-    await mkdir(dirname(destination), { recursive: true });
-    const bytes = await readSourceFile(pinnedRoot.resolvedRoot, sourceFile.path, async () => {}, sourceFile.identity);
-    await writeFile(destination, bytes);
-    inventory.push({
-      path: portablePath(relative(assetsRoot, destination)),
-      source: {
-        kind: "repository-file",
-        path: portablePath(relative(repositoryRoot, sourceFile.path)),
-        mapping,
-      },
-      sha256: createHash("sha256").update(bytes).digest("hex"),
-      bytes: bytes.byteLength,
-    });
-  }
-}
-
 async function prepareCapabilityPacks(inventory) {
   const policy = JSON.parse(await readFile(join(repositoryRoot, "config", "capability-packs.v1.json"), "utf8"));
-  const definitions = new Map(policy.packs.map((pack) => [pack.id, pack]));
+  if (policy.packs.length !== 0) throw new Error("New shipped capability packs require an explicit asset binding");
   const packsRoot = join(assetsRoot, "capability-packs");
-  const sources = [
-    {
-      id: "azure-governance-discovery",
-      root: join(repositoryRoot, ".github", "skills", "azure-governance-discovery"),
-      entries: [join("scripts", "discover.py"), join("scripts", "render_governance.py")],
-    },
-  ];
-  for (const source of sources) {
-    const pinnedRoot = await pinSourceRoot(source.root);
-    const destination = join(packsRoot, source.id, "source");
-    for (const entry of source.entries) {
-      await copyEntry(source.root, pinnedRoot, destination, entry, source.id, inventory);
-    }
-  }
-
-  const emptyDigest = createHash("sha256").update("").digest("hex");
-  const governanceSource = join(packsRoot, "azure-governance-discovery", "source");
-  const governanceScriptDigest = await fileDigest(join(governanceSource, "scripts", "discover.py"));
-  const metadata = (id) => {
-    const definition = definitions.get(id);
-    if (definition === undefined) throw new Error(`Capability pack metadata is missing for ${id}`);
-    return definition;
-  };
-  const registry = {
-    schemaVersion: policy.schemaVersion,
-    protocolVersion: policy.protocolVersion,
-    installationPolicy: policy.installationPolicy,
-    packs: [
-      {
-        ...metadata("azure-governance-discovery"),
-        version: "1.0.0",
-        runtime: "python",
-        artifact: {
-          type: "local-directory",
-          spec: "capability-packs/azure-governance-discovery/source",
-          digest: await treeDigest(governanceSource),
-        },
-        lock: {
-          installer: "pip-hashes",
-          digest: emptyDigest,
-          directDigest: emptyDigest,
-          transitiveDigest: emptyDigest,
-        },
-        executable: { command: "python", args: ["scripts/discover.py"] },
-        dependencyFree: true,
-        script: "scripts/discover.py",
-        scriptDigest: governanceScriptDigest,
-        capabilities: ["governance-discovery"],
-      },
-    ],
-  };
+  await mkdir(packsRoot, { recursive: true });
+  const registry = { ...policy, packs: [] };
   const registryPath = join(packsRoot, "registry.v1.json");
   await writeFile(registryPath, `${JSON.stringify(registry, null, 2)}\n`);
   const registryBytes = await readFile(registryPath);
@@ -599,6 +500,13 @@ async function prepareAssets() {
   const runtimeBundle = JSON.parse(await readFile(join(repositoryRoot, "config", "runtime-bundle.v1.json"), "utf8"));
   const bundleDeclaration = validateBundleDeclarations(customizationManifest, runtimeBundle);
   validateClientProjectionDeclarations(customizationManifest);
+  if (
+    GENERATED_SHARED_FILES.some(
+      (path) => !customizationManifest.sharedFiles.includes(path) || !customizationManifest.managedFiles.includes(path),
+    )
+  ) {
+    throw new Error("Generated shared assets must be declared as shared managed files");
+  }
   const sourceRoots = [
     { name: "customizations", root: join(repositoryRoot, "customizations") },
     { name: "config", root: join(repositoryRoot, "config") },
@@ -639,12 +547,65 @@ async function prepareAssets() {
     }
   }
 
+  const generatedSharedFiles = new Map();
+  const generatedSharedMappings = [];
+  for (const [index, sourcePath] of GENERATED_SHARED_FILES.entries()) {
+    const sourceRoot = dirname(sourcePath);
+    const sourceDirectory = join(repositoryRoot, sourceRoot);
+    const pinnedSource = await pinSourceRoot(sourceDirectory);
+    assertContained(await realpath(repositoryRoot), pinnedSource.resolvedRoot);
+    const bytes = await readSourceFile(pinnedSource.resolvedRoot, join(repositoryRoot, sourcePath));
+    const target = `customizations/${sourcePath}`;
+    if (inventory.some(({ path }) => path === target)) {
+      throw new Error(`Generated shared asset has a duplicate maintained source: ${sourcePath}`);
+    }
+    const destination = join(assetsRoot, target);
+    assertContained(assetsRoot, destination);
+    await mkdir(dirname(destination), { recursive: true });
+    await writeFile(destination, bytes);
+    const mapping = `governance-shared-${index}`;
+    generatedSharedMappings.push({
+      id: mapping,
+      mode: "copy-entries",
+      sourceRoot,
+      generatedRoot: `customizations/${sourceRoot}`,
+      entries: [{ source: sourcePath, target }],
+    });
+    generatedSharedFiles.set(sourcePath, bytes);
+    inventory.push({
+      path: target,
+      source: { kind: "repository-file", path: sourcePath, mapping },
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      bytes: bytes.byteLength,
+    });
+  }
+
   await prepareClientProjections(
     customizationManifest,
     sources.find(({ name }) => name === "customizations").pinnedRoot,
     inventory,
+    generatedSharedFiles,
   );
   await prepareCapabilityPacks(inventory);
+
+  const schemasRoot = join(repositoryRoot, "tools", "schemas");
+  const pinnedSchemas = await pinSourceRoot(schemasRoot);
+  const schemaName = "governance-baseline.schema.json";
+  const schemaBytes = await readSourceFile(pinnedSchemas.resolvedRoot, join(schemasRoot, schemaName));
+  const schemaDestination = join(assetsRoot, "schemas", schemaName);
+  assertContained(assetsRoot, schemaDestination);
+  await mkdir(dirname(schemaDestination), { recursive: true });
+  await writeFile(schemaDestination, schemaBytes);
+  inventory.push({
+    path: `schemas/${schemaName}`,
+    source: {
+      kind: "repository-file",
+      path: `tools/schemas/${schemaName}`,
+      mapping: "governance-baseline-schema",
+    },
+    sha256: createHash("sha256").update(schemaBytes).digest("hex"),
+    bytes: schemaBytes.byteLength,
+  });
 
   const sourcesMetadata = {
     customizations: customizationManifest.version,
@@ -662,6 +623,13 @@ async function prepareAssets() {
         generatedRoot: bundleDeclaration.generatedRoot,
       },
       { id: "config", mode: "copy-tree", sourceRoot: "config", generatedRoot: "config" },
+      ...generatedSharedMappings,
+      {
+        id: "governance-baseline-schema",
+        mode: "copy-entries",
+        sourceRoot: "tools/schemas",
+        generatedRoot: "schemas",
+      },
       {
         id: "copilot-cli-tool-inventory",
         mode: "copy-entries",
@@ -673,12 +641,6 @@ async function prepareAssets() {
         mode: "render-client-projections",
         sourceRoot: "customizations",
         generatedRoot: "client-projections",
-      },
-      {
-        id: "azure-governance-discovery",
-        mode: "copy-entries",
-        sourceRoot: ".github/skills/azure-governance-discovery",
-        generatedRoot: "capability-packs/azure-governance-discovery/source",
       },
       { id: "capability-pack-registry", mode: "compose-json", generatedPath: "capability-packs/registry.v1.json" },
     ],

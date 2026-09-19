@@ -15,7 +15,16 @@ New runs use three ordered panels before the requirements task:
 2. Workload pattern and service preferences
 3. Security and compliance
 
-Pending four-round requests remain valid and replay unchanged.
+Business discovery requires an explicit `workload-profile`: `alz-backed` or `standalone-lab`. Neither is recommended
+or inferred from environment names. The answer remains in the existing input journal and requirements task context,
+and the requirements template projects it as a `must` requirement with source `intake:workload-profile`.
+
+Pending three-panel requests issued before profile capture and legacy four-round requests replay unchanged. They do not
+gain an inferred profile. Profile-dependent follow-on work must clarify missing intent before relying on it.
+
+Profile capture does not itself enforce supplied-resource ownership or implement profile-specific planning and cleanup.
+Those remain follow-on work under the [workload boundary](../vnext/PRD.md#workload-boundary); policy, security and
+deployment approval requirements are unchanged.
 
 The workload-pattern round appends migration questions only when business discovery records `migration` or
 `modernization`. Conditional questions must be derived from accepted prior-round answers in the kernel; do not let an

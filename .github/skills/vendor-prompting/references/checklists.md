@@ -83,8 +83,7 @@ Two parallel checklists: agent (`*.agent.md`) and prompt
 
 ### Decision logging
 
-- [ ] **R-X-5** Significant decisions appended to
-      `decision_log` in `00-session-state.json` (reviewer-only).
+- [ ] **R-X-5** Significant decisions retain rationale and alternatives in the owning accepted vNext artifact.
 
 ---
 

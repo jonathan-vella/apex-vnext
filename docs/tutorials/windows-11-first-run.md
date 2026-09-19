@@ -5,6 +5,10 @@
 Complete [Prepare Windows 11](../how-to/prepare-windows-11.md) before starting. This tutorial creates local APEX state
 and prepares a selected Azure subscription; it does not deploy Azure resources.
 
+No Docker or devcontainer is required. Before workload planning, distinguish an ALZ-backed subscription with supplied
+platform resources from a standalone lab/demo. Both profiles obey Azure Policy; the full profile and COE adaptation
+experience is [planned work](../explanation/workflow-and-gates.md#planned-coe-reuse-and-change), not an extra init flag.
+
 ## Install The Published Preview
 
 Install the published preview from npm. Use the explicit `next` dist-tag rather than an unqualified package version:
@@ -126,7 +130,9 @@ For Terraform:
 terraform version
 ```
 
-Confirm the output includes **Owner** for the selected subscription before starting Azure-ready work.
+Confirm the identity has the least-privilege access required for the requested operation and supplied-resource usage.
+The displayed direct assignments are not a complete effective-access check. Subscription Owner is not a universal
+consumer requirement; resolve missing access with the platform owner rather than changing the landing-zone foundation.
 
 ## Continue Safely
 

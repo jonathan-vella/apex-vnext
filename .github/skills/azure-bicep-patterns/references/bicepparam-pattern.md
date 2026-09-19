@@ -8,7 +8,7 @@ Bicep inputs: `*.bicepparam` files materialised at deploy time from
 `main.bicep` MUST NOT hard-code GUIDs, subscription IDs, deployer
 object IDs, or e-mail addresses.
 
-> Loaded on demand by `06b-Bicep CodeGen` and `07b-Bicep Deploy` when
+> Loaded on demand for Bicep code generation and deployment planning when
 > they generate or render parameter files. Source: workflow
 > simplification plan, Workstream E.
 
@@ -70,7 +70,7 @@ appears as a default value or non-null literal in committed
 
 ---
 
-## Generation rules for 06b-Bicep CodeGen
+## Generation Rules
 
 1. Read `04-iac-contract.json#params[]` — these are the only params
    surfaced on `main.bicep`.

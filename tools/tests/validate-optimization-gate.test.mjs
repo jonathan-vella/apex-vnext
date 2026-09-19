@@ -12,6 +12,27 @@ test("authorized optimization gate has an exhaustive non-overlapping owned scope
   assert.deepEqual(validateOptimizationGate({ manifest, schema, scripts, trackedPaths }), []);
 });
 
+test("structural validation does not require an authorized audit or captured baselines", () => {
+  const draft = structuredClone(manifest);
+  draft.state = "draft";
+  draft.candidate = { status: "pending" };
+  draft.authorization = { status: "pending", pendingReason: "No maintenance audit is authorized." };
+  for (const baseline of draft.baselines) baseline.status = "pending";
+  assert.deepEqual(validateOptimizationGate({ manifest: draft, schema, scripts, trackedPaths }), []);
+});
+
+test("claiming audit completion still requires captured baselines", () => {
+  const incomplete = structuredClone(manifest);
+  incomplete.state = "complete";
+  incomplete.findings = [];
+  for (const baseline of incomplete.baselines) baseline.status = "pending";
+  assert.ok(
+    validateOptimizationGate({ manifest: incomplete, schema, scripts, trackedPaths }).includes(
+      "complete gate requires every baseline to be captured",
+    ),
+  );
+});
+
 test("optimization gate rejects unowned, multiply owned, and unknown proof paths", () => {
   assert.ok(
     validateOptimizationGate({

@@ -65,11 +65,11 @@ function computeActualCounts() {
   }
 
   let extensionCount = 0;
-  const dcPath = path.join(ROOT, ".devcontainer", "devcontainer.json");
-  if (fs.existsSync(dcPath)) {
+  const extensionsPath = path.join(ROOT, ".vscode", "extensions.json");
+  if (fs.existsSync(extensionsPath)) {
     try {
-      const dcContent = parseJsonc(fs.readFileSync(dcPath, "utf-8"));
-      extensionCount = dcContent?.customizations?.vscode?.extensions?.length || 0;
+      const extensions = parseJsonc(fs.readFileSync(extensionsPath, "utf-8"));
+      extensionCount = extensions?.recommendations?.length || 0;
     } catch {
       extensionCount = -1;
     }
