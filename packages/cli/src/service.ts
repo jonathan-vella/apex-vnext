@@ -5951,6 +5951,33 @@ export class ApexService {
                 ({ id }) => `${provider}://${run.environment}/${id}`,
               ),
       intendedExecutionRecipientIdentity,
+      ...(provider !== "terraform"
+        ? {}
+        : {
+            ownershipIssues:
+              logicalManifest === undefined
+                ? [{ path: "/ownership", message: "Accepted Terraform manifest is required to resolve ownership" }]
+                : logicalManifest.resources
+                    .filter(
+                      ({ ownership, implementationKind, executionAddress }) =>
+                        ownership === "managed" && (implementationKind === "module" || executionAddress === undefined),
+                    )
+                    .map(({ logicalId }) => ({
+                      path: `/ownership/${logicalId}`,
+                      message:
+                        "Terraform managed ownership requires resolved resource addresses; module descendants are unresolved",
+                    })),
+          }),
+      ...(provider !== "bicep"
+        ? {}
+        : {
+            ownershipIssues: bicepOwnership?.issues ?? [
+              {
+                path: "/ownership",
+                message: "Accepted Bicep binding and manifest are required to resolve ownership",
+              },
+            ],
+          }),
       ...(policyValidationBinding === undefined ? {} : { policyValidationBinding }),
       ...(attestation === undefined ? {} : { attestation }),
     };

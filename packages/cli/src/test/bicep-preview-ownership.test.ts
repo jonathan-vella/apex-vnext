@@ -218,6 +218,19 @@ test("Bicep module ownership stays unresolved instead of mapping a module to an 
   const result = resolveNativeBicepResourceOwnership(context);
   assert.match(result.issues[0]!.message, /module ownership is unresolved/);
   assert.deepEqual(result.expectedResourceIds, []);
+  const registry = new ValidatorRegistry();
+  registerWorkflowValidators(registry);
+  for (const changes of [[], [{ resourceId: managedId, action: "no-op", material: false }]]) {
+    assert.equal(
+      registry.validate("preview:coverage", {
+        provider: "bicep",
+        expectedResourceIds: result.expectedResourceIds,
+        ownershipIssues: result.issues,
+        preview: { changes },
+      }).valid,
+      false,
+    );
+  }
 });
 
 test("Bicep ownership checks accepted artifact identity, coverage, type, and descriptor", () => {
@@ -267,5 +280,36 @@ test("fake coverage retains exact synthetic ID matching", () => {
   assert.equal(
     coverage([resourceId], [{ resourceId: resourceId.toUpperCase(), action: "create", material: true }], "fake").valid,
     false,
+  );
+});
+
+test("Terraform no-op labels cannot conceal foreign material changes", () => {
+  assert.equal(
+    coverage(
+      ["azapi_resource.owned"],
+      [
+        {
+          resourceId: "azapi_resource.shared",
+          action: "no-op",
+          material: true,
+        },
+      ],
+      "terraform",
+    ).valid,
+    false,
+  );
+  assert.equal(
+    coverage(
+      ["azapi_resource.owned"],
+      [
+        {
+          resourceId: "azapi_resource.shared",
+          action: "no-op",
+          material: false,
+        },
+      ],
+      "terraform",
+    ).valid,
+    true,
   );
 });

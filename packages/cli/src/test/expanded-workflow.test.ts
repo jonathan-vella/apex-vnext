@@ -1242,6 +1242,82 @@ for (const scenario of ["foreign ID", "existing update", "existing delete"] as c
   });
 }
 
+for (const track of ["bicep", "terraform"] as const) {
+  test(`unresolved ${track} module ownership blocks empty and no-op previews without advancing state`, async (context) => {
+    for (const noOp of [false, true]) {
+      await context.test(`no-op=${noOp}`, async () => {
+        const root = await tempRoot();
+        const now = new Date("2026-01-01T00:00:00.000Z");
+        const base = track === "bicep" ? bicepPreviewProvider(now) : terraformPreviewProvider(now);
+        let moduleAttestation: ExecutionPlanAttestationV1 | undefined;
+        const provider: IacProvider = {
+          ...base,
+          ...(track !== "terraform"
+            ? {}
+            : {
+                attestation: (hash: string) =>
+                  moduleAttestation?.previewHash === hash ? moduleAttestation : undefined,
+              }),
+          async previewApply(request) {
+            const { previewHash, ...body } = await base.previewApply(request);
+            assert.equal(previewHash, sha256Json(body));
+            const changed = {
+              ...body,
+              changes: noOp
+                ? body.changes.map((change) => ({
+                    ...change,
+                    action: "no-op" as const,
+                    material: false,
+                  }))
+                : [],
+            };
+            const preview = { ...changed, previewHash: sha256Json(changed) };
+            if ("attestation" in base && typeof base.attestation === "function") {
+              const originalAttestation = base.attestation(previewHash) as ExecutionPlanAttestationV1 | undefined;
+              assert.ok(originalAttestation);
+              moduleAttestation = { ...originalAttestation, previewHash: preview.previewHash };
+            }
+            return preview;
+          },
+        };
+        const service = new ApexService(root, { clock: () => now, providers: { [track]: provider } });
+        const { runId } = await service.init({
+          projectId: "demo",
+          iacTool: track,
+          targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
+        });
+        const codegen = await reachCodegen(service, runId, track, (plan) => {
+          configureNativeBicepPlan(plan);
+          const binding = plan[1]!.value as IacBindingV1;
+          binding.resourceBindings.api!.implementation =
+            track === "bicep"
+              ? "avm:br/public:avm/res/storage/storage-account@0.9.0"
+              : "avm:Azure/avm-res-storage-storageaccount/azurerm@0.9.0";
+          binding.resourceBindings.api!.version = "0.9.0";
+        });
+        const bundle = codegenBundle(runId, track, codegen.plan);
+        const manifest = bundle.find(({ kind }) => kind === "logical-resource-manifest")!
+          .value as LogicalResourceManifestV1;
+        manifest.resources[0]!.implementationKind = "module";
+        manifest.resources[0]!.executionAddress = track === "bicep" ? "api" : "module.api";
+        const handoff = bundle.find(({ kind }) => kind === "iac-handoff")!.value as {
+          logicalResourceManifestHash: string;
+        };
+        handoff.logicalResourceManifestHash = sha256Json(manifest);
+        await service.completeTaskOutputs(codegen.taskId, bundle);
+        await complete(service, `validation-${track}`, [
+          { kind: "validation-evidence", value: validationEvidence(runId, track) },
+        ]);
+        const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+        const head = await journal.head();
+        await assert.rejects(service.preview({ operation: "apply", provider: track }), /preview:coverage/);
+        assert.equal((await service.status()).run.gates[3]!.state, "closed");
+        assert.equal(await journal.head(), head);
+      });
+    }
+  });
+}
+
 test("native apply requires complete source-bound policy receipts before Gate 4", async () => {
   const root = await tempRoot();
   const now = new Date("2026-01-01T00:00:00.000Z");

@@ -126,6 +126,13 @@ blockers to resolve, not accepted compliance exceptions. Native Terraform previe
 exact emitted managed addresses. Native Bicep previews resolve literal top-level IDs from accepted bindings and reject
 foreign mutations and existing-resource updates/deletes. AVM child ownership remains unresolved and blocked.
 
+The September 19 ownership follow-up carries Bicep resolver failures into preview coverage and explicitly blocks
+unresolved Terraform module descendants or missing managed execution addresses. Empty and no-op previews cannot hide
+those failures; workflow regressions retain the journal head and closed Gate 4. Terraform coverage also rejects
+foreign material changes labelled no-op. These are safety fixes, not completed AVM support. Current Bicep evidence
+binds source and physical what-if IDs but does not attribute each ID to an accepted logical module. Terraform plan
+module metadata likewise needs a source-bound ownership contract before descendant operations can be authorized.
+
 The September 18 follow-up blocks explicitly incomplete Terraform plans and malformed change arrays, actions and
 status fields. Native-provider tests confirm incomplete saved plans cannot apply with or without policy mappings.
 Absent optional fields remain compatible with older Terraform JSON. Plan acceptance on both tracks now rejects

@@ -89,6 +89,7 @@ export interface WorkflowPreviewValidatorContext {
   readonly currentDependencyRevision: string;
   readonly expectedResourceIds: readonly string[];
   readonly intendedExecutionRecipientIdentity: string;
+  readonly ownershipIssues?: readonly ValidationIssue[];
   readonly attestation?: ExecutionPlanAttestationV1;
   readonly policyValidationBinding?: PolicyValidationBinding & { readonly receiptHash: string };
 }
@@ -822,7 +823,7 @@ function previewCoverage(value: unknown): ValidationIssue[] {
   const context = previewContext(value);
   const changes = context.preview.changes;
   const resourceIds = changes.map(({ resourceId }) => resourceId);
-  const issues: ValidationIssue[] = [];
+  const issues: ValidationIssue[] = [...(context.ownershipIssues ?? [])];
   const uniqueIds = context.provider === "bicep" ? resourceIds.map((id) => id.toLowerCase()) : resourceIds;
   if (new Set(uniqueIds).size !== resourceIds.length) {
     issues.push({ path: "/changes", message: "Preview contains duplicate resource changes" });
@@ -839,7 +840,11 @@ function previewCoverage(value: unknown): ValidationIssue[] {
   }
   if (context.provider === "terraform") {
     const managedAddresses = new Set(context.expectedResourceIds);
-    if (changes.some(({ resourceId, action }) => action !== "no-op" && !managedAddresses.has(resourceId))) {
+    if (
+      changes.some(
+        ({ resourceId, action, material }) => (action !== "no-op" || material) && !managedAddresses.has(resourceId),
+      )
+    ) {
       issues.push({
         path: "/changes",
         message: "Terraform preview would modify a resource outside accepted managed ownership",
