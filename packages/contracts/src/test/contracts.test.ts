@@ -92,6 +92,12 @@ FormatRegistry.Set(
 );
 
 describe("Wave 1 contracts", () => {
+  it("requires Bicep format, build and lint rather than accepting build-only receipts", () => {
+    assert.deepEqual(
+      NATIVE_VALIDATION_COMMANDS.bicep.map(({ validatorId }) => validatorId),
+      ["bicep:format", "bicep:build", "bicep:lint"],
+    );
+  });
   for (const track of ["bicep", "terraform"] as const) {
     it(`validates strict source-bound native validation receipts for ${track}`, () => {
       const body: Omit<NativeValidationReceiptV1, "receiptHash"> = {
@@ -154,6 +160,7 @@ describe("Wave 1 contracts", () => {
       }
       for (const commands of [
         body.commands.slice(1),
+        body.commands.filter(({ validatorId }) => validatorId === "bicep:build"),
         [...body.commands, body.commands[0]!],
         body.commands.map((command) => ({ ...command, commandHash: otherHash })),
         body.commands.map((command) => ({ ...command, validatorId: "terraform:validate" as const })),
@@ -167,7 +174,7 @@ describe("Wave 1 contracts", () => {
           false,
         );
       }
-      if (track === "terraform") {
+      if (body.commands.length > 1) {
         const reordered = { ...body, commands: [...body.commands].reverse() };
         assert.equal(
           hasValidNativeValidationReceipt(

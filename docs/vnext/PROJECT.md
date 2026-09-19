@@ -144,8 +144,10 @@ generated-tree validation reject unsuccessful, interrupted or truncated command 
 connects configured native providers to validation-task completion: fixed local commands run against isolated source
 copies, and runtime-owned digest receipts bind the accepted handoff, tree, intent and policy map. Native preview checks
 the recorded receipts; label-only adapters require explicit simulation mode. `validateTask` remains artifact staging.
-Reports label unexecuted checks simulated. These receipts prove only Bicep build or Terraform init/format/validate;
-Bicep format/lint and earlier security/policy evaluation remain open, not inferred from receipt input hashes.
+Reports label unexecuted checks simulated. Bicep receipts now require format/build/lint, with scratch-only formatting
+and byte comparison to reject drift; Terraform receipts prove init/format/validate. Real local Bicep tests cover nested
+files, formatting drift and error-level lint findings without changing accepted source. Historical build-only receipts
+must be regenerated. Earlier security/policy evaluation remains open, not inferred from receipt input hashes.
 The validation-input/verdict checkpoint passed `qualify:vnext` with 233 capability and 235 CLI tests, plus the remaining
 contract, kernel, renderer, testkit, validator and packaging suites. A subsequent focused ownership regression also
 blocks delete/replace of managed ancestors containing protected existing children, including extension resources.

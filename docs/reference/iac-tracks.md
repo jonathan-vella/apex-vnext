@@ -50,7 +50,7 @@ ownership and full AVM policy evaluation remain unsupported. No live Azure quali
 
 | Concern           | Bicep                               | Terraform                                                      |
 | ----------------- | ----------------------------------- | -------------------------------------------------------------- |
-| Validation        | `bicep build` and repository checks | `terraform init`, format, validate, and provider schema checks |
+| Validation        | Bicep format/build/lint; configured severity | `terraform init`, format, validate, and provider schema checks |
 | Preview           | Azure CLI deployment what-if        | Saved Terraform plan plus JSON rendering                       |
 | Apply             | Azure deployment create             | Apply the exact saved plan                                     |
 | Preview lifetime  | Up to the configured Bicep TTL      | Up to the shorter configured Terraform TTL                     |
@@ -65,7 +65,10 @@ recipient, generated IaC, or provider change invalidates stale proof.
 ### Native Validation Receipts
 
 With an official native provider configured, validation-task completion executes fixed local checks against an isolated
-copy of the accepted source. Bicep runs `build main.bicep --stdout`; Terraform runs `init -backend=false -input=false`,
+copy of the accepted source. Bicep runs format across `**/*.bicep`, `build main.bicep --stdout`, then lint across
+`**/*.bicep` with `--no-restore`. Formatting modifies only the scratch copy; any source-byte change fails validation
+instead of repairing the accepted source. Lint follows configured diagnostic severity; error-level findings block.
+Terraform runs `init -backend=false -input=false`,
 `fmt -check`, and `validate`. Dependency downloads may occur, but these commands do not invoke Azure deployment or
 Terraform plan/apply. Original and temporary source bytes are checked before and after commands, and temporary outputs
 are removed. Failed, interrupted, truncated or stale results cannot complete the task.
@@ -73,10 +76,11 @@ are removed. Failed, interrupted, truncated or stale results cannot complete the
 The runtime stores a digest-only receipt bound to project, run, track, handoff, tree, intent and policy-map hashes.
 Submitted evidence hashes do not replace this execution. Native preview requires the matching runtime-recorded receipt;
 historical label-only validation must be invalidated and rerun before using an official native provider. Providers
+with historical Bicep build-only receipts must likewise rerun validation to produce format/build/lint evidence. Providers
 without source-validation support must explicitly declare simulated validation to remain usable as test adapters.
 
 Validation reports distinguish `native` and `simulated` entries. Only the commands listed above are proved by these
-receipts; Bicep format/lint, security checks and policy evaluation are not proved by a command receipt. Policy-map hashes
+receipts; security checks and policy evaluation are not proved by a command receipt. Policy-map hashes
 bind inputs, not compliance outcomes. Source-bound policy-property receipts remain required at native preview for
 nonempty maps. `validateTask` still stages and checks artifacts; command execution occurs at task completion.
 

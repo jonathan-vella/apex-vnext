@@ -26,6 +26,7 @@ import {
   LocalEncryptedPlanTransport,
   NativeBicepProvider,
   NativeTerraformProvider,
+  ProcessRunner,
   nativePolicyValidationBinding,
   normalizeAzureWhatIf,
   normalizeTerraformPlan,
@@ -199,6 +200,11 @@ async function nativePolicyFixture(context: TestContext, track: "bicep" | "terra
   const runner = new FakeRunner(async (process) => {
     await source.duringCommand?.(process);
     if (process.executable === "bicep") {
+      if (process.args[0] === "format" || process.args[0] === "lint") {
+        const command = NATIVE_VALIDATION_COMMANDS.bicep.find(({ args }) => args[0] === process.args[0]);
+        assert.deepEqual(process.args, command?.args);
+        return "";
+      }
       assert.deepEqual(process.args, ["build", "main.bicep", "--stdout"]);
       if (source.compileFailed) throw new Error("compiler diagnostic containing private source");
       return json();
@@ -474,6 +480,83 @@ for (const location of ["original", "scratch"] as const) {
   });
 }
 
+test("installed Bicep validates nested formatting and lint without changing accepted source", async (context) => {
+  const runner = new ProcessRunner();
+  try {
+    await runner.run({ executable: "bicep", args: ["--version"], timeoutMs: 10_000, maxOutputBytes: 4096 });
+  } catch (error) {
+    if ((error as { code?: string }).code === "PROCESS_SPAWN_ERROR") {
+      context.skip("Bicep is not installed");
+      return;
+    }
+    throw error;
+  }
+  for (const scenario of ["pass", "format-drift", "lint-error"] as const) {
+    await context.test(scenario, async (child) => {
+      const root = await mkdtemp(join(tmpdir(), "apex-real-bicep-validation-"));
+      child.after(() => rm(root, { recursive: true, force: true }));
+      const files = [
+        { path: "main.bicep", content: "output result string = 'ok'\n" },
+        {
+          path: "modules/nested.bicep",
+          content:
+            scenario === "format-drift"
+              ? "output result string='ok'\n"
+              : scenario === "lint-error"
+                ? "param unused string = 'value'\n"
+                : "output result string = 'nested'\n",
+        },
+        {
+          path: "bicepconfig.json",
+          content: JSON.stringify({ analyzers: { core: { rules: { "no-unused-params": { level: "error" } } } } }),
+        },
+      ].sort((left, right) => left.path.localeCompare(right.path));
+      await mkdir(join(root, "modules"));
+      for (const file of files) await writeFile(join(root, file.path), file.content);
+      const calls: ProcessRequest[] = [];
+      const provider = new NativeBicepProvider({
+        runner: {
+          run: async (command) => {
+            calls.push(command);
+            return runner.run(command);
+          },
+        },
+        currentAuthority: async () => authority,
+        target: {
+          cwd: root,
+          templateFile: "main.bicep",
+          resourceGroup: "rg",
+          deploymentName: "validation",
+          stackName: "workload",
+          denySettingsMode: "denyDelete",
+        },
+      });
+      const input = {
+        projectId: "project",
+        runId: "run",
+        sourceHash: hashes.iac,
+        policyHash: hashes.policy,
+        inputHash: hashes.input,
+        generatedSource: { rootPath: root, treeHash: sha256(files) },
+      };
+      if (scenario === "pass") {
+        const receipt = await provider.validateSource(input);
+        assert.deepEqual(
+          receipt.commands.map(({ validatorId }) => validatorId),
+          ["bicep:format", "bicep:build", "bicep:lint"],
+        );
+      } else {
+        await assert.rejects(provider.validateSource(input), {
+          code: scenario === "format-drift" ? "PREVIEW_HASH_MISMATCH" : "NATIVE_VALIDATION_FAILED",
+        });
+      }
+      assert.equal(calls.length, scenario === "format-drift" ? 1 : 3);
+      for (const file of files) assert.equal(await readFile(join(root, file.path), "utf8"), file.content);
+      await assert.rejects(stat(calls[0]!.cwd!), { code: "ENOENT" });
+    });
+  }
+});
+
 test("native bicep validateSource requires the accepted main.bicep target", async (context) => {
   const fixture = await nativePolicyFixture(context, "bicep");
   await assert.rejects(
@@ -532,7 +615,15 @@ for (const track of ["bicep", "terraform"] as const) {
     assert.deepEqual(
       commands,
       track === "bicep"
-        ? [{ validatorId: "bicep:build", executable: "bicep", args: ["build", "main.bicep", "--stdout"] }]
+        ? [
+            { validatorId: "bicep:format", executable: "bicep", args: ["format", "--pattern", "**/*.bicep"] },
+            { validatorId: "bicep:build", executable: "bicep", args: ["build", "main.bicep", "--stdout"] },
+            {
+              validatorId: "bicep:lint",
+              executable: "bicep",
+              args: ["lint", "--pattern", "**/*.bicep", "--no-restore"],
+            },
+          ]
         : [
             {
               validatorId: "terraform:init-backend-false",

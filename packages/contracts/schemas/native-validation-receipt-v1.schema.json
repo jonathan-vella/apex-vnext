@@ -29,7 +29,15 @@
           "validatorId": {
             "anyOf": [
               {
+                "const": "bicep:format",
+                "type": "string"
+              },
+              {
                 "const": "bicep:build",
+                "type": "string"
+              },
+              {
+                "const": "bicep:lint",
                 "type": "string"
               },
               {

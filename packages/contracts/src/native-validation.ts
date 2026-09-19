@@ -4,7 +4,11 @@ import { ContractVersionSchema, IacToolSchema, ProjectIdSchema, RunIdSchema, Sha
 import { calculatePolicyValidationDigest } from "./policy-validation.js";
 
 export const NATIVE_VALIDATION_COMMANDS = {
-  bicep: [{ validatorId: "bicep:build", executable: "bicep", args: ["build", "main.bicep", "--stdout"] }],
+  bicep: [
+    { validatorId: "bicep:format", executable: "bicep", args: ["format", "--pattern", "**/*.bicep"] },
+    { validatorId: "bicep:build", executable: "bicep", args: ["build", "main.bicep", "--stdout"] },
+    { validatorId: "bicep:lint", executable: "bicep", args: ["lint", "--pattern", "**/*.bicep", "--no-restore"] },
+  ],
   terraform: [
     {
       validatorId: "terraform:init-backend-false",
@@ -40,7 +44,9 @@ export const NativeValidationReceiptV1Schema = Type.Object(
       Type.Object(
         {
           validatorId: Type.Union([
+            Type.Literal("bicep:format"),
             Type.Literal("bicep:build"),
+            Type.Literal("bicep:lint"),
             Type.Literal("terraform:init-backend-false"),
             Type.Literal("terraform:format"),
             Type.Literal("terraform:validate"),
