@@ -312,19 +312,19 @@ test("generators render dependencies and native existing-resource semantics", ()
   };
   const bicep = generateBicepTree(
     sourceIntent,
-    { ...binding("bicep", "native:x@y", "legacy", {}), resourceBindings },
+    { ...binding("bicep", "native:x@y", "2023-05-01", {}), resourceBindings },
     {
       existingResources: ["storage"],
     },
   );
   const terraform = generateTerraformTree(
     sourceIntent,
-    { ...binding("terraform", "native:x@y", "legacy", {}), resourceBindings },
+    { ...binding("terraform", "native:x@y", "2023-05-01", {}), resourceBindings },
     { existingResources: ["storage"] },
   );
   assert.match(bicep.files[0]!.content, /resource storage .* existing/);
-  assertExecutionAddresses(bicep, { ...binding("bicep", "native:x@y", "legacy", {}), resourceBindings });
-  assertExecutionAddresses(terraform, { ...binding("terraform", "native:x@y", "legacy", {}), resourceBindings });
+  assertExecutionAddresses(bicep, { ...binding("bicep", "native:x@y", "2023-05-01", {}), resourceBindings });
+  assertExecutionAddresses(terraform, { ...binding("terraform", "native:x@y", "2023-05-01", {}), resourceBindings });
   assert.match(terraform.files.find(({ path }) => path === "main.tf")!.content, /data "azapi_resource" "storage"/);
   assert.match(
     terraform.files.find(({ path }) => path === "main.tf")!.content,

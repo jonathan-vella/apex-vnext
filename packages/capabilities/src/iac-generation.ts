@@ -91,12 +91,9 @@ function normalizeRelativePath(value: string): string {
   return segments.join("/");
 }
 
-function parseBinding(implementation: string, declaredVersion: string): ParsedBinding {
+function parseImplementation(implementation: string): ParsedBinding {
   const native = NATIVE_IMPLEMENTATION.exec(implementation);
   if (native !== null) {
-    if (declaredVersion !== "legacy" && declaredVersion !== native[2]) {
-      throw new TypeError(`Binding version '${declaredVersion}' does not match implementation pin '${native[2]}'`);
-    }
     return { kind: "native", source: native[1]!, version: native[2]! };
   }
   const avm = AVM_IMPLEMENTATION.exec(implementation);
@@ -104,10 +101,15 @@ function parseBinding(implementation: string, declaredVersion: string): ParsedBi
   const version = avm[2]!;
   if (!EXACT_VERSION.test(version))
     throw new TypeError(`AVM implementation '${implementation}' must use an exact version`);
-  if (declaredVersion !== "legacy" && declaredVersion !== version) {
-    throw new TypeError(`Binding version '${declaredVersion}' does not match implementation pin '${version}'`);
-  }
   return { kind: "avm", source: avm[1]!, version };
+}
+
+function parseBinding(implementation: string, declaredVersion: string): ParsedBinding {
+  const parsed = parseImplementation(implementation);
+  if (declaredVersion !== parsed.version) {
+    throw new TypeError(`Binding version '${declaredVersion}' does not match implementation pin '${parsed.version}'`);
+  }
+  return parsed;
 }
 
 function resourceContexts(intent: ImplementationIntentV1, binding: IacBindingV1): ResourceContext[] {
@@ -478,7 +480,7 @@ export function generateTerraformTree(
 }
 
 function logicalImplementation(value: string): string {
-  const parsed = parseBinding(value, "legacy");
+  const parsed = parseImplementation(value);
   return `${parsed.kind}:${parsed.source}@${parsed.version}`;
 }
 

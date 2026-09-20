@@ -61,7 +61,7 @@ environments are reviewed through their manifests and lockfiles rather than as s
 
 | ID  | Anchor                                                         | Disposition                                                             | Next work package |
 | --- | -------------------------------------------------------------- | ----------------------------------------------------------------------- | ----------------- |
-| L01 | `packages/capabilities/src/iac-generation.ts` binding sentinel | Confirmed candidate for removal after caller trace                      | WP06              |
+| L01 | `packages/capabilities/src/iac-generation.ts` binding sentinel | Removed; parity parses embedded exact pins without a declared-version bypass | WP06 complete     |
 | L02 | CLI `apex promote` alias                                       | Removed; retain `project promote` and MCP `promote`                    | WP05 complete     |
 | L03 | CLI/service single-output completion                           | Removed; CLI and MCP use atomic typed output bundles                    | WP05 complete     |
 | L05 | Governance collector/importer                                  | Dirty current-only work requires review and focused qualification       | WP04              |
