@@ -1,9 +1,9 @@
 {
   "schemaVersion": "1.0.0",
-  "observationCutoff": "2026-07-13",
+  "observationCutoff": "2026-09-20",
   "supportPolicy": {
     "selection": "newest-production-supported-mutually-compatible-set-at-cutoff",
-    "node": "newest-supported-lts-patch",
+    "node": "newest-stable-current-patch",
     "npm": "newest-stable-compatible-with-selected-node",
     "typescript": "newest-stable-ga-compatible-with-selected-node-and-npm",
     "vscode": "newest-stable-release-qualified-by-manual-host-tests",
@@ -13,20 +13,20 @@
   },
   "core": {
     "node": {
-      "authoritativeSource": "https://nodejs.org/en/about/previous-releases",
-      "releaseChannel": "lts",
-      "newestObservedVersion": "24.18.0",
-      "selectedExactVersion": "24.18.0",
-      "installedVersion": "24.18.0",
-      "observedAt": "2026-07-13"
+      "authoritativeSource": "https://nodejs.org/dist/index.json",
+      "releaseChannel": "current",
+      "newestObservedVersion": "26.9.0",
+      "selectedExactVersion": "26.9.0",
+      "installedVersion": "26.9.0",
+      "observedAt": "2026-09-20"
     },
     "npm": {
       "authoritativeSource": "https://www.npmjs.com/package/npm",
       "releaseChannel": "stable",
-      "newestObservedVersion": "11.16.0",
-      "selectedExactVersion": "11.16.0",
-      "installedVersion": "11.16.0",
-      "observedAt": "2026-07-13"
+      "newestObservedVersion": "12.0.2",
+      "selectedExactVersion": "12.0.2",
+      "installedVersion": "12.0.2",
+      "observedAt": "2026-09-20"
     },
     "typescript": {
       "authoritativeSource": "https://www.npmjs.com/package/typescript",
@@ -34,28 +34,28 @@
       "newestObservedVersion": "7.0.2",
       "selectedExactVersion": "7.0.2",
       "installedVersion": "7.0.2",
-      "observedAt": "2026-07-13"
+      "observedAt": "2026-09-20"
     },
     "vscode": {
       "authoritativeSource": "https://code.visualstudio.com/updates",
       "releaseChannel": "stable",
-      "newestObservedVersion": "1.130.0",
-      "minimumSupportedVersion": "1.130.0",
-      "installedVersion": "1.130.0",
+      "newestObservedVersion": "1.138.0",
+      "minimumSupportedVersion": "1.138.0",
+      "installedVersion": "1.138.0",
       "installedCopilotChatVersion": "0.58.0",
       "historicalFixtureVersion": "1.130.0",
       "historicalFixtureCopilotChatVersion": "0.58.0",
-      "observedAt": "2026-07-28",
+      "observedAt": "2026-09-20",
       "selectionStatus": "selected-qualification-required",
       "selectionEvidence": {
         "receipt": "tools/registry/client-context-baseline-receipt.json",
         "sha256": "197cbc48abfebc3d01c8511557d7b852ed35b5169e8cb2fdcb747d1dc013f42a"
       },
       "postCutoffObservation": {
-        "version": "1.130.0",
+        "version": "1.138.0",
         "copilotChatVersion": "0.58.0",
-        "observedAt": "2026-07-27",
-        "disposition": "selected-next-candidate-input"
+        "observedAt": "2026-09-20",
+        "disposition": "selected-current-candidate"
       },
       "requiredQualification": [
         "workspace-agent-discovery",
@@ -68,22 +68,22 @@
     },
     "copilotCli": {
       "authoritativeSource": "https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli",
-      "authoritativeReleaseSource": "https://github.com/github/copilot-cli/releases/tag/v1.0.73",
+      "authoritativeReleaseSource": "https://github.com/github/copilot-cli/releases/tag/v1.0.86",
       "package": "@github/copilot",
       "releaseChannel": "stable",
-      "newestObservedVersion": "1.0.73",
-      "selectedExactVersion": "1.0.73",
-      "installedVersion": null,
-      "observedAt": "2026-07-21",
+      "newestObservedVersion": "1.0.86",
+      "selectedExactVersion": "1.0.86",
+      "installedVersion": "1.0.86",
+      "observedAt": "2026-09-20",
       "selectionStatus": "selected-qualification-required",
       "releaseArtifact": {
         "name": "copilot-linux-x64.tar.gz",
-        "sha256": "8f9bb5f7e364c267265d1e24ac2aea69ed559ddb956719c6db12a353de6c5970",
+        "sha256": "ea4a519d7b2ff54e9c7d10ae9921cf4ab3f5041489ec340852f47f4f63fc535b",
         "verification": "digest-and-version-command-pass"
       },
       "channelObservation": {
-        "githubRelease": "1.0.73",
-        "npmLatest": "1.0.71-1",
+        "githubRelease": "1.0.86",
+        "npmLatest": "1.0.86",
         "selectedSource": "github-release"
       },
       "requiredQualification": [
@@ -99,11 +99,11 @@
     }
   },
   "compatibilitySet": {
-    "node": "24.18.0",
-    "npm": "11.16.0",
+    "node": "26.9.0",
+    "npm": "12.0.2",
     "typescript": "7.0.2",
-    "minimumVscode": "1.130.0",
-    "copilotCli": "1.0.73"
+    "minimumVscode": "1.138.0",
+    "copilotCli": "1.0.86"
   },
   "clientQualificationPolicy": {
     "mode": "rolling-observed",

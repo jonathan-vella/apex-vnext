@@ -101,6 +101,30 @@ test("GitHub binary selection verifies digest and permits repeated installation"
   assert.match(bash(body, { HOME: root }).stderr, /unique stable/);
 });
 
+test("Terraform installation keeps a versioned rollback target", (context) => {
+  const root = mkdtempSync(join(tmpdir(), "apex-terraform-setup-"));
+  context.after(() => rmSync(root, { recursive: true, force: true }));
+  for (const directory of [".local/bin", "tools", "scratch", "archive"]) {
+    mkdirSync(join(root, directory), { recursive: true });
+  }
+  writeFileSync(join(root, "archive", "terraform"), "terraform fixture\n", { mode: 0o755 });
+  const archive = join(root, "terraform.zip");
+  assert.equal(
+    spawnSync("python3", ["-m", "zipfile", "-c", archive, "terraform"], { cwd: join(root, "archive") }).status,
+    0,
+  );
+  const digest = createHash("sha256").update(readFileSync(archive)).digest("hex");
+  const body = `scratch="$HOME/scratch"; tool_root="$HOME/tools"; architecture=amd64;
+    download() { case "$1" in */v1/check/terraform) printf '{"current_version":"1.16.3"}' > "$2" ;; *SHA256SUMS) printf '${digest}  terraform_1.16.3_linux_amd64.zip\\n' > "$2" ;; *) cp "$HOME/terraform.zip" "$2" ;; esac; };
+    install_terraform`;
+  const result = bash(body, { HOME: root });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    readlinkSync(join(root, ".local", "bin", "terraform")),
+    join(root, "tools", "terraform-v1.16.3", "terraform"),
+  );
+});
+
 for (const architecture of ["amd64", "arm64"]) {
   test(`azd ${architecture} archive installs its platform-named binary as azd`, (context) => {
     const root = mkdtempSync(join(tmpdir(), "apex-azd-setup-"));

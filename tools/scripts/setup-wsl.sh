@@ -92,7 +92,7 @@ install_node() {
 }
 
 install_terraform() {
-    local version archive digest
+    local version archive digest destination
     download https://checkpoint-api.hashicorp.com/v1/check/terraform "$scratch/terraform-release.json"
     version="$(jq -r '.current_version' "$scratch/terraform-release.json")"
     [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { fail 'Invalid Terraform stable version.'; return 1; }
@@ -104,7 +104,12 @@ install_terraform() {
     printf '%s  %s\n' "$digest" "$scratch/$archive" | sha256sum --check --status
     mkdir -p "$scratch/terraform"
     unzip -q "$scratch/$archive" -d "$scratch/terraform"
-    install -m 0755 "$scratch/terraform/terraform" "$HOME/.local/bin/terraform"
+    destination="$tool_root/terraform-v$version"
+    if [[ ! -d "$destination" ]]; then
+        mv "$scratch/terraform" "$destination"
+    fi
+    chmod u+x "$destination/terraform"
+    ln -sfn "$destination/terraform" "$HOME/.local/bin/terraform"
 }
 
 check_tools() {

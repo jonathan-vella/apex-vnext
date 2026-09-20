@@ -78,7 +78,7 @@ function workflowScripts(value) {
     .join("\n");
 }
 
-function validatePythonSetupAction(text) {
+function validatePythonSetupAction(text, setupAction) {
   let value;
   try {
     value = yaml.load(text);
@@ -111,7 +111,7 @@ function validatePythonSetupAction(text) {
   if (
     !exactKeys(setup, ["name", "uses", "with"]) ||
     !exactKeys(setup?.with, ["python-version", "cache"]) ||
-    setup?.uses !== "actions/setup-python@v6" ||
+    setup?.uses !== setupAction ||
     setup.with?.["python-version"] !== "3.14" ||
     setup.with?.cache !== "pip"
   ) {
@@ -127,7 +127,7 @@ function validatePythonSetupAction(text) {
   return errors;
 }
 
-function validateNodeSetupAction(text) {
+function validateNodeSetupAction(text, setupAction) {
   let value;
   try {
     value = yaml.load(text);
@@ -140,6 +140,7 @@ function validateNodeSetupAction(text) {
     : [];
   const install = dependencyInstalls[0];
   if (
+    steps?.[0]?.uses !== setupAction ||
     dependencyInstalls.length !== 1 ||
     install?.name !== "Install Node dependencies" ||
     install?.if !== "inputs.install-deps == 'true'" ||
@@ -258,12 +259,22 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
   const pythonActionPath = ".github/actions/setup-python-validation/action.yml";
   const pythonAction = localActionTexts[pythonActionPath];
   if (pythonAction !== undefined) {
-    errors.push(...validatePythonSetupAction(pythonAction).map((error) => `${pythonActionPath}: ${error}`));
+    errors.push(
+      ...validatePythonSetupAction(
+        pythonAction,
+        `actions/setup-python@${contract.actionVersions["actions/setup-python"].sha}`,
+      ).map((error) => `${pythonActionPath}: ${error}`),
+    );
   }
   const nodeActionPath = ".github/actions/setup-node-repo/action.yml";
   const nodeAction = localActionTexts[nodeActionPath];
   if (nodeAction !== undefined) {
-    errors.push(...validateNodeSetupAction(nodeAction).map((error) => `${nodeActionPath}: ${error}`));
+    errors.push(
+      ...validateNodeSetupAction(
+        nodeAction,
+        `actions/setup-node@${contract.actionVersions["actions/setup-node"].sha}`,
+      ).map((error) => `${nodeActionPath}: ${error}`),
+    );
   }
 
   const values = new Map();
