@@ -449,8 +449,8 @@ does not become the default for other workloads. Human quality review complement
 
 ## Non-Functional Requirements
 
-- **Compatibility:** Supported vNext contracts, installation upgrades and persisted state retain explicit version and
-  migration guarantees. Unsupported state is rejected with actionable diagnostics.
+- **Current contracts:** Supported vNext contracts and installation upgrades are exact-versioned. Unsupported state is
+  rejected without mutation; users start a current run rather than receiving an implicit migration.
 - **Security:** Kernel authorization and deterministic validators fail closed on missing, stale, malformed, secret-bearing,
   or substituted state.
 - **Reliability:** Runs survive restart at each gate, reject stale writers, reconcile partial commits, and retain evidence.
@@ -461,8 +461,8 @@ does not become the default for other workloads. Human quality review complement
 - **Accessibility:** User-facing CLI and documentation provide clear text status, actionable diagnostics, and no
   color-only meaning.
 - **Privacy:** Telemetry is separate, optional, exportable, and deletable; raw chat history is never scraped or replayed.
-- **Maintainability:** Repository guidance and automation have one canonical owner per concern; generated views and
-  compatibility aliases are validated derivatives rather than parallel editable sources. Managed skills and
+- **Maintainability:** Repository guidance and automation have one canonical owner per concern; generated views are
+  validated derivatives rather than parallel editable sources. Managed skills and
   instructions use progressive disclosure without removing required domain capability.
 
 ## Exclusions

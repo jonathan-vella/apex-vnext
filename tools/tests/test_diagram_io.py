@@ -52,9 +52,7 @@ def test_diagram_kwargs_rejects_known_extension(diagram_io):
 
 
 def test_diagram_kwargs_overrides_win(diagram_io):
-    kw = diagram_io.diagram_kwargs(
-        "04-x", direction="LR", graph_attr={"dpi": "150"}, show=True
-    )
+    kw = diagram_io.diagram_kwargs("04-x", direction="LR", graph_attr={"dpi": "150"}, show=True)
     assert kw["direction"] == "LR"
     assert kw["graph_attr"] == {"dpi": "150"}
     assert kw["show"] is True

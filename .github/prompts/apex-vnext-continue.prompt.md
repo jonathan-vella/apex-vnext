@@ -113,7 +113,7 @@ For every slice:
 2. Make the smallest grounded edit that advances the issue.
 3. Immediately run the narrowest executable validation for the touched behavior.
 4. Repair locally and rerun the same check when a failure supports the hypothesis.
-5. Preserve compatibility aliases until their documented removal gates pass.
+5. Remove obsolete aliases once their current replacement and rejection coverage are verified.
 6. Do not weaken tests, checks, diagnostics, permissions, or release gates to obtain a green result.
 7. Keep secrets, raw chat history, credentials, and unredacted command output out of tracked files and GitHub comments.
 8. Update affected documentation, the register, and the decision index as part of the same slice.

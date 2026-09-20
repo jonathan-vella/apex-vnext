@@ -3,7 +3,7 @@
 // render-headings-summary.mjs
 //
 // Generates the runtime heading module and compact JSON summary from canonical
-// artifact templates. The public command name is retained for compatibility.
+// artifact templates. The public command is the canonical headings-summary entry point.
 //
 // Idempotent: re-running with no source change produces identical bytes.
 

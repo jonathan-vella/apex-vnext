@@ -91,7 +91,7 @@ every property below in the Code-Generation Contract:
 | `schedule.startDate` | ISO 8601 UTC midnight, e.g. `2026-05-17T00:00:00Z`. Must be present at deploy time.                                                                                                                      |
 | `schedule.endDate`   | ISO 8601 UTC midnight, **≤ 365 days** after startDate. The API rejects ranges > 1 year.                                                                                                                  |
 | `notification.to`    | Array of email addresses; CodeGen sources from `cost_alert_emails`.                                                                                                                                      |
-| `notificationEmail`  | The ARM-level sender field; freeze as `senderEmail` param even when `notification.to` is set. Both are required for legacy deployments.                                                                  |
+| `notificationEmail`  | The ARM-level sender field; freeze as `senderEmail` even when `notification.to` is set. The current API requires both fields.                                                                            |
 
 ### Module placement (Bicep)
 
