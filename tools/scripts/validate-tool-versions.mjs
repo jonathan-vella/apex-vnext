@@ -4,12 +4,11 @@
  *
  * Asserts the dev container + CI environment runs the minimum required
  * versions of bicep, terraform, az, and node. Mismatches block
- * Step 5 validation/Step 6 deploy because earlier versions miss the
- * built-in diagnostics path (bicep ≥ 0.21.0 for readEnvironmentVariable)
- * and AVM-TF v0.3+ semantics.
+ * Step 5 validation/Step 6 deploy because older versions do not satisfy
+ * the repository's selected runtime and IaC contracts.
  *
- * Pins are sourced from tools/registry/tool-version-pins.json (created
- * if missing with sane defaults). CI invokes this validator before any
+ * Pins are sourced only from tools/registry/tool-version-pins.json. A
+ * missing registry fails closed. CI invokes this validator before any
  * other Step 5/6 check.
  *
  * Usage:
@@ -25,24 +24,6 @@ import { Reporter } from "./_lib/reporter.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PINS_PATH = path.join(ROOT, "tools/registry/tool-version-pins.json");
-
-const DEFAULT_PINS = {
-  $schema: "https://json-schema.org/draft/2020-12/schema",
-  description:
-    "Minimum tool versions required by the APEX Step 5 validate gate and Step 6 deploy. Bump pins via PR with rationale.",
-  pins: {
-    bicep: { min: "0.21.0", check_cmd: "bicep --version", parser: "bicep" },
-    terraform: { min: "1.6.0", check_cmd: "terraform version -json", parser: "terraform-json" },
-    az: { min: "2.55.0", check_cmd: "az version --output json", parser: "az-json" },
-    node: { min: "24.0.0", check_cmd: "node --version", parser: "node" },
-  },
-};
-
-function ensureDefaultPins() {
-  if (fs.existsSync(PINS_PATH)) return;
-  fs.mkdirSync(path.dirname(PINS_PATH), { recursive: true });
-  fs.writeFileSync(PINS_PATH, `${JSON.stringify(DEFAULT_PINS, null, 2)}\n`);
-}
 
 function parseSemver(s) {
   const m = s.match(/(\d+)\.(\d+)\.(\d+)/);
@@ -94,8 +75,13 @@ function runVersion(cmd, parser) {
 function main() {
   const r = new Reporter("Tool Version Pin Validator");
   r.header();
-  ensureDefaultPins();
   const json = process.argv.includes("--json");
+  if (!fs.existsSync(PINS_PATH)) {
+    r.error("registry", "tools/registry/tool-version-pins.json is required");
+    r.summary();
+    r.exitOnError("Tool versions satisfy pins");
+    return;
+  }
   const pins = JSON.parse(fs.readFileSync(PINS_PATH, "utf-8")).pins ?? {};
   const findings = [];
 

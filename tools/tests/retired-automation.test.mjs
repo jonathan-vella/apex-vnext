@@ -148,6 +148,20 @@ test("consumer Node prerequisites match the canonical tool pin", () => {
   assert.doesNotMatch(service, /Node(?:\.js)? 24 or (?:later|newer)/u);
 });
 
+test("IaC handoff and validator use only canonical tool pins", () => {
+  const pins = JSON.parse(readFileSync("tools/registry/tool-version-pins.json", "utf8")).pins;
+  const handoff = JSON.parse(
+    readFileSync(".github/skills/azure-artifacts/templates/05-iac-handoff.template.json", "utf8"),
+  );
+  assert.deepEqual(handoff.validation_summary.tool_versions, {
+    bicep: pins.bicep.min,
+    az: pins.az.min,
+  });
+  const validator = readFileSync("tools/scripts/validate-tool-versions.mjs", "utf8");
+  assert.doesNotMatch(validator, /DEFAULT_PINS|ensureDefaultPins|writeFileSync\(PINS_PATH/u);
+  assert.match(validator, /tool-version-pins\.json is required/u);
+});
+
 test("WSL editor validation retains settings, discovery and exact extension guards", () => {
   const settings = JSON.parse(readFileSync(".vscode/settings.json", "utf8"));
   const extensions = JSON.parse(readFileSync(".vscode/extensions.json", "utf8")).recommendations;
