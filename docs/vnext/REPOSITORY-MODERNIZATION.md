@@ -68,7 +68,7 @@ environments are reviewed through their manifests and lockfiles rather than as s
 | L07 | Policy-precheck validator and tests                            | Preserve current v2 rejection coverage; inspect redundant wrappers only | WP03/WP07         |
 | L12 | Docker debug compose and scripts                               | Removed; host Azure CLI receiver and privacy tests retained              | WP08 complete     |
 | L13 | `apex-recall` generated or environment residue                 | Confirm ownership before removal                                        | WP07              |
-| L19 | Functions recipe materialization                               | Retire unavailable executable scaffolding; retain one backlog item      | WP08              |
+| L19 | Functions recipe materialization                               | Removed unavailable pack and templates; retained assessment/backlog guidance | WP08 complete     |
 | L21 | `validate:terraform` failure swallowing                        | Repaired and regression-tested; real cache error now fails truthfully   | WP03              |
 | L23 | Toolchain pins and CI metadata                                 | Freeze exact selections before upgrades                                 | WP02              |
 

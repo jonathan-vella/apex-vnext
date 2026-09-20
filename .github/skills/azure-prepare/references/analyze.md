@@ -96,8 +96,8 @@ Converting an existing application to run on Azure.
 
 **If the target compute is Azure Functions**, you MUST load the composition algorithm before generating ANY infrastructure:
 
-1. Load `services/functions/templates/selection.md` — decision tree for base template + recipe
-2. Load `services/functions/templates/recipes/composition.md` — the exact algorithm to follow
+1. Load `services/functions/README.md` — current hosting, trigger, identity, and observability assessment guidance
+2. Record implementation materialization as a future backlog item; do not compose or publish an unavailable template
 3. Use `azd init -t <template>` to generate proven IaC — **NEVER hand-write Bicep/Terraform**
 
 > ⚠️ **Critical**: The Functions `bicep.md` and `terraform.md` files are **REFERENCE DOCUMENTATION**, not templates to copy. Hand-writing infrastructure from these patterns results in missing RBAC, incorrect managed identity configuration, and security vulnerabilities.

@@ -80,7 +80,7 @@ Invoke related skills for specialized scenarios:
 | Scenario                                        | Action                                                                                                                                                                              |
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Migrating AWS Lambda / cross-cloud workload** | **Invoke `azure-cloud-migrate`** (assessment + code conversion, then resume azure-prepare)                                                                                          |
-| Using Azure Functions                           | Stay in **azure-prepare** — load [selection.md](services/functions/templates/selection.md) → Follow [composition.md](services/functions/templates/recipes/composition.md) algorithm |
+| Using Azure Functions                           | Stay in **azure-prepare** — assess with [Functions guidance](services/functions/README.md) and record unavailable materialization as backlog |
 | PostgreSQL with passwordless auth               | Handle directly without a separate skill                                                                                                                                            |
 | Need detailed security hardening                | `azure-security-hardening`                                                                                                                                                          |
 | Setting up App Insights instrumentation         | `appinsights-instrumentation`                                                                                                                                                       |
@@ -91,9 +91,9 @@ Invoke related skills for specialized scenarios:
 
 For **Azure Functions**:
 
-1. Load: [selection.md](services/functions/templates/selection.md) (decision tree)
-2. Follow: [composition.md](services/functions/templates/recipes/composition.md) (algorithm)
-3. Result: Base template + recipe composition (never synthesize IaC)
+1. Load: [Functions guidance](services/functions/README.md)
+2. Assess: trigger, hosting, identity, network, data, and observability requirements
+3. Result: a bounded assessment and future materialization backlog item; do not synthesize unavailable recipes
 
 For **PostgreSQL**:
 

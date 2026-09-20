@@ -6,8 +6,7 @@
 > **You MUST use the composition algorithm** to generate infrastructure:
 >
 > 1. Load `templates/selection.md` to choose the correct base template
-> 2. Follow `templates/recipes/composition.md` for the exact algorithm
-> 3. Run `azd init -t functions-quickstart-dotnet-azd-tf` to get the proven Terraform base, then adjust runtime/language per the composition recipes
+> 2. Record implementation materialization as a future backlog item; this guidance does not provide templates
 >
 > Hand-writing Terraform from these patterns will result in missing RBAC, incorrect managed identity configuration, and security vulnerabilities.
 

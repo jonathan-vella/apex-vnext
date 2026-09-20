@@ -6,10 +6,8 @@ Serverless compute for event-driven workloads, APIs, and scheduled tasks.
 >
 > **NEVER synthesize Bicep or Terraform from scratch for Azure Functions.**
 >
-> You MUST follow the base + recipe composition workflow:
->
-> 1. Load [selection.md](templates/selection.md) — decision tree for choosing base template + recipe
-> 2. Follow [composition.md](templates/recipes/composition.md) — the algorithm for fetching and composing
+> Template materialization is unavailable. Use this reference for bounded assessment only and record any implementation
+> work as a future backlog item.
 >
 > This ensures proven IaC patterns, correct RBAC, and Flex Consumption defaults.
 
@@ -83,8 +81,6 @@ services:
 
 ## References
 
-- **[Selection Guide](templates/selection.md)** — Start here: decision tree for base + recipe
-- **[Composition Algorithm](templates/recipes/composition.md)** — How to fetch and compose templates
 - [AZD Templates](templates/README.md) — Template overview
 - [Bicep Patterns](bicep.md)
 - [Terraform Patterns](terraform.md)
