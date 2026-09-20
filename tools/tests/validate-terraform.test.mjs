@@ -21,8 +21,8 @@ test("skips empty directories and reports every failed Terraform stage", async (
   try {
     const failures = await validateTerraformRoots({
       root,
-      run: async (cwd, args) => {
-        calls.push({ cwd, args });
+      run: async (cwd, args, options) => {
+        calls.push({ cwd, args, options });
         if (cwd.endsWith("invalid") && args[0] === "init") return { code: 1, signal: null };
         return { code: 0, signal: null };
       },
@@ -36,6 +36,7 @@ test("skips empty directories and reports every failed Terraform stage", async (
         ["valid", "validate"],
       ],
     );
+    assert.ok(calls.every(({ options }) => options.env.TF_DATA_DIR.includes("apex-terraform-data-")));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

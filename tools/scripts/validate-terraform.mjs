@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 
-import { readdir } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { spawn } from "node:child_process";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-function runTerraform(cwd, args) {
+function runTerraform(cwd, args, options = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn("terraform", args, { cwd, stdio: "inherit" });
+    const child = spawn("terraform", args, { cwd, stdio: "inherit", ...options });
     child.once("error", reject);
     child.once("exit", (code, signal) => resolve({ code, signal }));
   });
@@ -20,13 +21,19 @@ export async function validateTerraformRoots({ root = "infra/terraform", run = r
   for (const cwd of roots.sort()) {
     try {
       if (!(await readdir(cwd)).includes("main.tf")) continue;
-      const init = await run(cwd, ["init", "-backend=false", "-input=false"]);
-      if (init.code !== 0 || init.signal !== null) {
-        results.push({ cwd, stage: "init", ...init });
-        continue;
+      const dataDirectory = await mkdtemp(join(tmpdir(), "apex-terraform-data-"));
+      try {
+        const options = { env: { ...process.env, TF_DATA_DIR: dataDirectory } };
+        const init = await run(cwd, ["init", "-backend=false", "-input=false"], options);
+        if (init.code !== 0 || init.signal !== null) {
+          results.push({ cwd, stage: "init", ...init });
+          continue;
+        }
+        const validate = await run(cwd, ["validate"], options);
+        if (validate.code !== 0 || validate.signal !== null) results.push({ cwd, stage: "validate", ...validate });
+      } finally {
+        await rm(dataDirectory, { recursive: true, force: true });
       }
-      const validate = await run(cwd, ["validate"]);
-      if (validate.code !== 0 || validate.signal !== null) results.push({ cwd, stage: "validate", ...validate });
     } catch (error) {
       if (error?.code === "ENOENT") continue;
       results.push({ cwd, stage: "init", error });
