@@ -201,7 +201,7 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
           composition: "client-projections",
           clientId: client,
           target,
-          adapterVersion: "1.1.0",
+          adapterVersion: "1.2.0",
           sourcePath: target,
           sourceHash: sha256Bytes(content),
           ...(agent
@@ -333,7 +333,7 @@ test("rejects client projection digest and declaration drift after aggregate reb
   const adapterDrift = structuredClone(manifest);
   adapterDrift.files.find(
     ({ source }) => source.kind === "generated" && source.composition === "client-projections",
-  )!.source.adapterVersion = "1.0.0";
+  )!.source.adapterVersion = "1.1.0";
   adapterDrift.lock.digest = bundleLockDigest(adapterDrift);
   await assert.rejects(
     verifyBundledAssetManifest(root, adapterDrift),

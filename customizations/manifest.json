@@ -181,7 +181,7 @@
       "role": "coordinator",
       "supportedTargets": ["vscode", "github-copilot"],
       "interactionType": "interactive-handoff",
-      "model": "MAI-Code-1.1-Flash",
+      "model": "MAI-Code-1.1-Flash (copilot)",
       "costTier": "fast"
     },
     {

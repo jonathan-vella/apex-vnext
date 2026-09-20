@@ -11,7 +11,7 @@ const repositoryRoot = resolve(packageRoot, "../..");
 const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
-const CLIENT_ADAPTER_VERSION = "1.1.0";
+const CLIENT_ADAPTER_VERSION = "1.2.0";
 export const GENERATED_SHARED_FILES = [
   ".github/workflows/governance-policy-baseline.yml",
   "tools/scripts/collect-governance-baseline.ps1",
@@ -65,6 +65,13 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
   const { frontmatter, body } = parseAgentSource(source);
   if ("target" in frontmatter) throw new Error("Shared agent source must not declare target");
   if (clientId === "github-copilot-vscode") {
+    if (
+      Array.isArray(frontmatter.model) &&
+      frontmatter.model.length === 1 &&
+      frontmatter.model[0] === "MAI-Code-1.1-Flash (copilot)"
+    ) {
+      frontmatter.model = frontmatter.model[0];
+    }
     const mechanics = [
       frontmatter.name === "APEX"
         ? "For requirements intake, present the declared Gather requirements handoff to `APEX Requirements` and stop for the user's interactive transition. State the user's scope and stop point beside the handoff; do not ask a role-selection question when the kernel has selected the owner. If unavailable, ask the user to select `APEX Requirements`. Use `vscode/askQuestions` only for project lifecycle or routing choices, never intake."
@@ -114,7 +121,7 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
     name: frontmatter.name,
     description: frontmatter.description,
     target: "github-copilot",
-    model,
+    model: model === "MAI-Code-1.1-Flash (copilot)" ? "mai-code-1.1-flash" : model,
     "user-invocable": frontmatter["user-invocable"] ?? true,
     "disable-model-invocation": frontmatter["disable-model-invocation"] ?? frontmatter["user-invocable"] === false,
     tools,

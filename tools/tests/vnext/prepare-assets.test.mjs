@@ -667,6 +667,19 @@ test("asset generator rejects unsafe projection roots before generation", () => 
   }
 });
 
+test("APEX projections use exact client-specific MAI model identifiers", async () => {
+  const source = await readFile(join(root, "customizations/.github/agents/apex.agent.md"), "utf8");
+  const inventory = JSON.parse(await readFile(join(root, "tools/registry/copilot-cli-agent-tools.json"), "utf8"));
+  for (const [client, expectedModel] of [
+    ["github-copilot-vscode", "MAI-Code-1.1-Flash (copilot)"],
+    ["github-copilot-cli", "mai-code-1.1-flash"],
+  ]) {
+    const rendered = renderClientAgentProjection(source, client, inventory, { delegates: false });
+    const frontmatter = load(/^---\n([\s\S]*?)\n---/u.exec(rendered)[1]);
+    assert.equal(frontmatter.model, expectedModel);
+  }
+});
+
 test("CLI interactive handoffs do not grant background task delegation", () => {
   const coordinator = { agent: "APEX", supportedTargets: ["vscode", "github-copilot"] };
   const requirements = { agent: "APEX Requirements", supportedTargets: ["vscode", "github-copilot"] };
@@ -680,7 +693,7 @@ test("CLI interactive handoffs do not grant background task delegation", () => {
   const source = `---
 name: APEX
 description: Coordinate workflow.
-model: ["MAI-Code-1.1-Flash"]
+model: MAI-Code-1.1-Flash (copilot)
 user-invocable: true
 tools:
   - vscode/askQuestions
