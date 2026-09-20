@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import {
   buildOptimizationClientPreflight,
@@ -65,6 +67,40 @@ test("preflight schema rejects incomplete client coverage and reports unavailabl
   const incomplete = structuredClone(receipt);
   incomplete.clients = [incomplete.clients[0]];
   assert.ok(validateOptimizationClientPreflight(incomplete, schema).length > 0);
+});
+
+test("preflight detects host-bundled Copilot Chat when extension inventory omits built-ins", (context) => {
+  const home = mkdtempSync(join(tmpdir(), "apex-client-preflight-"));
+  context.after(() => rmSync(home, { recursive: true, force: true }));
+  const commit = "a".repeat(40);
+  const manifestDirectory = join(home, ".vscode-server", "bin", commit, "extensions", "copilot");
+  mkdirSync(manifestDirectory, { recursive: true });
+  writeFileSync(
+    join(manifestDirectory, "package.json"),
+    `${JSON.stringify({
+      name: "copilot-chat",
+      publisher: "GitHub",
+      version: toolchain.core.vscode.installedCopilotChatVersion,
+      engines: { vscode: `^${toolchain.core.vscode.minimumSupportedVersion}` },
+    })}\n`,
+  );
+  const run = commandRun({
+    "git rev-parse HEAD": `${gate.candidate.commit}\n`,
+    "git rev-parse HEAD^{tree}": `${gate.candidate.tree}\n`,
+    "git status --porcelain --untracked-files=no": "",
+    "code --version": `${toolchain.core.vscode.minimumSupportedVersion}\n${commit}\nx64\n`,
+    "code --list-extensions --show-versions": "example.other@1.0.0\n",
+    "copilot --version": `${toolchain.core.copilotCli.selectedExactVersion}\n`,
+  });
+  const receipt = buildOptimizationClientPreflight({ gate, toolchain, run, home });
+  assert.equal(receipt.status, "ready");
+  assert.equal(receipt.clients[0].observedExtensionVersion, toolchain.core.vscode.installedCopilotChatVersion);
+
+  writeFileSync(
+    join(manifestDirectory, "package.json"),
+    `${JSON.stringify({ name: "copilot-chat", publisher: "Other", version: "0.66.0" })}\n`,
+  );
+  assert.throws(() => buildOptimizationClientPreflight({ gate, toolchain, run, home }), /manifest is invalid/u);
 });
 
 test("preflight accepts newer VS Code and records the observed Copilot Chat version", () => {
