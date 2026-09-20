@@ -60,7 +60,7 @@ GitHub account for agent-led onboarding.
 
 ## Install Node.js And npm
 
-Install Node.js 24 or later. The Node Version Manager keeps the Linux runtime independent of Windows:
+Install Node.js 26.9.0 or later. The Node Version Manager keeps the Linux runtime independent of Windows:
 
 ```bash
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash

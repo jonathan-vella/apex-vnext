@@ -25,6 +25,9 @@ any artifacts until the plan is approved.
 
 > **❌ STOP** — do NOT proceed to Phase 2 until the user approves the plan.
 
+Azure Functions is an earlier stop condition: complete assessment, record unavailable materialization as a blocked
+future backlog item, and stop before recipe selection. Approval does not authorize Phase 2 for that workload.
+
 ## Phase 2: Execution (Only After Plan Approval)
 
 Update `infra/{iac}/{project}/.azure/plan.md` status after each step.

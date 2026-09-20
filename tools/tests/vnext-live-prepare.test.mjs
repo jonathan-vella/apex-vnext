@@ -15,6 +15,7 @@ import {
 const ROOT = resolve(import.meta.dirname, "../..");
 const CANDIDATE_SHA = "a".repeat(40);
 const SUBSCRIPTION = "b47d2942-f5ad-4d3c-b28e-c23e4f83d97e";
+const TOOL_PINS = JSON.parse(readFileSync(join(ROOT, "tools/registry/tool-version-pins.json"), "utf8")).pins;
 const GOVERNANCE_DISCOVERED_AT = JSON.parse(
   readFileSync(join(ROOT, "agent-output/vnext-qualification/04-governance-constraints.json"), "utf8"),
 ).discovered_at;
@@ -134,6 +135,7 @@ for (const track of ["bicep", "terraform"]) {
     assert.equal(artifacts.intent.resources[0].id, "qualification-storage");
     assert.equal(artifacts.binding.track, track);
     assert.match(artifacts.handoff.treeHash, /^[0-9a-f]{64}$/);
+    assert.deepEqual(artifacts.handoff.requiredToolVersions, { [track]: TOOL_PINS[track].min });
     assert.match(artifacts.governanceArtifact.constraintsRef.digest, /^[0-9a-f]{64}$/);
     assert.equal(artifacts.governanceArtifact.targetScope, `${artifacts.targetScope}`);
   });

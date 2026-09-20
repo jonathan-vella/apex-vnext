@@ -11,7 +11,7 @@ The fake provider is not evidence of either an ALZ-backed or standalone Azure de
 
 ## Prerequisites
 
-- Node.js 24 or newer
+- Node.js 26.9.0 or newer
 - npm compatible with the selected Node release
 - Git
 - a clean directory outside the APEX source repository

@@ -44,7 +44,6 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 - `project search`
 - `project show`
 - `project use`
-- `promote`
 - `provider transfer-export`
 - `provider transfer-import`
 - `quality decide`

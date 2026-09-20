@@ -162,13 +162,29 @@ test("rejects Python validation setup weakening and caller removal", () => {
     assert.ok(errors.some((error) => error.startsWith(`${actionPath}: `) && error.includes(expected)));
   }
 
-  for (const path of [".github/workflows/publish-npm.yml"]) {
+  for (const path of [".github/workflows/ci.yml", ".github/workflows/publish-npm.yml"]) {
     const texts = mutate(
       path,
       "      - name: Setup Python validation\n        uses: ./.github/actions/setup-python-validation\n",
       "",
     );
     assert.ok(validate(texts).some((error) => error.includes("complete job contract drift")));
+  }
+});
+
+test("rejects protected Python lane and canonical Terraform pin drift", () => {
+  const ciPath = ".github/workflows/ci.yml";
+  const withoutPythonTests = mutate(ciPath, "      - name: Test Python\n        run: npm run test:python\n\n", "");
+  assert.ok(
+    validate(withoutPythonTests, rebaseline(ciPath, withoutPythonTests)).includes(
+      "ci workflow must retain pinned Python lint and test coverage",
+    ),
+  );
+
+  for (const path of [".github/workflows/publish-npm.yml", ".github/workflows/vnext-live-qualification.yml"]) {
+    const staleTerraform = mutate(path, "          terraform_version: 1.16.3", "          terraform_version: 1.15.8");
+    const errors = validate(staleTerraform, rebaseline(path, staleTerraform));
+    assert.ok(errors.some((error) => error.includes("must install the canonical Terraform version")));
   }
 });
 

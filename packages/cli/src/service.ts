@@ -143,7 +143,7 @@ import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from "n
 import { resolveBundledAssets, type BundledClientProjection } from "./assets.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
 import { ApexError, EXIT_CODES } from "./errors.js";
-import { APEX_VERSION } from "./version.js";
+import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "./version.js";
 import {
   registerWorkflowValidators,
   resolveNativeBicepResourceOwnership,
@@ -4636,9 +4636,9 @@ export class ApexService {
     const checks: DoctorCheck[] = [
       {
         id: "node",
-        ok: Number(process.versions.node.split(".")[0]) >= 24,
+        ok: meetsMinimumVersion(process.versions.node, MINIMUM_NODE_VERSION),
         value: process.versions.node,
-        remedy: "Install Node.js 24 or newer",
+        remedy: `Install Node.js ${MINIMUM_NODE_VERSION} or newer`,
       },
       { id: "workspace", ok: await this.exists(this.root), value: this.root, remedy: "Restore the workspace root" },
       { id: "apex", ok: apexExists, value: join(this.root, ".apex"), remedy: "Run apex init" },

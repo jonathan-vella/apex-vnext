@@ -115,10 +115,10 @@ Add research findings to `infra/{iac}/{project}/.azure/plan.md` under a `## Rese
 
 ### Serverless Event-Driven
 
-1. Load: [services/functions/README.md](services/functions/README.md) (contains mandatory composition workflow)
+1. Load: [services/functions/README.md](services/functions/README.md) and stop at the documented assessment boundary
 2. Load: [services/event-grid/README.md](services/event-grid/README.md) or [services/service-bus/README.md](services/service-bus/README.md) (if using messaging)
 3. Load: [services/storage/README.md](services/storage/README.md) (if using queues/blobs)
-4. Invoke: `azure-observability` (distributed tracing)
+4. Record materialization as blocked future work; do not generate or deploy Functions infrastructure
 
 ### AI Application
 

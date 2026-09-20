@@ -10,6 +10,7 @@ import { reportRegistryValidation, requestedReportFormat } from "./_lib/registry
 const CONTRACT_PATH = "tools/registry/github-workflow-contract.json";
 const SCHEMA_PATH = "tools/registry/schemas/github-workflow-contract.schema.json";
 const WORKFLOW_DIRECTORY = ".github/workflows";
+const TOOL_VERSION_PINS = JSON.parse(readFileSync("tools/registry/tool-version-pins.json", "utf8")).pins;
 
 export const EXPECTED_REQUIRED_CONTEXTS = ["ci", "CodeQL"];
 
@@ -363,6 +364,31 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
   const ci = values.get("ci");
   if (ci?.jobs?.ci?.name !== "ci" || Object.keys(ci?.jobs ?? {}).join() !== "ci") {
     errors.push("ci workflow must preserve the required vNext job without retired external jobs");
+  }
+  const ciSteps = Array.isArray(ci?.jobs?.ci?.steps) ? ci.jobs.ci.steps : [];
+  const pythonSetup = ciSteps.filter((step) => step?.uses === "./.github/actions/setup-python-validation");
+  const pythonCommands = ciSteps.filter((step) => ["npm run lint:python", "npm run test:python"].includes(step?.run));
+  if (pythonSetup.length !== 1 || pythonCommands.length !== 2) {
+    errors.push("ci workflow must retain pinned Python lint and test coverage");
+  }
+
+  for (const [workflowId, jobId] of [
+    ["publish-npm", "publish"],
+    ["vnext-live-qualification", "apply"],
+  ]) {
+    const steps = values.get(workflowId)?.jobs?.[jobId]?.steps;
+    const terraformSetup = Array.isArray(steps)
+      ? steps.filter(
+          (step) =>
+            step?.uses === `hashicorp/setup-terraform@${contract.actionVersions["hashicorp/setup-terraform"].sha}`,
+        )
+      : [];
+    if (
+      terraformSetup.length !== 1 ||
+      String(terraformSetup[0]?.with?.terraform_version ?? "") !== TOOL_VERSION_PINS.terraform.min
+    ) {
+      errors.push(`${workflowId} must install the canonical Terraform version`);
+    }
   }
 
   const release = values.get("release-candidate-qualification");

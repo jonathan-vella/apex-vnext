@@ -32,6 +32,9 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-repo
 
+      - name: Setup Python validation
+        uses: ./.github/actions/setup-python-validation
+
       - name: Install bats
         run: sudo apt-get install -y bats
 
@@ -40,6 +43,12 @@ jobs:
 
       - name: Check formatting (Prettier)
         run: npm run format:check
+
+      - name: Lint Python (ruff)
+        run: npm run lint:python
+
+      - name: Test Python
+        run: npm run test:python
 
       - name: Verify Azure MCP beta freshness
         run: npm run validate:azure-mcp-latest

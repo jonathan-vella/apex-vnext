@@ -49,7 +49,7 @@ from the Command Palette before retrying.
 
 ## Install Node.js
 
-Install Node.js 24 or later in Ubuntu. The Linux runtime is separate from any Node.js installation on Windows:
+Install Node.js 26.9.0 or later in Ubuntu. The Linux runtime is separate from any Node.js installation on Windows:
 
 ```bash
 NVM_VERSION=v0.40.1

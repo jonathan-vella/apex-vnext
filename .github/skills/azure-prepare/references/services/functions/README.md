@@ -2,14 +2,11 @@
 
 Serverless compute for event-driven workloads, APIs, and scheduled tasks.
 
-> **⚠️ MANDATORY: Use Composition Algorithm**
+> **Assessment-only boundary**
 >
-> **NEVER synthesize Bicep or Terraform from scratch for Azure Functions.**
->
-> Template materialization is unavailable. Use this reference for bounded assessment only and record any implementation
-> work as a future backlog item.
->
-> This ensures proven IaC patterns, correct RBAC, and Flex Consumption defaults.
+> Azure Functions materialization is unavailable. Assess the workload, record the selected hosting and supporting
+> resource requirements, then create a blocked future backlog item. Do not select templates, generate infrastructure,
+> run deployment initialization, or mark the plan ready for validation.
 
 ## When to Use
 
@@ -41,7 +38,7 @@ services:
 
 ## Hosting Plans
 
-**Use Flex Consumption for new deployments** (all AZD templates default to Flex).
+Prefer Flex Consumption when a future reviewed materialization capability becomes available.
 
 | Plan                    | Use Case                               | Scaling                 | VNET |
 | ----------------------- | -------------------------------------- | ----------------------- | ---- |
@@ -81,9 +78,8 @@ services:
 
 ## References
 
-- [AZD Templates](templates/README.md) — Template overview
-- [Bicep Patterns](bicep.md)
-- [Terraform Patterns](terraform.md)
+- [Bicep assessment patterns](bicep.md)
+- [Terraform assessment patterns](terraform.md)
 - [Trigger Types](triggers.md)
 - [Durable Functions](durable.md)
 - [Aspire + Container Apps](aspire-containerapps.md)

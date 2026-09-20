@@ -201,7 +201,7 @@ test("rejects runtime-invalid selector and documentation values", async () => {
 
 test("treats a valid provider-free root as an empty installed schema set", async () => {
   const result = await new TerraformProviderIntrospection({
-    runner: new FixtureRunner({ format_version: "1.0" }, { terraform_version: "1.15.8", provider_selections: {} }),
+    runner: new FixtureRunner({ format_version: "1.0" }, { terraform_version: "1.16.3", provider_selections: {} }),
   }).inspect("/iac");
   assert.equal(result.status, "ok");
   if (result.status === "ok") assert.deepEqual(result.value.providers, []);

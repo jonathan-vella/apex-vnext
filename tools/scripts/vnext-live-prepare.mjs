@@ -201,6 +201,11 @@ function validationEntry(kind, value) {
 
 export async function buildQualificationArtifacts({ root, track, subscription, runId, now, availability }) {
   const tree = await sourceTree(root, track);
+  const toolPins = JSON.parse(await readFile(join(root, "tools/registry/tool-version-pins.json"), "utf8")).pins;
+  const requiredToolVersion = toolPins?.[track]?.min;
+  if (typeof requiredToolVersion !== "string" || !/^\d+\.\d+\.\d+$/u.test(requiredToolVersion)) {
+    throw new Error(`Missing canonical ${track} tool version pin`);
+  }
   const governancePath = join(root, "agent-output/vnext-qualification/04-governance-constraints.json");
   const governanceBytes = await readFile(governancePath);
   const governance = JSON.parse(governanceBytes.toString("utf8"));
@@ -466,7 +471,7 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
     bindingHash: sha256Json(binding),
     environmentInputsHash: sha256Json(environmentInputs),
     logicalResourceManifestHash: sha256Json(logicalManifest),
-    requiredToolVersions: { [track]: track === "bicep" ? "0.45.6" : "1.15.8" },
+    requiredToolVersions: { [track]: requiredToolVersion },
     generatedAt: now,
   };
   return {

@@ -111,6 +111,43 @@ test("retired automation commands remain unavailable", () => {
     assert.equal(existsSync(path), true, `${path} replacement is required`);
 });
 
+test("Functions guidance cannot route into retired materialization", () => {
+  const paths = [
+    ".github/skills/azure-prepare/references/analyze.md",
+    ".github/skills/azure-prepare/references/research.md",
+    ".github/skills/azure-prepare/references/specialized-routing.md",
+    ".github/skills/azure-prepare/references/services/functions/README.md",
+    ".github/skills/azure-prepare/references/services/functions/bicep.md",
+    ".github/skills/azure-prepare/references/services/functions/terraform.md",
+    ".github/skills/azure-prepare/references/recipes/azcli/commands.md",
+    ".github/skills/azure-prepare/references/recipes/azd/azure-yaml.md",
+    ".github/skills/azure-prepare/references/recipes/azd/terraform.md",
+  ];
+  const guidance = paths.map((path) => readFileSync(path, "utf8")).join("\n");
+  assert.doesNotMatch(
+    guidance,
+    /composition algorithm|templates\/selection\.md|templates\/README\.md|azd init -t|az functionapp create|resource "azurerm_linux_function_app"/iu,
+  );
+});
+
+test("consumer Node prerequisites match the canonical tool pin", () => {
+  const minimum = JSON.parse(readFileSync("tools/registry/tool-version-pins.json", "utf8")).pins.node.min;
+  const paths = [
+    "docs/how-to/prepare-windows-11.md",
+    "docs/tutorials/first-run.md",
+    "docs/tutorials/wsl2-vscode-consumer-runbook.md",
+    "packages/cli/src/version.ts",
+  ];
+  for (const path of paths) {
+    const content = readFileSync(path, "utf8");
+    assert.match(content, new RegExp(minimum.replaceAll(".", "\\."), "u"), `${path} must use ${minimum}`);
+    assert.doesNotMatch(content, /Node(?:\.js)? 24 or (?:later|newer)/u);
+  }
+  const service = readFileSync("packages/cli/src/service.ts", "utf8");
+  assert.match(service, /meetsMinimumVersion\(process\.versions\.node, MINIMUM_NODE_VERSION\)/u);
+  assert.doesNotMatch(service, /Node(?:\.js)? 24 or (?:later|newer)/u);
+});
+
 test("WSL editor validation retains settings, discovery and exact extension guards", () => {
   const settings = JSON.parse(readFileSync(".vscode/settings.json", "utf8"));
   const extensions = JSON.parse(readFileSync(".vscode/extensions.json", "utf8")).recommendations;

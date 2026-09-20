@@ -14,6 +14,7 @@ import { createMcpServer } from "../mcp.js";
 import { execute, formatHumanResult } from "../cli.js";
 import { ApexService } from "../service.js";
 import { ApexError, EXIT_CODES } from "../errors.js";
+import { meetsMinimumVersion, MINIMUM_NODE_VERSION } from "../version.js";
 import { nextTaskAfterInput, requirements, tempRoot, writeJson } from "./helpers.js";
 
 test("CLI emits a stable JSON envelope", async () => {
@@ -30,6 +31,14 @@ test("CLI emits a stable JSON envelope", async () => {
     ok: true,
     result: { version: "0.10.0-next.5", bundleVersion: "0.10.0-next.5", configVersion: "1.0.0" },
   });
+});
+
+test("CLI Node minimum compares complete stable versions", () => {
+  assert.equal(meetsMinimumVersion("26.8.9", MINIMUM_NODE_VERSION), false);
+  assert.equal(meetsMinimumVersion("26.9.0", MINIMUM_NODE_VERSION), true);
+  assert.equal(meetsMinimumVersion("26.10.0", MINIMUM_NODE_VERSION), true);
+  assert.equal(meetsMinimumVersion("27.0.0", MINIMUM_NODE_VERSION), true);
+  assert.equal(meetsMinimumVersion("invalid", MINIMUM_NODE_VERSION), false);
 });
 
 test("CLI renders concise human status and doctor output", () => {
