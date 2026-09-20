@@ -85,6 +85,7 @@ test("state export is deterministic and includes only selected state plus recurs
   const unrelatedHash = await objects.putJson({ value: "unreferenced" });
   const runRoot = join(source.root, ".apex", "projects", source.projectId, "runs", source.runId);
   await writeJson(join(runRoot, "refs.json"), { objectHash: parentHash });
+  await writeJson(join(runRoot, ".run-mutation.pending-test", "metadata.json"), { token: "local-only" });
   await writeJson(join(source.root, ".apex", "runtime", "qualification.json"), { enabled: true });
   await writeJson(join(source.root, ".apex", "runtime", "capability-packs", "excluded", "pack.json"), {
     excluded: true,
@@ -110,10 +111,47 @@ test("state export is deterministic and includes only selected state plus recurs
   assert(!paths.some((path) => path.includes("projects/other/")));
   assert(!paths.some((path) => path.includes("runs/other-run/")));
   assert(!paths.some((path) => /^(?:local|work|cache)\//.test(path)));
+  assert(!paths.some((path) => path.includes(".run-mutation.")));
 
   const first = await exportEnvelope(source);
   const second = await exportEnvelope(source);
   assert.deepEqual(first, second);
+});
+
+test("state transfer excludes local locks and refuses pending run mutations", async () => {
+  const source = await sourceState();
+  const runPrefix = `projects/${source.projectId}/runs/${source.runId}`;
+  const runRoot = join(source.root, ".apex", runPrefix);
+  const bundle = await createStateTransferBundle(
+    source.root,
+    { claimHash: source.claimHash, recipient: "ci", ttlMs: 1 },
+    instant,
+  );
+  for (const name of [
+    ".run-mutation.retired",
+    ".run-mutation.pending-test",
+    ".run-mutation.lock",
+    ".run-transaction.json",
+  ]) {
+    const injected = { ...bundle.files[0]!, path: `${runPrefix}/${name}/metadata.json` };
+    await assert.rejects(
+      importStateTransfer(
+        await tempRoot(),
+        seal({ ...bundle, files: [...bundle.files, injected] }),
+        "ci",
+        () => instant,
+      ),
+      /allowlist/,
+    );
+  }
+  for (const name of [".run-mutation.lock", ".run-transaction.json"]) {
+    await writeJson(join(runRoot, name), {});
+    await assert.rejects(
+      createStateTransferBundle(source.root, { claimHash: source.claimHash, recipient: "ci", ttlMs: 1 }, instant),
+      /quiescent run/,
+    );
+    await rm(join(runRoot, name));
+  }
 });
 
 test("state export rejects secrets and individual or aggregate size overflow", async () => {

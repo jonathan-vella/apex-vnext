@@ -76,7 +76,6 @@ export class RunRepository {
   private readonly runPath: string;
   private readonly lockPath: string;
   private readonly retiredLockPath: string;
-  private readonly staleLockPath: string;
   private readonly intentPath: string;
   private readonly clock: () => Date;
   private readonly idSource: () => string;
@@ -89,7 +88,6 @@ export class RunRepository {
     this.runPath = join(directory, "run.json");
     this.lockPath = join(directory, ".run-mutation.lock");
     this.retiredLockPath = join(directory, ".run-mutation.retired");
-    this.staleLockPath = join(directory, ".run-mutation.stale");
     this.intentPath = join(directory, ".run-transaction.json");
     this.clock = options.clock ?? (() => new Date());
     this.idSource = options.idSource ?? (() => crypto.randomUUID());
@@ -192,15 +190,17 @@ export class RunRepository {
       if (await this.acquireLock(metadata)) break;
       const existing = await this.readLock();
       if (existing === undefined) continue;
-      if (existing.expiresAt > this.clock().getTime()) throw new Error("Run mutation is already in progress");
-      if (!(await this.retireLock(existing.recoveryId, true))) throw new Error("Run mutation is already in progress");
+      if (existing.expiresAt > this.clock().getTime() || this.ownerMayBeAlive(existing.metadata)) {
+        throw new Error("Run mutation is already in progress");
+      }
+      if (!(await this.retireLock(existing.recoveryId))) throw new Error("Run mutation is already in progress");
     }
     try {
       return await operation();
     } finally {
       try {
         const current = await this.readLock();
-        if (current?.metadata.token === token) await this.retireLock(current.recoveryId, false);
+        if (current?.metadata.token === token) await this.retireLock(current.recoveryId);
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       }
@@ -235,6 +235,7 @@ export class RunRepository {
         published = true;
         return true;
       } catch (error) {
+        if (["EEXIST", "ENOTEMPTY"].includes((error as NodeJS.ErrnoException).code ?? "")) return false;
         try {
           await lstat(this.lockPath);
           return false;
@@ -344,38 +345,28 @@ export class RunRepository {
     };
   }
 
-  private async retireLock(recoveryId: string, preserve: boolean): Promise<boolean> {
+  private ownerMayBeAlive(metadata: MutationLock): boolean {
+    if (metadata.host !== hostname()) return true;
+    try {
+      process.kill(metadata.pid, 0);
+      return true;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code !== "ESRCH";
+    }
+  }
+
+  private async retireLock(recoveryId: string): Promise<boolean> {
     await mkdir(this.retiredLockPath, { recursive: true, mode: 0o700 });
     const retiredRoot = await lstat(this.retiredLockPath);
     if (!retiredRoot.isDirectory() || retiredRoot.isSymbolicLink()) {
       throw new Error("Run mutation retired-lock directory is unsafe");
     }
-    let claim;
     try {
-      claim = await open(
-        join(this.retiredLockPath, recoveryId),
-        constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY,
-        0o600,
-      );
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
-      throw error;
-    }
-    await claim.close();
-    if (!preserve) {
-      await rm(this.lockPath, { recursive: true, force: true });
-      return true;
-    }
-    await mkdir(this.staleLockPath, { recursive: true, mode: 0o700 });
-    const staleRoot = await lstat(this.staleLockPath);
-    if (!staleRoot.isDirectory() || staleRoot.isSymbolicLink()) {
-      throw new Error("Run mutation stale-lock directory is unsafe");
-    }
-    try {
-      await rename(this.lockPath, join(this.staleLockPath, recoveryId));
+      await rename(this.lockPath, join(this.retiredLockPath, recoveryId));
       return true;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      if (["EEXIST", "ENOTEMPTY"].includes((error as NodeJS.ErrnoException).code ?? "")) return false;
       throw error;
     }
   }

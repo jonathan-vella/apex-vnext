@@ -83,6 +83,9 @@ function safeRelativePath(path: string): boolean {
 }
 
 function prohibitedStatePath(path: string): boolean {
+  if (path.split("/").some((part) => part.startsWith(".run-mutation.") || part === ".run-transaction.json")) {
+    return true;
+  }
   return /(?:^|\/)(?:credentials?(?:\.json)?|terraform\.tfstate(?:\.[^/]*)?|[^/]+\.tfplan(?:\.enc)?|state-plans?)(?:\/|$)/i.test(
     path,
   );
@@ -159,6 +162,17 @@ async function walkRegularFiles(root: string, directory = root): Promise<string[
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name);
     if (entry.isSymbolicLink()) throw new Error(`State transfer source contains a symlink: ${path}`);
+    if (directory === root) {
+      if (entry.name === ".run-mutation.lock" || entry.name === ".run-transaction.json") {
+        throw new Error("State transfer requires a quiescent run without pending mutation recovery");
+      }
+      if (
+        entry.isDirectory() &&
+        (entry.name === ".run-mutation.retired" || entry.name.startsWith(".run-mutation.pending-"))
+      ) {
+        continue;
+      }
+    }
     if (entry.isDirectory()) files.push(...(await walkRegularFiles(root, path)));
     else if (entry.isFile()) files.push(relative(root, path).split(sep).join("/"));
     else throw new Error(`State transfer source is not a regular file: ${path}`);
