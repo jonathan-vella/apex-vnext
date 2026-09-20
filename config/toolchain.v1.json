@@ -74,6 +74,8 @@
       "newestObservedVersion": "1.0.86",
       "selectedExactVersion": "1.0.86",
       "installedVersion": "1.0.86",
+      "historicalFixtureVersion": "1.0.73",
+      "historicalFixtureArtifactHash": "8f9bb5f7e364c267265d1e24ac2aea69ed559ddb956719c6db12a353de6c5970",
       "observedAt": "2026-09-20",
       "selectionStatus": "selected-qualification-required",
       "releaseArtifact": {

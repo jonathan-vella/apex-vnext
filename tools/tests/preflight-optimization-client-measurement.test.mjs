@@ -68,11 +68,13 @@ test("preflight schema rejects incomplete client coverage and reports unavailabl
 });
 
 test("preflight accepts newer VS Code and records the observed Copilot Chat version", () => {
+  const [major, minor] = toolchain.core.vscode.minimumSupportedVersion.split(".").map(Number);
+  const newerVersion = `${major}.${minor + 1}.0`;
   const run = commandRun({
     "git rev-parse HEAD": `${gate.candidate.commit}\n`,
     "git rev-parse HEAD^{tree}": `${gate.candidate.tree}\n`,
     "git status --porcelain --untracked-files=no": "",
-    "code --version": "1.134.0\n",
+    "code --version": `${newerVersion}\n`,
     "code --list-extensions --show-versions": "github.copilot-chat@0.60.0\n",
     "copilot --version": `${toolchain.core.copilotCli.selectedExactVersion}\n`,
   });

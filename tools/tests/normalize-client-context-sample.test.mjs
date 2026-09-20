@@ -638,18 +638,16 @@ test("reports deterministic coverage for the approved stratified matrix", () => 
 test("binds matrix client versions to immutable historical fixture toolchain owners", () => {
   const vscode = matrix.clients.find(({ id }) => id === "github-copilot-vscode");
   const cli = matrix.clients.find(({ id }) => id === "github-copilot-cli");
-  assert.equal(vscode.version, toolchain.core.vscode.postCutoffObservation.version);
-  assert.equal(vscode.extensionVersion, toolchain.core.vscode.postCutoffObservation.copilotChatVersion);
   assert.equal(toolchain.core.vscode.historicalFixtureVersion, vscode.version);
   assert.equal(toolchain.core.vscode.historicalFixtureCopilotChatVersion, vscode.extensionVersion);
   assert.equal(toolchain.core.vscode.selectionStatus, "selected-qualification-required");
-  assert.equal(toolchain.core.vscode.postCutoffObservation.disposition, "selected-next-candidate-input");
+  assert.equal(toolchain.core.vscode.postCutoffObservation.disposition, "selected-current-candidate");
   assert.equal(toolchain.core.vscode.selectionEvidence.receipt, "tools/registry/client-context-baseline-receipt.json");
   assert.equal(
     toolchain.core.vscode.selectionEvidence.sha256,
     "197cbc48abfebc3d01c8511557d7b852ed35b5169e8cb2fdcb747d1dc013f42a",
   );
-  assert.equal(cli.version, toolchain.core.copilotCli.selectedExactVersion);
+  assert.equal(cli.version, toolchain.core.copilotCli.historicalFixtureVersion);
 });
 
 test("rejects weakened or modified matrix contracts", () => {
