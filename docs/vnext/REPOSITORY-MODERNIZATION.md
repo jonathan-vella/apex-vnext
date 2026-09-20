@@ -19,18 +19,18 @@ on `feat/governance-baseline-import`.
 
 ## Execution Status
 
-| Status                      | State                               | Evidence or blocker                                                               |
-| --------------------------- | ----------------------------------- | --------------------------------------------------------------------------------- |
-| source-cleanup-complete     | passed                              | Entry points, readers, generated assets, active guidance, and residue reviewed    |
-| toolchain-selected          | passed                              | Exact Current/stable versions activated; prior user-owned binaries retained       |
-| offline-validation-passed   | passed                              | `qualify:vnext` and `validate:all` passed on qualified source                     |
-| provider-behavior-qualified | not-applicable-with-approved-reason | Provider/module selections and lockfile are unchanged; native semantic tests pass |
+| Status                      | State                               | Evidence or blocker                                                                |
+| --------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------- |
+| source-cleanup-complete     | passed                              | Entry points, readers, generated assets, active guidance, and residue reviewed     |
+| toolchain-selected          | passed                              | Exact Current/stable versions activated; prior user-owned binaries retained        |
+| offline-validation-passed   | passed                              | `qualify:vnext` and `validate:all` passed on qualified source                      |
+| provider-behavior-qualified | not-applicable-with-approved-reason | Provider/module selections and lockfile are unchanged; native semantic tests pass  |
 | client-vscode-qualified     | pending                             | VS Code 1.138.0 / Copilot Chat 0.66.0 ready; interactive gate targets older source |
 | client-cli-qualified        | pending                             | Copilot CLI 1.0.86 ready; interactive gate targets older source                    |
 | hosted-ci-passed            | passed                              | All 10 exact-head checks passed on qualified source                                |
 | review-ready                | pending                             | Automated findings resolved; interactive client and human review gates remain      |
-| merge-authorized            | pending                             | Human gate                                                                        |
-| release-accepted            | pending                             | Human release gate                                                                |
+| merge-authorized            | pending                             | Human gate                                                                         |
+| release-accepted            | pending                             | Human release gate                                                                 |
 
 ## Coverage
 
