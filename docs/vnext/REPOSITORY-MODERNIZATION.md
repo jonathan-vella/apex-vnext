@@ -15,7 +15,7 @@ on `feat/governance-baseline-import`.
 | Pull request      | #345 (draft, open)                                                                                                                                           |
 | Starting worktree | Dirty: target-governance work, retired archive removals, and current-only policy-precheck tests; see `logs/repository-modernization/wp00-starting-state.log` |
 | Historical CI     | Green only for baseline source; not qualification for this worktree                                                                                          |
-| Qualified source  | `34ef9e52d4f47f37dcb3dcea747360950c4112a9`                                                                                                                   |
+| Qualified source  | `9b177608897ff71d2eaa4a6b89c81fe5c9ae63bb`                                                                                                                   |
 
 ## Execution Status
 
@@ -110,6 +110,7 @@ by this table.
 - `validate:all`: Node, documentation, hooks, security, toolchain, Python, Terraform, and Bicep lanes passed.
 - Final package payload: five exact-source npm tarballs plus SBOM and provenance; reproducible pack and clean install passed.
 - Run-lock contention: 64 stale-generation contenders and the 120-service reproducer completed without unstable errors.
+- Lock/transfer integration: 49 kernel tests and 10 state-transfer tests pass; local lock metadata cannot be imported.
 - Secret review: the full modernization range and both compressed and extracted release payloads produced zero findings.
 - Hosted validation: all 10 pull-request checks passed, including CI, CodeQL, IaC, docs, and release qualification.
 - Review: all automated review threads contain fix evidence and are resolved.
@@ -119,6 +120,12 @@ by this table.
 `validate:terraform` now delegates to `tools/scripts/validate-terraform.mjs`. It validates every immediate Terraform
 root with `main.tf`, continues through all roots, returns nonzero for any failed init or validation, and isolates
 `TF_DATA_DIR` so stale local provider caches cannot influence results.
+
+Run locks preserve live local owners even after TTL expiry. Only expired locks whose local owner is confirmed dead
+are reclaimed automatically; unknown-host owners fail closed. Complete generations retire atomically into permanent
+local tombstones so delayed contenders cannot remove a replacement lock. These tombstones are excluded from state
+transfer and retained for concurrency safety; automatic tombstone garbage collection is not implemented.
+State transfer rejects active locks and pending transactions rather than exporting incomplete mutation state.
 
 ## Checkpoint
 
