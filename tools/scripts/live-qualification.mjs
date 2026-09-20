@@ -1191,7 +1191,8 @@ export async function collectCliSurfaceEvidence(
   ) {
     throw new Error("Copilot CLI inventory is invalid");
   }
-  const versionOutput = runCli(binary, ["version", "--no-auto-update"], workspace);
+  const safetyFlags = ["--no-auto-update", "--no-remote", "--no-remote-export"];
+  const versionOutput = runCli(binary, [...safetyFlags, "--version"], workspace);
   if (Buffer.byteLength(versionOutput) > MAX_CLI_OUTPUT_BYTES)
     throw new Error("Copilot CLI version output is too large");
   const observedVersion = cliVersion(versionOutput);
@@ -1200,7 +1201,7 @@ export async function collectCliSurfaceEvidence(
   const drift = files.some(({ matches }) => !matches);
   let mcp = { status: "not-run", servers: [], sourceDigest: null };
   if (!drift) {
-    const output = runCli(binary, ["mcp", "list", "--json", "--no-auto-update", "--no-remote"], workspace);
+    const output = runCli(binary, [...safetyFlags, "mcp", "list", "--json"], workspace);
     if (Buffer.byteLength(output) > MAX_CLI_OUTPUT_BYTES) throw new Error("Copilot CLI MCP output is too large");
     const value = parseStrictJson(output);
     if (value?.mcpServers === null || typeof value?.mcpServers !== "object" || Array.isArray(value.mcpServers)) {

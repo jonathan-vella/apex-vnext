@@ -2124,7 +2124,7 @@ test("exports observed rolling CLI binding, managed files, and bounded MCP serve
       contractRoot: fixture.contractRoot,
       runCli: (_binary, args) => {
         calls.push(args);
-        return args[0] === "version" ? "GitHub Copilot CLI 1.0.75\n" : '{"mcpServers":{"apex":{"status":"ok"}}}\n';
+        return args.includes("--version") ? "GitHub Copilot CLI 1.0.75\n" : '{"mcpServers":{"apex":{"status":"ok"}}}\n';
       },
     },
   );
@@ -2136,8 +2136,8 @@ test("exports observed rolling CLI binding, managed files, and bounded MCP serve
   assert.deepEqual(exported.mcp.servers, ["apex"]);
   assert.equal(exported.workspace.files[0].matches, true);
   assert.deepEqual(calls, [
-    ["version", "--no-auto-update"],
-    ["mcp", "list", "--json", "--no-auto-update", "--no-remote"],
+    ["--no-auto-update", "--no-remote", "--no-remote-export", "--version"],
+    ["--no-auto-update", "--no-remote", "--no-remote-export", "mcp", "list", "--json"],
   ]);
   assert.doesNotMatch(JSON.stringify(exported), /private\/source\/path|status.*ok/u);
 });
@@ -2152,14 +2152,14 @@ test("rolling CLI versions and binary hashes remain source-bound without histori
       contractRoot: fixture.contractRoot,
       runCli: (_binary, args) => {
         calls.push(args);
-        return args[0] === "version" ? "GitHub Copilot CLI 1.0.75\n" : '{"mcpServers":{"apex":{}}}\n';
+        return args.includes("--version") ? "GitHub Copilot CLI 1.0.75\n" : '{"mcpServers":{"apex":{}}}\n';
       },
     },
   );
   assert.equal(exported.disposition.status, "pass");
   assert.deepEqual(calls, [
-    ["version", "--no-auto-update"],
-    ["mcp", "list", "--json", "--no-auto-update", "--no-remote"],
+    ["--no-auto-update", "--no-remote", "--no-remote-export", "--version"],
+    ["--no-auto-update", "--no-remote", "--no-remote-export", "mcp", "list", "--json"],
   ]);
   assert.equal(exported.mcp.status, "observed");
 
@@ -2172,14 +2172,14 @@ test("rolling CLI versions and binary hashes remain source-bound without histori
       contractRoot: versionFixture.contractRoot,
       runCli: (_binary, args) => {
         versionCalls.push(args);
-        return args[0] === "version" ? "GitHub Copilot CLI 1.0.76\n" : '{"mcpServers":{"apex":{}}}\n';
+        return args.includes("--version") ? "GitHub Copilot CLI 1.0.76\n" : '{"mcpServers":{"apex":{}}}\n';
       },
     },
   );
   assert.equal(versionMismatch.disposition.status, "pass");
   assert.deepEqual(versionCalls, [
-    ["version", "--no-auto-update"],
-    ["mcp", "list", "--json", "--no-auto-update", "--no-remote"],
+    ["--no-auto-update", "--no-remote", "--no-remote-export", "--version"],
+    ["--no-auto-update", "--no-remote", "--no-remote-export", "mcp", "list", "--json"],
   ]);
   assert.equal(versionMismatch.mcp.status, "observed");
 
@@ -2214,7 +2214,7 @@ test("CLI surface export reports managed drift and rejects unsafe lock paths", a
     },
   );
   assert.deepEqual(exported.disposition, { status: "fail", reasonCode: "MANAGED_FILE_DRIFT" });
-  assert.deepEqual(driftCalls, [["version", "--no-auto-update"]]);
+  assert.deepEqual(driftCalls, [["--no-auto-update", "--no-remote", "--no-remote-export", "--version"]]);
   assert.equal(exported.mcp.status, "not-run");
 
   const unsafe = await cliSurfaceFixture(context);
@@ -2300,7 +2300,7 @@ test("CLI surface export fails when exact-client MCP inventory omits APEX", asyn
       contractRoot: fixture.contractRoot,
       runCli: (_binary, args) => {
         calls.push(args);
-        return args[0] === "version" ? "GitHub Copilot CLI 1.0.73\n" : '{"mcpServers":{}}\n';
+        return args.includes("--version") ? "GitHub Copilot CLI 1.0.73\n" : '{"mcpServers":{}}\n';
       },
     },
   );
@@ -2308,8 +2308,8 @@ test("CLI surface export fails when exact-client MCP inventory omits APEX", asyn
   assert.equal(exported.mcp.status, "observed");
   assert.deepEqual(exported.mcp.servers, []);
   assert.deepEqual(calls, [
-    ["version", "--no-auto-update"],
-    ["mcp", "list", "--json", "--no-auto-update", "--no-remote"],
+    ["--no-auto-update", "--no-remote", "--no-remote-export", "--version"],
+    ["--no-auto-update", "--no-remote", "--no-remote-export", "mcp", "list", "--json"],
   ]);
 });
 
