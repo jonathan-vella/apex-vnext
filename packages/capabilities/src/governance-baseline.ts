@@ -186,22 +186,38 @@ function jsonInput(input: unknown): unknown {
   }
 }
 
+function scopeSegment(value: string): boolean {
+  return value.length > 0 && value !== "." && value !== ".." && !/[?#%\s]/u.test(value);
+}
+
 function scope(value: unknown, subscriptionId: string): string {
   const result = text(value);
   const normalized = result.toLowerCase();
+  const segments = normalized.split("/");
+  if (segments[0] !== "") fail("target-mismatch");
   if (
-    normalized.split("/").some((part) => part === "." || part === "..") ||
-    !/^(?:\/providers\/microsoft\.management\/managementgroups\/[^/?#%\s]+|\/subscriptions\/[0-9a-f-]{36}(?:\/resourcegroups\/[^/?#%\s]+)?(?:\/providers\/[^/?#%\s]+(?:\/[^/?#%\s]+\/[^/?#%\s]+)+)*)$/u.test(
-      normalized,
-    )
-  )
+    segments.length === 5 &&
+    segments[1] === "providers" &&
+    segments[2] === "microsoft.management" &&
+    segments[3] === "managementgroups" &&
+    scopeSegment(segments[4]!)
+  ) {
+    return result;
+  }
+  if (segments[1] !== "subscriptions" || segments[2] !== subscriptionId || !SUBSCRIPTION_ID.test(segments[2] ?? ""))
     fail("target-mismatch");
-  if (
-    !/^\/providers\/microsoft\.management\/managementgroups\/[^/]+$/u.test(normalized) &&
-    normalized !== `/subscriptions/${subscriptionId}` &&
-    !normalized.startsWith(`/subscriptions/${subscriptionId}/`)
-  )
+  let offset = 3;
+  if (segments[offset] === "resourcegroups") {
+    if (!scopeSegment(segments[offset + 1] ?? "")) fail("target-mismatch");
+    offset += 2;
+  }
+  if (offset === segments.length) return result;
+  if (segments[offset] !== "providers" || !scopeSegment(segments[offset + 1] ?? "")) fail("target-mismatch");
+  offset += 2;
+  const resourceSegments = segments.slice(offset);
+  if (resourceSegments.length < 2 || resourceSegments.length % 2 !== 0 || !resourceSegments.every(scopeSegment)) {
     fail("target-mismatch");
+  }
   return result;
 }
 
