@@ -52,6 +52,18 @@ test("CLI renders concise human status and doctor output", () => {
   );
 });
 
+test("CLI rejects the retired bare promote alias", async () => {
+  const root = await tempRoot();
+  await assert.rejects(
+    execute(
+      ["promote", "--environment", "test", "--target", "/subscriptions/00000000-0000-0000-0000-000000000000"],
+      root,
+    ),
+    (error: unknown) =>
+      error instanceof ApexError && error.code === "APEX_USAGE" && error.message === "Unknown command: promote",
+  );
+});
+
 test("CLI governance import requires a path and forwards only that path", async (context) => {
   const root = await tempRoot();
   const expected = { outputHash: "a".repeat(64), summary: "Reviewed baseline imported" };

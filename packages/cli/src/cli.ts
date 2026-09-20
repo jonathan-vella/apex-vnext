@@ -697,8 +697,6 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
       return service.diagnose();
     case "render":
       return service.render(required(flags, "kind") as never);
-    case "promote":
-      return service.promote(required(flags, "environment"), required(flags, "target"));
     case "customizations rollback":
       return service.rollbackCustomizations();
     case "customizations uninstall":

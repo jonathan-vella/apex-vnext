@@ -98,6 +98,9 @@ test("retired automation commands remain unavailable", () => {
     "challenger-telemetry",
   ])
     assert.equal(scripts[command], undefined, `${command} must stay retired`);
+  const cli = readFileSync("packages/cli/src/cli.ts", "utf8");
+  assert.match(cli, /case "project promote":/u);
+  assert.doesNotMatch(cli, /case "promote":/u);
   for (const path of [
     "tools/scripts/setup-wsl.sh",
     "tools/scripts/setup-windows.ps1",
