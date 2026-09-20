@@ -41,6 +41,9 @@ jobs:
       - name: Check formatting (Prettier)
         run: npm run format:check
 
+      - name: Verify Azure MCP beta freshness
+        run: npm run validate:azure-mcp-latest
+
       - name: Build vNext and run Node.js validators (CI-safe)
         run: npm run validate:_node-ci
 

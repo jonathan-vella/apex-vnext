@@ -103,6 +103,7 @@
     "validate:environment-manifest": "node tools/scripts/validate-environment-manifest.mjs",
     "validate:iac-handoff": "node tools/scripts/validate-iac-handoff.mjs",
     "validate:tool-versions": "node tools/scripts/validate-tool-versions.mjs",
+    "validate:azure-mcp-latest": "node tools/scripts/validate-azure-mcp-latest.mjs",
     "prove:bounded-improvement": "npm run build:vnext && node tools/scripts/prove-bounded-improvement.mjs",
     "test:bounded-improvement": "npm run build:vnext && node --test tools/tests/bounded-improvement-poc.test.mjs",
     "validate:policy-precheck": "node tools/scripts/validate-policy-precheck.mjs",

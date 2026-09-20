@@ -59,19 +59,19 @@ environments are reviewed through their manifests and lockfiles rather than as s
 
 ## Initial Findings
 
-| ID  | Anchor                                                         | Disposition                                                             | Next work package |
-| --- | -------------------------------------------------------------- | ----------------------------------------------------------------------- | ----------------- |
+| ID  | Anchor                                                         | Disposition                                                                  | Next work package |
+| --- | -------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------- |
 | L01 | `packages/capabilities/src/iac-generation.ts` binding sentinel | Removed; parity parses embedded exact pins without a declared-version bypass | WP06 complete     |
-| L02 | CLI `apex promote` alias                                       | Removed; retain `project promote` and MCP `promote`                    | WP05 complete     |
-| L03 | CLI/service single-output completion                           | Removed; CLI and MCP use atomic typed output bundles                    | WP05 complete     |
-| L05 | Governance collector/importer                                  | Dirty current-only work requires review and focused qualification       | WP04              |
-| L07 | Policy-precheck validator and tests                            | Preserve current v2 rejection coverage; inspect redundant wrappers only | WP03/WP07         |
-| L11 | Bicep and Terraform instructions                               | Removed direct deploy guidance and stale tag contracts                  | WP09 complete     |
-| L12 | Docker debug compose and scripts                               | Removed; host Azure CLI receiver and privacy tests retained              | WP08 complete     |
-| L13 | `apex-recall` generated or environment residue                 | Confirm ownership before removal                                        | WP07              |
+| L02 | CLI `apex promote` alias                                       | Removed; retain `project promote` and MCP `promote`                          | WP05 complete     |
+| L03 | CLI/service single-output completion                           | Removed; CLI and MCP use atomic typed output bundles                         | WP05 complete     |
+| L05 | Governance collector/importer                                  | Dirty current-only work requires review and focused qualification            | WP04              |
+| L07 | Policy-precheck validator and tests                            | Preserve current v2 rejection coverage; inspect redundant wrappers only      | WP03/WP07         |
+| L11 | Bicep and Terraform instructions                               | Removed direct deploy guidance and stale tag contracts                       | WP09 complete     |
+| L12 | Docker debug compose and scripts                               | Removed; host Azure CLI receiver and privacy tests retained                  | WP08 complete     |
+| L13 | `apex-recall` generated or environment residue                 | Confirm ownership before removal                                             | WP07              |
 | L19 | Functions recipe materialization                               | Removed unavailable pack and templates; retained assessment/backlog guidance | WP08 complete     |
-| L21 | `validate:terraform` failure swallowing                        | Repaired with isolated data directories and regression coverage          | WP03 complete     |
-| L23 | Toolchain pins and CI metadata                                 | Freeze exact selections before upgrades                                 | WP02              |
+| L21 | `validate:terraform` failure swallowing                        | Repaired with isolated data directories and regression coverage              | WP03 complete     |
+| L23 | Toolchain pins and CI metadata                                 | Freeze exact selections before upgrades                                      | WP02              |
 
 ## Frozen Candidate Table
 

@@ -37,7 +37,7 @@
       "triggerDigest": "5c375602c9ef5d8ec711bfa7db1aaaf0484d84e8339627fa7f3bcb8de81edbb6",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "ad4ff567e44c63e5cc34fe24ffc8beb87a811f159bb0e2b7e1e8413f90ff4dac",
+      "jobsDigest": "d4bdeff53e0a79f5ecba6b24ce070796be59764e08d08d955bcc864e4d23b4e5",
       "jobs": {
         "ci": "ci"
       }

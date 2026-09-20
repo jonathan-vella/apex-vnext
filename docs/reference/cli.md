@@ -44,19 +44,19 @@ new preview and Gate 4 approval.
 
 ## Workflow
 
-| Command                     | Required or notable flags                                    |
-| --------------------------- | ------------------------------------------------------------ |
-| `apex status`               | None                                                         |
-| `apex task next`            | None                                                         |
-| `apex task context`         | `--task`                                                     |
+| Command                     | Required or notable flags                                     |
+| --------------------------- | ------------------------------------------------------------- |
+| `apex status`               | None                                                          |
+| `apex task next`            | None                                                          |
+| `apex task context`         | `--task`                                                      |
 | `apex task complete`        | `--task --file`; each output file contains `kind` and `value` |
-| `apex task complete-bundle` | `--task --file`                                              |
-| `apex task cancel`          | `--task`                                                     |
-| `apex task stage-file`      | `--task --path --file`; optional `--sha`                     |
-| `apex task generate-iac`    | `--task`                                                     |
-| `apex review resolve`       | `--file`                                                     |
-| `apex gate decide`          | `--gate --decision --actor`; optional `--recipient`          |
-| `apex validate`             | None                                                         |
+| `apex task complete-bundle` | `--task --file`                                               |
+| `apex task cancel`          | `--task`                                                      |
+| `apex task stage-file`      | `--task --path --file`; optional `--sha`                      |
+| `apex task generate-iac`    | `--task`                                                      |
+| `apex review resolve`       | `--file`                                                      |
+| `apex gate decide`          | `--gate --decision --actor`; optional `--recipient`           |
+| `apex validate`             | None                                                          |
 
 ## Projects And Operations
 
