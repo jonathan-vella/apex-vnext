@@ -1,9 +1,9 @@
 import type { RunConfigV1 } from "@apexops/contracts";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, readFile, rm } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, open, readFile, rename, rm } from "node:fs/promises";
 import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { sha256Json, type JsonValue } from "./canonical.js";
+import { canonicalJsonBytes, sha256Bytes, sha256Json, type JsonValue } from "./canonical.js";
 import { EventJournal, type AppendEventInput } from "./event-journal.js";
 import { atomicWriteJson } from "./files.js";
 
@@ -45,6 +45,15 @@ interface MutationLock {
   expiresAt: string;
 }
 
+interface MutationLockSnapshot {
+  metadata: MutationLock;
+  expiresAt: number;
+  recoveryId: string;
+}
+
+const LOCK_METADATA_FILE = "metadata.json";
+const MAX_LOCK_METADATA_BYTES = 64 * 1024;
+
 function lockExpiry(value: unknown): number | undefined {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
   const lock = value as Partial<MutationLock>;
@@ -66,6 +75,7 @@ function lockExpiry(value: unknown): number | undefined {
 export class RunRepository {
   private readonly runPath: string;
   private readonly lockPath: string;
+  private readonly staleLockPath: string;
   private readonly intentPath: string;
   private readonly clock: () => Date;
   private readonly idSource: () => string;
@@ -77,6 +87,7 @@ export class RunRepository {
     const directory = resolve(runDirectory);
     this.runPath = join(directory, "run.json");
     this.lockPath = join(directory, ".run-mutation.lock");
+    this.staleLockPath = join(directory, ".run-mutation.stale");
     this.intentPath = join(directory, ".run-transaction.json");
     this.clock = options.clock ?? (() => new Date());
     this.idSource = options.idSource ?? (() => crypto.randomUUID());
@@ -175,60 +186,165 @@ export class RunRepository {
       createdAt: createdAt.toISOString(),
       expiresAt: new Date(createdAt.getTime() + this.lockTtlMs).toISOString(),
     };
-    const acquire = async () => {
-      const handle = await open(this.lockPath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
-      let failure: unknown;
-      try {
-        await handle.writeFile(JSON.stringify(metadata));
-        await handle.sync();
-      } catch (error) {
-        failure = error;
-      }
-      try {
-        await handle.close();
-      } catch (error) {
-        failure ??= error;
-      }
-      if (failure !== undefined) {
-        await rm(this.lockPath, { force: true });
-        throw failure;
-      }
-    };
     for (;;) {
-      try {
-        await acquire();
-        break;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-        let metadata: unknown;
-        let metadataStat;
-        try {
-          metadataStat = await lstat(this.lockPath);
-          if (!metadataStat.isFile() || metadataStat.isSymbolicLink()) {
-            throw new Error("Run mutation lock metadata is unsafe");
-          }
-          metadata = JSON.parse(await readFile(this.lockPath, "utf8")) as unknown;
-        } catch (readError) {
-          if ((readError as NodeJS.ErrnoException).code === "ENOENT") continue;
-          if (metadataStat === undefined || !metadataStat.isFile() || metadataStat.isSymbolicLink()) {
-            throw new Error("Run mutation lock metadata is unreadable", { cause: readError });
-          }
-        }
-        const expiresAt = lockExpiry(metadata) ?? metadataStat.mtimeMs + this.lockTtlMs;
-        if (expiresAt > this.clock().getTime()) {
-          throw new Error("Run mutation is already in progress", { cause: error });
-        }
-        await rm(this.lockPath, { force: true });
-      }
+      if (await this.acquireLock(metadata)) break;
+      const existing = await this.readLock();
+      if (existing === undefined) continue;
+      if (existing.expiresAt > this.clock().getTime()) throw new Error("Run mutation is already in progress");
+      if (!(await this.reclaimLock(existing.recoveryId))) throw new Error("Run mutation is already in progress");
     }
     try {
       return await operation();
     } finally {
       try {
-        const current = JSON.parse(await readFile(this.lockPath, "utf8")) as MutationLock;
-        if (current.token === token) await rm(this.lockPath, { force: true });
+        const current = await this.readLock();
+        if (current?.metadata.token === token) await rm(this.lockPath, { recursive: true, force: true });
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+    }
+  }
+
+  private async acquireLock(metadata: MutationLock): Promise<boolean> {
+    const parent = dirname(this.lockPath);
+    await mkdir(parent, { recursive: true });
+    const staging = await mkdtemp(join(parent, ".run-mutation.pending-"));
+    let published = false;
+    try {
+      const handle = await open(
+        join(staging, LOCK_METADATA_FILE),
+        constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY,
+        0o600,
+      );
+      try {
+        await handle.writeFile(canonicalJsonBytes(metadata));
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+      try {
+        await rename(staging, this.lockPath);
+        published = true;
+        return true;
+      } catch (error) {
+        try {
+          await lstat(this.lockPath);
+          return false;
+        } catch (lockError) {
+          if ((lockError as NodeJS.ErrnoException).code === "ENOENT") throw error;
+          throw lockError;
+        }
+      }
+    } finally {
+      if (!published) await rm(staging, { recursive: true, force: true });
+    }
+  }
+
+  private async readLock(): Promise<MutationLockSnapshot | undefined> {
+    let directoryStat;
+    try {
+      directoryStat = await lstat(this.lockPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      throw error;
+    }
+    if (!directoryStat.isDirectory() || directoryStat.isSymbolicLink()) {
+      throw new Error("Run mutation lock metadata is unsafe");
+    }
+    const metadataPath = join(this.lockPath, LOCK_METADATA_FILE);
+    let metadataStat;
+    try {
+      metadataStat = await lstat(metadataPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        try {
+          await lstat(this.lockPath);
+        } catch (lockError) {
+          if ((lockError as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+          throw lockError;
+        }
+        throw new Error("Run mutation lock metadata is unreadable", { cause: error });
+      }
+      throw error;
+    }
+    if (!metadataStat.isFile() || metadataStat.isSymbolicLink() || metadataStat.size > MAX_LOCK_METADATA_BYTES) {
+      throw new Error("Run mutation lock metadata is unsafe");
+    }
+    const handle = await open(metadataPath, constants.O_RDONLY);
+    let bytes: Buffer;
+    try {
+      const opened = await handle.stat();
+      if (
+        !opened.isFile() ||
+        opened.dev !== metadataStat.dev ||
+        opened.ino !== metadataStat.ino ||
+        opened.size > MAX_LOCK_METADATA_BYTES
+      ) {
+        return undefined;
+      }
+      bytes = await handle.readFile();
+    } finally {
+      await handle.close();
+    }
+    const [after, metadataAfter] = await Promise.all([
+      lstat(this.lockPath).catch((error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+        throw error;
+      }),
+      lstat(metadataPath).catch((error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+        throw error;
+      }),
+    ]);
+    if (
+      after === undefined ||
+      metadataAfter === undefined ||
+      after.dev !== directoryStat.dev ||
+      after.ino !== directoryStat.ino ||
+      metadataAfter.isSymbolicLink() ||
+      metadataAfter.dev !== metadataStat.dev ||
+      metadataAfter.ino !== metadataStat.ino ||
+      bytes.byteLength > MAX_LOCK_METADATA_BYTES
+    ) {
+      return undefined;
+    }
+    let metadata: unknown;
+    try {
+      metadata = JSON.parse(bytes.toString("utf8")) as unknown;
+    } catch (error) {
+      throw new Error("Run mutation lock metadata is unreadable", { cause: error });
+    }
+    const expiresAt = lockExpiry(metadata);
+    if (expiresAt === undefined) throw new Error("Run mutation lock metadata is unreadable");
+    return {
+      metadata: metadata as MutationLock,
+      expiresAt,
+      recoveryId: sha256Json({
+        metadataHash: sha256Bytes(bytes),
+        device: String(directoryStat.dev),
+        inode: String(directoryStat.ino),
+        changedAt: directoryStat.ctimeMs,
+      }),
+    };
+  }
+
+  private async reclaimLock(recoveryId: string): Promise<boolean> {
+    await mkdir(this.staleLockPath, { recursive: true, mode: 0o700 });
+    const staleRoot = await lstat(this.staleLockPath);
+    if (!staleRoot.isDirectory() || staleRoot.isSymbolicLink()) {
+      throw new Error("Run mutation stale-lock directory is unsafe");
+    }
+    try {
+      await rename(this.lockPath, join(this.staleLockPath, recoveryId));
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      try {
+        await lstat(join(this.staleLockPath, recoveryId));
+        return false;
+      } catch (staleError) {
+        if ((staleError as NodeJS.ErrnoException).code === "ENOENT") throw error;
+        throw staleError;
       }
     }
   }

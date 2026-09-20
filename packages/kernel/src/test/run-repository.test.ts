@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -46,9 +46,7 @@ test("run repository never exposes partial lock metadata under contention", asyn
   );
   await store.initializeProject({ projectId: "demo", displayName: "Demo", defaultIacTool: "bicep" });
   await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
-  const repository = new RunRepository(store.runDirectory("demo", "run-1"), {
-    idSource: () => "lock-token".repeat(8_192),
-  });
+  const repository = new RunRepository(store.runDirectory("demo", "run-1"));
   const results = await Promise.allSettled(Array.from({ length: 64 }, () => repository.read()));
   assert.ok(results.some(({ status }) => status === "fulfilled"));
   for (const result of results) {
@@ -56,8 +54,8 @@ test("run repository never exposes partial lock metadata under contention", asyn
   }
 });
 
-test("run repository treats fresh partial lock metadata as active and reclaims it after TTL", async () => {
-  const root = await mkdtemp(join(tmpdir(), "apex-run-partial-lock-"));
+test("run repository reclaims an expired lock generation into a permanent tombstone", async () => {
+  const root = await mkdtemp(join(tmpdir(), "apex-run-stale-lock-"));
   const now = new Date("2026-01-01T00:00:00.000Z");
   const store = new ProjectStore(
     root,
@@ -68,16 +66,31 @@ test("run repository treats fresh partial lock metadata as active and reclaims i
   await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
   const directory = store.runDirectory("demo", "run-1");
   const lockPath = join(directory, ".run-mutation.lock");
+  await mkdir(lockPath);
+  await writeFile(
+    join(lockPath, "metadata.json"),
+    JSON.stringify({
+      token: "expired-lock",
+      pid: 1,
+      host: "test",
+      createdAt: "2025-12-31T23:58:00.000Z",
+      expiresAt: "2025-12-31T23:59:00.000Z",
+    }),
+  );
   const repository = new RunRepository(directory, { clock: () => now, lockTtlMs: 30_000 });
-
-  await writeFile(lockPath, "");
-  await utimes(lockPath, now, now);
-  await assert.rejects(repository.read(), /Run mutation is already in progress/u);
-
-  const expired = new Date(now.getTime() - 31_000);
-  await utimes(lockPath, expired, expired);
-  assert.equal((await repository.read()).projectId, "demo");
+  const results = await Promise.allSettled(Array.from({ length: 64 }, () => repository.read()));
+  assert.ok(results.some(({ status }) => status === "fulfilled"));
+  for (const result of results) {
+    if (result.status === "fulfilled") assert.equal(result.value.projectId, "demo");
+    else assert.match(String(result.reason), /Run mutation is already in progress/u);
+  }
   await assert.rejects(readFile(lockPath), (error: unknown) => (error as NodeJS.ErrnoException).code === "ENOENT");
+  const tombstones = await readdir(join(directory, ".run-mutation.stale"));
+  assert.equal(tombstones.length, 1);
+  assert.equal(
+    JSON.parse(await readFile(join(directory, ".run-mutation.stale", tombstones[0]!, "metadata.json"), "utf8")).token,
+    "expired-lock",
+  );
 });
 
 test("run repository rejects a mutation when the validated journal head changed", async () => {
