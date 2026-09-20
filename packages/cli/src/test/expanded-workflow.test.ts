@@ -3751,7 +3751,7 @@ for (const track of ["bicep", "terraform"] as const) {
     delete legacySnapshot.contentHash;
     await replaceGovernance(legacySnapshot);
     const legacyHead = await journal.head();
-    await assert.rejects(restarted.importGovernanceBaseline(path), /migrate.*reconcile/i);
+    await assert.rejects(restarted.importGovernanceBaseline(path), /start a new run/i);
     assert.equal(await journal.head(), legacyHead);
     await replaceGovernance({ ...acceptedSnapshot, allowedLocations: ["changed"] });
     const semanticHead = await journal.head();
