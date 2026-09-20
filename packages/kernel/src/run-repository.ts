@@ -1,5 +1,6 @@
 import type { RunConfigV1 } from "@apexops/contracts";
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, mkdir, open, readFile, rm } from "node:fs/promises";
 import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { sha256Json, type JsonValue } from "./canonical.js";
@@ -42,6 +43,24 @@ interface MutationLock {
   host: string;
   createdAt: string;
   expiresAt: string;
+}
+
+function lockExpiry(value: unknown): number | undefined {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const lock = value as Partial<MutationLock>;
+  const createdAt = Date.parse(lock.createdAt ?? "");
+  const expiresAt = Date.parse(lock.expiresAt ?? "");
+  return typeof lock.token === "string" &&
+    lock.token.length > 0 &&
+    Number.isInteger(lock.pid) &&
+    Number(lock.pid) > 0 &&
+    typeof lock.host === "string" &&
+    lock.host.length > 0 &&
+    Number.isFinite(createdAt) &&
+    Number.isFinite(expiresAt) &&
+    expiresAt >= createdAt
+    ? expiresAt
+    : undefined;
 }
 
 export class RunRepository {
@@ -156,21 +175,51 @@ export class RunRepository {
       createdAt: createdAt.toISOString(),
       expiresAt: new Date(createdAt.getTime() + this.lockTtlMs).toISOString(),
     };
-    const acquire = () => atomicWriteJson(this.lockPath, metadata, { refuseOverwrite: true });
-    try {
-      await acquire();
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      let existing: MutationLock;
+    const acquire = async () => {
+      const handle = await open(this.lockPath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
+      let failure: unknown;
       try {
-        existing = JSON.parse(await readFile(this.lockPath, "utf8")) as MutationLock;
-      } catch {
-        throw new Error("Run mutation lock metadata is unreadable", { cause: error });
+        await handle.writeFile(JSON.stringify(metadata));
+        await handle.sync();
+      } catch (error) {
+        failure = error;
       }
-      if (Date.parse(existing.expiresAt) > this.clock().getTime())
-        throw new Error("Run mutation is already in progress", { cause: error });
-      await rm(this.lockPath);
-      await acquire();
+      try {
+        await handle.close();
+      } catch (error) {
+        failure ??= error;
+      }
+      if (failure !== undefined) {
+        await rm(this.lockPath, { force: true });
+        throw failure;
+      }
+    };
+    for (;;) {
+      try {
+        await acquire();
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        let metadata: unknown;
+        let metadataStat;
+        try {
+          metadataStat = await lstat(this.lockPath);
+          if (!metadataStat.isFile() || metadataStat.isSymbolicLink()) {
+            throw new Error("Run mutation lock metadata is unsafe");
+          }
+          metadata = JSON.parse(await readFile(this.lockPath, "utf8")) as unknown;
+        } catch (readError) {
+          if ((readError as NodeJS.ErrnoException).code === "ENOENT") continue;
+          if (metadataStat === undefined || !metadataStat.isFile() || metadataStat.isSymbolicLink()) {
+            throw new Error("Run mutation lock metadata is unreadable", { cause: readError });
+          }
+        }
+        const expiresAt = lockExpiry(metadata) ?? metadataStat.mtimeMs + this.lockTtlMs;
+        if (expiresAt > this.clock().getTime()) {
+          throw new Error("Run mutation is already in progress", { cause: error });
+        }
+        await rm(this.lockPath, { force: true });
+      }
     }
     try {
       return await operation();

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readFile, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -54,6 +54,30 @@ test("run repository never exposes partial lock metadata under contention", asyn
   for (const result of results) {
     if (result.status === "rejected") assert.match(String(result.reason), /Run mutation is already in progress/u);
   }
+});
+
+test("run repository treats fresh partial lock metadata as active and reclaims it after TTL", async () => {
+  const root = await mkdtemp(join(tmpdir(), "apex-run-partial-lock-"));
+  const now = new Date("2026-01-01T00:00:00.000Z");
+  const store = new ProjectStore(
+    root,
+    () => now,
+    () => "run-1",
+  );
+  await store.initializeProject({ projectId: "demo", displayName: "Demo", defaultIacTool: "bicep" });
+  await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
+  const directory = store.runDirectory("demo", "run-1");
+  const lockPath = join(directory, ".run-mutation.lock");
+  const repository = new RunRepository(directory, { clock: () => now, lockTtlMs: 30_000 });
+
+  await writeFile(lockPath, "");
+  await utimes(lockPath, now, now);
+  await assert.rejects(repository.read(), /Run mutation is already in progress/u);
+
+  const expired = new Date(now.getTime() - 31_000);
+  await utimes(lockPath, expired, expired);
+  assert.equal((await repository.read()).projectId, "demo");
+  await assert.rejects(readFile(lockPath), (error: unknown) => (error as NodeJS.ErrnoException).code === "ENOENT");
 });
 
 test("run repository rejects a mutation when the validated journal head changed", async () => {
