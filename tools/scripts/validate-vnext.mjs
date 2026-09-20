@@ -83,7 +83,7 @@ const SECRET_KEY = /(secret|password|passwd|token|privateKey|clientSecret|connec
 const SOURCE_IMPORT = /(?:from\s+|import\s*\()["']([^"']+)["']/g;
 const ARM_MCP_ENDPOINT = "https://mcp.management.azure.com";
 const ARM_MCP_TOOLSET = "CostManagement,Pricing";
-const AZURE_MCP_PACKAGE_VERSION = "3.0.0-beta.37";
+const AZURE_MCP_PACKAGE_VERSION = "3.0.0-beta.45";
 const ARM_MCP_READ_TOOLS = [
   "get_retail_prices",
   "query_costs",
