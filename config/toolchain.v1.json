@@ -42,7 +42,7 @@
       "newestObservedVersion": "1.138.0",
       "minimumSupportedVersion": "1.138.0",
       "installedVersion": "1.138.0",
-      "installedCopilotChatVersion": "0.58.0",
+      "installedCopilotChatVersion": "0.66.0",
       "historicalFixtureVersion": "1.130.0",
       "historicalFixtureCopilotChatVersion": "0.58.0",
       "observedAt": "2026-09-20",
@@ -53,7 +53,7 @@
       },
       "postCutoffObservation": {
         "version": "1.138.0",
-        "copilotChatVersion": "0.58.0",
+        "copilotChatVersion": "0.66.0",
         "observedAt": "2026-09-20",
         "disposition": "selected-current-candidate"
       },

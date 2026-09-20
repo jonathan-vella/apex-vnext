@@ -26,7 +26,7 @@ test("preflight reports ready for the bound candidate and minimum supported clie
     "git rev-parse HEAD^{tree}": `${gate.candidate.tree}\n`,
     "git status --porcelain --untracked-files=no": "",
     "code --version": `${toolchain.core.vscode.minimumSupportedVersion}\n`,
-    "code --list-extensions --show-versions": "github.copilot-chat@0.58.0\n",
+    "code --list-extensions --show-versions": `github.copilot-chat@${toolchain.core.vscode.installedCopilotChatVersion}\n`,
     "copilot --version": `${toolchain.core.copilotCli.selectedExactVersion}\n`,
   });
   const receipt = buildOptimizationClientPreflight({ gate, toolchain, run });
