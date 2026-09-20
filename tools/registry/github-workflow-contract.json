@@ -4,14 +4,42 @@
   "expectedRequiredContexts": ["ci", "CodeQL"],
   "managedContexts": ["CodeQL"],
   "actionVersions": {
-    "actions/checkout": ["v7"],
-    "actions/download-artifact": ["v8"],
-    "actions/github-script": ["v9"],
-    "actions/setup-python": ["v6"],
-    "actions/upload-artifact": ["v7"],
-    "azure/login": ["v3"],
-    "hashicorp/setup-terraform": ["v4"],
-    "peter-evans/create-pull-request": ["v8"]
+    "actions/checkout": {
+      "release": "v7.0.1",
+      "sha": "3d3c42e5aac5ba805825da76410c181273ba90b1"
+    },
+    "actions/download-artifact": {
+      "release": "v8.0.0",
+      "sha": "70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3"
+    },
+    "actions/github-script": {
+      "release": "v9.0.0",
+      "sha": "3a2844b7e9c422d3c10d287c895573f7108da1b3"
+    },
+    "actions/setup-node": {
+      "release": "v6.0.0",
+      "sha": "2028fbc5c25fe9cf00d9f06a71cc4710d4507903"
+    },
+    "actions/setup-python": {
+      "release": "v6.0.0",
+      "sha": "e797f83bcb11b83ae66e0230d6156d7c80228e7c"
+    },
+    "actions/upload-artifact": {
+      "release": "v7.0.1",
+      "sha": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+    },
+    "azure/login": {
+      "release": "v3.1.0",
+      "sha": "a641126d1b8aa4d1fa005f4f92df94a3a4c4c906"
+    },
+    "hashicorp/setup-terraform": {
+      "release": "v4.0.1",
+      "sha": "dfe3c3f87815947d99a8997f908cb6525fc44e9e"
+    },
+    "peter-evans/create-pull-request": {
+      "release": "v8.1.1",
+      "sha": "5f6978faf089d4d20b00c7766989d076bb2fc7f1"
+    }
   },
   "localActions": {
     ".github/actions/setup-node-repo/action.yml": "bcd3482dfefc75687a780123e9a1a698090c184a7b05cb601edb8eff4dd67183",
@@ -25,7 +53,7 @@
       "triggerDigest": "d200653bd7eeaf47f016907cfad28dff6696409693f772b5ed42f02e1e1d0723",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "e096ac61b6a99d7e8a60d1d3182b2da8ed89d06494c8d9cdfd069a7270773ede",
+      "jobsDigest": "7e4b2ca85e87fa6dbe3d9af879b33ba3cb49581c261b2c3fbe8d32635b3f5553",
       "jobs": {
         "policy": "Branch Policy"
       }
@@ -37,7 +65,7 @@
       "triggerDigest": "5c375602c9ef5d8ec711bfa7db1aaaf0484d84e8339627fa7f3bcb8de81edbb6",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "d4bdeff53e0a79f5ecba6b24ce070796be59764e08d08d955bcc864e4d23b4e5",
+      "jobsDigest": "9a4712e575acaab733c44069dae3f10aaa4cdc362caae67c2e64c92de1bcf335",
       "jobs": {
         "ci": "ci"
       }
@@ -49,7 +77,7 @@
       "triggerDigest": "a0ac18069f4b7b00102abf752b0dfdcc30eedbfb4a326c5eda263b7cb9a615a9",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "66dc42a8f8d8a3402ee88a262ab57f05d46a45c0595b0c793ecfc5111f3e4bcf",
+      "jobsDigest": "19a6046a4601f3de8461df44b8c8fa4566e65a535cd62de6ab69eeb1a2d1a251",
       "jobs": {
         "validate": "Markdown docs"
       }
@@ -61,7 +89,7 @@
       "triggerDigest": "37f673b0e102c919b3f5ca1275e591d4b46b9b44f0e7a9b02d1497725ece322c",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "1a9c62d79d458b19d4fc81f4acd0df6e4ddd29697af44ed8f4ec7e3de96fad4a",
+      "jobsDigest": "d76d73eefd188c32102c90547cb00d007ac19bd8b56f43b025f9fb48fb86db05",
       "jobs": {
         "collect-baseline": "collect-baseline"
       }
@@ -73,7 +101,7 @@
       "triggerDigest": "c487b034aea7bf4b37f8630c60a34ca80cd25c7cb411cab154b9009a3d8d5440",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "f6575fea1c5d37bb9f05c230778d9501541226c8e35b073ab475f7de38b6719f",
+      "jobsDigest": "94e157831462b9ef7535c57fdf51fb13662ab772452edb0cf02cf535dfcd9ff8",
       "jobs": {
         "terraform": "Terraform fmt + validate",
         "bicep": "Bicep fmt"
@@ -86,7 +114,7 @@
       "triggerDigest": "267a76bf9976b37b8267e70d277289467c5e081a07130713e09f99650755fac5",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "ef151f8720accb255a4fa5992b91062461084e75733aa11951976fa9f1159ffa",
+      "jobsDigest": "762712b8db6affef1616427db60b6fd5127d62f6dfcdd691d11116a75c0a7c42",
       "jobs": {
         "qualify": "Exact-head release qualification"
       }
@@ -98,7 +126,7 @@
       "triggerDigest": "cfaeb942288dcbcc4c8631ac5b901b073dc1acbbe285c3c40baaec41bc425f57",
       "permissionsDigest": "d57abeeb8232850a40cc2fd3e29e491dd077df7b2a7988ae52899fba4527b761",
       "concurrencyDigest": "1cf197bb4117f498288d0df9e90c8d763fe22f45c6b50310ae61aa8bca8a4178",
-      "jobsDigest": "2c471594c00a1925117e4541f6aa1e2b578a8239a2293043c1c93d0a430e4233",
+      "jobsDigest": "bd8db5fa5823d2101ffc024a193361f95db6d44971503c11cbb355120b5a641a",
       "jobs": {
         "publish": "Publish trusted npm release"
       }
@@ -110,7 +138,7 @@
       "triggerDigest": "e3ded6e02ec4d49557432b3b0d6fba9b1e37aa8136ebb240386c6d72546b4ec9",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "ac5c13ccbc116722f751295746c3c0d50eb7a8c994519ad66f4c2ed00f8ecc81",
-      "jobsDigest": "e967c3cc5bbac5969a5346436a7609e56d5eb41f53a419d3b7b49952089f9489",
+      "jobsDigest": "07cab1d3c217973e65362d438622c51a9cb75abde706d723481b25f4b9badb51",
       "jobs": {
         "validate_dispatch": "Validate exact dispatch",
         "apply": "Import local Gate 4 approval and deploy exact preview"
@@ -123,7 +151,7 @@
       "triggerDigest": "41f525188d27cb3a1fea9eff84337b73795b50d52df7d806b8d4d6a899e7d39a",
       "permissionsDigest": "0686420875052835389cb6e71bf20b413979858f142d3c2eb5c3efd881b5b4c9",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "860bc37c239ecd743c74092cbf0d3c6221a8d71b89bef468272d7b0a4510fd7f",
+      "jobsDigest": "f8cec492c511c31b11b1b8750222b4d7359db121b3c063ffc6512d31d9a2f1b1",
       "jobs": {
         "refresh-avm-module-index": "Refresh AVM Module Index",
         "track-deprecations": "Track Azure Deprecations",

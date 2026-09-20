@@ -14,6 +14,7 @@ const contract = JSON.parse(readFileSync("tools/registry/github-workflow-contrac
 const schema = JSON.parse(readFileSync("tools/registry/schemas/github-workflow-contract.schema.json", "utf8"));
 const workflowTexts = loadWorkflowTexts();
 const localActionTexts = loadLocalActionTexts(Object.keys(contract.localActions));
+const checkoutPin = `actions/checkout@${contract.actionVersions["actions/checkout"].sha}`;
 
 function validate(texts = workflowTexts, value = contract) {
   return validateGithubWorkflowContract({ contract: value, schema, workflowTexts: texts, localActionTexts });
@@ -71,7 +72,7 @@ test("rejects trigger, permission, and action-version drift", () => {
     ).some((error) => error.includes("permissions contract drift")),
   );
   assert.ok(
-    validate(mutate(".github/workflows/ci.yml", "actions/checkout@v7", "actions/checkout@latest")).some((error) =>
+    validate(mutate(".github/workflows/ci.yml", checkoutPin, "actions/checkout@latest")).some((error) =>
       error.includes("mutable or malformed action reference"),
     ),
   );
@@ -90,7 +91,7 @@ test("rejects job permission escalation, no-op execution, and exact action subst
     ),
   );
   assert.ok(
-    validate(mutate(path, "actions/checkout@v7", "actions/checkout@v6")).some((error) =>
+    validate(mutate(path, checkoutPin, "actions/checkout@v6")).some((error) =>
       error.includes("complete job contract drift"),
     ),
   );

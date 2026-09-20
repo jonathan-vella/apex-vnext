@@ -337,8 +337,8 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
       const version = action.slice(separator + 1);
       if (separator < 1 || version === "main" || version === "master" || version === "latest") {
         errors.push(`${expected.path}: mutable or malformed action reference: ${action}`);
-      } else if (!(contract.actionVersions[name] ?? []).includes(version)) {
-        errors.push(`${expected.path}: unapproved action version: ${action}`);
+      } else if (contract.actionVersions[name]?.sha !== version) {
+        errors.push(`${expected.path}: unapproved immutable action pin: ${action}`);
       }
     }
     for (const action of workflowLocalActions(value)) referencedLocalActions.add(action);
@@ -367,7 +367,9 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
     errors.push("release qualification permissions must remain exactly contents read with no job override");
   }
   const releaseActions = workflowActions({ jobs: { qualify: releaseJob } });
-  const allowedReleaseActions = ["actions/checkout@v7", "actions/upload-artifact@v7"];
+  const checkoutAction = `actions/checkout@${contract.actionVersions["actions/checkout"].sha}`;
+  const uploadArtifactAction = `actions/upload-artifact@${contract.actionVersions["actions/upload-artifact"].sha}`;
+  const allowedReleaseActions = [checkoutAction, uploadArtifactAction];
   const localReleaseActions = releaseSteps
     .filter((step) => step !== null && typeof step === "object" && String(step.uses ?? "").startsWith("./"))
     .map((step) => step.uses);
@@ -383,7 +385,7 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
   const checkout = checkouts.find((step) => step.name === "Checkout exact candidate");
   if (
     checkouts.length !== 1 ||
-    checkout?.uses !== "actions/checkout@v7" ||
+    checkout?.uses !== checkoutAction ||
     checkout.with?.ref !== "${{ github.event.pull_request.head.sha || github.sha }}" ||
     checkout.with?.["persist-credentials"] !== false
   ) {
@@ -409,7 +411,7 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
     .filter(Boolean);
   if (
     uploads.length !== 1 ||
-    upload?.uses !== "actions/upload-artifact@v7" ||
+    upload?.uses !== uploadArtifactAction ||
     upload.if !== "always()" ||
     upload.with?.name !== "release-qualification-${{ steps.candidate.outputs.candidate_sha }}" ||
     upload.with?.["if-no-files-found"] !== "error" ||
