@@ -8,11 +8,6 @@
   ],
   "scripts": {
     "prepare": "lefthook install",
-    "debug:up": "docker compose -f tools/debug/compose.yaml up -d --wait --wait-timeout 180",
-    "debug:down": "docker compose -f tools/debug/compose.yaml down",
-    "debug:status": "docker compose -f tools/debug/compose.yaml ps",
-    "debug:logs": "docker compose -f tools/debug/compose.yaml logs --tail 100",
-    "debug:smoke": "node tools/scripts/debug-smoke.mjs",
     "debug:enable": "node tools/scripts/debug-session.mjs enable",
     "debug:collector": "node tools/scripts/debug-session.mjs collector",
     "debug:copilot": "node tools/scripts/debug-session.mjs copilot",

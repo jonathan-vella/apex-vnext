@@ -66,7 +66,7 @@ environments are reviewed through their manifests and lockfiles rather than as s
 | L03 | CLI/service single-output completion                           | Removed; CLI and MCP use atomic typed output bundles                    | WP05 complete     |
 | L05 | Governance collector/importer                                  | Dirty current-only work requires review and focused qualification       | WP04              |
 | L07 | Policy-precheck validator and tests                            | Preserve current v2 rejection coverage; inspect redundant wrappers only | WP03/WP07         |
-| L12 | Docker debug compose and scripts                               | Approved retirement; host receiver remains current                      | WP08              |
+| L12 | Docker debug compose and scripts                               | Removed; host Azure CLI receiver and privacy tests retained              | WP08 complete     |
 | L13 | `apex-recall` generated or environment residue                 | Confirm ownership before removal                                        | WP07              |
 | L19 | Functions recipe materialization                               | Retire unavailable executable scaffolding; retain one backlog item      | WP08              |
 | L21 | `validate:terraform` failure swallowing                        | Repaired and regression-tested; real cache error now fails truthfully   | WP03              |

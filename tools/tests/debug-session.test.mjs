@@ -153,7 +153,7 @@ test("host collector restricts credentials to Azure CLI and binds only loopback"
   assert.equal(config.exporters.file.rotation.max_backups, 2);
   assert.ok(config.service.pipelines.traces.processors.includes("transform/privacy"));
   assert.ok(config.service.pipelines.logs.processors.includes("resource/registration"));
-  assert.equal(base.extensions.azure_auth.use_default, undefined);
+  assert.equal(base.extensions.azure_auth.use_default, true);
 });
 
 test("registration is idempotent and disabling preserves project settings and workspace edits", (context) => {

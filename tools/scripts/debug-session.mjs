@@ -44,8 +44,7 @@ export function argumentsFor(args) {
   const [action, ...extra] = parsed.positionals;
   if (!["enable", "collector", "copilot", "assess", "disable"].includes(action) || extra.length)
     throw new Error("Expected enable|collector|copilot|assess|disable");
-  if (parsed.values.auth !== "azure-cli")
-    throw new Error("These development commands support --auth azure-cli only; legacy Docker commands remain separate");
+  if (parsed.values.auth !== "azure-cli") throw new Error("These development commands support --auth azure-cli only");
   if (passthrough.length && action !== "copilot") throw new Error("Only copilot accepts arguments after --");
   if (!/^\d+$/u.test(parsed.values.since) || Number(parsed.values.since) < 1 || Number(parsed.values.since) > 720)
     throw new Error("--since must be 1..720 hours");
