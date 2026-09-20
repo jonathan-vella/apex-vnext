@@ -17,58 +17,42 @@
         {
           "source": "references/adr-template.md",
           "disposition": "adapt",
-          "targets": [
-            "references/decision-record-fields.md"
-          ],
+          "targets": ["references/decision-record-fields.md"],
           "reason": "Preserves the typed decision fields while removing file-authoring and numbering instructions.",
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/example-prompts.md",
           "disposition": "adapt",
-          "targets": [
-            "references/decision-examples.md"
-          ],
+          "targets": ["references/decision-examples.md"],
           "reason": "Preserves representative trade-off shapes without treating them as automatic recommendations.",
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/guardrails.md",
           "disposition": "adapt",
-          "targets": [
-            "references/decision-guardrails.md"
-          ],
+          "targets": ["references/decision-guardrails.md"],
           "reason": "Preserves decision-quality guardrails while excluding direct file and deployment operations.",
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/quality-checklist.md",
           "disposition": "adapt",
-          "targets": [
-            "references/decision-quality.md"
-          ],
+          "targets": ["references/decision-quality.md"],
           "reason": "Preserves bounded decision quality checks in managed consumer guidance.",
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
     },
@@ -87,9 +71,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/02-architecture-template.md",
@@ -99,9 +81,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/04-plan-template.md",
@@ -111,9 +91,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/05-code-template.md",
@@ -123,9 +101,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/06-deploy-template.md",
@@ -135,9 +111,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/07-docs-template.md",
@@ -147,9 +121,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/cost-estimate-sections.md",
@@ -159,9 +131,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/cost-estimate-standards.md",
@@ -171,9 +141,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/styling-standards.md",
@@ -183,9 +151,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/01-requirements.template.md",
@@ -195,9 +161,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/02-architecture-assessment.template.md",
@@ -207,9 +171,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/03-des-cost-estimate.template.md",
@@ -219,9 +181,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/04-environment-manifest.template.json",
@@ -231,9 +191,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/04-governance-constraints.template.md",
@@ -243,9 +201,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/04-iac-contract.template.json",
@@ -255,9 +211,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/04-implementation-plan.template.md",
@@ -267,9 +221,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/04-policy-property-map.template.json",
@@ -279,9 +231,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/04-preflight-check.template.md",
@@ -291,9 +241,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/05-iac-handoff.template.json",
@@ -303,9 +251,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/05-implementation-reference.template.md",
@@ -315,9 +261,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/06-deployment-summary.template.md",
@@ -327,9 +271,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/07-ab-cost-estimate.template.md",
@@ -339,9 +281,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/07-backup-dr-plan.template.md",
@@ -351,9 +291,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/07-compliance-matrix.template.md",
@@ -363,9 +301,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/07-design-document.template.md",
@@ -375,9 +311,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/07-documentation-index.template.md",
@@ -387,9 +321,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/07-operations-runbook.template.md",
@@ -399,9 +331,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/07-resource-inventory.template.md",
@@ -411,9 +341,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/09-lessons-learned.template.md",
@@ -423,9 +351,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/PROJECT-README.template.md",
@@ -435,9 +361,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/README.md",
@@ -447,9 +371,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Deterministic guidance-migration validation and managed consumer packaging prove this deferred artifact boundary is recorded.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
     },
@@ -462,29 +384,20 @@
         {
           "source": "references/avm-pitfalls.md",
           "disposition": "adapt",
-          "targets": [
-            "references/avm-and-codegen-acceptance.md",
-            "references/compiler-and-provider-gotchas.md"
-          ],
+          "targets": ["references/avm-and-codegen-acceptance.md", "references/compiler-and-provider-gotchas.md"],
           "reason": "Retain exact-schema, language, identity, SKU, query, and provider failure rules without commands or mutable version claims.",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/bicepparam-pattern.md",
           "disposition": "adapt",
-          "targets": [
-            "references/module-interfaces-and-parameters.md"
-          ],
+          "targets": ["references/module-interfaces-and-parameters.md"],
           "reason": "Retain environment-neutral parameter binding and remove legacy agent and deployment mechanics.",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/budget-pattern.md",
@@ -493,23 +406,17 @@
           "reason": "The source delegates this content to Azure defaults; restore it with the defaults cost-monitoring slice.",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ],
+          "scenarioIds": ["guidance-migration-ledger"],
           "capabilityOwner": "future bounded consumer capability"
         },
         {
           "source": "references/codegen-validation-checklist.md",
           "disposition": "adapt",
-          "targets": [
-            "references/codegen-acceptance-checklist.md"
-          ],
+          "targets": ["references/codegen-acceptance-checklist.md"],
           "reason": "Retain portable acceptance checks and remove retired artifact names and agent choreography.",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/common-patterns.md",
@@ -522,48 +429,34 @@
           "reason": "Split network, composition, identity, dependency, and provider rules by when they are needed.",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/hub-spoke-pattern.md",
           "disposition": "adapt",
-          "targets": [
-            "references/network-and-observability.md"
-          ],
+          "targets": ["references/network-and-observability.md"],
           "reason": "Retain topology and module-composition rules without embedding one project address plan.",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/module-interface.md",
           "disposition": "adapt",
-          "targets": [
-            "references/module-interfaces-and-parameters.md"
-          ],
+          "targets": ["references/module-interfaces-and-parameters.md"],
           "reason": "Retain the stable module contract while allowing typed exceptions for resources without identities or diagnostics.",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/private-endpoint-pattern.md",
           "disposition": "adapt",
-          "targets": [
-            "references/network-and-observability.md"
-          ],
+          "targets": ["references/network-and-observability.md"],
           "reason": "Retain endpoint, DNS ownership, zone-group, and common subresource guidance without direct generation commands.",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         }
       ],
       "lifecycle": "complete"
@@ -578,28 +471,20 @@
         {
           "source": "references/auth-best-practices.md",
           "disposition": "adapt",
-          "targets": [
-            "references/compliance-finding-criteria.md"
-          ],
+          "targets": ["references/compliance-finding-criteria.md"],
           "reason": "Preserves identity posture and least-privilege recommendation criteria without credential access.",
           "replacementProof": "Managed finding criteria separates authentication signals from direct identity actions.",
           "rollbackGate": "Restore planned status if guidance prescribes identity mutation or secret access.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azqr-recommendations.md",
           "disposition": "adapt",
-          "targets": [
-            "references/compliance-finding-criteria.md"
-          ],
+          "targets": ["references/compliance-finding-criteria.md"],
           "reason": "Preserves recommendation category and evidence-backed severity interpretation.",
           "replacementProof": "Managed finding criteria classifies category, severity, scope, and confidence.",
           "rollbackGate": "Restore planned status if recommendation evidence loses scope or confidence limits.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azqr-remediation-patterns.md",
@@ -609,22 +494,16 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azure-keyvault-expiration-audit.md",
           "disposition": "adapt",
-          "targets": [
-            "references/compliance-finding-criteria.md"
-          ],
+          "targets": ["references/compliance-finding-criteria.md"],
           "reason": "Preserves redacted expiration interpretation without Key Vault enumeration or content access.",
           "replacementProof": "Managed finding criteria retains expiry, coverage, and indeterminate semantics.",
           "rollbackGate": "Restore planned status if sensitive values or direct vault access are introduced.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azure-quick-review.md",
@@ -634,9 +513,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azure-resource-graph.md",
@@ -646,9 +523,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-keyvault-certificates-rust.md",
@@ -658,9 +533,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-keyvault-keys-rust.md",
@@ -670,9 +543,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-keyvault-keys-ts.md",
@@ -682,9 +553,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-keyvault-py.md",
@@ -694,9 +563,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-keyvault-secrets-rust.md",
@@ -706,9 +573,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-keyvault-secrets-ts.md",
@@ -718,9 +583,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-security-keyvault-keys-dotnet.md",
@@ -730,9 +593,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-security-keyvault-keys-java.md",
@@ -742,9 +603,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-security-keyvault-secrets-java.md",
@@ -754,9 +613,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
     },
@@ -770,54 +627,38 @@
         {
           "source": "references/recommendation-workflow.md",
           "disposition": "adapt",
-          "targets": [
-            "references/recommendation-and-scale-rules.md"
-          ],
+          "targets": ["references/recommendation-and-scale-rules.md"],
           "reason": "The managed reference retains requirement gathering, VM versus VMSS, option comparison, and evidence blockers without source fetch commands.",
           "replacementProof": "The managed reference records model, family, capacity, evidence, alternatives, and unresolved-risk rules.",
           "rollbackGate": "Remove only after a source comparison confirms the consumer reference no longer carries these advisory rules.",
-          "scenarioIds": [
-            "compute-guidance-parity"
-          ]
+          "scenarioIds": ["compute-guidance-parity"]
         },
         {
           "source": "references/retail-prices-api.md",
           "disposition": "adapt",
-          "targets": [
-            "references/recommendation-and-scale-rules.md"
-          ],
+          "targets": ["references/recommendation-and-scale-rules.md"],
           "reason": "The managed reference retains pricing comparison inputs, VMSS range accounting, and stale-evidence handling without API calls or query syntax.",
           "replacementProof": "The managed reference identifies retail price lookup as capability evidence and records the required comparison fields.",
           "rollbackGate": "Remove only after a source comparison confirms price-evidence intent remains covered by a managed target.",
-          "scenarioIds": [
-            "compute-guidance-parity"
-          ]
+          "scenarioIds": ["compute-guidance-parity"]
         },
         {
           "source": "references/vm-families.md",
           "disposition": "adapt",
-          "targets": [
-            "references/recommendation-and-scale-rules.md"
-          ],
+          "targets": ["references/recommendation-and-scale-rules.md"],
           "reason": "The managed reference retains workload-to-family trade-offs and evidence constraints without asserting time-sensitive SKU facts.",
           "replacementProof": "The managed reference defines compatible family categories, burstable and Spot cautions, and current-evidence requirements.",
           "rollbackGate": "Remove only after a source comparison confirms family-selection rules are managed elsewhere.",
-          "scenarioIds": [
-            "compute-guidance-parity"
-          ]
+          "scenarioIds": ["compute-guidance-parity"]
         },
         {
           "source": "references/vmss-guide.md",
           "disposition": "adapt",
-          "targets": [
-            "references/recommendation-and-scale-rules.md"
-          ],
+          "targets": ["references/recommendation-and-scale-rules.md"],
           "reason": "The managed reference retains scale-set suitability, orchestration, capacity, and autoscale decision rules without configuration instructions.",
           "replacementProof": "The managed reference records VMSS signals, Flexible guidance, scale inputs, and availability caveats.",
           "rollbackGate": "Remove only after a source comparison confirms VMSS decision rules are managed elsewhere.",
-          "scenarioIds": [
-            "compute-guidance-parity"
-          ]
+          "scenarioIds": ["compute-guidance-parity"]
         }
       ]
     },
@@ -836,9 +677,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azure-quick-review.md",
@@ -848,9 +687,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azure-redis.md",
@@ -860,9 +697,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azure-resource-graph.md",
@@ -872,9 +707,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/best-practices-notes.md",
@@ -884,9 +717,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/detailed-workflow-steps.md",
@@ -896,9 +727,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-resource-manager-redis-dotnet.md",
@@ -908,9 +737,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/workflow-steps.md",
@@ -920,9 +747,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/redis-detailed-cache-analysis.md",
@@ -932,9 +757,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "templates/redis-subscription-level-report.md",
@@ -944,9 +767,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
     },
@@ -965,9 +786,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azure-cli-auth-validation.md",
@@ -977,37 +796,27 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/deprecated-services.md",
           "disposition": "already-owned",
-          "targets": [
-            "references/security-baseline.md"
-          ],
+          "targets": ["references/security-baseline.md"],
           "reason": "Managed security guidance already requires supported service and runtime selections.",
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/naming-full-examples.md",
           "disposition": "already-owned",
-          "targets": [
-            "references/naming.md"
-          ],
+          "targets": ["references/naming.md"],
           "reason": "Managed naming guidance already owns deterministic binding rules and service constraints.",
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/policy-effect-decision-tree.md",
@@ -1017,51 +826,37 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/security-baseline-full.md",
           "disposition": "already-owned",
-          "targets": [
-            "references/security-baseline.md"
-          ],
+          "targets": ["references/security-baseline.md"],
           "reason": "Managed security guidance already owns the stable baseline and evidence boundary.",
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/service-matrices.md",
           "disposition": "adapt",
-          "targets": [
-            "references/decision-boundaries.md"
-          ],
+          "targets": ["references/decision-boundaries.md"],
           "reason": "Preserves matrix use as a comparison aid rather than an automatic selection authority.",
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/waf-criteria.md",
           "disposition": "already-owned",
-          "targets": [
-            "references/service-selection.md"
-          ],
+          "targets": ["references/service-selection.md"],
           "reason": "Managed service guidance already owns WAF comparison questions and evidence boundaries.",
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
     },
@@ -1080,9 +875,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/global-rules.md",
@@ -1092,9 +885,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/pre-deploy-checklist.md",
@@ -1104,9 +895,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/README.md",
@@ -1116,9 +905,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azcli/README.md",
@@ -1128,9 +915,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azcli/errors.md",
@@ -1140,9 +925,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azcli/verify.md",
@@ -1152,9 +935,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azd/README.md",
@@ -1164,9 +945,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azd/ef-migrations.md",
@@ -1176,9 +955,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azd/errors.md",
@@ -1188,9 +965,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azd/functions-deploy.md",
@@ -1200,9 +975,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azd/post-deployment.md",
@@ -1212,9 +985,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azd/sql-entra-auth.md",
@@ -1224,9 +995,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azd/sql-managed-identity.md",
@@ -1236,9 +1005,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azd/verify.md",
@@ -1248,9 +1015,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/bicep/README.md",
@@ -1260,9 +1025,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/bicep/errors.md",
@@ -1272,9 +1035,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/bicep/verify.md",
@@ -1284,9 +1045,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/cicd/README.md",
@@ -1296,9 +1055,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/cicd/errors.md",
@@ -1308,9 +1065,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/cicd/examples/azdo-azd.yml",
@@ -1320,9 +1075,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/cicd/examples/azdo-multistage.yml",
@@ -1332,9 +1085,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/cicd/examples/github-azd.yml",
@@ -1344,9 +1095,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/cicd/examples/github-bicep.yml",
@@ -1356,9 +1105,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/cicd/verify.md",
@@ -1368,9 +1115,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/terraform/README.md",
@@ -1380,9 +1125,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/terraform/errors.md",
@@ -1392,9 +1135,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/terraform/verify.md",
@@ -1404,9 +1145,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/region-availability.md",
@@ -1416,9 +1155,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azd-deployment.md",
@@ -1428,9 +1165,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-identity-dotnet.md",
@@ -1440,9 +1175,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-identity-java.md",
@@ -1452,9 +1185,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-identity-py.md",
@@ -1464,9 +1195,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-identity-ts.md",
@@ -1476,9 +1205,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/troubleshooting.md",
@@ -1488,9 +1215,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
     },
@@ -1509,9 +1234,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/container-apps/README.md",
@@ -1521,9 +1244,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/functions/README.md",
@@ -1533,9 +1254,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/infraops-health-checks.md",
@@ -1545,9 +1264,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/infraops-kql-templates.md",
@@ -1557,9 +1274,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/infraops-remediation-playbooks.md",
@@ -1569,9 +1284,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/kql-queries.md",
@@ -1581,9 +1294,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
     },
@@ -1610,22 +1321,16 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/query-patterns.md",
           "disposition": "adapt",
-          "targets": [
-            "references/kql-evidence-interpretation.md"
-          ],
+          "targets": ["references/kql-evidence-interpretation.md"],
           "reason": "Preserves bounded KQL retrieval, aggregation, time-series, correlation, and schema interpretation.",
           "replacementProof": "Managed KQL guidance retains query limits and defers execution to a qualified capability.",
           "rollbackGate": "Restore planned status if the reference implies query execution or inferred data.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
     },
@@ -1644,9 +1349,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/apim.md",
@@ -1656,9 +1359,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/architecture.md",
@@ -1668,9 +1369,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/aspire.md",
@@ -1680,9 +1379,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/auth-best-practices.md",
@@ -1692,9 +1389,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azure-context.md",
@@ -1704,9 +1399,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/generate.md",
@@ -1716,9 +1409,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/global-rules.md",
@@ -1728,9 +1419,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/phases.md",
@@ -1740,9 +1429,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/plan-template.md",
@@ -1752,9 +1439,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipe-selection.md",
@@ -1764,9 +1449,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azcli/README.md",
@@ -1776,9 +1459,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azcli/commands.md",
@@ -1788,9 +1469,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azcli/scripts.md",
@@ -1800,9 +1479,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azd/README.md",
@@ -1812,9 +1489,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azd/aspire.md",
@@ -1824,9 +1499,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azd/azure-yaml.md",
@@ -1836,9 +1509,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azd/docker.md",
@@ -1848,9 +1519,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azd/iac-rules.md",
@@ -1860,9 +1529,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azd/terraform.md",
@@ -1872,9 +1539,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/bicep/README.md",
@@ -1884,9 +1549,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/bicep/patterns.md",
@@ -1896,9 +1559,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/terraform/README.md",
@@ -1908,9 +1569,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/terraform/patterns.md",
@@ -1920,9 +1579,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/region-availability.md",
@@ -1932,9 +1589,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/requirements.md",
@@ -1944,9 +1599,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/research.md",
@@ -1956,9 +1609,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/resources-limits-quotas.md",
@@ -1968,9 +1619,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/runtimes/nodejs.md",
@@ -1980,9 +1629,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/scan.md",
@@ -1992,9 +1639,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azd-deployment.md",
@@ -2004,9 +1649,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-appconfiguration-java.md",
@@ -2016,9 +1659,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-appconfiguration-py.md",
@@ -2028,9 +1669,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-appconfiguration-ts.md",
@@ -2040,9 +1679,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-identity-dotnet.md",
@@ -2052,9 +1689,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-identity-java.md",
@@ -2064,9 +1699,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-identity-py.md",
@@ -2076,9 +1709,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/sdk/azure-identity-ts.md",
@@ -2088,9 +1719,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/security.md",
@@ -2100,9 +1729,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/aks/README.md",
@@ -2112,9 +1739,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/aks/addons.md",
@@ -2124,9 +1749,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/aks/bicep.md",
@@ -2136,9 +1759,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/aks/manifests.md",
@@ -2148,9 +1769,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/app-insights/README.md",
@@ -2160,9 +1779,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/app-service/README.md",
@@ -2172,9 +1789,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/app-service/bicep.md",
@@ -2184,9 +1799,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/app-service/deployment-slots.md",
@@ -2196,9 +1809,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/app-service/scaling.md",
@@ -2208,9 +1819,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/container-apps/README.md",
@@ -2220,9 +1829,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/container-apps/bicep.md",
@@ -2232,9 +1839,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/container-apps/environment.md",
@@ -2244,9 +1849,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/container-apps/health-probes.md",
@@ -2256,9 +1859,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/container-apps/scaling.md",
@@ -2268,9 +1869,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/cosmos-db/README.md",
@@ -2280,9 +1879,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/cosmos-db/bicep.md",
@@ -2292,9 +1889,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/cosmos-db/partitioning.md",
@@ -2304,9 +1899,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/cosmos-db/sdk.md",
@@ -2316,9 +1909,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/durable-task-scheduler/README.md",
@@ -2328,9 +1919,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/durable-task-scheduler/bicep.md",
@@ -2340,9 +1929,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/durable-task-scheduler/dotnet.md",
@@ -2352,9 +1939,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/durable-task-scheduler/java.md",
@@ -2364,9 +1949,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/durable-task-scheduler/javascript.md",
@@ -2376,9 +1959,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/durable-task-scheduler/python.md",
@@ -2388,9 +1969,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/event-grid/README.md",
@@ -2400,9 +1979,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/event-grid/bicep.md",
@@ -2412,9 +1989,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/event-grid/subscriptions.md",
@@ -2424,9 +1999,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/foundry/README.md",
@@ -2436,9 +2009,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/foundry/region-availability.md",
@@ -2448,9 +2019,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/functions/README.md",
@@ -2460,9 +2029,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/functions/aspire-containerapps.md",
@@ -2472,9 +2039,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/functions/bicep.md",
@@ -2484,9 +2049,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/functions/durable.md",
@@ -2496,9 +2059,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/functions/terraform.md",
@@ -2508,9 +2069,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/functions/triggers.md",
@@ -2520,9 +2079,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/key-vault/README.md",
@@ -2532,9 +2089,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/key-vault/bicep.md",
@@ -2544,9 +2099,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/key-vault/sdk.md",
@@ -2556,9 +2109,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/logic-apps/README.md",
@@ -2568,9 +2119,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/logic-apps/bicep.md",
@@ -2580,9 +2129,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/logic-apps/triggers.md",
@@ -2592,9 +2139,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/service-bus/README.md",
@@ -2604,9 +2149,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/service-bus/bicep.md",
@@ -2616,9 +2159,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/service-bus/patterns.md",
@@ -2628,9 +2169,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/sql-database/README.md",
@@ -2640,9 +2179,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/sql-database/auth.md",
@@ -2652,9 +2189,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/sql-database/bicep.md",
@@ -2664,9 +2199,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/sql-database/sdk.md",
@@ -2676,9 +2209,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/static-web-apps/README.md",
@@ -2688,9 +2219,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/static-web-apps/bicep.md",
@@ -2700,9 +2229,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/static-web-apps/deployment.md",
@@ -2712,9 +2239,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/static-web-apps/region-availability.md",
@@ -2724,9 +2249,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/static-web-apps/routing.md",
@@ -2736,9 +2259,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/storage/README.md",
@@ -2748,9 +2269,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/storage/access.md",
@@ -2760,9 +2279,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/services/storage/bicep.md",
@@ -2772,9 +2289,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/specialized-routing.md",
@@ -2784,9 +2299,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
     },
@@ -2805,9 +2318,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/commands.md",
@@ -2817,9 +2328,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/core-workflows.md",
@@ -2829,35 +2338,25 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/resource-name-mapping.md",
           "disposition": "adapt",
-          "targets": [
-            "references/capacity-decision-rules.md"
-          ],
+          "targets": ["references/capacity-decision-rules.md"],
           "reason": "Preserves provider-specific resource-to-quota mapping and unit checks.",
           "replacementProof": "Managed capacity guidance rejects inferred mappings and ambiguous units.",
           "rollbackGate": "Restore planned status if a universal ARM-to-quota mapping is implied.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/troubleshooting.md",
           "disposition": "adapt",
-          "targets": [
-            "references/capacity-decision-rules.md"
-          ],
+          "targets": ["references/capacity-decision-rules.md"],
           "reason": "Preserves unsupported-provider, invalid-scope, and hard-limit blocker semantics.",
           "replacementProof": "Managed capacity guidance routes operational failures to deferred provider capabilities.",
           "rollbackGate": "Restore planned status if troubleshooting becomes executable command guidance.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
     },
@@ -2884,9 +2383,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "assets/template-architecture.md",
@@ -2896,35 +2393,25 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azure-resource-graph.md",
           "disposition": "adapt",
-          "targets": [
-            "references/inventory-query-patterns.md"
-          ],
+          "targets": ["references/inventory-query-patterns.md"],
           "reason": "Preserves bounded Resource Graph scope, type, tag, and orphan-candidate query patterns.",
           "replacementProof": "Managed inventory guidance captures query boundaries and defers ARG execution.",
           "rollbackGate": "Restore planned status if the reference allows direct query execution.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/lookup-workflow.md",
           "disposition": "adapt",
-          "targets": [
-            "references/inventory-query-patterns.md"
-          ],
+          "targets": ["references/inventory-query-patterns.md"],
           "reason": "Preserves lookup pattern selection, pagination, freshness, and result-shaping limits.",
           "replacementProof": "Managed inventory guidance distinguishes complete evidence from partial pages.",
           "rollbackGate": "Restore planned status if lookup results can be represented as complete without coverage.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/visualize.md",
@@ -2934,9 +2421,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
     },
@@ -2950,15 +2435,11 @@
         {
           "source": "references/auth-best-practices.md",
           "disposition": "adapt",
-          "targets": [
-            "references/service-auth-and-sdk-boundary.md"
-          ],
+          "targets": ["references/service-auth-and-sdk-boundary.md"],
           "reason": "The managed reference retains managed-identity, least-privilege, and production credential-posture rules without credential setup or SDK code.",
           "replacementProof": "The managed reference records identity owner, role scope, network posture, and prohibited secret material.",
           "rollbackGate": "Remove only after a source comparison confirms storage authentication posture is managed elsewhere.",
-          "scenarioIds": [
-            "storage-guidance-parity"
-          ]
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-data-tables-java.md",
@@ -2967,9 +2448,7 @@
           "reason": "Java Table SDK installation and data-operation samples are implementation work that can access or mutate data.",
           "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
           "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
-          "scenarioIds": [
-            "storage-guidance-parity"
-          ]
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-data-tables-py.md",
@@ -2978,9 +2457,7 @@
           "reason": "Python Table SDK installation and data-operation samples are implementation work that can access or mutate data.",
           "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
           "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
-          "scenarioIds": [
-            "storage-guidance-parity"
-          ]
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-storage-blob-java.md",
@@ -2989,9 +2466,7 @@
           "reason": "Java Blob SDK installation and blob data-operation samples are implementation work that can access or mutate data.",
           "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
           "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
-          "scenarioIds": [
-            "storage-guidance-parity"
-          ]
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-storage-blob-py.md",
@@ -3000,9 +2475,7 @@
           "reason": "Python Blob SDK installation and blob data-operation samples are implementation work that can access or mutate data.",
           "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
           "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
-          "scenarioIds": [
-            "storage-guidance-parity"
-          ]
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-storage-blob-rust.md",
@@ -3011,9 +2484,7 @@
           "reason": "Rust Blob SDK installation and blob data-operation samples are implementation work that can access or mutate data.",
           "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
           "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
-          "scenarioIds": [
-            "storage-guidance-parity"
-          ]
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-storage-blob-ts.md",
@@ -3022,9 +2493,7 @@
           "reason": "TypeScript Blob SDK installation and blob data-operation samples are implementation work that can access or mutate data.",
           "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
           "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
-          "scenarioIds": [
-            "storage-guidance-parity"
-          ]
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-storage-file-datalake-py.md",
@@ -3033,9 +2502,7 @@
           "reason": "Python Data Lake SDK installation and file-operation samples are implementation work that can access or mutate data.",
           "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
           "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
-          "scenarioIds": [
-            "storage-guidance-parity"
-          ]
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-storage-file-share-py.md",
@@ -3044,9 +2511,7 @@
           "reason": "Python File Share SDK installation and file-operation samples are implementation work that can access or mutate data.",
           "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
           "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
-          "scenarioIds": [
-            "storage-guidance-parity"
-          ]
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-storage-file-share-ts.md",
@@ -3055,9 +2520,7 @@
           "reason": "TypeScript File Share SDK installation and file-operation samples are implementation work that can access or mutate data.",
           "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
           "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
-          "scenarioIds": [
-            "storage-guidance-parity"
-          ]
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-storage-queue-py.md",
@@ -3066,9 +2529,7 @@
           "reason": "Python Queue SDK installation and message-operation samples are implementation work that can access or mutate data.",
           "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
           "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
-          "scenarioIds": [
-            "storage-guidance-parity"
-          ]
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-storage-queue-ts.md",
@@ -3077,9 +2538,7 @@
           "reason": "TypeScript Queue SDK installation and message-operation samples are implementation work that can access or mutate data.",
           "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
           "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
-          "scenarioIds": [
-            "storage-guidance-parity"
-          ]
+          "scenarioIds": ["storage-guidance-parity"]
         },
         {
           "source": "references/sdk-usage.md",
@@ -3088,9 +2547,7 @@
           "reason": "SDK package installation, client construction, and upload samples are direct data operations outside advisory guidance.",
           "replacementProof": "The managed SDK boundary explicitly excludes language SDK installation and data operations.",
           "rollbackGate": "Restore only with an authorized, bounded implementation capability and reviewed operation controls.",
-          "scenarioIds": [
-            "storage-guidance-parity"
-          ]
+          "scenarioIds": ["storage-guidance-parity"]
         }
       ]
     },
@@ -3104,28 +2561,20 @@
         {
           "source": "references/global-rules.md",
           "disposition": "adapt",
-          "targets": [
-            "references/preflight-evidence.md"
-          ],
+          "targets": ["references/preflight-evidence.md"],
           "reason": "Preserves safe stop, proof, and non-advancement semantics as evidence interpretation.",
           "replacementProof": "Managed preflight guidance preserves distinct pass, fail, blocked, stale, and indeterminate results.",
           "rollbackGate": "Restore planned status if global validation rules become direct execution instructions.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/infraops-preflight.md",
           "disposition": "adapt",
-          "targets": [
-            "references/preflight-evidence.md"
-          ],
+          "targets": ["references/preflight-evidence.md"],
           "reason": "Preserves preflight prerequisite, governance, and error classification without command execution.",
           "replacementProof": "Managed preflight guidance routes provider and policy observations to trusted capabilities.",
           "rollbackGate": "Restore planned status if the reference starts invoking CLI, previews, or remediation.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/policy-validation.md",
@@ -3135,9 +2584,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/README.md",
@@ -3147,9 +2594,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azcli/README.md",
@@ -3159,9 +2604,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azcli/errors.md",
@@ -3171,9 +2614,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azd/README.md",
@@ -3183,9 +2624,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azd/environment.md",
@@ -3195,9 +2634,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/azd/errors.md",
@@ -3207,9 +2644,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/bicep/README.md",
@@ -3219,9 +2654,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/bicep/errors.md",
@@ -3231,9 +2664,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/terraform/README.md",
@@ -3243,9 +2674,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/recipes/terraform/errors.md",
@@ -3255,22 +2684,16 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/region-availability.md",
           "disposition": "adapt",
-          "targets": [
-            "references/preflight-evidence.md"
-          ],
+          "targets": ["references/preflight-evidence.md"],
           "reason": "Preserves target-bound region availability evidence and unavailable-result semantics.",
           "replacementProof": "Managed preflight guidance requires target, binding, freshness, and producing authority.",
           "rollbackGate": "Restore planned status if static availability tables are treated as live evidence.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
     },
@@ -3298,35 +2721,25 @@
           "reason": "Bicep registration configuration is state-changing IaC outside advisory identity design guidance.",
           "replacementProof": "The consumer skill prohibits IaC and hands approved intent to an authorized implementation capability.",
           "rollbackGate": "Restore only with a kernel-authorized implementation path and configuration validation.",
-          "scenarioIds": [
-            "entra-guidance-parity"
-          ]
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/api-permissions.md",
           "disposition": "adapt",
-          "targets": [
-            "references/design-and-diagnostics.md"
-          ],
+          "targets": ["references/design-and-diagnostics.md"],
           "reason": "The managed reference retains delegated versus application selection, least-privilege mapping, and consent blockers without granting permissions.",
           "replacementProof": "The managed reference records operation-to-permission intent, consent ownership, and evidence constraints.",
           "rollbackGate": "Remove only after a source comparison confirms permission intent is managed elsewhere.",
-          "scenarioIds": [
-            "entra-guidance-parity"
-          ]
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/auth-best-practices.md",
           "disposition": "adapt",
-          "targets": [
-            "references/design-and-diagnostics.md"
-          ],
+          "targets": ["references/design-and-diagnostics.md"],
           "reason": "The managed reference retains managed-identity, federation, certificate, and no-secret posture decisions without credential code or setup.",
           "replacementProof": "The managed reference records credential posture, owners, lifecycle requirements, and prohibited material.",
           "rollbackGate": "Remove only after a source comparison confirms credential-posture guidance is managed elsewhere.",
-          "scenarioIds": [
-            "entra-guidance-parity"
-          ]
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/cli-commands.md",
@@ -3335,22 +2748,16 @@
           "reason": "Entra CLI commands inspect or mutate registrations, permissions, credentials, and consent outside the consumer boundary.",
           "replacementProof": "The consumer skill prohibits CLI actions and returns authorized capability handoffs instead.",
           "rollbackGate": "Restore only with a kernel-authorized operation capability and reviewed scope controls.",
-          "scenarioIds": [
-            "entra-guidance-parity"
-          ]
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/common-patterns.md",
           "disposition": "adapt",
-          "targets": [
-            "references/design-and-diagnostics.md"
-          ],
+          "targets": ["references/design-and-diagnostics.md"],
           "reason": "The managed reference retains client-class, user-interaction, and service-to-service design distinctions without walkthroughs or implementation examples.",
           "replacementProof": "The managed reference maps client classes to flow intent and identity boundaries.",
           "rollbackGate": "Remove only after a source comparison confirms client-class design rules are managed elsewhere.",
-          "scenarioIds": [
-            "entra-guidance-parity"
-          ]
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/console-app-example.md",
@@ -3359,22 +2766,16 @@
           "reason": "Console authentication code and SDK setup can initiate protocol operations and handle tokens.",
           "replacementProof": "The consumer skill prohibits SDK, protocol, and authentication-testing actions.",
           "rollbackGate": "Restore only with a bounded implementation capability that redacts tokens and controls protocol operations.",
-          "scenarioIds": [
-            "entra-guidance-parity"
-          ]
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/core-workflow.md",
           "disposition": "adapt",
-          "targets": [
-            "references/design-and-diagnostics.md"
-          ],
+          "targets": ["references/design-and-diagnostics.md"],
           "reason": "The managed reference retains registration inputs, flow, permission, and credential design ordering without portal, CLI, or secret actions.",
           "replacementProof": "The managed reference requires identity inputs and returns only typed design intent and handoffs.",
           "rollbackGate": "Remove only after a source comparison confirms identity design workflow is managed elsewhere.",
-          "scenarioIds": [
-            "entra-guidance-parity"
-          ]
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/first-app-registration.md",
@@ -3383,22 +2784,16 @@
           "reason": "Portal registration, consent, secret creation, and authentication testing are direct identity operations.",
           "replacementProof": "The consumer skill prohibits registration, consent, credential, portal, and authentication-test actions.",
           "rollbackGate": "Restore only with a kernel-authorized implementation path and explicit secret-handling controls.",
-          "scenarioIds": [
-            "entra-guidance-parity"
-          ]
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/oauth-flows.md",
           "disposition": "adapt",
-          "targets": [
-            "references/design-and-diagnostics.md"
-          ],
+          "targets": ["references/design-and-diagnostics.md"],
           "reason": "The managed reference retains client-class flow selection, PKCE posture, tenant, audience, and redirect-URI constraints without token requests.",
           "replacementProof": "The managed reference models flow selection as traceable intent and prohibits protocol operations.",
           "rollbackGate": "Remove only after a source comparison confirms OAuth design rules are managed elsewhere.",
-          "scenarioIds": [
-            "entra-guidance-parity"
-          ]
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-identity-dotnet.md",
@@ -3407,9 +2802,7 @@
           "reason": ".NET identity SDK setup and authentication samples can initiate protocol operations and handle tokens.",
           "replacementProof": "The consumer skill prohibits SDK, protocol, and authentication-testing actions.",
           "rollbackGate": "Restore only with a bounded implementation capability that redacts tokens and controls protocol operations.",
-          "scenarioIds": [
-            "entra-guidance-parity"
-          ]
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-identity-java.md",
@@ -3418,9 +2811,7 @@
           "reason": "Java identity SDK setup and authentication samples can initiate protocol operations and handle tokens.",
           "replacementProof": "The consumer skill prohibits SDK, protocol, and authentication-testing actions.",
           "rollbackGate": "Restore only with a bounded implementation capability that redacts tokens and controls protocol operations.",
-          "scenarioIds": [
-            "entra-guidance-parity"
-          ]
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-identity-py.md",
@@ -3429,9 +2820,7 @@
           "reason": "Python identity SDK setup and authentication samples can initiate protocol operations and handle tokens.",
           "replacementProof": "The consumer skill prohibits SDK, protocol, and authentication-testing actions.",
           "rollbackGate": "Restore only with a bounded implementation capability that redacts tokens and controls protocol operations.",
-          "scenarioIds": [
-            "entra-guidance-parity"
-          ]
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-identity-rust.md",
@@ -3440,9 +2829,7 @@
           "reason": "Rust identity SDK setup and authentication samples can initiate protocol operations and handle tokens.",
           "replacementProof": "The consumer skill prohibits SDK, protocol, and authentication-testing actions.",
           "rollbackGate": "Restore only with a bounded implementation capability that redacts tokens and controls protocol operations.",
-          "scenarioIds": [
-            "entra-guidance-parity"
-          ]
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-identity-ts.md",
@@ -3451,9 +2838,7 @@
           "reason": "TypeScript identity SDK setup and authentication samples can initiate protocol operations and handle tokens.",
           "replacementProof": "The consumer skill prohibits SDK, protocol, and authentication-testing actions.",
           "rollbackGate": "Restore only with a bounded implementation capability that redacts tokens and controls protocol operations.",
-          "scenarioIds": [
-            "entra-guidance-parity"
-          ]
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-keyvault-py.md",
@@ -3462,9 +2847,7 @@
           "reason": "Python Key Vault SDK samples access secret material and are outside the advisory identity boundary.",
           "replacementProof": "The consumer skill prohibits credential material handling and SDK actions.",
           "rollbackGate": "Restore only with a bounded implementation capability that protects secret material.",
-          "scenarioIds": [
-            "entra-guidance-parity"
-          ]
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/sdk/azure-keyvault-secrets-ts.md",
@@ -3473,9 +2856,7 @@
           "reason": "TypeScript Key Vault SDK samples access secret material and are outside the advisory identity boundary.",
           "replacementProof": "The consumer skill prohibits credential material handling and SDK actions.",
           "rollbackGate": "Restore only with a bounded implementation capability that protects secret material.",
-          "scenarioIds": [
-            "entra-guidance-parity"
-          ]
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/sdk/microsoft-azure-webjobs-extensions-authentication-events-dotnet.md",
@@ -3484,22 +2865,16 @@
           "reason": ".NET authentication-event integration code can receive identity events and is outside advisory guidance.",
           "replacementProof": "The consumer skill prohibits SDK and direct identity operations.",
           "rollbackGate": "Restore only with a bounded implementation capability and reviewed event-data controls.",
-          "scenarioIds": [
-            "entra-guidance-parity"
-          ]
+          "scenarioIds": ["entra-guidance-parity"]
         },
         {
           "source": "references/troubleshooting.md",
           "disposition": "adapt",
-          "targets": [
-            "references/design-and-diagnostics.md"
-          ],
+          "targets": ["references/design-and-diagnostics.md"],
           "reason": "The managed reference retains redirect, consent, permission, credential, tenant, and application-boundary failure classification without remediation commands.",
           "replacementProof": "The managed reference returns only evidence gaps, owners, and authorized next tasks.",
           "rollbackGate": "Remove only after a source comparison confirms diagnostic classification is managed elsewhere.",
-          "scenarioIds": [
-            "entra-guidance-parity"
-          ]
+          "scenarioIds": ["entra-guidance-parity"]
         }
       ]
     },
@@ -3528,9 +2903,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
     },
@@ -3549,9 +2922,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/syntax-cheatsheet.md",
@@ -3561,9 +2932,7 @@
           "capabilityOwner": "future bounded consumer capability",
           "replacementProof": "Record consumer qualification evidence before marking this mapping complete.",
           "rollbackGate": "Revert only after a negative discovery check and owner approval.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
     },
@@ -3595,22 +2964,16 @@
           "capabilityOwner": "future Terraform validation capability",
           "replacementProof": "A target-matched AVM validation receipt is accepted.",
           "rollbackGate": "Retain the deferral until a qualified capability and evidence contract exist.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/avm-pitfalls.md",
           "disposition": "adapt",
-          "targets": [
-            "references/plan-and-change-assessment.md"
-          ],
+          "targets": ["references/plan-and-change-assessment.md"],
           "reason": "Retain provider-drift and replacement-risk interpretation without provider inspection commands.",
           "replacementProof": "Managed plan assessment is installed for both supported client projections.",
           "rollbackGate": "Restore the source mapping if client packaging no longer includes the assessment reference.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/azuread-pattern.md",
@@ -3620,9 +2983,7 @@
           "capabilityOwner": "future identity capability",
           "replacementProof": "A target-matched identity capability receipt is accepted.",
           "rollbackGate": "Retain the deferral until the identity capability is qualified.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/bootstrap-backend-template.md",
@@ -3631,9 +2992,7 @@
           "reason": "Backend bootstrap templates create stateful infrastructure and cannot be projected as guidance.",
           "replacementProof": "No managed consumer file exposes bootstrap commands or mutable backend configuration.",
           "rollbackGate": "Reconsider only with an authorized state-bootstrap capability.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/budget-pattern.md",
@@ -3643,22 +3002,16 @@
           "capabilityOwner": "future Terraform cost capability",
           "replacementProof": "A target-matched cost configuration receipt is accepted.",
           "rollbackGate": "Retain the deferral until a qualified cost capability exists.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/codegen-validation-checklist.md",
           "disposition": "adapt",
-          "targets": [
-            "references/module-locks-and-codegen-acceptance.md"
-          ],
+          "targets": ["references/module-locks-and-codegen-acceptance.md"],
           "reason": "Retain lock and acceptance intent while capability owners perform generation and validation.",
           "replacementProof": "The managed reference requires accepted receipts for lock and acceptance evidence.",
           "rollbackGate": "Restore the source mapping if receipt-gated acceptance is removed.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/common-patterns.md",
@@ -3670,9 +3023,7 @@
           "reason": "Retain topology, diagnostics, identity, and dependency intent without generated configuration.",
           "replacementProof": "Managed references preserve bounded architecture intent and capability handoff.",
           "rollbackGate": "Restore the source mapping if either managed design boundary is removed.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/deploy-script-template.md",
@@ -3681,61 +3032,43 @@
           "reason": "Deployment scripts execute provider, state, and cloud operations outside the consumer boundary.",
           "replacementProof": "No managed consumer file contains Terraform deployment scripts or commands.",
           "rollbackGate": "Reconsider only with an authorized deployment capability.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/hub-spoke-pattern.md",
           "disposition": "adapt",
-          "targets": [
-            "references/network-and-observability.md"
-          ],
+          "targets": ["references/network-and-observability.md"],
           "reason": "Retain network topology intent without embedding directly deployable configuration.",
           "replacementProof": "The managed reference defines receipt-gated hub-spoke and private-connectivity intent.",
           "rollbackGate": "Restore the source mapping if network intent no longer requires accepted evidence.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/module-composition.md",
           "disposition": "adapt",
-          "targets": [
-            "references/module-composition-and-state-boundaries.md"
-          ],
+          "targets": ["references/module-composition-and-state-boundaries.md"],
           "reason": "Retain output-to-input composition and stable interface intent without module generation.",
           "replacementProof": "The managed reference records explicit interfaces, dependencies, and locks.",
           "rollbackGate": "Restore the source mapping if stable composition intent is removed.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/plan-interpretation.md",
           "disposition": "adapt",
-          "targets": [
-            "references/plan-and-change-assessment.md"
-          ],
+          "targets": ["references/plan-and-change-assessment.md"],
           "reason": "Retain action and risk interpretation without Terraform commands or plan generation.",
           "replacementProof": "The managed reference classifies accepted plan evidence and risk signals.",
           "rollbackGate": "Restore the source mapping if action assessment becomes command-driven.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/private-endpoint-pattern.md",
           "disposition": "adapt",
-          "targets": [
-            "references/network-and-observability.md"
-          ],
+          "targets": ["references/network-and-observability.md"],
           "reason": "Retain private-connectivity ownership intent without endpoint generation or deployment actions.",
           "replacementProof": "The managed reference requires accepted architecture and capability receipts.",
           "rollbackGate": "Restore the source mapping if private endpoint intent becomes operational guidance.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/project-scaffold.md",
@@ -3744,35 +3077,25 @@
           "reason": "Project scaffolding writes files and resolves provider dependencies outside the consumer boundary.",
           "replacementProof": "No managed consumer file creates Terraform project trees or downloads providers.",
           "rollbackGate": "Reconsider only with an authorized scaffold capability.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/refactor-module.md",
           "disposition": "adapt",
-          "targets": [
-            "references/module-composition-and-state-boundaries.md"
-          ],
+          "targets": ["references/module-composition-and-state-boundaries.md"],
           "reason": "Retain interface and address-transition intent while excluding state operations.",
           "replacementProof": "The managed reference requires authorized state-transition evidence and forbids operations.",
           "rollbackGate": "Restore the source mapping if state transition intent is no longer receipt-gated.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/tf-best-practices-examples.md",
           "disposition": "adapt",
-          "targets": [
-            "references/module-locks-and-codegen-acceptance.md"
-          ],
+          "targets": ["references/module-locks-and-codegen-acceptance.md"],
           "reason": "Retain portable lock and acceptance rules without direct code generation or command guidance.",
           "replacementProof": "The managed reference binds acceptance to exact locks and authorized receipts.",
           "rollbackGate": "Restore the source mapping if lock-bound acceptance is removed.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
     },
@@ -3786,16 +3109,11 @@
         {
           "source": "references/manual-import.md",
           "disposition": "adapt",
-          "targets": [
-            "references/import-assessment.md",
-            "references/mapping-and-adoption-attestation.md"
-          ],
+          "targets": ["references/import-assessment.md", "references/mapping-and-adoption-attestation.md"],
           "reason": "Retain scoped mapping, dependency, and attestation intent while excluding discovery and import actions.",
           "replacementProof": "Managed references require accepted inventory and target-matched operation evidence.",
           "rollbackGate": "Restore the source mapping if managed import guidance exposes operational commands.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "scripts/list_resources.sh",
@@ -3804,9 +3122,7 @@
           "reason": "The script inspects provider resources and cannot run in a client guidance projection.",
           "replacementProof": "No managed import consumer file contains discovery scripts or provider downloads.",
           "rollbackGate": "Reconsider only with an authorized inventory capability.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
     },
@@ -3820,29 +3136,20 @@
         {
           "source": "references/mock-providers.md",
           "disposition": "adapt",
-          "targets": [
-            "references/plan-mode-and-mock-design.md"
-          ],
+          "targets": ["references/plan-mode-and-mock-design.md"],
           "reason": "Retain mock scope and limitations without provider configuration or test execution.",
           "replacementProof": "The managed reference limits mocks to accepted locks and distinguishes live evidence.",
           "rollbackGate": "Restore the source mapping if mock evidence is promoted to live behavior.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/test-examples.md",
           "disposition": "adapt",
-          "targets": [
-            "references/test-design.md",
-            "references/plan-mode-and-mock-design.md"
-          ],
+          "targets": ["references/test-design.md", "references/plan-mode-and-mock-design.md"],
           "reason": "Retain assertion, negative-case, and isolated plan-mode design without materializing tests.",
           "replacementProof": "Managed references define observable contracts and capability-owned execution.",
           "rollbackGate": "Restore the source mapping if consumer guidance begins creating test files.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/test-execution.md",
@@ -3851,23 +3158,16 @@
           "reason": "Execution commands, environment access, and provider downloads are capability-owned operations.",
           "replacementProof": "No managed test consumer file contains Terraform execution commands.",
           "rollbackGate": "Reconsider only with an authorized test execution capability.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         },
         {
           "source": "references/test-patterns.md",
           "disposition": "adapt",
-          "targets": [
-            "references/test-design.md",
-            "references/plan-mode-and-mock-design.md"
-          ],
+          "targets": ["references/test-design.md", "references/plan-mode-and-mock-design.md"],
           "reason": "Retain deterministic coverage, expected-failure, and mock-versus-integration boundaries.",
           "replacementProof": "Managed references preserve test classification and receipt-gated integration intent.",
           "rollbackGate": "Restore the source mapping if test classification loses its evidence boundary.",
-          "scenarioIds": [
-            "guidance-migration-ledger"
-          ]
+          "scenarioIds": ["guidance-migration-ledger"]
         }
       ]
     },
@@ -3891,9 +3191,7 @@
     {
       "source": "agent-authoring.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-agent-authoring.instructions.md"
-      ],
+      "targets": ["apex-agent-authoring.instructions.md"],
       "reason": "Preserves managed-agent tool, state, and interaction boundaries for consumers.",
       "replacementProof": "Managed projection packaging and agent validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer projection validation fails."
@@ -3901,9 +3199,7 @@
     {
       "source": "agent-skills.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-skill-authoring.instructions.md"
-      ],
+      "targets": ["apex-skill-authoring.instructions.md"],
       "reason": "Preserves concise skill structure and progressive disclosure guidance.",
       "replacementProof": "Managed projection packaging and skill validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer projection validation fails."
@@ -3911,9 +3207,7 @@
     {
       "source": "azure-artifacts.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-artifact-contracts.instructions.md"
-      ],
+      "targets": ["apex-artifact-contracts.instructions.md"],
       "reason": "Preserves typed artifact identity and evidence boundaries without source template workflows.",
       "replacementProof": "Managed projection packaging and artifact contract tests prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer artifact validation fails."
@@ -3921,9 +3215,7 @@
     {
       "source": "azure-yaml.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-azure-yaml.instructions.md"
-      ],
+      "targets": ["apex-azure-yaml.instructions.md"],
       "reason": "Preserves consumer azd co-location and environment naming rules.",
       "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer instruction validation fails."
@@ -3931,9 +3223,7 @@
     {
       "source": "code-quality.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-code-quality.instructions.md"
-      ],
+      "targets": ["apex-code-quality.instructions.md"],
       "reason": "Preserves consumer code quality and secret-safe review boundaries.",
       "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer instruction validation fails."
@@ -3941,9 +3231,7 @@
     {
       "source": "context-optimization.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-context.instructions.md"
-      ],
+      "targets": ["apex-context.instructions.md"],
       "reason": "Preserves narrow consumer guidance and progressive loading rules.",
       "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer instruction validation fails."
@@ -3951,9 +3239,7 @@
     {
       "source": "docs.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-documentation.instructions.md"
-      ],
+      "targets": ["apex-documentation.instructions.md"],
       "reason": "Preserves consumer documentation structure and evidence-aware language.",
       "replacementProof": "Managed projection packaging and documentation validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer documentation validation fails."
@@ -3969,9 +3255,7 @@
     {
       "source": "github-actions.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-automation.instructions.md"
-      ],
+      "targets": ["apex-automation.instructions.md"],
       "reason": "Preserves consumer workflow safety without repository CI ownership rules.",
       "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer automation validation fails."
@@ -3979,9 +3263,7 @@
     {
       "source": "governance-discovery.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-governance.instructions.md"
-      ],
+      "targets": ["apex-governance.instructions.md"],
       "reason": "Preserves evidence-bound governance and planning boundaries without direct discovery operations.",
       "replacementProof": "Managed projection packaging and governance contract tests prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer governance validation fails."
@@ -3989,9 +3271,7 @@
     {
       "source": "iac-bicep-best-practices.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-bicep.instructions.md"
-      ],
+      "targets": ["apex-bicep.instructions.md"],
       "reason": "Preserves consumer Bicep security, AVM, naming, and validation guidance.",
       "replacementProof": "Managed projection packaging and IaC validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer IaC validation fails."
@@ -3999,9 +3279,7 @@
     {
       "source": "iac-plan-best-practices.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-governance.instructions.md"
-      ],
+      "targets": ["apex-governance.instructions.md"],
       "reason": "Preserves track-neutral planning and policy evidence boundaries.",
       "replacementProof": "Managed projection packaging and governance contract tests prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer planning validation fails."
@@ -4009,9 +3287,7 @@
     {
       "source": "iac-terraform-best-practices.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-terraform.instructions.md"
-      ],
+      "targets": ["apex-terraform.instructions.md"],
       "reason": "Preserves consumer Terraform security, provider, and validation guidance.",
       "replacementProof": "Managed projection packaging and IaC validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer IaC validation fails."
@@ -4019,9 +3295,7 @@
     {
       "source": "instructions.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-instruction-authoring.instructions.md"
-      ],
+      "targets": ["apex-instruction-authoring.instructions.md"],
       "reason": "Preserves consumer instruction scope and authoring rules.",
       "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer instruction validation fails."
@@ -4029,9 +3303,7 @@
     {
       "source": "javascript.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-javascript.instructions.md"
-      ],
+      "targets": ["apex-javascript.instructions.md"],
       "reason": "Preserves safe consumer JavaScript and Node.js implementation rules.",
       "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer instruction validation fails."
@@ -4039,9 +3311,7 @@
     {
       "source": "json.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-json.instructions.md"
-      ],
+      "targets": ["apex-json.instructions.md"],
       "reason": "Preserves consumer configuration formatting and secret boundaries.",
       "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer instruction validation fails."
@@ -4057,9 +3327,7 @@
     {
       "source": "markdown-docs.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-documentation.instructions.md"
-      ],
+      "targets": ["apex-documentation.instructions.md"],
       "reason": "Preserves consumer documentation audience and evidence guidance.",
       "replacementProof": "Managed projection packaging and documentation validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer documentation validation fails."
@@ -4067,9 +3335,7 @@
     {
       "source": "markdown.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-markdown.instructions.md"
-      ],
+      "targets": ["apex-markdown.instructions.md"],
       "reason": "Preserves portable Markdown structure and formatting rules.",
       "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer instruction validation fails."
@@ -4085,9 +3351,7 @@
     {
       "source": "no-heredoc.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-safe-file-edits.instructions.md"
-      ],
+      "targets": ["apex-safe-file-edits.instructions.md"],
       "reason": "Preserves safe consumer file editing and generated artifact boundaries.",
       "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer instruction validation fails."
@@ -4095,9 +3359,7 @@
     {
       "source": "no-interactive-shell.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-safe-shell.instructions.md"
-      ],
+      "targets": ["apex-safe-shell.instructions.md"],
       "reason": "Preserves non-interactive command and secret-safe consumer guidance.",
       "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer instruction validation fails."
@@ -4105,9 +3367,7 @@
     {
       "source": "powershell.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-powershell.instructions.md"
-      ],
+      "targets": ["apex-powershell.instructions.md"],
       "reason": "Preserves non-interactive consumer PowerShell rules.",
       "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer instruction validation fails."
@@ -4115,9 +3375,7 @@
     {
       "source": "prompt.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-prompt-authoring.instructions.md"
-      ],
+      "targets": ["apex-prompt-authoring.instructions.md"],
       "reason": "Preserves consumer prompt scope, tools, and outcome guidance.",
       "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer prompt validation fails."
@@ -4125,9 +3383,7 @@
     {
       "source": "python.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-python.instructions.md"
-      ],
+      "targets": ["apex-python.instructions.md"],
       "reason": "Preserves safe consumer Python implementation rules.",
       "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer instruction validation fails."
@@ -4135,9 +3391,7 @@
     {
       "source": "shell.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-shell.instructions.md"
-      ],
+      "targets": ["apex-shell.instructions.md"],
       "reason": "Preserves safe consumer shell structure and parsing rules.",
       "replacementProof": "Managed projection packaging and instruction validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer instruction validation fails."
@@ -4145,9 +3399,7 @@
     {
       "source": "vendor-prompting.instructions.md",
       "disposition": "adapt",
-      "targets": [
-        "apex-prompt-authoring.instructions.md"
-      ],
+      "targets": ["apex-prompt-authoring.instructions.md"],
       "reason": "Preserves consumer model, tool, and prompt authority boundaries.",
       "replacementProof": "Managed projection packaging and agent validation prove the consumer instruction is present.",
       "rollbackGate": "Restore only after consumer prompt validation fails."
