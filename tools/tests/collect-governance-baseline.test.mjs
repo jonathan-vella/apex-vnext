@@ -549,6 +549,7 @@ test(
     };
     responses[exemptionsUrl].value = [
       {
+        id: `${subscriptionScope}/providers/Microsoft.Authorization/policyExemptions/inherited-waiver`,
         properties: {
           policyAssignmentId: inherited.id,
           exemptionCategory: "Waiver",
@@ -1121,10 +1122,52 @@ for (const scenario of [
   });
 }
 
+for (const suffix of ["", "name/child", "name?query", "name#fragment", "white space"]) {
+  test(`exemption rejects malformed assignment identity ${JSON.stringify(suffix)}`, powershellOptions, (context) => {
+    const responses = routes();
+    responses[exemptionsUrl].value = [
+      {
+        id: `${subscriptionScope}/providers/Microsoft.Authorization/policyExemptions/waiver`,
+        properties: {
+          policyAssignmentId: `${subscriptionScope}/providers/Microsoft.Authorization/policyAssignments/${suffix}`,
+          exemptionCategory: "Waiver",
+        },
+      },
+    ];
+    assertAborted(collect(context, responses), /Invalid policy exemption assignment identity/);
+  });
+}
+
 for (const scenario of [
   { name: "expired waiver", expiresOn: "2000-01-01T00:00:00Z", expired: true },
   { name: "active waiver", expiresOn: "2999-01-01T00:00:00Z" },
   { name: "permanent waiver" },
+  {
+    name: "management group waiver",
+    id: `${managementGroupScope}/providers/Microsoft.Authorization/policyExemptions/waiver`,
+    scope: managementGroupScope,
+  },
+  {
+    name: "unrelated management group waiver",
+    id: "/providers/Microsoft.Management/managementGroups/unrelated/providers/Microsoft.Authorization/policyExemptions/waiver",
+    failure: /Policy exemption scope does not cover/,
+  },
+  {
+    name: "query in exemption identity",
+    id: `${subscriptionScope}/providers/Microsoft.Authorization/policyExemptions/waiver?scope=other`,
+    failure: /Invalid or unsupported policy exemption scope/,
+  },
+  { name: "missing identity", id: null, failure: /Invalid or unsupported policy exemption scope/ },
+  {
+    name: "child scope cannot waive subscription",
+    id: `${subscriptionScope}/resourceGroups/child/providers/Microsoft.Authorization/policyExemptions/waiver`,
+    failure: /Invalid or unsupported policy exemption scope/,
+  },
+  {
+    name: "foreign scope",
+    id: "/subscriptions/22222222-2222-2222-2222-222222222222/providers/Microsoft.Authorization/policyExemptions/waiver",
+    failure: /Policy exemption scope does not cover/,
+  },
   { name: "invalid expiration", expiresOn: "not-a-date", failure: /Invalid policy exemption expiresOn/ },
   {
     name: "expiration without timezone",
@@ -1152,6 +1195,9 @@ for (const scenario of [
     responses[assignmentsUrl].value = [assigned];
     responses[definitionsUrl].value = [policy];
     const exemption = {
+      id: Object.hasOwn(scenario, "id")
+        ? scenario.id
+        : `${subscriptionScope}/providers/Microsoft.Authorization/policyExemptions/waiver`,
       properties: {
         policyAssignmentId: assigned.id,
         exemptionCategory: "Waiver",
@@ -1174,10 +1220,12 @@ for (const scenario of [
         },
       ];
       responses[exemptionsUrl].value = ["first", "second"].map((reference) => ({
+        id: `${exemption.id}-${reference}`,
         properties: { ...exemption.properties, policyDefinitionReferenceIds: [reference] },
       }));
       if (scenario.expiredLast)
         responses[exemptionsUrl].value.push({
+          id: `${exemption.id}-expired`,
           properties: { ...exemption.properties, expiresOn: "2000-01-01T00:00:00Z" },
         });
     }
@@ -1197,6 +1245,15 @@ for (const scenario of [
         scenario.expired ? (scenario.effect === "Modify" ? "auto-remediate" : "blocker") : "informational",
       );
       assert.equal(finding.exemption === null, Boolean(scenario.expired));
+      if (finding.exemption) {
+        assert.equal(finding.exemption.scope, scenario.scope ?? subscriptionScope);
+        assert.ok(
+          finding.exemption.id.startsWith(
+            `${scenario.scope ?? subscriptionScope}/providers/Microsoft.Authorization/policyExemptions/`,
+          ),
+        );
+        assert.equal(finding.exemption.expiresOn, scenario.expiresOn ?? null);
+      }
     }
   });
 }

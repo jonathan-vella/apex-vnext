@@ -413,6 +413,68 @@ test("preserves inherited findings and reported exemptions deterministically wit
   );
 });
 
+test("preserves scoped exemption provenance without granting verification", () => {
+  const source = inheritedBaseline();
+  const entry = source.subscriptions[subscriptionId]!;
+  const exemptionScope = `/subscriptions/${subscriptionId}`;
+  const provenance = {
+    id: `${exemptionScope}/providers/Microsoft.Authorization/policyExemptions/waiver`,
+    scope: exemptionScope,
+    expiresOn: "2027-01-01T00:00:00Z",
+  };
+  for (const item of entry.findings) Object.assign(item.exemption!, provenance);
+  entry.policies = structuredClone(entry.findings);
+  const selected = importGovernanceBaseline(source, options, validate);
+  assert.deepEqual(selected.snapshot.findings[0]!.exemption, {
+    ...provenance,
+    category: "Waiver",
+    policyDefinitionReferenceIds: ["member-a", "member-b"],
+    verificationStatus: "unverified",
+  });
+  const legacy = importGovernanceBaseline(inheritedBaseline(), options, validate);
+  assert.equal(legacy.snapshot.findings[0]!.exemption?.scope, undefined);
+  assert.notEqual(selected.snapshot.contentHash, legacy.snapshot.contentHash);
+  const management = structuredClone(source);
+  for (const item of management.subscriptions[subscriptionId]!.findings) {
+    Object.assign(item.exemption!, {
+      id: `${managementScope}/providers/Microsoft.Authorization/policyExemptions/waiver`,
+      scope: managementScope,
+      expiresOn: null,
+    });
+  }
+  management.subscriptions[subscriptionId]!.policies = structuredClone(
+    management.subscriptions[subscriptionId]!.findings,
+  );
+  const inherited = importGovernanceBaseline(management, options, validate);
+  assert.equal(inherited.snapshot.findings[0]!.exemption?.scope, managementScope);
+  assert.notEqual(inherited.snapshot.contentHash, selected.snapshot.contentHash);
+  for (const changes of [
+    { id: `${provenance.id}/child` },
+    { id: `${provenance.id}?scope=other` },
+    { scope: `${exemptionScope}/resourceGroups/child` },
+    { id: provenance.id.replace(subscriptionId, otherId) },
+    { expiresOn: "not-a-date" },
+    { expiresOn: "2027-01-01T00:00:00" },
+    { expiresOn: "2027-02-30T00:00:00Z" },
+    { id: undefined },
+  ]) {
+    const invalid = structuredClone(source);
+    Object.assign(invalid.subscriptions[subscriptionId]!.findings[0]!.exemption!, changes);
+    invalid.subscriptions[subscriptionId]!.policies = structuredClone(invalid.subscriptions[subscriptionId]!.findings);
+    assert.throws(() => importGovernanceBaseline(invalid, options, validate), GovernanceBaselineError);
+  }
+});
+
+test("rejects malformed assignment resource identities", () => {
+  for (const suffix of ["", "name/child", "name?query", "name#fragment", "white space"]) {
+    const source = inheritedBaseline();
+    source.subscriptions[subscriptionId]!.findings[0]!.assignment_id =
+      `${managementScope}/providers/Microsoft.Authorization/policyAssignments/${suffix}`;
+    source.subscriptions[subscriptionId]!.policies = structuredClone(source.subscriptions[subscriptionId]!.findings);
+    rejected(source, "target-mismatch");
+  }
+});
+
 test("retains effective constraints while excluding arbitrary metadata and collector mapping guesses", () => {
   const source = inheritedBaseline();
   const entry = source.subscriptions[subscriptionId]!;

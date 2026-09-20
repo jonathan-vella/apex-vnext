@@ -43,6 +43,9 @@ export interface GovernanceBaselineFinding {
   readonly resourceTypes: readonly string[];
   readonly mappingStatus: "unmapped";
   readonly exemption: null | {
+    readonly id?: string;
+    readonly scope?: string;
+    readonly expiresOn?: string | null;
     readonly category: "Waiver" | "Mitigated";
     readonly policyDefinitionReferenceIds: readonly string[];
     readonly verificationStatus: "unverified";
@@ -212,7 +215,25 @@ function finding(value: unknown, subscriptionId: string): GovernanceBaselineFind
     const reported = record(source.exemption);
     const category = text(reported.category);
     if (category !== "Waiver" && category !== "Mitigated") fail();
+    let provenance: Pick<NonNullable<GovernanceBaselineFinding["exemption"]>, "id" | "scope" | "expiresOn"> = {};
+    if (["id", "scope", "expiresOn"].some((key) => Object.hasOwn(reported, key))) {
+      const exemptionId = text(reported.id);
+      const exemptionScope = scope(reported.scope, subscriptionId);
+      const suffix = exemptionId.slice(exemptionScope.length);
+      if (
+        exemptionId.slice(0, exemptionScope.length).toLowerCase() !== exemptionScope.toLowerCase() ||
+        !/^\/providers\/microsoft\.authorization\/policyexemptions\/[^/?#\s]+$/iu.test(suffix) ||
+        (exemptionScope.toLowerCase() !== `/subscriptions/${subscriptionId}` &&
+          (!/^\/providers\/microsoft\.management\/managementgroups\/[^/?#\s]+$/iu.test(exemptionScope) ||
+            exemptionScope.toLowerCase() !== text(source.scope).toLowerCase()))
+      )
+        fail("target-mismatch");
+      const expiresOn = reported.expiresOn === null ? null : text(reported.expiresOn);
+      if (expiresOn !== null) timestamp(expiresOn);
+      provenance = { id: exemptionId, scope: exemptionScope, expiresOn };
+    }
     exemption = {
+      ...provenance,
       category,
       policyDefinitionReferenceIds:
         reported.policyDefinitionReferenceIds === null ? [] : strings(reported.policyDefinitionReferenceIds),
@@ -222,9 +243,10 @@ function finding(value: unknown, subscriptionId: string): GovernanceBaselineFind
   const findingScope = scope(source.scope, subscriptionId);
   const assignmentId = text(source.assignment_id);
   if (
-    !assignmentId
-      .toLowerCase()
-      .startsWith(`${findingScope.toLowerCase()}/providers/microsoft.authorization/policyassignments/`)
+    assignmentId.slice(0, findingScope.length).toLowerCase() !== findingScope.toLowerCase() ||
+    !/^\/providers\/microsoft\.authorization\/policyassignments\/[^/?#\s]+$/iu.test(
+      assignmentId.slice(findingScope.length),
+    )
   )
     fail("target-mismatch");
   return {

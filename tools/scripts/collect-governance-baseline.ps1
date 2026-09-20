@@ -365,6 +365,18 @@ function Process-Subscription {
         if (-not $exProps -or -not $exProps.policyAssignmentId -or $exProps.exemptionCategory -notin @("Waiver", "Mitigated")) {
             throw "Invalid policy exemption"
         }
+        if ($ex.id -isnot [string] -or $ex.id -notmatch '^(/subscriptions/[0-9a-f-]{36}|/providers/Microsoft.Management/managementGroups/[^/?#\s]+)/providers/Microsoft.Authorization/policyExemptions/[^/?#\s]+$') {
+            throw "Invalid or unsupported policy exemption scope"
+        }
+        $exemptionScope = $Matches[1]
+        if ($exProps.policyAssignmentId -isnot [string] -or $exProps.policyAssignmentId -notmatch '^(/subscriptions/[0-9a-f-]{36}|/providers/Microsoft.Management/managementGroups/[^/?#\s]+)/providers/Microsoft.Authorization/policyAssignments/[^/?#\s]+$') {
+            throw "Invalid policy exemption assignment identity"
+        }
+        $assignmentScope = $Matches[1]
+        if ($exemptionScope -ine "/subscriptions/$SubId" -and
+            ($exemptionScope -notmatch '^/providers/Microsoft.Management/managementGroups/' -or $exemptionScope -ine $assignmentScope)) {
+            throw "Policy exemption scope does not cover the collected subscription"
+        }
         if ($null -ne $exProps.expiresOn) {
             $expiresAt = [DateTimeOffset]::MinValue
             if ($exProps.expiresOn -is [datetime]) {
@@ -382,8 +394,14 @@ function Process-Subscription {
         if ($null -ne $exProps.policyDefinitionReferenceIds -and $exProps.policyDefinitionReferenceIds -isnot [array]) {
             throw "Invalid policy exemption member references"
         }
-        $asgId = ($exProps.policyAssignmentId -replace '\s', '').ToLower()
-        $exemptionMap[$asgId] = @($exemptionMap[$asgId]) + @(@{ category = $exProps.exemptionCategory; policyDefinitionReferenceIds = $exProps.policyDefinitionReferenceIds })
+        $asgId = $exProps.policyAssignmentId.ToLower()
+        $exemptionMap[$asgId] = @($exemptionMap[$asgId]) + @(@{
+            id = $ex.id
+            scope = $exemptionScope
+            expiresOn = $exProps.expiresOn
+            category = $exProps.exemptionCategory
+            policyDefinitionReferenceIds = $exProps.policyDefinitionReferenceIds
+        })
     }
 
     # Filter Defender auto-assignments
@@ -392,6 +410,10 @@ function Process-Subscription {
     $notScopeExcludedCount = 0
     $targetScope = "/subscriptions/$SubId"
     foreach ($a in $assignments) {
+        if ($a.id -isnot [string] -or $a.id -notmatch '^(.+)/providers/Microsoft.Authorization/policyAssignments/[^/?#\s]+$' -or
+            $Matches[1] -ine $a.properties.scope) {
+            throw "Invalid policy assignment identity"
+        }
         $notScopes = $a.properties.notScopes
         if ($null -ne $notScopes -and $notScopes -isnot [array]) { throw "Invalid assignment notScopes" }
         $normalizedNotScopes = @(

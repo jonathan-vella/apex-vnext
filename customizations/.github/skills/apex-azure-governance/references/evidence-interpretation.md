@@ -44,6 +44,11 @@ Explicit assignment and initiative-member `definitionVersion` selectors are not 
 Applicable selectors, including wildcards, stop collection rather than substitute an unversioned definition.
 Retain the prior baseline after failure; do not remove Azure version pins to make collection pass.
 
+Collected exemptions retain their resource ID, scope, and expiry. Import preserves that provenance as unverified;
+legacy exemptions without it remain unknown. The current subscription-level collector rejects descendant exemption
+scopes and unrelated scope pairs rather than treating them as subscription-wide waivers. This does not establish
+resource-group/resource coverage or permit skipping target-specific applicability checks.
+
 ## Planning Handoff
 
 Project only applicable constraints into the typed decision:
