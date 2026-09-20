@@ -243,6 +243,9 @@ test("recall package and installation entry points remain retired", () => {
 });
 
 test("local governance discovery is not a shipped capability", () => {
+  const installationGuide = readFileSync("docs/how-to/manage-installation.md", "utf8");
+  assert.doesNotMatch(installationGuide, /--pack\s+azure-governance-discovery/u);
+  assert.match(installationGuide, /registry is currently empty/u);
   const policy = JSON.parse(readFileSync("config/capability-packs.v1.json", "utf8"));
   assert.equal(
     policy.packs.some(({ id }) => id === "azure-governance-discovery"),

@@ -104,17 +104,11 @@ uses the recorded client selection unless a custom source is supplied.
 
 ```bash
 npx apex capability list --json
-npx apex capability status --pack azure-governance-discovery --json
-npx apex capability install --pack azure-governance-discovery --yes --json
-npx apex capability verify --pack azure-governance-discovery --json
 ```
 
-Optional packs have independent update, rollback, and uninstall commands. Core APEX remains usable when an unrelated
-optional pack is absent; workflows that require the missing pack block explicitly.
-
-These are existing lifecycle commands, not the target governance setup. The approved
-[governance baseline plan](../vnext/PRD.md#req-gov-001-governance-and-policy) does not use capability-pack execution.
-Its implementation must replace the relevant workflow dependency before that path is advertised as available.
+The shipped capability-pack registry is currently empty. Do not install a retired pack or infer availability from
+retained lifecycle commands. Governance uses reviewed baseline import, not local discovery or capability-pack execution;
+follow the [governance baseline requirements](../vnext/PRD.md#req-gov-001-governance-and-policy).
 
 ## Final Distribution Decision
 
