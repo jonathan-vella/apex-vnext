@@ -1,6 +1,5 @@
 import type { RunConfigV1 } from "@apexops/contracts";
-import { constants } from "node:fs";
-import { mkdir, open, readFile, rm } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { sha256Json, type JsonValue } from "./canonical.js";
@@ -157,11 +156,7 @@ export class RunRepository {
       createdAt: createdAt.toISOString(),
       expiresAt: new Date(createdAt.getTime() + this.lockTtlMs).toISOString(),
     };
-    const acquire = async () => {
-      const handle = await open(this.lockPath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
-      await handle.writeFile(JSON.stringify(metadata));
-      await handle.close();
-    };
+    const acquire = () => atomicWriteJson(this.lockPath, metadata, { refuseOverwrite: true });
     try {
       await acquire();
     } catch (error) {

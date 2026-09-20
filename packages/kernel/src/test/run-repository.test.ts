@@ -37,6 +37,25 @@ test("run repository CAS permits one mutation and rejects a racing stale hash", 
   assert.equal((await repository.journal.replay()).length, 1);
 });
 
+test("run repository never exposes partial lock metadata under contention", async () => {
+  const root = await mkdtemp(join(tmpdir(), "apex-run-lock-contention-"));
+  const store = new ProjectStore(
+    root,
+    () => new Date("2026-01-01T00:00:00.000Z"),
+    () => "run-1",
+  );
+  await store.initializeProject({ projectId: "demo", displayName: "Demo", defaultIacTool: "bicep" });
+  await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
+  const repository = new RunRepository(store.runDirectory("demo", "run-1"), {
+    idSource: () => "lock-token".repeat(8_192),
+  });
+  const results = await Promise.allSettled(Array.from({ length: 64 }, () => repository.read()));
+  assert.ok(results.some(({ status }) => status === "fulfilled"));
+  for (const result of results) {
+    if (result.status === "rejected") assert.match(String(result.reason), /Run mutation is already in progress/u);
+  }
+});
+
 test("run repository rejects a mutation when the validated journal head changed", async () => {
   const root = await mkdtemp(join(tmpdir(), "apex-run-journal-cas-"));
   const store = new ProjectStore(
