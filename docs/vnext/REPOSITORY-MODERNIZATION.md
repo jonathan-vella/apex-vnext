@@ -15,7 +15,7 @@ on `feat/governance-baseline-import`.
 | Pull request      | #345 (draft, open)                                                                                                                                           |
 | Starting worktree | Dirty: target-governance work, retired archive removals, and current-only policy-precheck tests; see `logs/repository-modernization/wp00-starting-state.log` |
 | Historical CI     | Green only for baseline source; not qualification for this worktree                                                                                          |
-| Qualified source  | `7d7f26a7375d830b1675f51e795866d5181e1eda`                                                                                                                   |
+| Qualified source  | `11fd7a67041971a738ebd49a6a781e3a6a6e30f2`                                                                                                                   |
 
 ## Execution Status
 
@@ -109,7 +109,8 @@ by this table.
 - `qualify:vnext`: 146 validator tests and 33 package tests passed with zero failures or cancellations.
 - `validate:all`: Node, documentation, hooks, security, toolchain, Python, Terraform, and Bicep lanes passed.
 - Final package payload: five exact-source npm tarballs plus SBOM and provenance; reproducible pack and clean install passed.
-- Secret review: 26 commits and both compressed and extracted release payloads produced zero findings.
+- Run-lock contention: the original 120-service race reproduced two unstable errors before repair and zero afterward.
+- Secret review: the full modernization range and both compressed and extracted release payloads produced zero findings.
 - Hosted validation: all 10 pull-request checks passed, including CI, CodeQL, IaC, docs, and release qualification.
 - Review: all automated review threads contain fix evidence and are resolved.
 
