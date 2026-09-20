@@ -3026,15 +3026,6 @@
           "scenarioIds": ["guidance-migration-ledger"]
         },
         {
-          "source": "references/deploy-script-template.md",
-          "disposition": "exclude-unsafe",
-          "targets": [],
-          "reason": "Deployment scripts execute provider, state, and cloud operations outside the consumer boundary.",
-          "replacementProof": "No managed consumer file contains Terraform deployment scripts or commands.",
-          "rollbackGate": "Reconsider only with an authorized deployment capability.",
-          "scenarioIds": ["guidance-migration-ledger"]
-        },
-        {
           "source": "references/hub-spoke-pattern.md",
           "disposition": "adapt",
           "targets": ["references/network-and-observability.md"],
