@@ -270,7 +270,13 @@ export class RunRepository {
     if (!metadataStat.isFile() || metadataStat.isSymbolicLink() || metadataStat.size > MAX_LOCK_METADATA_BYTES) {
       throw new Error("Run mutation lock metadata is unsafe");
     }
-    const handle = await open(metadataPath, constants.O_RDONLY);
+    let handle;
+    try {
+      handle = await open(metadataPath, constants.O_RDONLY);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      throw error;
+    }
     let bytes: Buffer;
     try {
       const opened = await handle.stat();
