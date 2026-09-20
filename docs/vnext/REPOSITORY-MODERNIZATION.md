@@ -1,8 +1,8 @@
 # Repository Modernization
 
-Status: implementation complete; final automated qualification and human client/review gates remain. This document is
-the authoritative maintenance ledger for repository-wide legacy removal and modernization on
-`feat/governance-baseline-import`.
+Status: implementation and automated qualification complete; interactive client, human review, merge, and release
+gates remain. This document is the authoritative maintenance ledger for repository-wide legacy removal and modernization
+on `feat/governance-baseline-import`.
 
 ## Candidate Identity
 
@@ -15,6 +15,7 @@ the authoritative maintenance ledger for repository-wide legacy removal and mode
 | Pull request      | #345 (draft, open)                                                                                                                                           |
 | Starting worktree | Dirty: target-governance work, retired archive removals, and current-only policy-precheck tests; see `logs/repository-modernization/wp00-starting-state.log` |
 | Historical CI     | Green only for baseline source; not qualification for this worktree                                                                                          |
+| Qualified source  | `7d7f26a7375d830b1675f51e795866d5181e1eda`                                                                                                                   |
 
 ## Execution Status
 
@@ -22,12 +23,12 @@ the authoritative maintenance ledger for repository-wide legacy removal and mode
 | --------------------------- | ----------------------------------- | --------------------------------------------------------------------------------- |
 | source-cleanup-complete     | passed                              | Entry points, readers, generated assets, active guidance, and residue reviewed    |
 | toolchain-selected          | passed                              | Exact Current/stable versions activated; prior user-owned binaries retained       |
-| offline-validation-passed   | pending                             | Final combined `qualify:vnext` and `validate:all` checkpoint not yet recorded     |
+| offline-validation-passed   | passed                              | `qualify:vnext` and `validate:all` passed on qualified source                     |
 | provider-behavior-qualified | not-applicable-with-approved-reason | Provider/module selections and lockfile are unchanged; native semantic tests pass |
-| client-vscode-qualified     | pending                             | Requires clean same-candidate client qualification                                |
-| client-cli-qualified        | pending                             | Requires clean same-candidate client qualification                                |
-| hosted-ci-passed            | pending                             | No current candidate head yet                                                     |
-| review-ready                | pending                             | Dependent qualification statuses incomplete                                       |
+| client-vscode-qualified     | pending                             | VS Code 1.138.0 / Copilot Chat 0.66.0 ready; interactive gate targets older source |
+| client-cli-qualified        | pending                             | Copilot CLI 1.0.86 ready; interactive gate targets older source                    |
+| hosted-ci-passed            | passed                              | All 10 exact-head checks passed on qualified source                                |
+| review-ready                | pending                             | Automated findings resolved; interactive client and human review gates remain      |
 | merge-authorized            | pending                             | Human gate                                                                        |
 | release-accepted            | pending                             | Human release gate                                                                |
 
@@ -76,7 +77,7 @@ environments are reviewed through their manifests and lockfiles rather than as s
 
 ## Frozen Candidate Table
 
-Candidate `modernization-2026-09-20.1` is frozen at `2026-09-20T07:13:12Z` for the listed stable JavaScript
+Candidate `modernization-2026-09-20.2` is frozen at `2026-09-20T07:13:12Z` for the listed stable JavaScript
 selections. It binds source `5184c0c177fd2fc4a1badb1007fb9e2bee8b80be`, dirty diff
 `7632c7a1e3d5a6ac00e17d32b93bb51397c0a6de4164eca77c8c3a777f49aa9b`, and the initial lock hashes in
 `logs/repository-modernization/wp02-lockfile-hashes.txt`.
@@ -103,6 +104,15 @@ The direct workspace inventory, npm metadata, audit, installed tools, and action
 `logs/repository-modernization/wp02-*`. `npm audit` reports zero vulnerabilities. No upgrade is qualified or activated
 by this table.
 
+## Final Automated Evidence
+
+- `qualify:vnext`: 146 validator tests and 33 package tests passed with zero failures or cancellations.
+- `validate:all`: Node, documentation, hooks, security, toolchain, Python, Terraform, and Bicep lanes passed.
+- Final package payload: five exact-source npm tarballs plus SBOM and provenance; reproducible pack and clean install passed.
+- Secret review: 26 commits and both compressed and extracted release payloads produced zero findings.
+- Hosted validation: all 10 pull-request checks passed, including CI, CodeQL, IaC, docs, and release qualification.
+- Review: all automated review threads contain fix evidence and are resolved.
+
 ## Validation Repair
 
 `validate:terraform` now delegates to `tools/scripts/validate-terraform.mjs`. It validates every immediate Terraform
@@ -111,5 +121,6 @@ root with `main.tf`, continues through all roots, returns nonzero for any failed
 
 ## Checkpoint
 
-Next action: record final combined qualification, exact-head hosted CI, and human client/review decisions. Merge,
-release, Windows client changes, and live Azure operations remain separately authorized gates.
+Next action: perform exact-candidate interactive qualification in both selected clients, then obtain protected human
+review and merge decisions. Release, Windows-side client changes, and live Azure operations remain separately
+authorized gates.
