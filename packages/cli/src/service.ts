@@ -1010,11 +1010,11 @@ export class ApexService {
     customizationsSource?: string,
   ): Promise<{ installed: string[]; clientId: BundledClientProjection["id"] }> {
     await this.recoverCustomizationTransaction();
+    const selection = await this.customizationSelection();
     const lockPath = join(this.root, ".apex", "customizations.lock.json");
     if (await this.exists(lockPath)) {
       throw new ApexError("APEX_CONFLICT", "Managed customizations are already installed", EXIT_CODES.conflict);
     }
-    const selection = await this.customizationSelection();
     if (selection.sourceMode === "custom-source" && customizationsSource === undefined) {
       throw new ApexError("APEX_USAGE", "Custom-source reinstall requires --customizations-source", EXIT_CODES.usage);
     }
