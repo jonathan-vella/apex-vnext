@@ -93,6 +93,20 @@ test("run repository reclaims an expired lock generation into a permanent tombst
   );
 });
 
+test("run repository rejects missing metadata in a stable lock generation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "apex-run-invalid-lock-"));
+  const store = new ProjectStore(
+    root,
+    () => new Date("2026-01-01T00:00:00.000Z"),
+    () => "run-1",
+  );
+  await store.initializeProject({ projectId: "demo", displayName: "Demo", defaultIacTool: "bicep" });
+  await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
+  const directory = store.runDirectory("demo", "run-1");
+  await mkdir(join(directory, ".run-mutation.lock"));
+  await assert.rejects(new RunRepository(directory).read(), /Run mutation lock metadata is unreadable/u);
+});
+
 test("run repository rejects a mutation when the validated journal head changed", async () => {
   const root = await mkdtemp(join(tmpdir(), "apex-run-journal-cas-"));
   const store = new ProjectStore(

@@ -223,6 +223,12 @@ export class RunRepository {
         await handle.close();
       }
       try {
+        await lstat(this.lockPath);
+        return false;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+      try {
         await rename(staging, this.lockPath);
         published = true;
         return true;
@@ -257,12 +263,14 @@ export class RunRepository {
       metadataStat = await lstat(metadataPath);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        let currentDirectory;
         try {
-          await lstat(this.lockPath);
+          currentDirectory = await lstat(this.lockPath);
         } catch (lockError) {
           if ((lockError as NodeJS.ErrnoException).code === "ENOENT") return undefined;
           throw lockError;
         }
+        if (currentDirectory.dev !== directoryStat.dev || currentDirectory.ino !== directoryStat.ino) return undefined;
         throw new Error("Run mutation lock metadata is unreadable", { cause: error });
       }
       throw error;
