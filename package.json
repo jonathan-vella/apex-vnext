@@ -66,7 +66,7 @@
     "lint:safe-shell": "node tools/scripts/safe-shell.mjs",
     "lint:terraform-fmt": "terraform fmt -check -recursive infra/terraform/",
     "lint:bicep-fmt": "bash tools/scripts/check-bicep-fmt.sh",
-    "validate:terraform": "for dir in infra/terraform/*/; do [ -f \"$dir/main.tf\" ] && (cd \"$dir\" && terraform init -backend=false -input=false > /dev/null 2>&1 && terraform validate) || true; done",
+    "validate:terraform": "node tools/scripts/validate-terraform.mjs",
     "validate:vscode": "node tools/scripts/validate-vscode-config.mjs",
     "snapshot:baseline": "bash tools/scripts/snapshot-agent-context.sh",
     "diff:baseline": "bash tools/scripts/diff-context-baseline.sh",
