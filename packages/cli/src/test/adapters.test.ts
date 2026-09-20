@@ -767,12 +767,12 @@ test("CLI task complete accepts repeated self-describing files", async () => {
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
   const requirementsPath = join(root, "requirements-output.json");
-  await writeJson(requirementsPath, requirements());
+  await writeJson(requirementsPath, { kind: "requirements", value: requirements() });
   const completed = (await execute(
-    ["task", "complete", "--task", issued.task.taskId, "--kind", "requirements", "--file", requirementsPath],
+    ["task", "complete", "--task", issued.task.taskId, "--file", requirementsPath],
     root,
-  )) as { outputHash: string };
-  assert.match(completed.outputHash, /^[0-9a-f]{64}$/);
+  )) as { outputHashes: Record<string, string> };
+  assert.match(completed.outputHashes.requirements!, /^[0-9a-f]{64}$/);
 });
 
 test("CLI rejects incomplete native provider config before execution", async () => {

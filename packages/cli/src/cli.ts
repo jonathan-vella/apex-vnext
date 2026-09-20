@@ -23,7 +23,7 @@ import { resolveBundledAssets } from "./assets.js";
 import { serveMcp } from "./mcp.js";
 import { createFileProviderRuntime, hashTerraformConfiguration, hashTerraformLockFile } from "./provider-runtime.js";
 import { exportProviderTransfer, importProviderTransfer } from "./provider-transfer.js";
-import { ApexService, type ArtifactKind, type ServiceOptions, type TaskOutput } from "./service.js";
+import { ApexService, type ServiceOptions, type TaskOutput } from "./service.js";
 import { exportStateTransfer, importStateTransfer } from "./state-transfer.js";
 import { APEX_VERSION } from "./version.js";
 
@@ -631,17 +631,10 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
       return service.taskContext(required(flags, "task"));
     case "task complete": {
       const paths = files(flags);
-      if (paths.length > 1) {
-        const outputs = await Promise.all(
-          paths.map(async (path) => JSON.parse(await readFile(path, "utf8")) as TaskOutput),
-        );
-        return service.completeTaskOutputs(required(flags, "task"), outputs);
-      }
-      return service.completeTask(required(flags, "task"), {
-        kind: required(flags, "kind") as ArtifactKind,
-        value: JSON.parse(await readFile(paths[0]!, "utf8")) as unknown,
-        ...(typeof flags.summary === "string" ? { summary: flags.summary } : {}),
-      });
+      const outputs = await Promise.all(
+        paths.map(async (path) => JSON.parse(await readFile(path, "utf8")) as TaskOutput),
+      );
+      return service.completeTaskOutputs(required(flags, "task"), outputs);
     }
     case "task complete-bundle": {
       const bundle = (await inputJson(flags)) as { taskId?: string; outputs?: TaskOutput[] } | TaskOutput[];

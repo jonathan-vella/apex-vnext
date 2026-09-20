@@ -62,8 +62,8 @@ environments are reviewed through their manifests and lockfiles rather than as s
 | ID  | Anchor                                                         | Disposition                                                             | Next work package |
 | --- | -------------------------------------------------------------- | ----------------------------------------------------------------------- | ----------------- |
 | L01 | `packages/capabilities/src/iac-generation.ts` binding sentinel | Confirmed candidate for removal after caller trace                      | WP06              |
-| L02 | CLI `apex promote` alias                                       | Confirmed compatibility alias; retain `project promote`                 | WP05              |
-| L03 | CLI/service single-output completion                           | Retire after all callers use typed or bundled completion                | WP05              |
+| L02 | CLI `apex promote` alias                                       | Removed; retain `project promote` and MCP `promote`                    | WP05 complete     |
+| L03 | CLI/service single-output completion                           | Removed; CLI and MCP use atomic typed output bundles                    | WP05 complete     |
 | L05 | Governance collector/importer                                  | Dirty current-only work requires review and focused qualification       | WP04              |
 | L07 | Policy-precheck validator and tests                            | Preserve current v2 rejection coverage; inspect redundant wrappers only | WP03/WP07         |
 | L12 | Docker debug compose and scripts                               | Approved retirement; host receiver remains current                      | WP08              |

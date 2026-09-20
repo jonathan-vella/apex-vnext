@@ -18,7 +18,7 @@ APEX server with independent state.
 | `stageFile`            | Stage a bounded file for a task, optionally with an expected SHA-256. |
 | `generateIac`          | Generate the selected task's Bicep or Terraform batch.                |
 | `validateTask`         | Validate staged or supplied task outputs without completion.          |
-| `completeTask`         | Compatibility operation for a complete typed output bundle.           |
+| `completeTask`         | Atomically accept a complete typed output bundle.                      |
 | `requirementsComplete` | Complete Requirements without constructing a generic bundle.          |
 | `architectureComplete` | Complete Architecture, cost, and decisions atomically.                |
 | `reviewComplete`       | Complete a review with APEX-derived identity and evidence binding.    |

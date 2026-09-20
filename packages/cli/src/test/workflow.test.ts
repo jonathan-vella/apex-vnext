@@ -1968,8 +1968,8 @@ test("a task remains current across stage then complete", async () => {
   const value = requirements();
   const staged = await service.stageArtifact(issued.task.taskId, { kind: "requirements", value });
   assert.equal(staged.kind, "requirements");
-  const completed = await service.completeTask(issued.task.taskId, { kind: "requirements", value });
-  assert.match(completed.outputHash, /^[0-9a-f]{64}$/);
+  const completed = await service.completeTaskOutputs(issued.task.taskId, [{ kind: "requirements", value }]);
+  assert.match(completed.outputHashes.requirements!, /^[0-9a-f]{64}$/);
   const next = await service.nextTask();
   assert.equal(next.status, "task");
   if (next.status === "task") assert.equal(next.task.taskType, "requirements-review");
@@ -2001,7 +2001,7 @@ test("gate approval rejects stale dependencies while explicit rejection remains 
   const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
-  await service.completeTask(issued.task.taskId, { kind: "requirements", value: requirements() });
+  await service.completeTaskOutputs(issued.task.taskId, [{ kind: "requirements", value: requirements() }]);
   const reviewer = await service.nextTask();
   assert.equal(reviewer.status, "task");
   if (reviewer.status !== "task") return;

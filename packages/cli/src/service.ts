@@ -2585,11 +2585,6 @@ export class ApexService {
     return { valid: true, taskId, ...(staged === undefined ? {} : { staged }) };
   }
 
-  async completeTask(taskId: string, output: TaskOutput): Promise<{ outputHash: string; summary: string }> {
-    const completed = await this.completeTaskOutputs(taskId, [output]);
-    return { outputHash: completed.outputHashes[output.kind]!, summary: output.summary ?? `${output.kind} accepted` };
-  }
-
   async completeTaskOutputs(
     taskId: string,
     outputs: TaskOutput[],

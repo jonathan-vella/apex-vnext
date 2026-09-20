@@ -2445,7 +2445,7 @@ test("plan rejects wrong track and secret literals", async () => {
     const planTask = await task(isolated, "plan");
     const sourceHashes = (plan[0]!.value as ImplementationIntentV1).sourceHashes;
     const before = await isolated.status();
-    await assert.rejects(isolated.completeTask(planTask, plan[0]!), /Task bundle is missing/);
+    await assert.rejects(isolated.completeTaskOutputs(planTask, [plan[0]!]), /Task bundle is missing/);
     await assert.rejects(
       isolated.completeTaskOutputs(planTask, planBundle(initialized.runId, "terraform", {}, sourceHashes)),
       /track/i,

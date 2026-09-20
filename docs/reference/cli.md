@@ -40,7 +40,7 @@ its first run, and its selected IaC track under the existing `.apex` state.
 
 Each project can have multiple environment-scoped runs. Use `apex project promote` after Gates 1 through 3 are approved
 to create a linked run for the next environment. It inherits only still-valid upstream proof and always requires a
-new preview and Gate 4 approval. `apex promote` remains available as a compatibility alias.
+new preview and Gate 4 approval.
 
 ## Workflow
 
@@ -49,7 +49,7 @@ new preview and Gate 4 approval. `apex promote` remains available as a compatibi
 | `apex status`               | None                                                         |
 | `apex task next`            | None                                                         |
 | `apex task context`         | `--task`                                                     |
-| `apex task complete`        | `--task --kind --file`; repeat `--file` for multiple outputs |
+| `apex task complete`        | `--task --file`; each output file contains `kind` and `value` |
 | `apex task complete-bundle` | `--task --file`                                              |
 | `apex task cancel`          | `--task`                                                     |
 | `apex task stage-file`      | `--task --path --file`; optional `--sha`                     |
@@ -74,7 +74,6 @@ new preview and Gate 4 approval. `apex promote` remains available as a compatibi
 | `apex inventory`       | None                                                                                             |
 | `apex diagnose`        | None                                                                                             |
 | `apex render`          | `--kind` with status, requirements, preview, approval, or inventory                              |
-| `apex promote`         | `--environment --target`                                                                         |
 
 Only a human-authorized operator should run gate or deployment mutations. A preview must match the selected IaC track.
 
