@@ -7,10 +7,8 @@
  * `.github/skills/iac-common/references/policy-precheck-contract.md`.
  *
  * Errors are emitted when the file contains a contract contradiction
- * that would mislead a deploy agent. Warnings are emitted when the
- * file is in the legacy `policy-precheck-v1` shape — the file is still
- * usable but should be regenerated against the new contract so the
- * deterministic `deploy_gate` derivation runs.
+ * that would mislead a deploy agent. Only explicit `policy-precheck-v2`
+ * outputs are accepted so deterministic `deploy_gate` derivation runs.
  *
  * Specifically, this validator catches the exact ambiguity that
  * stalled the nordic-foods deploy on 2026-05-13:
@@ -82,13 +80,18 @@ for (const file of precheckFiles) {
 
   const status = data.status;
   const deployGate = data.deploy_gate;
-  const schemaVersion = data.schema_version || "policy-precheck-v1";
+  const schemaVersion = data.schema_version;
   const blockers = Array.isArray(data.policies_that_will_block_deploy) ? data.policies_that_will_block_deploy : [];
   const whatIfViolations = data.what_if_summary?.policy_violations_in_what_if ?? 0;
   const envelopeStatus = data.attestation?.envelope_status;
   const hasBlocker = blockers.length > 0 || whatIfViolations > 0;
   const driftSeverity = data.drift_signal?.severity;
   const driftAccepted = data.drift_signal?.accepted_by_residual_drift_policy === true;
+
+  if (schemaVersion !== "policy-precheck-v2") {
+    r.error(relPath, `schema_version must be policy-precheck-v2, got: ${schemaVersion}`);
+    continue;
+  }
 
   // ── Mandatory fields ──────────────────────────────────────────
   if (!status) {
@@ -180,26 +183,6 @@ for (const file of precheckFiles) {
     r.ok(relPath, `v2 OK (deploy_gate=${deployGate}, status=${status})`);
     continue;
   }
-
-  // ── Legacy v1 (status=DRIFT) ──────────────────────────────────
-  // The exact contradiction that stalled nordic-foods on 2026-05-13.
-  if (status === "BLOCKED" && !hasBlocker) {
-    r.error(relPath, "status=BLOCKED but no blocking policies and no what-if violations (the contract contradiction)");
-    continue;
-  }
-  if (status === "DRIFT") {
-    r.warn(
-      relPath,
-      "legacy status=DRIFT (schema v1). Regenerate against policy-precheck-v2 so deploy_gate is set deterministically.",
-    );
-    continue;
-  }
-  if (!["CLEAN", "DRIFT", "BLOCKED", "FAILED"].includes(status)) {
-    r.error(relPath, `legacy status must be CLEAN|DRIFT|BLOCKED|FAILED, got: ${status}`);
-    continue;
-  }
-
-  r.ok(relPath, `legacy v1 OK (status=${status})`);
 }
 
 console.log(

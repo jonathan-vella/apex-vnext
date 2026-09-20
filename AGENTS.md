@@ -54,6 +54,12 @@ inputs may add subscription-level Azure Policy requirements.
 
 ## vNext Architecture
 
+There is no backward-compatibility requirement anywhere in this project. Remove obsolete implementations, formats,
+aliases, fallback paths, and migration code rather than preserving them for legacy consumers. Update tests and guidance
+to the current contracts; keep rejection tests where obsolete input could bypass validation. Retired archives are not
+runtime dependencies or compatibility requirements. Preserve audit evidence and current authorization, freshness,
+ownership, and approval safeguards; their age does not make them obsolete.
+
 - `packages/kernel/` owns deterministic state, gates, authorization, evidence, and improvement decisions.
 - `packages/contracts/` owns versioned JSON schemas and contract validation.
 - `packages/capabilities/` owns bounded provider and workflow capabilities.

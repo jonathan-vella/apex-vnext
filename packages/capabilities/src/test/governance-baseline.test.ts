@@ -413,6 +413,130 @@ test("preserves inherited findings and reported exemptions deterministically wit
   );
 });
 
+test("target projection retains inherited and child policies only after full cache validation", () => {
+  const source = baseline();
+  const entry = source.subscriptions[subscriptionId]!;
+  Object.assign(entry.discovery_metadata.scope, {
+    coverage: "subscription-and-descendants-v1",
+    management_groups: ["root"],
+  });
+  const targetScope = `/subscriptions/${subscriptionId}/resourceGroups/target`;
+  const scopes = [
+    managementScope,
+    `/subscriptions/${subscriptionId}`,
+    targetScope,
+    `${targetScope}/providers/Microsoft.Storage/storageAccounts/child`,
+    `/subscriptions/${subscriptionId}/resourceGroups/target-other`,
+  ];
+  entry.findings = scopes.map((scope, index) => ({
+    policy_id: `policy-${index}`,
+    display_name: `Policy ${index}`,
+    effect: "deny",
+    scope,
+    assignment_id: `${scope}/providers/Microsoft.Authorization/policyAssignments/policy`,
+    classification: "blocker",
+    resource_types: ["Microsoft.Storage/storageAccounts"],
+    exemption: null,
+    reported_exemptions: [],
+  }));
+  entry.policies = structuredClone(entry.findings);
+  entry.assignment_inventory = scopes.map((scope) => ({
+    scope,
+    assignmentId: `${scope}/providers/Microsoft.Authorization/policyAssignments/policy`,
+    displayName: "Policy",
+    policyDefinitionId: "policy",
+    assignmentType: scope === managementScope ? "management-group" : "subscription",
+  }));
+  Object.assign(entry.discovery_summary, {
+    assignment_total: 5,
+    assignment_kept: 5,
+    subscription_scope_count: 4,
+    management_group_inherited_count: 1,
+    blocker_count: 5,
+    classified_policy_count: 5,
+    other_effect_count: 0,
+  });
+  entry.discovery_metadata.page_counts.policyAssignments = 5;
+  Object.assign(source.summary, { total_findings: 5, total_blockers: 5 });
+  const selected = importGovernanceBaseline(source, { ...options, targetScope }, validate);
+  assert.equal(selected.snapshot.schemaVersion, "governance-baseline-selection-v2");
+  assert.equal(selected.snapshot.targetScope, targetScope.toLowerCase());
+  assert.equal(selected.snapshot.findings.length, 4);
+  assert.ok(selected.snapshot.findings.some((item) => item.scope.endsWith("/child")));
+  assert.equal(selected.constraints.summary.assignmentCount, 4);
+  assert.equal(entry.findings.length, 5);
+  const other = importGovernanceBaseline(source, { ...options, targetScope: scopes[4]! }, validate);
+  assert.notEqual(selected.snapshot.contentHash, other.snapshot.contentHash);
+  const scoped = structuredClone(source);
+  const scopedEntry = scoped.subscriptions[subscriptionId]!;
+  const reported = [targetScope, scopes[4]!].map((scope) => ({
+    id: `${scope}/providers/Microsoft.Authorization/policyExemptions/reported`,
+    scope,
+    expiresOn: null,
+    category: "Waiver",
+    policyDefinitionReferenceIds: null,
+  }));
+  scopedEntry.findings[1]!.reported_exemptions = reported;
+  Object.assign(scopedEntry.findings[2]!, { effect: "auditIfNotExists", classification: "informational" });
+  scopedEntry.policies = structuredClone(scopedEntry.findings);
+  Object.assign(scopedEntry.discovery_summary, { blocker_count: 4, informational_count: 1, audit_count: 1 });
+  scopedEntry.discovery_metadata.page_counts.policyExemptions = 2;
+  scoped.summary.total_blockers = 4;
+  const projected = importGovernanceBaseline(scoped, { ...options, targetScope }, validate);
+  assert.equal(projected.constraints.summary.auditCount, 1);
+  assert.equal(projected.constraints.summary.exemptionCount, 1);
+  assert.equal(projected.constraints.summary.denyCount, 3);
+  assert.equal(
+    projected.snapshot.findings.find((item) => item.policyId === "policy-1")!.reportedExemptions![0]!.scope,
+    targetScope,
+  );
+  assert.ok(projected.snapshot.findings.every((item) => item.exemption === null));
+  for (const mutate of [
+    (value: typeof source) => {
+      value.subscriptions[subscriptionId]!.assignment_inventory[2]!.scope = scopes[4]!;
+    },
+    (value: typeof source) => {
+      value.subscriptions[subscriptionId]!.discovery_summary.audit_count = 2;
+    },
+    (value: typeof source) => {
+      value.subscriptions[subscriptionId]!.findings[2]!.scope = `${targetScope}/../other`;
+    },
+    (value: typeof source) => {
+      value.subscriptions[subscriptionId]!.findings[2]!.reported_exemptions = reported;
+    },
+  ]) {
+    const invalid = structuredClone(scoped);
+    mutate(invalid);
+    invalid.subscriptions[subscriptionId]!.policies = structuredClone(invalid.subscriptions[subscriptionId]!.findings);
+    assert.throws(
+      () => importGovernanceBaseline(invalid, { ...options, targetScope }, validate),
+      GovernanceBaselineError,
+    );
+  }
+  for (const target of [`/subscriptions/${otherId}`, `${targetScope}/../other`, `${targetScope}?query`]) {
+    assert.throws(
+      () => importGovernanceBaseline(source, { ...options, targetScope: target }, validate),
+      GovernanceBaselineError,
+    );
+  }
+  const partialOther = structuredClone(source);
+  partialOther.subscriptions[otherId] = envelope(otherId);
+  partialOther.subscriptions[otherId]!.discovery_status = "PARTIAL";
+  partialOther.subscriptions_discovered =
+    partialOther.subscriptions_processed =
+    partialOther.summary.subscriptions_complete =
+      2;
+  assert.throws(
+    () => importGovernanceBaseline(partialOther, { ...options, targetScope }, validate),
+    GovernanceBaselineError,
+  );
+  const legacy = structuredClone(source);
+  delete (legacy.subscriptions[subscriptionId]!.discovery_metadata.scope as Record<string, unknown>).coverage;
+  assert.throws(() => importGovernanceBaseline(legacy, { ...options, targetScope }, validate), GovernanceBaselineError);
+  entry.discovery_summary.blocker_count--;
+  assert.throws(() => importGovernanceBaseline(source, { ...options, targetScope }, validate), GovernanceBaselineError);
+});
+
 test("preserves scoped exemption provenance without granting verification", () => {
   const source = inheritedBaseline();
   const entry = source.subscriptions[subscriptionId]!;

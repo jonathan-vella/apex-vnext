@@ -24,6 +24,9 @@
 .PARAMETER IncludeDefenderAuto
     Switch. If set, retains Defender-for-Cloud auto-assignments.
 
+.PARAMETER IncludeDescendants
+    Retain resource-group/resource assignments and scoped exemption evidence.
+
 .PARAMETER MaxSubscriptions
     Maximum subscriptions to process. Default: 100.
 #>
@@ -41,6 +44,7 @@ param(
     [string]$OutputDir = ".github/data",
 
     [switch]$IncludeDefenderAuto,
+    [switch]$IncludeDescendants,
 
     [ValidateRange(1, [int]::MaxValue)]
     [int]$MaxSubscriptions = 100
@@ -345,11 +349,13 @@ function Process-Subscription {
     param([string]$SubId, [string]$Token)
 
     $base = "$ARM/subscriptions/$SubId/providers/Microsoft.Authorization"
+    $scopePattern = if ($IncludeDescendants) { "(/subscriptions/$SubId(?:/resourceGroups/[^/?#%\s]+)?(?:/providers/[^/?#%\s]+(?:/[^/?#%\s]+/[^/?#%\s]+)+)*|/providers/Microsoft.Management/managementGroups/[^/?#%\s]+)" } else { '(/subscriptions/[0-9a-f-]{36}|/providers/Microsoft.Management/managementGroups/[^/?#\s]+)' }
 
-    $assignments = Invoke-ArmRest -Url "$base/policyAssignments?`$filter=atScope()&api-version=$API_ASSIGNMENTS" -Token $Token
+    $scopeFilter = if ($IncludeDescendants) { "" } else { '$filter=atScope()&' }
+    $assignments = Invoke-ArmRest -Url "$base/policyAssignments?${scopeFilter}api-version=$API_ASSIGNMENTS" -Token $Token
     $subDefs = Invoke-ArmRest -Url "$base/policyDefinitions?api-version=$API_DEFINITIONS" -Token $Token
     $subSets = Invoke-ArmRest -Url "$base/policySetDefinitions?api-version=$API_DEFINITIONS" -Token $Token
-    $exemptions = Invoke-ArmRest -Url "$base/policyExemptions?`$filter=atScope()&api-version=$API_EXEMPTIONS" -Token $Token
+    $exemptions = Invoke-ArmRest -Url "$base/policyExemptions?${scopeFilter}api-version=$API_EXEMPTIONS" -Token $Token
 
     $defs = @{}
     foreach ($d in $subDefs) { $defs[($d.id).ToLower()] = $d }
@@ -365,15 +371,19 @@ function Process-Subscription {
         if (-not $exProps -or -not $exProps.policyAssignmentId -or $exProps.exemptionCategory -notin @("Waiver", "Mitigated")) {
             throw "Invalid policy exemption"
         }
-        if ($ex.id -isnot [string] -or $ex.id -notmatch '^(/subscriptions/[0-9a-f-]{36}|/providers/Microsoft.Management/managementGroups/[^/?#\s]+)/providers/Microsoft.Authorization/policyExemptions/[^/?#\s]+$') {
+        if ($ex.id -isnot [string] -or $ex.id -notmatch "^$scopePattern/providers/Microsoft.Authorization/policyExemptions/[^/?#%\s]+`$") {
             throw "Invalid or unsupported policy exemption scope"
         }
         $exemptionScope = $Matches[1]
-        if ($exProps.policyAssignmentId -isnot [string] -or $exProps.policyAssignmentId -notmatch '^(/subscriptions/[0-9a-f-]{36}|/providers/Microsoft.Management/managementGroups/[^/?#\s]+)/providers/Microsoft.Authorization/policyAssignments/[^/?#\s]+$') {
+        if ($exProps.policyAssignmentId -isnot [string] -or $exProps.policyAssignmentId -notmatch "^$scopePattern/providers/Microsoft.Authorization/policyAssignments/[^/?#%\s]+`$") {
             throw "Invalid policy exemption assignment identity"
         }
         $assignmentScope = $Matches[1]
-        if ($exemptionScope -ine "/subscriptions/$SubId" -and
+        if ($IncludeDescendants -and $assignmentScope -notmatch '^/providers/Microsoft.Management/' -and
+            $exemptionScope -ine $assignmentScope -and -not $exemptionScope.StartsWith("$assignmentScope/", [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Policy exemption scope is outside its assignment"
+        }
+        if (-not ($IncludeDescendants -and $exemptionScope.StartsWith("/subscriptions/$SubId/", [StringComparison]::OrdinalIgnoreCase)) -and $exemptionScope -ine "/subscriptions/$SubId" -and
             ($exemptionScope -notmatch '^/providers/Microsoft.Management/managementGroups/' -or $exemptionScope -ine $assignmentScope)) {
             throw "Policy exemption scope does not cover the collected subscription"
         }
@@ -410,6 +420,9 @@ function Process-Subscription {
     $notScopeExcludedCount = 0
     $targetScope = "/subscriptions/$SubId"
     foreach ($a in $assignments) {
+        if ($IncludeDescendants -and ($a.properties.scope -notmatch "^$scopePattern`$" -or $a.properties.scope -match '/\.{1,2}(?:/|$)')) {
+            throw "Invalid policy assignment scope"
+        }
         if ($a.id -isnot [string] -or $a.id -notmatch '^(.+)/providers/Microsoft.Authorization/policyAssignments/[^/?#\s]+$' -or
             $Matches[1] -ine $a.properties.scope) {
             throw "Invalid policy assignment identity"
@@ -441,7 +454,7 @@ function Process-Subscription {
             throw "Unsupported assignment definitionVersion"
         }
         $null = Get-EnforcementMode $a
-        if ((Test-IsDefenderAuto $a) -and -not $IncludeDefenderAuto) {
+        if ((Test-IsDefenderAuto $a) -and -not $IncludeDefenderAuto -and -not $IncludeDescendants) {
             $filteredDefender += ($a.properties.displayName ?? $a.name ?? $a.id ?? "<unknown>")
         }
         else { $keptAssignments += $a }
@@ -464,6 +477,7 @@ function Process-Subscription {
         $enforcementMode = Get-EnforcementMode $a
 
         $assignmentInventory += @{
+            assignmentId = $a.id
             displayName = $display
             scope = $scope
             assignmentType = $assignmentType
@@ -497,22 +511,27 @@ function Process-Subscription {
             $effectivePolicy = Get-EffectOf -Defn $defn -Parameters $member.parameters -Initiative $policySet -Assignment $a -MemberRefId $memberRefId
             $eff = $effectivePolicy.effect
             $classifiedPolicyCount++
-            if ($eff -eq "Disabled") { $disabledCount++; continue }
-            if ($eff -in @("Audit", "AuditIfNotExists")) { $auditCount++; continue }
-            if ($eff -notin $RELEVANT_EFFECTS) { $otherEffectCount++; continue }
+            if ($eff -eq "Disabled") { $disabledCount++; if (-not $IncludeDescendants) { continue } }
+            if ($eff -in @("Audit", "AuditIfNotExists")) { $auditCount++; if (-not $IncludeDescendants) { continue } }
+            if ($IncludeDescendants -and $eff -notin ($RELEVANT_EFFECTS + @("Disabled", "Audit", "AuditIfNotExists", "Append"))) { throw "Unsupported policy effect" }
+            if (-not $IncludeDescendants -and $eff -notin $RELEVANT_EFFECTS) { $otherEffectCount++; continue }
 
             $rtypes = Get-ResourceTypes $defn
             $paths = Get-PropertyPaths $defn $rtypes
             $category = $defn.properties.metadata.category ?? "Uncategorized"
 
             $exemption = $null
+            $reportedExemptions = @()
             if ($exemptionMap.ContainsKey($assignmentId)) {
                 foreach ($candidate in $exemptionMap[$assignmentId]) {
                     if ($null -eq $candidate) { continue }
                     $refIds = $candidate.policyDefinitionReferenceIds
                     if (-not $refIds -or $memberRefId -in $refIds) {
-                        $exemption = $candidate
-                        break
+                        $reportedExemptions += $candidate
+                        if (-not $IncludeDescendants) {
+                            $exemption = $candidate
+                        }
+                        if (-not $IncludeDescendants) { break }
                     }
                 }
             }
@@ -540,6 +559,7 @@ function Process-Subscription {
                 override = $effectivePolicy.override
             }
             if ($policySet) { $finding.policyDefinitionReferenceId = $memberRefId }
+            if ($IncludeDescendants) { $finding.reported_exemptions = @($reportedExemptions) }
 
             # Assignment parameters
             $assignmentParams = $props.parameters
@@ -624,6 +644,7 @@ function Process-Subscription {
         completeness_signature = ""
         ttl_days = 30
     }
+    if ($IncludeDescendants) { $discoveryMetadata.scope.coverage = "subscription-and-descendants-v1" }
 
     return [ordered]@{
         schema_version = "governance-constraints-v1"

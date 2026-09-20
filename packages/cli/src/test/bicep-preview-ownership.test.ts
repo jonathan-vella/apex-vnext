@@ -96,6 +96,16 @@ function planCoverage(context: ReturnType<typeof fixture>) {
   });
 }
 
+test("native Bicep rejects obsolete and mismatched binding versions", () => {
+  for (const version of ["legacy", "2022-09-01"]) {
+    const context = fixture();
+    context.binding.resourceBindings.storage!.version = version;
+    const result = resolveNativeBicepResourceOwnership(context);
+    assert.notEqual(result.issues.length, 0);
+    assert.deepEqual(result.expectedResourceIds, []);
+  }
+});
+
 test("native Bicep resolves accepted literal names and exact RG ownership", () => {
   const context = fixture();
   for (const parentId of ["/", targetScope, targetScope.toUpperCase()]) {

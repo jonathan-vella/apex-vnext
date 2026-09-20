@@ -72,7 +72,6 @@ export interface WorkflowGateValidatorContext {
   readonly reviewBlockers: readonly string[];
   readonly expectedDependencyHash?: string;
   readonly currentDependencyRevision: string;
-  readonly legacyRequirements: boolean;
   readonly expectedApprovalRecipientIdentity: string;
   readonly provedPreviewTransferClaimHash?: string;
   readonly preview?: DeploymentPreviewV1;
@@ -274,7 +273,7 @@ export function resolveNativeBicepResourceOwnership(context: {
     if (
       descriptor === null ||
       descriptor[1]!.toLowerCase() !== resource.type.toLowerCase() ||
-      (resourceBinding.version !== "legacy" && resourceBinding.version !== descriptor[2]) ||
+      resourceBinding.version !== descriptor[2] ||
       typeof name !== "string" ||
       !/^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\s\S])/.test(name) ||
       typeof parentId !== "string" ||
@@ -817,7 +816,7 @@ function gateReady(expectedGate: 1 | 2 | 3, value: unknown): ValidationIssue[] {
     3: ["implementation-intent", "iac-binding", "environment-inputs"],
   };
   const requiredReviews: Record<1 | 2 | 3, readonly string[]> = {
-    1: context.legacyRequirements ? [] : ["requirements-review"],
+    1: ["requirements-review"],
     2: ["architecture-review", "governance-review"],
     3: ["plan-review"],
   };

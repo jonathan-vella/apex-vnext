@@ -155,7 +155,9 @@ function assertComplete(result) {
     const summary = envelope.discovery_summary;
     assert.equal(
       summary.classified_policy_count,
-      envelope.findings.length + summary.audit_count + summary.disabled_count + summary.other_effect_count,
+      envelope.findings.length +
+        (envelope.discovery_metadata.scope.coverage ? 0 : summary.audit_count + summary.disabled_count) +
+        summary.other_effect_count,
     );
   }
   return baseline;
@@ -1119,6 +1121,79 @@ for (const scenario of [
     assert.equal(envelope.discovery_summary.assignment_kept, scenario.excluded ? 0 : 1);
     assert.equal(envelope.discovery_summary.not_scope_excluded, scenario.excluded ? 1 : 0);
     assert.equal(envelope.findings.length, scenario.excluded ? 0 : 1);
+  });
+}
+
+test(
+  "descendant collection preserves scoped assignments and exemptions without a blanket waiver",
+  powershellOptions,
+  (context) => {
+    const responses = routes();
+    const policyId = "/providers/Microsoft.Authorization/policyDefinitions/scoped";
+    const target = `${subscriptionScope}/resourceGroups/target`;
+    const assigned = assignment(policyId, subscriptionScope);
+    responses[assignmentsUrl.replace("$filter=atScope()&", "")] = {
+      value: [
+        assigned,
+        assignment(policyId, target, "rg"),
+        assignment(policyId, `${target}/providers/Microsoft.Storage/storageAccounts/child`, "child"),
+      ],
+    };
+    responses[exemptionsUrl.replace("$filter=atScope()&", "")] = {
+      value: [
+        {
+          id: `${target}/providers/Microsoft.Authorization/policyExemptions/partial`,
+          properties: { policyAssignmentId: assigned.id, exemptionCategory: "Waiver" },
+        },
+      ],
+    };
+    responses[definitionsUrl].value = [definition(policyId)];
+    const envelope = assertComplete(
+      collect(context, responses, { root: { SubscriptionId: subscriptionId, IncludeDescendants: true } }),
+    ).subscriptions[subscriptionId];
+    assert.equal(envelope.discovery_metadata.scope.coverage, "subscription-and-descendants-v1");
+    assert.equal(envelope.findings.length, 3);
+    assert.equal(envelope.findings[0].classification, "blocker");
+    assert.equal(envelope.findings[0].exemption, null);
+    assert.equal(envelope.findings[0].reported_exemptions[0].scope, target);
+  },
+);
+
+for (const effect of ["Manual", "DenyAction", "Mutate"]) {
+  test(`descendant collection rejects unsupported ${effect} without publication`, powershellOptions, (context) => {
+    const responses = routes();
+    const policyId = "/providers/Microsoft.Authorization/policyDefinitions/unsupported";
+    const policy = definition(policyId);
+    policy.properties.policyRule.then.effect = effect;
+    responses[definitionsUrl].value = [policy];
+    responses[assignmentsUrl.replace("$filter=atScope()&", "")] = { value: [assignment(policyId, subscriptionScope)] };
+    responses[exemptionsUrl.replace("$filter=atScope()&", "")] = { value: [] };
+    assertAborted(
+      collect(context, responses, { root: { SubscriptionId: subscriptionId, IncludeDescendants: true } }),
+      /Unsupported policy effect/,
+    );
+  });
+}
+
+for (const effect of ["Audit", "AuditIfNotExists", "Disabled", "Append"]) {
+  test(`descendant collection retains ${effect} members and exact counts`, powershellOptions, (context) => {
+    const responses = routes();
+    const policyId = "/providers/Microsoft.Authorization/policyDefinitions/scoped-audit";
+    const policy = definition(policyId);
+    policy.properties.policyRule.then.effect = effect;
+    responses[definitionsUrl].value = [policy];
+    responses[assignmentsUrl.replace("$filter=atScope()&", "")] = {
+      value: [assignment(policyId, `${subscriptionScope}/resourceGroups/target`)],
+    };
+    responses[exemptionsUrl.replace("$filter=atScope()&", "")] = { value: [] };
+    const envelope = assertComplete(
+      collect(context, responses, { root: { SubscriptionId: subscriptionId, IncludeDescendants: true } }),
+    ).subscriptions[subscriptionId];
+    assert.equal(envelope.findings.length, 1);
+    assert.equal(envelope.findings[0].classification, "informational");
+    assert.equal(envelope.discovery_summary.classified_policy_count, 1);
+    assert.equal(envelope.discovery_summary.audit_count, effect.startsWith("Audit") ? 1 : 0);
+    assert.equal(envelope.discovery_summary.disabled_count, effect === "Disabled" ? 1 : 0);
   });
 }
 

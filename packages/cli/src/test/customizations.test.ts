@@ -343,16 +343,14 @@ test("init installs only the selected Copilot CLI projection and records it in t
   await assert.rejects(readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"), /ENOENT/u);
 });
 
-test("legacy locks default to VS Code and custom sources require explicit updates", async () => {
+test("missing customization selection fails closed and custom sources require explicit updates", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
   await service.init({ projectId: "demo" });
   await rm(join(root, ".apex", "customizations.selection.json"));
-  const lockPath = join(root, ".apex", "customizations.lock.json");
-  const lock = JSON.parse(await readFile(lockPath, "utf8")) as Record<string, unknown>;
-  delete lock.clientId;
-  await writeFile(lockPath, `${JSON.stringify(lock)}\n`);
-  await service.update();
+  await assert.rejects(service.update(), /Customization selection is missing/);
+  await assert.rejects(service.reinstallCustomizations(), /Customization selection is missing/);
+  await assert.rejects(service.doctor(true, true), /Customization selection is missing/);
   assert.ok(await stat(join(root, ".vscode", "mcp.json")));
 
   const customRoot = await tempRoot();

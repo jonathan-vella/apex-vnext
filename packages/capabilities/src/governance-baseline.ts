@@ -13,6 +13,7 @@ export class GovernanceBaselineError extends Error {
 
 export interface GovernanceBaselineImportOptions {
   readonly subscriptionId: string;
+  readonly targetScope?: string;
   readonly now: string;
 }
 
@@ -42,6 +43,7 @@ export interface GovernanceBaselineFinding {
   readonly classification: "blocker" | "auto-remediate" | "informational";
   readonly resourceTypes: readonly string[];
   readonly mappingStatus: "unmapped";
+  readonly reportedExemptions?: readonly NonNullable<GovernanceBaselineFinding["exemption"]>[];
   readonly exemption: null | {
     readonly id?: string;
     readonly scope?: string;
@@ -54,8 +56,9 @@ export interface GovernanceBaselineFinding {
 
 export interface GovernanceBaselineSelection {
   readonly snapshot: {
-    readonly schemaVersion: "governance-baseline-selection-v1";
+    readonly schemaVersion: "governance-baseline-selection-v2";
     readonly subscriptionId: string;
+    readonly targetScope?: string;
     readonly contentHash: string;
     readonly provenance: {
       readonly root: GovernanceBaselineRoot;
@@ -187,6 +190,13 @@ function scope(value: unknown, subscriptionId: string): string {
   const result = text(value);
   const normalized = result.toLowerCase();
   if (
+    normalized.split("/").some((part) => part === "." || part === "..") ||
+    !/^(?:\/providers\/microsoft\.management\/managementgroups\/[^/?#%\s]+|\/subscriptions\/[0-9a-f-]{36}(?:\/resourcegroups\/[^/?#%\s]+)?(?:\/providers\/[^/?#%\s]+(?:\/[^/?#%\s]+\/[^/?#%\s]+)+)*)$/u.test(
+      normalized,
+    )
+  )
+    fail("target-mismatch");
+  if (
     !/^\/providers\/microsoft\.management\/managementgroups\/[^/]+$/u.test(normalized) &&
     normalized !== `/subscriptions/${subscriptionId}` &&
     !normalized.startsWith(`/subscriptions/${subscriptionId}/`)
@@ -202,7 +212,7 @@ function enforcementMode(source: Record<string, unknown>): GovernanceBaselineFin
   return mode;
 }
 
-function finding(value: unknown, subscriptionId: string): GovernanceBaselineFinding {
+function finding(value: unknown, subscriptionId: string, descendants = false): GovernanceBaselineFinding {
   const source = record(value);
   const mode = enforcementMode(source);
   const effect = text(source.effect) as GovernanceBaselineFinding["effect"];
@@ -210,20 +220,28 @@ function finding(value: unknown, subscriptionId: string): GovernanceBaselineFind
     fail();
   const classification = text(source.classification) as GovernanceBaselineFinding["classification"];
   if (!["blocker", "auto-remediate", "informational"].includes(classification)) fail();
-  let exemption: GovernanceBaselineFinding["exemption"] = null;
-  if (source.exemption !== null) {
-    const reported = record(source.exemption);
+  function readExemption(value: unknown): NonNullable<GovernanceBaselineFinding["exemption"]> {
+    const reported = record(value);
     const category = text(reported.category);
     if (category !== "Waiver" && category !== "Mitigated") fail();
     let provenance: Pick<NonNullable<GovernanceBaselineFinding["exemption"]>, "id" | "scope" | "expiresOn"> = {};
-    if (["id", "scope", "expiresOn"].some((key) => Object.hasOwn(reported, key))) {
+    if (descendants || ["id", "scope", "expiresOn"].some((key) => Object.hasOwn(reported, key))) {
       const exemptionId = text(reported.id);
       const exemptionScope = scope(reported.scope, subscriptionId);
+      const assignmentScope = scope(source.scope, subscriptionId).toLowerCase();
+      if (
+        descendants &&
+        !assignmentScope.startsWith("/providers/microsoft.management/managementgroups/") &&
+        exemptionScope.toLowerCase() !== assignmentScope &&
+        !exemptionScope.toLowerCase().startsWith(`${assignmentScope}/`)
+      )
+        fail("target-mismatch");
       const suffix = exemptionId.slice(exemptionScope.length);
       if (
         exemptionId.slice(0, exemptionScope.length).toLowerCase() !== exemptionScope.toLowerCase() ||
         !/^\/providers\/microsoft\.authorization\/policyexemptions\/[^/?#\s]+$/iu.test(suffix) ||
-        (exemptionScope.toLowerCase() !== `/subscriptions/${subscriptionId}` &&
+        (!(descendants && exemptionScope.toLowerCase().startsWith(`/subscriptions/${subscriptionId}/`)) &&
+          exemptionScope.toLowerCase() !== `/subscriptions/${subscriptionId}` &&
           (!/^\/providers\/microsoft\.management\/managementgroups\/[^/?#\s]+$/iu.test(exemptionScope) ||
             exemptionScope.toLowerCase() !== text(source.scope).toLowerCase()))
       )
@@ -232,7 +250,7 @@ function finding(value: unknown, subscriptionId: string): GovernanceBaselineFind
       if (expiresOn !== null) timestamp(expiresOn);
       provenance = { id: exemptionId, scope: exemptionScope, expiresOn };
     }
-    exemption = {
+    return {
       ...provenance,
       category,
       policyDefinitionReferenceIds:
@@ -240,6 +258,24 @@ function finding(value: unknown, subscriptionId: string): GovernanceBaselineFind
       verificationStatus: "unverified",
     };
   }
+  const exemption = source.exemption === null ? null : readExemption(source.exemption);
+  const reportedExemptions = descendants ? array(source.reported_exemptions).map(readExemption) : undefined;
+  if (
+    descendants &&
+    (exemption !== null ||
+      classification !==
+        (effect === "deny"
+          ? "blocker"
+          : ["modify", "deployIfNotExists"].includes(effect)
+            ? "auto-remediate"
+            : "informational"))
+  )
+    fail("incomplete");
+  if (
+    reportedExemptions &&
+    new Set(reportedExemptions.map((item) => item.id!.toLowerCase())).size !== reportedExemptions.length
+  )
+    fail("incomplete");
   const findingScope = scope(source.scope, subscriptionId);
   const assignmentId = text(source.assignment_id);
   if (
@@ -271,6 +307,7 @@ function finding(value: unknown, subscriptionId: string): GovernanceBaselineFind
     resourceTypes: strings(source.resource_types),
     mappingStatus: "unmapped",
     exemption,
+    ...(reportedExemptions === undefined ? {} : { reportedExemptions }),
   };
 }
 
@@ -294,6 +331,8 @@ function selectEntry(
   )
     fail("incomplete");
   const metadataScope = record(metadata.scope);
+  const descendants = metadataScope.coverage === "subscription-and-descendants-v1";
+  if (metadataScope.coverage !== undefined && !descendants) fail("incomplete");
   if (
     subscription(entry.subscription_id) !== subscriptionId ||
     subscription(metadataScope.subscription_id) !== subscriptionId
@@ -316,7 +355,7 @@ function selectEntry(
   }
   const rawFindings = array(entry.findings);
   if (canonical(array(entry.policies)) !== canonical(rawFindings)) fail("incomplete");
-  const findings = rawFindings.map((item) => finding(item, subscriptionId));
+  const findings = rawFindings.map((item) => finding(item, subscriptionId, descendants));
   const findingIdentities = findings.map((item) =>
     canonical([item.assignmentId.toLowerCase(), item.policyId.toLowerCase(), item.policyDefinitionReferenceId ?? null]),
   );
@@ -349,6 +388,28 @@ function selectEntry(
     if (assignment.assignmentType !== expectedType) fail("incomplete");
     return expectedType;
   });
+  if (descendants) {
+    const inventoryIds = array(entry.assignment_inventory).map((item) => {
+      const assignment = record(item);
+      const assignmentId = text(assignment.assignmentId).toLowerCase();
+      const assignmentScope = scope(assignment.scope, subscriptionId).toLowerCase();
+      if (
+        !assignmentId.startsWith(assignmentScope) ||
+        !/^\/providers\/microsoft\.authorization\/policyassignments\/[^/?#%\s]+$/u.test(
+          assignmentId.slice(assignmentScope.length),
+        )
+      )
+        fail("target-mismatch");
+      return assignmentId;
+    });
+    const findingIds = new Set(findings.map((item) => item.assignmentId.toLowerCase()));
+    if (
+      new Set(inventoryIds).size !== inventoryIds.length ||
+      inventoryIds.length !== findingIds.size ||
+      inventoryIds.some((id) => !findingIds.has(id))
+    )
+      fail("incomplete");
+  }
   const summary = record(entry.discovery_summary);
   for (const key of [
     "assignment_total",
@@ -366,7 +427,19 @@ function selectEntry(
     count(summary[key]);
   const notScopeExcluded = summary.not_scope_excluded === undefined ? 0 : count(summary.not_scope_excluded);
   const findingAssignments = new Set(findings.map((item) => item.assignmentId.toLowerCase())).size;
-  const classifiedMembers = findings.length + Number(summary.audit_count) + Number(summary.disabled_count);
+  const classifiedMembers =
+    findings.length + (descendants ? 0 : Number(summary.audit_count) + Number(summary.disabled_count));
+  if (
+    descendants &&
+    (count(summary.audit_count) !==
+      findings.filter((item) => item.effect === "audit" || item.effect === "auditIfNotExists").length ||
+      count(summary.disabled_count) !== findings.filter((item) => item.effect === "disabled").length ||
+      count(summary.classified_policy_count) !== findings.length ||
+      count(summary.other_effect_count) !== 0 ||
+      count(summary.defender_auto_filtered) !== 0 ||
+      findingAssignments !== inventory.length)
+  )
+    fail("incomplete");
   if (
     findingAssignments > inventory.length ||
     findingAssignments + Number(summary.audit_count) + Number(summary.disabled_count) < inventory.length ||
@@ -415,8 +488,9 @@ function selectEntry(
     .sort((left, right) => (canonical(left) < canonical(right) ? -1 : canonical(left) > canonical(right) ? 1 : 0));
   return {
     snapshot: {
-      schemaVersion: "governance-baseline-selection-v1",
+      schemaVersion: "governance-baseline-selection-v2",
       subscriptionId,
+      targetScope: `/subscriptions/${subscriptionId}`,
       contentHash: createHash("sha256")
         .update(
           canonical({
@@ -529,7 +603,60 @@ function validateGovernanceBaseline(
     count(summary.total_auto_remediate) !== totalAutoRemediate
   )
     fail("incomplete");
-  return selected ?? fail("target-mismatch");
+  if (!selected) fail("target-mismatch");
+  if (options.targetScope === undefined) return selected;
+  const targetScope = text(options.targetScope).toLowerCase();
+  const subscriptionScope = `/subscriptions/${subscriptionId}`;
+  if (
+    targetScope !== subscriptionScope &&
+    !new RegExp(`^${subscriptionScope}/resourcegroups/[^/?#\\s]+$`, "u").test(targetScope)
+  )
+    fail("invalid-options");
+  scope(targetScope, subscriptionId);
+  const selectedEntry = record(entries.find(([key]) => subscription(key) === subscriptionId)![1]);
+  const selectedMetadata = record(selectedEntry.discovery_metadata);
+  if (record(selectedMetadata.scope).coverage !== "subscription-and-descendants-v1") fail("incomplete");
+  const applies = (value: unknown): boolean => {
+    const candidate = scope(value, subscriptionId).toLowerCase();
+    return (
+      candidate.startsWith("/providers/microsoft.management/managementgroups/") ||
+      candidate === targetScope ||
+      candidate.startsWith(`${targetScope}/`) ||
+      targetScope.startsWith(`${candidate}/`)
+    );
+  };
+  const findings = selected.snapshot.findings
+    .filter((item) => applies(item.scope))
+    .map((item) => ({
+      ...item,
+      reportedExemptions: (item.reportedExemptions ?? []).filter((exemption) => applies(exemption.scope)),
+    }));
+  return {
+    snapshot: {
+      ...selected.snapshot,
+      schemaVersion: "governance-baseline-selection-v2",
+      targetScope,
+      contentHash: createHash("sha256")
+        .update(canonical({ sourceHash: selected.snapshot.contentHash, targetScope }))
+        .digest("hex"),
+      findings,
+      tagsRequired: [],
+      allowedLocations: [],
+    },
+    constraints: {
+      ...selected.constraints,
+      targetScope,
+      summary: {
+        assignmentCount: array(selectedEntry.assignment_inventory).filter((item) => applies(record(item).scope)).length,
+        denyCount: findings.filter((item) => item.effect === "deny").length,
+        modifyCount: findings.filter((item) => item.effect === "modify").length,
+        auditCount: findings.filter((item) => item.effect === "audit" || item.effect === "auditIfNotExists").length,
+        exemptionCount: new Set(
+          findings.flatMap((item) => (item.reportedExemptions ?? []).map((exemption) => exemption.id!.toLowerCase())),
+        ).size,
+      },
+    },
+  };
 }
 
 export function importGovernanceBaseline(

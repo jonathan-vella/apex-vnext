@@ -1144,14 +1144,14 @@ test("task context rejects a task whose journal head changed", async () => {
   const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"));
   const requirementsHash = "a".repeat(64);
   await journal.append({
-    eventId: "legacy-requirements",
+    eventId: "completed-requirements",
     projectId: "demo",
     runId: initialized.runId,
     type: "task.completed",
     timestamp: "2026-01-01T00:00:00.000Z",
     ownerEpoch: 1,
     expectedHead: await journal.head(),
-    payload: { nodeId: "requirements", requirementsHash, legacy: true },
+    payload: { nodeId: "requirements", artifactHashes: { requirements: requirementsHash } },
   });
 
   await assert.rejects(service.taskContext(issued.task.taskId), /stale/);
@@ -1378,10 +1378,11 @@ test("imported initiative members require distinct mappings and run-owned eviden
   const run = await internal.currentRun();
   const objects = new ObjectStore(root);
   const snapshot = {
-    schemaVersion: "governance-baseline-selection-v1",
+    schemaVersion: "governance-baseline-selection-v2",
     projectId: run.projectId,
     runId: run.runId,
     subscriptionId,
+    targetScope: run.targetScope.toLowerCase(),
     findings: ["member-1", "member-2"].map((policyDefinitionReferenceId) => ({
       assignmentId: "assignment",
       policyId: "definition",
@@ -1849,16 +1850,16 @@ test("pending input is reissued after writer transfer", async () => {
   assert.equal((await service.nextTask()).status, "needs_input");
 });
 
-test("compatibility input rejects legacy answers without recording unrelated values", async () => {
+test("typed input rejects obsolete answers without recording unrelated values", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
   await service.init({ projectId: "demo" });
   await assert.rejects(
-    service.recordRequirementsInput({ workload: "demo", secretToken: "do-not-journal" }),
+    service.recordInput({ workload: "demo", secretToken: "do-not-journal" } as never),
     (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
   );
   await assert.rejects(
-    service.recordRequirementsInput({ workload: "demo", requirements: "bounded", secretToken: "do-not-journal" }),
+    service.recordInput({ workload: "demo", requirements: "bounded", secretToken: "do-not-journal" } as never),
     (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
   );
   const events = await new EventJournal(
@@ -1897,7 +1898,7 @@ test("concurrent input submissions return only stable Apex errors", async () => 
 });
 
 for (const total of [3, 4]) {
-  test(`pending legacy ${total}-round intake requests replay unchanged`, async () => {
+  test(`obsolete ${total}-round intake requests fail closed without mutation`, async () => {
     const root = await tempRoot();
     const service = new ApexService(root);
     const initialized = await service.init({ projectId: "demo" });
@@ -1927,29 +1928,10 @@ for (const total of [3, 4]) {
         ],
       },
     });
-    const pending = await service.nextTask();
-    assert.equal(pending.status, "needs_input");
-    if (pending.status !== "needs_input") return;
-    assert.deepEqual(pending.request.intake, { round: "business-discovery", ordinal: 1, total });
-    assert.equal(
-      pending.request.questions.some(({ id }) => id === "workload-profile"),
-      false,
-    );
-    await service.recordInput({
-      schemaVersion: "1.0.0",
-      requestId: pending.request.requestId,
-      expectedHead: pending.request.expectedHead,
-      ownerEpoch: pending.request.ownerEpoch,
-      answers: pending.request.questions.map(({ id, options, multiSelect }) => ({
-        questionId: id,
-        value: multiSelect ? [options![0]!] : (options?.[0] ?? "demo workload"),
-      })),
-    });
-    const next = await new ApexService(root).nextTask();
-    assert.equal(next.status, "needs_input");
-    if (next.status === "needs_input") {
-      assert.deepEqual(next.request.intake, { round: "workload-pattern", ordinal: 2, total });
-    }
+    const head = await journal.head();
+    await assert.rejects(service.nextTask(), /Requirements intake is incompatible/u);
+    await assert.rejects(new ApexService(root).status(), /Requirements intake is incompatible/u);
+    assert.equal(await journal.head(), head);
   });
 }
 
@@ -1988,6 +1970,10 @@ test("a task remains current across stage then complete", async () => {
   assert.equal(staged.kind, "requirements");
   const completed = await service.completeTask(issued.task.taskId, { kind: "requirements", value });
   assert.match(completed.outputHash, /^[0-9a-f]{64}$/);
+  const next = await service.nextTask();
+  assert.equal(next.status, "task");
+  if (next.status === "task") assert.equal(next.task.taskType, "requirements-review");
+  assert.equal((await service.status()).run.gates[0]?.state, "closed");
 });
 
 test("expired preview and wrong preview hash are rejected", async () => {
@@ -2016,6 +2002,10 @@ test("gate approval rejects stale dependencies while explicit rejection remains 
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
   await service.completeTask(issued.task.taskId, { kind: "requirements", value: requirements() });
+  const reviewer = await service.nextTask();
+  assert.equal(reviewer.status, "task");
+  if (reviewer.status !== "task") return;
+  await service.completeReview(reviewer.task.taskId, []);
 
   const runPath = join(root, ".apex", "projects", "demo", "runs", initialized.runId, "run.json");
   const run = JSON.parse(await readFile(runPath, "utf8")) as { gates: Array<{ gate: number; dependencyHash: string }> };

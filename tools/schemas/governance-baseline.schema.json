@@ -96,6 +96,17 @@
           "discovered_at": { "type": "string" },
           "source": { "type": "string" },
           "discovery_status": { "type": "string" },
+          "discovery_metadata": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "object",
+                "properties": {
+                  "coverage": { "const": "subscription-and-descendants-v1" }
+                }
+              }
+            }
+          },
           "findings": { "type": "array" },
           "policies": { "type": "array" },
           "tags_required": { "type": "array" },

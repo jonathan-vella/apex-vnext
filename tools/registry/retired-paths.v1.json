@@ -1,6 +1,9 @@
 {
   "schemaVersion": "1.0.0",
   "paths": [
+    ".archive/README.md",
+    ".archive/index.json",
+    ".archive/legacy.tar.gz",
     ".devcontainer",
     ".devcontainer/README.md",
     ".devcontainer/devcontainer-lock.json",

@@ -70,7 +70,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $parameters = @{ MaxSubscriptions = [int]$env:GOVERNANCE_MAX_SUBSCRIPTIONS; IncludeDefenderAuto = $true }
+          $parameters = @{ MaxSubscriptions = [int]$env:GOVERNANCE_MAX_SUBSCRIPTIONS; IncludeDefenderAuto = $true; IncludeDescendants = $true }
           if ($env:GOVERNANCE_MG_ID) {
             $parameters.ManagementGroupId = $env:GOVERNANCE_MG_ID
           } else {

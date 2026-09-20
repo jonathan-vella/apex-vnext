@@ -415,7 +415,7 @@ interface ArchitectureDecision {
   questions: InputRequestV1["questions"];
 }
 
-const LEGACY_REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
+const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
   {
     round: "business-discovery",
     questions: [
@@ -456,6 +456,12 @@ const LEGACY_REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
           rationale: "Plan development and production intent; each environment remains a separate governed run.",
         },
       },
+      {
+        id: "workload-profile",
+        prompt:
+          "Choose ALZ-backed to use supplied networking, identity and monitoring, or standalone-lab for a single-subscription lab/demo with workload support resources. Both require Azure Policy, security and deployment approval.",
+        options: ["alz-backed", "standalone-lab"],
+      },
     ],
   },
   {
@@ -479,12 +485,6 @@ const LEGACY_REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
           rationale: "Use internal as the baseline unless the workload handles public-only or more sensitive data.",
         },
       },
-      { id: "iac-preference", prompt: "Choose the preferred infrastructure tool.", options: ["bicep", "terraform"] },
-    ],
-  },
-  {
-    round: "service-preferences",
-    questions: [
       {
         id: "prohibited-services",
         prompt: "List prohibited services, use 'none', or explicitly defer the constraint.",
@@ -590,29 +590,6 @@ const LEGACY_REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
       },
     ],
   },
-];
-
-const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
-  {
-    round: "business-discovery",
-    questions: [
-      ...LEGACY_REQUIREMENTS_INTAKE[0]!.questions,
-      {
-        id: "workload-profile",
-        prompt:
-          "Choose ALZ-backed to use supplied networking, identity and monitoring, or standalone-lab for a single-subscription lab/demo with workload support resources. Both require Azure Policy, security and deployment approval.",
-        options: ["alz-backed", "standalone-lab"],
-      },
-    ],
-  },
-  {
-    round: "workload-pattern",
-    questions: [
-      ...LEGACY_REQUIREMENTS_INTAKE[1]!.questions.filter(({ id }) => id !== "iac-preference"),
-      ...LEGACY_REQUIREMENTS_INTAKE[2]!.questions,
-    ],
-  },
-  LEGACY_REQUIREMENTS_INTAKE[3]!,
 ];
 
 const ARCHITECTURE_DECISIONS: readonly ArchitectureDecision[] = [
@@ -938,10 +915,7 @@ export class ApexService {
       await readFile(join(this.root, ".apex", "apex.lock.json"), "utf8"),
     ) as RuntimeBundleLockV1;
     await this.installRuntimeGeneration(previousRuntimeLock);
-    const lock = JSON.parse(
-      await readFile(join(this.root, ".apex", "customizations.lock.json"), "utf8"),
-    ) as CustomizationLock;
-    const persisted = await this.customizationSelection(lock.clientId);
+    const persisted = await this.customizationSelection();
     const clientId = persisted.clientId;
     if (persisted.sourceMode === "custom-source" && customizationsSource === undefined) {
       throw new ApexError("APEX_USAGE", "Custom-source updates require --customizations-source", EXIT_CODES.usage);
@@ -1367,35 +1341,6 @@ export class ApexService {
     return { recorded: true, requestId: request.requestId };
   }
 
-  async recordRequirementsInput(value: unknown): Promise<void> {
-    const pending = await this.nextTask();
-    if (pending.status !== "needs_input") {
-      throw new ApexError("APEX_CONFLICT", "No requirements input request is pending", EXIT_CODES.conflict);
-    }
-    const source =
-      value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
-    const missing = pending.request.questions.filter(
-      ({ id }) => typeof source[id] !== "string" || (source[id] as string).length === 0,
-    );
-    if (missing.length > 0) {
-      throw new ApexError(
-        "APEX_VALIDATION",
-        `Missing requirements input: ${missing.map(({ id }) => id).join(", ")}`,
-        EXIT_CODES.validation,
-      );
-    }
-    await this.recordInput({
-      schemaVersion: CONTRACT_VERSION,
-      requestId: pending.request.requestId,
-      expectedHead: pending.request.expectedHead,
-      ownerEpoch: pending.request.ownerEpoch,
-      answers: pending.request.questions.map(({ id }) => ({
-        questionId: id,
-        value: source[id] as string,
-      })),
-    });
-  }
-
   private async taskReviewMetadata(
     run: RunConfigV1,
     task: TaskEnvelopeV1,
@@ -1742,7 +1687,7 @@ export class ApexService {
         "Governance import requires a subscription-scoped run target",
         EXIT_CODES.validation,
       );
-    return { subscriptionId: subscription[1]!, now: this.clock().toISOString() };
+    return { subscriptionId: subscription[1]!, targetScope: run.targetScope, now: this.clock().toISOString() };
   }
 
   private governanceQuestions(
@@ -2181,7 +2126,7 @@ export class ApexService {
     if (typeof snapshot.contentHash !== "string")
       throw new ApexError(
         "APEX_VALIDATION",
-        "Legacy governance snapshot has no content digest; explicit migration is required",
+        "Governance snapshot has no content digest; start a new run",
         EXIT_CODES.validation,
       );
     for (const [index, event] of events.entries()) {
@@ -2355,7 +2300,7 @@ export class ApexService {
       if (typeof snapshot.contentHash !== "string")
         throw new ApexError(
           "APEX_VALIDATION",
-          "Legacy governance snapshot has no content digest; migrate and reconcile governance before renewal",
+          "Governance snapshot has no content digest; start a new run",
           EXIT_CODES.validation,
         );
       if (
@@ -2476,7 +2421,6 @@ export class ApexService {
     const completed = await this.acceptTaskOutputs(
       task.taskId,
       [{ kind: "governance-constraints", value: constraints }],
-      false,
       revision,
     );
     if (selectionMetadata !== undefined) {
@@ -2642,7 +2586,7 @@ export class ApexService {
   }
 
   async completeTask(taskId: string, output: TaskOutput): Promise<{ outputHash: string; summary: string }> {
-    const completed = await this.acceptTaskOutputs(taskId, [output], true);
+    const completed = await this.completeTaskOutputs(taskId, [output]);
     return { outputHash: completed.outputHashes[output.kind]!, summary: output.summary ?? `${output.kind} accepted` };
   }
 
@@ -2650,7 +2594,7 @@ export class ApexService {
     taskId: string,
     outputs: TaskOutput[],
   ): Promise<{ outputHashes: Partial<Record<ArtifactKind, string>>; summary: string }> {
-    return this.acceptTaskOutputs(taskId, outputs, false);
+    return this.acceptTaskOutputs(taskId, outputs);
   }
 
   async completeRequirements(
@@ -2854,7 +2798,6 @@ export class ApexService {
   private async acceptTaskOutputs(
     taskId: string,
     outputs: TaskOutput[],
-    legacy: boolean,
     confirmedRevision?: ReturnType<ApexService["pendingGovernanceRevision"]>,
   ): Promise<{ outputHashes: Partial<Record<ArtifactKind, string>>; summary: string }> {
     outputs = [...outputs];
@@ -2893,11 +2836,7 @@ export class ApexService {
     }
     const missing = descriptor.outputs.filter((kind) => !kinds.includes(kind));
     if (missing.length > 0) {
-      if (legacy && descriptor.id === "plan" && kinds.length === 1 && kinds[0] === "implementation-intent") {
-        outputs = [...outputs, ...this.legacyPlanOutputs(run, outputs[0]!.value)];
-      } else {
-        throw new ApexError("APEX_VALIDATION", `Task bundle is missing: ${missing.join(", ")}`, EXIT_CODES.validation);
-      }
+      throw new ApexError("APEX_VALIDATION", `Task bundle is missing: ${missing.join(", ")}`, EXIT_CODES.validation);
     }
     for (const output of outputs) {
       if (!task.allowedOutputKinds.includes(output.kind))
@@ -2953,7 +2892,6 @@ export class ApexService {
               subjectHash: (outputs[0]!.value as ReviewFindingsV1).subjectHash,
               dependencyHash,
             }),
-        legacy,
       },
       completionHead,
     );
@@ -3027,8 +2965,6 @@ export class ApexService {
       if (reviewBlockers.length === 0 && descriptor.gate !== undefined) {
         await this.openRunGate(await this.currentRun(), descriptor.gate, dependencyHash);
       }
-    } else if (legacy && descriptor.id === "requirements") {
-      await this.openRunGate(await this.currentRun(), 1, sha256Json(outputHashes));
     }
     const completedRun = await this.currentRun();
     const completedEvents = await this.journal(completedRun).replay();
@@ -4689,10 +4625,7 @@ export class ApexService {
     if (fix && yes && apexExists) {
       await this.ensureLocalGitBoundary(true);
       const assets = await resolveBundledAssets();
-      const lock = JSON.parse(
-        await readFile(join(this.root, ".apex", "customizations.lock.json"), "utf8"),
-      ) as CustomizationLock;
-      const selection = await this.customizationSelection(lock.clientId);
+      const selection = await this.customizationSelection();
       if (selection.sourceMode === "custom-source") {
         throw new ApexError(
           "APEX_USAGE",
@@ -5290,7 +5223,7 @@ export class ApexService {
           : [],
       ),
     );
-    const catalog = this.requirementsIntakeCatalog(requests);
+    const catalog = REQUIREMENTS_INTAKE;
     const latest = requests.at(-1);
     if (latest !== undefined && !recordedRequestIds.has((latest.payload as { requestId: string }).requestId)) {
       const intake = (latest.payload as { intake: { ordinal?: unknown; round?: unknown; total?: unknown } }).intake;
@@ -5306,13 +5239,6 @@ export class ApexService {
       return round;
     }
     return catalog[recordedRequestIds.size];
-  }
-
-  private requirementsIntakeCatalog(
-    requests: Array<Awaited<ReturnType<EventJournal["replay"]>>[number]>,
-  ): readonly RequirementsIntakeRound[] {
-    const total = (requests[0]?.payload as { intake?: { total?: unknown } } | undefined)?.intake?.total;
-    return total === LEGACY_REQUIREMENTS_INTAKE.length ? LEGACY_REQUIREMENTS_INTAKE : REQUIREMENTS_INTAKE;
   }
 
   private async issueRequirementsInput(run: RunConfigV1, round: RequirementsIntakeRound): Promise<InputRequestV1> {
@@ -5332,9 +5258,7 @@ export class ApexService {
         return this.inputRequest(latest, run.ownerEpoch);
       }
     }
-    const catalog = this.requirementsIntakeCatalog(
-      events.filter((event) => event.type === "requirements.input-requested"),
-    );
+    const catalog = REQUIREMENTS_INTAKE;
     const ordinal = catalog.findIndex((candidate) => candidate === round) + 1;
     const event = await this.append(run, "requirements.input-requested", {
       requestId: this.idSource(),
@@ -5348,8 +5272,7 @@ export class ApexService {
     round: RequirementsIntakeRound,
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): InputRequestV1["questions"] {
-    const hasServicePreferences = round.questions.some(({ id }) => id === "service-preferences");
-    if (round.round === "service-preferences" || (round.round === "workload-pattern" && hasServicePreferences)) {
+    if (round.round === "workload-pattern") {
       const input = this.recordedRequirementsInput(events);
       const scenario = input?.["delivery-scenario"];
       const workload = typeof input?.workload === "string" ? input.workload : "";
@@ -5384,7 +5307,6 @@ export class ApexService {
         scenario === "migration" || scenario === "modernization" || scenario === "extension"
           ? [{ id: "retained-services", prompt: "List Azure services or integrations that must be retained." }]
           : [];
-      if (round.round === "service-preferences") return [...retained, ...questions];
       const migration =
         scenario === "migration" || scenario === "modernization"
           ? [
@@ -5398,32 +5320,7 @@ export class ApexService {
           : [];
       return [...questions, ...retained, ...migration];
     }
-    if (round.round !== "workload-pattern") return round.questions;
-    const input = this.recordedRequirementsInput(events);
-    const scenario = input?.["delivery-scenario"];
-    const workload = typeof input?.workload === "string" ? input.workload : "";
-    const pattern = this.recommendedWorkloadPattern(workload);
-    const questions = round.questions.map((question) =>
-      question.id === "workload-pattern"
-        ? {
-            ...question,
-            recommendation: {
-              value: pattern,
-              source: "derived" as const,
-              rationale: "Derived from the confirmed workload description; confirm or choose another pattern.",
-            },
-          }
-        : question.id === "scale"
-          ? { ...question, prompt: this.workloadScalePrompt(pattern) }
-          : question,
-    );
-    if (scenario !== "migration" && scenario !== "modernization") return questions;
-    return [
-      ...questions,
-      { id: "current-platform", prompt: "Describe the current platform and hosting model." },
-      { id: "migration-pain-points", prompt: "Describe the problems the migration or modernization must address." },
-      { id: "preserve-components", prompt: "List components, integrations, or data that must be preserved." },
-    ];
+    return round.questions;
   }
 
   private recommendedWorkloadPattern(
@@ -5552,14 +5449,14 @@ export class ApexService {
         );
       }
       const intake = request.intake;
-      const catalog =
-        intake?.total === LEGACY_REQUIREMENTS_INTAKE.length ? LEGACY_REQUIREMENTS_INTAKE : REQUIREMENTS_INTAKE;
+      const catalog = REQUIREMENTS_INTAKE;
       const round = intake === undefined ? undefined : catalog[intake.ordinal - 1];
       if (
         round === undefined ||
         intake === undefined ||
         round.round !== intake.round ||
-        intake.total !== catalog.length
+        intake.total !== catalog.length ||
+        round.questions.some(({ id }) => !request.questions.some((question) => question.id === id))
       ) {
         throw new ApexError(
           "APEX_CONFLICT",
@@ -5609,20 +5506,11 @@ export class ApexService {
       const hashes = (event.payload as { artifactHashes?: Partial<Record<ArtifactKind, unknown>> }).artifactHashes;
       if (typeof hashes?.[kind] === "string") return hashes[kind];
     }
-    const legacyFields: Partial<Record<ArtifactKind, string>> = {
-      requirements: "requirementsHash",
-      "implementation-intent": "intentHash",
-    };
-    const field = legacyFields[kind];
-    return field === undefined ? undefined : this.latestPayloadHash(events, "task.completed", field);
+    return undefined;
   }
 
   private acceptedArtifactHashes(events: Awaited<ReturnType<EventJournal["replay"]>>): Record<string, string> {
     const hashes: Record<string, string> = {};
-    const legacyFields: Partial<Record<ArtifactKind, string>> = {
-      requirements: "requirementsHash",
-      "implementation-intent": "intentHash",
-    };
     for (const event of events) {
       if (event.type === "workflow.invalidated") {
         const kinds = (event.payload as { artifactKinds?: unknown }).artifactKinds;
@@ -5635,10 +5523,6 @@ export class ApexService {
       const payload = event.payload as Record<string, unknown>;
       for (const [kind, hash] of Object.entries(payload.artifactHashes ?? {})) {
         if (typeof hash === "string") hashes[kind] = hash;
-      }
-      for (const [kind, field] of Object.entries(legacyFields)) {
-        const hash = payload[field];
-        if (typeof hash === "string" && hashes[kind] === undefined) hashes[kind] = hash;
       }
     }
     return hashes;
@@ -5786,7 +5670,8 @@ export class ApexService {
         : undefined;
     if (
       snapshot === null ||
-      snapshot.schemaVersion !== "governance-baseline-selection-v1" ||
+      snapshot.schemaVersion !== "governance-baseline-selection-v2" ||
+      snapshot.targetScope !== run.targetScope.toLowerCase() ||
       !Array.isArray(snapshot.findings) ||
       snapshot.projectId !== run.projectId ||
       snapshot.runId !== run.runId ||
@@ -6251,15 +6136,6 @@ export class ApexService {
   }> {
     events = this.governanceWorkflowEvents(events);
     const completed = this.completedNodeIds(events);
-    const legacy = events.some(
-      (event) => event.type === "task.completed" && (event.payload as { legacy?: unknown }).legacy === true,
-    );
-    if (legacy) {
-      if (!completed.has("requirements")) return { task: TASKS[0]!, blockers: [] };
-      if (!this.gateApproved(run, 1)) return { blockers: ["Gate 1 approval is required"] };
-      if (!completed.has("plan")) return { task: TASKS.find(({ id }) => id === "plan")!, blockers: [] };
-      return { blockers: [] };
-    }
     const manifest = (await this.lockedWorkflowEngine(run)).manifest;
     const ordered = manifest.nodes
       .flatMap((node) => {
@@ -6843,8 +6719,7 @@ export class ApexService {
       3: ["plan-review"],
       4: ["requirements-review", "architecture-review", "governance-review", "plan-review"],
     };
-    let reviewNodes = reviewNodesByGate[gate.gate] ?? [];
-    let legacyRequirements = false;
+    const reviewNodes = reviewNodesByGate[gate.gate] ?? [];
     let expectedDependencyHash: string | undefined;
     const dependencyReview = { 1: "requirements-review", 2: "governance-review", 3: "plan-review" }[gate.gate];
     if (dependencyReview !== undefined) {
@@ -6855,23 +6730,6 @@ export class ApexService {
         (payload) => payload.nodeId === dependencyReview,
       );
     }
-    if (gate.gate === 1 && expectedDependencyHash === undefined) {
-      const legacyEvent = [...events]
-        .reverse()
-        .find(
-          (event) =>
-            event.type === "task.completed" &&
-            (event.payload as { nodeId?: unknown; legacy?: unknown }).nodeId === "requirements" &&
-            (event.payload as { legacy?: unknown }).legacy === true,
-        );
-      const hashes = (legacyEvent?.payload as { artifactHashes?: Record<string, string> } | undefined)?.artifactHashes;
-      if (hashes !== undefined) {
-        legacyRequirements = true;
-        reviewNodes = [];
-        expectedDependencyHash = sha256Json(hashes);
-      }
-    }
-
     let preview: DeploymentPreviewV1 | undefined;
     if (gate.gate === 4) {
       const previewObjectHash = this.latestPayloadHash(events, "preview.created", "previewObjectHash");
@@ -6895,7 +6753,6 @@ export class ApexService {
       completedNodes,
       reviewBlockers: reviewNodes.flatMap((reviewNode) => this.reviewBlockers(events, reviewNode)),
       currentDependencyRevision: this.dependencyRevision(run, events),
-      legacyRequirements,
       expectedApprovalRecipientIdentity,
       ...(provedPreviewTransferClaimHash === undefined ? {} : { provedPreviewTransferClaimHash }),
       ...(expectedDependencyHash === undefined ? {} : { expectedDependencyHash }),
@@ -7136,9 +6993,6 @@ export class ApexService {
     events = this.governanceWorkflowEvents(events);
     if (events.some(({ type }) => type === "workflow.completed")) return events;
     const workflow = await this.lockedWorkflowEngine(run);
-    const legacy = events.some(
-      (event) => event.type === "task.completed" && (event.payload as { legacy?: unknown }).legacy === true,
-    );
     const artifactAliases: Readonly<Record<string, string>> = {
       requirements: "requirements-v1",
       "workload-decision-manifest": "workload-decision-manifest-v1",
@@ -7175,16 +7029,10 @@ export class ApexService {
         if (typeof payload.inventoryHash === "string") artifacts["resource-inventory-v1"] = payload.inventoryHash;
       }
     }
-    const activeValidatorIds = legacy
-      ? events.flatMap((event) => {
-          if (event.type !== "task.completed") return [];
-          const ids = (event.payload as { validatorIds?: unknown }).validatorIds;
-          return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : [];
-        })
-      : workflow.activeValidatorIds({
-          run: { iacTool: run.iacTool, targetScope: run.targetScope },
-          artifacts,
-        });
+    const activeValidatorIds = workflow.activeValidatorIds({
+      run: { iacTool: run.iacTool, targetScope: run.targetScope },
+      artifacts,
+    });
     const executedValidatorIds = new Set<string>();
     const simulatedOmittedValidatorIds = new Set<string>();
     for (const event of events) {
@@ -7242,39 +7090,8 @@ export class ApexService {
       activeValidatorIds: deduplicatedActiveValidatorIds,
       executedValidatorIds: [...context.executedValidatorIds],
       simulatedOmittedValidatorIds: [...context.simulatedOmittedValidatorIds],
-      ...(legacy ? { legacy: true } : {}),
     });
     return this.journal(run).replay();
-  }
-
-  private legacyPlanOutputs(run: RunConfigV1, intent: unknown): TaskOutput[] {
-    const intentHash = sha256Json(intent);
-    const resources = (intent as ImplementationIntentV1).resources;
-    return [
-      {
-        kind: "iac-binding",
-        value: {
-          schemaVersion: CONTRACT_VERSION,
-          projectId: run.projectId,
-          runId: run.runId,
-          track: run.iacTool,
-          intentHash,
-          resourceBindings: Object.fromEntries(
-            resources.map(({ id, type }) => [id, { implementation: type, version: "legacy", parameters: {} }]),
-          ),
-        },
-      },
-      {
-        kind: "environment-inputs",
-        value: {
-          schemaVersion: CONTRACT_VERSION,
-          projectId: run.projectId,
-          runId: run.runId,
-          environment: run.environment,
-          inputs: {},
-        },
-      },
-    ];
   }
 
   private async readTask(run: RunConfigV1, taskId: string): Promise<TaskEnvelopeV1> {
@@ -7419,9 +7236,7 @@ export class ApexService {
     return latest.runId;
   }
 
-  private async customizationSelection(
-    legacyClientId: BundledClientProjection["id"] = "github-copilot-vscode",
-  ): Promise<CustomizationSelection> {
+  private async customizationSelection(): Promise<CustomizationSelection> {
     try {
       const value = JSON.parse(
         await readFile(join(this.root, ".apex", "customizations.selection.json"), "utf8"),
@@ -7437,7 +7252,7 @@ export class ApexService {
       return value;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      return { version: 1, clientId: legacyClientId, sourceMode: "bundled-projection" };
+      throw new ApexError("APEX_VALIDATION", "Customization selection is missing", EXIT_CODES.validation);
     }
   }
 

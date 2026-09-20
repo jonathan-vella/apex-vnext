@@ -118,13 +118,13 @@ async function reachCodegen(
     const context = await service.taskContext(reconciliationTask);
     assert.ok(
       context.inputs.some(
-        (value) => (value as { schemaVersion?: string }).schemaVersion === "governance-baseline-selection-v1",
+        (value) => (value as { schemaVersion?: string }).schemaVersion === "governance-baseline-selection-v2",
       ),
     );
     const selected = context.inputReferences.find(({ hash }) => !Object.values(context.artifactHashes).includes(hash));
     assert.ok(selected);
     const chunk = await service.readTaskInput(reconciliationTask, 0, 6_000, selected.hash);
-    assert.match(chunk.content, /governance-baseline-selection-v1/);
+    assert.match(chunk.content, /governance-baseline-selection-v2/);
   }
   const policy = policyMap(runId, governanceHashes["governance-constraints"]!) as PolicyPropertyMapV1;
   configurePolicy?.(policy);
@@ -2441,25 +2441,24 @@ test("plan rejects wrong track and secret literals", async () => {
 
   const isolated = new ApexService(await tempRoot());
   const initialized = await isolated.init({ projectId: "demo", iacTool: "bicep" });
-  await isolated.nextTask();
-  const acceptedRequirements = await isolated.completeTask(await task(isolated, "requirements"), {
-    kind: "requirements",
-    value: requirements(),
+  await reachCodegen(isolated, initialized.runId, "bicep", async (plan) => {
+    const planTask = await task(isolated, "plan");
+    const sourceHashes = (plan[0]!.value as ImplementationIntentV1).sourceHashes;
+    const before = await isolated.status();
+    await assert.rejects(isolated.completeTask(planTask, plan[0]!), /Task bundle is missing/);
+    await assert.rejects(
+      isolated.completeTaskOutputs(planTask, planBundle(initialized.runId, "terraform", {}, sourceHashes)),
+      /track/i,
+    );
+    await assert.rejects(
+      isolated.completeTaskOutputs(
+        planTask,
+        planBundle(initialized.runId, "bicep", { password: { kind: "value", value: "literal" } }, sourceHashes),
+      ),
+      /secret-reference/i,
+    );
+    assert.equal((await isolated.status()).head, before.head);
   });
-  await isolated.decideGateNumber(1, "approved", "tester");
-  const planTask = await task(isolated, "plan");
-  const sourceHashes = { requirements: acceptedRequirements.outputHash };
-  await assert.rejects(
-    isolated.completeTaskOutputs(planTask, planBundle(initialized.runId, "terraform", {}, sourceHashes)),
-    /track/i,
-  );
-  await assert.rejects(
-    isolated.completeTaskOutputs(
-      planTask,
-      planBundle(initialized.runId, "bicep", { password: { kind: "value", value: "literal" } }, sourceHashes),
-    ),
-    /secret-reference/i,
-  );
 });
 
 test("MCP completeTask accepts an output bundle", async () => {
@@ -2521,7 +2520,11 @@ function emptyGovernanceBaseline(subscriptionId: string, discoveredAt: string) {
         discovery_metadata: {
           discovery_status: "COMPLETE",
           discovered_at: discoveredAt,
-          scope: { subscription_id: subscriptionId, management_groups: [] },
+          scope: {
+            subscription_id: subscriptionId,
+            management_groups: [],
+            coverage: "subscription-and-descendants-v1",
+          },
           api_versions: {
             policyAssignments: "2022-06-01",
             policyDefinitions: "2021-06-01",
@@ -2543,6 +2546,8 @@ function emptyGovernanceBaseline(subscriptionId: string, discoveredAt: string) {
           audit_count: 0,
           disabled_count: 0,
           exempted_count: 0,
+          classified_policy_count: 0,
+          other_effect_count: 0,
         },
         assignment_inventory: [],
         findings: [],
@@ -2666,7 +2671,7 @@ test("material governance revision blocks synthetic and legacy accepted governan
   };
   for (const [value, pattern] of [
     [governance(runId), /synthetic/],
-    [legacy, /Legacy.*migration/],
+    [legacy, /content digest.*new run/],
   ] as const) {
     await service["append"](run, "task.completed", {
       nodeId: "governance-discovery",
@@ -2676,6 +2681,58 @@ test("material governance revision blocks synthetic and legacy accepted governan
     await assert.rejects(service.reviseGovernanceBaseline(path, { confirm: true, reason: "Policy changed" }), pattern);
     assert.equal(await journal.head(), head);
   }
+});
+
+test("target-bound governance rejects obsolete coverage and snapshots without migration", async () => {
+  const { root, path, baseline, service, journal } = await materialGovernanceFixture("bicep");
+  const run = (await service.status()).run;
+  const objects = new ObjectStore(root);
+  const original = await objects.getJson<GovernanceConstraintsV1>(
+    service["acceptedArtifactHashes"](await journal.replay())["governance-constraints"]!,
+  );
+  const snapshot = await objects.getJson<Record<string, unknown>>(original.constraintsRef.digest);
+  assert.equal(snapshot.schemaVersion, "governance-baseline-selection-v2");
+  assert.equal(snapshot.targetScope, run.targetScope.toLowerCase());
+  const oldBaseline = structuredClone(baseline);
+  delete (
+    oldBaseline.subscriptions[Object.keys(oldBaseline.subscriptions)[0]!]!.discovery_metadata.scope as Record<
+      string,
+      unknown
+    >
+  ).coverage;
+  await writeJson(path, oldBaseline);
+  const head = await journal.head();
+  await assert.rejects(service.importGovernanceBaseline(path), /incomplete/);
+  assert.equal(await journal.head(), head);
+  await writeJson(path, baseline);
+  snapshot.schemaVersion = "governance-baseline-selection-v1";
+  delete snapshot.targetScope;
+  snapshot.contentHash = "a".repeat(64);
+  const digest = await objects.putJson(snapshot);
+  const legacy = {
+    ...original,
+    constraintsRef: {
+      ...original.constraintsRef,
+      digest,
+      uri: `apex-object:${digest}`,
+      bytes: (await objects.getBytes(digest)).length,
+    },
+  };
+  await service["append"](run, "task.completed", {
+    nodeId: "governance-discovery",
+    artifactHashes: { "governance-constraints": await objects.putJson(legacy) },
+  });
+  await assert.rejects(service.importGovernanceBaseline(path), /run and target/);
+  await assert.rejects(
+    service.reviseGovernanceBaseline(path, { confirm: false, reason: "Migrate target coverage" }),
+    /confirmation/,
+  );
+  const obsoleteHead = await journal.head();
+  await assert.rejects(
+    service.reviseGovernanceBaseline(path, { confirm: true, reason: "Migrate target coverage" }),
+    /run and target/,
+  );
+  assert.equal(await journal.head(), obsoleteHead);
 });
 
 test("material governance revision is permitted after native execution is reconciled", async () => {
@@ -3418,13 +3475,27 @@ for (const track of ["bicep", "terraform"] as const) {
       },
       (value: typeof baseline) => {
         const entry = value.subscriptions[subscriptionId]!;
+        const finding = {
+          policy_id: "audit-policy",
+          display_name: "Audit",
+          effect: "audit",
+          scope: `/subscriptions/${subscriptionId}`,
+          assignment_id: `/subscriptions/${subscriptionId}/providers/Microsoft.Authorization/policyAssignments/audit`,
+          classification: "informational",
+          resource_types: [],
+          exemption: null,
+          reported_exemptions: [],
+        };
         Object.assign(entry, {
+          findings: [finding],
+          policies: [finding],
           assignment_inventory: [
             {
               scope: `/subscriptions/${subscriptionId}`,
               assignmentType: "subscription",
               displayName: "audit",
               policyDefinitionId: "audit-policy",
+              assignmentId: finding.assignment_id,
             },
           ],
         });
@@ -3433,7 +3504,10 @@ for (const track of ["bicep", "terraform"] as const) {
           assignment_kept: 1,
           subscription_scope_count: 1,
           audit_count: 1,
+          informational_count: 1,
+          classified_policy_count: 1,
         });
+        value.summary.total_findings = 1;
         entry.discovery_metadata.page_counts.policyAssignments = 1;
       },
     ]) {
@@ -3451,26 +3525,35 @@ for (const track of ["bicep", "terraform"] as const) {
         effect: "deny",
         scope: `/subscriptions/${subscriptionId}`,
         assignment_id: `/subscriptions/${subscriptionId}/providers/Microsoft.Authorization/policyAssignments/policy`,
-        classification: "informational",
+        classification: "blocker",
         resource_types: ["Microsoft.Storage/storageAccounts"],
         exemption: null,
         required_value: requiredValue,
+        reported_exemptions: [],
       };
       Object.assign(entry, {
         findings: [finding],
         policies: [finding],
         assignment_inventory: [
-          { scope: finding.scope, assignmentType: "subscription", displayName: "Policy", policyDefinitionId: "policy" },
+          {
+            scope: finding.scope,
+            assignmentId: finding.assignment_id,
+            assignmentType: "subscription",
+            displayName: "Policy",
+            policyDefinitionId: "policy",
+          },
         ],
       });
       Object.assign(entry.discovery_summary, {
         assignment_total: 1,
         assignment_kept: 1,
         subscription_scope_count: 1,
-        informational_count: 1,
+        blocker_count: 1,
+        classified_policy_count: 1,
       });
       entry.discovery_metadata.page_counts.policyAssignments = 1;
       changed.summary.total_findings = 1;
+      changed.summary.total_blockers = 1;
       await rejectRenewal(changed, /content changed.*reconcile/i);
     }
     incomplete.coverage_status = "PARTIAL";
