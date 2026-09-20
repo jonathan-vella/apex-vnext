@@ -132,8 +132,8 @@ apex governance import --path .github/data/governance-policy-baseline.json --jso
 ```
 
 Import verifies the selected path and exact candidate bytes for reuse. Refresh requires a newer observation at that
-path; changed files cannot silently replace a pending reuse decision. Direct import without a pending selection remains
-an explicit operator action for automation and backward compatibility. Human gate approvals remain separate.
+path; changed files cannot silently replace a pending reuse decision. A direct import is permitted only at the active
+governance-discovery task for bounded automation. Human gate approvals remain separate.
 
 After initial import, the same operation accepts a newer observation only when the complete selected subscription
 content is unchanged, excluding collection timestamps and legacy TTL fields. It records a separate observation receipt
@@ -141,8 +141,8 @@ and preserves accepted governance, policy, plan and gate hashes. Material differ
 revision process below, not `apex reconcile`, which handles deployment recovery. Unrelated subscription data is not copied
 into run state. A replay of the exact accepted
 renewal is idempotent. The journal head advances, so active tasks may need reissuing; preview expiry and writer authority
-are not extended. Legacy snapshots without a content digest require a separately supported governance migration instead
-of inferred equality; deployment reconciliation cannot create the missing digest.
+are not extended. Obsolete snapshots without a content digest are rejected; start a current run rather than inferring
+equality or rewriting historical state.
 
 ### Changed Policy
 

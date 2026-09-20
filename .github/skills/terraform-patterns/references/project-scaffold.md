@@ -17,8 +17,6 @@ infra/terraform/{project}/
 ├── outputs.tf              # Resource IDs, endpoints, connection info
 ├── bootstrap-backend.sh    # Bash: provision storage account for state
 ├── bootstrap-backend.ps1   # PowerShell: same
-├── deploy.sh               # Bash deployment script (deprecated — use azd)
-├── deploy.ps1              # PowerShell deployment script (deprecated — use azd)
 └── modules/                # Optional — only for complex sub-compositions
     └── {component}/
         ├── main.tf
@@ -34,12 +32,12 @@ locals {
 
   tags = merge(
     {
-      Environment = var.environment
-      ManagedBy   = "Terraform"
-      Project     = var.project_name
-      Owner       = var.owner
+      environment       = var.environment
+      owner             = var.owner
+      application       = var.project_name
+      technical-contact = var.technical_contact
     },
-    var.additional_tags  # extra tags from governance constraints
+    var.governance_tags
   )
 }
 ```
@@ -75,5 +73,3 @@ module "key_vault" {
 | Terraform Configurations | `infra/terraform/{project}/`                                    |
 | Bootstrap Backend (Bash) | `infra/terraform/{project}/bootstrap-backend.sh`                |
 | Bootstrap Backend (PS)   | `infra/terraform/{project}/bootstrap-backend.ps1`               |
-| Deploy Script (Bash)     | `infra/terraform/{project}/deploy.sh` _(deprecated — use azd)_  |
-| Deploy Script (PS)       | `infra/terraform/{project}/deploy.ps1` _(deprecated — use azd)_ |

@@ -46,10 +46,9 @@ def test_diagram_kwargs_default_shape(diagram_io):
     assert kw["show"] is False
 
 
-def test_diagram_kwargs_strips_known_extension(diagram_io):
-    # Forgiving contract: legacy call sites passed `foo.png` — strip it.
-    kw = diagram_io.diagram_kwargs("04-architecture-diagram.png")
-    assert kw["filename"] == "04-architecture-diagram"
+def test_diagram_kwargs_rejects_known_extension(diagram_io):
+    with pytest.raises(ValueError, match="must not include"):
+        diagram_io.diagram_kwargs("04-architecture-diagram.png")
 
 
 def test_diagram_kwargs_overrides_win(diagram_io):
@@ -89,18 +88,15 @@ def test_save_figure_writes_png_and_svg_siblings(diagram_io, tmp_path):
     assert svg_text.lstrip().startswith(("<?xml", "<svg")), "SVG should be text-based"
 
 
-def test_save_figure_accepts_explicit_png_path(diagram_io, tmp_path):
+def test_save_figure_rejects_explicit_png_path(diagram_io, tmp_path):
     matplotlib = pytest.importorskip("matplotlib")
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     fig, _ = plt.subplots()
-    # Pass `<base>.png` — helper should still produce both siblings.
-    diagram_io.save_figure(fig, tmp_path / "chart.png")
+    with pytest.raises(ValueError, match="must not include"):
+        diagram_io.save_figure(fig, tmp_path / "chart.png")
     plt.close(fig)
-
-    assert (tmp_path / "chart.png").exists()
-    assert (tmp_path / "chart.svg").exists()
 
 
 def test_save_figure_creates_parent_directory(diagram_io, tmp_path):

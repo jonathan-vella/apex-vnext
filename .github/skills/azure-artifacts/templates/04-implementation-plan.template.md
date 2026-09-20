@@ -82,8 +82,7 @@ infra/bicep/{project-name}/
 │   ├── module1.bicep
 │   ├── module2.bicep
 │   └── module3.bicep
-├── azure.yaml           # azd manifest (primary deployment method)
-└── deploy.ps1           # DEPRECATED — use azd instead
+└── azure.yaml           # Optional consumer application manifest
 ```
 
 | Module        | AVM Source                            | Version | Purpose   |
@@ -139,15 +138,14 @@ Example configuration snippet
 
 - List outputs
 
-### Task N: deploy.ps1 (Deployment Script — Deprecated)
+### Task N: Native Validation And Preview
 
 **Features**:
 
-- Parameter validation
 - Bicep lint/build verification
-- What-If preview
-- Deployment execution
-- Output display
+- Source-bound native validation receipt
+- Kernel-authorized preview
+- Gate 4 approval before deployment
 
 ---
 
