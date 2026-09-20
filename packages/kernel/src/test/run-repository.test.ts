@@ -91,6 +91,10 @@ test("run repository reclaims an expired lock generation into a permanent tombst
     JSON.parse(await readFile(join(directory, ".run-mutation.stale", tombstones[0]!, "metadata.json"), "utf8")).token,
     "expired-lock",
   );
+  assert.equal(
+    (await readdir(join(directory, ".run-mutation.retired"))).length,
+    results.filter(({ status }) => status === "fulfilled").length + 1,
+  );
 });
 
 test("run repository rejects missing metadata in a stable lock generation", async () => {

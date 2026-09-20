@@ -75,6 +75,7 @@ function lockExpiry(value: unknown): number | undefined {
 export class RunRepository {
   private readonly runPath: string;
   private readonly lockPath: string;
+  private readonly retiredLockPath: string;
   private readonly staleLockPath: string;
   private readonly intentPath: string;
   private readonly clock: () => Date;
@@ -87,6 +88,7 @@ export class RunRepository {
     const directory = resolve(runDirectory);
     this.runPath = join(directory, "run.json");
     this.lockPath = join(directory, ".run-mutation.lock");
+    this.retiredLockPath = join(directory, ".run-mutation.retired");
     this.staleLockPath = join(directory, ".run-mutation.stale");
     this.intentPath = join(directory, ".run-transaction.json");
     this.clock = options.clock ?? (() => new Date());
@@ -191,14 +193,14 @@ export class RunRepository {
       const existing = await this.readLock();
       if (existing === undefined) continue;
       if (existing.expiresAt > this.clock().getTime()) throw new Error("Run mutation is already in progress");
-      if (!(await this.reclaimLock(existing.recoveryId))) throw new Error("Run mutation is already in progress");
+      if (!(await this.retireLock(existing.recoveryId, true))) throw new Error("Run mutation is already in progress");
     }
     try {
       return await operation();
     } finally {
       try {
         const current = await this.readLock();
-        if (current?.metadata.token === token) await rm(this.lockPath, { recursive: true, force: true });
+        if (current?.metadata.token === token) await this.retireLock(current.recoveryId, false);
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       }
@@ -342,7 +344,28 @@ export class RunRepository {
     };
   }
 
-  private async reclaimLock(recoveryId: string): Promise<boolean> {
+  private async retireLock(recoveryId: string, preserve: boolean): Promise<boolean> {
+    await mkdir(this.retiredLockPath, { recursive: true, mode: 0o700 });
+    const retiredRoot = await lstat(this.retiredLockPath);
+    if (!retiredRoot.isDirectory() || retiredRoot.isSymbolicLink()) {
+      throw new Error("Run mutation retired-lock directory is unsafe");
+    }
+    let claim;
+    try {
+      claim = await open(
+        join(this.retiredLockPath, recoveryId),
+        constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY,
+        0o600,
+      );
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
+      throw error;
+    }
+    await claim.close();
+    if (!preserve) {
+      await rm(this.lockPath, { recursive: true, force: true });
+      return true;
+    }
     await mkdir(this.staleLockPath, { recursive: true, mode: 0o700 });
     const staleRoot = await lstat(this.staleLockPath);
     if (!staleRoot.isDirectory() || staleRoot.isSymbolicLink()) {
@@ -353,13 +376,7 @@ export class RunRepository {
       return true;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
-      try {
-        await lstat(join(this.staleLockPath, recoveryId));
-        return false;
-      } catch (staleError) {
-        if ((staleError as NodeJS.ErrnoException).code === "ENOENT") throw error;
-        throw staleError;
-      }
+      throw error;
     }
   }
 }
