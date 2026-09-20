@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import * as yaml from "js-yaml";
@@ -8,6 +7,8 @@ import {
   loadWorkflowTexts,
   validateGithubWorkflowContract,
   workflowContractDigest,
+  workflowJobsDigest,
+  localActionDigest,
 } from "../scripts/validate-github-workflows.mjs";
 
 const contract = JSON.parse(readFileSync("tools/registry/github-workflow-contract.json", "utf8"));
@@ -34,13 +35,68 @@ function rebaseline(path, texts, value = structuredClone(contract)) {
   workflow.triggerDigest = workflowContractDigest(parsed.on);
   workflow.permissionsDigest = workflowContractDigest(parsed.permissions);
   workflow.concurrencyDigest = workflowContractDigest(parsed.concurrency);
-  workflow.jobsDigest = workflowContractDigest(parsed.jobs);
+  workflow.jobsDigest = workflowJobsDigest(parsed.jobs);
   workflow.jobs = Object.fromEntries(Object.entries(parsed.jobs).map(([id, job]) => [id, job.name ?? id]));
   return value;
 }
 
 test("current GitHub workflows satisfy the hosted contract", () => {
   assert.deepEqual(validate(), []);
+});
+
+test("structural digests ignore only immutable action revisions", () => {
+  const jobs = { check: { steps: [{ uses: checkoutPin, with: { ref: "main" } }] } };
+  const updated = structuredClone(jobs);
+  updated.check.steps[0].uses = `actions/checkout@${"a".repeat(40)}`;
+  assert.equal(workflowJobsDigest(updated), workflowJobsDigest(jobs));
+  assert.equal(jobs.check.steps[0].uses, checkoutPin);
+  for (const uses of ["actions/checkout@v7", `other/checkout@${"a".repeat(40)}`]) {
+    updated.check.steps[0].uses = uses;
+    assert.notEqual(workflowJobsDigest(updated), workflowJobsDigest(jobs));
+  }
+  updated.check.steps[0].uses = checkoutPin;
+  updated.check.steps[0].with.ref = "unreviewed";
+  assert.notEqual(workflowJobsDigest(updated), workflowJobsDigest(jobs));
+  const action = localActionTexts[".github/actions/setup-node-repo/action.yml"];
+  const oldSha = contract.actionVersions["actions/setup-node"].sha;
+  assert.equal(localActionDigest(action.replace(oldSha, "a".repeat(40))), localActionDigest(action));
+  assert.notEqual(localActionDigest(action.replace("run: npm ci", "run: npm install")), localActionDigest(action));
+});
+
+test("approved Action updates need no structural hash changes", () => {
+  const changedContract = structuredClone(contract);
+  const texts = structuredClone(workflowTexts);
+  const actions = structuredClone(localActionTexts);
+  for (const [name, pin] of Object.entries(changedContract.actionVersions)) {
+    const oldReference = `${name}@${pin.sha}`;
+    pin.sha = "a".repeat(40);
+    for (const path of Object.keys(texts)) texts[path] = texts[path].replaceAll(oldReference, `${name}@${pin.sha}`);
+    for (const path of Object.keys(actions))
+      actions[path] = actions[path].replaceAll(oldReference, `${name}@${pin.sha}`);
+  }
+  assert.deepEqual(
+    validateGithubWorkflowContract({
+      contract: changedContract,
+      schema,
+      workflowTexts: texts,
+      localActionTexts: actions,
+    }),
+    [],
+  );
+  const errors = validateGithubWorkflowContract({ contract, schema, workflowTexts: texts, localActionTexts: actions });
+  assert.ok(errors.some((error) => error.includes("unapproved immutable action pin")));
+  assert.ok(
+    errors.some((error) => error.startsWith(".github/actions/") && error.includes("unapproved immutable action pin")),
+  );
+});
+
+test("pin normalization never masks executable workflow changes", () => {
+  const path = ".github/workflows/ci.yml";
+  const texts = mutate(path, checkoutPin, `actions/checkout@${"a".repeat(40)}`);
+  texts[path] = texts[path].replace("run: npm run qualify:vnext", "run: echo skipped");
+  const changedContract = structuredClone(contract);
+  changedContract.actionVersions["actions/checkout"].sha = "a".repeat(40);
+  assert.ok(validate(texts, changedContract).some((error) => error.includes("complete job contract drift")));
 });
 
 test("rejects required vNext context drift", () => {
@@ -122,7 +178,7 @@ test("rejects Node dependency registry drift after action rebaselining", () => {
       [actionPath]: mutateAction(localActionTexts[actionPath]),
     };
     const changedContract = structuredClone(contract);
-    changedContract.localActions[actionPath] = createHash("sha256").update(changed[actionPath]).digest("hex");
+    changedContract.localActions[actionPath] = localActionDigest(changed[actionPath]);
     const errors = validateGithubWorkflowContract({
       contract: changedContract,
       schema,
@@ -152,7 +208,7 @@ test("rejects Python validation setup weakening and caller removal", () => {
     assert.ok(localActionTexts[actionPath].includes(search), `${search} missing from ${actionPath}`);
     const changed = { ...localActionTexts, [actionPath]: localActionTexts[actionPath].replace(search, replacement) };
     const changedContract = structuredClone(contract);
-    changedContract.localActions[actionPath] = createHash("sha256").update(changed[actionPath]).digest("hex");
+    changedContract.localActions[actionPath] = localActionDigest(changed[actionPath]);
     const errors = validateGithubWorkflowContract({
       contract: changedContract,
       schema,

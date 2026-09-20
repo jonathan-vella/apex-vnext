@@ -18,6 +18,26 @@
 Devcontainer CI and obsolete long-lived branch maintenance are retired. Ordinary feature integration uses reviewed
 pull requests and the required CI checks. Windows development uses WSL2; no retired workflow is an execution authority.
 
+## Updating Action Pins
+
+Keep third-party Actions pinned to full commit SHAs, with release comments for readability. Dependabot already proposes
+weekly updates through [the repository configuration](../dependabot.yml); review the upstream release and commit before
+accepting its changes. Shared Node and Python setup actions keep their dependency pins in one place.
+
+For a pin-only update:
+
+1. Review the proposed SHA and release comment in the workflow or shared action YAML.
+2. Update that Action's `release` and `sha` entry in
+   [the approved-pin registry](../../tools/registry/github-workflow-contract.json), keeping its consumers consistent.
+3. Run `npm run validate:github-workflows`, `npm run test:github-workflows`, and
+   `npm run validate:vnext-live-workflow` before submitting the PR for review.
+
+Do not regenerate workflow hashes for an Action revision change. Job and shared-action digests bind parsed YAML
+structure, replacing only full SHAs in executable `uses` references with a stable marker. Exact approved SHAs are
+checked separately, so mutable tags and unapproved revisions still fail. Release comments are documentation, not
+authorization. Permissions, triggers, commands, conditions, inputs, artifact paths, and approval controls remain bound;
+changes to those require their own reviewed contract update. Nothing is auto-merged.
+
 ## Weekly Maintenance
 
 `weekly-maintenance.yml` is the umbrella workflow for low-frequency

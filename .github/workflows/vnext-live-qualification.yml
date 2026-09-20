@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout exact candidate
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.candidate_sha }}
           fetch-depth: 1
@@ -87,7 +87,7 @@ jobs:
       APEX_RUNTIME_ROOT: ${{ github.workspace }}/apex-live/runtime
     steps:
       - name: Checkout exact candidate
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.candidate_sha }}
           fetch-depth: 1
@@ -97,19 +97,19 @@ jobs:
       - name: Build vNext
         run: npm run build:vnext
       - name: Azure OIDC login
-        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: 1.16.3
           terraform_wrapper: false
       - name: Acquire ARM OIDC token
         id: arm_oidc
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           result-encoding: string
           script: |
@@ -218,7 +218,7 @@ jobs:
           fi
       - name: Refresh ARM OIDC token for deploy
         id: deploy_oidc
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           result-encoding: string
           script: |
@@ -265,7 +265,7 @@ jobs:
           printf 'claim_hash=%s\nblob=%s\n' "$claim_hash" "$blob" >> "$GITHUB_OUTPUT"
       - name: Upload bound return fallback
         if: always() && steps.accept.outputs.accepted == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: vnext-return-${{ inputs.handoff_id }}-${{ inputs.track }}-${{ inputs.operation }}-apply
           path: apex-live/return-authority.json
@@ -296,7 +296,7 @@ jobs:
           exit "$status"
       - name: Upload apply evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: vnext-apply-evidence-${{ inputs.handoff_id }}-${{ inputs.track }}-${{ inputs.operation }}
           path: apex-live/evidence/

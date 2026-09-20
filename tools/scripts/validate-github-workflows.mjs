@@ -30,10 +30,31 @@ export function workflowContractDigest(value) {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
 }
 
+function normalizeActionPin(step) {
+  if (step !== null && typeof step === "object" && typeof step.uses === "string") {
+    step.uses = step.uses.replace(/@[0-9a-f]{40}$/u, "@approved-sha");
+  }
+}
+
+export function workflowJobsDigest(jobs) {
+  const normalized = structuredClone(jobs);
+  for (const job of Object.values(normalized)) {
+    normalizeActionPin(job);
+    if (Array.isArray(job?.steps)) job.steps.forEach(normalizeActionPin);
+  }
+  return workflowContractDigest(normalized);
+}
+
+export function localActionDigest(text) {
+  const value = yaml.load(text);
+  if (Array.isArray(value?.runs?.steps)) value.runs.steps.forEach(normalizeActionPin);
+  return workflowContractDigest(value);
+}
+
 function sectionDigest(value, path, section, errors) {
   try {
     if (value === undefined) throw new TypeError("section is missing");
-    return workflowContractDigest(value);
+    return section === "jobs" ? workflowJobsDigest(value) : workflowContractDigest(value);
   } catch (error) {
     errors.push(`${path}: ${section} contract cannot be hashed: ${error.message}`);
     return null;
@@ -51,6 +72,17 @@ function workflowActions(value) {
     }
   }
   return actions.filter((action) => !action.startsWith("./"));
+}
+
+function actionPinError(action, approved) {
+  const separator = action.lastIndexOf("@");
+  const name = action.slice(0, separator);
+  const version = action.slice(separator + 1);
+  if (separator < 1 || !/^[0-9a-f]{40}$/u.test(version)) {
+    return `mutable or malformed action reference: ${action}`;
+  }
+  if (approved[name]?.sha !== version) return `unapproved immutable action pin: ${action}`;
+  return undefined;
 }
 
 function workflowLocalActions(value) {
@@ -253,8 +285,17 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
   for (const [path, expectedDigest] of Object.entries(contract.localActions)) {
     const text = localActionTexts[path];
     if (text === undefined) errors.push(`${path}: local action is missing`);
-    else if (createHash("sha256").update(text).digest("hex") !== expectedDigest) {
-      errors.push(`${path}: local action content drift`);
+    else {
+      try {
+        if (localActionDigest(text) !== expectedDigest) errors.push(`${path}: local action content drift`);
+        const value = yaml.load(text);
+        for (const action of workflowActions({ jobs: { composite: { steps: value?.runs?.steps } } })) {
+          const error = actionPinError(action, contract.actionVersions);
+          if (error !== undefined) errors.push(`${path}: ${error}`);
+        }
+      } catch (error) {
+        errors.push(`${path}: local action contract cannot be hashed: ${error.message}`);
+      }
     }
   }
   const pythonActionPath = ".github/actions/setup-python-validation/action.yml";
@@ -344,14 +385,8 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
     }
 
     for (const action of workflowActions(value)) {
-      const separator = action.lastIndexOf("@");
-      const name = action.slice(0, separator);
-      const version = action.slice(separator + 1);
-      if (separator < 1 || version === "main" || version === "master" || version === "latest") {
-        errors.push(`${expected.path}: mutable or malformed action reference: ${action}`);
-      } else if (contract.actionVersions[name]?.sha !== version) {
-        errors.push(`${expected.path}: unapproved immutable action pin: ${action}`);
-      }
+      const error = actionPinError(action, contract.actionVersions);
+      if (error !== undefined) errors.push(`${expected.path}: ${error}`);
     }
     for (const action of workflowLocalActions(value)) referencedLocalActions.add(action);
   }

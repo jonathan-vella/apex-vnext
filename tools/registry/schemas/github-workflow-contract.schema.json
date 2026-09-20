@@ -42,6 +42,7 @@
     },
     "localActions": {
       "type": "object",
+      "description": "Canonical parsed-YAML digests with full SHAs normalized only in runs.steps uses references; exact pins are checked through actionVersions.",
       "minProperties": 1,
       "additionalProperties": { "$ref": "#/$defs/sha256" }
     },
@@ -68,7 +69,10 @@
           "triggerDigest": { "$ref": "#/$defs/sha256" },
           "permissionsDigest": { "$ref": "#/$defs/sha256" },
           "concurrencyDigest": { "$ref": "#/$defs/sha256" },
-          "jobsDigest": { "$ref": "#/$defs/sha256" },
+          "jobsDigest": {
+            "$ref": "#/$defs/sha256",
+            "description": "Canonical jobs digest with full SHAs normalized only in job and step uses references; action identity and all execution settings remain bound."
+          },
           "jobs": {
             "type": "object",
             "minProperties": 1,

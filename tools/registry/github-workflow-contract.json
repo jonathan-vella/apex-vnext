@@ -42,8 +42,8 @@
     }
   },
   "localActions": {
-    ".github/actions/setup-node-repo/action.yml": "b714c03114ca85f474a1653109f5611c6028116a86d3b1605b785be7934dcd05",
-    ".github/actions/setup-python-validation/action.yml": "8092b54776e1064ea25c56896a755cab2cbc439829dc076bd18200c2679f4faa"
+    ".github/actions/setup-node-repo/action.yml": "05eb1ebde5b15c3dcc278b1ffcd7e85caf7ef3fb5892daed02b4071b9ea1c9cd",
+    ".github/actions/setup-python-validation/action.yml": "fbd2566c3fea26d2cf865c46c4511eb5132d8548398536d814e21adfd7fe023f"
   },
   "workflows": [
     {
@@ -53,7 +53,7 @@
       "triggerDigest": "d200653bd7eeaf47f016907cfad28dff6696409693f772b5ed42f02e1e1d0723",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "7e4b2ca85e87fa6dbe3d9af879b33ba3cb49581c261b2c3fbe8d32635b3f5553",
+      "jobsDigest": "a36d245e660b7e5622b15730e8a0e760d0b5c02e7fd07e94c0010decb46845a9",
       "jobs": {
         "policy": "Branch Policy"
       }
@@ -65,7 +65,7 @@
       "triggerDigest": "5c375602c9ef5d8ec711bfa7db1aaaf0484d84e8339627fa7f3bcb8de81edbb6",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "37ec58581dc1c5126748e08e3f2686b9a35e4117e8b8cb0e035af97df9d274cd",
+      "jobsDigest": "503dd8abdb7cf4898a8ece4b92eca46f7e420cadf0750057eee4f69ed9b053c6",
       "jobs": {
         "ci": "ci"
       }
@@ -77,7 +77,7 @@
       "triggerDigest": "a0ac18069f4b7b00102abf752b0dfdcc30eedbfb4a326c5eda263b7cb9a615a9",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "19a6046a4601f3de8461df44b8c8fa4566e65a535cd62de6ab69eeb1a2d1a251",
+      "jobsDigest": "4f47392f2f1fb5915e6f8ba9a009e1136a3612b7256b714adbdee88117f834e2",
       "jobs": {
         "validate": "Markdown docs"
       }
@@ -89,7 +89,7 @@
       "triggerDigest": "37f673b0e102c919b3f5ca1275e591d4b46b9b44f0e7a9b02d1497725ece322c",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "d76d73eefd188c32102c90547cb00d007ac19bd8b56f43b025f9fb48fb86db05",
+      "jobsDigest": "f66bc3f6cef70c3911189abb584d14df58f90052e6019a187b79678d4d7b415c",
       "jobs": {
         "collect-baseline": "collect-baseline"
       }
@@ -101,7 +101,7 @@
       "triggerDigest": "c487b034aea7bf4b37f8630c60a34ca80cd25c7cb411cab154b9009a3d8d5440",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "94e157831462b9ef7535c57fdf51fb13662ab772452edb0cf02cf535dfcd9ff8",
+      "jobsDigest": "bc19bc319da18f5f53dc291afe3afe1059541224f5e33f086f1c4d04e0c4a7d7",
       "jobs": {
         "terraform": "Terraform fmt + validate",
         "bicep": "Bicep fmt"
@@ -114,7 +114,7 @@
       "triggerDigest": "267a76bf9976b37b8267e70d277289467c5e081a07130713e09f99650755fac5",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "762712b8db6affef1616427db60b6fd5127d62f6dfcdd691d11116a75c0a7c42",
+      "jobsDigest": "7c6e50fe67050d02f2c77bbc133999462eca95274230947098917a7e75ce8ff7",
       "jobs": {
         "qualify": "Exact-head release qualification"
       }
@@ -126,7 +126,7 @@
       "triggerDigest": "cfaeb942288dcbcc4c8631ac5b901b073dc1acbbe285c3c40baaec41bc425f57",
       "permissionsDigest": "d57abeeb8232850a40cc2fd3e29e491dd077df7b2a7988ae52899fba4527b761",
       "concurrencyDigest": "1cf197bb4117f498288d0df9e90c8d763fe22f45c6b50310ae61aa8bca8a4178",
-      "jobsDigest": "4b9ecf58acae9ac8a86907770524d1b8767e6907d88f0fe8b1424829c7e3749b",
+      "jobsDigest": "fbee92010d3941137642ef6818279b0cc36933db9a923a304f8cf8fe27ba521d",
       "jobs": {
         "publish": "Publish trusted npm release"
       }
@@ -138,7 +138,7 @@
       "triggerDigest": "e3ded6e02ec4d49557432b3b0d6fba9b1e37aa8136ebb240386c6d72546b4ec9",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "ac5c13ccbc116722f751295746c3c0d50eb7a8c994519ad66f4c2ed00f8ecc81",
-      "jobsDigest": "dadac9fa681b17183427f149f682621e5ba5a968946963e8f9a17404b6319305",
+      "jobsDigest": "5b543210f68ce988daca8137a34742bab58e251a388d87c6d9b95858f5476833",
       "jobs": {
         "validate_dispatch": "Validate exact dispatch",
         "apply": "Import local Gate 4 approval and deploy exact preview"
@@ -151,7 +151,7 @@
       "triggerDigest": "41f525188d27cb3a1fea9eff84337b73795b50d52df7d806b8d4d6a899e7d39a",
       "permissionsDigest": "0686420875052835389cb6e71bf20b413979858f142d3c2eb5c3efd881b5b4c9",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "f8cec492c511c31b11b1b8750222b4d7359db121b3c063ffc6512d31d9a2f1b1",
+      "jobsDigest": "6c913f8ed668d9bca32d90130f52e8512f7f34e9b2dae5c608b9d2e766e697a8",
       "jobs": {
         "refresh-avm-module-index": "Refresh AVM Module Index",
         "track-deprecations": "Track Azure Deprecations",
