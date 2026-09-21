@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { Value } from "@sinclair/typebox/value";
 import {
   POLICY_VALIDATION_LIMITS,
+  STORAGE_PROPERTY_HARDENING_CONTROLS,
   PolicyPropertyMapV1Schema,
   assertPolicyValidationJson,
   calculatePolicyValidationDigest,
@@ -318,20 +319,7 @@ export function validateStorageSecurityBindings(request: {
     typeof request.json !== "string"
   )
     throw new TypeError("STORAGE_SECURITY_INVALID_INPUT");
-  const controls: readonly [string, string | boolean][] =
-    request.track === "bicep"
-      ? [
-          ["properties.minimumTlsVersion", "TLS1_2"],
-          ["properties.supportsHttpsTrafficOnly", true],
-          ["properties.allowBlobPublicAccess", false],
-          ["properties.allowSharedKeyAccess", false],
-        ]
-      : [
-          ["min_tls_version", "TLS1_2"],
-          ["https_traffic_only_enabled", true],
-          ["allow_nested_items_to_be_public", false],
-          ["shared_access_key_enabled", false],
-        ];
+  const controls = STORAGE_PROPERTY_HARDENING_CONTROLS[request.track];
   const expectedType = request.track === "bicep" ? "microsoft.storage/storageaccounts" : "azurerm_storage_account";
   let resources: readonly Resource[] | undefined;
   try {

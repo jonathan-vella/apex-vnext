@@ -2640,7 +2640,8 @@ export class ApexService {
       });
       if (
         !hasValidNativeValidationReceipt(receipt, binding) ||
-        !this.hasRequiredNativePolicyEvidence(receipt, policyValidation)
+        !this.hasRequiredNativePolicyEvidence(receipt, policyValidation) ||
+        !this.hasBoundStorageDiagnostics(receipt, manifest)
       )
         throw new ApexError(
           "APEX_VALIDATION",
@@ -4024,7 +4025,8 @@ export class ApexService {
           if (
             payload?.validatorEvidenceModes?.[validatorId] !== "native" ||
             !hasValidNativeValidationReceipt(nativeReceipt, binding) ||
-            !this.hasRequiredNativePolicyEvidence(nativeReceipt, policyValidation)
+            !this.hasRequiredNativePolicyEvidence(nativeReceipt, policyValidation) ||
+            !this.hasBoundStorageDiagnostics(nativeReceipt, logicalManifest)
           )
             throw new ApexError(
               "APEX_VALIDATION",
@@ -6660,6 +6662,23 @@ export class ApexService {
     };
   }
 
+  private hasBoundStorageDiagnostics(
+    receipt: NativeValidationReceiptV1,
+    manifest: LogicalResourceManifestV1 | undefined,
+  ): boolean {
+    if (receipt.storageSecurity === undefined) return true;
+    const bindings = this.storageSecurityBindings(manifest);
+    return (
+      receipt.track === "bicep" &&
+      Object.keys(bindings).length === Object.keys(receipt.storageSecurity).length &&
+      Object.entries(receipt.storageSecurity).every(
+        ([logicalId, observation]) =>
+          Object.hasOwn(bindings, logicalId) &&
+          observation.bindingHash === calculatePolicyValidationDigest(bindings[logicalId]),
+      )
+    );
+  }
+
   private storageSecurityBindings(
     manifest: LogicalResourceManifestV1 | undefined,
   ): Record<string, { codeSymbol: string }> {
@@ -6829,6 +6848,17 @@ export class ApexService {
           throw new ApexError(
             "APEX_VALIDATION",
             "Native validation requires passing source-bound policy evidence for every mapping",
+            EXIT_CODES.validation,
+          );
+        if (
+          !this.hasBoundStorageDiagnostics(
+            receipt,
+            artifacts["logical-resource-manifest"] as LogicalResourceManifestV1 | undefined,
+          )
+        )
+          throw new ApexError(
+            "APEX_VALIDATION",
+            "Native storage diagnostic does not match accepted binding",
             EXIT_CODES.validation,
           );
         const receiptHash = await this.objects.putJson(receipt);

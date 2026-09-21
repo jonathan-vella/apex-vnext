@@ -27,6 +27,7 @@ import {
   NativeTerraformProvider,
   nativePolicyValidationBinding,
   validatePolicyProperties,
+  validateStorageSecurityBindings,
 } from "@apexops/capabilities";
 import type { IacProvider, PreviewRequest } from "@apexops/capabilities";
 import { EventJournal, ObjectStore, RunRepository, ValidatorRegistry, sha256Bytes, sha256Json } from "@apexops/kernel";
@@ -736,6 +737,7 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
     let stale = true;
     let now = new Date();
     let expireDuringValidation = false;
+    let substituteStorage = false;
     const provider: IacProvider = {
       ...(track === "bicep" ? bicepPreviewProvider(new Date()) : terraformPreviewProvider(new Date())),
       async validateSource(request) {
@@ -750,6 +752,34 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
           inputHash: request.inputHash,
           policyHash: request.policyHash,
           outcome: "pass" as const,
+          ...(track !== "bicep"
+            ? {}
+            : {
+                storageSecurity: Object.fromEntries(
+                  Object.entries(
+                    validateStorageSecurityBindings({
+                      track,
+                      sourceHash: request.sourceHash,
+                      bindings: substituteStorage
+                        ? { api: { codeSymbol: "foreign" } }
+                        : request.storageSecurityBindings!,
+                      json: JSON.stringify({
+                        resources: {
+                          api: {
+                            type: "Microsoft.Storage/storageAccounts",
+                            properties: {
+                              minimumTlsVersion: "TLS1_2",
+                              supportsHttpsTrafficOnly: true,
+                              allowBlobPublicAccess: false,
+                              allowSharedKeyAccess: false,
+                            },
+                          },
+                        },
+                      }),
+                    }),
+                  ).map(([key, value]) => [key, { ...value, results: [...value.results] }]),
+                ),
+              }),
           ...(track !== "terraform"
             ? {}
             : {
@@ -835,6 +865,16 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
     assert.equal(await journal.head(), head);
     now = originalTime;
     expireDuringValidation = false;
+    if (track === "bicep") {
+      substituteStorage = true;
+      await assert.rejects(service.validateTask(validationTask), /invalid or incomplete/);
+      await assert.rejects(
+        service.completeTaskOutputs(validationTask, [{ kind: "validation-evidence", value: submitted }]),
+        /storage diagnostic.*binding/i,
+      );
+      assert.equal(await journal.head(), head);
+      substituteStorage = false;
+    }
     const checked = await service.validateTask(validationTask);
     assert.equal(checked.valid, false);
     assert.equal(checked.execution?.mode, "native");

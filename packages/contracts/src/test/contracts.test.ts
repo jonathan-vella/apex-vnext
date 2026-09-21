@@ -33,6 +33,7 @@ import {
   NATIVE_VALIDATION_COMMANDS,
   calculateNativeValidationCommandHash,
   calculateNativeValidationReceiptHash,
+  calculatePolicyValidationDigest,
   hasValidNativeValidationReceipt,
   LiveQualificationV1Schema,
   LIVE_QUALIFICATION_SCENARIO_IDS,
@@ -164,6 +165,61 @@ describe("Wave 1 contracts", () => {
       const receipt = { ...body, receiptHash: calculateNativeValidationReceiptHash(body) };
       assert.equal(Value.Check(NativeValidationReceiptV1Schema, receipt), true);
       assert.equal(hasValidNativeValidationReceipt(receipt, body), true);
+      if (track === "bicep") {
+        const controls = [
+          ["properties.minimumTlsVersion", "TLS1_2"],
+          ["properties.supportsHttpsTrafficOnly", true],
+          ["properties.allowBlobPublicAccess", false],
+          ["properties.allowSharedKeyAccess", false],
+        ] as const;
+        const diagnostics: NonNullable<NativeValidationReceiptV1["storageSecurity"]> = {
+          storage: {
+            coverage: "storage-account-property-hardening-v1",
+            fullBaselineEvaluated: false,
+            sourceHash: hash,
+            inputHash: otherHash,
+            bindingHash: hash,
+            outcome: "pass",
+            results: controls.map(([propertyPath, expected]) => ({
+              propertyPath,
+              expectedValueDigest: calculatePolicyValidationDigest(expected),
+              observedValueDigest: calculatePolicyValidationDigest(expected),
+              outcome: "pass",
+              reason: "matched",
+            })),
+          },
+        };
+        const check = (storageSecurity: typeof diagnostics) => {
+          const changed = { ...body, storageSecurity };
+          return hasValidNativeValidationReceipt(
+            { ...changed, receiptHash: calculateNativeValidationReceiptHash(changed) },
+            body,
+          );
+        };
+        assert.equal(check(diagnostics), true);
+        for (const mutation of [
+          "path",
+          "expected",
+          "duplicate",
+          "reason",
+          "mismatch-digests",
+          "missing-observed",
+          "mixed-inputs",
+        ] as const) {
+          const changed = structuredClone(diagnostics);
+          const result = changed.storage!.results[0]!;
+          if (mutation === "path") result.propertyPath = "unrelated";
+          else if (mutation === "expected") result.expectedValueDigest = result.observedValueDigest = hash;
+          else if (mutation === "duplicate") changed.storage!.results[1] = { ...result };
+          else if (mutation === "mixed-inputs") changed.other = { ...changed.storage!, inputHash: hash };
+          else {
+            changed.storage!.outcome = result.outcome = "fail";
+            result.reason = mutation === "reason" ? "unsupported-expression" : "value-mismatch";
+            if (mutation === "missing-observed") delete result.observedValueDigest;
+          }
+          assert.equal(check(changed), false, mutation);
+        }
+      }
       assert.equal(schemaById[NativeValidationReceiptV1Schema.$id!], NativeValidationReceiptV1Schema);
       assert.equal(contractMetadata[NativeValidationReceiptV1Schema.$id!]?.maxBytes, 8_404_992);
       assert.equal(

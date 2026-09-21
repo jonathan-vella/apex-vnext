@@ -40,6 +40,21 @@ for (const commands of Object.values(NATIVE_VALIDATION_COMMANDS)) {
 }
 Object.freeze(NATIVE_VALIDATION_COMMANDS);
 
+export const STORAGE_PROPERTY_HARDENING_CONTROLS = Object.freeze({
+  bicep: Object.freeze([
+    Object.freeze(["properties.minimumTlsVersion", "TLS1_2"] as const),
+    Object.freeze(["properties.supportsHttpsTrafficOnly", true] as const),
+    Object.freeze(["properties.allowBlobPublicAccess", false] as const),
+    Object.freeze(["properties.allowSharedKeyAccess", false] as const),
+  ]),
+  terraform: Object.freeze([
+    Object.freeze(["min_tls_version", "TLS1_2"] as const),
+    Object.freeze(["https_traffic_only_enabled", true] as const),
+    Object.freeze(["allow_nested_items_to_be_public", false] as const),
+    Object.freeze(["shared_access_key_enabled", false] as const),
+  ]),
+});
+
 const policyResultProperties = PolicyValidationV1Schema.properties.results.items.properties;
 const storageSecurityObservation = Type.Object(
   {
@@ -133,12 +148,15 @@ export function hasValidNativeValidationReceipt(
     const { receiptHash, ...receipt } = value;
     const keys = ["projectId", "runId", "track", "sourceHash", "treeHash", "policyHash", "inputHash"] as const;
     if (keys.some((key) => receipt[key] !== binding[key])) return false;
+    const storageInputHash =
+      receipt.storageSecurity === undefined ? undefined : Object.values(receipt.storageSecurity)[0]?.inputHash;
     if (
       receipt.storageSecurity !== undefined &&
       (receipt.track !== "bicep" ||
         Object.values(receipt.storageSecurity).some(
           (observation) =>
             observation.sourceHash !== receipt.sourceHash ||
+            observation.inputHash !== storageInputHash ||
             (receipt.policyValidation !== undefined && observation.inputHash !== receipt.policyValidation.inputHash) ||
             observation.outcome !==
               (observation.results.some(({ outcome }) => outcome === "fail")
@@ -146,11 +164,37 @@ export function hasValidNativeValidationReceipt(
                 : observation.results.some(({ outcome }) => outcome === "unsupported")
                   ? "unsupported"
                   : "pass") ||
-            observation.results.some(
-              (result) =>
-                result.outcome === "pass" &&
-                (result.reason !== "matched" || result.expectedValueDigest !== result.observedValueDigest),
-            ),
+            observation.results.some((result, index) => {
+              const control = STORAGE_PROPERTY_HARDENING_CONTROLS.bicep[index];
+              if (
+                control === undefined ||
+                result.propertyPath !== control[0] ||
+                result.expectedValueDigest !== calculatePolicyValidationDigest(control[1])
+              )
+                return true;
+              if (result.reason === "matched")
+                return result.outcome !== "pass" || result.expectedValueDigest !== result.observedValueDigest;
+              if (result.reason === "value-mismatch")
+                return (
+                  result.outcome !== "fail" ||
+                  result.observedValueDigest === undefined ||
+                  result.expectedValueDigest === result.observedValueDigest
+                );
+              if (result.reason === "missing-property")
+                return result.outcome !== "fail" || result.observedValueDigest !== undefined;
+              return (
+                ![
+                  "unsupported-expression",
+                  "resource-not-bound",
+                  "resource-not-found",
+                  "ambiguous-resource",
+                  "unsupported-resource",
+                  "invalid-source",
+                ].includes(result.reason) ||
+                result.outcome !== "unsupported" ||
+                result.observedValueDigest !== undefined
+              );
+            }),
         ))
     )
       return false;
