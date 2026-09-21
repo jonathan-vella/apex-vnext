@@ -58,6 +58,12 @@ do not build a separate benchmark harness. Record explicit gaps until implemente
 
 ## Execution Rules
 
+The clean-install package regression now exercises local archetype listing, exact-commit inspection, independent copy,
+source-instruction exclusion, destination conflicts, hash-confirmed decision adoption and restart in both installed
+client projections. It invokes the packaged CLI from independent consumer directories and verifies that Requirements
+review remains next and no gate is approved. This is package/command-path evidence for parts of CLIENT-014 through
+CLIENT-017, not live VS Code or Copilot CLI agent interaction and not complete acceptance of those scenarios.
+
 1. Use clean independent consumer workspaces for each client.
 2. Install the same exact package candidate and one selected projection.
 3. Trust only the qualification workspace. A disposable, isolated profile root may be mutated solely for the managed

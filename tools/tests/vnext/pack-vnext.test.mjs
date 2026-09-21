@@ -573,6 +573,139 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
   } finally {
     await mcpClient.close();
   }
+  const coe = join(temporaryRoot, "coe");
+  await mkdir(join(coe, "archetypes", "storage"), { recursive: true });
+  await writeFile(join(coe, "archetypes", "storage", "main.bicep"), "output name string = 'fixture'\n");
+  await writeFile(join(coe, "archetypes", "storage", "AGENTS.md"), "Untrusted source instructions\n");
+  await runInTest("git", ["init", "--initial-branch", "fixture"], coe);
+  await runInTest("git", ["add", "."], coe);
+  await runInTest(
+    "git",
+    [
+      "-c",
+      "user.name=Fixture",
+      "-c",
+      "user.email=fixture@example.invalid",
+      "-c",
+      "core.hooksPath=/dev/null",
+      "commit",
+      "-qm",
+      "fixture",
+    ],
+    coe,
+  );
+  const revision = (await runInTest("git", ["rev-parse", "HEAD"], coe)).stdout.trim();
+  for (const clientId of ["github-copilot-vscode", "github-copilot-cli"]) {
+    const consumer = clientId === "github-copilot-vscode" ? project : await createConsumer("cli-consumer");
+    if (consumer !== project) {
+      await installCandidate(consumer, true);
+      await runInTest("git", ["init", "--initial-branch", "qualification"], consumer);
+    }
+    const binary = join(consumer, "node_modules", ".bin", process.platform === "win32" ? "apex.cmd" : "apex");
+    const cli = async (args) => JSON.parse((await runInTest(binary, [...args, "--json"], consumer)).stdout).result;
+    if (consumer !== project) await cli(["init", "--project", "demo", "--client", clientId]);
+    const before = await cli(["status"]);
+    const selection = ["--repository", coe, "--revision", revision, "--path", "archetypes/storage"];
+    const catalog = await cli([
+      "archetype",
+      "list",
+      "--repository",
+      coe,
+      "--revision",
+      revision,
+      "--path",
+      "archetypes",
+    ]);
+    assert.deepEqual(
+      catalog.candidates.map(({ selectedPath }) => selectedPath),
+      ["archetypes/storage"],
+    );
+    const proposal = await cli(["archetype", "inspect", ...selection]);
+    const importing = [
+      "archetype",
+      "import",
+      ...selection,
+      "--destination",
+      "workload",
+      "--expected-hash",
+      proposal.contentHash,
+    ];
+    await assert.rejects(cli(importing));
+    await cli([...importing, "--yes"]);
+    assert.deepEqual(await cli(["status"]), before);
+    assert.equal(await readFile(join(consumer, "workload", "main.bicep"), "utf8"), "output name string = 'fixture'\n");
+    await assert.rejects(readFile(join(consumer, "workload", "AGENTS.md")), { code: "ENOENT" });
+    await writeFile(join(consumer, "workload", "main.bicep"), "manual consumer edit\n");
+    await assert.rejects(cli([...importing, "--yes"]));
+    assert.equal(await readFile(join(consumer, "workload", "main.bicep"), "utf8"), "manual consumer edit\n");
+    const candidate = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      workload: "Recovered storage workload",
+      environment: "dev",
+      requirements: [
+        {
+          id: "REQ-1",
+          statement: "Preserve consumer ownership",
+          priority: "must",
+          status: "confirmed",
+          source: "consumer confirmation",
+        },
+      ],
+      assumptions: [],
+      unknowns: [],
+    };
+    const candidatePath = join(consumer, "requirements.json");
+    await writeFile(candidatePath, JSON.stringify(candidate));
+    const adoption = await cli([
+      "requirements",
+      "preview-adoption",
+      "--file",
+      candidatePath,
+      "--reason",
+      "Recover decisions",
+    ]);
+    await assert.rejects(
+      cli([
+        "requirements",
+        "adopt",
+        "--file",
+        candidatePath,
+        "--reason",
+        "Recover decisions",
+        "--expected-hash",
+        "f".repeat(64),
+        "--yes",
+      ]),
+    );
+    await cli([
+      "requirements",
+      "adopt",
+      "--file",
+      candidatePath,
+      "--reason",
+      "Recover decisions",
+      "--expected-hash",
+      adoption.proposalHash,
+      "--yes",
+    ]);
+    const next = await cli(["task", "next"]);
+    assert.equal(next.status, "task");
+    assert.equal(next.task.taskType, "requirements");
+    const taskContext = await cli(["task", "context", "--task", next.task.taskId]);
+    assert.deepEqual(taskContext.outputTemplates.requirements, candidate);
+    const outputPath = join(consumer, "requirements-output.json");
+    await writeFile(outputPath, JSON.stringify({ kind: "requirements", value: candidate }));
+    await cli(["task", "complete", "--task", next.task.taskId, "--file", outputPath]);
+    const after = await cli(["status"]);
+    assert.equal(after.task, "requirements-review");
+    assert.ok(after.run.gates.every(({ state }) => !["approved", "inherited"].includes(state)));
+    assert.deepEqual(await cli(["status"]), after);
+    assert.equal(
+      JSON.parse(await readFile(join(consumer, ".apex", "customizations.lock.json"), "utf8")).clientId,
+      clientId,
+    );
+  }
   for (const path of [".apex/local/run/saved.tfplan", ".apex/work/run/task/output.json", ".apex/cache/content/item"]) {
     await mkdir(join(project, path, ".."), { recursive: true });
     await writeFile(join(project, path), "derived\n");
