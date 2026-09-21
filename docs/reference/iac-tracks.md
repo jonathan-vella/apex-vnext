@@ -18,6 +18,10 @@ contradictory declarations with `APEX_VALIDATION`: existing resources use Bicep 
 rejected. The owning predicate is
 [`hasValidLogicalResourceReferences`](../../packages/contracts/src/targets.ts).
 
+Code-generation acceptance also matches each manifest resource's ID, type, implementation descriptor and dependency
+set to the approved intent and binding. Rehashing an altered manifest does not authorize additional or substituted
+resources. These artifact-consistency checks do not prove compiled-resource parity.
+
 Preview requires a valid accepted manifest covering every intent resource. Only `managed` entries enter APEX's provider
 apply/destroy request resource lists and simulated changes/inventory. Existing references remain in the accepted intent
 and its hash binding. An all-existing workload has no simulated changes but still requires fresh deployment approval.
@@ -111,6 +115,13 @@ only a task ID for an IaC validation task, it executes native checks and returns
 and blocked validator IDs, without completing the task. `valid: false` means required execution evidence is incomplete;
 the worker must report the blockers rather than fabricate missing entries. Acceptance reexecutes current native checks.
 No authenticated planning is implicitly added to source validation.
+
+Native task completion requires executed evidence for every required validator, not merely caller-supplied entries.
+Native preview also rejects a prior completion containing required simulated or missing evidence, before provider
+commands run. Explicit simulated adapters remain available for offline tests and cannot establish production readiness.
+Because business security-baseline and full logical-parity executors remain incomplete, the production native workflow
+currently stops at validation. Preview implementation tests use explicitly simulated business evidence where necessary;
+their success is not evidence that this production prerequisite has been satisfied.
 
 Deterministic and package qualification cover both tracks. Current-candidate live Azure qualification remains required
 before claiming production readiness or release acceptance.

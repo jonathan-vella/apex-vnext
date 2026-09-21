@@ -113,6 +113,11 @@ bundle submission also fail in deterministic tests. This qualifies blocked-resul
 workflow: executable security-baseline and logical-parity evidence remains missing, and empty policy maps are not
 reported as executed policy checks. No placeholder hashes or simulated checks fill those gaps.
 
+Native completion now rejects caller-supplied entries for required checks without executed receipts. Native preview
+also rejects stored simulated required evidence before any provider command. Imported-policy preview tests explicitly
+label their business-check adapter simulation after asserting the production rejection. Successful native validation
+and preview remain unqualified until the missing executors exist; no worker enablement is implied by these checks.
+
 The renderer also retains `disable-model-invocation: true` for these candidates. Parent routing therefore still needs
 qualification as client functionality; the flag is not treated as a security boundary. No shipped target membership,
 model substitution or worker permission change was made. Local candidate metadata is retained under

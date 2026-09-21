@@ -715,10 +715,22 @@ function bindingCoverage(expectedTrack: "bicep" | "terraform", value: unknown): 
   const expectedIds = intent.resources.map(({ id }) => id).sort();
   const bindingIds = Object.keys(binding.resourceBindings).sort();
   const manifestIds = manifest.resources.map(({ logicalId }) => logicalId).sort();
+  const intentById = new Map(intent.resources.map((resource) => [resource.id, resource]));
   return binding.track === expectedTrack &&
     manifest.track === expectedTrack &&
     JSON.stringify(bindingIds) === JSON.stringify(expectedIds) &&
-    JSON.stringify(manifestIds) === JSON.stringify(expectedIds)
+    JSON.stringify(manifestIds) === JSON.stringify(expectedIds) &&
+    manifest.resources.every((resource) => {
+      const approved = intentById.get(resource.logicalId);
+      const implementation = binding.resourceBindings[resource.logicalId];
+      return (
+        approved !== undefined &&
+        implementation !== undefined &&
+        resource.type === approved.type &&
+        resource.implementationAddress === implementation.implementation &&
+        JSON.stringify([...resource.dependsOn].sort()) === JSON.stringify([...approved.dependsOn].sort())
+      );
+    })
     ? []
     : issue("/outputs/logical-resource-manifest", `${expectedTrack} binding coverage is incomplete`);
 }

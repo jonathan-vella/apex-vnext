@@ -860,6 +860,14 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
     );
     assert.equal(await journal.head(), head);
     assert.equal((await service.status()).run.gates[3]!.state, "closed");
+    const { validationMode: simulatedMode, ...nativeOnly } = provider;
+    assert.equal(simulatedMode, "simulated");
+    const production = new ApexService(root, { providers: { [track]: nativeOnly }, clock: () => now });
+    await assert.rejects(
+      production.completeTaskOutputs(validationTask, [{ kind: "validation-evidence", value: submitted }]),
+      /Native validation requires executed evidence for every required validator/,
+    );
+    assert.equal(await journal.head(), head);
     const server = createMcpServer(service);
     const client = new Client({ name: "validation-evidence-test", version: "1.0.0" });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -2816,6 +2824,67 @@ test("MCP completeTask accepts an output bundle", async () => {
   await server.close();
 });
 
+test("codegen binding coverage compares approved dependency sets without imposing array order", () => {
+  const registry = new ValidatorRegistry();
+  registerWorkflowValidators(registry);
+  for (const track of ["bicep", "terraform"] as const) {
+    const plan = planBundle("run-test", track);
+    const intent = plan[0]!.value as ImplementationIntentV1;
+    const binding = plan[1]!.value as IacBindingV1;
+    for (const id of ["network", "identity"]) {
+      intent.resources.push({ ...intent.resources[0]!, id, dependsOn: [] });
+      binding.resourceBindings[id] = structuredClone(binding.resourceBindings.api!);
+    }
+    intent.resources[0]!.dependsOn = ["network", "identity"];
+    binding.intentHash = sha256Json(intent);
+    const bundle = codegenBundle("run-test", track, plan);
+    const manifest = bundle[0]!.value as LogicalResourceManifestV1;
+    for (const logicalId of ["network", "identity"]) manifest.resources.push({ ...manifest.resources[0]!, logicalId });
+    manifest.resources[0]!.dependsOn = ["identity", "network"];
+    const context = {
+      artifacts: { "implementation-intent": intent, "iac-binding": binding },
+      outputs: { "logical-resource-manifest": manifest },
+    };
+    assert.equal(registry.validate(`business:${track}-binding-coverage`, context).valid, true);
+    manifest.resources[0]!.dependsOn = ["network"];
+    assert.equal(registry.validate(`business:${track}-binding-coverage`, context).valid, false);
+    manifest.resources[0]!.dependsOn = ["network", "identity", "network"];
+    assert.equal(registry.validate(`business:${track}-binding-coverage`, context).valid, false);
+  }
+});
+
+test("codegen acceptance rejects rehashed manifests that diverge from approved intent and binding", async () => {
+  for (const track of ["bicep", "terraform"] as const) {
+    const root = await tempRoot();
+    const service = new ApexService(root);
+    const { runId } = await service.init({ projectId: "demo", iacTool: track });
+    const generated = await reachCodegen(service, runId, track);
+    const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+    const head = await journal.head();
+    for (const mutation of ["logical-id", "type", "implementation", "extra-resource"] as const) {
+      const bundle = codegenBundle(runId, track, generated.plan);
+      const manifest = bundle.find(({ kind }) => kind === "logical-resource-manifest")!
+        .value as LogicalResourceManifestV1;
+      const resource = manifest.resources[0]!;
+      if (mutation === "logical-id") resource.logicalId = "unapproved";
+      if (mutation === "type") resource.type = "Microsoft.KeyVault/vaults";
+      if (mutation === "implementation") resource.implementationAddress = "native:Microsoft.KeyVault/vaults@2023-07-01";
+      if (mutation === "extra-resource")
+        manifest.resources.push({ ...resource, logicalId: "unapproved", executionAddress: "unapproved" });
+      const handoff = bundle.find(({ kind }) => kind === "iac-handoff")!.value as IacHandoffV1;
+      handoff.logicalResourceManifestHash = sha256Json(manifest);
+      await assert.rejects(
+        service.completeTaskOutputs(generated.taskId, bundle),
+        /binding-coverage validation failed/i,
+      );
+      assert.equal(await journal.head(), head);
+      assert.equal((await service.status()).run.gates[3]!.state, "closed");
+    }
+    await service.completeTaskOutputs(generated.taskId, codegenBundle(runId, track, generated.plan));
+    assert.equal((await service.status()).task, `validation-${track}`);
+  }
+});
+
 test("restricted staging and generateIac produce a real accepted tree", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
@@ -3985,7 +4054,18 @@ for (const track of ["bicep", "terraform"] as const) {
           assert.equal((await nativeService.status()).run.gates[3]!.state, "closed");
         }
         observed = true;
-        await nativeService.completeTaskOutputs(validationTask, evidence);
+        const beforeIncomplete = await journal.head();
+        await assert.rejects(
+          nativeService.completeTaskOutputs(validationTask, evidence),
+          /Native validation requires executed evidence for every required validator/,
+        );
+        assert.equal(await journal.head(), beforeIncomplete);
+        assert.equal((await nativeService.status()).run.gates[3]!.state, "closed");
+        const previewFixture = new ApexService(root, {
+          clock: () => now,
+          providers: { [track]: Object.assign(makeProvider(), { validationMode: "simulated" as const }) },
+        });
+        await previewFixture.completeTaskOutputs(validationTask, evidence);
         const validated = (await journal.replay()).findLast(({ type }) => type === "task.completed")!.payload as {
           validatorEvidenceRefs: Record<string, string>;
           validatorEvidenceModes: Record<string, string>;
@@ -3993,6 +4073,8 @@ for (const track of ["bicep", "terraform"] as const) {
         const nativeReceipt = await objects.getJson<NativeValidationReceiptV1>(
           validated.validatorEvidenceRefs[NATIVE_VALIDATION_COMMANDS[track][0]!.validatorId]!,
         );
+        assert.equal(validated.validatorEvidenceModes["business:security-baseline"], "simulated");
+        assert.equal(validated.validatorEvidenceModes["business:logical-resource-parity"], "simulated");
         assert.equal(nativeReceipt.sourceHash, generatedHashes["iac-handoff"]);
         assert.equal(nativeReceipt.policyHash, policyHash);
         for (const { validatorId } of NATIVE_VALIDATION_COMMANDS[track])
@@ -4006,7 +4088,19 @@ for (const track of ["bicep", "terraform"] as const) {
           assert.equal(validated.validatorEvidenceRefs["business:policy-property-map"], undefined);
           assert.equal(nativeReceipt.policyValidation, undefined);
         }
-        const restarted = new ApexService(root, { clock: () => now, providers: { [track]: makeProvider() } });
+        const productionRestart = new ApexService(root, { clock: () => now, providers: { [track]: makeProvider() } });
+        const beforeRestart = await journal.head();
+        const commandCount = calls.length;
+        await assert.rejects(
+          productionRestart.preview({ operation: "apply", provider: track }),
+          /native validation for every required validator/,
+        );
+        assert.equal(await journal.head(), beforeRestart);
+        assert.equal(calls.length, commandCount);
+        const restarted = new ApexService(root, {
+          clock: () => now,
+          providers: { [track]: Object.assign(makeProvider(), { validationMode: "simulated" as const }) },
+        });
         observed = false;
         const head = await journal.head();
         await assert.rejects(restarted.preview({ operation: "apply", provider: track }), /policy|blocker/i);

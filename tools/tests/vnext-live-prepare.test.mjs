@@ -134,6 +134,10 @@ for (const track of ["bicep", "terraform"]) {
     assert.equal(artifacts.intent.resources.length, 1);
     assert.equal(artifacts.intent.resources[0].id, "qualification-storage");
     assert.equal(artifacts.binding.track, track);
+    assert.equal(
+      artifacts.logicalManifest.resources[0].implementationAddress,
+      artifacts.binding.resourceBindings["qualification-storage"].implementation,
+    );
     assert.match(artifacts.handoff.treeHash, /^[0-9a-f]{64}$/);
     assert.deepEqual(artifacts.handoff.requiredToolVersions, { [track]: TOOL_PINS[track].min });
     assert.match(artifacts.governanceArtifact.constraintsRef.digest, /^[0-9a-f]{64}$/);

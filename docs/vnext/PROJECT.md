@@ -44,6 +44,9 @@ explicit unexecuted-validator blockers. Fresh CLI Validator probes on both track
 completion or Gate 4 changes. Required executable security-baseline/logical-parity evidence remains an implementation
 gap; command receipts must not be used to claim those checks passed. See the
 [worker matrix](CLIENT-QUALIFICATION.md#cli-worker-qualification).
+Native completion and preview now reject required unexecuted or simulated evidence instead of accepting supplied
+business-check hashes. Codegen acceptance also compares manifest resource types, descriptors and dependency sets with
+approved artifacts. This strengthens rejection behavior but does not implement the missing business executors.
 Complete the remaining product and paired-client matrix. Do not restart completed cleanup
 or add optional agent helpers, telemetry or orchestration infrastructure to accelerate delivery.
 

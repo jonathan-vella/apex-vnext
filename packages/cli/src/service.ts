@@ -3972,6 +3972,26 @@ export class ApexService {
         const payload = completed?.payload as
           | { validatorEvidenceRefs?: Record<string, string>; validatorEvidenceModes?: Record<string, string> }
           | undefined;
+        if (provider.validationMode !== "simulated") {
+          const workflow = await this.lockedWorkflowEngine(run);
+          const validationNode = workflow.manifest.nodes.find(({ id }) => id === `validation-${run.iacTool}`);
+          const required = validationNode?.validators.filter(
+            (id) => workflowValidatorOwnership(id)?.boundary === "validation",
+          );
+          if (
+            required === undefined ||
+            required.some(
+              (id) =>
+                payload?.validatorEvidenceModes?.[id] !== "native" ||
+                payload?.validatorEvidenceRefs?.[id] === undefined,
+            )
+          )
+            throw new ApexError(
+              "APEX_VALIDATION",
+              "Preview requires runtime-owned native validation for every required validator",
+              EXIT_CODES.validation,
+            );
+        }
         if (handoff === undefined || handoffHash === undefined || policyHash === undefined)
           throw new ApexError(
             "APEX_VALIDATION",
@@ -6782,6 +6802,12 @@ export class ApexService {
         const receiptBytes = Buffer.byteLength(JSON.stringify(receipt));
         const executed = new Set<string>(receipt.commands.map(({ validatorId }) => validatorId));
         if (run.iacTool === "bicep" && policyValidation !== undefined) executed.add("business:policy-property-map");
+        if (provider.validationMode !== "simulated" && validatorIds.some((id) => !executed.has(id)))
+          throw new ApexError(
+            "APEX_VALIDATION",
+            "Native validation requires executed evidence for every required validator",
+            EXIT_CODES.validation,
+          );
         for (const id of validatorIds) {
           if (executed.has(id)) {
             nativeEvidenceRefs[id] = receiptHash;
