@@ -1,5 +1,6 @@
 import type {
   ApprovalEvidenceV1,
+  ArchitectureV1,
   DeploymentPreviewV1,
   OperationRecordV1,
   RequirementsV1,
@@ -141,6 +142,76 @@ export function renderApprovalEvidence(approval: ApprovalEvidenceV1): string {
     ]),
   ];
   return summary.join("\n");
+}
+
+export function renderArchitectureDecisionRecords(architecture: ArchitectureV1, architectureHash: string): string {
+  const records = architecture.decisionRecords;
+  if (records === undefined || records.length === 0)
+    throw new Error("Structured Architecture decision records are unavailable");
+  const list = (values: string[]) => values.map((value) => `- ${escapeMarkdown(value)}`).join("\n");
+  return [
+    "# Architecture Decision Records",
+    "",
+    `Architecture artifact: ${architectureHash}`,
+    "",
+    "Design decisions from accepted Architecture data. Gate approval and implemented state are separate evidence.",
+    "",
+    ...[...records]
+      .sort((left, right) => compareText(left.id, right.id))
+      .map((record) =>
+        [
+          `## ${escapeMarkdown(record.id)}: ${escapeMarkdown(record.title)}`,
+          "",
+          `Requirements: ${record.requirementIds.map(escapeMarkdown).join(", ")}`,
+          "",
+          "### Context",
+          "",
+          escapeMarkdown(record.context),
+          "",
+          "### Decision",
+          "",
+          escapeMarkdown(record.decision),
+          "",
+          "### Alternatives Considered",
+          "",
+          markdownTable(
+            ["Option", "Benefits", "Drawbacks", "Rejection Reason"],
+            record.alternatives.map((alternative) => [
+              alternative.option,
+              alternative.benefits,
+              alternative.drawbacks,
+              alternative.rejectionReason,
+            ]),
+          ),
+          "",
+          "### Consequences",
+          "",
+          "Positive:",
+          "",
+          list(record.positiveConsequences),
+          "",
+          "Negative:",
+          "",
+          list(record.negativeConsequences),
+          "",
+          "### WAF Pillar Analysis",
+          "",
+          markdownTable(
+            ["Pillar", "Impact"],
+            Object.entries(record.wafImpacts).sort(([left], [right]) => compareText(left, right)),
+          ),
+          "",
+          "### Compliance Considerations",
+          "",
+          escapeMarkdown(record.complianceConsiderations),
+          "",
+          "### Implementation Notes",
+          "",
+          escapeMarkdown(record.implementationNotes),
+          "",
+        ].join("\n"),
+      ),
+  ].join("\n");
 }
 
 export function renderDeploymentSummary(input: {

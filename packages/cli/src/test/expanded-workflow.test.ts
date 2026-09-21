@@ -2897,6 +2897,22 @@ test("MCP completeTask accepts an output bundle", async () => {
   await server.close();
 });
 
+test("Architecture decision records reject duplicate IDs and foreign requirement links", () => {
+  const registry = new ValidatorRegistry();
+  registerWorkflowValidators(registry);
+  const source = requirements();
+  const record = { id: "ADR-0001", requirementIds: [source.requirements[0]!.id] };
+  const context = {
+    artifacts: { requirements: source },
+    outputs: { architecture: { ...architecture("run-test"), decisionRecords: [record] } },
+  };
+  assert.equal(registry.validate("business:requirements-traceability", context).valid, true);
+  context.outputs.architecture.decisionRecords.push(record);
+  assert.equal(registry.validate("business:requirements-traceability", context).valid, false);
+  context.outputs.architecture.decisionRecords = [{ ...record, requirementIds: ["foreign"] }];
+  assert.equal(registry.validate("business:requirements-traceability", context).valid, false);
+});
+
 test("codegen binding coverage compares approved dependency sets without imposing array order", () => {
   const registry = new ValidatorRegistry();
   registerWorkflowValidators(registry);

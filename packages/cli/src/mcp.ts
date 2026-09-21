@@ -693,9 +693,17 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
     "render",
     {
       description:
-        "Render the selected run's status, requirements, preview, approval, inventory, or evidence-bound deployment summary as a human-readable projection.",
+        "Render the selected run's status, requirements, preview, approval, inventory, structured Architecture decisions, or evidence-bound deployment summary as a human-readable projection.",
       inputSchema: {
-        kind: z.enum(["status", "requirements", "preview", "approval", "inventory", "deployment-summary"]),
+        kind: z.enum([
+          "status",
+          "requirements",
+          "preview",
+          "approval",
+          "inventory",
+          "deployment-summary",
+          "architecture-decisions",
+        ]),
       },
       outputSchema: z.object({ markdown: z.string() }).strict(),
     },

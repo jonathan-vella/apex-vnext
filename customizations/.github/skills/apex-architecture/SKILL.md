@@ -23,6 +23,10 @@ Use this skill only for an active architecture task.
    Excellence, and Performance Efficiency. Bind every pillar to accepted requirements and evidence; do not derive
    numeric scores.
 3. Keep identity, networking, diagnostics, recovery, data, and lifecycle decisions explicit.
+   For decisions requiring an ADR, include `architecture.decisionRecords`: a stable `ADR-NNNN` ID, title, context,
+   decision, accepted requirement IDs, at least two considered alternatives with benefits/drawbacks/rejection reasons,
+   positive and negative consequences, all five `wafImpacts`, compliance considerations and implementation notes.
+   Reuse recorded rationale; missing information remains an unresolved decision, never invented renderer content.
 4. Present user-owned choices only when `apex/nextTask` returns `needs_input`; record them through `apex/recordInput`
    before reading the architecture task context.
 5. Call `azure-resource-manager-mcp/get_retail_prices` after selecting candidate SKUs. Do not infer unavailability from

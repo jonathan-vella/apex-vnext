@@ -359,6 +359,46 @@ describe("Wave 1 contracts", () => {
       assert.equal(Value.Check(RequirementsChangeProposalV1Schema, changed), false);
   });
 
+  it("requires explicit alternatives and all WAF impacts for structured Architecture decisions", () => {
+    const record = {
+      id: "ADR-0001",
+      title: "Service selection",
+      context: "Workload constraints",
+      decision: "Selected service",
+      requirementIds: ["REQ-1"],
+      alternatives: [
+        { option: "Alternative A", benefits: "Simple", drawbacks: "Capacity", rejectionReason: "Cannot meet demand" },
+        {
+          option: "Alternative B",
+          benefits: "Flexible",
+          drawbacks: "Operations",
+          rejectionReason: "Requires unavailable staffing",
+        },
+      ],
+      positiveConsequences: ["Meets demand"],
+      negativeConsequences: ["Higher baseline cost"],
+      wafImpacts: {
+        security: "Identity controls",
+        reliability: "Recovery design",
+        "performance-efficiency": "Capacity",
+        "cost-optimization": "Cost trade-off",
+        "operational-excellence": "Staffing",
+      },
+      complianceConsiderations: "Review against target policy",
+      implementationNotes: "Bind selected service in plan",
+    };
+    const schema = ArchitectureV1Schema.properties.decisionRecords.items;
+    assert.equal(Value.Check(schema, record), true);
+    for (const changed of [
+      { ...record, alternatives: [] },
+      { ...record, negativeConsequences: [] },
+      { ...record, wafImpacts: { security: "Only one pillar" } },
+      { ...record, approval: true },
+      { ...record, id: "../escape" },
+    ])
+      assert.equal(Value.Check(schema, changed), false);
+  });
+
   it("uses one explicit persisted contract version", () => {
     const lock: RuntimeBundleLockV1 = {
       schemaVersion: CONTRACT_VERSION,

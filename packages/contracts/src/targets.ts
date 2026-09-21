@@ -156,6 +156,47 @@ export const ArchitectureV1Schema = Type.Object(
       { minItems: 1 },
     ),
     decisions: Type.Array(NonEmptyStringSchema),
+    decisionRecords: Type.Optional(
+      Type.Array(
+        Type.Object(
+          {
+            id: Type.String({ pattern: "^ADR-[0-9]{4}$" }),
+            title: Type.String({ minLength: 1, maxLength: 256 }),
+            context: Type.String({ minLength: 1, maxLength: 4096 }),
+            decision: Type.String({ minLength: 1, maxLength: 4096 }),
+            requirementIds: Type.Array(NonEmptyStringSchema, { minItems: 1, maxItems: 256, uniqueItems: true }),
+            alternatives: Type.Array(
+              Type.Object(
+                {
+                  option: Type.String({ minLength: 1, maxLength: 256 }),
+                  benefits: Type.String({ minLength: 1, maxLength: 2048 }),
+                  drawbacks: Type.String({ minLength: 1, maxLength: 2048 }),
+                  rejectionReason: Type.String({ minLength: 1, maxLength: 2048 }),
+                },
+                { additionalProperties: false },
+              ),
+              { minItems: 2, maxItems: 10 },
+            ),
+            positiveConsequences: Type.Array(NonEmptyStringSchema, { minItems: 1, maxItems: 32 }),
+            negativeConsequences: Type.Array(NonEmptyStringSchema, { minItems: 1, maxItems: 32 }),
+            wafImpacts: Type.Object(
+              {
+                security: NonEmptyStringSchema,
+                reliability: NonEmptyStringSchema,
+                "performance-efficiency": NonEmptyStringSchema,
+                "cost-optimization": NonEmptyStringSchema,
+                "operational-excellence": NonEmptyStringSchema,
+              },
+              { additionalProperties: false },
+            ),
+            complianceConsiderations: NonEmptyStringSchema,
+            implementationNotes: NonEmptyStringSchema,
+          },
+          { additionalProperties: false },
+        ),
+        { minItems: 1, maxItems: 64 },
+      ),
+    ),
     risks: Type.Array(NonEmptyStringSchema),
     wellArchitectedAssessment: Type.Optional(
       Type.Object(

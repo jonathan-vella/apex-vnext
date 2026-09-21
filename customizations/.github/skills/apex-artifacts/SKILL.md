@@ -40,6 +40,8 @@ Read [presentation conventions](references/presentation-conventions.md) before p
 - [Requirements document](templates/requirements.md) - present an accepted `requirements` artifact.
 - Architecture assessment - presents accepted components, decisions, risks, and all five qualitative WAF pillars.
 - Cost estimate - presents priced and unpriced tables, pricing evidence, monthly breakdown, and uncertainty ranges.
+- Architecture decisions - presents accepted `decisionRecords` with alternatives, consequences, all five WAF impacts,
+  requirement links and implementation notes. Missing records remain unavailable; do not infer them from summary prose.
 
 The registry also exposes direct, non-template renderers for run status, deployment preview, approval evidence, and
 resource inventory, and deployment summaries. Deployment summaries bind the completed operation, inventory and approval;

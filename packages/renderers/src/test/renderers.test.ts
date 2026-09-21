@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type {
   ApprovalEvidenceV1,
+  ArchitectureV1,
   DeploymentPreviewV1,
   OperationRecordV1,
   RequirementsV1,
@@ -12,6 +13,7 @@ import {
   DOCUMENT_REGISTRY,
   REQUIREMENTS_TEMPLATE_SLOTS,
   renderApprovalEvidence,
+  renderArchitectureDecisionRecords,
   renderDeploymentPreview,
   renderDeploymentSummary,
   renderRequirementsDocument,
@@ -184,6 +186,58 @@ test("approval evidence renders supplied timestamps and optional binding fields"
   assert.match(rendered, /\*\*Decision:\*\* APPROVED/);
   assert.match(rendered, /2026-07-01T11:00:00Z/);
   assert.match(rendered, /github-actions:owner\/repo:123:2:deploy/);
+});
+
+test("ADR rendering preserves explicit alternatives and consequences without inventing approval", () => {
+  const architecture: ArchitectureV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    runId: "run",
+    title: "Design",
+    summary: "Design",
+    sourceHashes: {},
+    components: [],
+    decisions: [],
+    risks: [],
+    decisionRecords: [
+      {
+        id: "ADR-0001",
+        title: "Service|selection",
+        context: "Requirements",
+        decision: "Selected service",
+        requirementIds: ["REQ-1"],
+        alternatives: [
+          { option: "A", benefits: "Low cost", drawbacks: "Limited scale", rejectionReason: "Demand exceeds capacity" },
+          {
+            option: "B",
+            benefits: "Flexible",
+            drawbacks: "Higher operations effort",
+            rejectionReason: "Team capacity",
+          },
+        ],
+        positiveConsequences: ["Demand met"],
+        negativeConsequences: ["Higher cost"],
+        wafImpacts: {
+          security: "Identity",
+          reliability: "Recovery",
+          "performance-efficiency": "Scale",
+          "cost-optimization": "Cost",
+          "operational-excellence": "Staffing",
+        },
+        complianceConsiderations: "Target policy review required",
+        implementationNotes: "Plan the selected resource",
+      },
+    ],
+  };
+  const rendered = renderArchitectureDecisionRecords(architecture, hash("a"));
+  assert.equal(rendered, renderArchitectureDecisionRecords(architecture, hash("a")));
+  assert.match(rendered, /Demand exceeds capacity/);
+  assert.match(rendered, /Higher cost/);
+  assert.match(rendered, /Service\\\|selection/);
+  assert.match(rendered, /Gate approval and implemented state are separate evidence/);
+  const missingRecords = { ...architecture };
+  delete missingRecords.decisionRecords;
+  assert.throws(() => renderArchitectureDecisionRecords(missingRecords, hash("a")), /unavailable/);
 });
 
 test("deployment summary distinguishes recorded evidence from live and operational claims", () => {

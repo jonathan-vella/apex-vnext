@@ -376,6 +376,15 @@ function requirementsTraceability(value: unknown): ValidationIssue[] {
   const requirements = context.artifacts.requirements as RequirementsV1 | undefined;
   if (requirements === undefined) return issue("/artifacts/requirements", "Accepted requirements are required");
   const knownIds = new Set(requirements.requirements.map(({ id }) => id));
+  const records = architecture.decisionRecords ?? [];
+  if (
+    new Set(records.map(({ id }) => id)).size !== records.length ||
+    records.some(({ requirementIds }) => requirementIds.some((id) => !knownIds.has(id)))
+  )
+    return issue(
+      "/outputs/architecture/decisionRecords",
+      "Decision records require unique IDs and accepted requirement references",
+    );
   const referencedIds = architecture.components.flatMap(({ requirementIds }) => requirementIds);
   const unknown = [...new Set(referencedIds.filter((id) => !knownIds.has(id)))].sort();
   if (unknown.length > 0) {

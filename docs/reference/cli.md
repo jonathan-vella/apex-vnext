@@ -135,13 +135,17 @@ remain intact. APEX does not automatically merge prose into requirements or sync
 | `apex reconcile`       | None                                                                                             |
 | `apex inventory`       | None                                                                                             |
 | `apex diagnose`        | None                                                                                             |
-| `apex render`          | `--kind` with status, requirements, preview, approval, inventory, or deployment-summary          |
+| `apex render`          | `--kind` with status, requirements, preview, approval, inventory, deployment-summary, or architecture-decisions |
 
 Only a human-authorized operator should run gate or deployment mutations. A preview must match the selected IaC track.
 
 `apex render --kind deployment-summary` projects the latest completed operation with its exact inventory and approval
 bindings. It labels simulated and native-adapter evidence separately, omits arbitrary resource properties, and reports
 operational evidence gaps. It does not query Azure, establish live execution independently, or authorize another operation.
+
+`apex render --kind architecture-decisions` renders explicit `decisionRecords` from accepted Architecture data, including
+requirement links, alternatives, consequences, WAF impacts and implementation notes. Missing structured records return
+an unavailable error. Acceptance as an Architecture artifact is not Gate 2 approval or proof of implementation.
 
 ## Capabilities, Transfers, Evidence, And Quality
 

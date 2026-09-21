@@ -1819,7 +1819,43 @@ test("plan task context projects source hashes and valid output templates", asyn
   );
   await service.decideGateNumber(1, "approved", "tester");
   await acceptAvailabilityEvidence(service, initialized.runId);
-  const architectureValue = architecture(initialized.runId);
+  const architectureValue = {
+    ...architecture(initialized.runId),
+    decisionRecords: [
+      {
+        id: "ADR-0001",
+        title: "Service choice",
+        context: "Consumer workload requirements",
+        decision: "Use the accepted service",
+        requirementIds: [requirements().requirements[0]!.id],
+        alternatives: [
+          {
+            option: "Alternative A",
+            benefits: "Lower base cost",
+            drawbacks: "Insufficient capacity",
+            rejectionReason: "Fails workload demand",
+          },
+          {
+            option: "Alternative B",
+            benefits: "Flexible",
+            drawbacks: "Operations burden",
+            rejectionReason: "Team staffing limit",
+          },
+        ],
+        positiveConsequences: ["Meets workload demand"],
+        negativeConsequences: ["Higher base cost"],
+        wafImpacts: {
+          security: "Managed identity",
+          reliability: "Recovery planning",
+          "performance-efficiency": "Capacity alignment",
+          "cost-optimization": "Base cost trade-off",
+          "operational-excellence": "Team ownership",
+        },
+        complianceConsiderations: "Target policy remains mandatory",
+        implementationNotes: "Use accepted binding and parameter contract",
+      },
+    ],
+  };
   const costValue = costEstimate(initialized.runId);
   const architectureHashes = await complete("architecture", [
     { kind: "architecture", value: architectureValue },
@@ -1835,6 +1871,10 @@ test("plan task context projects source hashes and valid output templates", asyn
     },
   ]);
   const architectureReviewDirectory = join(root, "agent-output", "demo", initialized.runId, "architecture");
+  const decisions = await service.render("architecture-decisions");
+  assert.match(decisions, /ADR-0001/);
+  assert.match(decisions, new RegExp(architectureHashes.outputHashes.architecture!));
+  assert.equal(await readFile(join(architectureReviewDirectory, "architecture-decisions.md"), "utf8"), decisions);
   assert.match(await readFile(join(architectureReviewDirectory, "README.md"), "utf8"), /Architecture hash/u);
   assert.match(
     await readFile(join(architectureReviewDirectory, "architecture-assessment.md"), "utf8"),
