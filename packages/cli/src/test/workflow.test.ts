@@ -317,6 +317,85 @@ test("deployment summary binds accepted operation evidence and never upgrades si
   }
 });
 
+test("operational handoff requires current inventory and pinned evidence before runbook materialization", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo" });
+  await prepareValidatedRun(service, runId, "bicep");
+  const preview = await service.preview({ operation: "apply", provider: "fake" });
+  await service.decideGateNumber(4, "approved", "tester");
+  const deployed = await service.deploy(preview.previewHash);
+  const next = await service.nextTask();
+  if (next.status !== "task" || next.task.taskType !== "diagnosis") throw new Error("Expected diagnosis task");
+  const handoff = {
+    owner: "Operations",
+    escalation: "On-call",
+    maintenanceWindow: "Sunday UTC",
+    accessPrerequisites: ["Monitoring access"],
+    configurationReferences: [],
+    healthChecks: [
+      {
+        resourceId: deployed.inventory.resources[0]!.resourceId,
+        check: "Inspect metrics",
+        expectedOutcome: "Within SLO",
+        evidenceRefs: [] as string[],
+      },
+    ],
+    monitoring: "Recorded resource metrics",
+    incidentResponse: { applicability: "not-applicable" as const, rationale: "Simulated fixture only" },
+    rollback: { applicability: "not-applicable" as const, rationale: "No live operation" },
+    recovery: { applicability: "not-applicable" as const, rationale: "No live data" },
+    limitations: ["Simulation, not production readiness"],
+  };
+  const diagnosis = {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    runId,
+    diagnosedAt: new Date().toISOString(),
+    status: "unknown",
+    observations: ["Simulated inventory"],
+    causes: [],
+    operationalHandoff: handoff,
+  };
+  const before = await service.status();
+  await assert.rejects(
+    service.completeTaskOutputs(next.task.taskId, [
+      {
+        kind: "diagnosis",
+        value: {
+          ...diagnosis,
+          operationalHandoff: { ...handoff, healthChecks: [{ ...handoff.healthChecks[0], resourceId: "/foreign" }] },
+        },
+      },
+    ]),
+    /diagnosis:read-only/,
+  );
+  await assert.rejects(
+    service.completeTaskOutputs(next.task.taskId, [
+      {
+        kind: "diagnosis",
+        value: {
+          ...diagnosis,
+          operationalHandoff: {
+            ...handoff,
+            healthChecks: [{ ...handoff.healthChecks[0], evidenceRefs: ["f".repeat(64)] }],
+          },
+        },
+      },
+    ]),
+    /diagnosis:read-only/,
+  );
+  assert.deepEqual(await service.status(), before);
+  const accepted = await service.completeTaskOutputs(next.task.taskId, [{ kind: "diagnosis", value: diagnosis }]);
+  const runbook = await service.render("operations-runbook");
+  assert.match(runbook, new RegExp(accepted.outputHashes.diagnosis!));
+  assert.match(runbook, /Simulation, not production readiness/);
+  assert.equal(
+    await readFile(join(root, "agent-output", "demo", runId, "operations", "operations-runbook.md"), "utf8"),
+    runbook,
+  );
+});
+
 test("status leaves pending run transaction recovery to an advancing operation", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);

@@ -42,6 +42,8 @@ Read [presentation conventions](references/presentation-conventions.md) before p
 - Cost estimate - presents priced and unpriced tables, pricing evidence, monthly breakdown, and uncertainty ranges.
 - Architecture decisions - presents accepted `decisionRecords` with alternatives, consequences, all five WAF impacts,
   requirement links and implementation notes. Missing records remain unavailable; do not infer them from summary prose.
+- Operations runbook - presents accepted Diagnosis `operationalHandoff`, with resource-bound health-check guidance and
+    explicit untested procedures or justified non-applicability. References do not establish execution or successful recovery.
 
 The registry also exposes direct, non-template renderers for run status, deployment preview, approval evidence, and
 resource inventory, and deployment summaries. Deployment summaries bind the completed operation, inventory and approval;
@@ -54,8 +56,10 @@ All are read-only views of accepted typed sources.
 - [Architecture assessment](templates/architecture-assessment.md) and [cost estimate](templates/cost-estimate.md) remain
     reference-only outlines; their accepted sources use direct deterministic renderers. [Governance constraints](templates/governance-constraints.md),
     [implementation plan](templates/implementation-plan.md),
-    [operations runbook](templates/operations-runbook.md), and [resource inventory](templates/resource-inventory.md) are
+    and [resource inventory](templates/resource-inventory.md) are
     reference-only until the registry has a matching source producer and renderer.
+- [Operations runbook](templates/operations-runbook.md) is an advisory outline; the direct renderer requires explicit
+    accepted operational handoff data and does not infer missing ownership, procedures or test outcomes.
 - [Deployment summary](templates/deployment-summary.md) remains an advisory outline; the direct renderer derives its
     supported sections from completed operation evidence instead of claiming every outline slot is available.
 - [Additional document outlines](references/reference-only-outlines.md) preserve useful source-document semantics.

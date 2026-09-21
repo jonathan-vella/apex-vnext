@@ -2,6 +2,7 @@ import type {
   ApprovalEvidenceV1,
   ArchitectureV1,
   DeploymentPreviewV1,
+  DiagnosisV1,
   OperationRecordV1,
   RequirementsV1,
   ResourceInventoryV1,
@@ -211,6 +212,90 @@ export function renderArchitectureDecisionRecords(architecture: ArchitectureV1, 
           "",
         ].join("\n"),
       ),
+  ].join("\n");
+}
+
+export function renderOperationsRunbook(diagnosis: DiagnosisV1, diagnosisHash: string): string {
+  const handoff = diagnosis.operationalHandoff;
+  if (handoff === undefined) throw new Error("Operational handoff data is unavailable");
+  const list = (values: string[]) => values.map((value) => `- ${escapeMarkdown(value)}`).join("\n");
+  const procedure = (title: string, value: typeof handoff.recovery): string =>
+    [
+      `## ${title}`,
+      "",
+      value.applicability === "not-applicable"
+        ? `Not applicable: ${escapeMarkdown(value.rationale)}`
+        : [
+            `Owner: ${escapeMarkdown(value.owner)}`,
+            "",
+            "Execution status: untested. These instructions have not been executed by APEX.",
+            "",
+            "### Prerequisites",
+            "",
+            list(value.prerequisites),
+            "",
+            "### Steps",
+            "",
+            value.steps.map((step, index) => `${index + 1}. ${escapeMarkdown(step)}`).join("\n"),
+            "",
+            "### Verification",
+            "",
+            escapeMarkdown(value.verification),
+          ].join("\n"),
+      "",
+    ].join("\n");
+  return [
+    "# Operations Runbook",
+    "",
+    `Diagnosis artifact: ${diagnosisHash}`,
+    "",
+    "Documented operational intent, not execution authorization. Obtain current approvals before changes or recovery actions.",
+    "",
+    "## Ownership And Access",
+    "",
+    fieldList([
+      ["Project", diagnosis.projectId],
+      ["Run", diagnosis.runId],
+      ["Owner", handoff.owner],
+      ["Escalation", handoff.escalation],
+      ["Maintenance window", handoff.maintenanceWindow],
+      ["Diagnosis recorded", diagnosis.diagnosedAt],
+      ["Recorded diagnosis status", diagnosis.status],
+    ]),
+    "",
+    list(handoff.accessPrerequisites),
+    "",
+    "## Configuration References",
+    "",
+    handoff.configurationReferences.length === 0
+      ? "No configuration references recorded."
+      : markdownTable(
+          ["Name", "Source Reference"],
+          handoff.configurationReferences.map(({ name, source }) => [name, source]),
+        ),
+    "",
+    "## Health Checks And Monitoring",
+    "",
+    markdownTable(
+      ["Resource", "Check", "Expected Outcome", "Pinned References"],
+      handoff.healthChecks.map((check) => [
+        check.resourceId,
+        check.check,
+        check.expectedOutcome,
+        check.evidenceRefs.join(", ") || "None; not observed",
+      ]),
+    ),
+    "",
+    "Expected outcomes and evidence references do not establish that these checks ran or passed.",
+    "",
+    escapeMarkdown(handoff.monitoring),
+    "",
+    procedure("Incident Response", handoff.incidentResponse),
+    procedure("Rollback", handoff.rollback),
+    procedure("Backup And Recovery", handoff.recovery),
+    "## Limitations",
+    "",
+    list(handoff.limitations),
   ].join("\n");
 }
 

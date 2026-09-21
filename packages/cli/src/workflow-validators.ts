@@ -1258,7 +1258,13 @@ function diagnosisReadOnly(value: unknown): ValidationIssue[] {
       message: "Diagnosis is not a read-only observation of current inventory",
     });
   }
-  const unpinned = diagnosis.causes
+  const checks = diagnosis.operationalHandoff?.healthChecks ?? [];
+  if (checks.some(({ resourceId }) => !inventory.resources.some((resource) => resource.resourceId === resourceId)))
+    issues.push({
+      path: "/outputs/diagnosis/operationalHandoff/healthChecks",
+      message: "Health checks must reference recorded inventory resources",
+    });
+  const unpinned = [...diagnosis.causes, ...checks]
     .flatMap(({ evidenceRefs }) => evidenceRefs)
     .filter((reference) => !context.inputRefs.includes(reference))
     .sort();

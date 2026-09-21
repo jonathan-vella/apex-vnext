@@ -585,6 +585,24 @@ export const TelemetryV1Schema = Type.Object(
   { $id: "https://schemas.apexops.dev/telemetry-v1.json", additionalProperties: false },
 );
 
+const OperationalProcedureSchema = Type.Union([
+  Type.Object(
+    {
+      applicability: Type.Literal("applicable"),
+      owner: NonEmptyStringSchema,
+      prerequisites: Type.Array(NonEmptyStringSchema, { minItems: 1, maxItems: 32 }),
+      steps: Type.Array(NonEmptyStringSchema, { minItems: 1, maxItems: 64 }),
+      verification: NonEmptyStringSchema,
+      executionStatus: Type.Literal("untested"),
+    },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    { applicability: Type.Literal("not-applicable"), rationale: NonEmptyStringSchema },
+    { additionalProperties: false },
+  ),
+]);
+
 export const DiagnosisV1Schema = Type.Object(
   {
     schemaVersion: ContractVersionSchema,
@@ -598,6 +616,38 @@ export const DiagnosisV1Schema = Type.Object(
       Type.Literal("unknown"),
     ]),
     observations: Type.Array(NonEmptyStringSchema),
+    operationalHandoff: Type.Optional(
+      Type.Object(
+        {
+          owner: NonEmptyStringSchema,
+          escalation: NonEmptyStringSchema,
+          maintenanceWindow: NonEmptyStringSchema,
+          accessPrerequisites: Type.Array(NonEmptyStringSchema, { minItems: 1, maxItems: 32 }),
+          configurationReferences: Type.Array(
+            Type.Object({ name: NonEmptyStringSchema, source: NonEmptyStringSchema }, { additionalProperties: false }),
+            { maxItems: 128 },
+          ),
+          healthChecks: Type.Array(
+            Type.Object(
+              {
+                resourceId: NonEmptyStringSchema,
+                check: NonEmptyStringSchema,
+                expectedOutcome: NonEmptyStringSchema,
+                evidenceRefs: Type.Array(Sha256Schema, { maxItems: 32, uniqueItems: true }),
+              },
+              { additionalProperties: false },
+            ),
+            { minItems: 1, maxItems: 256 },
+          ),
+          monitoring: NonEmptyStringSchema,
+          incidentResponse: OperationalProcedureSchema,
+          rollback: OperationalProcedureSchema,
+          recovery: OperationalProcedureSchema,
+          limitations: Type.Array(NonEmptyStringSchema, { minItems: 1, maxItems: 64 }),
+        },
+        { additionalProperties: false },
+      ),
+    ),
     causes: Type.Array(
       Type.Object(
         {

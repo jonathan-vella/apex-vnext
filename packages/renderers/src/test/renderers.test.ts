@@ -4,6 +4,7 @@ import type {
   ApprovalEvidenceV1,
   ArchitectureV1,
   DeploymentPreviewV1,
+  DiagnosisV1,
   OperationRecordV1,
   RequirementsV1,
   ResourceInventoryV1,
@@ -20,6 +21,7 @@ import {
   renderRequirements,
   renderResourceInventory,
   renderRunStatus,
+  renderOperationsRunbook,
 } from "../index.js";
 
 const hash = (character: string): string => character.repeat(64);
@@ -31,8 +33,9 @@ test("document registry limits template bindings to supported sources", () => {
   assert.equal(DOCUMENT_REGISTRY["architecture-assessment"]?.sourceAvailability, "available");
   assert.equal(DOCUMENT_REGISTRY["cost-estimate"]?.sourceAvailability, "available");
   assert.equal(DOCUMENT_REGISTRY["deployment-summary"]?.renderer, "deployment-summary-v1");
+  assert.equal(DOCUMENT_REGISTRY["operations-runbook"]?.renderer, "operations-runbook-v1");
   assert.equal(DOCUMENT_REGISTRY["resource-inventory-template"]?.templateAvailability, "reference-only");
-  for (const documentId of ["governance-constraints", "implementation-plan", "operations-runbook"]) {
+  for (const documentId of ["governance-constraints", "implementation-plan"]) {
     assert.equal(DOCUMENT_REGISTRY[documentId]?.sourceAvailability, "unavailable");
     assert.equal(DOCUMENT_REGISTRY[documentId]?.templateAvailability, "reference-only");
   }
@@ -238,6 +241,49 @@ test("ADR rendering preserves explicit alternatives and consequences without inv
   const missingRecords = { ...architecture };
   delete missingRecords.decisionRecords;
   assert.throws(() => renderArchitectureDecisionRecords(missingRecords, hash("a")), /unavailable/);
+});
+
+test("operations runbook renders explicit ownership and untested recovery without claiming execution", () => {
+  const diagnosis: DiagnosisV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    runId: "run",
+    diagnosedAt: "2026-09-21T00:00:00Z",
+    status: "unknown",
+    observations: [],
+    causes: [],
+    operationalHandoff: {
+      owner: "Operations",
+      escalation: "On-call",
+      maintenanceWindow: "Sunday UTC",
+      accessPrerequisites: ["Read monitoring"],
+      configurationReferences: [{ name: "ENDPOINT", source: "Deployment output" }],
+      healthChecks: [{ resourceId: "/api", check: "Read /health", expectedOutcome: "HTTP 200", evidenceRefs: [] }],
+      monitoring: "Review alert workspace",
+      incidentResponse: {
+        applicability: "applicable",
+        owner: "On-call",
+        prerequisites: ["Incident declared"],
+        steps: ["Inspect service metrics"],
+        verification: "Record findings",
+        executionStatus: "untested",
+      },
+      rollback: {
+        applicability: "not-applicable",
+        rationale: "Replacement requires a new reviewed infrastructure change",
+      },
+      recovery: { applicability: "not-applicable", rationale: "State is owned by another service" },
+      limitations: ["No restore exercise evidence"],
+    },
+  };
+  const output = renderOperationsRunbook(diagnosis, hash("a"));
+  assert.equal(output, renderOperationsRunbook(diagnosis, hash("a")));
+  assert.match(output, /Execution status: untested/);
+  assert.match(output, /not establish that these checks ran or passed/);
+  assert.match(output, /State is owned by another service/);
+  const missing = { ...diagnosis };
+  delete missing.operationalHandoff;
+  assert.throws(() => renderOperationsRunbook(missing, hash("a")), /unavailable/);
 });
 
 test("deployment summary distinguishes recorded evidence from live and operational claims", () => {

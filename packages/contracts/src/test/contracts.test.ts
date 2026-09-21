@@ -399,6 +399,44 @@ describe("Wave 1 contracts", () => {
       assert.equal(Value.Check(schema, changed), false);
   });
 
+  it("operational handoff describes procedures without asserting unobserved execution", () => {
+    const procedure = {
+      applicability: "applicable",
+      owner: "Operations",
+      prerequisites: ["Approved maintenance"],
+      steps: ["Follow resource-specific procedure"],
+      verification: "Verify expected health",
+      executionStatus: "untested",
+    };
+    const handoff = {
+      owner: "Operations",
+      escalation: "On-call escalation",
+      maintenanceWindow: "Sunday 02:00 UTC",
+      accessPrerequisites: ["Read-only monitoring role"],
+      configurationReferences: [{ name: "SERVICE_ENDPOINT", source: "Deployment output reference" }],
+      healthChecks: [
+        { resourceId: "/resource", check: "Inspect health endpoint", expectedOutcome: "Healthy", evidenceRefs: [] },
+      ],
+      monitoring: "Review target workspace alerts",
+      incidentResponse: procedure,
+      rollback: procedure,
+      recovery: {
+        applicability: "not-applicable",
+        rationale: "Stateless component; persistent data is externally owned",
+      },
+      limitations: ["Procedures have not been exercised"],
+    };
+    const schema = DiagnosisV1Schema.properties.operationalHandoff;
+    assert.equal(Value.Check(schema, handoff), true);
+    for (const changed of [
+      { ...handoff, recovery: { applicability: "not-applicable" } },
+      { ...handoff, rollback: { ...procedure, executionStatus: "tested" } },
+      { ...handoff, healthChecks: [] },
+      { ...handoff, approval: true },
+    ])
+      assert.equal(Value.Check(schema, changed), false);
+  });
+
   it("uses one explicit persisted contract version", () => {
     const lock: RuntimeBundleLockV1 = {
       schemaVersion: CONTRACT_VERSION,

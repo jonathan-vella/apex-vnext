@@ -135,7 +135,7 @@ remain intact. APEX does not automatically merge prose into requirements or sync
 | `apex reconcile`       | None                                                                                             |
 | `apex inventory`       | None                                                                                             |
 | `apex diagnose`        | None                                                                                             |
-| `apex render`          | `--kind` with status, requirements, preview, approval, inventory, deployment-summary, or architecture-decisions |
+| `apex render`          | `--kind` with status, requirements, preview, approval, inventory, deployment-summary, architecture-decisions, or operations-runbook |
 
 Only a human-authorized operator should run gate or deployment mutations. A preview must match the selected IaC track.
 
@@ -146,6 +146,12 @@ operational evidence gaps. It does not query Azure, establish live execution ind
 `apex render --kind architecture-decisions` renders explicit `decisionRecords` from accepted Architecture data, including
 requirement links, alternatives, consequences, WAF impacts and implementation notes. Missing structured records return
 an unavailable error. Acceptance as an Architecture artifact is not Gate 2 approval or proof of implementation.
+
+`apex render --kind operations-runbook` projects optional `operationalHandoff` data from accepted Diagnosis: ownership,
+escalation, access prerequisites, configuration references, health checks, monitoring, incident response, rollback,
+recovery and limitations. Health checks must reference the recorded inventory and only task-pinned evidence.
+Procedures are explicitly untested, or not applicable with a rationale. Rendering neither runs procedures nor establishes
+that checks passed. Submit handoff data through the existing diagnosis task's typed output; missing data remains unavailable.
 
 ## Capabilities, Transfers, Evidence, And Quality
 

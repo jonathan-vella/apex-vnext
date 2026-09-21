@@ -27,6 +27,10 @@ Use this skill only in the interactive Operator agent.
 4. Direct the user to `apex gate decide` and `apex deploy`; those trusted CLI ceremonies are not MCP tools.
 5. Report provider and kernel results without claiming transactional rollback, live Azure diagnostics, or a diagnosis
    beyond the returned bounded status and doctor checks.
+   For a requested runbook, use `apex/render` with `kind: operations-runbook`. It requires accepted Diagnosis
+   `operationalHandoff` data; absence is a blocker, not permission to invent operational readiness. Workload owners can
+   supply typed handoff data through the existing diagnosis task completion path. Keep procedures explicitly untested,
+   health checks bound to recorded resources, configuration as references, and evidence pinned to the task.
 6. For governance selection, call `apex/governanceSelect` with the local reviewed path. Present `request.governance`
    questions and record the exact answer with `apex/recordInput`. Reuse is recommended below 30 days; refresh remains
    optional there and is the only option at 30 days. Remembered choices return `status=selected`; do not re-ask.

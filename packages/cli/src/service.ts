@@ -44,6 +44,7 @@ import {
   type ArchitectureV1,
   type CostEstimateV1,
   type DeploymentPreviewV1,
+  type DiagnosisV1,
   type EnvironmentInputsV1,
   type GovernanceConstraintsV1,
   type GovernanceObservationReceiptV1,
@@ -142,6 +143,7 @@ import {
   renderRequirementsDocument,
   renderResourceInventory,
   renderRunStatus,
+  renderOperationsRunbook,
   renderWafAssessmentDiagram,
   type DiagramSource,
 } from "@apexops/renderers";
@@ -3420,6 +3422,14 @@ export class ApexService {
     if (descriptor.id === "plan-review") {
       await this.materializePlanChallengeFindings(run, outputs[0]!.value as ReviewFindingsV1);
     }
+    if (descriptor.id === "diagnosis") {
+      const diagnosis = outputs.find(({ kind }) => kind === "diagnosis")!.value as DiagnosisV1;
+      if (diagnosis.operationalHandoff !== undefined)
+        await this.writeGeneratedReview(
+          join(this.operationsReviewDirectory(run), "operations-runbook.md"),
+          Buffer.from(renderOperationsRunbook(diagnosis, outputHashes.diagnosis!), "utf8"),
+        );
+    }
     if (descriptor.reviewSubject !== undefined) {
       await this.materializeReviewerSummary(run, descriptor.reviewSubject, outputs[0]!.value as ReviewFindingsV1);
     }
@@ -3517,6 +3527,7 @@ export class ApexService {
         "challenger-findings.md",
       ].map((name) => `plan/${name}`);
     if (descriptor.id.startsWith("validation-")) files = ["validation/validation-report.md"];
+    if (descriptor.id === "diagnosis") files = ["operations/operations-runbook.md"];
     if (descriptor.reviewSubject !== undefined) {
       files.push(`reviews/${descriptor.reviewSubject}-findings.md`);
       if (descriptor.reviewSubject === "requirements") files.push("challenger-findings.md");
@@ -5482,6 +5493,7 @@ export class ApexService {
       | "approval"
       | "inventory"
       | "deployment-summary"
+      | "operations-runbook"
       | "architecture-decisions",
   ): Promise<string> {
     const run = await this.currentRun();
@@ -5489,6 +5501,15 @@ export class ApexService {
     const events = await this.journal(run).replay();
     if (kind === "deployment-summary") {
       return this.renderCompletedDeploymentSummary(run, events);
+    }
+    if (kind === "operations-runbook") {
+      const hash = this.artifactHash(events, "diagnosis");
+      if (hash === undefined)
+        throw new ApexError("APEX_NOT_FOUND", "No accepted Diagnosis exists", EXIT_CODES.notFound);
+      const diagnosis = await this.objects.getJson<DiagnosisV1>(hash);
+      if (diagnosis.operationalHandoff === undefined)
+        throw new ApexError("APEX_NOT_FOUND", "Accepted Diagnosis has no operational handoff", EXIT_CODES.notFound);
+      return renderOperationsRunbook(diagnosis, hash);
     }
     if (kind === "architecture-decisions") {
       const hash = this.artifactHash(events, "architecture");
