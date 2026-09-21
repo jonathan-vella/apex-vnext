@@ -8,6 +8,13 @@ import * as yaml from "js-yaml";
 import { VNEXT_QUALIFICATION_REPOSITORY } from "./_lib/vnext-qualification.mjs";
 
 const WORKFLOW = ".github/workflows/vnext-live-qualification.yml";
+const ACTION_CONTRACT = JSON.parse(readFileSync("tools/registry/github-workflow-contract.json", "utf8"));
+const action = (name) => `${name}@${ACTION_CONTRACT.actionVersions[name].sha}`;
+const CHECKOUT_ACTION = action("actions/checkout");
+const LOGIN_ACTION = action("azure/login");
+const TERRAFORM_ACTION = action("hashicorp/setup-terraform");
+const SCRIPT_ACTION = action("actions/github-script");
+const UPLOAD_ACTION = action("actions/upload-artifact");
 const PROTECTED = ["apply"];
 const REQUIRED_VARS = [
   "APEX_CONTROL_RESOURCE_GROUP",
@@ -90,7 +97,7 @@ export function validateWorkflowText(text) {
   fail(jobs.apply?.needs === "validate_dispatch", "apply must need validate_dispatch");
   fail(jobs.apply?.if === undefined, "apply must not bypass dispatch validation");
   for (const name of ["validate_dispatch", ...PROTECTED]) {
-    const checkoutSteps = steps(jobs[name]).filter((step) => step.uses === "actions/checkout@v7");
+    const checkoutSteps = steps(jobs[name]).filter((step) => step.uses === CHECKOUT_ACTION);
     fail(
       checkoutSteps.length === 1 &&
         checkoutSteps[0].with?.ref === "${{ inputs.candidate_sha }}" &&
@@ -112,7 +119,7 @@ export function validateWorkflowText(text) {
     "exact lowercase SHA or preview hash guard missing",
   );
   fail(validation.includes("[0-9a-f]{8}-[0-9a-f]{4}-4"), "handoff UUID guard missing");
-  fail(uses(jobs.validate_dispatch).includes("actions/checkout@v7"), "validation checkout must use v7");
+  fail(uses(jobs.validate_dispatch).includes(CHECKOUT_ACTION), "validation checkout must use the approved pin");
   fail(!text.includes("APEX_PLAN_TRANSPORT_KEY"), "manual transport key is forbidden");
 
   for (const name of PROTECTED) {
@@ -132,11 +139,11 @@ export function validateWorkflowText(text) {
       `${name} isolated APEX runtime missing`,
     );
     fail(job?.["timeout-minutes"] > 0, `${name} timeout missing`);
-    fail(actions.includes("actions/checkout@v7"), `${name} exact checkout action missing`);
+    fail(actions.includes(CHECKOUT_ACTION), `${name} exact checkout action missing`);
     fail(actions.includes("./.github/actions/setup-node-repo"), `${name} setup action missing`);
-    fail(actions.includes("azure/login@v3"), `${name} Azure login version invalid`);
-    fail(actions.includes("hashicorp/setup-terraform@v4"), `${name} Terraform setup version invalid`);
-    fail(actions.includes("actions/github-script@v9"), `${name} OIDC script version invalid`);
+    fail(actions.includes(LOGIN_ACTION), `${name} Azure login version invalid`);
+    fail(actions.includes(TERRAFORM_ACTION), `${name} Terraform setup version invalid`);
+    fail(actions.includes(SCRIPT_ACTION), `${name} OIDC script version invalid`);
     fail(script.includes("git rev-parse HEAD"), `${name} does not verify checked out HEAD`);
     const atRest = steps(job).find((step) => step.name === "Validate at-rest endpoint boundary");
     fail(
@@ -214,7 +221,7 @@ export function validateWorkflowText(text) {
     const oidc = steps(job).find((step) => step.name === "Acquire ARM OIDC token");
     fail(
       oidc?.id === "arm_oidc" &&
-        oidc.uses === "actions/github-script@v9" &&
+        oidc.uses === SCRIPT_ACTION &&
         oidc.with?.["result-encoding"] === "string" &&
         oidc.with?.script?.includes("return token") &&
         !oidc.with?.script?.includes("exportVariable"),
@@ -224,7 +231,7 @@ export function validateWorkflowText(text) {
     const refreshedId = "deploy_oidc";
     fail(
       refreshedOidc?.id === refreshedId &&
-        refreshedOidc.uses === "actions/github-script@v9" &&
+        refreshedOidc.uses === SCRIPT_ACTION &&
         refreshedOidc.with?.["result-encoding"] === "string" &&
         refreshedOidc.with?.script?.includes("return token"),
       `${name} refreshed ARM token step missing`,
@@ -320,7 +327,7 @@ export function validateWorkflowText(text) {
   );
   const returnFallback = applySteps.find((step) => step.name === "Upload bound return fallback");
   fail(
-    returnFallback?.uses === "actions/upload-artifact@v7" &&
+    returnFallback?.uses === UPLOAD_ACTION &&
       returnFallback.with?.path === "apex-live/return-authority.json" &&
       returnFallback.with?.["retention-days"] === 1 &&
       returnFallback.with?.["compression-level"] === 0 &&
@@ -330,7 +337,7 @@ export function validateWorkflowText(text) {
   );
   const evidence = applySteps.find((step) => step.name === "Upload apply evidence");
   fail(
-    evidence?.uses === "actions/upload-artifact@v7" &&
+    evidence?.uses === UPLOAD_ACTION &&
       evidence.with?.path === "apex-live/evidence/" &&
       evidence.with?.["retention-days"] === 1 &&
       evidence.with?.["compression-level"] === 0 &&
@@ -338,10 +345,7 @@ export function validateWorkflowText(text) {
       evidence.with?.["if-no-files-found"] === "error",
     "apply evidence artifact invalid",
   );
-  fail(
-    uses(jobs.apply).filter((action) => action === "actions/upload-artifact@v7").length >= 2,
-    "apply artifacts invalid",
-  );
+  fail(uses(jobs.apply).filter((value) => value === UPLOAD_ACTION).length >= 2, "apply artifacts invalid");
 
   const combined = text;
   const forbidden = [
@@ -354,7 +358,7 @@ export function validateWorkflowText(text) {
   ];
   for (const pattern of forbidden) fail(!pattern.test(combined), `forbidden direct mutation found: ${pattern}`);
   const artifactPaths = steps(jobs.apply)
-    .filter((step) => step.uses === "actions/upload-artifact@v7")
+    .filter((step) => step.uses === UPLOAD_ACTION)
     .map((step) => String(step.with?.path ?? ""))
     .join("\n");
   fail(

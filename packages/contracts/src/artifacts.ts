@@ -76,6 +76,39 @@ export const IacBindingV1Schema = Type.Object(
           implementation: NonEmptyStringSchema,
           version: NonEmptyStringSchema,
           parameters: Type.Record(NonEmptyStringSchema, Type.Unknown()),
+          physicalResources: Type.Optional(
+            Type.Array(
+              Type.Object(
+                {
+                  resourceId: Type.String({
+                    minLength: 1,
+                    maxLength: 2048,
+                    pattern: [
+                      "^/[sS][uU][bB][sS][cC][rR][iI][pP][tT][iI][oO][nN][sS]/",
+                      "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/",
+                      "[rR][eE][sS][oO][uU][rR][cC][eE][gG][rR][oO][uU][pP][sS]/[A-Za-z0-9_()-][A-Za-z0-9_.()-]*/",
+                      "[pP][rR][oO][vV][iI][dD][eE][rR][sS]/[A-Za-z0-9_.()/-]+$(?![\\s\\S])",
+                    ].join(""),
+                  }),
+                  type: Type.String({
+                    minLength: 1,
+                    maxLength: 256,
+                    pattern:
+                      "^[mM][iI][cC][rR][oO][sS][oO][fF][tT]\\.[A-Za-z0-9.]+(?:/[A-Za-z][A-Za-z0-9]*)+$(?![\\s\\S])",
+                  }),
+                  ownership: Type.Union([Type.Literal("managed"), Type.Literal("existing")]),
+                  role: Type.Union([Type.Literal("primary"), Type.Literal("ancillary")]),
+                },
+                { additionalProperties: false },
+              ),
+              {
+                minItems: 1,
+                maxItems: 128,
+                uniqueItems: true,
+                description: "Accepted intended authorization scope, not observed resource attribution.",
+              },
+            ),
+          ),
         },
         { additionalProperties: false },
       ),

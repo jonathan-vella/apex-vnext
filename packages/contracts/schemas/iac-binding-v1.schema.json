@@ -26,6 +26,61 @@
               },
               "type": "object"
             },
+            "physicalResources": {
+              "description": "Accepted intended authorization scope, not observed resource attribution.",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "ownership": {
+                    "anyOf": [
+                      {
+                        "const": "managed",
+                        "type": "string"
+                      },
+                      {
+                        "const": "existing",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "resourceId": {
+                    "maxLength": 2048,
+                    "minLength": 1,
+                    "pattern": "^/[sS][uU][bB][sS][cC][rR][iI][pP][tT][iI][oO][nN][sS]/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/[rR][eE][sS][oO][uU][rR][cC][eE][gG][rR][oO][uU][pP][sS]/[A-Za-z0-9_()-][A-Za-z0-9_.()-]*/[pP][rR][oO][vV][iI][dD][eE][rR][sS]/[A-Za-z0-9_.()/-]+$(?![\\s\\S])",
+                    "type": "string"
+                  },
+                  "role": {
+                    "anyOf": [
+                      {
+                        "const": "primary",
+                        "type": "string"
+                      },
+                      {
+                        "const": "ancillary",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "type": {
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "pattern": "^[mM][iI][cC][rR][oO][sS][oO][fF][tT]\\.[A-Za-z0-9.]+(?:/[A-Za-z][A-Za-z0-9]*)+$(?![\\s\\S])",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "resourceId",
+                  "type",
+                  "ownership",
+                  "role"
+                ],
+                "type": "object"
+              },
+              "maxItems": 128,
+              "minItems": 1,
+              "type": "array",
+              "uniqueItems": true
+            },
             "version": {
               "minLength": 1,
               "type": "string"

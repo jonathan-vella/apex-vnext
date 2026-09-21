@@ -23,8 +23,8 @@
       "description": "Validation and lint scripts registered in the npm suite"
     },
     "vscode_extensions": {
-      "computed_from": ".devcontainer/devcontainer.json customizations.vscode.extensions[]",
-      "description": "Pre-installed VS Code extensions in the dev container"
+      "computed_from": ".vscode/extensions.json recommendations[]",
+      "description": "Approved VS Code workspace extension recommendations"
     },
     "golden_principles": {
       "value": 10,

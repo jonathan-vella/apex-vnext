@@ -173,7 +173,7 @@ test("init installs bundled customizations and runtime config by default", async
   };
   assert.deepEqual(
     registry.packs.map(({ id }) => id),
-    ["azure-governance-discovery"],
+    [],
   );
   for (const pack of registry.packs) {
     const source = join(root, ".apex", "runtime", pack.artifact.spec);
@@ -213,7 +213,8 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(requirementsAgent, /target: github-copilot/u);
   assert.match(requirementsAgent, /model: GPT-5\.6 Sol/u);
   assert.match(requirementsAgent, /- ask_user/u);
-  assert.match(requirementsAgent, /- task/u);
+  assert.doesNotMatch(requirementsAgent, /\n\s+- task\s*\n/u);
+  assert.match(requirementsAgent, /foreground agent using `ask_user`/u);
   assert.doesNotMatch(requirementsAgent, /vscode\/askQuestions|handoffs:|agents:/u);
   const plannerAgent = await readFile(join(root, ".github", "agents", "apex-planner.agent.md"), "utf8");
   assert.match(plannerAgent, /- apex\/planComplete/u);
@@ -225,7 +226,9 @@ test("init installs only the selected Copilot CLI projection and records it in t
   const coordinatorAgent = await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8");
   assert.match(coordinatorAgent, /- apex\/projectCreate/u);
   assert.match(coordinatorAgent, /- apex\/gateDecide/u);
-  assert.match(coordinatorAgent, /Use `ask_user` for kernel-owned input requests/u);
+  assert.match(coordinatorAgent, /Use `ask_user` only for project lifecycle or routing choices, never intake/u);
+  assert.match(coordinatorAgent, /select `APEX Requirements` as the foreground agent/u);
+  assert.doesNotMatch(coordinatorAgent, /\n\s+- task\s*\n/u);
   assert.match(coordinatorAgent, /request\.intake.*hand off to `APEX Requirements`/su);
   assert.match(coordinatorAgent, /replace the active project.*apex\/projectCreate.*apex\/projectDelete/su);
   assert.match(coordinatorAgent, /If creation does not succeed, stop and report its result/u);
@@ -340,16 +343,14 @@ test("init installs only the selected Copilot CLI projection and records it in t
   await assert.rejects(readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"), /ENOENT/u);
 });
 
-test("legacy locks default to VS Code and custom sources require explicit updates", async () => {
+test("missing customization selection fails closed and custom sources require explicit updates", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
   await service.init({ projectId: "demo" });
   await rm(join(root, ".apex", "customizations.selection.json"));
-  const lockPath = join(root, ".apex", "customizations.lock.json");
-  const lock = JSON.parse(await readFile(lockPath, "utf8")) as Record<string, unknown>;
-  delete lock.clientId;
-  await writeFile(lockPath, `${JSON.stringify(lock)}\n`);
-  await service.update();
+  await assert.rejects(service.update(), /Customization selection is missing/);
+  await assert.rejects(service.reinstallCustomizations(), /Customization selection is missing/);
+  await assert.rejects(service.doctor(true, true), /Customization selection is missing/);
   assert.ok(await stat(join(root, ".vscode", "mcp.json")));
 
   const customRoot = await tempRoot();
@@ -587,7 +588,7 @@ test("init writes a real runtime lock and doctor detects managed tampering", asy
       /^[a-f0-9]{64}$/.test(hash),
     ),
   );
-  assert.ok(lock.requiredCapabilityPacks.includes("azure-governance-discovery"));
+  assert.deepEqual(lock.requiredCapabilityPacks, []);
   assert.equal((await service.status()).run.runId, initialized.runId);
   await writeFile(join(root, ".apex", "runtime", "defaults.v1.json"), "{}\n");
   const doctor = await service.doctor();
@@ -622,7 +623,7 @@ test("existing runs use their immutable runtime generation", async () => {
   assert.equal((await service.nextTask()).status, "needs_input");
 });
 
-test("doctor leaves unrelated core routes unaffected and service reports required workflow packs", async () => {
+test("doctor and core routes work without shipped governance discovery packs", async () => {
   const root = await tempRoot();
   const service = new ApexService(root, {
     executableChecker: async () => true,
@@ -635,24 +636,10 @@ test("doctor leaves unrelated core routes unaffected and service reports require
     false,
   );
   assert.equal(runId.length > 0, true);
-  const governance = (await service.capabilityStatus("azure-governance-discovery")) as {
-    state: string;
-    reason?: string;
-    requiredWorkflows: string[];
-    action: string;
-  };
-  assert.equal(governance.state, "not-installed");
-  assert.equal(governance.reason, undefined);
-  assert.deepEqual(governance.requiredWorkflows, [
-    "governance-discovery",
-    "governance-reconciliation",
-    "preview-bicep",
-    "preview-terraform",
-  ]);
-  assert.match(governance.action, /capability install/);
+  await assert.rejects(service.capabilityStatus("azure-governance-discovery"));
   const listed = (await service.capabilityList()) as Array<{ id: string; state: string }>;
   assert.deepEqual(
     listed.map(({ id, state }) => ({ id, state })),
-    [{ id: "azure-governance-discovery", state: "not-installed" }],
+    [],
   );
 });

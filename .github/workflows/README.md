@@ -5,20 +5,38 @@
 
 ## At a glance
 
-| Workflow                                                           | Trigger                       | Purpose                                                                                                                    | Side effects                                                         |
-| ------------------------------------------------------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| [`ci.yml`](ci.yml)                                                 | PR + push to `main`           | Required code check: formatting, Node validators, hook tests, and deterministic vNext qualification.                     | None — fails the PR on regression.                                   |
-| [`branch-enforcement.yml`](branch-enforcement.yml)                 | PR to `main`                  | Runs canonical branch naming and strict file-scope policy so PRs stay reviewable.                                           | None — fails the PR on violation.                                    |
-| [`docs.yml`](docs.yml) | PR + push to `main` (Markdown) | Validate documentation links and freshness; required CI owns Markdown lint. | None - fails on documentation regression. |
-| [`governance-policy-baseline.yml`](governance-policy-baseline.yml) | Weekly Mon 05:00 UTC + manual | Refresh `.github/data/governance-policy-baseline.json` from a live subscription.                                           | Opens a PR (manual review + merge required) when baseline drifts.    |
-| [`release-candidate-qualification.yml`](release-candidate-qualification.yml) | Release-relevant PR/push + manual | Run the release-unique exact-head scorecard after required CI proves validators, tests, and packaging. | Uploads a compact evidence bundle; cannot deploy, merge, publish, tag, or authorize cutover. |
-| [`sensei-branch-maintenance.yml`](sensei-branch-maintenance.yml)   | Weekly Mon 08:00 UTC + manual | Keep `feat/skills-sensei` long-lived branch healthy: merge `main` weekly, run validators, file issue if branch is missing. | Pushes merge commit to `feat/skills-sensei`; may open issue.         |
-| [`vnext-live-qualification.yml`](vnext-live-qualification.yml)     | Manual only; default-branch bootstrap required | Import a locally approved exact Bicep or Terraform preview and run sandbox apply/destroy.                               | Opens a bounded backend session and mutates qualification resources after local APEX Gate 4 approval. |
-| [`weekly-maintenance.yml`](weekly-maintenance.yml)                 | Weekly Mon 06:00 UTC + manual | Consolidated data-refresh + audit umbrella — see [Weekly Maintenance](#weekly-maintenance) below.                          | Opens PRs (refresh jobs, manual merge) + GitHub issues (audit jobs). |
+| Workflow                                                                     | Trigger                                        | Purpose                                                                                                | Side effects                                                                                          |
+| ---------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| [`ci.yml`](ci.yml)                                                           | PR + push to `main`                            | Required code check: formatting, Node validators, hook tests, and deterministic vNext qualification.   | None — fails the PR on regression.                                                                    |
+| [`branch-enforcement.yml`](branch-enforcement.yml)                           | PR to `main`                                   | Runs canonical branch naming and strict file-scope policy so PRs stay reviewable.                      | None — fails the PR on violation.                                                                     |
+| [`docs.yml`](docs.yml)                                                       | PR + push to `main` (Markdown)                 | Validate documentation links and freshness; required CI owns Markdown lint.                            | None - fails on documentation regression.                                                             |
+| [`governance-policy-baseline.yml`](governance-policy-baseline.yml)           | Weekly Mon 05:00 UTC + manual                  | Refresh `.github/data/governance-policy-baseline.json` from a live subscription.                       | Opens a PR (manual review + merge required) when baseline drifts.                                     |
+| [`release-candidate-qualification.yml`](release-candidate-qualification.yml) | Release-relevant PR/push + manual              | Run the release-unique exact-head scorecard after required CI proves validators, tests, and packaging. | Uploads a compact evidence bundle; cannot deploy, merge, publish, tag, or authorize cutover.          |
+| [`vnext-live-qualification.yml`](vnext-live-qualification.yml)               | Manual only; default-branch bootstrap required | Import a locally approved exact Bicep or Terraform preview and run sandbox apply/destroy.              | Opens a bounded backend session and mutates qualification resources after local APEX Gate 4 approval. |
+| [`weekly-maintenance.yml`](weekly-maintenance.yml)                           | Weekly Mon 06:00 UTC + manual                  | Consolidated data-refresh + audit umbrella — see [Weekly Maintenance](#weekly-maintenance) below.      | Opens PRs (refresh jobs, manual merge) + GitHub issues (audit jobs).                                  |
 
-The retired devcontainer CI implementation is preserved in the
-[automation archive](../../.archive/retired-automation/devcontainer-base-v1/README.md). Do not restore or dispatch it
-without a new explicit decision.
+Devcontainer CI and obsolete long-lived branch maintenance are retired. Ordinary feature integration uses reviewed
+pull requests and the required CI checks. Windows development uses WSL2; no retired workflow is an execution authority.
+
+## Updating Action Pins
+
+Keep third-party Actions pinned to full commit SHAs, with release comments for readability. Dependabot already proposes
+weekly updates through [the repository configuration](../dependabot.yml); review the upstream release and commit before
+accepting its changes. Shared Node and Python setup actions keep their dependency pins in one place.
+
+For a pin-only update:
+
+1. Review the proposed SHA and release comment in the workflow or shared action YAML.
+2. Update that Action's `release` and `sha` entry in
+   [the approved-pin registry](../../tools/registry/github-workflow-contract.json), keeping its consumers consistent.
+3. Run `npm run validate:github-workflows`, `npm run test:github-workflows`, and
+   `npm run validate:vnext-live-workflow` before submitting the PR for review.
+
+Do not regenerate workflow hashes for an Action revision change. Job and shared-action digests bind parsed YAML
+structure, replacing only full SHAs in executable `uses` references with a stable marker. Exact approved SHAs are
+checked separately, so mutable tags and unapproved revisions still fail. Release comments are documentation, not
+authorization. Permissions, triggers, commands, conditions, inputs, artifact paths, and approval controls remain bound;
+changes to those require their own reviewed contract update. Nothing is auto-merged.
 
 ## Weekly Maintenance
 
@@ -28,12 +46,12 @@ maintenance tasks. It folds in the retired `azure-deprecation-tracker.yml`
 PR-driven `refresh-avm-module-index` job), and the standalone weekly
 link-check cron (folded May 2026).
 
-| Job                           | What it does                                                                                                                             | Output                                                                                                                                                                                        |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `refresh-avm-module-index`    | Fetches canonical AVM module indexes (Bicep + Terraform), pre-warms the per-module version cache used by `validate:avm-versions:freeze`. | PR (manual merge) updating `.github/data/avm-bicep-modules.csv`, `.github/data/avm-terraform-modules.csv`, `.github/data/avm-module-index.json`, `tools/scripts/_data/avm-module-cache.json`. |
-| `track-deprecations`          | Pulls Azure Updates RSS for deprecation notices; merges with the curated `KNOWN_DEPRECATIONS` allowlist.                                 | PR (manual merge) updating `.github/data/azure-deprecations.json`.                                                                                                                            |
-| `docs-freshness`              | Runs `npm run audit:quarterly` (glob-audit + orphan-content + docs-freshness).                                                           | Opens or updates a GitHub issue on regression.                                                                                                                                                |
-| `link-check` | Runs `lint:links` against root Markdown and `docs/**` as a scheduled safety net. | Fails the workflow run on broken links. |
+| Job                        | What it does                                                                                                                             | Output                                                                                                                                                                                        |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `refresh-avm-module-index` | Fetches canonical AVM module indexes (Bicep + Terraform), pre-warms the per-module version cache used by `validate:avm-versions:freeze`. | PR (manual merge) updating `.github/data/avm-bicep-modules.csv`, `.github/data/avm-terraform-modules.csv`, `.github/data/avm-module-index.json`, `tools/scripts/_data/avm-module-cache.json`. |
+| `track-deprecations`       | Pulls Azure Updates RSS for deprecation notices; merges with the curated `KNOWN_DEPRECATIONS` allowlist.                                 | PR (manual merge) updating `.github/data/azure-deprecations.json`.                                                                                                                            |
+| `docs-freshness`           | Runs `npm run audit:quarterly` (glob-audit + orphan-content + docs-freshness).                                                           | Opens or updates a GitHub issue on regression.                                                                                                                                                |
+| `link-check`               | Runs `lint:links` against root Markdown and `docs/**` as a scheduled safety net.                                                         | Fails the workflow run on broken links.                                                                                                                                                       |
 
 ### Permissions model
 
@@ -73,7 +91,6 @@ behind each other on the free-tier runner pool. All times UTC.
 | ------ | ----- | -------------------------------- |
 | Monday | 05:00 | `governance-policy-baseline.yml` |
 | Monday | 06:00 | `weekly-maintenance.yml`         |
-| Monday | 08:00 | `sensei-branch-maintenance.yml`  |
 
 ## See also
 

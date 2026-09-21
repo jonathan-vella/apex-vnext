@@ -12,7 +12,7 @@ If matched, invoke the corresponding skill **immediately** — it has tested tem
 | User prompt mentions                                                        | Action                                                                                                                                 |
 | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Lambda, AWS Lambda, migrate AWS, migrate GCP, Lambda to Functions           | **Invoke azure-cloud-migrate skill NOW** → then resume azure-prepare at Step 4                                                         |
-| Azure Functions, function app, serverless function, timer trigger, func new | Stay in **azure-prepare**. When selecting compute, **prefer Azure Functions** templates and best practices, then continue from Step 4. |
+| Azure Functions, function app, serverless function, timer trigger, func new | Stay in **azure-prepare**. Complete bounded assessment, record materialization as blocked future work, and stop before recipe selection. |
 
 > ⚠️ Check the user's **prompt text** — not just existing code. This is critical for greenfield projects with no codebase. See [full routing table](specialized-routing.md).
 
@@ -92,14 +92,15 @@ Converting an existing application to run on Azure.
 
 ---
 
-## ⛔ MANDATORY for Azure Functions: Load Composition Rules BEFORE Execution
+## Azure Functions Assessment Boundary
 
-**If the target compute is Azure Functions**, you MUST load the composition algorithm before generating ANY infrastructure:
+If the target compute is Azure Functions, stop before recipe selection or infrastructure generation:
 
-1. Load `services/functions/templates/selection.md` — decision tree for base template + recipe
-2. Load `services/functions/templates/recipes/composition.md` — the exact algorithm to follow
-3. Use `azd init -t <template>` to generate proven IaC — **NEVER hand-write Bicep/Terraform**
+1. Load `services/functions/README.md` — current hosting, trigger, identity, and observability assessment guidance
+2. Record the selected hosting model and required supporting resources as assessment findings
+3. Record implementation materialization as a blocked future backlog item owned by a reviewed capability
+4. Do not select a template, generate IaC, initialize an azd template, or mark the plan ready for validation
 
-> ⚠️ **Critical**: The Functions `bicep.md` and `terraform.md` files are **REFERENCE DOCUMENTATION**, not templates to copy. Hand-writing infrastructure from these patterns results in missing RBAC, incorrect managed identity configuration, and security vulnerabilities.
+The Functions `bicep.md` and `terraform.md` files are assessment references only. They do not authorize code generation.
 
 For other compute targets (Container Apps, App Service, Static Web Apps), load their respective README files in `services/` for guidance.

@@ -4,8 +4,7 @@
 
 Choose the deployment recipe based on project needs and existing tooling.
 
-> **See also**: [azd vs deploy.ps1 guide](../../iac-common/references/azd-vs-deploy-guide.md)
-> for detailed comparison, per-project conventions, hooks, and troubleshooting.
+> Deployment execution remains owned by `azure-deploy`; recipe selection does not authorize deployment.
 
 ## ⛔ Special Cases: Detect First
 

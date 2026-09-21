@@ -59,13 +59,13 @@ Artifact generation flow (per Step N):
 5. **Save** to `agent-output/{project}/` with the prescribed filename
 6. **Update README** — mark step complete, list artifacts, refresh `Last Updated` date
 7. **Delegate validation** — do **not** invoke `npm run validate:artifacts`
-  or `markdownlint-cli2` directly against
+   or `markdownlint-cli2` directly against
    `agent-output/**`. The lefthook `artifact-validation` pre-commit hook (which
    wraps these scripts) and the `10-Challenger` review own the artifact
    contract. See
-   [`agent-authoring.instructions.md`](../../instructions/agent-authoring.instructions.md#no-direct-markdownlint-on-agent-output-rule).
+   [`agent-authoring.instructions.md`](../../../customizations/.github/instructions/apex-agent-authoring.instructions.md).
 
-For revisions (challenger findings, user-decision Apply/Skip/Defer, approval-gate fixes), see [`references/revision-workflow.md`](./references/revision-workflow.md) — bundle all fixes into a single `multi_replace_string_in_file` call.
+For revisions (challenger findings, user-decision Apply/Skip/Defer, approval-gate fixes), see [`references/revision-workflow.md`](../../../customizations/.github/skills/apex-artifacts/SKILL.md) — bundle all fixes into a single `multi_replace_string_in_file` call.
 
 ## Post-write validation
 
@@ -74,14 +74,14 @@ artifact**, before moving to the next step. Catches malformed output at
 source instead of at deploy time. Markdown artifacts are owned by the
 lefthook `artifact-validation` hook — do not duplicate that check here.
 
-| Artifact type                              | Validation command (run after write)                                |
-| ------------------------------------------ | ------------------------------------------------------------------- |
-| `*.json`                                   | `python -m json.tool <file> >/dev/null`                             |
-| `*.bicep`                                  | `bicep build --stdout <file> >/dev/null`                            |
-| `*.tf`                                     | `terraform fmt -check <file>` + `terraform validate` (in module dir) |
-| `challenge-findings-*.json` (sidecar JSON) | `node tools/scripts/validate-challenger-findings.mjs <file>`        |
+| Artifact type                                               | Validation command (run after write)                                  |
+| ----------------------------------------------------------- | --------------------------------------------------------------------- |
+| `*.json`                                                    | `python -m json.tool <file> >/dev/null`                               |
+| `*.bicep`                                                   | `bicep build --stdout <file> >/dev/null`                              |
+| `*.tf`                                                      | `terraform fmt -check <file>` + `terraform validate` (in module dir)  |
+| `challenge-findings-*.json` (sidecar JSON)                  | `node tools/scripts/validate-challenger-findings.mjs <file>`          |
 | `challenge-findings-*-decisions.json` (per-finding sidecar) | `node tools/scripts/validate-challenge-findings-decisions.mjs <file>` |
-| `*.md`                                     | _delegated to lefthook `artifact-validation` — do not run inline_   |
+| `*.md`                                                      | _delegated to lefthook `artifact-validation` — do not run inline_     |
 
 Fail closed: if the validator exits non-zero, fix the artifact and
 re-validate before continuing. Do **not** record the artifact in the
@@ -98,7 +98,7 @@ All templates use single-brace `{placeholder-name}` syntax:
 
 These npm scripts are invoked by the lefthook `artifact-validation` pre-commit
 hook and by CI — **not by agents directly** (see
-[`agent-authoring.instructions.md`](../../instructions/agent-authoring.instructions.md#no-direct-markdownlint-on-agent-output-rule)).
+[`agent-authoring.instructions.md`](../../../customizations/.github/instructions/apex-agent-authoring.instructions.md)).
 
 ```bash
 npm run validate:artifacts # H2 order, required headings, and template sync
@@ -108,7 +108,7 @@ npm run validate:all       # All validators together (humans / CI only)
 ### Fast H2-order sanity check (agent-safe)
 
 When an agent needs a quick "did I get the H2 structure right?" check
-*before* invoking the challenger, use the dedicated helper instead of
+_before_ invoking the challenger, use the dedicated helper instead of
 improvising `node -e '…'` one-liners (which trip shell quoting and waste
 context on retries):
 

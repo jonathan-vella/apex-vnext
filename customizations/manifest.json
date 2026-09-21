@@ -8,6 +8,9 @@
     "generatedRoot": "customizations"
   },
   "managedFiles": [
+    ".github/workflows/governance-policy-baseline.yml",
+    "tools/scripts/collect-governance-baseline.ps1",
+    "tools/schemas/governance-baseline.schema.json",
     ".github/agents/apex.agent.md",
     ".github/agents/apex-requirements.agent.md",
     ".github/agents/apex-architect.agent.md",
@@ -81,7 +84,6 @@
     ".github/skills/apex-bicep-patterns/references/codegen-acceptance-checklist.md",
     ".github/skills/apex-azure-prepare/SKILL.md",
     ".github/skills/apex-azure-prepare/references/preparation-lineage.md",
-    ".github/skills/apex-azure-prepare/references/functions-recipe-pack.md",
     ".github/skills/apex-azure-validate/SKILL.md",
     ".github/skills/apex-azure-validate/references/preflight-evidence.md",
     ".github/skills/apex-azure-validate/references/operational-checklist.md",
@@ -153,7 +155,10 @@
     ".vscode/mcp.json"
   ],
   "sharedFiles": [
-    ".github/copilot-instructions.md"
+    ".github/copilot-instructions.md",
+    ".github/workflows/governance-policy-baseline.yml",
+    "tools/scripts/collect-governance-baseline.ps1",
+    "tools/schemas/governance-baseline.schema.json"
   ],
   "sharedDirectories": [".github/instructions", ".github/skills"],
   "clientProjections": [
@@ -176,7 +181,7 @@
       "role": "coordinator",
       "supportedTargets": ["vscode", "github-copilot"],
       "interactionType": "interactive-handoff",
-      "model": "MAI-Code-1.1-Flash",
+      "model": "MAI-Code-1.1-Flash (copilot)",
       "costTier": "fast"
     },
     {

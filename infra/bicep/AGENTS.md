@@ -14,23 +14,18 @@ entry; per-environment overrides come from
 
 ## Authentication Prerequisites
 
-`az` and `azd` use **independent** MSAL token caches. A valid `az` session does **not**
-authenticate `azd`. Container restarts and new devcontainer sessions can invalidate either
-context. Both must be validated before any `azd` operation.
+`az` authentication is required only for explicitly authorized native provider operations. Confirm its current WSL
+session before a preview or deployment; ordinary builds and linting remain credential-free.
 
-| Tool  | Token cache | Validate with                                                                        |
-| ----- | ----------- | ------------------------------------------------------------------------------------ |
-| `az`  | `~/.azure/` | `az account get-access-token --resource https://management.azure.com/ --output none` |
-| `azd` | `~/.azd/`   | `azd auth login --check-status`                                                      |
+| Tool | Token cache | Validate with |
+| --- | --- | --- |
+| `az` | `~/.azure/` | `az account get-access-token --resource https://management.azure.com/ --output none` |
 
 ```bash
 # Step 1 — Azure CLI (az account show is NOT sufficient; must get a real token)
 az account get-access-token \
   --resource https://management.azure.com/ --output none
 
-# Step 2 — Azure Developer CLI (separate auth context)
-azd auth login --check-status \
-  || azd auth login --use-device-code
 ```
 
 ## Build Commands
@@ -40,17 +35,10 @@ azd auth login --check-status \
 bicep build infra/bicep/{project}/main.bicep
 bicep lint infra/bicep/{project}/main.bicep
 
-# Deploy with azd (preferred — when azure.yaml exists)
-cd infra/bicep/{project}
-azd env new {project}-{env}           # Create environment (e.g., hub-spoke-dev)
-azd env set AZURE_LOCATION swedencentral
-azd provision --preview                # Preview
-azd provision                          # Deploy
-
-# Deploy with deploy.ps1 (DEPRECATED — use azd instead)
-cd infra/bicep/{project}
-pwsh deploy.ps1 -WhatIf
-pwsh deploy.ps1
+# Kernel-authorized native lifecycle
+apex preview --provider bicep --operation apply
+# Approve the required gate, then use the authorized deployment operation.
+apex deploy
 ```
 
 ## Module Structure
@@ -61,12 +49,6 @@ Each project follows this layout:
 infra/bicep/{project}/
   main.bicep           # Orchestrator — parameters, unique suffix, module calls
   main.bicepparam      # Parameter values
-  azure.yaml           # azd project manifest (infra.path: . — co-located)
-  deploy.ps1           # Deployment script — DEPRECATED (use azd instead)
-  .azure/              # azd environment state (git-ignored)
-    plan.md            # azure-prepare output — source of truth for validate/deploy
-    {project}-{env}/   # Per-environment azd state (e.g., hub-spoke-dev/)
-      .env             # azd environment variables
   modules/
     *.bicep            # One module per resource or logical group
 ```
@@ -75,7 +57,8 @@ infra/bicep/{project}/
 
 - **AVM-first**: Use `br/public:avm/res/{provider}/{resource}:{version}` for all resources that have an AVM module
 - **Unique suffix**: Generate `uniqueString(resourceGroup().id)` once in `main.bicep`, pass to all modules
-- **Tags**: Every resource gets the 4 required tags (`Environment`, `ManagedBy: Bicep`, `Project`, `Owner`)
+- **Tags**: Use the live Azure Policy tag contract. When no contract exists, use the canonical lowercase fallback in
+  the repository Azure defaults guidance.
 - **Parameters**: Use `@description()` decorator on every parameter
 - **Security**: TLS 1.2, HTTPS-only, managed identity, no public blob access, Azure AD-only SQL auth
 - **No hardcoded secrets**: Use Key Vault references for sensitive values

@@ -45,13 +45,13 @@ Verify ALL items before marking Step 5 complete.
 - [ ] Extension-resource diagnostics isolated in scope-aware helper modules (not inline at subscription scope)
 - [ ] **Provider-runtime traps absent** — for each rendered ARM:
   - `Microsoft.Insights/scheduledQueryRules` KQL targeting `_LogOperation` does NOT reference `OperationName` / `Message` (see [`avm-pitfalls.md` § Log Analytics ingestion-cap alerts](avm-pitfalls.md#log-analytics-ingestion-cap-alerts-kql-column-safety)).
-  - `Microsoft.CostManagement/scheduledActions` (`InsightAlert`) has `notification.to[]` + `notification.subject`, sub-scope `viewId`, `displayName` ≤ 25 chars, and lives in a `targetScope = 'subscription'` module ([`cost-alerts-bicep.md` §6](../../azure-defaults/references/cost-alerts-bicep.md#6-cost-anomaly-alert-subscription-scoped)).
+  - `Microsoft.CostManagement/scheduledActions` (`InsightAlert`) has `notification.to[]` + `notification.subject`, sub-scope `viewId`, `displayName` ≤ 25 chars, and lives in a `targetScope = 'subscription'` module ([`cost-alerts-bicep.md` §6](../../../../customizations/.github/skills/apex-azure-defaults/SKILL.md)).
   - Every `entra-object-id` shaped param in `04-environment-manifest.json` is declared as **required, deploy-time-resolved** (not baked into the bicepparam) ([`avm-pitfalls.md` § SQL Entra admin object ID resolution](avm-pitfalls.md#sql-entra-admin-object-id-resolution)).
-  - Budget / Action Group emit conditions do not silently no-op when `costAlertEmails == []` unless `cost_monitoring_mode ∈ {minimal, deferred}` is recorded in governance ([`cost-alerts-baseline.md` § Empty-array silent-skip](../../azure-defaults/references/cost-alerts-baseline.md#empty-array-silent-skip-deploy-time-hazard)).
+  - Budget / Action Group emit conditions do not silently no-op when `costAlertEmails == []` unless `cost_monitoring_mode ∈ {minimal, deferred}` is recorded in governance ([`cost-alerts-baseline.md` § Empty-array silent-skip](../../../../customizations/.github/skills/apex-azure-defaults/references/decision-boundaries.md)).
 
 ## Deployment Artifacts
 
-- [ ] `azure.yaml` generated (primary); `deploy.ps1` generated (deprecated fallback); `05-implementation-reference.md` saved
+- [ ] Source-bound Bicep validation and current `05-implementation-reference.md` saved
 - [ ] Budget module with forecast alerts (80/100/120%) and anomaly detection
 - [ ] Tree formatted once via `npm run format:bicep -- infra/bicep/{project}` (single call — do NOT run `mcp_bicep_format_bicep_file` per file)
 

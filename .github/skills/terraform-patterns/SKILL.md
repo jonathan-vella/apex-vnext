@@ -107,7 +107,6 @@ Applying a Terraform pattern in a root module:
 | `references/avm-pitfalls.md`               | Set-type diffs, provider pins, tag ignore, moved blocks, 4.x      |
 | `references/tf-best-practices-examples.md` | Best-practice code examples, formatting, code review checklist    |
 | `references/bootstrap-backend-template.md` | Backend bootstrap template                                        |
-| `references/deploy-script-template.md`     | Deployment script template                                        |
 | `references/project-scaffold.md`           | Project scaffolding structure                                     |
 | `references/avm-authoring-requirements.md` | AVM certification: 37 requirements, compliance checklist          |
 | `references/refactor-module.md`            | Module extraction, state migration, refactoring patterns          |

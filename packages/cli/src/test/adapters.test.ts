@@ -13,6 +13,8 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createMcpServer } from "../mcp.js";
 import { execute, formatHumanResult } from "../cli.js";
 import { ApexService } from "../service.js";
+import { ApexError, EXIT_CODES } from "../errors.js";
+import { meetsMinimumVersion, MINIMUM_NODE_VERSION } from "../version.js";
 import { nextTaskAfterInput, requirements, tempRoot, writeJson } from "./helpers.js";
 
 test("CLI emits a stable JSON envelope", async () => {
@@ -29,6 +31,14 @@ test("CLI emits a stable JSON envelope", async () => {
     ok: true,
     result: { version: "0.10.0-next.5", bundleVersion: "0.10.0-next.5", configVersion: "1.0.0" },
   });
+});
+
+test("CLI Node minimum compares complete stable versions", () => {
+  assert.equal(meetsMinimumVersion("26.8.9", MINIMUM_NODE_VERSION), false);
+  assert.equal(meetsMinimumVersion("26.9.0", MINIMUM_NODE_VERSION), true);
+  assert.equal(meetsMinimumVersion("26.10.0", MINIMUM_NODE_VERSION), true);
+  assert.equal(meetsMinimumVersion("27.0.0", MINIMUM_NODE_VERSION), true);
+  assert.equal(meetsMinimumVersion("invalid", MINIMUM_NODE_VERSION), false);
 });
 
 test("CLI renders concise human status and doctor output", () => {
@@ -49,6 +59,69 @@ test("CLI renders concise human status and doctor output", () => {
     }),
     "Status: Setup incomplete (1/3 checks ready)\nNext: Install Bicep\nLater: 1 additional setup item",
   );
+});
+
+test("CLI rejects the retired bare promote alias", async () => {
+  const root = await tempRoot();
+  await assert.rejects(
+    execute(
+      ["promote", "--environment", "test", "--target", "/subscriptions/00000000-0000-0000-0000-000000000000"],
+      root,
+    ),
+    (error: unknown) =>
+      error instanceof ApexError && error.code === "APEX_USAGE" && error.message === "Unknown command: promote",
+  );
+});
+
+test("CLI governance import requires a path and forwards only that path", async (context) => {
+  const root = await tempRoot();
+  const expected = { outputHash: "a".repeat(64), summary: "Reviewed baseline imported" };
+  const importer = context.mock.method(ApexService.prototype, "importGovernanceBaseline", async () => expected);
+  for (const flags of [[], ["--path"], ["--path", "first.json", "--path", "second.json"]]) {
+    await assert.rejects(execute(["governance", "import", ...flags], root), /Missing --path/u);
+  }
+  assert.equal(importer.mock.callCount(), 0);
+  const path = "reviewed baselines/governance.json";
+  assert.deepEqual(await execute(["governance", "import", "--path", path], root), expected);
+  assert.deepEqual(importer.mock.calls[0]?.arguments, [path]);
+});
+
+test("CLI governance select forwards a path without importing or inventing a choice", async (context) => {
+  const root = await tempRoot();
+  const expected = {
+    status: "selected" as const,
+    choice: "refresh" as const,
+    candidateHash: "a".repeat(64),
+    observedAt: "2026-09-01T00:00:00Z",
+    refreshRequired: false,
+  };
+  const selection = context.mock.method(ApexService.prototype, "selectGovernanceBaseline", async () => expected);
+  await assert.rejects(execute(["governance", "select"], root), /Missing --path/);
+  assert.deepEqual(await execute(["governance", "select", "--path", "baseline.json"], root), expected);
+  assert.deepEqual(selection.mock.calls[0]?.arguments, ["baseline.json"]);
+  await execute(["governance", "select", "--path", "baseline.json", "--reopen"], root);
+  assert.deepEqual(selection.mock.calls[1]?.arguments, ["baseline.json", { reopen: true }]);
+});
+
+test("CLI governance revision requires explicit confirmation and reason before service calls", async (context) => {
+  const root = await tempRoot();
+  const expected = {
+    invalidatedNodes: ["governance-discovery"],
+    previousGovernanceHash: "a".repeat(64),
+    candidateHash: "b".repeat(64),
+  };
+  const revision = context.mock.method(ApexService.prototype, "reviseGovernanceBaseline", async () => expected);
+  await assert.rejects(
+    execute(["governance", "revise", "--path", "baseline.json", "--reason", "Policy changed"], root),
+    /--yes/,
+  );
+  await assert.rejects(execute(["governance", "revise", "--path", "baseline.json", "--yes"], root), /Missing --reason/);
+  assert.equal(revision.mock.callCount(), 0);
+  assert.deepEqual(
+    await execute(["governance", "revise", "--path", "baseline.json", "--reason", "Policy changed", "--yes"], root),
+    expected,
+  );
+  assert.deepEqual(revision.mock.calls[0]?.arguments, ["baseline.json", { confirm: true, reason: "Policy changed" }]);
 });
 
 test("CLI bootstrap validates onboarding files before initializing a selected client", async () => {
@@ -200,6 +273,94 @@ test("CLI rejects a symlinked profile bootstrap agent", async () => {
   await assert.rejects(execute(["profile", "install", "--yes"], root, { profileRoot }), /regular file/u);
 });
 
+test("MCP preserves valid result envelopes and sanitized execution errors", async () => {
+  const service = new ApexService(await tempRoot());
+  service.render = async () => "# Run status";
+  service.improvementObservations = async () => [];
+  service.improvementProposals = async () => [];
+  service.capabilityList = async () => [];
+  service.stageArtifact = async (taskId, output) => ({
+    taskId,
+    kind: output.kind,
+    path: "staged.json",
+    bytes: 2,
+    hash: "a".repeat(64),
+  });
+  service.taskContext = async () => {
+    throw new ApexError("APEX_STALE", "Task expired", EXIT_CODES.stale, { token: "private-detail" });
+  };
+  service.status = async () => {
+    throw new Error("Bearer synthetic-private-token");
+  };
+  const server = createMcpServer(service);
+  const client = new Client({ name: "response-contract-test", version: "1.0.0" });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+  try {
+    for (const [name, args, expected] of [
+      ["render", { kind: "status" }, { markdown: "# Run status" }],
+      ["improvementObservations", {}, { observations: [] }],
+      ["improvementProposals", {}, { proposals: [] }],
+      ["capabilityList", {}, { packs: [] }],
+    ] as const) {
+      const response = await client.callTool({ name, arguments: args });
+      assert.equal(response.isError, undefined);
+      assert.deepEqual(response.structuredContent, expected);
+      assert.deepEqual(JSON.parse((response.content as Array<{ text: string }>)[0]!.text), expected);
+    }
+    const stale = await client.callTool({ name: "taskContext", arguments: { taskId: "expired" } });
+    assert.equal(stale.isError, true);
+    assert.deepEqual(stale.structuredContent, {
+      error: { code: "APEX_STALE", message: "Task is stale or expired; refresh status before retrying." },
+    });
+    assert.doesNotMatch(JSON.stringify(stale), /private-detail/);
+    const unexpected = await client.callTool({ name: "status", arguments: {} });
+    assert.equal(unexpected.isError, true);
+    assert.deepEqual(unexpected.structuredContent, {
+      error: { code: "APEX_INTERNAL", message: "APEX could not complete the operation." },
+    });
+    assert.doesNotMatch(JSON.stringify(unexpected), /synthetic-private-token|Bearer/);
+    for (const code of [
+      "APEX_VALIDATION",
+      "APEX_AUTHORIZATION",
+      "APEX_CONFLICT",
+      "APEX_NOT_FOUND",
+      "APEX_USAGE",
+    ] as const) {
+      service.status = async () => {
+        throw new ApexError(code, "Bearer private-diagnostic", EXIT_CODES.validation);
+      };
+      const response = await client.callTool({ name: "status", arguments: {} });
+      assert.equal(response.isError, true);
+      assert.equal((response.structuredContent as { error: { code: string } }).error.code, code);
+      assert.doesNotMatch(JSON.stringify(response), /private-diagnostic|Bearer/);
+    }
+    service.status = async () => {
+      throw new Error("Task has expired");
+    };
+    const expired = await client.callTool({ name: "status", arguments: {} });
+    assert.equal((expired.structuredContent as { error: { code: string } }).error.code, "APEX_STALE");
+    const staged = await client.callTool({
+      name: "stageArtifact",
+      arguments: {
+        taskId: "task-1",
+        outputs: [{ kind: "requirements", value: {} }],
+      },
+    });
+    assert.equal(staged.isError, undefined);
+    assert.deepEqual(staged.structuredContent, {
+      artifacts: [{ taskId: "task-1", kind: "requirements", path: "staged.json", bytes: 2, hash: "a".repeat(64) }],
+    });
+    const tools = await client.listTools();
+    for (const name of ["render", "recordInput"])
+      assert.ok(tools.tools.find((tool) => tool.name === name)?.outputSchema);
+  } finally {
+    await client.close();
+    await server.close();
+  }
+});
+
 test("MCP registers only narrow tools and calls the service", async () => {
   const service = new ApexService(await tempRoot());
   await service.init({ projectId: "demo" });
@@ -218,6 +379,8 @@ test("MCP registers only narrow tools and calls the service", async () => {
     "doctor",
     "gateDecide",
     "generateIac",
+    "governanceImport",
+    "governanceSelect",
     "improvementObservations",
     "improvementObserve",
     "improvementProposals",
@@ -244,7 +407,15 @@ test("MCP registers only narrow tools and calls the service", async () => {
     "taskContext",
     "validateTask",
   ]);
+  for (const tool of tools.tools) {
+    assert.ok(tool.description?.trim(), `${tool.name} must describe its operation`);
+  }
   assert.match(tools.tools.find(({ name }) => name === "nextTask")?.description ?? "", /needs_input/u);
+  assert.match(tools.tools.find(({ name }) => name === "nextTask")?.description ?? "", /needs_review.*reviewDecide/u);
+  assert.match(
+    tools.tools.find(({ name }) => name === "nextTask")?.description ?? "",
+    /Only status=task.*taskContext/u,
+  );
   assert.match(tools.tools.find(({ name }) => name === "taskContext")?.description ?? "", /exact task\.taskId/u);
   const response = await client.callTool({ name: "status", arguments: {} });
   assert.equal(response.isError, undefined);
@@ -529,7 +700,7 @@ test("MCP requires an atomic outputs bundle for every task", async () => {
     arguments: { taskId: "plan-task", kind: "implementation-intent", value: {} },
   });
   assert.equal(single.isError, true);
-  assert.match(JSON.stringify(single.content), /outputs/u);
+  assert.equal((single.structuredContent as { error: { code: string } }).error.code, "APEX_VALIDATION");
 
   const bundle = await client.callTool({
     name: "completeTask",
@@ -617,12 +788,12 @@ test("CLI task complete accepts repeated self-describing files", async () => {
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
   const requirementsPath = join(root, "requirements-output.json");
-  await writeJson(requirementsPath, requirements());
+  await writeJson(requirementsPath, { kind: "requirements", value: requirements() });
   const completed = (await execute(
-    ["task", "complete", "--task", issued.task.taskId, "--kind", "requirements", "--file", requirementsPath],
+    ["task", "complete", "--task", issued.task.taskId, "--file", requirementsPath],
     root,
-  )) as { outputHash: string };
-  assert.match(completed.outputHash, /^[0-9a-f]{64}$/);
+  )) as { outputHashes: Record<string, string> };
+  assert.match(completed.outputHashes.requirements!, /^[0-9a-f]{64}$/);
 });
 
 test("CLI rejects incomplete native provider config before execution", async () => {
@@ -711,8 +882,7 @@ test("CLI capability commands report retained packs and require confirmation for
   const root = await tempRoot();
   await new ApexService(root).init({ projectId: "demo" });
   const listed = (await execute(["capability", "list"], root)) as Array<{ id: string; state: string; reason?: string }>;
-  assert.equal(listed.find(({ id }) => id === "azure-governance-discovery")?.state, "not-installed");
-  assert.equal(listed.find(({ id }) => id === "azure-governance-discovery")?.reason, undefined);
+  assert.deepEqual(listed, []);
   await assert.rejects(
     execute(["capability", "install", "--pack", "azure-governance-discovery"], root),
     /requires --yes/,

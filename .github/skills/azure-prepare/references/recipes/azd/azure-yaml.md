@@ -126,13 +126,8 @@ services:
 
 ### Azure Functions
 
-```yaml
-services:
-  functions:
-    project: ./src/functions
-    language: js
-    host: function
-```
+Functions `azure.yaml` materialization is unavailable. Record the intended service boundary during assessment, but do
+not emit a `host: function` service until a reviewed capability owns the complete infrastructure and deployment path.
 
 ### Static Web App (with framework build)
 

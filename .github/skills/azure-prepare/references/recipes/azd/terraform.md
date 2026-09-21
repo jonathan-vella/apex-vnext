@@ -104,20 +104,8 @@ provider "azurerm" {
 }
 ```
 
-> **⚠️ IMPORTANT**: For **Azure Functions Flex Consumption**, use azurerm provider **v4.2 or later**:
->
-> ```hcl
-> terraform {
->   required_providers {
->     azurerm = {
->       source  = "hashicorp/azurerm"
->       version = "~> 4.2"
->     }
->   }
-> }
-> ```
->
-> See [Terraform Functions patterns](../../services/functions/terraform.md) for Flex Consumption examples.
+> Azure Functions Terraform materialization is unavailable. Use the
+> [Functions assessment](../../services/functions/terraform.md) only to record requirements and a future backlog item.
 
 ### 4. Variables and Outputs
 
@@ -345,7 +333,7 @@ Use pure Terraform (without azd) when:
 
 Enterprise Azure subscriptions typically enforce security policies. Your Terraform must comply:
 
-### Storage Account (Required for Functions)
+### Storage Account
 
 ```hcl
 resource "azurerm_storage_account" "storage" {
@@ -359,48 +347,6 @@ resource "azurerm_storage_account" "storage" {
   allow_nested_items_to_be_public = false   # Disable anonymous blob access
   local_user_enabled              = false   # Disable local users
   shared_access_key_enabled       = false   # RBAC-only, no access keys
-}
-```
-
-### Function App with Managed Identity Storage
-
-```hcl
-provider "azurerm" {
-  features {}
-  storage_use_azuread = true   # Required when shared_access_key_enabled = false
-}
-
-resource "azurerm_linux_function_app" "function" {
-  name                          = "func-myapp"
-  resource_group_name           = azurerm_resource_group.rg.name
-  location                      = azurerm_resource_group.rg.location
-  service_plan_id               = azurerm_service_plan.plan.id
-  storage_account_name          = azurerm_storage_account.storage.name
-  storage_uses_managed_identity = true   # Use MI instead of access key
-
-  identity {
-    type = "SystemAssigned"
-  }
-
-  tags = {
-    "azd-service-name" = "api"   # REQUIRED for azd deploy
-  }
-
-  depends_on = [azurerm_role_assignment.deployer_storage]
-}
-
-# RBAC for deploying user (create function with MI storage)
-resource "azurerm_role_assignment" "deployer_storage" {
-  scope                = azurerm_storage_account.storage.id
-  role_definition_name = "Storage Blob Data Owner"
-  principal_id         = data.azurerm_client_config.current.object_id
-}
-
-# RBAC for function app after creation
-resource "azurerm_role_assignment" "function_storage" {
-  scope                = azurerm_storage_account.storage.id
-  role_definition_name = "Storage Blob Data Owner"
-  principal_id         = azurerm_linux_function_app.function.identity[0].principal_id
 }
 ```
 

@@ -51,7 +51,14 @@ access for prod data services, no hardcoded secrets) is documented in
 [.github/instructions/references/iac-policy-compliance.md](.github/instructions/references/iac-policy-compliance.md).
 This is the source of truth for `validate:iac-security-baseline`. Typed governance
 inputs may add subscription-level Azure Policy requirements.
+
 ## vNext Architecture
+
+There is no backward-compatibility requirement anywhere in this project. Remove obsolete implementations, formats,
+aliases, fallback paths, and migration code rather than preserving them for legacy consumers. Update tests and guidance
+to the current contracts; keep rejection tests where obsolete input could bypass validation. Retired archives are not
+runtime dependencies or compatibility requirements. Preserve audit evidence and current authorization, freshness,
+ownership, and approval safeguards; their age does not make them obsolete.
 
 - `packages/kernel/` owns deterministic state, gates, authorization, evidence, and improvement decisions.
 - `packages/contracts/` owns versioned JSON schemas and contract validation.
@@ -65,8 +72,17 @@ State-changing behavior belongs behind kernel authorization and typed contracts.
 they do not become an independent workflow authority. Preserve stable error codes, fail closed on stale evidence, and
 keep client-specific behavior at adapter boundaries.
 
-Use `npm run qualify:vnext` for deterministic product qualification. Live cloud qualification is a separate,
-explicitly authorized operation and must not run as part of ordinary repository validation.
+Choose validation by the changed behavior, not by habit:
+
+- Prose-only edits: lint the changed files and verify changed links; run project-control checks only when affected.
+- Skill/instruction edits: validate affected metadata, references, invocation and discovery contracts.
+- Local code edits: run the owning package build and focused regression tests immediately; expand only for concrete risk.
+- Shared runtime, contract, packaging or broad maintenance changes: run `npm run qualify:vnext` once at the integration
+  checkpoint after focused checks pass. Do not repeat it after each small edit within the same slice.
+- Keep required hooks and CI checks enabled. Full repository validation belongs at integration/release boundaries or
+  when a cross-cutting change needs it, not every wording correction.
+
+Live cloud qualification is a separate, explicitly authorized operation and must not run as part of ordinary validation.
 
 ## Conventions Detail
 

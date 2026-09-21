@@ -4,6 +4,9 @@
 
 ## Select The Project
 
+The commands below describe current runtime behavior. The [planned COE import and change experience](../explanation/workflow-and-gates.md#planned-coe-reuse-and-change)
+is a target requirement, not a new CLI command advertised by this guide. Use Windows via WSL2 without a devcontainer.
+
 ```bash
 apex project list --json
 apex project use --project PROJECT_ID --json
@@ -63,12 +66,102 @@ Architecture selection, SKU decisions, and implementation stay with later workfl
 The coordinator hands work to interactive specialists:
 
 1. Requirements gathers workload outcomes and constraints.
-2. Architect resolves design, cost, availability, governance, and risk decisions.
+2. Architect resolves design, cost, governance, assumptions and risk decisions.
 3. Planner produces track-neutral implementation intent, binding, and environment inputs.
 4. Operator handles preview, approval, deployment, recovery, and evidence.
 
 Specialists delegate bounded code generation, review, and validation tasks when supported. Review findings return as a
 single decision panel; permitted risk acceptance is time-bound, while revision creates a fresh artifact and review.
+
+## Governance Freshness
+
+### Consumer Collection Setup
+
+Installation includes the governance workflow, collector and schema in both supported client projections, copied from
+the packaged canonical sources. The workflow is disabled by default. A consumer administrator configures the following
+in the consumer GitHub repository; installing APEX does not provision identities, grant permissions or enable collection.
+
+| Setting                                                       | Value                                                                                                          |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `GOVERNANCE_BASELINE_ENABLED`                                 | Repository or organization variable `true` to opt in.                                                          |
+| `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` | OIDC client, tenant and login subscription IDs. Variables preferred; same-named secrets are supported for IDs. |
+| `GOVERNANCE_MG_ID`                                            | Management-group root; leave empty for standalone collection.                                                  |
+| `GOVERNANCE_SUBSCRIPTION_ID`                                  | Standalone target subscription; exactly one collection target must be set.                                     |
+| `GOVERNANCE_MAX_SUBSCRIPTIONS`                                | Positive integer cap; default `100`. Incomplete coverage is not approval evidence.                             |
+
+Create the protected GitHub environment `governance` and configure Entra workload identity federation for that repository
+and environment. Grant the collection identity read access to the required policy scopes, separate from deployment
+permissions. No client secret is required. Permit the workflow's token to create pull requests under repository policy.
+Collection is scheduled weekly or started manually through GitHub Actions; the enable variable must be true for either.
+Only baseline JSON is proposed in a review PR. No artifact upload or automatic merge is performed. After review and merge,
+update the consumer checkout before selecting the file. Repository updates preserve local edits through normal managed-file
+conflict handling; do not assume installing/updating APEX overwrites consumer workflow customizations.
+
+### Select Or Renew
+
+Before planning, import the reviewed JSON snapshot for the run's target through the governance-discovery task. Azure
+Policy remains authoritative; a snapshot is evidence, not permission to override a policy. The consumer owns the
+collection workflow and its GitHub configuration; do not commit Azure credentials.
+
+Imported snapshots less than 30 days old can be reused. Refresh is optional, including before deployment. The runtime
+measures age from successful Azure collection, not file download, import or commit time. At exactly 30 days, imported
+evidence blocks new planning, preview and deployment approval until refreshed evidence is accepted. Missing, incomplete,
+future-dated or wrong-scope evidence remains blocked independently of age; existing preview expiry rules still apply.
+
+Select a reviewed candidate before import:
+
+```bash
+apex governance select --path .github/data/governance-policy-baseline.json --json
+```
+
+The kernel question shows collection age and date. Below 30 days it offers `reuse` (recommended) or `refresh`; at
+30 days only `refresh` is permitted. The managed Operator submits your answer through `recordInput`; no default is
+silently recorded. Pending questions and answers survive restart, and selecting the same answered candidate returns
+the recorded choice rather than asking again. Questions expire after 24 hours; reuse is rechecked against snapshot age.
+
+If an optional refresh fails and the same prior file is still usable, explicitly reconsider the decision with
+`apex governance select --path .github/data/governance-policy-baseline.json --reopen --json`. This creates a new question;
+it does not automatically choose reuse or erase the earlier answer. At 30 days, only refresh remains available.
+
+Selection does not import or contact Azure. A pending refresh blocks progression, preview and new approval until a
+newer complete collection replaces the selected file and is explicitly imported. Automatic collection dispatch is not
+yet implemented: use the consumer collection workflow, not an invented local discovery command. Import with:
+
+```bash
+apex governance import --path .github/data/governance-policy-baseline.json --json
+```
+
+Import verifies the selected path and exact candidate bytes for reuse. Refresh requires a newer observation at that
+path; changed files cannot silently replace a pending reuse decision. A direct import is permitted only at the active
+governance-discovery task for bounded automation. Human gate approvals remain separate.
+
+After initial import, the same operation accepts a newer observation only when the complete selected subscription
+content is unchanged, excluding collection timestamps and legacy TTL fields. It records a separate observation receipt
+and preserves accepted governance, policy, plan and gate hashes. Material differences block renewal; use the confirmed
+revision process below, not `apex reconcile`, which handles deployment recovery. Unrelated subscription data is not copied
+into run state. A replay of the exact accepted
+renewal is idempotent. The journal head advances, so active tasks may need reissuing; preview expiry and writer authority
+are not extended. Obsolete snapshots without a content digest are rejected; start a current run rather than inferring
+equality or rewriting historical state.
+
+### Changed Policy
+
+After reviewing a changed, complete and fresh baseline, explicitly authorize reopening governance:
+
+```bash
+apex governance revise --path .github/data/governance-policy-baseline.json --reason "Reviewed Azure policy changes" --yes --json
+apex governance import --path .github/data/governance-policy-baseline.json --json
+```
+
+Revision is a trusted CLI-only operation. It atomically invalidates the workflow's governance dependency closure and
+Gates 2-4, preserving requirements, architecture and historical evidence. It does not import the replacement, approve
+policy, or change Azure. The later import must match the exact confirmed path and bytes; a changed candidate requires
+new confirmation. Reconciliation, governance review, planning and affected approvals must run again.
+
+In-flight or indeterminate deployments block revision until their outcome is resolved. Do not bypass this by editing
+journal/state files. Legacy snapshots without content digests still require a separately supported migration path.
+The current deployment reconciliation path requires a recorded execution receipt. Without one, remain blocked for
+operator/provider-supported resolution; repeating `apex reconcile` or deployment does not establish the missing outcome.
 
 ## Decide Gates
 
@@ -84,6 +177,9 @@ Requirements acceptance also materializes a read-only Gate 1 review package at
 `service-recommendations.md`, `sku-preferences.md`, and `challenger-findings.md`
 before approving Gate 1. These documents are derived from accepted APEX state;
 regeneration overwrites local edits.
+
+Conflict-aware selective updates are planned under `REQ-CHANGE-001`; until implemented, do not treat manual edits to
+these generated packages as persistent project intent. Ask APEX to revise accepted decisions through supported tasks.
 
 Architecture acceptance materializes `agent-output/<project>/<run>/architecture/` with authoritative assessment, cost,
 SKU, and challenger Markdown. It also includes editable Python, SVG, and PNG views for Architecture topology,

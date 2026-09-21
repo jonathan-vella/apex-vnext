@@ -1,134 +1,47 @@
 ---
 name: context-management
-description: '**UTILITY SKILL** — Manages context through runtime artifact compression and post-run Copilot log audits. WHEN: "context optimization", "token budget", "runtime compression", "log parsing", "handoff gaps". EXCLUDES infrastructure generation and deployment.'
-compatibility: Audit mode requires Python 3.14 for log parser script
+user-invocable: true
+disable-model-invocation: true
+description: '**UTILITY SKILL** - Manual diagnostics for selected task context and Copilot logs. WHEN: explicitly invoked as /context-management. Do not auto-select for coding, CI, log inspection, handoffs or session resumes.'
+compatibility: Log parsing requires Python; runtime reads use the current APEX client.
 ---
 
-# Context Management Skill
+# Context Management
 
-Unified context-window management with two distinct lifecycles:
+## Invocation Boundary
 
-- **Runtime Compression** — what an agent does _before loading_ a large
-  artifact to stay under the model context limit (during workflow execution).
-- **Diagnostic Audit** — what the 11-Context Optimizer agent does
-  _after the fact_ to find waste in agent definitions, instructions, and
-  skill loads.
+Run only when the user explicitly invokes `/context-management`. Routine context handling, session summaries,
+continuations, log inspection and CI troubleshooting do not authorize loading this skill. Follow ordinary repository
+instructions for those tasks; references to this skill are not invocation requests.
 
-The two modes do not depend on each other — pick the section that matches
-your need.
+## Runtime Boundaries
 
----
+Use the current task's authorized inputs and targeted reads. The kernel owns accepted revisions, task budgets,
+expiry and writer authority; chat summaries do not replace them. Do not discard policy, security, cost uncertainty,
+review criteria or required evidence merely to shorten context. Preserve rich outputs from accepted decisions.
 
-## Mode A: Runtime Compression
+Follow the [managed context rules](../../../customizations/.github/instructions/apex-context.instructions.md).
+Load relevant skills once and references on demand using [skill loading](references/skill-loading.md).
+Resume through current APEX status and task operations. Do not invent checkpoint commands, model limits or mandatory
+chat-reset ceremonies. If a bounded read cannot supply required evidence, report the blocker rather than truncate it.
 
-> Replaces the legacy `context-shredding` skill.
+## Requested Diagnostics
 
-### When to Use Runtime Compression
-
-- Before loading a predecessor artifact file (01 through 07)
-- When conversation length suggests >60% of model context is used
-- When an agent needs to load multiple large artifacts
-
-### Compression Tiers
-
-| Tier         | Context Usage | Strategy                                   |
-| ------------ | ------------- | ------------------------------------------ |
-| `full`       | < 60%         | Load entire artifact — no compression      |
-| `summarized` | 60-80%        | Load key H2 sections only                  |
-| `minimal`    | > 80%         | Load decision summaries only (< 500 chars) |
-
-### Hard Token Checkpoints
-
-Percentages are advisory; absolute input-token counts override them.
-gpt-5.5 hard-checkpoints at ≥300K input; claude-opus-4.7 at ≥160K. When
-hit, emit a compaction message and switch every further read to the
-`minimal` tier. Full per-model table, checkpoint procedure (4 steps), and
-background context (nordic-foods saturation event) in
-[`references/hard-checkpoints.md`](references/hard-checkpoints.md).
-
-### Rules
-
-1. **Estimate context usage** — count approximate conversation tokens
-2. **Select tier** based on the thresholds above
-3. **Apply compression template** from
-   [`references/compression-templates.md`](references/compression-templates.md)
-4. If loading multiple artifacts, compress the older / less-critical ones first
-
-### Steps
-
-```text
-1. Estimate current context usage (rough: 1 token ≈ 4 chars)
-2. Check model limit (Claude family: 200K, GPT-5 family: 400K)
-3. Calculate usage percentage and check hard-checkpoint table
-4. Select tier:
-   < 60%  → full (no compression needed)
-   60-80% → summarized (key sections only)
-   > 80%  → minimal (decision summaries only)
-5. Load artifact/skill using the appropriate variant
-```
-
-### Skill Loading
-
-Skills are single-tier — one file per skill, no digest / minimal variants.
-Load each `SKILL.md` only once per session; defer `references/*.md` until
-the SKILL.md body explicitly points to one. Full protocol in
-[`references/skill-loading.md`](references/skill-loading.md).
-
----
-
-## Mode B: Diagnostic Audit
-
-> Replaces the legacy `context-optimizer` skill.
-
-Structured methodology for auditing how GitHub Copilot agents consume their
-context window. Identifies waste, recommends hand-off points, and produces
-prioritised optimisation reports.
-
-### When to Use Diagnostic Audit
-
-- Auditing context-window efficiency across a multi-agent system
-- Identifying where to introduce subagent hand-offs
-- Reducing redundant file reads and skill loads
-- Optimising instruction file `applyTo` glob patterns
-- Profiling per-turn token cost from debug logs
-- Porting agent optimisations to a new project
-
-### Audit Capabilities & Prerequisites
-
-Capabilities cover log parsing, turn-cost profiling, redundancy detection,
-hand-off gap analysis, instruction audit, and structured report generation.
-Prerequisites: Python 3.14, VS Code Copilot Chat debug logs, and
-`.github/agents/*.agent.md` (or equivalent). Full capability matrix,
-portability checklist, and debug-log discovery in
-[`references/audit-setup.md`](references/audit-setup.md).
-
-### Analysis Methodology
-
-For the complete methodology — log format reference (`ccreq` line parsing,
-request types, latency heuristics), Steps 1-5 (log parsing → optimisation
-recommendations), common optimisation patterns, and baseline comparison
-workflow (Phase 0 + Phase 6) — read
-[`references/analysis-methodology.md`](references/analysis-methodology.md).
-
-### Report Template
-
-See [`templates/optimization-report.md`](templates/optimization-report.md)
-for the full output template.
-
----
+Inspect only the user-selected logs or task. Keep raw transcripts and credentials out of committed reports.
+Distinguish observed metrics from estimates; file bytes are not measured model tokens. Follow
+[the current optimization scope](../../../docs/vnext/PRD.md#req-optimization-001-bounded-input-efficiency).
+Do not start a benchmarking campaign, add telemetry or change models without separate authorization.
 
 ## Reference Index
 
-Load on demand:
+| Reference                                                  | Use                                                             |
+| ---------------------------------------------------------- | --------------------------------------------------------------- |
+| [Audit setup](references/audit-setup.md)                   | Discover selected logs and prerequisites.                       |
+| [Analysis methodology](references/analysis-methodology.md) | Analyze observed reads, latency and handoff gaps.               |
+| [Log profiling](references/log-profiling.md)               | Profile normalized metrics using the existing utility.          |
+| [Token estimation](references/token-estimation.md)         | Label approximate estimates when measured usage is unavailable. |
+| [Log parser](scripts/parse-chat-logs.py)                   | Parse selected logs into structured observations.               |
+| [Report template](templates/optimization-report.md)        | Report findings when a diagnostic report is requested.          |
 
-| Reference                             | Mode    | When to Load                                                               |
-| ------------------------------------- | ------- | -------------------------------------------------------------------------- |
-| `references/compression-templates.md` | Runtime | Per-artifact H2 sections per tier                                          |
-| `references/hard-checkpoints.md`      | Runtime | Hitting a model token threshold or wiring agent checkpoint logic           |
-| `references/skill-loading.md`         | Runtime | Multi-skill loads / clarifying single-tier load protocol                   |
-| `references/token-estimation.md`      | Audit   | Estimating token counts for context optimisation                           |
-| `references/analysis-methodology.md`  | Audit   | Log format, 5-step methodology, optimisation patterns, baseline comparison |
-| `references/audit-setup.md`           | Audit   | Prerequisites, enabling debug logs, audit capabilities, portability        |
-| `references/log-profiling.md`         | Audit   | Profiling normalized debug-log metrics and interpreting results            |
-| `scripts/parse-chat-logs.py`          | Audit   | Log parser producing structured JSON                                       |
-| `templates/optimization-report.md`    | Audit   | Report output template                                                     |
+Run only checks relevant to changed behavior under `AGENTS.md`. Diagnostic findings are proposals, not permission to
+change runtime state, accept risk, waive reviews or deploy.

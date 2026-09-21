@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtemp } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
+import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { ProjectStore, RunRepository } from "../index.js";
@@ -35,6 +35,112 @@ test("run repository CAS permits one mutation and rejects a racing stale hash", 
   assert.equal(results.filter((result) => result.status === "rejected").length, 1);
   assert.equal((await repository.read()).ownerEpoch, 2);
   assert.equal((await repository.journal.replay()).length, 1);
+});
+
+test("run repository never exposes partial lock metadata under contention", async () => {
+  const root = await mkdtemp(join(tmpdir(), "apex-run-lock-contention-"));
+  const store = new ProjectStore(
+    root,
+    () => new Date("2026-01-01T00:00:00.000Z"),
+    () => "run-1",
+  );
+  await store.initializeProject({ projectId: "demo", displayName: "Demo", defaultIacTool: "bicep" });
+  await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
+  const repository = new RunRepository(store.runDirectory("demo", "run-1"));
+  const results = await Promise.allSettled(Array.from({ length: 64 }, () => repository.read()));
+  assert.ok(results.some(({ status }) => status === "fulfilled"));
+  for (const result of results) {
+    if (result.status === "rejected") assert.match(String(result.reason), /Run mutation is already in progress/u);
+  }
+});
+
+test("run repository reclaims an expired dead-owner generation into a permanent tombstone", async () => {
+  const root = await mkdtemp(join(tmpdir(), "apex-run-stale-lock-"));
+  const now = new Date("2026-01-01T00:00:00.000Z");
+  const store = new ProjectStore(
+    root,
+    () => now,
+    () => "run-1",
+  );
+  await store.initializeProject({ projectId: "demo", displayName: "Demo", defaultIacTool: "bicep" });
+  await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
+  const directory = store.runDirectory("demo", "run-1");
+  const lockPath = join(directory, ".run-mutation.lock");
+  await mkdir(lockPath);
+  await writeFile(
+    join(lockPath, "metadata.json"),
+    JSON.stringify({
+      token: "expired-lock",
+      pid: 2_147_483_647,
+      host: hostname(),
+      createdAt: "2025-12-31T23:58:00.000Z",
+      expiresAt: "2025-12-31T23:59:00.000Z",
+    }),
+  );
+  const repository = new RunRepository(directory, { clock: () => now, lockTtlMs: 30_000 });
+  const results = await Promise.allSettled(Array.from({ length: 64 }, () => repository.read()));
+  assert.ok(results.some(({ status }) => status === "fulfilled"));
+  for (const result of results) {
+    if (result.status === "fulfilled") assert.equal(result.value.projectId, "demo");
+    else assert.match(String(result.reason), /Run mutation is already in progress/u);
+  }
+  await assert.rejects(readFile(lockPath), (error: unknown) => (error as NodeJS.ErrnoException).code === "ENOENT");
+  const tombstones = await readdir(join(directory, ".run-mutation.retired"));
+  assert.equal(tombstones.length, results.filter(({ status }) => status === "fulfilled").length + 1);
+  assert.equal(
+    (
+      await Promise.all(
+        tombstones.map(async (name) =>
+          JSON.parse(await readFile(join(directory, ".run-mutation.retired", name, "metadata.json"), "utf8")),
+        ),
+      )
+    ).some(({ token }) => token === "expired-lock"),
+    true,
+  );
+});
+
+test("run repository never reclaims an expired lock owned by a live local process", async () => {
+  const root = await mkdtemp(join(tmpdir(), "apex-run-live-lock-"));
+  const now = new Date("2026-01-01T00:00:00.000Z");
+  const store = new ProjectStore(
+    root,
+    () => now,
+    () => "run-1",
+  );
+  await store.initializeProject({ projectId: "demo", displayName: "Demo", defaultIacTool: "bicep" });
+  await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
+  const directory = store.runDirectory("demo", "run-1");
+  const lockPath = join(directory, ".run-mutation.lock");
+  await mkdir(lockPath);
+  await writeFile(
+    join(lockPath, "metadata.json"),
+    JSON.stringify({
+      token: "live-lock",
+      pid: process.pid,
+      host: hostname(),
+      createdAt: "2025-12-31T23:58:00.000Z",
+      expiresAt: "2025-12-31T23:59:00.000Z",
+    }),
+  );
+  await assert.rejects(
+    new RunRepository(directory, { clock: () => now }).read(),
+    /Run mutation is already in progress/u,
+  );
+  assert.equal(JSON.parse(await readFile(join(lockPath, "metadata.json"), "utf8")).token, "live-lock");
+});
+
+test("run repository rejects missing metadata in a stable lock generation", async () => {
+  const root = await mkdtemp(join(tmpdir(), "apex-run-invalid-lock-"));
+  const store = new ProjectStore(
+    root,
+    () => new Date("2026-01-01T00:00:00.000Z"),
+    () => "run-1",
+  );
+  await store.initializeProject({ projectId: "demo", displayName: "Demo", defaultIacTool: "bicep" });
+  await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
+  const directory = store.runDirectory("demo", "run-1");
+  await mkdir(join(directory, ".run-mutation.lock"));
+  await assert.rejects(new RunRepository(directory).read(), /Run mutation lock metadata is unreadable/u);
 });
 
 test("run repository rejects a mutation when the validated journal head changed", async () => {

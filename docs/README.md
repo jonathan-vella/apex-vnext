@@ -2,22 +2,28 @@
 
 > [Current Version](../VERSION.md) | Pre-release documentation for the governed APEX runtime and clients.
 
-APEX vNext is a deterministic workflow runtime for governed Azure platform engineering. The kernel owns state,
-authorization, gates, evidence, and bounded operations. Copilot clients guide people through that runtime; they do not
-replace its authority.
+APEX vNext targets COE workload reuse and conversational adaptation with rich design and operational output. Both
+ALZ-backed workloads and standalone labs/demos are initial scope, using VS Code or Copilot CLI on Windows via WSL2
+without a devcontainer. The kernel owns state, gates and evidence; clients guide people through it.
+
+The [PRD](vnext/PRD.md) defines the target contract. Guides describe implemented commands and mark planned extensions
+explicitly; the [checkpoint](vnext/PROJECT.md) identifies remaining work. Distribution and APEX MCP packaging are the
+last feature-delivery phase, not prerequisites for completing governance and workload reuse.
 
 ## Start By Goal
 
-| Goal | Start here |
-| --- | --- |
-| Start on Windows 11 with WSL2 | [WSL2 consumer runbook](tutorials/wsl2-vscode-consumer-runbook.md) |
-| Evaluate APEX locally | [Complete the first local run](tutorials/first-run.md) |
-| Install or update APEX | [Manage installation](how-to/manage-installation.md) |
-| Run a governed workflow | [Run the workflow](how-to/run-workflow.md) |
-| Preview or reconcile infrastructure | [Operate a project](how-to/operate-project.md) |
-| Contribute to the repository | [Contribute to APEX vNext](how-to/contribute.md) |
-| Understand kernel authority | [Runtime architecture](explanation/runtime-architecture.md) |
-| Look up commands or support | [Reference index](reference/README.md) |
+| Goal                                     | Start here                                                                           |
+| ---------------------------------------- | ------------------------------------------------------------------------------------ |
+| Start on Windows 11 with WSL2            | [WSL2 consumer runbook](tutorials/wsl2-vscode-consumer-runbook.md)                   |
+| Evaluate APEX locally                    | [Complete the first local run](tutorials/first-run.md)                               |
+| Install or update APEX                   | [Manage installation](how-to/manage-installation.md)                                 |
+| Run a governed workflow                  | [Run the workflow](how-to/run-workflow.md)                                           |
+| Understand planned COE reuse and changes | [Project adaptation](explanation/workflow-and-gates.md#planned-coe-reuse-and-change) |
+| Review output quality expectations       | [Quality reference](vnext/PRD.md#output-quality-reference)                           |
+| Preview or reconcile infrastructure      | [Operate a project](how-to/operate-project.md)                                       |
+| Contribute to the repository             | [Contribute to APEX vNext](how-to/contribute.md)                                     |
+| Understand kernel authority              | [Runtime architecture](explanation/runtime-architecture.md)                          |
+| Look up commands or support              | [Reference index](reference/README.md)                                               |
 
 ## Tutorials
 
@@ -35,7 +41,7 @@ replace its authority.
 - [Operate a project](how-to/operate-project.md)
 - [Qualify a candidate](how-to/qualify-candidate.md)
 - [Contribute to APEX vNext](how-to/contribute.md)
-- [Maintain the development container](how-to/maintain-devcontainer.md)
+- [Historical development agent logging](how-to/debug-local.md)
 
 ## Explanation
 
@@ -60,13 +66,7 @@ replace its authority.
 Binding product requirements, decisions, risks, release controls, and qualification procedures remain under
 [`docs/vnext`](vnext/README.md). These files govern repository development and are not user tutorials.
 
-The [documentation inventory](vnext/documentation-inventory.v1.json) records content ownership and migration status.
-Frozen Phase 0A evidence remains immutable.
-
-## Migration History
-
-Predecessor history and extraction provenance are isolated in [Migration](MIGRATION.md). Active product documentation is
-vNext-only.
+The [documentation inventory](vnext/documentation-inventory.v1.json) records current content ownership.
 
 ## Validate Documentation
 

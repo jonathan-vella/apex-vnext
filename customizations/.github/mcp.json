@@ -13,6 +13,8 @@
         "taskContext",
         "readTaskInput",
         "recordInput",
+        "governanceImport",
+        "governanceSelect",
         "projectCreate",
         "projectList",
         "projectUse",

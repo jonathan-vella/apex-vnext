@@ -87,7 +87,7 @@
         "description": { "type": "string" },
         "agents": {
           "type": "object",
-          "description": "Map of agent file basename (e.g. 01-orchestrator.agent.md) to its frontmatter model label.",
+          "description": "Map of managed agent file basename (e.g. apex.agent.md) to its frontmatter model label.",
           "patternProperties": {
             ".*\\.agent\\.md$": { "type": "string" }
           }

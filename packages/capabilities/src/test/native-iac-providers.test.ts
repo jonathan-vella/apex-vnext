@@ -1,14 +1,24 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { link, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { type TestContext } from "node:test";
+import { sha256 } from "../iac.js";
 import { Value } from "@sinclair/typebox/value";
 import { FormatRegistry } from "@sinclair/typebox";
 import {
   ExecutionPlanAttestationV1Schema,
+  NativeValidationReceiptV1Schema,
+  NATIVE_VALIDATION_COMMANDS,
+  calculateNativeValidationCommandHash,
+  calculateNativeValidationReceiptHash,
+  hasValidNativeValidationReceipt,
+  calculatePolicyValidationHash,
+  hasValidPolicyValidation,
   type ApprovalEvidenceV1,
   type DeploymentPreviewV1,
+  type PolicyValidationV1,
 } from "@apexops/contracts";
 import {
   IacOutputParseError,
@@ -16,10 +26,13 @@ import {
   LocalEncryptedPlanTransport,
   NativeBicepProvider,
   NativeTerraformProvider,
+  ProcessRunner,
+  nativePolicyValidationBinding,
   normalizeAzureWhatIf,
   normalizeTerraformPlan,
   selectAzureDeploymentStack,
   type CurrentDeploymentAuthority,
+  type NativeValidationRequest,
   type PreviewRequest,
   type ProcessRequest,
   type ProcessResult,
@@ -132,6 +145,1122 @@ class MemoryArtifactStore {
   }
 }
 
+async function nativePolicyFixture(context: TestContext, track: "bicep" | "terraform") {
+  const root = await mkdtemp(join(tmpdir(), `apex-native-policy-${track}-`));
+  context.after(async () => rm(root, { recursive: true, force: true }));
+  const sourceFile = track === "bicep" ? "main.bicep" : "main.tf";
+  const content = track === "bicep" ? "targetScope = 'resourceGroup'\n" : "terraform {}\n";
+  await writeFile(join(root, sourceFile), content);
+  const generatedSource = { rootPath: root, treeHash: sha256([{ path: sourceFile, content }]) };
+  const source = {
+    value: "native-value-must-not-leak",
+    invalid: false,
+    unknown: false,
+    compileFailed: false,
+    complete: true,
+    configHash: hashes.iac,
+    duringPreview: undefined as (() => Promise<void>) | undefined,
+    duringShow: undefined as (() => Promise<void>) | undefined,
+    duringInit: undefined as (() => Promise<void>) | undefined,
+    duringCommand: undefined as ((process: ProcessRequest) => Promise<void>) | undefined,
+  };
+  const json = () =>
+    source.invalid
+      ? "{}"
+      : JSON.stringify(
+          track === "bicep"
+            ? { resources: { storage: { properties: { security: source.value } } } }
+            : {
+                complete: source.complete,
+                resource_changes: [
+                  {
+                    address: "azurerm_storage_account.main",
+                    mode: "managed",
+                    change: {
+                      actions: ["create"],
+                      before: null,
+                      after: { properties: { security: source.value } },
+                      after_unknown: { properties: { security: source.unknown } },
+                    },
+                  },
+                ],
+                planned_values: {
+                  root_module: {
+                    resources: [
+                      {
+                        address: "azurerm_storage_account.main",
+                        mode: "managed",
+                        values: { properties: { security: source.value } },
+                      },
+                    ],
+                  },
+                },
+              },
+        );
+  const runner = new FakeRunner(async (process) => {
+    await source.duringCommand?.(process);
+    if (process.executable === "bicep") {
+      if (process.args[0] === "format" || process.args[0] === "lint") {
+        const command = NATIVE_VALIDATION_COMMANDS.bicep.find(({ args }) => args[0] === process.args[0]);
+        assert.deepEqual(process.args, command?.args);
+        return "";
+      }
+      assert.deepEqual(process.args, ["build", "main.bicep", "--stdout"]);
+      if (source.compileFailed) throw new Error("compiler diagnostic containing private source");
+      return json();
+    }
+    if (process.args.includes("what-if")) {
+      await source.duringPreview?.();
+      return JSON.stringify({ changes: [{ resourceId: "/storage", changeType: "Create" }] });
+    }
+    if (process.args[2] === "list") return "[]";
+    if (process.args[0] === "init") await source.duringInit?.();
+    const outputArg = process.args.find((argument) => argument.startsWith("-out="));
+    if (outputArg !== undefined) {
+      await writeFile(outputArg.slice(5), "actual-saved-plan", { mode: 0o600 });
+      await source.duringPreview?.();
+    }
+    if (process.args[0] === "show") {
+      await source.duringShow?.();
+      return json();
+    }
+    if (process.args[0] === "state") return JSON.stringify({ lineage: "policy-state", serial: 1 });
+    return "";
+  });
+  const bindings = new MemoryBindingStore();
+  const artifacts = new MemoryArtifactStore();
+  const runtime = {
+    runner,
+    bindingStore: bindings,
+    currentAuthority: async () => authority,
+    now: () => clock.value,
+  };
+  const makeProvider = (
+    options: { cwd?: string; templateFile?: string; parametersFile?: string; planPath?: string } = {},
+  ) =>
+    track === "bicep"
+      ? new NativeBicepProvider({
+          ...runtime,
+          target: {
+            cwd: options.cwd ?? root,
+            resourceGroup: "rg",
+            deploymentName: "preview",
+            stackName: "workload",
+            templateFile: options.templateFile ?? "main.bicep",
+            ...(options.parametersFile === undefined ? {} : { parametersFile: options.parametersFile }),
+            denySettingsMode: "denyDelete",
+          },
+        })
+      : new NativeTerraformProvider({
+          ...runtime,
+          artifactStore: artifacts,
+          keyProvider: async () => Buffer.alloc(32, 9),
+          target: {
+            cwd: options.cwd ?? root,
+            target: "dev",
+            planPath: () => options.planPath ?? join(root, "policy.tfplan"),
+            configHash: async () => source.configHash,
+            lockfileHash: hashes.lock,
+          },
+        });
+  const policyRequest = request({
+    policyValidation: {
+      policyMap: {
+        schemaVersion: "1.0.0",
+        projectId: "project",
+        runId: "run",
+        governanceHash: hashes.policy,
+        mappings: (["deny", "modify", "deployIfNotExists"] as const).map((effect) => ({
+          policyAssignmentId: "/assignments/baseline",
+          effect,
+          logicalResourceId: "storage",
+          propertyPath: "properties.security",
+          expectedValue: "native-value-must-not-leak",
+          disposition: "planned",
+        })),
+      },
+      logicalResourceManifest: { storage: { codeSymbol: "storage", terraformAddress: "azurerm_storage_account.main" } },
+    },
+  });
+  const executed = () => runner.requests.some((entry) => entry.args[0] === "apply" || entry.args[2] === "create");
+  return {
+    root,
+    sourceFile,
+    generatedSource,
+    source,
+    json,
+    runner,
+    bindings,
+    artifacts,
+    makeProvider,
+    policyRequest,
+    executed,
+  };
+}
+
+function rehashPolicy(receipt: PolicyValidationV1): PolicyValidationV1 {
+  const { receiptHash: previousHash, ...body } = receipt;
+  assert.ok(previousHash);
+  return { ...body, receiptHash: calculatePolicyValidationHash(body) };
+}
+
+test("native terraform validateSource leaves accepted source pristine for fresh validation and preview", async (context) => {
+  const fixture = await nativePolicyFixture(context, "terraform");
+  const provider = fixture.makeProvider();
+  const input: NativeValidationRequest = {
+    projectId: "project",
+    runId: "run",
+    sourceHash: hashes.iac,
+    generatedSource: fixture.generatedSource,
+    policyHash: hashes.policy,
+    inputHash: hashes.input,
+  };
+  fixture.source.duringCommand = async (process) => {
+    if (process.args[0] !== "init") return;
+    await mkdir(join(process.cwd!, ".terraform"), { recursive: true });
+    await writeFile(join(process.cwd!, ".terraform", "provider"), Buffer.from([0xff, 0xfe]));
+    await writeFile(join(process.cwd!, ".terraform.lock.hcl"), "new native lock");
+  };
+  const receipt = await provider.validateSource(input);
+  assert.deepEqual(await provider.validateSource(input), receipt);
+  assert.equal(fixture.runner.requests.length, 6);
+  assert.deepEqual(await fixture.makeProvider().validateSource(input), receipt);
+  const scratchRoots = new Set(fixture.runner.requests.map(({ cwd }) => cwd!));
+  assert.equal(scratchRoots.size, 3);
+  for (const root of scratchRoots) {
+    assert.notEqual(root, fixture.root);
+    await assert.rejects(stat(root), { code: "ENOENT" });
+    assert.equal(JSON.stringify(receipt).includes(root), false);
+  }
+  assert.deepEqual(await readdir(fixture.root), [fixture.sourceFile]);
+  assert.equal(await readFile(join(fixture.root, fixture.sourceFile), "utf8"), "terraform {}\n");
+  fixture.source.duringCommand = undefined;
+  await fixture.makeProvider().previewApply(request({ generatedSource: fixture.generatedSource }));
+  assert.deepEqual(await readdir(fixture.root), [fixture.sourceFile]);
+  const previous = fixture.runner.requests.length;
+  await writeFile(join(fixture.root, ".unexpected"), "hidden-source-change");
+  await assert.rejects(provider.validateSource(input), { code: "PREVIEW_HASH_MISMATCH" });
+  assert.equal(fixture.runner.requests.length, previous);
+});
+
+test("native terraform validateSource does not trust unknown, failed, or mistyped outputs", async (context) => {
+  for (const scenario of [
+    "preexisting-cache",
+    "preexisting-lock",
+    "later-cache",
+    "later-lock",
+    "failed-init",
+    "cache-file",
+    "lock-directory",
+    "cache-symlink",
+  ] as const) {
+    await context.test(scenario, async (child) => {
+      const fixture = await nativePolicyFixture(child, "terraform");
+      const provider = fixture.makeProvider();
+      const input: NativeValidationRequest = {
+        projectId: "project",
+        runId: "run",
+        sourceHash: hashes.iac,
+        generatedSource: fixture.generatedSource,
+        policyHash: hashes.policy,
+        inputHash: hashes.input,
+      };
+      const cache = join(fixture.root, ".terraform");
+      const lock = join(fixture.root, ".terraform.lock.hcl");
+      if (scenario.startsWith("later-")) await provider.validateSource(input);
+      if (scenario.endsWith("cache")) await mkdir(cache);
+      if (scenario.endsWith("lock")) await writeFile(lock, "untrusted native lock");
+      if (scenario === "failed-init") {
+        fixture.source.duringInit = async () => {
+          await mkdir(cache);
+          throw new Error("private-init-failure");
+        };
+        await assert.rejects(provider.validateSource(input), { code: "PREVIEW_HASH_MISMATCH" });
+        fixture.source.duringInit = undefined;
+      }
+      if (scenario === "cache-file")
+        fixture.source.duringInit = async () => {
+          await writeFile(cache, "not a cache directory");
+        };
+      if (scenario === "lock-directory")
+        fixture.source.duringInit = async () => {
+          await mkdir(lock);
+        };
+      if (scenario === "cache-symlink")
+        fixture.source.duringInit = async () => {
+          await symlink(fixture.root, cache);
+        };
+      const previous = fixture.runner.requests.length;
+      await assert.rejects(provider.validateSource(input), { code: "PREVIEW_HASH_MISMATCH" });
+      if (!["cache-file", "lock-directory", "cache-symlink"].includes(scenario))
+        assert.equal(fixture.runner.requests.length, previous);
+    });
+  }
+});
+
+test("native terraform validateSource rejects malformed scratch outputs and cleans failed init", async (context) => {
+  for (const scenario of [
+    "cache-file",
+    "lock-directory",
+    "cache-symlink",
+    "lock-symlink",
+    "lock-hardlink",
+    "failed-init",
+  ] as const) {
+    await context.test(scenario, async (child) => {
+      const fixture = await nativePolicyFixture(child, "terraform");
+      fixture.source.duringCommand = async (process) => {
+        if (process.args[0] !== "init") return;
+        const cache = join(process.cwd!, ".terraform");
+        const lock = join(process.cwd!, ".terraform.lock.hcl");
+        if (scenario === "cache-file") await writeFile(cache, "not a cache directory");
+        if (scenario === "lock-directory") await mkdir(lock);
+        if (scenario === "cache-symlink") await symlink(fixture.root, cache);
+        if (scenario === "lock-symlink") await symlink(join(fixture.root, fixture.sourceFile), lock);
+        if (scenario === "lock-hardlink") await link(join(process.cwd!, fixture.sourceFile), lock);
+        if (scenario === "failed-init") {
+          await mkdir(cache);
+          await writeFile(join(cache, "provider"), Buffer.from([0xff]));
+          await writeFile(lock, "new native lock");
+          throw new Error(`private-init-failure ${process.cwd}`);
+        }
+      };
+      await assert.rejects(
+        fixture.makeProvider().validateSource({
+          projectId: "project",
+          runId: "run",
+          sourceHash: hashes.iac,
+          generatedSource: fixture.generatedSource,
+          policyHash: hashes.policy,
+          inputHash: hashes.input,
+        }),
+        { code: scenario === "failed-init" ? "NATIVE_VALIDATION_FAILED" : "PREVIEW_HASH_MISMATCH" },
+      );
+      assert.equal(fixture.runner.requests.length, 1);
+      await assert.rejects(stat(fixture.runner.requests[0]!.cwd!), { code: "ENOENT" });
+      assert.deepEqual(await readdir(fixture.root), [fixture.sourceFile]);
+      assert.equal(await readFile(join(fixture.root, fixture.sourceFile), "utf8"), "terraform {}\n");
+    });
+  }
+});
+
+for (const location of ["original", "scratch"] as const) {
+  test(`native terraform validateSource preserves accepted lockfiles in ${location}`, async (context) => {
+    for (const mutation of ["none", "init", "fmt", "validate"] as const) {
+      await context.test(mutation, async (child) => {
+        const fixture = await nativePolicyFixture(child, "terraform");
+        const lockContent = "accepted native lock";
+        await writeFile(join(fixture.root, ".terraform.lock.hcl"), lockContent);
+        const files = [
+          { path: ".terraform.lock.hcl", content: lockContent },
+          { path: fixture.sourceFile, content: await readFile(join(fixture.root, fixture.sourceFile), "utf8") },
+        ].sort((left, right) => left.path.localeCompare(right.path));
+        const input: NativeValidationRequest = {
+          projectId: "project",
+          runId: "run",
+          sourceHash: hashes.iac,
+          generatedSource: { rootPath: fixture.root, treeHash: sha256(files) },
+          policyHash: hashes.policy,
+          inputHash: hashes.input,
+        };
+        fixture.source.duringCommand = async (process) => {
+          const root = location === "original" ? fixture.root : process.cwd!;
+          assert.equal(await readFile(join(process.cwd!, ".terraform.lock.hcl"), "utf8"), lockContent);
+          if (process.args[0] === mutation) await writeFile(join(root, ".terraform.lock.hcl"), "changed lock");
+        };
+        const provider = fixture.makeProvider();
+        if (mutation === "none") {
+          const receipt = await provider.validateSource(input);
+          assert.deepEqual(await provider.validateSource(input), receipt);
+        } else {
+          await assert.rejects(provider.validateSource(input), { code: "PREVIEW_HASH_MISMATCH" });
+        }
+      });
+    }
+  });
+}
+
+test("installed Bicep validates nested formatting and lint without changing accepted source", async (context) => {
+  const runner = new ProcessRunner();
+  try {
+    await runner.run({ executable: "bicep", args: ["--version"], timeoutMs: 10_000, maxOutputBytes: 4096 });
+  } catch (error) {
+    if ((error as { code?: string }).code === "PROCESS_SPAWN_ERROR") {
+      context.skip("Bicep is not installed");
+      return;
+    }
+    throw error;
+  }
+  for (const scenario of ["pass", "format-drift", "lint-error"] as const) {
+    await context.test(scenario, async (child) => {
+      const root = await mkdtemp(join(tmpdir(), "apex-real-bicep-validation-"));
+      child.after(() => rm(root, { recursive: true, force: true }));
+      const files = [
+        { path: "main.bicep", content: "output result string = 'ok'\n" },
+        {
+          path: "modules/nested.bicep",
+          content:
+            scenario === "format-drift"
+              ? "output result string='ok'\n"
+              : scenario === "lint-error"
+                ? "param unused string = 'value'\n"
+                : "output result string = 'nested'\n",
+        },
+        {
+          path: "bicepconfig.json",
+          content: JSON.stringify({ analyzers: { core: { rules: { "no-unused-params": { level: "error" } } } } }),
+        },
+      ].sort((left, right) => left.path.localeCompare(right.path));
+      await mkdir(join(root, "modules"));
+      for (const file of files) await writeFile(join(root, file.path), file.content);
+      const calls: ProcessRequest[] = [];
+      const provider = new NativeBicepProvider({
+        runner: {
+          run: async (command) => {
+            calls.push(command);
+            return runner.run(command);
+          },
+        },
+        currentAuthority: async () => authority,
+        target: {
+          cwd: root,
+          templateFile: "main.bicep",
+          resourceGroup: "rg",
+          deploymentName: "validation",
+          stackName: "workload",
+          denySettingsMode: "denyDelete",
+        },
+      });
+      const input = {
+        projectId: "project",
+        runId: "run",
+        sourceHash: hashes.iac,
+        policyHash: hashes.policy,
+        inputHash: hashes.input,
+        generatedSource: { rootPath: root, treeHash: sha256(files) },
+      };
+      if (scenario === "pass") {
+        const receipt = await provider.validateSource(input);
+        assert.deepEqual(
+          receipt.commands.map(({ validatorId }) => validatorId),
+          ["bicep:format", "bicep:build", "bicep:lint"],
+        );
+      } else {
+        await assert.rejects(provider.validateSource(input), {
+          code: scenario === "format-drift" ? "PREVIEW_HASH_MISMATCH" : "NATIVE_VALIDATION_FAILED",
+        });
+      }
+      assert.equal(calls.length, scenario === "format-drift" ? 1 : 3);
+      for (const file of files) assert.equal(await readFile(join(root, file.path), "utf8"), file.content);
+      await assert.rejects(stat(calls[0]!.cwd!), { code: "ENOENT" });
+    });
+  }
+});
+
+test("native bicep validateSource requires the accepted main.bicep target", async (context) => {
+  const fixture = await nativePolicyFixture(context, "bicep");
+  await assert.rejects(
+    fixture.makeProvider({ templateFile: "other.bicep" }).validateSource({
+      projectId: "project",
+      runId: "run",
+      sourceHash: hashes.iac,
+      generatedSource: fixture.generatedSource,
+      policyHash: hashes.policy,
+      inputHash: hashes.input,
+    }),
+    { code: "PREVIEW_HASH_MISMATCH" },
+  );
+  assert.equal(fixture.runner.requests.length, 0);
+});
+
+for (const track of ["bicep", "terraform"] as const) {
+  test(`native ${track} validateSource returns a source-bound receipt`, async (context) => {
+    const fixture = await nativePolicyFixture(context, track);
+    const nestedPath = `modules/nested/${fixture.sourceFile}`;
+    const nestedContent = "\uFEFFnested source\r\n";
+    await mkdir(join(fixture.root, "modules", "nested"), { recursive: true });
+    await writeFile(join(fixture.root, nestedPath), nestedContent);
+    fixture.generatedSource.treeHash = sha256(
+      [
+        { path: fixture.sourceFile, content: await readFile(join(fixture.root, fixture.sourceFile), "utf8") },
+        { path: nestedPath, content: nestedContent },
+      ].sort((left, right) => left.path.localeCompare(right.path)),
+    );
+    fixture.source.duringCommand = async (process) => {
+      assert.notEqual(process.cwd, fixture.root);
+      assert.equal(await readFile(join(process.cwd!, nestedPath), "utf8"), nestedContent);
+      assert.deepEqual((await readdir(process.cwd!)).sort(), [fixture.sourceFile, "modules"].sort());
+      assert.equal((await stat(process.cwd!)).mode & 0o777, 0o700);
+      assert.equal((await stat(join(process.cwd!, nestedPath))).nlink, 1);
+    };
+    const provider = fixture.makeProvider();
+    const input: NativeValidationRequest = {
+      projectId: "project",
+      runId: "run",
+      sourceHash: hashes.iac,
+      generatedSource: fixture.generatedSource,
+      policyHash: hashes.policy,
+      inputHash: hashes.input,
+    };
+    const receipt = await provider.validateSource(input);
+    assert.equal(Value.Check(NativeValidationReceiptV1Schema, receipt), true);
+    assert.equal(
+      hasValidNativeValidationReceipt(receipt, { ...input, track, treeHash: input.generatedSource.treeHash }),
+      true,
+    );
+    const { receiptHash, ...body } = receipt;
+    assert.equal(receiptHash, calculateNativeValidationReceiptHash(body));
+    assert.equal(receipt.outcome, "pass");
+    const commands = NATIVE_VALIDATION_COMMANDS[track];
+    assert.deepEqual(
+      commands,
+      track === "bicep"
+        ? [
+            { validatorId: "bicep:format", executable: "bicep", args: ["format", "--pattern", "**/*.bicep"] },
+            { validatorId: "bicep:build", executable: "bicep", args: ["build", "main.bicep", "--stdout"] },
+            {
+              validatorId: "bicep:lint",
+              executable: "bicep",
+              args: ["lint", "--pattern", "**/*.bicep", "--no-restore"],
+            },
+          ]
+        : [
+            {
+              validatorId: "terraform:init-backend-false",
+              executable: "terraform",
+              args: ["init", "-backend=false", "-input=false"],
+            },
+            { validatorId: "terraform:format", executable: "terraform", args: ["fmt", "-check"] },
+            { validatorId: "terraform:validate", executable: "terraform", args: ["validate"] },
+          ],
+    );
+    assert.deepEqual(
+      receipt.commands.map(({ validatorId, commandHash }) => ({ validatorId, commandHash })),
+      commands.map((command) => ({
+        validatorId: command.validatorId,
+        commandHash: calculateNativeValidationCommandHash(command),
+      })),
+    );
+    assert.deepEqual(
+      fixture.runner.requests.map(({ executable, args, cwd }) => ({ executable, args, cwd })),
+      commands.map(({ executable, args }) => ({ executable, args: [...args], cwd: fixture.runner.requests[0]!.cwd })),
+    );
+    const scratchRoot = fixture.runner.requests[0]!.cwd!;
+    assert.notEqual(scratchRoot, fixture.root);
+    await assert.rejects(stat(scratchRoot), { code: "ENOENT" });
+    assert.equal(JSON.stringify(receipt).includes(scratchRoot), false);
+    assert.equal(JSON.stringify(receipt).includes(fixture.root), false);
+    assert.equal(JSON.stringify(receipt).includes(fixture.source.value), false);
+    assert.equal(JSON.stringify(receipt).includes("stdout"), false);
+    assert.equal(JSON.stringify(receipt).includes("stderr"), false);
+    assert.deepEqual(await provider.validateSource(input), receipt);
+  });
+
+  test(`native ${track} validateSource rejects missing, stale, or misbound sources before commands`, async (context) => {
+    for (const failure of [
+      "missing",
+      "missing-file",
+      "stale",
+      "cwd",
+      "relative-root",
+      "symlink",
+      "hardlink",
+      "hidden",
+      "bad-hash",
+    ] as const) {
+      await context.test(failure, async (child) => {
+        const fixture = await nativePolicyFixture(child, track);
+        const input: NativeValidationRequest = {
+          projectId: "project",
+          runId: "run",
+          sourceHash: hashes.iac,
+          generatedSource: fixture.generatedSource,
+          policyHash: hashes.policy,
+          inputHash: hashes.input,
+        };
+        if (failure === "missing-file") await rm(join(fixture.root, fixture.sourceFile));
+        if (failure === "stale") await writeFile(join(fixture.root, fixture.sourceFile), "private-source-changed");
+        if (failure === "hidden") await writeFile(join(fixture.root, ".unexpected"), "private-hidden-content");
+        if (failure === "symlink") await symlink(join(fixture.root, fixture.sourceFile), join(fixture.root, "alias"));
+        if (failure === "hardlink") {
+          const other = await nativePolicyFixture(child, track);
+          await rm(join(fixture.root, fixture.sourceFile));
+          await link(join(other.root, other.sourceFile), join(fixture.root, fixture.sourceFile));
+        }
+        const malformed =
+          failure === "missing"
+            ? { ...input, generatedSource: undefined }
+            : failure === "relative-root"
+              ? { ...input, generatedSource: { ...input.generatedSource, rootPath: "." } }
+              : failure === "bad-hash"
+                ? { ...input, inputHash: "private-invalid-hash" }
+                : input;
+        await assert.rejects(
+          fixture
+            .makeProvider(failure === "cwd" ? { cwd: tmpdir() } : {})
+            .validateSource(malformed as NativeValidationRequest),
+          (error: unknown) => {
+            assert.ok(error instanceof IacProviderError);
+            assert.equal(
+              error.code,
+              failure === "bad-hash" ? "NATIVE_VALIDATION_INPUT_INVALID" : "PREVIEW_HASH_MISMATCH",
+            );
+            assert.equal(JSON.stringify(error).includes("private-"), false);
+            assert.equal(error.message.includes(fixture.root), false);
+            return true;
+          },
+        );
+        assert.equal(fixture.runner.requests.length, 0);
+      });
+    }
+  });
+
+  test(`native ${track} validateSource rejects every unsuccessful process result without output leakage`, async (context) => {
+    const failures: Array<Partial<ProcessResult> | "throw"> = [
+      { exitCode: 1 },
+      { exitCode: null },
+      { signal: "SIGTERM" },
+      { timedOut: true },
+      { outputTruncated: true },
+      "throw",
+    ];
+    for (const failure of failures) {
+      for (const command of NATIVE_VALIDATION_COMMANDS[track]) {
+        await context.test(`${command.validatorId} ${JSON.stringify(failure)}`, async (child) => {
+          const fixture = await nativePolicyFixture(child, track);
+          const run = fixture.runner.run.bind(fixture.runner);
+          fixture.runner.run = async (process) => {
+            const result = await run(process);
+            if (process.args[0] !== command.args[0]) return result;
+            if (failure === "throw") throw new Error(`private-source ${fixture.root}`);
+            return {
+              ...result,
+              stdout: `private-source ${fixture.root}`,
+              stderr: "private-diagnostic-secret",
+              ...failure,
+            };
+          };
+          await assert.rejects(
+            fixture.makeProvider().validateSource({
+              projectId: "project",
+              runId: "run",
+              sourceHash: hashes.iac,
+              generatedSource: fixture.generatedSource,
+              policyHash: hashes.policy,
+              inputHash: hashes.input,
+            }),
+            (error: unknown) => {
+              assert.ok(error instanceof IacProviderError);
+              assert.equal(error.code, "NATIVE_VALIDATION_FAILED");
+              assert.equal(error.message, "Native validation command failed");
+              assert.deepEqual(Object.keys(error).sort(), ["code", "name"]);
+              assert.equal(JSON.stringify(error).includes("private-"), false);
+              return true;
+            },
+          );
+          assert.equal(
+            fixture.runner.requests.length,
+            NATIVE_VALIDATION_COMMANDS[track].findIndex((entry) => entry.validatorId === command.validatorId) + 1,
+          );
+          await assert.rejects(stat(fixture.runner.requests[0]!.cwd!), { code: "ENOENT" });
+        });
+      }
+    }
+  });
+
+  for (const location of ["original", "scratch"] as const) {
+    test(`native ${track} validateSource checks ${location} source after each command`, async (context) => {
+      for (const command of NATIVE_VALIDATION_COMMANDS[track]) {
+        for (const mutation of ["edit", "remove", "extra", "hidden", "symlink", "hardlink"] as const) {
+          await context.test(`${command.validatorId} ${mutation}`, async (child) => {
+            const fixture = await nativePolicyFixture(child, track);
+            fixture.source.duringCommand = async (process) => {
+              if (process.args[0] !== command.args[0]) return;
+              const root = location === "original" ? fixture.root : process.cwd!;
+              const path = join(root, fixture.sourceFile);
+              if (mutation === "edit") await writeFile(path, "private-source-tamper");
+              if (mutation === "remove") await rm(path);
+              if (mutation === "extra") await writeFile(join(root, "extra.tf"), "private-source-extra");
+              if (mutation === "hidden") await writeFile(join(root, ".unexpected"), "private-source-hidden");
+              if (mutation === "symlink") {
+                await rm(path);
+                await symlink(join(fixture.root, "missing"), path);
+              }
+              if (mutation === "hardlink") {
+                const other = await nativePolicyFixture(child, track);
+                await rm(path);
+                await link(join(other.root, other.sourceFile), path);
+              }
+            };
+            await assert.rejects(
+              fixture.makeProvider().validateSource({
+                projectId: "project",
+                runId: "run",
+                sourceHash: hashes.iac,
+                generatedSource: fixture.generatedSource,
+                policyHash: hashes.policy,
+                inputHash: hashes.input,
+              }),
+              { code: "PREVIEW_HASH_MISMATCH" },
+            );
+            assert.equal(
+              fixture.runner.requests.length,
+              NATIVE_VALIDATION_COMMANDS[track].findIndex((entry) => entry.validatorId === command.validatorId) + 1,
+            );
+            await assert.rejects(stat(fixture.runner.requests[0]!.cwd!), { code: "ENOENT" });
+          });
+        }
+      }
+    });
+  }
+
+  test(`native ${track} binds generated source before commands and after evaluation`, async (context) => {
+    for (const mutation of ["none", "before", "during", "extra", "extra-during", "removed-during"] as const) {
+      await context.test(mutation, async (child) => {
+        const fixture = await nativePolicyFixture(child, track);
+        const { generatedSource } = fixture;
+        if (mutation === "before") await writeFile(join(fixture.root, fixture.sourceFile), "changed");
+        if (mutation === "during") {
+          fixture.source.duringPreview = async () => writeFile(join(fixture.root, fixture.sourceFile), "changed");
+        }
+        if (mutation === "extra") await writeFile(join(fixture.root, "extra.tf"), "unbound");
+        if (mutation === "extra-during") {
+          fixture.source.duringPreview = async () => writeFile(join(fixture.root, "extra.tf"), "unbound");
+        }
+        if (mutation === "removed-during") {
+          fixture.source.duringPreview = async () => rm(join(fixture.root, fixture.sourceFile));
+        }
+        const provider = fixture.makeProvider();
+        const preview = provider.previewApply({ ...fixture.policyRequest, generatedSource });
+        if (mutation === "none") {
+          const result = await preview;
+          assert.deepEqual(result.blockers, []);
+          assert.equal(provider.policyValidation(result.previewHash)!.sourceHash, hashes.iac);
+        } else {
+          await assert.rejects(
+            preview,
+            (error) => error instanceof IacProviderError && error.code === "PREVIEW_HASH_MISMATCH",
+          );
+          assert.equal(fixture.bindings.values.size, 0);
+          assert.equal(fixture.artifacts.values.size, 0);
+          if (mutation === "before" || mutation === "extra") assert.equal(fixture.runner.requests.length, 0);
+        }
+      });
+    }
+  });
+
+  test(`native ${track} generated source rejects unrelated roots and symlinks`, async (context) => {
+    for (const mismatch of ["cwd", "root-link", "file-link", "directory-link", "relative-root"] as const) {
+      await context.test(mismatch, async (child) => {
+        const fixture = await nativePolicyFixture(child, track);
+        const other = await nativePolicyFixture(child, track);
+        let rootPath = fixture.root;
+        if (mismatch === "root-link") {
+          rootPath = join(other.root, "alias");
+          await symlink(fixture.root, rootPath, "dir");
+        }
+        if (mismatch === "file-link") {
+          await rm(join(fixture.root, fixture.sourceFile));
+          await symlink(join(other.root, other.sourceFile), join(fixture.root, fixture.sourceFile));
+        }
+        if (mismatch === "directory-link") await symlink(other.root, join(fixture.root, "modules"), "dir");
+        if (mismatch === "relative-root") rootPath = ".";
+        const provider = fixture.makeProvider({ cwd: mismatch === "cwd" ? other.root : rootPath });
+        await assert.rejects(
+          provider.previewApply({
+            ...fixture.policyRequest,
+            generatedSource: { ...fixture.generatedSource, rootPath },
+          }),
+          (error) => error instanceof IacProviderError && error.code === "PREVIEW_HASH_MISMATCH",
+        );
+        assert.equal(fixture.runner.requests.length, 0);
+      });
+    }
+  });
+
+  test(`native ${track} checks sorted nested sources with and without policy`, async (context) => {
+    for (const withPolicy of [true, false]) {
+      for (const mutate of [false, true]) {
+        const fixture = await nativePolicyFixture(context, track);
+        const path = `modules/${fixture.sourceFile}`;
+        await mkdir(join(fixture.root, "modules"));
+        const content = "nested source\n";
+        await writeFile(join(fixture.root, path), content);
+        const generatedSource = {
+          rootPath: fixture.root,
+          treeHash: sha256(
+            [
+              { path, content },
+              { path: fixture.sourceFile, content: await readFile(join(fixture.root, fixture.sourceFile), "utf8") },
+            ].sort((left, right) => left.path.localeCompare(right.path)),
+          ),
+        };
+        if (mutate) fixture.source.duringPreview = async () => writeFile(join(fixture.root, path), "changed module");
+        const previewRequest = withPolicy ? fixture.policyRequest : request();
+        const provider = fixture.makeProvider();
+        if (mutate) {
+          await assert.rejects(
+            provider.previewApply({ ...previewRequest, generatedSource }),
+            (error) => error instanceof IacProviderError && error.code === "PREVIEW_HASH_MISMATCH",
+          );
+        } else {
+          const preview = await provider.previewApply({ ...previewRequest, generatedSource });
+          assert.deepEqual(preview.blockers, []);
+          assert.equal(provider.policyValidation(preview.previewHash) !== undefined, withPolicy);
+          assert.deepEqual((await provider.previewDestroy({ ...previewRequest, generatedSource })).blockers, []);
+        }
+      }
+    }
+  });
+
+  test(`native ${track} bounds generated tree bytes and rejects invalid UTF-8`, async (context) => {
+    for (const oversized of [true, false]) {
+      const fixture = await nativePolicyFixture(context, track);
+      const content = oversized ? Buffer.alloc(16 * 1024 * 1024 + 1, "x") : Buffer.from([0xff]);
+      await writeFile(join(fixture.root, fixture.sourceFile), content);
+      const generatedSource = {
+        rootPath: fixture.root,
+        treeHash: sha256([{ path: fixture.sourceFile, content: content.toString("utf8") }]),
+      };
+      await assert.rejects(
+        fixture.makeProvider().previewApply({ ...fixture.policyRequest, generatedSource }),
+        (error) => error instanceof IacProviderError && error.code === "PREVIEW_HASH_MISMATCH",
+      );
+      assert.equal(fixture.runner.requests.length, 0);
+    }
+  });
+
+  test(`native ${track} policy receipts bind actual output and survive restart without replacing approval`, async (context) => {
+    const fixture = await nativePolicyFixture(context, track);
+    const provider = fixture.makeProvider();
+    const preview = await provider.previewApply(fixture.policyRequest);
+    assert.deepEqual(preview.blockers, []);
+    const receipt = provider.policyValidation(preview.previewHash)!;
+    const binding = fixture.bindings.values.get(preview.previewHash)!;
+    assert.deepEqual(nativePolicyValidationBinding(receipt), {
+      track,
+      sourceHash: receipt.sourceHash,
+      policyMapHash: receipt.policyMapHash,
+      policyMapContentHash: receipt.policyMapContentHash,
+      logicalResourceManifestHash: receipt.logicalResourceManifestHash,
+      inputHash: receipt.inputHash,
+      receiptHash: receipt.receiptHash,
+    });
+    assert.deepEqual(binding.policyValidationBinding, nativePolicyValidationBinding(receipt));
+    assert.equal(receipt.outcome, "pass");
+    assert.equal(receipt.results.length, 3);
+    assert.equal(receipt.sourceHash, fixture.policyRequest.iacHash);
+    assert.equal(receipt.policyMapHash, fixture.policyRequest.policyHash);
+    assert.equal(receipt.inputHash, createHash("sha256").update(fixture.json()).digest("hex"));
+    assert.equal(hasValidPolicyValidation(receipt, binding.policyValidationBinding!), true);
+    assert.equal(JSON.stringify(binding).includes("native-value-must-not-leak"), false);
+    assert.equal(JSON.stringify(receipt).includes('expectedValue"'), false);
+    assert.equal(JSON.stringify(receipt).includes('observedValue"'), false);
+    assert.notEqual(receipt.sourceHash, receipt.inputHash);
+    assert.equal(fixture.executed(), false);
+    const restarted = fixture.makeProvider();
+    await assert.rejects(
+      restarted.apply(preview, { ...approval(preview), decision: "rejected" }, authority),
+      (error) => error instanceof IacProviderError && error.code === "APPROVAL_REJECTED",
+    );
+    assert.equal(fixture.executed(), false);
+    await fixture.bindings.save(preview.previewHash, JSON.parse(JSON.stringify(binding)) as PersistedPreviewBinding);
+    assert.equal((await restarted.apply(preview, approval(preview), authority)).state, "succeeded");
+    assert.deepEqual(restarted.policyValidation(preview.previewHash), receipt);
+    receipt.results.length = 0;
+    assert.equal(provider.policyValidation(preview.previewHash)!.results.length, 3);
+    if (track === "terraform") {
+      assert.equal(fixture.runner.requests.filter((entry) => entry.args[0] === "show").length, 1);
+    }
+  });
+
+  test(`native ${track} policy mismatches and unsupported expressions block with diagnostic receipts`, async (context) => {
+    for (const [value, outcome, reason] of [
+      ["actual-private-mismatch", "fail", "value-mismatch"],
+      [track === "bicep" ? "[parameters('security')]" : "${var.security}", "unsupported", "unsupported-expression"],
+    ] as const) {
+      await context.test(outcome, async (child) => {
+        const fixture = await nativePolicyFixture(child, track);
+        fixture.source.value = value;
+        const provider = fixture.makeProvider();
+        const preview = await provider.previewApply(fixture.policyRequest);
+        const receipt = provider.policyValidation(preview.previewHash)!;
+        assert.equal(receipt.outcome, outcome);
+        assert.equal(receipt.results[0]!.reason, reason);
+        assert.equal(preview.blockers.length, 3);
+        assert.equal(JSON.stringify(receipt).includes(value), false);
+        await assert.rejects(
+          fixture.makeProvider().apply(preview, approval(preview), authority),
+          (error) => error instanceof IacProviderError && error.code === "PREVIEW_BLOCKED",
+        );
+        assert.equal(fixture.executed(), false);
+      });
+    }
+  });
+
+  test(`native ${track} policy exemptions block, while empty baselines and destroy skip`, async (context) => {
+    const fixture = await nativePolicyFixture(context, track);
+    fixture.policyRequest.policyValidation!.policyMap.mappings[0]!.disposition = "exempt";
+    const provider = fixture.makeProvider();
+    const exempt = await provider.previewApply(fixture.policyRequest);
+    assert.equal(provider.policyValidation(exempt.previewHash)!.results[0]!.reason, "unverified-exemption");
+    assert.equal(exempt.blockers.length, 1);
+    const destroy = await provider.previewDestroy(fixture.policyRequest);
+    assert.equal(provider.policyValidation(destroy.previewHash), undefined);
+    fixture.policyRequest.policyValidation!.policyMap.mappings.length = 0;
+    const empty = await provider.previewApply(fixture.policyRequest);
+    assert.equal(provider.policyValidation(empty.previewHash), undefined);
+    assert.equal(fixture.bindings.values.get(empty.previewHash)!.policyValidationBinding, undefined);
+    assert.deepEqual(empty.blockers, []);
+    await fixture.makeProvider().apply(empty, approval(empty), authority);
+    if (track === "bicep") {
+      assert.equal(fixture.runner.requests.filter((entry) => entry.executable === "bicep").length, 1);
+    }
+  });
+
+  test(`native ${track} rejects restarted policy receipt omission and tampering`, async (context) => {
+    const fixture = await nativePolicyFixture(context, track);
+    const preview = await fixture.makeProvider().previewApply(fixture.policyRequest);
+    const original = fixture.bindings.values.get(preview.previewHash)!;
+    const { policyValidation: receipt, policyValidationBinding: expectation, ...native } = original;
+    assert.ok(receipt);
+    assert.ok(expectation);
+    const mutations: Record<string, PersistedPreviewBinding> = {
+      "omit receipt": { ...native, policyValidationBinding: expectation },
+      "omit expectation": { ...native, policyValidation: receipt },
+      "omit both": native,
+      "receipt hash": { ...original, policyValidation: { ...receipt, receiptHash: "f".repeat(64) } },
+      results: { ...original, policyValidation: { ...receipt, results: [] } },
+    };
+    for (const field of [
+      "sourceHash",
+      "policyMapHash",
+      "policyMapContentHash",
+      "logicalResourceManifestHash",
+      "inputHash",
+    ] as const) {
+      const changed = rehashPolicy({ ...receipt, [field]: "f".repeat(64) });
+      mutations[field] = {
+        ...original,
+        policyValidation: changed,
+        policyValidationBinding: { ...expectation, [field]: changed[field], receiptHash: changed.receiptHash },
+      };
+    }
+    const changedResults = rehashPolicy({
+      ...receipt,
+      results: receipt.results.map((result) => ({ ...result, mappingHash: "f".repeat(64) })),
+    });
+    mutations["rehashed results"] = {
+      ...original,
+      policyValidation: changedResults,
+      policyValidationBinding: { ...expectation, receiptHash: changedResults.receiptHash },
+    };
+    for (const [name, binding] of Object.entries(mutations)) {
+      await context.test(name, async () => {
+        await fixture.bindings.save(
+          preview.previewHash,
+          JSON.parse(JSON.stringify(binding)) as PersistedPreviewBinding,
+        );
+        await assert.rejects(
+          fixture.makeProvider().apply(preview, approval(preview), authority),
+          (error) => error instanceof IacProviderError && error.code === "PREVIEW_HASH_MISMATCH",
+        );
+        assert.equal(fixture.executed(), false);
+      });
+    }
+  });
+
+  test(`native ${track} source drift during and after preview cannot bypass native binding`, async (context) => {
+    const fixture = await nativePolicyFixture(context, track);
+    const provider = fixture.makeProvider();
+    const preview = await provider.previewApply(fixture.policyRequest);
+    if (track === "bicep") fixture.source.value = "changed-compiler-output";
+    else fixture.source.configHash = "f".repeat(64);
+    await assert.rejects(
+      fixture.makeProvider().apply(preview, approval(preview), authority),
+      (error) => error instanceof IacProviderError && error.code === "PREVIEW_HASH_MISMATCH",
+    );
+    fixture.source.value = "native-value-must-not-leak";
+    fixture.source.configHash = hashes.iac;
+    fixture.source.duringPreview = async () => {
+      if (track === "bicep") await writeFile(join(fixture.root, "main.bicep"), "changed-source");
+      else fixture.source.configHash = "f".repeat(64);
+    };
+    const drifted = await provider.previewApply(fixture.policyRequest);
+    assert.match(drifted.blockers.join("\n"), /changed during policy validation preview/);
+    assert.ok(provider.policyValidation(drifted.previewHash));
+    await assert.rejects(
+      fixture.makeProvider().apply(drifted, approval(drifted), authority),
+      (error) => error instanceof IacProviderError && error.code === "PREVIEW_BLOCKED",
+    );
+    assert.equal(fixture.executed(), false);
+  });
+}
+
+test("native Bicep generated binding requires main.bicep and accepted parameters", async (context) => {
+  for (const mismatch of [
+    "compiled",
+    "other-entrypoint",
+    "outside-entrypoint",
+    "outside-parameters",
+    "none",
+  ] as const) {
+    await context.test(mismatch, async (child) => {
+      const fixture = await nativePolicyFixture(child, "bicep");
+      const files = [
+        { path: "main.bicep", content: await readFile(join(fixture.root, "main.bicep"), "utf8") },
+        { path: "main.json", content: "{}" },
+        { path: "other.bicep", content: "targetScope = 'resourceGroup'\n" },
+        { path: "parameters.json", content: "{}" },
+      ].sort((left, right) => left.path.localeCompare(right.path));
+      for (const file of files) await writeFile(join(fixture.root, file.path), file.content);
+      const generatedSource = { rootPath: fixture.root, treeHash: sha256(files) };
+      const provider = fixture.makeProvider({
+        templateFile:
+          mismatch === "compiled"
+            ? "main.json"
+            : mismatch === "other-entrypoint"
+              ? "other.bicep"
+              : mismatch === "outside-entrypoint"
+                ? "../main.bicep"
+                : "main.bicep",
+        parametersFile: mismatch === "outside-parameters" ? "../parameters.json" : "parameters.json",
+      });
+      if (mismatch === "none") {
+        assert.deepEqual((await provider.previewApply({ ...fixture.policyRequest, generatedSource })).blockers, []);
+        await provider.validate();
+        assert.ok(
+          fixture.runner.requests
+            .filter((entry) => entry.executable === "bicep")
+            .every((entry) => entry.args.includes("--stdout")),
+        );
+      } else {
+        await assert.rejects(
+          provider.previewApply({ ...fixture.policyRequest, generatedSource }),
+          (error) => error instanceof IacProviderError && error.code === "PREVIEW_HASH_MISMATCH",
+        );
+        assert.equal(fixture.runner.requests.length, 0);
+      }
+    });
+  }
+});
+
+test("native Terraform generated binding allows only newly created native outputs", async (context) => {
+  for (const extra of ["none", "extra.tf", "extra.tf.json", "modules/main.tf", "other.tfplan", "main.json"] as const) {
+    await context.test(extra, async (child) => {
+      const fixture = await nativePolicyFixture(child, "terraform");
+      fixture.source.duringInit = async () => {
+        await mkdir(join(fixture.root, ".terraform", "modules"), { recursive: true });
+        await writeFile(join(fixture.root, ".terraform", "modules", "modules.json"), "{}");
+        await writeFile(join(fixture.root, ".terraform.lock.hcl"), "provider lock");
+      };
+      if (extra !== "none") {
+        fixture.source.duringShow = async () => {
+          await mkdir(join(fixture.root, "modules"), { recursive: true });
+          await writeFile(join(fixture.root, extra), "unbound source");
+        };
+      }
+      const preview = fixture
+        .makeProvider()
+        .previewApply({ ...fixture.policyRequest, generatedSource: fixture.generatedSource });
+      if (extra === "none") assert.deepEqual((await preview).blockers, []);
+      else {
+        await assert.rejects(
+          preview,
+          (error) => error instanceof IacProviderError && error.code === "PREVIEW_HASH_MISMATCH",
+        );
+        assert.equal(fixture.bindings.values.size, 0);
+        assert.equal(fixture.artifacts.values.size, 0);
+      }
+      await assert.rejects(stat(join(fixture.root, "policy.tfplan")), /ENOENT/);
+    });
+  }
+});
+
+test("native Terraform generated binding never exempts accepted lockfiles or source plan paths", async (context) => {
+  for (const mutation of ["lockfile", "entrypoint", "unbound-source", "during-init"] as const) {
+    const fixture = await nativePolicyFixture(context, "terraform");
+    const files = [
+      { path: ".terraform.lock.hcl", content: "accepted lock" },
+      { path: "main.tf", content: await readFile(join(fixture.root, "main.tf"), "utf8") },
+    ].sort((left, right) => left.path.localeCompare(right.path));
+    await writeFile(
+      join(fixture.root, ".terraform.lock.hcl"),
+      files.find(({ path }) => path === ".terraform.lock.hcl")!.content,
+    );
+    const generatedSource = { rootPath: fixture.root, treeHash: sha256(files) };
+    if (mutation === "lockfile")
+      fixture.source.duringInit = async () => writeFile(join(fixture.root, ".terraform.lock.hcl"), "changed lock");
+    if (mutation === "during-init")
+      fixture.source.duringInit = async () => writeFile(join(fixture.root, "main.tf"), "changed source");
+    const provider = fixture.makeProvider({
+      ...(mutation === "entrypoint" ? { planPath: join(fixture.root, "main.tf") } : {}),
+      ...(mutation === "unbound-source" ? { planPath: join(fixture.root, "extra.tf") } : {}),
+    });
+    await assert.rejects(
+      provider.previewApply({ ...fixture.policyRequest, generatedSource }),
+      (error) => error instanceof IacProviderError && error.code === "PREVIEW_HASH_MISMATCH",
+    );
+    assert.equal(fixture.bindings.values.size, 0);
+    if (mutation === "entrypoint" || mutation === "unbound-source") assert.equal(fixture.runner.requests.length, 0);
+  }
+});
+
+test("native generated binding does not ignore artifacts present before preview", async (context) => {
+  for (const track of ["bicep", "terraform"] as const) {
+    const fixture = await nativePolicyFixture(context, track);
+    await writeFile(join(fixture.root, track === "bicep" ? "main.json" : ".terraform.lock.hcl"), "unaccepted output");
+    await assert.rejects(
+      fixture.makeProvider().previewApply({ ...fixture.policyRequest, generatedSource: fixture.generatedSource }),
+      (error) => error instanceof IacProviderError && error.code === "PREVIEW_HASH_MISMATCH",
+    );
+    assert.equal(fixture.runner.requests.length, 0);
+  }
+});
+
+test("native Bicep unavailable or invalid compiler JSON preserves unsupported receipts", async (context) => {
+  for (const failure of ["invalid", "compileFailed"] as const) {
+    const fixture = await nativePolicyFixture(context, "bicep");
+    fixture.source[failure] = true;
+    const provider = fixture.makeProvider();
+    const preview = await provider.previewApply(fixture.policyRequest);
+    assert.equal(provider.policyValidation(preview.previewHash)!.outcome, "unsupported");
+    assert.equal(provider.policyValidation(preview.previewHash)!.results[0]!.reason, "invalid-source");
+    assert.ok(preview.blockers.length >= 3);
+    assert.equal(JSON.stringify(preview).includes("private source"), false);
+    assert.equal(fixture.executed(), false);
+  }
+});
+
+test("native Terraform unknown saved-plan values remain unsupported", async (context) => {
+  const fixture = await nativePolicyFixture(context, "terraform");
+  fixture.source.unknown = true;
+  const provider = fixture.makeProvider();
+  const preview = await provider.previewApply(fixture.policyRequest);
+  const receipt = provider.policyValidation(preview.previewHash)!;
+  assert.equal(receipt.outcome, "unsupported");
+  assert.equal(receipt.results[0]!.reason, "unsupported-expression");
+  await assert.rejects(
+    fixture.makeProvider().apply(preview, approval(preview), authority),
+    (error) => error instanceof IacProviderError && error.code === "PREVIEW_BLOCKED",
+  );
+  assert.equal(fixture.executed(), false);
+});
+
+test("native Terraform detects saved-plan byte mutation during show-json", async (context) => {
+  const fixture = await nativePolicyFixture(context, "terraform");
+  fixture.source.duringShow = async () => writeFile(join(fixture.root, "policy.tfplan"), "replaced-plan");
+  const provider = fixture.makeProvider();
+  const preview = await provider.previewApply(fixture.policyRequest);
+  assert.match(preview.blockers.join("\n"), /saved plan changed during policy validation/);
+  assert.ok(provider.policyValidation(preview.previewHash));
+  await assert.rejects(
+    fixture.makeProvider().apply(preview, approval(preview), authority),
+    (error) => error instanceof IacProviderError && error.code === "PREVIEW_BLOCKED",
+  );
+  assert.equal(fixture.executed(), false);
+});
+
 test("Azure and Terraform normalizers block unknown or unevaluated changes", () => {
   const azure = normalizeAzureWhatIf({
     properties: {
@@ -184,6 +1313,44 @@ test("normalizers block missing, duplicate, and malformed material change identi
     ],
   });
   assert.match(terraform.blockers.join("\n"), /no stable resource address|duplicate material|malformed/);
+});
+
+test("Terraform normalization cannot turn incomplete or malformed plan evidence into safe changes", () => {
+  for (const plan of [
+    { resource_changes: [], complete: false },
+    { resource_changes: "invalid" },
+    { resource_changes: [], deferred_changes: {} },
+    { resource_changes: [], complete: "true" },
+    { resource_changes: [], errored: "false" },
+    { resource_changes: [{ address: "azapi_resource.main", change: { actions: ["no-op", 42] } }] },
+    { resource_changes: [{ address: "azapi_resource.main", change: { actions: ["create", null] } }] },
+  ]) {
+    const normalized = normalizeTerraformPlan(plan);
+    assert.ok(normalized.blockers.length > 0, JSON.stringify(plan));
+  }
+  const noOp = normalizeTerraformPlan({ resource_changes: [], complete: true, errored: false });
+  assert.deepEqual(noOp, { changes: [], blockers: [] });
+  assert.deepEqual(normalizeTerraformPlan({ terraform_version: "1.7.5", format_version: "1.2" }), {
+    changes: [],
+    blockers: [],
+  });
+});
+
+test("native Terraform incomplete plans block apply even without policy mappings", async (context) => {
+  for (const withPolicy of [false, true]) {
+    await context.test(`policy=${withPolicy}`, async (child) => {
+      const fixture = await nativePolicyFixture(child, "terraform");
+      fixture.source.complete = false;
+      const provider = fixture.makeProvider();
+      const preview = await provider.previewApply(withPolicy ? fixture.policyRequest : request());
+      assert.match(preview.blockers.join("\n"), /plan is incomplete/);
+      await assert.rejects(
+        provider.apply(preview, approval(preview), authority),
+        (error) => error instanceof IacProviderError && error.code === "PREVIEW_BLOCKED",
+      );
+      assert.equal(fixture.executed(), false);
+    });
+  }
 });
 
 function stack(name: string, resourceGroup = "rg", resources: unknown[] = []) {

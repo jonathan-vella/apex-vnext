@@ -37,13 +37,7 @@ infra/
     └── *.bicep
 ```
 
-### 2. Generate Deployment Scripts
-
-Create deployment scripts for provisioning.
-
-→ [scripts.md](scripts.md)
-
-### 3. Generate Dockerfiles (if containerized)
+### 2. Generate Dockerfiles (if containerized)
 
 Manual Dockerfile creation required.
 
@@ -54,7 +48,6 @@ Manual Dockerfile creation required.
 | Main Bicep    | `./main.bicep`                        |
 | Parameters    | `./main.parameters.json`              |
 | Modules       | `./modules/*.bicep`                   |
-| Deploy script | `./scripts/deploy.sh` or `deploy.ps1` |
 | Dockerfiles   | `src/<service>/Dockerfile`            |
 
 ## Deployment Commands

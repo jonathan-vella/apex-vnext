@@ -10,8 +10,9 @@ npm run build:vnext
 npm run validate:vnext
 ```
 
-Use the development container for the complete cross-platform toolchain. Work on a short-lived conventional branch and
-keep unrelated user changes intact.
+Use the [Windows and WSL2 setup automation](prepare-windows-11.md#automated-repository-setup) for the development
+toolchain without a devcontainer. Activate the repository `.venv` before Python checks. Work on a short-lived
+conventional branch and keep unrelated user changes intact.
 
 ## Respect Package Boundaries
 

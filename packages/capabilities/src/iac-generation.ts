@@ -91,12 +91,9 @@ function normalizeRelativePath(value: string): string {
   return segments.join("/");
 }
 
-function parseBinding(implementation: string, declaredVersion: string): ParsedBinding {
+function parseImplementation(implementation: string): ParsedBinding {
   const native = NATIVE_IMPLEMENTATION.exec(implementation);
   if (native !== null) {
-    if (declaredVersion !== "legacy" && declaredVersion !== native[2]) {
-      throw new TypeError(`Binding version '${declaredVersion}' does not match implementation pin '${native[2]}'`);
-    }
     return { kind: "native", source: native[1]!, version: native[2]! };
   }
   const avm = AVM_IMPLEMENTATION.exec(implementation);
@@ -104,10 +101,15 @@ function parseBinding(implementation: string, declaredVersion: string): ParsedBi
   const version = avm[2]!;
   if (!EXACT_VERSION.test(version))
     throw new TypeError(`AVM implementation '${implementation}' must use an exact version`);
-  if (declaredVersion !== "legacy" && declaredVersion !== version) {
-    throw new TypeError(`Binding version '${declaredVersion}' does not match implementation pin '${version}'`);
-  }
   return { kind: "avm", source: avm[1]!, version };
+}
+
+function parseBinding(implementation: string, declaredVersion: string): ParsedBinding {
+  const parsed = parseImplementation(implementation);
+  if (declaredVersion !== parsed.version) {
+    throw new TypeError(`Binding version '${declaredVersion}' does not match implementation pin '${parsed.version}'`);
+  }
+  return parsed;
 }
 
 function resourceContexts(intent: ImplementationIntentV1, binding: IacBindingV1): ResourceContext[] {
@@ -274,6 +276,7 @@ function virtualTree(
 function manifest(
   intent: ImplementationIntentV1,
   binding: IacBindingV1,
+  contexts: readonly ResourceContext[],
   sourcePath: string,
   existing: ReadonlySet<string>,
 ): LogicalResourceManifestV1 {
@@ -282,24 +285,30 @@ function manifest(
     projectId: intent.projectId,
     runId: intent.runId,
     track: binding.track,
-    resources: [...intent.resources]
-      .sort((left, right) => left.id.localeCompare(right.id))
-      .map((resource) => ({
-        logicalId: resource.id,
-        type: resource.type,
-        implementationAddress: binding.resourceBindings[resource.id]!.implementation,
-        implementationKind: existing.has(resource.id)
-          ? binding.track === "terraform"
-            ? ("data" as const)
-            : ("existing" as const)
-          : binding.resourceBindings[resource.id]!.implementation.startsWith("avm:")
-            ? ("module" as const)
-            : ("resource" as const),
-        ownership: existing.has(resource.id) ? ("existing" as const) : ("managed" as const),
-        dependsOn: [...resource.dependsOn].sort(),
-        generatedDependencies: [...resource.dependsOn].sort(),
-        sourcePath,
-      })),
+    resources: contexts.map(({ resource, declaration, parsed }) => ({
+      logicalId: resource.id,
+      type: resource.type,
+      implementationAddress: binding.resourceBindings[resource.id]!.implementation,
+      executionAddress:
+        binding.track === "bicep"
+          ? declaration
+          : parsed.kind === "avm"
+            ? `module.${declaration}`
+            : existing.has(resource.id)
+              ? `data.azapi_resource.${declaration}`
+              : `azapi_resource.${declaration}`,
+      implementationKind: existing.has(resource.id)
+        ? binding.track === "terraform"
+          ? ("data" as const)
+          : ("existing" as const)
+        : binding.resourceBindings[resource.id]!.implementation.startsWith("avm:")
+          ? ("module" as const)
+          : ("resource" as const),
+      ownership: existing.has(resource.id) ? ("existing" as const) : ("managed" as const),
+      dependsOn: [...resource.dependsOn].sort(),
+      generatedDependencies: [...resource.dependsOn].sort(),
+      sourcePath,
+    })),
   };
 }
 
@@ -371,7 +380,7 @@ export function generateBicepTree(
     ["targetScope = 'resourceGroup'", descriptions, blocks.join("\n\n")]
       .filter((part) => part.length > 0)
       .join("\n\n") + "\n";
-  return virtualTree([{ path: "main.bicep", content }], manifest(intent, binding, "main.bicep", existing));
+  return virtualTree([{ path: "main.bicep", content }], manifest(intent, binding, contexts, "main.bicep", existing));
 }
 
 function exactProviderConstraint(value: string | undefined, fallback: string, label: string): string {
@@ -467,11 +476,11 @@ export function generateTerraformTree(
   ];
   if (options.lockFileContent !== undefined)
     files.push({ path: ".terraform.lock.hcl", content: options.lockFileContent });
-  return virtualTree(files, manifest(intent, binding, "main.tf", existing));
+  return virtualTree(files, manifest(intent, binding, contexts, "main.tf", existing));
 }
 
 function logicalImplementation(value: string): string {
-  const parsed = parseBinding(value, "legacy");
+  const parsed = parseImplementation(value);
   return `${parsed.kind}:${parsed.source}@${parsed.version}`;
 }
 
@@ -699,13 +708,16 @@ export async function validateGeneratedTree(
   const commandResults: ProcessResult[] = [];
   if (options.runner !== undefined) {
     for (const plan of plans) {
-      commandResults.push(
-        await options.runner.run({
-          ...plan,
-          timeoutMs: options.timeoutMs ?? 120_000,
-          maxOutputBytes: options.maxOutputBytes ?? 1_048_576,
-        }),
-      );
+      const result = await options.runner.run({
+        ...plan,
+        timeoutMs: options.timeoutMs ?? 120_000,
+        maxOutputBytes: options.maxOutputBytes ?? 1_048_576,
+      });
+      commandResults.push(result);
+      if (result.exitCode !== 0 || result.signal !== null || result.timedOut || result.outputTruncated) {
+        issues.push(`Validation command ${commandResults.length} failed or returned incomplete evidence`);
+        break;
+      }
     }
   }
   return { valid: issues.length === 0, issues, commandPlans: plans, commandResults };

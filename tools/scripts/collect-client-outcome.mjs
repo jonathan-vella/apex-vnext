@@ -277,8 +277,8 @@ function assertClientVersionBinding(input) {
         input.client.extensionVersion !== fixture.vscodeExtensionVersion)) ||
     (input.client.id === "github-copilot-cli" &&
       (input.client.version !== fixture.cliVersion || input.client.extensionVersion !== undefined)) ||
-    fixture.cliVersion !== cli.selectedExactVersion ||
-    fixture.cliArtifactHash !== cli.releaseArtifact.sha256
+    fixture.cliVersion !== cli.historicalFixtureVersion ||
+    fixture.cliArtifactHash !== cli.historicalFixtureArtifactHash
   ) {
     throw new TypeError("FIXTURE_CLIENT_VERSION_MISMATCH");
   }

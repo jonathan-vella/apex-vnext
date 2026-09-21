@@ -56,7 +56,7 @@ Before Phase 1, scan the user's prompt for specialized technologies. If matched,
 | Prompt keywords                                   | Invoke FIRST                                                                                                                                                      |
 | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Lambda, AWS, GCP, migrate AWS/GCP                 | **azure-cloud-migrate**                                                                                                                                           |
-| Azure Functions, function app, timer/HTTP trigger | Stay in **azure-prepare** (use Functions templates in Phase 1 Step 4)                                                                                             |
+| Azure Functions, function app, timer/HTTP trigger | Stay in **azure-prepare**; assess requirements and record a future materialization backlog item                                                                    |
 | APIM, API gateway                                 | Stay in **azure-prepare** — see [APIM guide](references/apim.md)                                                                                                  |
 | workflow, orchestration, durable, saga            | Stay in **azure-prepare** + load [durable.md](references/services/functions/durable.md) and [DTS reference](references/services/durable-task-scheduler/README.md) |
 

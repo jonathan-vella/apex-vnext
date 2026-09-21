@@ -9,6 +9,7 @@ import {
   SECRET_FIELD_PATTERN,
   SECRET_VALUE_PATTERN,
   hasValidCostArithmetic,
+  isGovernanceObservationCurrent,
   type ApprovalEvidenceV1,
   type ArchitectureAvailabilityV1,
   type ArchitectureV1,
@@ -22,6 +23,7 @@ import {
   type ImplementationIntentV1,
   type LogicalResourceManifestV1,
   type OperationRecordV1,
+  type PolicyValidationBinding,
   type PolicyPropertyMapV1,
   type QualityMeasurementsV1,
   type QualityReportV1,
@@ -40,6 +42,7 @@ import {
   type ValidatorRegistry,
 } from "@apexops/kernel";
 import { evaluateQualityScorecard } from "@apexops/renderers";
+import { Value } from "@sinclair/typebox/value";
 
 export interface WorkflowTaskValidatorContext {
   readonly nodeId: string;
@@ -55,6 +58,7 @@ export interface WorkflowTaskValidatorContext {
   readonly availabilityEvidence?: ArchitectureAvailabilityV1;
   readonly deploymentOperation?: OperationRecordV1;
   readonly deploymentInventory?: ResourceInventoryV1;
+  readonly importedPolicyEffects?: readonly string[];
 }
 
 export interface WorkflowGateValidatorContext {
@@ -68,7 +72,6 @@ export interface WorkflowGateValidatorContext {
   readonly reviewBlockers: readonly string[];
   readonly expectedDependencyHash?: string;
   readonly currentDependencyRevision: string;
-  readonly legacyRequirements: boolean;
   readonly expectedApprovalRecipientIdentity: string;
   readonly provedPreviewTransferClaimHash?: string;
   readonly preview?: DeploymentPreviewV1;
@@ -87,7 +90,10 @@ export interface WorkflowPreviewValidatorContext {
   readonly currentDependencyRevision: string;
   readonly expectedResourceIds: readonly string[];
   readonly intendedExecutionRecipientIdentity: string;
+  readonly ownershipIssues?: readonly ValidationIssue[];
+  readonly protectedResourceIds?: readonly string[];
   readonly attestation?: ExecutionPlanAttestationV1;
+  readonly policyValidationBinding?: PolicyValidationBinding & { readonly receiptHash: string };
 }
 
 export interface WorkflowDeployValidatorContext {
@@ -106,6 +112,197 @@ export interface WorkflowDeployValidatorContext {
     readonly operationId: string;
     readonly previewHash: string;
     readonly validatorIds: readonly string[];
+  };
+}
+
+export interface NativeBicepResourceOwnership {
+  readonly expectedResourceIds: readonly string[];
+  readonly resourceIdsByLogicalId: Readonly<Record<string, string>>;
+  readonly protectedResourceIds: readonly string[];
+  readonly issues: readonly ValidationIssue[];
+}
+
+const bicepResourceGroupScopePattern =
+  /^\/subscriptions\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/resourceGroups\/[A-Za-z0-9_()-][A-Za-z0-9_.()-]*$(?![\s\S])/i;
+const bicepPhysicalResourcesSchema =
+  IacBindingV1Schema.properties.resourceBindings.patternProperties["^(.*)$"]!.properties.physicalResources;
+
+function exactBicepPhysicalResourceType(resourceId: string, targetScope: string): string | undefined {
+  if (!resourceId.toLowerCase().startsWith(`${targetScope}/providers/`.toLowerCase())) return undefined;
+  const segments = resourceId.slice(targetScope.length + 1).split("/");
+  if (segments.some((segment) => !/^[A-Za-z0-9_()-][A-Za-z0-9_.()-]*$/.test(segment))) return undefined;
+  let offset = 0;
+  let resourceType: string | undefined;
+  while (offset < segments.length) {
+    if (
+      segments[offset]!.toLowerCase() !== "providers" ||
+      !/^Microsoft\.[A-Za-z0-9.]+$/i.test(segments[offset + 1] ?? "")
+    )
+      return undefined;
+    const namespace = segments[offset + 1]!;
+    offset += 2;
+    const types: string[] = [];
+    while (offset < segments.length && segments[offset]!.toLowerCase() !== "providers") {
+      if (!/^[A-Za-z][A-Za-z0-9]*$/.test(segments[offset]!) || segments[offset + 1] === undefined) return undefined;
+      types.push(segments[offset]!);
+      offset += 2;
+    }
+    if (types.length === 0) return undefined;
+    resourceType = `${namespace}/${types.join("/")}`;
+  }
+  return resourceType;
+}
+
+function bicepPhysicalResourceIssues(
+  binding: IacBindingV1["resourceBindings"][string],
+  intentType: string,
+  targetScope: string,
+  path: string,
+  physicalIds: Set<string>,
+): ValidationIssue[] {
+  const physicalResources = binding.physicalResources;
+  if (
+    !binding.implementation.startsWith("avm:") ||
+    physicalResources === undefined ||
+    !Value.Check(bicepPhysicalResourcesSchema, physicalResources)
+  ) {
+    return [
+      { path, message: "Bicep module ownership is unresolved; AVM requires a bounded exact physical resource map" },
+    ];
+  }
+  if (!bicepResourceGroupScopePattern.test(targetScope)) {
+    return [{ path, message: "AVM ownership requires an exact resource-group scope" }];
+  }
+  const issues: ValidationIssue[] = [];
+  const primary = physicalResources.filter(({ role }) => role === "primary");
+  if (
+    primary.length !== 1 ||
+    primary[0]!.ownership !== "managed" ||
+    primary[0]!.type.toLowerCase() !== intentType.toLowerCase()
+  ) {
+    issues.push({ path, message: "AVM ownership requires exactly one managed primary of the intent type" });
+  }
+  for (const { resourceId, type } of physicalResources) {
+    if (exactBicepPhysicalResourceType(resourceId, targetScope)?.toLowerCase() !== type.toLowerCase()) {
+      issues.push({ path, message: "AVM ownership requires exact target RG resource IDs with matching ARM types" });
+      continue;
+    }
+    const normalizedId = resourceId.toLowerCase();
+    if (physicalIds.has(normalizedId)) {
+      issues.push({ path, message: "Bicep bindings resolve to duplicate resource IDs" });
+    }
+    physicalIds.add(normalizedId);
+  }
+  return issues;
+}
+
+export function resolveNativeBicepResourceOwnership(context: {
+  readonly intent: ImplementationIntentV1;
+  readonly binding: IacBindingV1;
+  readonly manifest: LogicalResourceManifestV1;
+  readonly targetScope: string;
+}): NativeBicepResourceOwnership {
+  const { intent, binding, manifest, targetScope } = context;
+  const issues: ValidationIssue[] = [];
+  const resourceIdsByLogicalId: Record<string, string> = Object.create(null);
+  const expectedResourceIds: string[] = [];
+  const protectedResourceIds: string[] = [];
+  if (!bicepResourceGroupScopePattern.test(targetScope)) {
+    issues.push({ path: "/targetScope", message: "Native Bicep ownership requires an exact resource-group scope" });
+  }
+  const intentIds = intent.resources.map(({ id }) => id).sort();
+  if (
+    binding.track !== "bicep" ||
+    manifest.track !== "bicep" ||
+    binding.projectId !== intent.projectId ||
+    manifest.projectId !== intent.projectId ||
+    binding.runId !== intent.runId ||
+    manifest.runId !== intent.runId ||
+    binding.intentHash !== sha256Json(intent) ||
+    new Set(intentIds).size !== intentIds.length ||
+    JSON.stringify(Object.keys(binding.resourceBindings).sort()) !== JSON.stringify(intentIds) ||
+    JSON.stringify(manifest.resources.map(({ logicalId }) => logicalId).sort()) !== JSON.stringify(intentIds)
+  ) {
+    issues.push({
+      path: "/binding",
+      message: "Bicep ownership requires matching accepted intent, binding, and manifest coverage",
+    });
+  }
+  if (issues.length > 0) {
+    return { expectedResourceIds: [], resourceIdsByLogicalId, protectedResourceIds, issues };
+  }
+  const manifestResources = new Map(manifest.resources.map((resource) => [resource.logicalId, resource]));
+  const physicalIds = new Set<string>();
+  for (const resource of intent.resources) {
+    const resourceBinding = binding.resourceBindings[resource.id]!;
+    const entry = manifestResources.get(resource.id)!;
+    const path = `/binding/resourceBindings/${resource.id}`;
+    if (entry.type !== resource.type || entry.implementationAddress !== resourceBinding.implementation) {
+      issues.push({ path, message: "Manifest resource does not match the accepted binding and type" });
+      continue;
+    }
+    if (resourceBinding.implementation.startsWith("avm:") || entry.implementationKind === "module") {
+      if (entry.ownership !== "managed" || entry.implementationKind !== "module") {
+        issues.push({
+          path,
+          message: "Bicep module ownership is unresolved; only managed AVM logical modules are supported",
+        });
+        continue;
+      }
+      const mapIssues = bicepPhysicalResourceIssues(resourceBinding, resource.type, targetScope, path, physicalIds);
+      issues.push(...mapIssues);
+      if (mapIssues.length > 0) continue;
+      for (const { resourceId, ownership, role } of resourceBinding.physicalResources!) {
+        if (ownership === "existing") protectedResourceIds.push(resourceId);
+        else {
+          expectedResourceIds.push(resourceId);
+          if (role === "primary") resourceIdsByLogicalId[resource.id] = resourceId;
+        }
+      }
+      continue;
+    }
+    if (resourceBinding.physicalResources !== undefined) {
+      issues.push({ path, message: "Physical resource maps are not supported on native Bicep declarations" });
+      continue;
+    }
+    const descriptor =
+      /^native:(Microsoft\.[A-Za-z0-9.]+\/[A-Za-z0-9.]+)@([0-9]{4}-[0-9]{2}-[0-9]{2}(?:-preview)?)$/.exec(
+        resourceBinding.implementation,
+      );
+    const { name, parentId } = resourceBinding.parameters;
+    if (
+      descriptor === null ||
+      descriptor[1]!.toLowerCase() !== resource.type.toLowerCase() ||
+      resourceBinding.version !== descriptor[2] ||
+      typeof name !== "string" ||
+      !/^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\s\S])/.test(name) ||
+      typeof parentId !== "string" ||
+      (parentId !== "/" && parentId.toLowerCase() !== targetScope.toLowerCase()) ||
+      (entry.ownership === "managed" && entry.implementationKind !== "resource")
+    ) {
+      issues.push({
+        path,
+        message: "Native Bicep ownership requires a matching top-level type, literal name, and target RG parent",
+      });
+      continue;
+    }
+    const resourceId = `${targetScope}/providers/${descriptor[1]}/${name}`;
+    const normalizedId = resourceId.toLowerCase();
+    if (physicalIds.has(normalizedId)) {
+      issues.push({ path, message: "Bicep bindings resolve to duplicate resource IDs" });
+    }
+    physicalIds.add(normalizedId);
+    if (entry.ownership === "existing") protectedResourceIds.push(resourceId);
+    else {
+      expectedResourceIds.push(resourceId);
+      resourceIdsByLogicalId[resource.id] = resourceId;
+    }
+  }
+  return {
+    expectedResourceIds: issues.length === 0 ? expectedResourceIds : [],
+    resourceIdsByLogicalId: issues.length === 0 ? resourceIdsByLogicalId : {},
+    protectedResourceIds,
+    issues,
   };
 }
 
@@ -348,6 +545,11 @@ function governanceCompleteness(value: unknown): ValidationIssue[] {
 function governanceFreshness(value: unknown): ValidationIssue[] {
   const context = taskContext(value);
   const governance = context.outputs["governance-constraints"] as GovernanceConstraintsV1;
+  if (governance.constraintsRef.uri === `apex-object:${governance.constraintsRef.digest}`) {
+    return isGovernanceObservationCurrent(governance.discoveredAt, context.now)
+      ? []
+      : issue("/outputs/governance-constraints/discoveredAt", "Governance snapshot requires refresh at 30 days");
+  }
   const now = Date.parse(context.now);
   if (Date.parse(governance.discoveredAt) > now) {
     return issue("/outputs/governance-constraints/discoveredAt", "Governance discovery is from the future");
@@ -366,11 +568,18 @@ function policyEffectCoverage(value: unknown): ValidationIssue[] {
   }
   const counts = new Map<string, number>();
   for (const mapping of policyMap.mappings) counts.set(mapping.effect, (counts.get(mapping.effect) ?? 0) + 1);
-  const missing = [
-    ["deny", governance.summary.denyCount],
-    ["modify", governance.summary.modifyCount],
-    ["audit", governance.summary.auditCount],
-  ].flatMap(([effect, required]) =>
+  const requiredCounts =
+    context.importedPolicyEffects === undefined
+      ? [
+          ["deny", governance.summary.denyCount],
+          ["modify", governance.summary.modifyCount],
+          ["audit", governance.summary.auditCount],
+        ]
+      : ["deny", "modify", "deployIfNotExists"].map((effect) => [
+          effect,
+          context.importedPolicyEffects!.filter((value) => value === effect).length,
+        ]);
+  const missing = requiredCounts.flatMap(([effect, required]) =>
     (counts.get(effect as string) ?? 0) < (required as number) ? [effect as string] : [],
   );
   return missing.length === 0
@@ -385,9 +594,28 @@ function planSourceCoverage(value: unknown): ValidationIssue[] {
     (kind) => context.artifactHashes[kind] !== undefined,
   );
   const invalid = requiredSources.filter((kind) => intent.sourceHashes[kind] !== context.artifactHashes[kind]);
-  return invalid.length === 0
-    ? []
-    : issue("/outputs/implementation-intent/sourceHashes", `Missing or stale source hashes: ${invalid.join(", ")}`);
+  const issues =
+    invalid.length === 0
+      ? []
+      : issue("/outputs/implementation-intent/sourceHashes", `Missing or stale source hashes: ${invalid.join(", ")}`);
+  const policy = context.artifacts["policy-property-map"] as PolicyPropertyMapV1 | undefined;
+  if (context.artifactHashes["policy-property-map"] !== undefined && policy === undefined) {
+    issues.push({ path: "/artifacts/policy-property-map", message: "Accepted policy mappings are required" });
+  }
+  const resources = new Set(intent.resources.map(({ id }) => id));
+  for (const mapping of policy?.mappings ?? []) {
+    if (!resources.has(mapping.logicalResourceId))
+      issues.push({
+        path: "/outputs/implementation-intent/resources",
+        message: "Policy mapping references a resource absent from the plan",
+      });
+    if (mapping.disposition === "blocked")
+      issues.push({
+        path: "/artifacts/policy-property-map/mappings",
+        message: "Blocked policy controls must be resolved before plan acceptance",
+      });
+  }
+  return issues;
 }
 
 function bindingTrackMatch(value: unknown): ValidationIssue[] {
@@ -396,12 +624,48 @@ function bindingTrackMatch(value: unknown): ValidationIssue[] {
   const binding = context.outputs["iac-binding"] as IacBindingV1;
   const resourceIds = new Set(intent.resources.map(({ id }) => id));
   const bindingIds = Object.keys(binding.resourceBindings);
-  return binding.track === context.track &&
+  const issues =
+    binding.track === context.track &&
     binding.intentHash === sha256Json(intent) &&
     bindingIds.length === resourceIds.size &&
     bindingIds.every((id) => resourceIds.has(id))
-    ? []
-    : issue("/outputs/iac-binding", "IaC binding track, intent, or resource coverage is invalid");
+      ? []
+      : issue("/outputs/iac-binding", "IaC binding track, intent, or resource coverage is invalid");
+  if (Object.values(binding.resourceBindings).some(({ physicalResources }) => physicalResources !== undefined)) {
+    if (binding.track !== "bicep") {
+      issues.push({
+        path: "/outputs/iac-binding",
+        message: "Exact physical resource maps are supported only for Bicep AVM bindings",
+      });
+    } else if (issues.length === 0) {
+      issues.push(
+        ...resolveNativeBicepResourceOwnership({
+          intent,
+          binding,
+          targetScope: context.targetScope,
+          manifest: {
+            schemaVersion: "1.0.0",
+            projectId: intent.projectId,
+            runId: intent.runId,
+            track: "bicep",
+            resources: intent.resources.map((resource) => ({
+              logicalId: resource.id,
+              type: resource.type,
+              implementationAddress: binding.resourceBindings[resource.id]!.implementation,
+              implementationKind: binding.resourceBindings[resource.id]!.implementation.startsWith("avm:")
+                ? "module"
+                : "resource",
+              ownership: "managed",
+              dependsOn: resource.dependsOn,
+              generatedDependencies: [],
+              sourcePath: "main.bicep",
+            })),
+          },
+        }).issues,
+      );
+    }
+  }
+  return issues;
 }
 
 function dependencyAcyclic(value: unknown): ValidationIssue[] {
@@ -552,7 +816,7 @@ function gateReady(expectedGate: 1 | 2 | 3, value: unknown): ValidationIssue[] {
     3: ["implementation-intent", "iac-binding", "environment-inputs"],
   };
   const requiredReviews: Record<1 | 2 | 3, readonly string[]> = {
-    1: context.legacyRequirements ? [] : ["requirements-review"],
+    1: ["requirements-review"],
     2: ["architecture-review", "governance-review"],
     3: ["plan-review"],
   };
@@ -693,8 +957,9 @@ function previewCoverage(value: unknown): ValidationIssue[] {
   const context = previewContext(value);
   const changes = context.preview.changes;
   const resourceIds = changes.map(({ resourceId }) => resourceId);
-  const issues: ValidationIssue[] = [];
-  if (new Set(resourceIds).size !== resourceIds.length) {
+  const issues: ValidationIssue[] = [...(context.ownershipIssues ?? [])];
+  const uniqueIds = context.provider === "bicep" ? resourceIds.map((id) => id.toLowerCase()) : resourceIds;
+  if (new Set(uniqueIds).size !== resourceIds.length) {
     issues.push({ path: "/changes", message: "Preview contains duplicate resource changes" });
   }
   if (changes.some(({ action }) => action === "unknown")) {
@@ -705,6 +970,46 @@ function previewCoverage(value: unknown): ValidationIssue[] {
     const expected = [...context.expectedResourceIds].sort();
     if (JSON.stringify(actual) !== JSON.stringify(expected)) {
       issues.push({ path: "/changes", message: "Fake preview does not cover every requested resource" });
+    }
+  }
+  if (context.provider === "terraform") {
+    const managedAddresses = new Set(context.expectedResourceIds);
+    if (
+      changes.some(
+        ({ resourceId, action, material }) => (action !== "no-op" || material) && !managedAddresses.has(resourceId),
+      )
+    ) {
+      issues.push({
+        path: "/changes",
+        message: "Terraform preview would modify a resource outside accepted managed ownership",
+      });
+    }
+  }
+  if (context.provider === "bicep") {
+    const protectedIds = (context.protectedResourceIds ?? []).map((id) => id.toLowerCase());
+    if (
+      changes.some(
+        ({ resourceId, action }) =>
+          (action === "delete" || action === "replace") &&
+          protectedIds.some((id) => id === resourceId.toLowerCase() || id.startsWith(`${resourceId.toLowerCase()}/`)),
+      )
+    ) {
+      issues.push({
+        path: "/changes",
+        message: "Bicep destructive operation would remove a protected existing resource or its ancestor",
+      });
+    }
+    const managedIds = new Set(context.expectedResourceIds.map((id) => id.toLowerCase()));
+    if (
+      changes.some(
+        ({ resourceId, action, material }) =>
+          (action !== "no-op" || material) && !managedIds.has(resourceId.toLowerCase()),
+      )
+    ) {
+      issues.push({
+        path: "/changes",
+        message: "Bicep preview would modify a resource outside accepted managed ownership",
+      });
     }
   }
   return issues;
@@ -733,6 +1038,7 @@ function terraformSavedPlanBinding(value: unknown): ValidationIssue[] {
     lockfileHash: attestation.lockfileHash,
     recipient: attestation.recipient,
     artifactRef: attestation.artifactRef,
+    ...(context.policyValidationBinding === undefined ? {} : { policyValidation: context.policyValidationBinding }),
   });
   const valid =
     attestation.projectId === preview.projectId &&
@@ -867,7 +1173,9 @@ function inventorySecretFree(value: unknown): ValidationIssue[] {
 function inventorySourceCoverage(value: unknown): ValidationIssue[] {
   const context = inventoryContext(value);
   const inventory = context.inventory;
-  const resourceIds = inventory.resources.map(({ resourceId }) => resourceId);
+  const resourceIds = inventory.resources.map(({ resourceId }) =>
+    /^\/subscriptions\//i.test(resourceId) ? resourceId.toLowerCase() : resourceId,
+  );
   const logicalIds = inventory.resources.map(({ logicalId }) => logicalId);
   const issues: ValidationIssue[] = [];
   if (new Set(resourceIds).size !== resourceIds.length || new Set(logicalIds).size !== logicalIds.length) {
@@ -878,9 +1186,10 @@ function inventorySourceCoverage(value: unknown): ValidationIssue[] {
     .map(({ resourceId }) => resourceId);
   const missing = expected.filter(
     (expectedId) =>
-      !inventory.resources.some(
-        ({ logicalId, resourceId }) =>
-          logicalId === expectedId || resourceId === expectedId || resourceId.endsWith(`:${expectedId}`),
+      !inventory.resources.some(({ logicalId, resourceId }) =>
+        /^\/subscriptions\//i.test(expectedId)
+          ? resourceId.toLowerCase() === expectedId.toLowerCase()
+          : logicalId === expectedId || resourceId === expectedId || resourceId.endsWith(`:${expectedId}`),
       ),
   );
   if (missing.length > 0) {

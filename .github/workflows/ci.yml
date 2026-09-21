@@ -25,12 +25,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Setup Node
         uses: ./.github/actions/setup-node-repo
+
+      - name: Setup Python validation
+        uses: ./.github/actions/setup-python-validation
 
       - name: Install bats
         run: sudo apt-get install -y bats
@@ -40,6 +43,15 @@ jobs:
 
       - name: Check formatting (Prettier)
         run: npm run format:check
+
+      - name: Lint Python (ruff)
+        run: npm run lint:python
+
+      - name: Test Python
+        run: npm run test:python
+
+      - name: Verify Azure MCP beta freshness
+        run: npm run validate:azure-mcp-latest
 
       - name: Build vNext and run Node.js validators (CI-safe)
         run: npm run validate:_node-ci
@@ -52,22 +64,3 @@ jobs:
 
       - name: Validate handoff references
         run: bash tools/scripts/validate-handoff-references.sh
-
-  external-tests:
-    name: External Python tests (apex-recall)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Setup Node
-        uses: ./.github/actions/setup-node-repo
-
-      - name: Setup Python validation
-        uses: ./.github/actions/setup-python-validation
-
-      - name: Lint Python (ruff)
-        run: npm run lint:python
-
-      - name: Run apex-recall test suite
-        run: npm run test:apex-recall

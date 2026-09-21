@@ -32,8 +32,7 @@
 infra/bicep/{project-name}/
 ├── main.bicep              # Main orchestration template
 ├── main.bicepparam         # Parameter file
-├── azure.yaml              # azd manifest (primary deployment method)
-├── deploy.ps1              # PowerShell deployment script (DEPRECATED)
+├── azure.yaml              # Optional consumer application manifest
 └── modules/
     └── {module}.bicep      # Resource modules
 ```
@@ -67,59 +66,16 @@ graph TD
 ## 🚀 Deployment Instructions
 
 <details>
-<summary><strong>🟢 Quick Deploy (azd — Recommended)</strong></summary>
+<summary><strong>Kernel-Authorized Preview And Deploy</strong></summary>
 
 ```bash
-cd infra/bicep/{project-name}
-azd env new {project-name}-dev
-azd env set AZURE_LOCATION swedencentral
-azd provision
+apex preview --provider bicep --operation apply
+# Review the exact preview and complete Gate 4 approval.
+apex deploy
 ```
 
 </details>
 
-<details>
-<summary><strong>🟡 Quick Deploy (deploy.ps1 — Deprecated)</strong></summary>
-
-```powershell
-cd infra/bicep/{project-name}
-./deploy.ps1
-```
-
-</details>
-
-<details>
-<summary><strong>🔍 Preview Changes (What-If)</strong></summary>
-
-```powershell
-./deploy.ps1 -WhatIf
-```
-
-</details>
-
-<details>
-<summary><strong>⚙️ Custom Parameters</strong></summary>
-
-```powershell
-./deploy.ps1 `
-    -ResourceGroupName "rg-{project}-{env}" `
-    -Location "{location}" `
-    -Environment "{env}"
-```
-
-</details>
-
-<details>
-<summary><strong>🚀 Azure CLI</strong></summary>
-
-```bash
-az deployment group create \
-  --resource-group "rg-{project}-{env}" \
-  --template-file main.bicep \
-  --parameters main.bicepparam
-```
-
-</details>
 
 ## 📝 Key Implementation Notes
 

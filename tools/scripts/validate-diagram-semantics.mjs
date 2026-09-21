@@ -8,7 +8,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 
 const REGISTRY_PATH = "tools/registry/diagram-semantics.v1.json";
 const SCHEMA_PATH = "tools/registry/schemas/diagram-semantics.schema.json";
-const EXPECTED_SHA256 = "9771c78db495184f7b59d7ea69ccdb9efb854e79763d86579ffd5a3b7ce22c59";
+const EXPECTED_SHA256 = "5958fe843b420749affe76f497d3fab27bc075597a05f44b299024133e70a015";
 const EXPECTED_IDS = [
   "g1-three-tier-web",
   "g2-hub-spoke-landing-zone",
