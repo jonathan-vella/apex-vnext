@@ -563,7 +563,7 @@ test("installed Bicep validates nested formatting and lint without changing acce
         {
           path: "main.bicep",
           content: checkPolicy
-            ? "resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {\n  name: 'apexpolicytest'\n  location: 'swedencentral'\n  kind: 'StorageV2'\n  sku: {\n    name: 'Standard_LRS'\n  }\n  properties: {\n    supportsHttpsTrafficOnly: true\n  }\n}\n"
+            ? "resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {\n  name: 'apexpolicytest'\n  location: 'swedencentral'\n  kind: 'StorageV2'\n  sku: {\n    name: 'Standard_LRS'\n  }\n  properties: {\n    supportsHttpsTrafficOnly: true\n    minimumTlsVersion: 'TLS1_2'\n    allowBlobPublicAccess: false\n    allowSharedKeyAccess: false\n  }\n}\n"
             : "output result string = 'ok'\n",
         },
         {
@@ -635,12 +635,53 @@ test("installed Bicep validates nested formatting and lint without changing acce
         inputHash: hashes.input,
         generatedSource: { rootPath: root, treeHash: sha256(files) },
         policyValidation,
+        ...(policyValidation === undefined
+          ? {}
+          : { storageSecurityBindings: policyValidation.logicalResourceManifest }),
       };
       if (scenario === "pass" || scenario.endsWith("-pass")) {
         const receipt = await provider.validateSource(input);
         if (checkPolicy) {
           assert.equal(receipt.policyValidation?.outcome, "pass");
           assert.equal(receipt.policyValidation?.results.length, 3);
+          assert.equal(receipt.storageSecurity?.storage?.outcome, "pass");
+          assert.equal(receipt.storageSecurity?.storage?.fullBaselineEvaluated, false);
+          assert.equal(receipt.storageSecurity?.storage?.sourceHash, input.sourceHash);
+          assert.equal(receipt.storageSecurity?.storage?.bindingHash, sha256(input.storageSecurityBindings!.storage));
+          assert.equal(
+            hasValidNativeValidationReceipt(receipt, {
+              ...input,
+              track: "bicep",
+              treeHash: input.generatedSource.treeHash,
+            }),
+            true,
+          );
+          for (const field of [
+            "sourceHash",
+            "inputHash",
+            "fullBaselineEvaluated",
+            "outcome",
+            "observedValueDigest",
+          ] as const) {
+            const altered = structuredClone(receipt);
+            const diagnostic = altered.storageSecurity!.storage!;
+            if (field === "sourceHash") diagnostic.sourceHash = "f".repeat(64);
+            else if (field === "inputHash") diagnostic.inputHash = "f".repeat(64);
+            else if (field === "fullBaselineEvaluated") Object.assign(diagnostic, { fullBaselineEvaluated: true });
+            else if (field === "outcome") diagnostic.outcome = "fail";
+            else diagnostic.results[0]!.observedValueDigest = "f".repeat(64);
+            const { receiptHash, ...body } = altered;
+            assert.ok(receiptHash);
+            altered.receiptHash = calculateNativeValidationReceiptHash(body);
+            assert.equal(
+              hasValidNativeValidationReceipt(altered, {
+                ...input,
+                track: "bicep",
+                treeHash: input.generatedSource.treeHash,
+              }),
+              false,
+            );
+          }
         }
         assert.deepEqual(
           receipt.commands.map(({ validatorId }) => validatorId),

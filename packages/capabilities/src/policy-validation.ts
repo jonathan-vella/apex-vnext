@@ -29,6 +29,7 @@ export interface PolicyValidationInput {
 }
 
 interface Resource {
+  readonly resourceType?: string;
   readonly physicalId?: string;
   readonly codeSymbol?: string;
   readonly value: Record<string, unknown>;
@@ -138,6 +139,7 @@ function resourcesFromJson(json: string, track: IacTool): readonly Resource[] {
         resources.push({
           value: resource,
           unsupported,
+          ...(text(resource.type) === undefined ? {} : { resourceType: text(resource.type)! }),
           ...(physicalId === undefined ? {} : { physicalId }),
           ...(symbols === null ? {} : { codeSymbol: symbols.join("::") }),
         });
@@ -187,6 +189,9 @@ function resourcesFromJson(json: string, track: IacTool): readonly Resource[] {
         const physicalId = text(own(values, "id"));
         resources.push({
           codeSymbol: address,
+          ...(text(resource.type) !== undefined && own(matchingChanges[0], "type") === resource.type
+            ? { resourceType: text(resource.type)! }
+            : {}),
           ...(physicalId === undefined ? {} : { physicalId }),
           value: values,
           unknown,
@@ -218,6 +223,14 @@ function observe(
   if (mapping.disposition === "exempt") return { outcome: "unsupported", reason: "unverified-exemption" };
   if (mapping.effect === "disabled") return { outcome: "unsupported", reason: "unsupported-effect" };
   if (!Object.hasOwn(mapping, "expectedValue")) return { outcome: "unsupported", reason: "missing-expected-value" };
+  return observeBoundProperty(mapping, request, resources);
+}
+
+function observeBoundProperty(
+  mapping: Pick<PolicyPropertyMapV1["mappings"][number], "propertyPath" | "logicalResourceId" | "expectedValue">,
+  request: Pick<PolicyValidationInput, "track" | "logicalResourceManifest">,
+  resources: readonly Resource[] | undefined,
+): Observation {
   const segments = mapping.propertyPath.split(".");
   if (
     !/^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*$/.test(mapping.propertyPath) ||
@@ -267,6 +280,100 @@ function observe(
   const observedValueDigest = calculatePolicyValidationDigest(observed);
   const matched = observedValueDigest === calculatePolicyValidationDigest(mapping.expectedValue);
   return { outcome: matched ? "pass" : "fail", reason: matched ? "matched" : "value-mismatch", observedValueDigest };
+}
+
+export interface StorageSecurityObservation {
+  readonly coverage: "storage-account-property-hardening-v1";
+  readonly fullBaselineEvaluated: false;
+  readonly sourceHash: string;
+  readonly inputHash: string;
+  readonly bindingHash: string;
+  readonly outcome: PolicyValidationV1["outcome"];
+  readonly results: readonly (Observation & { readonly propertyPath: string; readonly expectedValueDigest: string })[];
+}
+
+export function validateStorageSecurityProperties(request: {
+  readonly track: IacTool;
+  readonly sourceHash: string;
+  readonly binding: PolicyResourceBinding;
+  readonly json: string;
+}): StorageSecurityObservation {
+  const { binding, ...source } = request;
+  return validateStorageSecurityBindings({ ...source, bindings: { storage: binding } }).storage!;
+}
+
+export function validateStorageSecurityBindings(request: {
+  readonly track: IacTool;
+  readonly sourceHash: string;
+  readonly bindings: Readonly<Record<string, PolicyResourceBinding>>;
+  readonly json: string;
+}): Readonly<Record<string, StorageSecurityObservation>> {
+  assertPolicyValidationJson(request.bindings);
+  if (
+    !["bicep", "terraform"].includes(request.track) ||
+    !/^[0-9a-f]{64}$/.test(request.sourceHash) ||
+    object(request.bindings) === undefined ||
+    Object.keys(request.bindings).length > POLICY_VALIDATION_LIMITS.mappings ||
+    Object.entries(request.bindings).some(([id, binding]) => id.length === 0 || object(binding) === undefined) ||
+    typeof request.json !== "string"
+  )
+    throw new TypeError("STORAGE_SECURITY_INVALID_INPUT");
+  const controls: readonly [string, string | boolean][] =
+    request.track === "bicep"
+      ? [
+          ["properties.minimumTlsVersion", "TLS1_2"],
+          ["properties.supportsHttpsTrafficOnly", true],
+          ["properties.allowBlobPublicAccess", false],
+          ["properties.allowSharedKeyAccess", false],
+        ]
+      : [
+          ["min_tls_version", "TLS1_2"],
+          ["https_traffic_only_enabled", true],
+          ["allow_nested_items_to_be_public", false],
+          ["shared_access_key_enabled", false],
+        ];
+  const expectedType = request.track === "bicep" ? "microsoft.storage/storageaccounts" : "azurerm_storage_account";
+  let resources: readonly Resource[] | undefined;
+  try {
+    resources = resourcesFromJson(request.json, request.track).map((resource) => ({
+      ...resource,
+      unsupported: resource.unsupported || resource.resourceType?.toLowerCase() !== expectedType,
+    }));
+  } catch {
+    resources = undefined;
+  }
+  const inputHash = createHash("sha256").update(request.json).digest("hex");
+  return Object.freeze(
+    Object.fromEntries(
+      Object.entries(request.bindings).map(([logicalId, binding]) => {
+        const results = controls.map(([propertyPath, expectedValue]) =>
+          Object.freeze({
+            propertyPath,
+            expectedValueDigest: calculatePolicyValidationDigest(expectedValue),
+            ...observeBoundProperty(
+              { propertyPath, expectedValue, logicalResourceId: "storage" },
+              { track: request.track, logicalResourceManifest: { storage: binding } },
+              resources,
+            ),
+          }),
+        );
+        const observation: StorageSecurityObservation = Object.freeze({
+          coverage: "storage-account-property-hardening-v1",
+          fullBaselineEvaluated: false,
+          sourceHash: request.sourceHash,
+          bindingHash: calculatePolicyValidationDigest(binding),
+          inputHash,
+          outcome: results.some(({ outcome }) => outcome === "fail")
+            ? "fail"
+            : results.some(({ outcome }) => outcome === "unsupported")
+              ? "unsupported"
+              : "pass",
+          results: Object.freeze(results),
+        });
+        return [logicalId, observation];
+      }),
+    ),
+  );
 }
 
 export function validatePolicyProperties(request: PolicyValidationInput): PolicyValidationV1 {

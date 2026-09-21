@@ -366,6 +366,168 @@
       "pattern": "^[0-9a-f]{64}$",
       "type": "string"
     },
+    "storageSecurity": {
+      "maxProperties": 1000,
+      "patternProperties": {
+        "^(.*)$": {
+          "additionalProperties": false,
+          "properties": {
+            "bindingHash": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "coverage": {
+              "const": "storage-account-property-hardening-v1",
+              "type": "string"
+            },
+            "fullBaselineEvaluated": {
+              "const": false,
+              "type": "boolean"
+            },
+            "inputHash": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "outcome": {
+              "anyOf": [
+                {
+                  "const": "pass",
+                  "type": "string"
+                },
+                {
+                  "const": "fail",
+                  "type": "string"
+                },
+                {
+                  "const": "unsupported",
+                  "type": "string"
+                }
+              ]
+            },
+            "results": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "expectedValueDigest": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "observedValueDigest": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "outcome": {
+                    "anyOf": [
+                      {
+                        "const": "pass",
+                        "type": "string"
+                      },
+                      {
+                        "const": "fail",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unsupported",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "propertyPath": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "reason": {
+                    "anyOf": [
+                      {
+                        "const": "matched",
+                        "type": "string"
+                      },
+                      {
+                        "const": "value-mismatch",
+                        "type": "string"
+                      },
+                      {
+                        "const": "missing-property",
+                        "type": "string"
+                      },
+                      {
+                        "const": "blocked",
+                        "type": "string"
+                      },
+                      {
+                        "const": "missing-expected-value",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unverified-exemption",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unsupported-effect",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unsupported-path",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unsupported-expression",
+                        "type": "string"
+                      },
+                      {
+                        "const": "resource-not-bound",
+                        "type": "string"
+                      },
+                      {
+                        "const": "resource-not-found",
+                        "type": "string"
+                      },
+                      {
+                        "const": "ambiguous-resource",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unsupported-resource",
+                        "type": "string"
+                      },
+                      {
+                        "const": "invalid-source",
+                        "type": "string"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "propertyPath",
+                  "expectedValueDigest",
+                  "outcome",
+                  "reason"
+                ],
+                "type": "object"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            "sourceHash": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "coverage",
+            "fullBaselineEvaluated",
+            "sourceHash",
+            "inputHash",
+            "bindingHash",
+            "outcome",
+            "results"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
     "track": {
       "anyOf": [
         {

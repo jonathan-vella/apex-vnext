@@ -146,7 +146,7 @@
   },
   "https://schemas.apexops.dev/native-validation-receipt-v1.json": {
     "compatibility": "strict-v1",
-    "maxBytes": 4210688,
+    "maxBytes": 8404992,
     "sensitivity": "confidential"
   },
   "https://schemas.apexops.dev/onboarding-config-v1.json": {

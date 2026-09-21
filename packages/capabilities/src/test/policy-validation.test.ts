@@ -10,7 +10,12 @@ import {
   hasValidPolicyValidation,
   type PolicyPropertyMapV1,
 } from "@apexops/contracts";
-import { validatePolicyProperties, type PolicyValidationInput } from "../policy-validation.js";
+import {
+  validatePolicyProperties,
+  validateStorageSecurityProperties,
+  validateStorageSecurityBindings,
+  type PolicyValidationInput,
+} from "../policy-validation.js";
 
 const hash = "a".repeat(64);
 
@@ -65,6 +70,159 @@ function input(track: "bicep" | "terraform"): PolicyValidationInput {
 }
 
 describe("bounded policy property validation", () => {
+  it("keeps batched storage observations resource-specific and bounded", () => {
+    const secure = {
+      type: "Microsoft.Storage/storageAccounts",
+      properties: {
+        minimumTlsVersion: "TLS1_2",
+        supportsHttpsTrafficOnly: true,
+        allowBlobPublicAccess: false,
+        allowSharedKeyAccess: false,
+      },
+    };
+    const source = {
+      resources: { secure, insecure: { ...secure, properties: { ...secure.properties, allowSharedKeyAccess: true } } },
+    };
+    const request = {
+      track: "bicep" as const,
+      sourceHash: hash,
+      json: JSON.stringify(source),
+      bindings: { secure: { codeSymbol: "secure" }, insecure: { codeSymbol: "insecure" } },
+    };
+    const result = validateStorageSecurityBindings(request);
+    assert.equal(result.secure!.outcome, "pass");
+    assert.equal(result.insecure!.outcome, "fail");
+    assert.equal(result.secure!.inputHash, result.insecure!.inputHash);
+    assert.notEqual(result.secure!.bindingHash, result.insecure!.bindingHash);
+    assert.ok(Object.isFrozen(result));
+    assert.ok(Object.isFrozen(result.secure!.results));
+    assert.throws(
+      () =>
+        validateStorageSecurityBindings({
+          ...request,
+          bindings: Object.fromEntries(
+            Array.from({ length: 1001 }, (_, index) => [`storage${index}`, { codeSymbol: "secure" }]),
+          ),
+        }),
+      /INVALID_INPUT/,
+    );
+  });
+
+  it("reports storage property hardening without claiming full security-baseline coverage", () => {
+    for (const track of ["bicep", "terraform"] as const) {
+      const source = (insecure = false, foreign = false) => {
+        if (track === "bicep")
+          return {
+            resources: {
+              storage: {
+                type: foreign ? "Microsoft.KeyVault/vaults" : "Microsoft.Storage/storageAccounts",
+                properties: {
+                  minimumTlsVersion: "TLS1_2",
+                  supportsHttpsTrafficOnly: true,
+                  allowBlobPublicAccess: false,
+                  allowSharedKeyAccess: insecure,
+                },
+              },
+            },
+          };
+        const plan = terraformSource({
+          min_tls_version: "TLS1_2",
+          https_traffic_only_enabled: true,
+          allow_nested_items_to_be_public: false,
+          shared_access_key_enabled: insecure,
+        });
+        if (foreign) plan.planned_values.root_module.resources[0]!.type = "azurerm_key_vault";
+        return plan;
+      };
+      const binding =
+        track === "bicep" ? { codeSymbol: "storage" } : { terraformAddress: "azurerm_storage_account.main" };
+      const request = { track, sourceHash: hash, binding, json: JSON.stringify(source()) };
+      const result = validateStorageSecurityProperties(request);
+      assert.equal(result.outcome, "pass");
+      assert.equal(result.coverage, "storage-account-property-hardening-v1");
+      assert.equal(result.fullBaselineEvaluated, false);
+      assert.equal(result.results.length, 4);
+      assert.ok(result.results.every(({ outcome }) => outcome === "pass"));
+      assert.equal(result.bindingHash, calculatePolicyValidationDigest(binding));
+      assert.equal(
+        validateStorageSecurityProperties({ ...request, json: JSON.stringify(source(true)) }).outcome,
+        "fail",
+      );
+      assert.equal(
+        validateStorageSecurityProperties({ ...request, json: JSON.stringify(source(false, true)) }).outcome,
+        "unsupported",
+      );
+    }
+  });
+
+  it("storage hardening requires every concrete property on the exact resource", () => {
+    const bicepProperties: Record<string, unknown> = {
+      minimumTlsVersion: "TLS1_2",
+      supportsHttpsTrafficOnly: true,
+      allowBlobPublicAccess: false,
+      allowSharedKeyAccess: false,
+    };
+    const terraformProperties: Record<string, unknown> = {
+      min_tls_version: "TLS1_2",
+      https_traffic_only_enabled: true,
+      allow_nested_items_to_be_public: false,
+      shared_access_key_enabled: false,
+    };
+    for (const track of ["bicep", "terraform"] as const) {
+      const binding =
+        track === "bicep" ? { codeSymbol: "storage" } : { terraformAddress: "azurerm_storage_account.main" };
+      const makeSource = (values: Record<string, unknown>, unknown = false) => {
+        if (track === "bicep")
+          return {
+            resources: {
+              storage: { type: "Microsoft.Storage/storageAccounts", properties: values },
+              sibling: { type: "Microsoft.Storage/storageAccounts", properties: bicepProperties },
+            },
+          };
+        const plan = terraformSource(values);
+        if (unknown) plan.resource_changes[0]!.change.after_unknown = { shared_access_key_enabled: true };
+        return plan;
+      };
+      const valid = track === "bicep" ? bicepProperties : terraformProperties;
+      const evaluate = (json: string) => validateStorageSecurityProperties({ track, binding, sourceHash: hash, json });
+      for (const property of Object.keys(valid)) {
+        const missing = { ...valid };
+        delete missing[property];
+        const result = evaluate(JSON.stringify(makeSource(missing)));
+        assert.equal(result.outcome, "fail");
+        assert.ok(result.results.some(({ reason }) => reason === "missing-property"));
+        for (const bad of [null, "private-value-must-not-leak", {}, []]) {
+          const failed = evaluate(JSON.stringify(makeSource({ ...valid, [property]: bad })));
+          assert.equal(failed.outcome, "fail");
+          assert.equal(JSON.stringify(failed).includes("private-value-must-not-leak"), false);
+        }
+      }
+      assert.equal(evaluate("invalid-json").outcome, "unsupported");
+      assert.equal(evaluate("{}").outcome, "unsupported");
+      if (track === "bicep") {
+        const unresolved = makeSource({ ...valid, allowSharedKeyAccess: "[parameters('sharedKey')]" });
+        assert.equal(evaluate(JSON.stringify(unresolved)).outcome, "unsupported");
+      } else {
+        assert.equal(evaluate(JSON.stringify(makeSource(valid, true))).outcome, "unsupported");
+        const duplicate = terraformSource(valid);
+        duplicate.planned_values.root_module.resources.push(duplicate.planned_values.root_module.resources[0]!);
+        assert.equal(evaluate(JSON.stringify(duplicate)).results[0]!.reason, "ambiguous-resource");
+        const wrongType = terraformSource(valid);
+        wrongType.resource_changes[0]!.type = "azurerm_key_vault";
+        assert.equal(evaluate(JSON.stringify(wrongType)).outcome, "unsupported");
+      }
+      assert.throws(
+        () =>
+          validateStorageSecurityProperties({ track, sourceHash: hash, binding: nestedValue(80) as never, json: "{}" }),
+        /LIMIT_EXCEEDED/,
+      );
+      assert.throws(
+        () => validateStorageSecurityProperties({ track, sourceHash: "bad", binding, json: "{}" }),
+        /INVALID_INPUT/,
+      );
+    }
+  });
+
   for (const track of ["bicep", "terraform"] as const) {
     it(`${track}: requires an exact physical ID whenever the binding supplies one`, () => {
       const request = input(track);

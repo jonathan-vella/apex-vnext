@@ -1,6 +1,13 @@
 import { Type, type Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
-import { ContractVersionSchema, IacToolSchema, ProjectIdSchema, RunIdSchema, Sha256Schema } from "./common.js";
+import {
+  ContractVersionSchema,
+  IacToolSchema,
+  NonEmptyStringSchema,
+  ProjectIdSchema,
+  RunIdSchema,
+  Sha256Schema,
+} from "./common.js";
 import {
   calculatePolicyValidationDigest,
   hasValidPolicyValidation,
@@ -33,6 +40,32 @@ for (const commands of Object.values(NATIVE_VALIDATION_COMMANDS)) {
 }
 Object.freeze(NATIVE_VALIDATION_COMMANDS);
 
+const policyResultProperties = PolicyValidationV1Schema.properties.results.items.properties;
+const storageSecurityObservation = Type.Object(
+  {
+    coverage: Type.Literal("storage-account-property-hardening-v1"),
+    fullBaselineEvaluated: Type.Literal(false),
+    sourceHash: Sha256Schema,
+    inputHash: Sha256Schema,
+    bindingHash: Sha256Schema,
+    outcome: policyResultProperties.outcome,
+    results: Type.Array(
+      Type.Object(
+        {
+          propertyPath: NonEmptyStringSchema,
+          expectedValueDigest: Sha256Schema,
+          observedValueDigest: Type.Optional(Sha256Schema),
+          outcome: policyResultProperties.outcome,
+          reason: policyResultProperties.reason,
+        },
+        { additionalProperties: false },
+      ),
+      { minItems: 4, maxItems: 4 },
+    ),
+  },
+  { additionalProperties: false },
+);
+
 export const NativeValidationReceiptV1Schema = Type.Object(
   {
     schemaVersion: ContractVersionSchema,
@@ -44,6 +77,9 @@ export const NativeValidationReceiptV1Schema = Type.Object(
     policyHash: Sha256Schema,
     inputHash: Sha256Schema,
     policyValidation: Type.Optional(PolicyValidationV1Schema),
+    storageSecurity: Type.Optional(
+      Type.Record(NonEmptyStringSchema, storageSecurityObservation, { maxProperties: 1000 }),
+    ),
     outcome: Type.Literal("pass"),
     commands: Type.Array(
       Type.Object(
@@ -97,6 +133,27 @@ export function hasValidNativeValidationReceipt(
     const { receiptHash, ...receipt } = value;
     const keys = ["projectId", "runId", "track", "sourceHash", "treeHash", "policyHash", "inputHash"] as const;
     if (keys.some((key) => receipt[key] !== binding[key])) return false;
+    if (
+      receipt.storageSecurity !== undefined &&
+      (receipt.track !== "bicep" ||
+        Object.values(receipt.storageSecurity).some(
+          (observation) =>
+            observation.sourceHash !== receipt.sourceHash ||
+            (receipt.policyValidation !== undefined && observation.inputHash !== receipt.policyValidation.inputHash) ||
+            observation.outcome !==
+              (observation.results.some(({ outcome }) => outcome === "fail")
+                ? "fail"
+                : observation.results.some(({ outcome }) => outcome === "unsupported")
+                  ? "unsupported"
+                  : "pass") ||
+            observation.results.some(
+              (result) =>
+                result.outcome === "pass" &&
+                (result.reason !== "matched" || result.expectedValueDigest !== result.observedValueDigest),
+            ),
+        ))
+    )
+      return false;
     const policy = receipt.policyValidation;
     if (
       policy !== undefined &&

@@ -47,6 +47,10 @@ gap; command receipts must not be used to claim those checks passed. See the
 Native completion and preview now reject required unexecuted or simulated evidence instead of accepting supplied
 business-check hashes. Codegen acceptance also compares manifest resource types, descriptors and dependency sets with
 approved artifacts. This strengthens rejection behavior but does not implement the missing business executors.
+Storage-account property hardening now has a bounded concrete-value evaluator. Bicep source validation attaches its
+limited diagnostics for accepted storage bindings to the receipt and task-only response; four passing properties do
+not satisfy the full security baseline. Actual local-module compilation and both-track property/unknown-value tests
+cover this subset. Production validation remains blocked on the unimplemented required coverage.
 Complete the remaining product and paired-client matrix. Do not restart completed cleanup
 or add optional agent helpers, telemetry or orchestration infrastructure to accelerate delivery.
 

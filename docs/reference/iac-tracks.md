@@ -116,6 +116,19 @@ and blocked validator IDs, without completing the task. `valid: false` means req
 the worker must report the blockers rather than fabricate missing entries. Acceptance reexecutes current native checks.
 No authenticated planning is implicitly added to source validation.
 
+For managed storage accounts with accepted Bicep execution addresses, the receipt and task-only response include
+`storageSecurity` diagnostics from the captured compiler output. Coverage is explicitly
+`storage-account-property-hardening-v1`: minimum TLS, HTTPS-only, disabled public blob access and disabled shared-key
+access. Results bind source/output/binding hashes and retain value digests, not raw observed values. Root and qualified
+module-child symbols use the same exact-resource lookup; values on other resources cannot satisfy the check.
+
+Every diagnostic declares `fullBaselineEvaluated: false`. Diagnostics, production network policy, identity/authorization,
+other resource types and full resource parity are not covered by these four properties. Missing values fail; unresolved
+expressions, ambiguous bindings and unsupported types remain unsupported. The capability can inspect the corresponding
+AzureRM properties in supplied Terraform saved-plan JSON with known change evidence, but Terraform source validation
+does not generate a plan or attach these diagnostics. Passing limited storage properties never credits the full
+`business:security-baseline` validator or opens a gate.
+
 Native task completion requires executed evidence for every required validator, not merely caller-supplied entries.
 Native preview also rejects a prior completion containing required simulated or missing evidence, before provider
 commands run. Explicit simulated adapters remain available for offline tests and cannot establish production readiness.

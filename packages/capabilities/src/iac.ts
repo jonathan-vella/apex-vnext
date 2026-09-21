@@ -80,6 +80,7 @@ export interface NativeValidationRequest {
   readonly policyHash: string;
   readonly inputHash: string;
   readonly policyValidation?: PreviewRequest["policyValidation"];
+  readonly storageSecurityBindings?: Readonly<Record<string, PolicyResourceBinding>>;
 }
 
 export interface CurrentDeploymentAuthority {

@@ -7,6 +7,7 @@ import {
   InputValueV1Schema,
   IsoDateTimeSchema,
   NonEmptyStringSchema,
+  NativeValidationReceiptV1Schema,
   ResourceInventoryV1Schema,
   RunConfigV1Schema,
   Sha256Schema,
@@ -247,6 +248,7 @@ export const MCP_OUTPUT_SCHEMAS = {
           mode: Type.Literal("native"),
           executedValidatorIds: strings,
           blockedValidatorIds: strings,
+          storageSecurity: NativeValidationReceiptV1Schema.properties.storageSecurity,
         }),
         outputs: Type.Array(object({ kind: Type.Literal("validation-evidence"), value: EvidenceManifestV1Schema }), {
           minItems: 1,

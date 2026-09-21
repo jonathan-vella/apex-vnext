@@ -48,7 +48,7 @@ import {
 import type { ProcessRunnerLike } from "./process-runner.js";
 import { secretFreeProperties } from "./secret-redaction.js";
 import { LocalEncryptedPlanTransport, type LocalEncryptedPlan } from "./local-plan-transport.js";
-import { validatePolicyProperties } from "./policy-validation.js";
+import { validatePolicyProperties, validateStorageSecurityBindings } from "./policy-validation.js";
 
 export interface NativeProviderRuntime {
   readonly runner: ProcessRunnerLike;
@@ -308,7 +308,13 @@ abstract class NativeProviderBase {
     const commands = NATIVE_VALIDATION_COMMANDS[track];
     let receipt: NativeValidationReceiptV1;
     let policyInput: NativeValidationRequest["policyValidation"];
+    let storageBindings: NativeValidationRequest["storageSecurityBindings"];
     try {
+      if (track === "bicep" && request.storageSecurityBindings !== undefined) {
+        calculatePolicyValidationDigest(request.storageSecurityBindings);
+        storageBindings = structuredClone(request.storageSecurityBindings);
+        if (Object.keys(storageBindings).length > 1000) throw new Error();
+      }
       if (track === "bicep" && request.policyValidation !== undefined) {
         calculatePolicyValidationDigest(request.policyValidation);
         policyInput = structuredClone(request.policyValidation);
@@ -432,6 +438,25 @@ abstract class NativeProviderBase {
         const { receiptHash, ...updated } = receipt;
         if (!receiptHash)
           throw new IacProviderError("NATIVE_VALIDATION_FAILED", "Native validation receipt is missing");
+        receipt = { ...updated, receiptHash: calculateNativeValidationReceiptHash(updated) };
+      }
+      if (storageBindings !== undefined && Object.keys(storageBindings).length > 0) {
+        const observations = validateStorageSecurityBindings({
+          track,
+          bindings: storageBindings,
+          sourceHash: receipt.sourceHash,
+          json: compiledTemplate ?? "",
+        });
+        const storageSecurity = Object.fromEntries(
+          Object.entries(observations).map(([logicalId, observation]) => {
+            return [logicalId, { ...observation, results: [...observation.results] }];
+          }),
+        );
+        await verify();
+        const { receiptHash, ...body } = receipt;
+        if (!receiptHash)
+          throw new IacProviderError("NATIVE_VALIDATION_FAILED", "Native validation receipt is missing");
+        const updated = { ...body, storageSecurity };
         receipt = { ...updated, receiptHash: calculateNativeValidationReceiptHash(updated) };
       }
       return receipt;

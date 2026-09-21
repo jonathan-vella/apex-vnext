@@ -4054,6 +4054,16 @@ for (const track of ["bicep", "terraform"] as const) {
           assert.equal((await nativeService.status()).run.gates[3]!.state, "closed");
         }
         observed = true;
+        const diagnostics = await nativeService.validateTask(validationTask);
+        assert.equal(diagnostics.valid, false);
+        assert.ok(diagnostics.execution!.blockedValidatorIds.includes("business:security-baseline"));
+        const diagnosticEvidence = diagnostics.outputs![0]!.value as ReturnType<typeof validationEvidence>;
+        const sourceReceipt = await objects.getJson<NativeValidationReceiptV1>(diagnosticEvidence.entries[0]!.hash);
+        if (track === "bicep") {
+          assert.equal(sourceReceipt.storageSecurity?.api?.fullBaselineEvaluated, false);
+          assert.notEqual(sourceReceipt.storageSecurity?.api?.outcome, "pass");
+          assert.deepEqual(diagnostics.execution?.storageSecurity, sourceReceipt.storageSecurity);
+        } else assert.equal(sourceReceipt.storageSecurity, undefined);
         const beforeIncomplete = await journal.head();
         await assert.rejects(
           nativeService.completeTaskOutputs(validationTask, evidence),

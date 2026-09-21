@@ -2577,7 +2577,12 @@ export class ApexService {
     valid: boolean;
     taskId: string;
     staged?: StagedArtifact | StagedArtifact[];
-    execution?: { mode: "native"; executedValidatorIds: string[]; blockedValidatorIds: string[] };
+    execution?: {
+      mode: "native";
+      executedValidatorIds: string[];
+      blockedValidatorIds: string[];
+      storageSecurity?: NativeValidationReceiptV1["storageSecurity"];
+    };
     outputs?: TaskOutput[];
   }> {
     const run = await this.currentRun();
@@ -2631,6 +2636,7 @@ export class ApexService {
         ...binding,
         generatedSource: { rootPath, treeHash: handoff.treeHash },
         policyValidation: structuredClone(policyValidation),
+        ...(run.iacTool === "bicep" ? { storageSecurityBindings: this.storageSecurityBindings(manifest) } : {}),
       });
       if (
         !hasValidNativeValidationReceipt(receipt, binding) ||
@@ -2669,7 +2675,12 @@ export class ApexService {
       return {
         valid: blockedValidatorIds.length === 0,
         taskId,
-        execution: { mode: "native", executedValidatorIds, blockedValidatorIds },
+        execution: {
+          mode: "native",
+          executedValidatorIds,
+          blockedValidatorIds,
+          ...(receipt.storageSecurity === undefined ? {} : { storageSecurity: receipt.storageSecurity }),
+        },
         outputs: [{ kind: "validation-evidence", value: evidence }],
       };
     }
@@ -6649,6 +6660,21 @@ export class ApexService {
     };
   }
 
+  private storageSecurityBindings(
+    manifest: LogicalResourceManifestV1 | undefined,
+  ): Record<string, { codeSymbol: string }> {
+    return Object.fromEntries(
+      (manifest?.resources ?? [])
+        .filter(
+          (resource) =>
+            resource.ownership === "managed" &&
+            resource.type.toLowerCase() === "microsoft.storage/storageaccounts" &&
+            resource.executionAddress !== undefined,
+        )
+        .map((resource) => [resource.logicalId, { codeSymbol: resource.executionAddress! }]),
+    );
+  }
+
   private async validateTaskValidators(
     run: RunConfigV1,
     task: TaskEnvelopeV1,
@@ -6785,6 +6811,13 @@ export class ApexService {
           ...binding,
           generatedSource: { rootPath, treeHash: handoff.treeHash },
           policyValidation: structuredClone(policyValidation),
+          ...(run.iacTool === "bicep"
+            ? {
+                storageSecurityBindings: this.storageSecurityBindings(
+                  artifacts["logical-resource-manifest"] as LogicalResourceManifestV1 | undefined,
+                ),
+              }
+            : {}),
         });
         if (!hasValidNativeValidationReceipt(receipt, binding))
           throw new ApexError(

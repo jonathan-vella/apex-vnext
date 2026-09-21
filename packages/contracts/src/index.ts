@@ -174,7 +174,7 @@ export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
   "https://schemas.apexops.dev/governance-observation-receipt-v1.json": metadata(16_384, "confidential"),
   "https://schemas.apexops.dev/policy-property-map-v1.json": metadata(2_097_152, "confidential"),
   "https://schemas.apexops.dev/policy-validation-v1.json": metadata(4_194_304, "confidential"),
-  "https://schemas.apexops.dev/native-validation-receipt-v1.json": metadata(4_210_688, "confidential"),
+  "https://schemas.apexops.dev/native-validation-receipt-v1.json": metadata(8_404_992, "confidential"),
   "https://schemas.apexops.dev/environment-inputs-v1.json": metadata(524_288, "restricted"),
   "https://schemas.apexops.dev/logical-resource-manifest-v1.json": metadata(2_097_152),
   "https://schemas.apexops.dev/iac-handoff-v1.json": metadata(131_072, "confidential"),
