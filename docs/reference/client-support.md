@@ -32,9 +32,13 @@ qualification. Revised [ADR-0006](../vnext/adrs/03-des-adr-0006-omit-cli-autonom
 usability convention, not authorization. Kernel task, evidence, ownership and approval checks remain mandatory, and
 worker tool/model grants are unchanged. A directly selectable profile is not itself a security failure.
 
-CLI adapter `1.3.0` maps canonical `GPT-5.6 Terra` and `GPT-5.6 Sol` model labels to the documented CLI identifiers
+CLI adapter `1.4.0` maps canonical `GPT-5.6 Terra` and `GPT-5.6 Sol` model labels to the documented CLI identifiers
 `gpt-5.6-terra` and `gpt-5.6-sol`. VS Code labels and the selected model families are unchanged. This is identifier
 translation, not a model substitution or fallback.
+
+Hidden-user discovery does not implicitly disable model invocation. The adapter preserves explicit invocation-disable
+settings; isolated review-routing probes cover the canonical parent-to-Reviewer path on both tracks. This does not
+enable shipped workers, add tools, authenticate reviewers or establish successful native validation.
 
 In Copilot CLI, run interactive specialists as foreground custom agents. The coordinator names the required role
 and supplies a continuation note with the user's scope; the user selects that role before continuing. Interactive

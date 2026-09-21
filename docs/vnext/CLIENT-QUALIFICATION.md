@@ -118,11 +118,24 @@ also rejects stored simulated required evidence before any provider command. Imp
 label their business-check adapter simulation after asserting the production rejection. Successful native validation
 and preview remain unqualified until the missing executors exist; no worker enablement is implied by these checks.
 
-The renderer also retains `disable-model-invocation: true` for these candidates. Parent routing therefore still needs
-qualification as client functionality; the flag is not treated as a security boundary. No shipped target membership,
-model substitution or worker permission change was made. Local candidate metadata is retained under
-`dist/cli-worker-qualification-04` through `dist/cli-worker-qualification-07`.
-Other review stages, parent routing and full worker qualification remain incomplete.
+Adapter `1.4.0` no longer derives `disable-model-invocation` from `user-invocable`. Hidden discovery and delegation are
+independent settings; an explicit invocation-disable flag remains honored. Canonical model/tool lists and shipped target
+membership are unchanged. The isolated candidate enabled only existing declared parent-to-Reviewer routes.
+
+Actual CLI probes routed Requirements, Architecture, Governance and Plan review through the canonical owning parents
+to `APEX Reviewer` on both tracks. CLI traces identify the named child and `gpt-5.6-terra` model. Independent checks
+verified one accepted review per case, exact subject/task bindings, open findings, all five required Architecture pillar
+receipts, preserved user canaries and restart state, and no new gate decisions. Governance initially exposed a kernel
+template alias mismatch; using `policy-property-map` instead of the workflow node name fixed completion in fresh probes.
+
+These are bounded synthetic routing results, not full client or review-quality acceptance. Rejected submissions remain
+recorded, and some non-Architecture reviews supplied optional pillar receipts. No authenticated independent reviewer
+identity is claimed. Successful native Validator completion remains blocked; CodeGen/Validator parent edges and the
+full workload lifecycle remain unqualified, so shipped CLI workers are still absent.
+
+Local evidence is retained under `dist/cli-worker-qualification-04` through `dist/cli-worker-qualification-07`,
+`dist/cli-parent-qualification-08`, the `dist/cli-review-qualification-09-*` fixtures, and
+`dist/cli-governance-qualification-10`. Failed probes are not replaced by the later successful receipts.
 
 ## Multiple-Selection Input
 

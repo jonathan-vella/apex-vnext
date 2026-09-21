@@ -37,7 +37,11 @@ The maintainer-approved ADR revision removes visibility as a security blocker. R
 CLI-to-MCP probe reject invalid/stale work and accept a valid task without approving gates. Qualify actual CodeGen,
 Reviewer and Validator profiles next, preserving models, tool grants and kernel safeguards. Shipped worker membership
 remains unchanged pending that evidence; same-client review is not authenticated independent identity.
-The model identifier issue is resolved: CLI adapter `1.3.0` maps the same configured GPT models to documented CLI IDs.
+The model identifier issue is resolved: CLI adapter `1.4.0` maps the same configured GPT models to documented CLI IDs
+and keeps user discovery separate from model invocation. Isolated canonical parents delegated all four review stages
+on both tracks; stored reviews bound the correct subjects and introduced no gate approvals. Governance template identity
+now uses the accepted policy artifact rather than its workflow alias. These bounded probes do not qualify review quality,
+CodeGen/Validator parent edges or the full lifecycle, and shipped CLI worker membership remains unchanged.
 The actual Reviewer accepted a bound Requirements finding; corrected CodeGen guidance produced one accepted tree on
 each track. Task-only IaC `validateTask` requests now execute native checks and return runtime-owned evidence with
 explicit unexecuted-validator blockers. Fresh CLI Validator probes on both tracks report those blockers and stop without

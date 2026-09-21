@@ -11,7 +11,7 @@ const repositoryRoot = resolve(packageRoot, "../..");
 const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
-const CLIENT_ADAPTER_VERSION = "1.3.0";
+const CLIENT_ADAPTER_VERSION = "1.4.0";
 const CLI_MODEL_IDS = new Map([
   ["MAI-Code-1.1-Flash (copilot)", "mai-code-1.1-flash"],
   ["GPT-5.6 Sol", "gpt-5.6-sol"],
@@ -128,7 +128,7 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
     target: "github-copilot",
     model: CLI_MODEL_IDS.get(model) ?? model,
     "user-invocable": frontmatter["user-invocable"] ?? true,
-    "disable-model-invocation": frontmatter["disable-model-invocation"] ?? frontmatter["user-invocable"] === false,
+    "disable-model-invocation": frontmatter["disable-model-invocation"] ?? false,
     tools,
   };
   const mechanics = [

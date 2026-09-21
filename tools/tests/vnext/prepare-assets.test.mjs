@@ -634,6 +634,19 @@ Validate one result.
   assert.match(rendered, /user-invocable: false/u);
   assert.match(rendered, /disable-model-invocation: true/u);
   assert.doesNotMatch(rendered, /ask_user|\n\s+- task/u);
+  const delegable = renderClientAgentProjection(
+    hidden.replace("disable-model-invocation: true\n", ""),
+    "github-copilot-cli",
+    {
+      interactiveTools: { askUser: "ask_user", delegate: "task" },
+      workspaceServer: "apex",
+      operationIds: ["status"],
+    },
+  );
+  const enabled = load(/^---\n([\s\S]*?)\n---/u.exec(delegable)[1]);
+  assert.equal(enabled["user-invocable"], false);
+  assert.equal(enabled["disable-model-invocation"], false);
+  assert.deepEqual(enabled.tools, ["apex/status"]);
   assert.throws(
     () =>
       renderClientAgentProjection(hidden.replace("apex/status", "apex/unknown"), "github-copilot-cli", {

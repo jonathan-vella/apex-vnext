@@ -5837,7 +5837,8 @@ export class ApexService {
     }
     if (kind === "review-findings") {
       const review = TASKS.find(({ id }) => id === taskType);
-      const subjectKind = review?.reviewSubject;
+      const subjectKind =
+        review?.reviewSubject === "governance-reconciliation" ? "policy-property-map" : review?.reviewSubject;
       const artifactKind = review === undefined ? undefined : this.reviewSubjectArtifactKind(review);
       const subjectHash = artifactKind === undefined ? undefined : this.artifactHash(events, artifactKind);
       if (subjectKind === undefined || subjectHash === undefined) {

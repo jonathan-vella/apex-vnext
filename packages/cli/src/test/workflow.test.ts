@@ -1519,7 +1519,7 @@ test("plan task context projects source hashes and valid output templates", asyn
     assert.equal(template.subjectHash, subjectHash);
     assert.equal(
       template.subjectKind,
-      taskType === "governance-review" ? "governance-reconciliation" : taskType.replace("-review", ""),
+      taskType === "governance-review" ? "policy-property-map" : taskType.replace("-review", ""),
     );
     if (taskType === "architecture-review") assert.equal(template.criteria?.length, 5);
     for (const reference of context.inputReferences) {

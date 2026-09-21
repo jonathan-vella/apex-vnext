@@ -2841,6 +2841,39 @@ test("plan rejects wrong track and secret literals", async () => {
   });
 });
 
+test("governance review completion uses the accepted policy artifact subject", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo" });
+  const stop = new Error("Governance review checked");
+  const original = service.completeTaskOutputs.bind(service);
+  service.completeTaskOutputs = async (taskId, outputs) => {
+    if (
+      outputs.some(
+        ({ kind, value }) =>
+          kind === "review-findings" && (value as { subjectKind?: string }).subjectKind === "policy-property-map",
+      )
+    ) {
+      service.completeTaskOutputs = original;
+      const context = await service.taskContext(taskId);
+      assert.equal(
+        (context.outputTemplates["review-findings"] as { subjectKind: string }).subjectKind,
+        "policy-property-map",
+      );
+      const completed = await service.completeReview(taskId, []);
+      const stored = await new ObjectStore(root).getJson<{ subjectKind: string; subjectHash: string }>(
+        completed.outputHashes["review-findings"]!,
+      );
+      assert.equal(stored.subjectKind, "policy-property-map");
+      assert.equal(stored.subjectHash, context.artifactHashes["policy-property-map"]);
+      assert.notEqual((await service.status()).run.gates[1]!.state, "approved");
+      throw stop;
+    }
+    return original(taskId, outputs);
+  };
+  await assert.rejects(reachCodegen(service, runId, "bicep"), (error) => error === stop);
+});
+
 test("MCP completeTask accepts an output bundle", async () => {
   const service = new ApexService(await tempRoot());
   await service.init({ projectId: "demo" });
