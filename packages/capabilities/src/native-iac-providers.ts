@@ -242,6 +242,12 @@ async function readGeneratedSource(
   }
 }
 
+export async function assertGeneratedSourceUnchanged(
+  source: NonNullable<PreviewRequest["generatedSource"]>,
+): Promise<void> {
+  await readGeneratedSource(source);
+}
+
 async function bindGeneratedSource(
   request: Pick<PreviewRequest, "generatedSource">,
   cwd: string | undefined,

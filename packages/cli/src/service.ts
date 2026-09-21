@@ -24,6 +24,7 @@ import {
   QualityMeasurementsV1Schema,
   QualityReportV1Schema,
   RequirementsV1Schema,
+  RequirementsChangeProposalV1Schema,
   ResourceInventoryV1Schema,
   ReviewFindingsV1Schema,
   RuntimeBundleLockV1Schema,
@@ -93,6 +94,7 @@ import {
   inspectArchetypeSource,
   GovernanceBaselineError,
   nativePolicyValidationBinding,
+  assertGeneratedSourceUnchanged,
   type GovernanceBaselineSelection,
   type CapabilityPackInstallOptions,
   type IacProvider,
@@ -1285,7 +1287,10 @@ export class ApexService {
       await this.assertGovernanceCandidate(run, governanceInput.request, "reuse");
     }
     if (requirements === undefined) {
-      const pending = this.nextRequirementsIntakeRound(events);
+      const pending =
+        this.pendingRequirementsRevision(events) === undefined && this.previousRequirementsHash(events) === undefined
+          ? this.nextRequirementsIntakeRound(events)
+          : undefined;
       if (pending !== undefined)
         return { status: "needs_input", request: await this.issueRequirementsInput(run, pending) };
       return { status: "task", task: await this.issueTask(run, TASKS[0]!, []) };
@@ -1532,6 +1537,10 @@ export class ApexService {
         outputTemplates[kind as ArtifactKind] = this.outputTemplate(kind as ArtifactKind, run, events, task.taskType);
       }
     }
+    const requirementsRevision = this.pendingRequirementsRevision(events);
+    const requirementsCandidateHash = requirementsRevision?.candidateHash ?? this.previousRequirementsHash(events);
+    if (task.taskType === "requirements" && requirementsCandidateHash !== undefined)
+      outputTemplates.requirements = await this.objects.getJson<RequirementsV1>(requirementsCandidateHash);
     const artifactHashes = Object.fromEntries(
       Object.entries(this.acceptedArtifactHashes(events)).filter(([, hash]) => task.inputRefs.includes(hash)),
     );
@@ -2543,6 +2552,7 @@ export class ApexService {
     assertTaskCurrent(task, head, run.ownerEpoch, this.clock);
     if (!task.taskType.startsWith("codegen-"))
       throw new ApexError("APEX_AUTHORIZATION", "Only code generation tasks may stage files", EXIT_CODES.authorization);
+    await this.assertPreviousGeneratedSourceUnmodified(await this.journal(run).replay());
     const normalized = relativePath.replaceAll("\\", "/");
     const suffixes = [".terraform.lock.hcl", ".tfvars.example", ".bicep", ".json", ".tf", ".md"];
     if (
@@ -2601,6 +2611,9 @@ export class ApexService {
         "Task is not the selected code generation task",
         EXIT_CODES.authorization,
       );
+    const events = await this.journal(run).replay();
+    assertTaskCurrent(task, events.at(-1)!.hash, run.ownerEpoch, this.clock);
+    await this.assertPreviousGeneratedSourceUnmodified(events);
     const inputs = await Promise.all(task.inputRefs.map((hash) => this.objects.getJson<unknown>(hash)));
     const intent = inputs.find((value): value is ImplementationIntentV1 => this.looksLikeIntent(value));
     const binding = inputs.find((value): value is IacBindingV1 => this.looksLikeBinding(value, run.iacTool));
@@ -2653,6 +2666,30 @@ export class ApexService {
       { kind: "iac-handoff", value: handoff },
     ]);
     return { files, outputHashes: completed.outputHashes, treeHash: tree.treeHash };
+  }
+
+  private async assertPreviousGeneratedSourceUnmodified(events: EventV1[]): Promise<void> {
+    const previous = events.findLast(
+      (event) =>
+        event.type === "task.completed" &&
+        typeof (event.payload as { artifactHashes?: Record<string, unknown> }).artifactHashes?.["iac-handoff"] ===
+          "string",
+    );
+    const previousHash = (previous?.payload as { artifactHashes?: Record<string, string> } | undefined)
+      ?.artifactHashes?.["iac-handoff"];
+    if (previousHash === undefined) return;
+    const handoff = await this.objects.getJson<IacHandoffV1>(previousHash);
+    const rootPath = resolve(this.root, handoff.rootPath);
+    await this.assertSafeDestination(this.root, rootPath);
+    try {
+      await assertGeneratedSourceUnchanged({ rootPath, treeHash: handoff.treeHash });
+    } catch {
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "Previous generated source has manual edits, missing files or unsafe paths; resolve before regeneration",
+        EXIT_CODES.conflict,
+      );
+    }
   }
 
   async validateTask(
@@ -2792,6 +2829,221 @@ export class ApexService {
   ): Promise<{ outputHashes: Partial<Record<ArtifactKind, string>>; summary: string }> {
     await this.assertTaskType(taskId, "requirements");
     return this.completeTaskOutputs(taskId, [{ kind: "requirements", value: requirements }]);
+  }
+
+  async previewRequirementsChange(candidate: RequirementsV1, reason: string, mode: "adopt" | "revise" = "revise") {
+    candidate = structuredClone(candidate);
+    this.assertValid("requirements", candidate);
+    const run = await this.run(await this.selection(), { readOnly: true });
+    const events = await this.journal(run).replay();
+    if (
+      !Value.Check(RequirementsV1Schema, candidate) ||
+      candidate.projectId !== run.projectId ||
+      candidate.environment !== run.environment ||
+      typeof reason !== "string" ||
+      reason.trim().length === 0 ||
+      reason.length > 2048 ||
+      new Set(candidate.requirements.map(({ id }) => id)).size !== candidate.requirements.length
+    )
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Requirements change must contain valid consumer requirements and a reason",
+        EXIT_CODES.validation,
+      );
+    const sourceRequirementsHash =
+      this.artifactHash(events, "requirements") ??
+      this.pendingRequirementsRevision(events)?.sourceRequirementsHash ??
+      null;
+    if (!["adopt", "revise"].includes(mode) || (mode === "adopt" && sourceRequirementsHash !== null))
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "Adoption requires a run without accepted requirements; use revision for existing decisions",
+        EXIT_CODES.conflict,
+      );
+    if (mode === "revise" && sourceRequirementsHash === null)
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "Requirements change requires accepted consumer requirements",
+        EXIT_CODES.conflict,
+      );
+    const previous =
+      sourceRequirementsHash === null
+        ? { ...candidate, requirements: [] }
+        : await this.objects.getJson<RequirementsV1>(sourceRequirementsHash);
+    const candidateHash = sha256Json(candidate);
+    if (candidateHash === sourceRequirementsHash)
+      throw new ApexError("APEX_VALIDATION", "Requirements are unchanged", EXIT_CODES.validation);
+    const previousById = new Map(previous.requirements.map((item) => [item.id, item]));
+    const candidateById = new Map(candidate.requirements.map((item) => [item.id, item]));
+    const changedRequirementIds = candidate.requirements
+      .filter((item) => previousById.has(item.id) && sha256Json(previousById.get(item.id)) !== sha256Json(item))
+      .map(({ id }) => id)
+      .sort();
+    const retainedRequirementIds = candidate.requirements
+      .filter((item) => previousById.has(item.id) && sha256Json(previousById.get(item.id)) === sha256Json(item))
+      .map(({ id }) => id)
+      .sort();
+    const changedFields = [...new Set([...Object.keys(previous), ...Object.keys(candidate)])]
+      .filter(
+        (key) =>
+          key !== "requirements" &&
+          JSON.stringify(previous[key as keyof RequirementsV1]) !==
+            JSON.stringify(candidate[key as keyof RequirementsV1]),
+      )
+      .sort();
+    const workflow = await this.lockedWorkflowEngine(run);
+    const nodeIds = new Set([
+      "requirements",
+      ...workflow.invalidationPlan("requirements", reason.trim()).map(({ nodeId }) => nodeId),
+    ]);
+    for (const descriptor of TASKS)
+      if (descriptor.reviewSubject !== undefined && nodeIds.has(descriptor.reviewSubject)) nodeIds.add(descriptor.id);
+    const body = {
+      schemaVersion: CONTRACT_VERSION,
+      projectId: run.projectId,
+      runId: run.runId,
+      expectedHead: events.at(-1)!.hash,
+      ownerEpoch: run.ownerEpoch,
+      sourceRequirementsHash,
+      candidateHash,
+      reason: reason.trim(),
+      mode,
+      addedRequirementIds: candidate.requirements
+        .filter(({ id }) => !previousById.has(id))
+        .map(({ id }) => id)
+        .sort(),
+      removedRequirementIds: previous.requirements
+        .filter(({ id }) => !candidateById.has(id))
+        .map(({ id }) => id)
+        .sort(),
+      changedRequirementIds,
+      retainedRequirementIds,
+      changedFields,
+      invalidatedNodes: [...nodeIds].sort(),
+      invalidatedGates: run.gates.filter(({ gate }) => nodeIds.has(`gate-${gate}`)).map(({ gate }) => gate),
+      requiresReassessment: ["cost", "policy", "security", "dependencies", "code", "documents"],
+      filesModified: false,
+      deploymentAuthorized: false,
+    };
+    const proposal = { ...body, proposalHash: sha256Json(body) };
+    if (!Value.Check(RequirementsChangeProposalV1Schema, proposal))
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Requirements change proposal exceeds contract bounds",
+        EXIT_CODES.validation,
+      );
+    return proposal;
+  }
+
+  async reviseRequirements(
+    candidate: RequirementsV1,
+    options: { reason: string; expectedHash: string; confirm: boolean; mode?: "adopt" | "revise" },
+  ) {
+    if (options.confirm !== true)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Requirements revision requires explicit confirmation",
+        EXIT_CODES.authorization,
+      );
+    candidate = structuredClone(candidate);
+    const proposal = await this.previewRequirementsChange(candidate, options.reason, options.mode);
+    if (proposal.proposalHash !== options.expectedHash)
+      throw new ApexError(
+        "APEX_STALE",
+        "Requirements change proposal is stale or differs from the confirmed candidate",
+        EXIT_CODES.stale,
+      );
+    const run = await this.currentRun();
+    const events = await this.journal(run).replay();
+    if (
+      run.runId !== proposal.runId ||
+      run.ownerEpoch !== proposal.ownerEpoch ||
+      events.at(-1)?.hash !== proposal.expectedHead
+    )
+      throw new ApexError("APEX_STALE", "Requirements change state is stale", EXIT_CODES.stale);
+    const transfers = new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock);
+    await this.assertCurrentWriterAuthority(run, transfers);
+    for (const [index, event] of events.entries()) {
+      if (!["deployment.started", "deployment.executed", "deployment.indeterminate"].includes(event.type)) continue;
+      const previewHash = (event.payload as { previewHash?: string }).previewHash;
+      if (
+        !events
+          .slice(index + 1)
+          .some(
+            (entry) =>
+              entry.type === "deployment.completed" &&
+              (entry.payload as { previewHash?: string }).previewHash === previewHash,
+          )
+      )
+        throw new ApexError(
+          "APEX_CONFLICT",
+          "Deployment is in-flight or indeterminate; reconcile before requirements revision",
+          EXIT_CODES.conflict,
+        );
+    }
+    const candidateHash = await this.objects.putJson(candidate);
+    const proposalHash = await this.objects.putJson(proposal);
+    const payload = {
+      reason: proposal.reason,
+      nodeIds: proposal.invalidatedNodes,
+      artifactKinds: [
+        ...new Set(TASKS.filter(({ id }) => proposal.invalidatedNodes.includes(id)).flatMap(({ outputs }) => outputs)),
+      ],
+      requirementsRevision: { candidateHash, proposalHash, sourceRequirementsHash: proposal.sourceRequirementsHash },
+    };
+    const dependencyHash = this.dependencyRevision(run, [
+      ...events,
+      { type: "workflow.invalidated", payload } as EventV1,
+    ]);
+    await this.assertCurrentWriterAuthority(run, transfers);
+    await this.mutateRun(
+      run,
+      {
+        ...run,
+        gates: run.gates.map((gate) =>
+          proposal.invalidatedGates.includes(gate.gate) ? invalidateGate(gate, dependencyHash, proposal.reason) : gate,
+        ),
+      },
+      "workflow.invalidated",
+      payload,
+      proposal.expectedHead,
+    );
+    return {
+      candidateHash,
+      proposalHash,
+      invalidatedNodes: proposal.invalidatedNodes,
+      deploymentAuthorized: false as const,
+    };
+  }
+
+  private pendingRequirementsRevision(events: EventV1[]) {
+    if (this.artifactHash(events, "requirements") !== undefined) return undefined;
+    const event = events.findLast(
+      (entry) =>
+        entry.type === "workflow.invalidated" &&
+        (entry.payload as { nodeIds?: string[] }).nodeIds?.includes("requirements"),
+    );
+    return (
+      event?.payload as
+        | {
+            requirementsRevision?: {
+              candidateHash: string;
+              proposalHash: string;
+              sourceRequirementsHash: string | null;
+            };
+          }
+        | undefined
+    )?.requirementsRevision;
+  }
+
+  private previousRequirementsHash(events: EventV1[]): string | undefined {
+    const event = events.findLast(
+      (entry) =>
+        entry.type === "task.completed" &&
+        typeof (entry.payload as { artifactHashes?: { requirements?: unknown } }).artifactHashes?.requirements ===
+          "string",
+    );
+    return (event?.payload as { artifactHashes?: { requirements?: string } } | undefined)?.artifactHashes?.requirements;
   }
 
   async completeArchitecture(
@@ -3004,6 +3256,20 @@ export class ApexService {
     const descriptor = TASKS.find(({ id }) => id === task.taskType);
     if (descriptor === undefined)
       throw new ApexError("APEX_VALIDATION", `Unknown task type ${task.taskType}`, EXIT_CODES.validation);
+    await this.assertTaskReviewFilesUnmodified(run, descriptor);
+    if (descriptor.id.startsWith("codegen-")) await this.assertPreviousGeneratedSourceUnmodified(events);
+    if (descriptor.id === "requirements") {
+      const pending = this.pendingRequirementsRevision(events);
+      if (
+        pending !== undefined &&
+        sha256Json(outputs.find(({ kind }) => kind === "requirements")?.value) !== pending.candidateHash
+      )
+        throw new ApexError(
+          "APEX_STALE",
+          "Requirements output differs from the confirmed change candidate",
+          EXIT_CODES.stale,
+        );
+    }
     if (descriptor.id === "governance-discovery") {
       const pending = this.pendingGovernanceRevision(events);
       if (
@@ -3185,6 +3451,75 @@ export class ApexService {
     return join(this.root, "agent-output", run.projectId, run.runId);
   }
 
+  private generatedReviewBase(path: string): string {
+    return join(this.root, ".apex", "generated-review-bases", sha256Bytes(Buffer.from(relative(this.root, path))));
+  }
+
+  private async assertGeneratedReviewUnmodified(path: string): Promise<void> {
+    await this.assertSafeDestination(this.root, path);
+    const current = await this.readOptional(path);
+    if (current === undefined) return;
+    const basePath = this.generatedReviewBase(path);
+    await this.assertSafeDestination(this.root, basePath);
+    const base = await this.readOptional(basePath);
+    if (base === undefined || !current.equals(base))
+      throw new ApexError(
+        "APEX_CONFLICT",
+        `Generated review file has manual edits: ${relative(this.root, path)}`,
+        EXIT_CODES.conflict,
+      );
+  }
+
+  private async assertTaskReviewFilesUnmodified(run: RunConfigV1, descriptor: WorkflowTaskDescriptor): Promise<void> {
+    const root = this.requirementsReviewDirectory(run);
+    let files: string[] = [];
+    if (descriptor.id === "requirements")
+      files = [
+        "01-requirements.md",
+        "README.md",
+        "service-recommendations.md",
+        "sku-preferences.md",
+        "challenger-findings.md",
+      ];
+    if (descriptor.id === "architecture")
+      files = [
+        "README.md",
+        "architecture-assessment.md",
+        "cost-estimate.md",
+        "sku-comparison.md",
+        "challenger-findings.md",
+        ...["03-des-diagram", "02-waf-assessment", "03-des-cost-breakdown", "03-des-cost-uncertainty"].flatMap((name) =>
+          ["py", "svg", "png"].map((extension) => `${name}.${extension}`),
+        ),
+      ].map((name) => `architecture/${name}`);
+    if (descriptor.id === "plan")
+      files = [
+        "README.md",
+        "implementation-plan.md",
+        "iac-binding.md",
+        "environment-inputs.md",
+        "challenger-findings.md",
+      ].map((name) => `plan/${name}`);
+    if (descriptor.id.startsWith("validation-")) files = ["validation/validation-report.md"];
+    if (descriptor.reviewSubject !== undefined) {
+      files.push(`reviews/${descriptor.reviewSubject}-findings.md`);
+      if (descriptor.reviewSubject === "requirements") files.push("challenger-findings.md");
+      if (["architecture", "plan"].includes(descriptor.reviewSubject))
+        files.push(`${descriptor.reviewSubject}/challenger-findings.md`);
+    }
+    for (const name of files) await this.assertGeneratedReviewUnmodified(join(root, name));
+  }
+
+  private async writeGeneratedReview(path: string, content: Buffer): Promise<void> {
+    await this.assertGeneratedReviewUnmodified(path);
+    const current = await this.readOptional(path);
+    if (current?.equals(content)) return;
+    await atomicWriteBytes(path, content, { refuseOverwrite: current === undefined });
+    const basePath = this.generatedReviewBase(path);
+    await this.assertSafeDestination(this.root, basePath);
+    await atomicWriteBytes(basePath, content);
+  }
+
   private reviewMarkdownText(value: string): string {
     return value.replaceAll("\\", "\\\\").replaceAll("|", "\\|").replaceAll("\r\n", "\n").replaceAll("\n", "<br>");
   }
@@ -3217,29 +3552,29 @@ export class ApexService {
     };
     await mkdir(directory, { recursive: true });
     await Promise.all([
-      atomicWriteBytes(join(directory, "01-requirements.md"), Buffer.from(document.content, "utf8")),
-      atomicWriteBytes(
+      this.writeGeneratedReview(join(directory, "01-requirements.md"), Buffer.from(document.content, "utf8")),
+      this.writeGeneratedReview(
         join(directory, "README.md"),
         Buffer.from(
           `# ${this.reviewMarkdownText(run.projectId)}\n\nGenerated Gate 1 review package for run \`${this.reviewMarkdownText(run.runId)}\`. The APEX kernel state remains authoritative.\n\n- Environment: ${this.reviewMarkdownText(run.environment)}\n- Business context: ${this.reviewMarkdownText(requirements.businessContext ?? "Deferred")}\n- Requirements document hash: ${requirementsDocumentHash}\n- Review status: challenger findings pending\n`,
           "utf8",
         ),
       ),
-      atomicWriteBytes(
+      this.writeGeneratedReview(
         join(directory, "service-recommendations.md"),
         Buffer.from(
           `# Service Recommendations\n\nThese are user-reviewed candidate services, not Architecture decisions.\n\n## Candidate Services\n${list(input["service-preferences"])}\n\n## Recommendation Rationale\n${this.reviewMarkdownText(requirements.architectureHandoff ?? "Architecture must evaluate the candidate services against approved requirements and current evidence.")}\n\n## Constraints\n- Retained services: ${text(input["retained-services"])}\n- Prohibited services: ${text(input["prohibited-services"])}\n- Environment overrides: ${text(input["environment-overrides"])}\n\nArchitecture must validate candidates against approved requirements, governance, and current evidence.\n`,
           "utf8",
         ),
       ),
-      atomicWriteBytes(
+      this.writeGeneratedReview(
         join(directory, "sku-preferences.md"),
         Buffer.from(
-          `# SKU Preferences\n\nUser constraints only. Architecture owns SKU selection.\n\n- Preference: ${text(input["sku-preferences"])}\n- Budget posture: ${text(input.budget)}\n- Scale: ${text(input.scale)}\n`,
+          `# SKU Preferences\n\nUser constraints only. Architecture owns SKU selection.\n\n- Preference: ${text(input["sku-preferences"])}\n- Budget posture: ${requirements.budgetAndOperations === undefined ? text(input.budget) : this.reviewMarkdownText(requirements.budgetAndOperations)}\n- Scale: ${text(input.scale)}\n`,
           "utf8",
         ),
       ),
-      atomicWriteBytes(
+      this.writeGeneratedReview(
         join(directory, "challenger-findings.md"),
         Buffer.from(
           "# Challenger Findings\n\nRequirements challenger review is pending. Gate 1 cannot be approved until the reviewer completes this document.\n",
@@ -3259,7 +3594,7 @@ export class ApexService {
                 `## ${this.reviewMarkdownText(id)}: ${this.reviewMarkdownText(title)}\n\n- Severity: ${this.reviewMarkdownText(severity)}\n- Finding: ${this.reviewMarkdownText(detail)}${resolution === undefined ? "" : `\n- Resolution: ${this.reviewMarkdownText(resolution)}`}`,
             )
             .join("\n\n");
-    await atomicWriteBytes(
+    await this.writeGeneratedReview(
       join(this.requirementsReviewDirectory(run), "challenger-findings.md"),
       Buffer.from(`# Challenger Findings\n\n${findings}\n`, "utf8"),
     );
@@ -3350,14 +3685,14 @@ export class ApexService {
         .join("\n\n") ?? "- Unavailable for this historical Architecture artifact.";
     await mkdir(directory, { recursive: true });
     await Promise.all([
-      atomicWriteBytes(
+      this.writeGeneratedReview(
         join(directory, "README.md"),
         Buffer.from(
           `# ${this.reviewMarkdownText(architecture.title)}\n\nGenerated Gate 2 review package for run \`${this.reviewMarkdownText(run.runId)}\`. The APEX kernel state remains authoritative.\n\n- Architecture hash: ${hashes.architecture}\n- Cost estimate hash: ${hashes["cost-estimate"]}\n- Decision manifest hash: ${hashes["workload-decision-manifest"]}\n- Review status: challenger findings pending\n\n## Diagram Status\n\n${diagramStatus}\n`,
           "utf8",
         ),
       ),
-      atomicWriteBytes(
+      this.writeGeneratedReview(
         join(directory, "architecture-assessment.md"),
         Buffer.from(
           `# Architecture Assessment\n\n## Summary\n\n${this.reviewMarkdownText(architecture.summary)}\n\n## Architecture Diagram\n\n${architectureImages || "- Diagram unavailable. See README.md for status."}\n\n## Components\n\n${table(
@@ -3372,21 +3707,21 @@ export class ApexService {
           "utf8",
         ),
       ),
-      atomicWriteBytes(
+      this.writeGeneratedReview(
         join(directory, "cost-estimate.md"),
         Buffer.from(
           `# Cost Estimate\n\n- Pricing date: ${this.reviewMarkdownText(cost.pricingDate)}\n- Pricing status: ${this.reviewMarkdownText(cost.pricingStatus ?? "complete")}\n- Priced monthly subtotal: ${cost.totalMonthlyCost.toFixed(2)} ${this.reviewMarkdownText(cost.currency)}\n\n## Cost Diagrams\n\n${costImages || "- Diagrams unavailable. See README.md for status."}\n\nUnpriced items are excluded from the priced subtotal and diagrams.\n\n## Priced Line Items\n\n${costRows.length === 0 ? "- None." : table(["Service", "SKU", "Quantity", "Monthly", "Confidence"], costRows)}\n\n## Unpriced Items\n\n${unpricedRows.length === 0 ? "- None." : table(["Service", "SKU", "Quantity", "Reason"], unpricedRows)}\n\n## Evidence Appendix\n\n${cost.lineItems.map((item) => `- ${this.reviewMarkdownText(item.service)} / ${this.reviewMarkdownText(item.sku)}: ${this.reviewMarkdownText(item.source.provider)} — ${this.reviewMarkdownText(item.source.uri)} — retrieved ${this.reviewMarkdownText(item.source.retrievedAt)}; uncertainty ${this.reviewMarkdownText(item.uncertainty.basis)}`).join("\n") || "- No priced evidence rows."}\n\n## Assumptions\n\n${list(cost.assumptions)}\n`,
           "utf8",
         ),
       ),
-      atomicWriteBytes(
+      this.writeGeneratedReview(
         join(directory, "sku-comparison.md"),
         Buffer.from(
           `# SKU Comparison\n\n${table(["Logical ID", "Service", "Selected SKU", "Quantity", "Rationale"], skuRows)}\n\nThese are user-confirmed Architecture decisions. Alternatives and rejected options must be recorded in the architecture assessment before Gate 2 approval.\n`,
           "utf8",
         ),
       ),
-      atomicWriteBytes(
+      this.writeGeneratedReview(
         join(directory, "challenger-findings.md"),
         Buffer.from(
           "# Challenger Findings\n\nArchitecture challenger review is pending. Gate 2 cannot be approved until the reviewer completes this document.\n",
@@ -3397,9 +3732,15 @@ export class ApexService {
         "error" in diagram
           ? []
           : [
-              atomicWriteBytes(join(directory, `${diagram.name}.py`), Buffer.from(diagram.source.python, "utf8")),
-              atomicWriteBytes(join(directory, `${diagram.name}.svg`), Buffer.from(diagram.source.svg, "utf8")),
-              atomicWriteBytes(join(directory, `${diagram.name}.png`), Buffer.from(diagram.png)),
+              this.writeGeneratedReview(
+                join(directory, `${diagram.name}.py`),
+                Buffer.from(diagram.source.python, "utf8"),
+              ),
+              this.writeGeneratedReview(
+                join(directory, `${diagram.name}.svg`),
+                Buffer.from(diagram.source.svg, "utf8"),
+              ),
+              this.writeGeneratedReview(join(directory, `${diagram.name}.png`), Buffer.from(diagram.png)),
             ],
       ),
     ]);
@@ -3433,7 +3774,7 @@ export class ApexService {
               this.reviewMarkdownText(criterion.rationale),
             ]),
           );
-    await atomicWriteBytes(
+    await this.writeGeneratedReview(
       join(this.architectureReviewDirectory(run), "challenger-findings.md"),
       Buffer.from(`# Challenger Findings\n\n## Well-Architected Criteria\n\n${criteria}\n\n${findings}\n`, "utf8"),
     );
@@ -3480,14 +3821,14 @@ export class ApexService {
     ]);
     await mkdir(directory, { recursive: true });
     await Promise.all([
-      atomicWriteBytes(
+      this.writeGeneratedReview(
         join(directory, "README.md"),
         Buffer.from(
           `# Implementation Plan\n\nGenerated Gate 3 review package for run \`${this.reviewMarkdownText(run.runId)}\`. The APEX kernel state remains authoritative.\n\n- Intent hash: ${hashes["implementation-intent"]}\n- Binding hash: ${hashes["iac-binding"]}\n- Environment input hash: ${hashes["environment-inputs"]}\n- Review status: challenger findings pending\n`,
           "utf8",
         ),
       ),
-      atomicWriteBytes(
+      this.writeGeneratedReview(
         join(directory, "implementation-plan.md"),
         Buffer.from(
           `# Implementation Plan\n\n## Logical Resources\n\n${table(["ID", "Type", "Purpose", "Depends On", "Controls"], resourceRows)}\n\n## Outputs\n\n${intent.outputs.map((output) => `- ${this.reviewMarkdownText(output)}`).join("\n")}\n\n## Source Artifacts\n\n${Object.entries(
@@ -3498,21 +3839,21 @@ export class ApexService {
           "utf8",
         ),
       ),
-      atomicWriteBytes(
+      this.writeGeneratedReview(
         join(directory, "iac-binding.md"),
         Buffer.from(
           `# IaC Binding\n\n- Track: ${this.reviewMarkdownText(binding.track)}\n- Intent hash: ${binding.intentHash}\n\n${table(["Logical ID", "Implementation", "Version", "Parameters", "Physical Authorization Scope"], bindingRows)}\n\nPhysical scope declares intended managed and protected resources; it is not evidence of module expansion or resource existence.\n`,
           "utf8",
         ),
       ),
-      atomicWriteBytes(
+      this.writeGeneratedReview(
         join(directory, "environment-inputs.md"),
         Buffer.from(
           `# Environment Inputs\n\n- Environment: ${this.reviewMarkdownText(inputs.environment)}\n\n${table(["Name", "Kind", "Reference or Value"], inputRows)}\n`,
           "utf8",
         ),
       ),
-      atomicWriteBytes(
+      this.writeGeneratedReview(
         join(directory, "challenger-findings.md"),
         Buffer.from(
           "# Challenger Findings\n\nImplementation-plan challenger review is pending. Gate 3 cannot be approved until the reviewer completes this document.\n",
@@ -3532,7 +3873,7 @@ export class ApexService {
                 `## ${this.reviewMarkdownText(id)}: ${this.reviewMarkdownText(title)}\n\n- Severity: ${this.reviewMarkdownText(severity)}\n- Finding: ${this.reviewMarkdownText(detail)}${resolution === undefined ? "" : `\n- Resolution: ${this.reviewMarkdownText(resolution)}`}`,
             )
             .join("\n\n");
-    await atomicWriteBytes(
+    await this.writeGeneratedReview(
       join(this.planReviewDirectory(run), "challenger-findings.md"),
       Buffer.from(`# Challenger Findings\n\n${findings}\n`, "utf8"),
     );
@@ -3550,7 +3891,7 @@ export class ApexService {
             .join("\n\n");
     const directory = join(this.root, "agent-output", run.projectId, run.runId, "reviews");
     await mkdir(directory, { recursive: true });
-    await atomicWriteBytes(
+    await this.writeGeneratedReview(
       join(directory, `${subject}-findings.md`),
       Buffer.from(
         `# ${this.reviewMarkdownText(subject)} Challenger Findings\n\n- Reviewed artifact kind: ${this.reviewMarkdownText(review.subjectKind)}\n- Review subject hash: ${review.subjectHash}\n- Reviewed at: ${this.reviewMarkdownText(review.reviewedAt)}\n\n${findings}\n`,
@@ -3576,7 +3917,7 @@ export class ApexService {
             )
             .join("\n");
     await mkdir(directory, { recursive: true });
-    await atomicWriteBytes(
+    await this.writeGeneratedReview(
       join(directory, "validation-report.md"),
       Buffer.from(
         `# Validation Report\n\n- Task: ${this.reviewMarkdownText(taskType)}\n- Track: ${this.reviewMarkdownText(run.iacTool)}\n- Created: ${this.reviewMarkdownText(evidence.createdAt)}\n- Verdict: accepted evidence with per-check execution modes\n\n## Validator Evidence\n\n${entries}\n\nOnly native entries reference runtime-executed source-bound command receipts. Simulated entries do not prove command execution or policy compliance. Artifact repair, risk acceptance, and gate decisions remain with their authorized owners.\n`,
@@ -3900,6 +4241,8 @@ export class ApexService {
     options: GateDecisionOptions = {},
   ): Promise<ApprovalEvidenceV1> {
     const run = await this.currentRun();
+    if (gateNumber === 4)
+      await this.assertGeneratedReviewUnmodified(join(this.operationsReviewDirectory(run), "approval.md"));
     const gate = run.gates.find(({ gate }) => gate === gateNumber);
     if (gate === undefined) throw new ApexError("APEX_USAGE", `Unknown gate ${gateNumber}`, EXIT_CODES.usage);
     const events = await this.journal(run).replay();
@@ -4272,6 +4615,8 @@ export class ApexService {
       track: run.iacTool,
       targetScope: run.targetScope,
     });
+    for (const name of ["README.md", "deployment-preview.md"])
+      await this.assertGeneratedReviewUnmodified(join(this.operationsReviewDirectory(run), name));
     await this.append(run, "preview.created", {
       previewHash: preview.previewHash,
       previewObjectHash,
@@ -4326,14 +4671,14 @@ export class ApexService {
     ].join("\n");
     await mkdir(directory, { recursive: true });
     await Promise.all([
-      atomicWriteBytes(
+      this.writeGeneratedReview(
         join(directory, "README.md"),
         Buffer.from(
           `# Operations Review\n\nGenerated from exact kernel evidence for run \`${this.reviewMarkdownText(run.runId)}\`. The APEX kernel state remains authoritative.\n\n- Preview hash: ${preview.previewHash}\n- Preview object hash: ${previewObjectHash}\n- Gate 4 status: pending human terminal approval\n`,
           "utf8",
         ),
       ),
-      atomicWriteBytes(join(directory, "deployment-preview.md"), Buffer.from(previewContent, "utf8")),
+      this.writeGeneratedReview(join(directory, "deployment-preview.md"), Buffer.from(previewContent, "utf8")),
     ]);
   }
 
@@ -4355,7 +4700,10 @@ export class ApexService {
       "This approval authorizes only the exact preview above.",
       "",
     ].join("\n");
-    await atomicWriteBytes(join(this.operationsReviewDirectory(run), "approval.md"), Buffer.from(content, "utf8"));
+    await this.writeGeneratedReview(
+      join(this.operationsReviewDirectory(run), "approval.md"),
+      Buffer.from(content, "utf8"),
+    );
   }
 
   async currentPreview(): Promise<string> {

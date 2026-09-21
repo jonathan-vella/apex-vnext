@@ -46,6 +46,7 @@ import {
   QualityMeasurementsV1Schema,
   ArchitectureAvailabilityV1Schema,
   RequirementsV1Schema,
+  RequirementsChangeProposalV1Schema,
   ReviewFindingsV1Schema,
   RuntimeBundleLockV1Schema,
   ScenarioV1Schema,
@@ -315,6 +316,47 @@ describe("Wave 1 contracts", () => {
         false,
       );
     assert.equal(hasValidArchetypeSourceProposal({ ...proposal, revision: "b".repeat(40) }), false);
+  });
+
+  it("keeps requirements change proposals bounded and distinct from deployment authority", () => {
+    const proposal = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run-1",
+      expectedHead: hash,
+      ownerEpoch: 0,
+      sourceRequirementsHash: hash,
+      candidateHash: hash,
+      reason: "Change budget",
+      mode: "revise",
+      addedRequirementIds: [],
+      removedRequirementIds: [],
+      changedRequirementIds: ["budget"],
+      retainedRequirementIds: ["availability"],
+      changedFields: [],
+      invalidatedNodes: ["requirements"],
+      invalidatedGates: [1, 2, 3, 4],
+      requiresReassessment: ["cost", "policy", "security", "dependencies", "code", "documents"],
+      filesModified: false,
+      deploymentAuthorized: false,
+      proposalHash: hash,
+    };
+    assert.equal(Value.Check(RequirementsChangeProposalV1Schema, proposal), true);
+    assert.equal(
+      Value.Check(RequirementsChangeProposalV1Schema, { ...proposal, mode: "adopt", sourceRequirementsHash: null }),
+      true,
+    );
+    for (const changed of [
+      { ...proposal, deploymentAuthorized: true },
+      { ...proposal, filesModified: true },
+      { ...proposal, ownerEpoch: -1 },
+      { ...proposal, expectedHead: "HEAD" },
+      { ...proposal, invalidatedGates: [5] },
+      { ...proposal, changedRequirementIds: ["same", "same"] },
+      { ...proposal, reason: "x".repeat(2049) },
+      { ...proposal, approval: true },
+    ])
+      assert.equal(Value.Check(RequirementsChangeProposalV1Schema, changed), false);
   });
 
   it("uses one explicit persisted contract version", () => {

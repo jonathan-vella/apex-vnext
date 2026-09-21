@@ -59,6 +59,10 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 - `quality status`
 - `reconcile`
 - `render`
+- `requirements adopt`
+- `requirements preview-adoption`
+- `requirements preview-change`
+- `requirements revise`
 - `review resolve`
 - `setup`
 - `state transfer-export`

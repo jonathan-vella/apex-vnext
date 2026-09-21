@@ -70,6 +70,201 @@ test("status is read-only across repeated active-run reads and restart", async (
   assert.deepEqual(await snapshotFiles(root), files);
 });
 
+test("requirements change preview binds retained decisions and leaves workflow and files unchanged", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo" });
+  await prepareValidatedRun(service, runId, "bicep");
+  const before = await service.status();
+  const current = requirements();
+  const candidate = {
+    ...current,
+    budgetAndOperations: "Monthly limit is EUR 500",
+    requirements: [
+      ...current.requirements,
+      {
+        id: "REQ-ADDED",
+        statement: "Retain daily recovery points",
+        priority: "must" as const,
+        status: "confirmed" as const,
+        source: "consumer",
+      },
+    ],
+  };
+  const files = await snapshotFiles(root);
+  const proposal = await service.previewRequirementsChange(candidate, "Add recovery requirement");
+  assert.deepEqual(proposal.addedRequirementIds, ["REQ-ADDED"]);
+  assert.deepEqual(proposal.retainedRequirementIds, current.requirements.map(({ id }) => id).sort());
+  assert.deepEqual(proposal.changedFields, ["budgetAndOperations"]);
+  assert.equal(proposal.expectedHead, before.head);
+  assert.equal(proposal.candidateHash, sha256Json(candidate));
+  assert.deepEqual(proposal.invalidatedGates, [1, 2, 3, 4]);
+  assert.equal(proposal.deploymentAuthorized, false);
+  assert.deepEqual(
+    await new ApexService(root).previewRequirementsChange(candidate, "Add recovery requirement"),
+    proposal,
+  );
+  await assert.rejects(service.previewRequirementsChange(current, "No change"), /unchanged/);
+  await assert.rejects(
+    service.previewRequirementsChange({ ...candidate, projectId: "foreign" }, "Wrong project"),
+    /valid consumer/,
+  );
+  assert.deepEqual(await service.status(), before);
+  assert.deepEqual(await snapshotFiles(root), files);
+});
+
+test("confirmed requirements revision invalidates proof without approvals or file replacement", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo" });
+  await prepareValidatedRun(service, runId, "bicep");
+  const before = await service.status();
+  const candidate = { ...requirements(), budgetAndOperations: "Monthly limit is EUR 500" };
+  const proposal = await service.previewRequirementsChange(candidate, "Change budget");
+  const options = { reason: "Change budget", expectedHash: proposal.proposalHash, confirm: true };
+  await assert.rejects(service.reviseRequirements(candidate, { ...options, confirm: false }), /explicit confirmation/);
+  await assert.rejects(
+    service.reviseRequirements({ ...candidate, budgetAndOperations: "Different" }, options),
+    /stale/,
+  );
+  assert.deepEqual(await service.status(), before);
+  await writeFile(join(root, "manual-design.md"), "Retain this manual edit\n");
+  const result = await service.reviseRequirements(candidate, options);
+  assert.equal(result.deploymentAuthorized, false);
+  const after = await service.status();
+  assert.equal(after.task, "requirements");
+  assert.equal(after.events, before.events + 1);
+  assert.ok(after.run.gates.every(({ state }) => state !== "approved" && state !== "inherited"));
+  assert.equal(await readFile(join(root, "manual-design.md"), "utf8"), "Retain this manual edit\n");
+  const restarted = new ApexService(root);
+  const task = await restarted.nextTask();
+  assert.equal(task.status, "task");
+  if (task.status !== "task") throw new Error("Expected revised requirements task");
+  assert.deepEqual((await restarted.taskContext(task.task.taskId)).outputTemplates.requirements, candidate);
+  await assert.rejects(restarted.completeRequirements(task.task.taskId, requirements()), /confirmed change candidate/);
+  const documentPath = join(root, "agent-output", "demo", runId, "01-requirements.md");
+  const originalDocument = await readFile(documentPath, "utf8");
+  await writeFile(documentPath, "Manual requirements edit\n");
+  const pending = await restarted.status();
+  await assert.rejects(restarted.completeRequirements(task.task.taskId, candidate), /manual edits/);
+  assert.deepEqual(await restarted.status(), pending);
+  assert.equal(await readFile(documentPath, "utf8"), "Manual requirements edit\n");
+  await writeFile(documentPath, originalDocument);
+  const unchangedPath = join(root, "agent-output", "demo", runId, "service-recommendations.md");
+  const unchangedBefore = await stat(unchangedPath, { bigint: true });
+  await restarted.completeRequirements(task.task.taskId, candidate);
+  assert.equal((await stat(unchangedPath, { bigint: true })).mtimeNs, unchangedBefore.mtimeNs);
+  assert.equal((await restarted.status()).task, "requirements-review");
+  assert.equal(await readFile(join(root, "manual-design.md"), "utf8"), "Retain this manual edit\n");
+});
+
+test("confirmed decision adoption reuses recovered requirements without importing approvals", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo" });
+  await writeFile(join(root, "manual-workload.md"), "Existing independently copied design\n");
+  const candidate = requirements();
+  const before = await service.status();
+  const proposal = await service.previewRequirementsChange(candidate, "Adopt recovered consumer decisions", "adopt");
+  assert.equal(proposal.sourceRequirementsHash, null);
+  assert.equal(proposal.mode, "adopt");
+  assert.deepEqual(proposal.retainedRequirementIds, []);
+  assert.deepEqual(await service.status(), before);
+  await service.reviseRequirements(candidate, {
+    reason: proposal.reason,
+    expectedHash: proposal.proposalHash,
+    confirm: true,
+    mode: "adopt",
+  });
+  const restarted = new ApexService(root);
+  const task = await restarted.nextTask();
+  assert.equal(task.status, "task");
+  if (task.status !== "task") throw new Error("Expected adopted requirements task without repeated intake");
+  assert.deepEqual((await restarted.taskContext(task.task.taskId)).outputTemplates.requirements, candidate);
+  await restarted.completeRequirements(task.task.taskId, candidate);
+  assert.equal((await restarted.status()).task, "requirements-review");
+  assert.ok((await restarted.status()).run.gates.every(({ state }) => state !== "approved" && state !== "inherited"));
+  await assert.rejects(restarted.previewRequirementsChange(candidate, "Duplicate adoption", "adopt"), /use revision/);
+  assert.equal(await readFile(join(root, "manual-workload.md"), "utf8"), "Existing independently copied design\n");
+});
+
+test("a later review invalidation does not resurrect an older confirmed requirements candidate", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo" });
+  const candidate = { ...requirements(), budgetAndOperations: "Adopted budget" };
+  const proposal = await service.previewRequirementsChange(candidate, "Adopt", "adopt");
+  await service.reviseRequirements(candidate, {
+    reason: "Adopt",
+    expectedHash: proposal.proposalHash,
+    confirm: true,
+    mode: "adopt",
+  });
+  const task = await service.nextTask();
+  if (task.status !== "task") throw new Error("Expected requirements task");
+  await service.completeRequirements(task.task.taskId, candidate);
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+  const before = await service.status();
+  await journal.append({
+    eventId: "review-revision",
+    projectId: "demo",
+    runId,
+    type: "workflow.invalidated",
+    timestamp: new Date().toISOString(),
+    ownerEpoch: before.run.ownerEpoch,
+    expectedHead: before.head,
+    payload: {
+      reason: "Reviewer requires correction",
+      nodeIds: ["requirements", "requirements-review"],
+      artifactKinds: ["requirements", "review-findings"],
+    },
+  });
+  const correction = await service.nextTask();
+  assert.equal(correction.status, "task");
+  if (correction.status !== "task") throw new Error("Expected correction without repeated intake");
+  assert.deepEqual((await service.taskContext(correction.task.taskId)).outputTemplates.requirements, candidate);
+  await service.completeRequirements(correction.task.taskId, {
+    ...candidate,
+    budgetAndOperations: "Reviewer-corrected budget",
+  });
+  assert.equal((await service.status()).task, "requirements-review");
+});
+
+test("requirements revision rejects stale heads and unresolved deployment execution", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo", iacTool: "terraform" });
+  await prepareValidatedRun(service, runId, "terraform");
+  const candidate = { ...requirements(), budgetAndOperations: "Monthly limit is EUR 500" };
+  const first = await service.previewRequirementsChange(candidate, "Change budget");
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+  await journal.append({
+    eventId: "in-flight",
+    projectId: "demo",
+    runId,
+    type: "deployment.started",
+    timestamp: new Date().toISOString(),
+    ownerEpoch: first.ownerEpoch,
+    expectedHead: first.expectedHead,
+    payload: { previewHash: "a".repeat(64) },
+  });
+  const before = await service.status();
+  await assert.rejects(
+    service.reviseRequirements(candidate, { reason: "Change budget", expectedHash: first.proposalHash, confirm: true }),
+    /stale/,
+  );
+  const current = await service.previewRequirementsChange(candidate, "Change budget");
+  await assert.rejects(
+    service.reviseRequirements(candidate, {
+      reason: "Change budget",
+      expectedHash: current.proposalHash,
+      confirm: true,
+    }),
+    /in-flight or indeterminate/,
+  );
+  assert.deepEqual(await service.status(), before);
+});
+
 test("status leaves pending run transaction recovery to an advancing operation", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);

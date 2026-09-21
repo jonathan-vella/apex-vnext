@@ -2986,6 +2986,50 @@ test("restricted staging and generateIac produce a real accepted tree", async ()
   assert.equal(await journal.head(), completedHead);
 });
 
+for (const track of ["bicep", "terraform"] as const) {
+  test(`regeneration preserves and blocks manual edits in previous ${track} source`, async () => {
+    const root = await tempRoot();
+    const service = new ApexService(root);
+    const { runId } = await service.init({ projectId: "demo", iacTool: track });
+    const first = await reachCodegen(service, runId, track);
+    const generated = await service.generateIac(first.taskId);
+    const main = generated.files.find(({ path }) => path.endsWith(`main.${track === "bicep" ? "bicep" : "tf"}`))!;
+    const original = await readFile(main.path, "utf8");
+    await writeFile(main.path, `${original}\n// manual consumer edit\n`);
+    const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+    const state = await service.status();
+    await journal.append({
+      eventId: "regenerate",
+      projectId: "demo",
+      runId,
+      ownerEpoch: state.run.ownerEpoch,
+      timestamp: new Date().toISOString(),
+      expectedHead: state.head,
+      type: "workflow.invalidated",
+      payload: {
+        reason: "Regenerate",
+        nodeIds: [`codegen-${track}`, `validation-${track}`],
+        artifactKinds: ["iac-handoff", "logical-resource-manifest", "validation-evidence"],
+      },
+    });
+    const next = await service.nextTask();
+    if (next.status !== "task") throw new Error("Expected regeneration task");
+    const before = await service.status();
+    await assert.rejects(service.generateIac(next.task.taskId), /manual edits/);
+    await assert.rejects(service.stageFile(next.task.taskId, "notes.md", "replacement"), /manual edits/);
+    await assert.rejects(
+      service.completeTaskOutputs(next.task.taskId, codegenBundle(runId, track, first.plan)),
+      /manual edits/,
+    );
+    assert.deepEqual(await service.status(), before);
+    assert.equal(await readFile(main.path, "utf8"), `${original}\n// manual consumer edit\n`);
+    await writeFile(main.path, original);
+    const regenerated = await service.generateIac(next.task.taskId);
+    assert.equal(regenerated.treeHash, generated.treeHash);
+    assert.equal(await readFile(main.path, "utf8"), original);
+  });
+}
+
 function emptyGovernanceBaseline(subscriptionId: string, discoveredAt: string) {
   return {
     schema_version: "governance-baseline-v1",
@@ -3453,7 +3497,7 @@ for (const track of ["bicep", "terraform"] as const) {
 
   test(`${track} material governance revision makes prior native preview and approval unusable`, async () => {
     const { path, candidate, service, runId, generated, journal } = await materialGovernanceFixture(track, true);
-    await service.completeTaskOutputs(generated.taskId, codegenBundle(runId, track, generated.plan));
+    await service.generateIac(generated.taskId);
     await complete(service, `validation-${track}`, [
       { kind: "validation-evidence", value: validationEvidence(runId, track) },
     ]);
@@ -3494,7 +3538,7 @@ for (const track of ["bicep", "terraform"] as const) {
       { kind: "review-findings", value: review(runId, "plan", planHashes["implementation-intent"]!) },
     ]);
     await service.decideGateNumber(3, "approved", "tester");
-    await complete(service, `codegen-${track}`, codegenBundle(runId, track, plan));
+    await service.generateIac(await task(service, `codegen-${track}`));
     await complete(service, `validation-${track}`, [
       { kind: "validation-evidence", value: validationEvidence(runId, track) },
     ]);

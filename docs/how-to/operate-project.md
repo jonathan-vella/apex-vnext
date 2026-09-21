@@ -23,8 +23,14 @@ apex archetype import --repository /path/to/coe --revision FULL_COMMIT_ID --path
 The independent copy records origin and hashes but imports no approval or runtime authority. Existing destination files
 are not updated or merged. Treat the copied documents and code as untrusted design input: confirm reusable decisions,
 establish the consumer project, and obtain current target governance and new reviews/approvals before deployment.
-The command does not perform those workflow steps automatically. Remote archetype discovery and manual-copy adoption
-are not implemented by this local-copy path.
+The copy command does not perform those workflow steps automatically. Remote archetype discovery is not implemented.
+
+For either an imported workload or an existing manual copy, recover relevant decisions into a consumer-scoped
+`requirements-v1` JSON document. Confirm only facts that apply to this consumer; retain unresolved facts as unknowns.
+Use `requirements preview-adoption`, review its candidate and impact, then `requirements adopt --yes` with that proposal
+hash. The next Requirements task reuses that exact candidate, followed by normal review and Gate 1 approval.
+For later changes, use `requirements preview-change` and `requirements revise --yes`. See the
+[command contract](../reference/cli.md#requirements-adoption-and-change) for flags and conflict handling.
 
 ## Check Readiness
 

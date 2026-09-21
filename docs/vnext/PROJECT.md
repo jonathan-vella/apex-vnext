@@ -115,7 +115,18 @@ The working-tree `archetype inspect` and confirmation-gated `archetype import` c
 subtree at an exact commit and create a new independent directory with typed provenance. Tests cover uncommitted source
 edits, known credentials, source authority, unsafe paths, symlinks, executable files, byte limits, case collisions,
 proposal tampering, concurrent imports and destination conflicts. The operation does not execute source instructions,
-alter current runs or approve gates. It is not remote discovery, manual-copy adoption or selective regeneration.
+alter current runs or approve gates. It is not remote discovery or selective IaC regeneration.
+
+The next local slice adds explicit adoption and revision of consumer `requirements-v1` decisions. A typed impact
+proposal binds the candidate, reason, run, journal head and owner epoch; confirmation uses the existing atomic workflow
+invalidation path. Recovered decisions resume as the exact Requirements task template and still require review and
+approval. Tests cover restart, stale candidates/heads, unresolved deployment execution and preserved consumer files.
+Generated review documents and diagrams reject manual conflicts and skip byte-identical rewrites. Codegen verifies
+previous accepted source before generation, direct staging and acceptance; both-track tests preserve edited files and
+unchanged journal state on conflicts. Reviewer corrections reuse previously accepted decisions without repeating intake.
+Automatic document
+interpretation, remote catalog discovery, detailed cost/policy impact analysis and resource-level selective IaC
+regeneration remain open; these commands do not establish complete conversational adaptation acceptance.
 
 Canonical Planner-to-CodeGen and Planner-to-Validator CLI probes now have both-track routing evidence. Generation
 completed once per run; Validator correctly remained blocked on unexecuted business checks. Shipped worker membership

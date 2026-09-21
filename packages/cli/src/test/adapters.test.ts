@@ -172,6 +172,59 @@ test("CLI archetype inspection and confirmed copy preserve independent origin an
   assert.deepEqual(await service.status(), before);
 });
 
+test("CLI requirements change adapters require a file, reason, hash and explicit confirmation", async (context) => {
+  const root = await tempRoot();
+  const candidate = requirements();
+  const file = join(root, "requirements.json");
+  await writeJson(file, candidate);
+  const preview = context.mock.method(ApexService.prototype, "previewRequirementsChange", async () => ({
+    proposalHash: "a".repeat(64),
+  }));
+  const revise = context.mock.method(ApexService.prototype, "reviseRequirements", async () => ({
+    deploymentAuthorized: false,
+  }));
+  await assert.rejects(execute(["requirements", "preview-change", "--file", file], root), /Missing --reason/);
+  assert.equal(preview.mock.callCount(), 0);
+  await execute(["requirements", "preview-change", "--file", file, "--reason", "Budget change"], root);
+  assert.deepEqual(preview.mock.calls[0]!.arguments, [candidate, "Budget change"]);
+  const args = [
+    "requirements",
+    "revise",
+    "--file",
+    file,
+    "--reason",
+    "Budget change",
+    "--expected-hash",
+    "a".repeat(64),
+  ];
+  await assert.rejects(execute(args, root), /--yes/);
+  assert.equal(revise.mock.callCount(), 0);
+  await execute([...args, "--yes"], root);
+  assert.deepEqual(revise.mock.calls[0]!.arguments, [
+    candidate,
+    { reason: "Budget change", expectedHash: "a".repeat(64), confirm: true },
+  ]);
+  await execute(["requirements", "preview-adoption", "--file", file, "--reason", "Recovered decisions"], root);
+  assert.deepEqual(preview.mock.calls[1]!.arguments, [candidate, "Recovered decisions", "adopt"]);
+  const adoptArgs = [
+    "requirements",
+    "adopt",
+    "--file",
+    file,
+    "--reason",
+    "Recovered decisions",
+    "--expected-hash",
+    "a".repeat(64),
+  ];
+  await assert.rejects(execute(adoptArgs, root), /--yes/);
+  assert.equal(revise.mock.callCount(), 1);
+  await execute([...adoptArgs, "--yes"], root);
+  assert.deepEqual(revise.mock.calls[1]!.arguments, [
+    candidate,
+    { reason: "Recovered decisions", expectedHash: "a".repeat(64), confirm: true, mode: "adopt" },
+  ]);
+});
+
 test("CLI Node minimum compares complete stable versions", () => {
   assert.equal(meetsMinimumVersion("26.8.9", MINIMUM_NODE_VERSION), false);
   assert.equal(meetsMinimumVersion("26.9.0", MINIMUM_NODE_VERSION), true);

@@ -39,6 +39,46 @@ export const RequirementsV1Schema = Type.Object(
   { $id: "https://schemas.apexops.dev/requirements-v1.json", additionalProperties: false },
 );
 
+const ChangeIdsSchema = Type.Array(Type.String({ minLength: 1, maxLength: 512 }), {
+  maxItems: 4096,
+  uniqueItems: true,
+});
+
+export const RequirementsChangeProposalV1Schema = Type.Object(
+  {
+    schemaVersion: ContractVersionSchema,
+    projectId: ProjectIdSchema,
+    runId: RunIdSchema,
+    expectedHead: Sha256Schema,
+    ownerEpoch: Type.Integer({ minimum: 0 }),
+    sourceRequirementsHash: Type.Union([Sha256Schema, Type.Null()]),
+    mode: Type.Union([Type.Literal("adopt"), Type.Literal("revise")]),
+    candidateHash: Sha256Schema,
+    reason: Type.String({ minLength: 1, maxLength: 2048 }),
+    addedRequirementIds: ChangeIdsSchema,
+    removedRequirementIds: ChangeIdsSchema,
+    changedRequirementIds: ChangeIdsSchema,
+    retainedRequirementIds: ChangeIdsSchema,
+    changedFields: ChangeIdsSchema,
+    invalidatedNodes: ChangeIdsSchema,
+    invalidatedGates: Type.Array(Type.Integer({ minimum: 1, maximum: 4 }), { maxItems: 4, uniqueItems: true }),
+    requiresReassessment: Type.Tuple([
+      Type.Literal("cost"),
+      Type.Literal("policy"),
+      Type.Literal("security"),
+      Type.Literal("dependencies"),
+      Type.Literal("code"),
+      Type.Literal("documents"),
+    ]),
+    filesModified: Type.Literal(false),
+    deploymentAuthorized: Type.Literal(false),
+    proposalHash: Sha256Schema,
+  },
+  { $id: "https://schemas.apexops.dev/requirements-change-proposal-v1.json", additionalProperties: false },
+);
+
+export type RequirementsChangeProposalV1 = Static<typeof RequirementsChangeProposalV1Schema>;
+
 export const LogicalResourceV1Schema = Type.Object(
   {
     id: NonEmptyStringSchema,

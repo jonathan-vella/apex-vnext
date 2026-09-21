@@ -8,6 +8,7 @@ import {
   type OnboardingConfigV1,
   type QualityMeasurementsV1,
   type QualityScorecardV1,
+  type RequirementsV1,
 } from "@apexops/contracts";
 import { Value } from "@sinclair/typebox/value";
 import { EventJournal, ValidatorRegistry, WriterTransferStore, atomicWriteJson, sha256Json } from "@apexops/kernel";
@@ -627,6 +628,29 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
       });
     case "status":
       return service.status();
+    case "requirements preview-change":
+      return service.previewRequirementsChange((await inputJson(flags)) as RequirementsV1, required(flags, "reason"));
+    case "requirements preview-adoption":
+      return service.previewRequirementsChange(
+        (await inputJson(flags)) as RequirementsV1,
+        required(flags, "reason"),
+        "adopt",
+      );
+    case "requirements adopt":
+      confirmed(flags, "requirements adopt");
+      return service.reviseRequirements((await inputJson(flags)) as RequirementsV1, {
+        reason: required(flags, "reason"),
+        expectedHash: required(flags, "expected-hash"),
+        confirm: true,
+        mode: "adopt",
+      });
+    case "requirements revise":
+      confirmed(flags, "requirements revise");
+      return service.reviseRequirements((await inputJson(flags)) as RequirementsV1, {
+        reason: required(flags, "reason"),
+        expectedHash: required(flags, "expected-hash"),
+        confirm: true,
+      });
     case "governance import":
       return service.importGovernanceBaseline(required(flags, "path"));
     case "governance revise": {
