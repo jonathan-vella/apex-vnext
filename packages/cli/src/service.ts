@@ -144,6 +144,7 @@ import {
   renderResourceInventory,
   renderRunStatus,
   renderOperationsRunbook,
+  renderPolicyMappingMatrix,
   renderWafAssessmentDiagram,
   type DiagramSource,
 } from "@apexops/renderers";
@@ -3429,6 +3430,7 @@ export class ApexService {
           join(this.operationsReviewDirectory(run), "operations-runbook.md"),
           Buffer.from(renderOperationsRunbook(diagnosis, outputHashes.diagnosis!), "utf8"),
         );
+      await this.materializeOperationalIndex(run, events, diagnosis, outputHashes.diagnosis!);
     }
     if (descriptor.reviewSubject !== undefined) {
       await this.materializeReviewerSummary(run, descriptor.reviewSubject, outputs[0]!.value as ReviewFindingsV1);
@@ -3527,7 +3529,15 @@ export class ApexService {
         "challenger-findings.md",
       ].map((name) => `plan/${name}`);
     if (descriptor.id.startsWith("validation-")) files = ["validation/validation-report.md"];
-    if (descriptor.id === "diagnosis") files = ["operations/operations-runbook.md"];
+    if (descriptor.id === "diagnosis")
+      files = [
+        "operations-runbook.md",
+        "handoff-index.md",
+        "deployment-summary.md",
+        "resource-inventory.md",
+        "policy-matrix.md",
+        "cost-reference.md",
+      ].map((name) => `operations/${name}`);
     if (descriptor.reviewSubject !== undefined) {
       files.push(`reviews/${descriptor.reviewSubject}-findings.md`);
       if (descriptor.reviewSubject === "requirements") files.push("challenger-findings.md");
@@ -3545,6 +3555,53 @@ export class ApexService {
     const basePath = this.generatedReviewBase(path);
     await this.assertSafeDestination(this.root, basePath);
     await atomicWriteBytes(basePath, content);
+  }
+
+  private async materializeOperationalIndex(
+    run: RunConfigV1,
+    events: EventV1[],
+    diagnosis: DiagnosisV1,
+    diagnosisHash: string,
+  ): Promise<void> {
+    const directory = this.operationsReviewDirectory(run);
+    const inventoryHash = this.latestPayloadHash(events, "deployment.completed", "inventoryHash");
+    if (inventoryHash === undefined)
+      throw new ApexError("APEX_NOT_FOUND", "Operational package requires recorded inventory", EXIT_CODES.notFound);
+    const inventory = await this.objects.getJson<ResourceInventoryV1>(inventoryHash);
+    const policyHash = this.artifactHash(events, "policy-property-map");
+    const costHash = this.artifactHash(events, "cost-estimate");
+    const policy = policyHash === undefined ? undefined : await this.objects.getJson<PolicyPropertyMapV1>(policyHash);
+    const cost = costHash === undefined ? undefined : await this.objects.getJson<CostEstimateV1>(costHash);
+    const costContent =
+      cost === undefined
+        ? "# Cost Reference\n\nNo accepted design cost estimate is available. Actual spend is unavailable.\n"
+        : `# Cost Reference\n\nAccepted design estimate: ${costHash}\n\nPricing date: ${this.reviewMarkdownText(cost.pricingDate)}\n\nPriced monthly subtotal: ${cost.totalMonthlyCost} ${this.reviewMarkdownText(cost.currency)}\n\nThis is the accepted design estimate, not measured as-built spend. Unpriced items are excluded from the subtotal.\n\n## Priced Services\n\n${cost.lineItems.map((item) => `- ${this.reviewMarkdownText(item.service)} / ${this.reviewMarkdownText(item.sku)}: ${item.quantity} x ${item.unitsPerMonth} units at ${item.unitPrice} = ${item.monthlyCost} ${this.reviewMarkdownText(cost.currency)} monthly; retrieved ${this.reviewMarkdownText(item.source.retrievedAt)}; ${this.reviewMarkdownText(item.uncertainty.basis)}`).join("\n")}\n\n## Unpriced Services\n\n${(cost.unpricedItems ?? []).map((item) => `- ${this.reviewMarkdownText(item.service)}: ${this.reviewMarkdownText(item.reason)}`).join("\n") || "None recorded."}\n`;
+    const index = `# Operational Handoff\n\nProject: ${this.reviewMarkdownText(run.projectId)}\n\nRun: ${this.reviewMarkdownText(run.runId)}\n\nEnvironment: ${this.reviewMarkdownText(run.environment)}\n\nDiagnosis: ${diagnosisHash}\n\nInventory: ${inventoryHash}\n\n## Documents\n\n- [Deployment summary](deployment-summary.md)\n- [Resource inventory](resource-inventory.md)\n- [Policy mapping matrix](policy-matrix.md)\n- [Design cost reference](cost-reference.md)\n${diagnosis.operationalHandoff === undefined ? "- Operations runbook unavailable: no accepted operational handoff data." : "- [Operations runbook and recovery guidance](operations-runbook.md)"}\n\n## Evidence Boundaries\n\nDesign estimates are not actual spend. Mapping dispositions are not compliance certification. Documented procedures are not restore-test evidence. The deployment summary identifies simulated versus native-adapter provenance. Current authorization is required for further operations.\n`;
+    await Promise.all([
+      this.writeGeneratedReview(
+        join(directory, "deployment-summary.md"),
+        Buffer.from(await this.renderCompletedDeploymentSummary(run, events)),
+      ),
+      this.writeGeneratedReview(
+        join(directory, "resource-inventory.md"),
+        Buffer.from(
+          renderResourceInventory({
+            ...inventory,
+            resources: inventory.resources.map((resource) => ({ ...resource, properties: {} })),
+          }),
+        ),
+      ),
+      this.writeGeneratedReview(
+        join(directory, "policy-matrix.md"),
+        Buffer.from(
+          policy === undefined
+            ? "# Policy Mapping Matrix\n\nNo accepted policy map is available; compliance is not established.\n"
+            : renderPolicyMappingMatrix(policy, policyHash!),
+        ),
+      ),
+      this.writeGeneratedReview(join(directory, "cost-reference.md"), Buffer.from(costContent)),
+      this.writeGeneratedReview(join(directory, "handoff-index.md"), Buffer.from(index)),
+    ]);
   }
 
   private reviewMarkdownText(value: string): string {

@@ -134,6 +134,13 @@ and permissions remain unchanged.
 
 ## Open Release Work
 
+The local implementation now includes bounded local catalog discovery, confirmed requirements adoption/revision,
+generated-file and prior-IaC conflict protection, structured Architecture decision records, evidence-bound deployment
+summaries and optional Diagnosis operational handoff. Diagnosis packages include a navigable inventory/policy/design-cost
+index. These are implemented source paths with automated checks, not complete live-client acceptance: native business
+validation, resource-level selective regeneration, actual as-built spend and independently observed operational tests
+remain incomplete. Procedures stay untested unless a separate evidence-producing workflow establishes otherwise.
+
 - Complete the [MCP contract follow-up](ROADMAP.md#mcp-contract-follow-up). The 2026-09-18 review reproduced invalid
   string/list results under SDK 1.29.0 and loss of stable error codes. All 34 tools now have output contracts, strict
   arguments and conservative annotations. Read-only status, bounded serialized dispatch, cancellation/expiry recovery,

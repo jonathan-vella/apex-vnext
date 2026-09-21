@@ -122,19 +122,19 @@ remain intact. APEX does not automatically merge prose into requirements or sync
 
 ## Projects And Operations
 
-| Command                | Required or notable flags                                                                        |
-| ---------------------- | ------------------------------------------------------------------------------------------------ |
-| `apex project list`    | None                                                                                             |
-| `apex project use`     | `--project`; optional `--run`                                                                    |
-| `apex project show`    | Optional `--project`                                                                             |
-| `apex project search`  | `--query`                                                                                        |
-| `apex project history` | Optional `--limit`                                                                               |
-| `apex preview`         | `--operation` with apply/destroy; `--provider` with fake/Bicep/Terraform; optional `--recipient` |
-| `apex approval show`   | None                                                                                             |
-| `apex deploy`          | Optional `--preview`                                                                             |
-| `apex reconcile`       | None                                                                                             |
-| `apex inventory`       | None                                                                                             |
-| `apex diagnose`        | None                                                                                             |
+| Command                | Required or notable flags                                                                                                           |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `apex project list`    | None                                                                                                                                |
+| `apex project use`     | `--project`; optional `--run`                                                                                                       |
+| `apex project show`    | Optional `--project`                                                                                                                |
+| `apex project search`  | `--query`                                                                                                                           |
+| `apex project history` | Optional `--limit`                                                                                                                  |
+| `apex preview`         | `--operation` with apply/destroy; `--provider` with fake/Bicep/Terraform; optional `--recipient`                                    |
+| `apex approval show`   | None                                                                                                                                |
+| `apex deploy`          | Optional `--preview`                                                                                                                |
+| `apex reconcile`       | None                                                                                                                                |
+| `apex inventory`       | None                                                                                                                                |
+| `apex diagnose`        | None                                                                                                                                |
 | `apex render`          | `--kind` with status, requirements, preview, approval, inventory, deployment-summary, architecture-decisions, or operations-runbook |
 
 Only a human-authorized operator should run gate or deployment mutations. A preview must match the selected IaC track.
@@ -152,6 +152,11 @@ escalation, access prerequisites, configuration references, health checks, monit
 recovery and limitations. Health checks must reference the recorded inventory and only task-pinned evidence.
 Procedures are explicitly untested, or not applicable with a rationale. Rendering neither runs procedures nor establishes
 that checks passed. Submit handoff data through the existing diagnosis task's typed output; missing data remains unavailable.
+
+Diagnosis acceptance also writes an operations `handoff-index.md` linking the bound deployment summary, resource
+identifiers, accepted policy mapping matrix, and design cost reference. A runbook is linked only when handoff data exists.
+The cost reference is not actual spend, and the policy matrix is not live compliance evidence. These generated files
+use the same manual-conflict checks as other review outputs.
 
 ## Capabilities, Transfers, Evidence, And Quality
 

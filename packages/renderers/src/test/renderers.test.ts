@@ -5,6 +5,7 @@ import type {
   ArchitectureV1,
   DeploymentPreviewV1,
   DiagnosisV1,
+  PolicyPropertyMapV1,
   OperationRecordV1,
   RequirementsV1,
   ResourceInventoryV1,
@@ -22,6 +23,7 @@ import {
   renderResourceInventory,
   renderRunStatus,
   renderOperationsRunbook,
+  renderPolicyMappingMatrix,
 } from "../index.js";
 
 const hash = (character: string): string => character.repeat(64);
@@ -241,6 +243,35 @@ test("ADR rendering preserves explicit alternatives and consequences without inv
   const missingRecords = { ...architecture };
   delete missingRecords.decisionRecords;
   assert.throws(() => renderArchitectureDecisionRecords(missingRecords, hash("a")), /unavailable/);
+});
+
+test("policy mapping matrix preserves design dispositions without exposing expected values or certifying compliance", () => {
+  const policy: PolicyPropertyMapV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    runId: "run",
+    governanceHash: hash("a"),
+    mappings: [
+      {
+        policyAssignmentId: "assignment",
+        policyDefinitionId: "definition",
+        policyDefinitionReferenceId: "member",
+        effect: "deny",
+        logicalResourceId: "storage",
+        propertyPath: "properties.minimumTlsVersion",
+        expectedValue: "DO_NOT_RENDER",
+        disposition: "satisfied",
+      },
+    ],
+  };
+  const output = renderPolicyMappingMatrix(policy, hash("b"));
+  assert.match(output, /member/);
+  assert.match(output, /satisfied disposition alone is not execution evidence/);
+  assert.doesNotMatch(output, /DO_NOT_RENDER/);
+  assert.match(
+    renderPolicyMappingMatrix({ ...policy, mappings: [] }, hash("b")),
+    /does not establish absence of audit policies/,
+  );
 });
 
 test("operations runbook renders explicit ownership and untested recovery without claiming execution", () => {

@@ -394,6 +394,20 @@ test("operational handoff requires current inventory and pinned evidence before 
     await readFile(join(root, "agent-output", "demo", runId, "operations", "operations-runbook.md"), "utf8"),
     runbook,
   );
+  const directory = join(root, "agent-output", "demo", runId, "operations");
+  const index = await readFile(join(directory, "handoff-index.md"), "utf8");
+  for (const name of [
+    "deployment-summary.md",
+    "resource-inventory.md",
+    "policy-matrix.md",
+    "cost-reference.md",
+    "operations-runbook.md",
+  ]) {
+    assert.ok(index.includes(`](${name})`));
+    assert.ok((await readFile(join(directory, name))).length > 0);
+  }
+  assert.match(await readFile(join(directory, "deployment-summary.md"), "utf8"), /Simulated evidence only/);
+  assert.match(await readFile(join(directory, "cost-reference.md"), "utf8"), /not measured as-built spend/);
 });
 
 test("status leaves pending run transaction recovery to an advancing operation", async () => {

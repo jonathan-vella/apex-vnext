@@ -4,6 +4,7 @@ import type {
   DeploymentPreviewV1,
   DiagnosisV1,
   OperationRecordV1,
+  PolicyPropertyMapV1,
   RequirementsV1,
   ResourceInventoryV1,
   RunConfigV1,
@@ -212,6 +213,58 @@ export function renderArchitectureDecisionRecords(architecture: ArchitectureV1, 
           "",
         ].join("\n"),
       ),
+  ].join("\n");
+}
+
+export function renderPolicyMappingMatrix(policy: PolicyPropertyMapV1, policyHash: string): string {
+  const rows = [...policy.mappings]
+    .sort((left, right) =>
+      compareText(
+        `${left.policyAssignmentId}\u0000${left.policyDefinitionReferenceId ?? ""}\u0000${left.logicalResourceId}\u0000${left.propertyPath}`,
+        `${right.policyAssignmentId}\u0000${right.policyDefinitionReferenceId ?? ""}\u0000${right.logicalResourceId}\u0000${right.propertyPath}`,
+      ),
+    )
+    .map((mapping) => [
+      mapping.policyAssignmentId,
+      optional(mapping.policyDefinitionId),
+      optional(mapping.policyDefinitionReferenceId),
+      mapping.effect,
+      mapping.logicalResourceId,
+      mapping.propertyPath,
+      mapping.disposition,
+    ]);
+  return [
+    "# Policy Mapping Matrix",
+    "",
+    "> Accepted design mappings, not a compliance certification or live policy evaluation. A satisfied disposition alone is not execution evidence.",
+    "",
+    fieldList([
+      ["Project", policy.projectId],
+      ["Run", policy.runId],
+      ["Policy map hash", policyHash],
+      ["Governance hash", policy.governanceHash],
+    ]),
+    "",
+    "## Control Mapping",
+    "",
+    rows.length === 0
+      ? "No actionable property mappings are recorded. This does not establish absence of audit policies or complete compliance."
+      : markdownTable(
+          [
+            "Assignment",
+            "Definition",
+            "Initiative Member",
+            "Effect",
+            "Logical Resource",
+            "Property",
+            "Design Disposition",
+          ],
+          rows,
+        ),
+    "",
+    "## Evidence And Gaps",
+    "",
+    "Use the source-bound validation receipts and current target-governance evidence to assess enforcement. Exemption dispositions do not establish verified exemptions. Expected property values and raw governance exports are intentionally omitted.",
   ].join("\n");
 }
 
