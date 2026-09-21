@@ -328,6 +328,8 @@ export const PolicyPropertyMapV1Schema = Type.Object(
       Type.Object(
         {
           policyAssignmentId: NonEmptyStringSchema,
+          policyDefinitionId: Type.Optional(NonEmptyStringSchema),
+          policyDefinitionReferenceId: Type.Optional(NonEmptyStringSchema),
           effect: Type.Union([
             Type.Literal("deny"),
             Type.Literal("modify"),
@@ -402,6 +404,7 @@ export const LogicalResourceManifestV1Schema = Type.Object(
           logicalId: NonEmptyStringSchema,
           type: NonEmptyStringSchema,
           implementationAddress: NonEmptyStringSchema,
+          executionAddress: Type.Optional(NonEmptyStringSchema),
           implementationKind: Type.Union([
             Type.Literal("resource"),
             Type.Literal("module"),
@@ -624,6 +627,30 @@ export type CustomizationLockV1 = Static<typeof CustomizationLockV1Schema>;
 
 const arithmeticEqual = (left: number, right: number): boolean => Math.abs(left - right) <= 0.000001;
 
+export const GOVERNANCE_MAX_AGE_MS = 30 * 86_400_000;
+
+export function isGovernanceObservationCurrent(discoveredAt: string, now: string): boolean {
+  for (const value of [discoveredAt, now]) {
+    if (
+      !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$(?![\s\S])/.test(
+        value,
+      )
+    )
+      return false;
+    const date = value.slice(0, 10);
+    const dateValue = Date.parse(`${date}T00:00:00Z`);
+    if (!Number.isFinite(dateValue) || new Date(dateValue).toISOString().slice(0, 10) !== date) return false;
+  }
+  const observed = Date.parse(discoveredAt);
+  const current = Date.parse(now);
+  return (
+    Number.isFinite(observed) &&
+    Number.isFinite(current) &&
+    current >= observed &&
+    current - observed < GOVERNANCE_MAX_AGE_MS
+  );
+}
+
 export function hasValidCostArithmetic(estimate: CostEstimateV1): boolean {
   const linesAreValid = estimate.lineItems.every(
     (line) =>
@@ -646,7 +673,14 @@ export function hasValidLogicalResourceReferences(manifest: LogicalResourceManif
   const knownIds = new Set(ids);
   return (
     new Set(ids).size === ids.length &&
-    manifest.resources.every((resource) => resource.dependsOn.every((id) => knownIds.has(id)))
+    manifest.resources.every((resource) => {
+      const referenceKind = manifest.track === "bicep" ? "existing" : "data";
+      const ownershipMatches =
+        resource.ownership === "existing"
+          ? resource.implementationKind === referenceKind
+          : resource.implementationKind === "resource" || resource.implementationKind === "module";
+      return ownershipMatches && resource.dependsOn.every((id) => knownIds.has(id));
+    })
   );
 }
 

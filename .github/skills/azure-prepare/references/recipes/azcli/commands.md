@@ -63,16 +63,8 @@ az webapp create \
 
 ## Functions
 
-```bash
-# Create function app
-az functionapp create \
-  --name <func-name> \
-  --resource-group <rg-name> \
-  --storage-account <storage-name> \
-  --consumption-plan-location <location> \
-  --runtime node \
-  --functions-version 4
-```
+Direct Functions materialization is unavailable. Return to the Functions assessment boundary and record a blocked
+future backlog item; do not create a Function App with Azure CLI.
 
 ## Key Vault
 

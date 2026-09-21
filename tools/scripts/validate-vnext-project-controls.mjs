@@ -6,7 +6,6 @@
  * node tools/scripts/validate-vnext-project-controls.mjs
  */
 
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,8 +14,6 @@ import { Reporter } from "./_lib/reporter.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PROJECT_DIR = "docs/vnext";
-const PHASE_0A_DIR = "docs/vnext/phase-0a";
-const FROZEN_PHASE_0A_DIGEST = "d4c774504df69f12814fd056fa76cf85de608f91e95a0309229162f79d9ff26b";
 const REQUIRED_DOCUMENTS = ["README.md", "PROJECT.md", "PRD.md", "ROADMAP.md", "REGISTER.md", "DECISIONS.md"];
 const REQUIRED_WORK_ITEM_FIELDS = [
   "workstream",
@@ -31,27 +28,6 @@ const REQUIRED_WORK_ITEM_FIELDS = [
   "safety",
 ];
 const REQUIRED_BUG_FIELDS = ["integration-head", "failed-check", "regression-test"];
-
-function findFiles(directory) {
-  return fs
-    .readdirSync(directory, { withFileTypes: true })
-    .flatMap((entry) => {
-      const entryPath = path.join(directory, entry.name);
-      return entry.isDirectory() ? findFiles(entryPath) : [entryPath];
-    })
-    .sort();
-}
-
-function digestTree(directory) {
-  const digest = crypto.createHash("sha256");
-  for (const filePath of findFiles(directory)) {
-    digest.update(path.relative(directory, filePath));
-    digest.update("\0");
-    digest.update(fs.readFileSync(filePath));
-    digest.update("\0");
-  }
-  return digest.digest("hex");
-}
 
 function extractIds(content, pattern) {
   return [...content.matchAll(pattern)].map((match) => match[1]);
@@ -92,7 +68,6 @@ export function loadProjectControls(root) {
   return {
     documents,
     localLinks,
-    phase0aDigest: digestTree(path.join(root, PHASE_0A_DIR)),
     workItemForm: loadIssueForm(root, ".github/ISSUE_TEMPLATE/vnext-work-item.yml"),
     bugForm: loadIssueForm(root, ".github/ISSUE_TEMPLATE/bug-report.yml"),
   };
@@ -140,10 +115,6 @@ export function validateProjectControls(model) {
     if (!link.exists) addFinding("link.local", `${link.source} has missing target ${link.target}`);
   }
 
-  if (model.phase0aDigest !== FROZEN_PHASE_0A_DIGEST) {
-    addFinding("phase-0a.frozen", `Phase 0A digest changed to ${model.phase0aDigest}`);
-  }
-
   const workItemFields = formFieldIds(model.workItemForm);
   for (const field of REQUIRED_WORK_ITEM_FIELDS) {
     if (!workItemFields.has(field)) addFinding("work-item.required-field", `work item form is missing ${field}`);
@@ -163,7 +134,7 @@ function main() {
   const findings = validateProjectControls(loadProjectControls(REPO_ROOT));
   reporter.tick();
   if (findings.length === 0) {
-    reporter.ok("project controls", "documents, references, forms, links, and frozen evidence are valid");
+    reporter.ok("project controls", "current documents, references, forms and links are valid");
   } else {
     for (const finding of findings) reporter.error(finding.ruleId, finding.message);
   }

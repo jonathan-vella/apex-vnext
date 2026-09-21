@@ -21,6 +21,10 @@ const baseline = readFileSync(
   new URL("../../.github/workflows/vnext-live-qualification.yml", import.meta.url),
   "utf8",
 ).replaceAll("\r\n", "\n");
+const actionContract = JSON.parse(
+  readFileSync(new URL("../registry/github-workflow-contract.json", import.meta.url), "utf8"),
+);
+const actionPin = (name) => `${name}@${actionContract.actionVersions[name].sha}`;
 const launcher = readFileSync(new URL("../scripts/vnext-live-handoff.mjs", import.meta.url), "utf8").replaceAll(
   "\r\n",
   "\n",
@@ -332,17 +336,17 @@ rejectsMutation(
 );
 rejectsMutation(
   "wrong upload action version fails",
-  (text) => text.replace("actions/upload-artifact@v7", "actions/upload-artifact@v6"),
+  (text) => text.replace(actionPin("actions/upload-artifact"), "actions/upload-artifact@v6"),
   "apply artifacts invalid",
 );
 rejectsMutation(
   "wrong OIDC script action version fails",
-  (text) => text.replaceAll("actions/github-script@v9", "actions/github-script@v8"),
+  (text) => text.replaceAll(actionPin("actions/github-script"), "actions/github-script@v8"),
   "OIDC script version invalid",
 );
 rejectsMutation(
   "wrong Terraform setup action version fails",
-  (text) => text.replace("hashicorp/setup-terraform@v4", "hashicorp/setup-terraform@v3"),
+  (text) => text.replace(actionPin("hashicorp/setup-terraform"), "hashicorp/setup-terraform@v3"),
   "Terraform setup version invalid",
 );
 rejectsMutation(
@@ -352,8 +356,8 @@ rejectsMutation(
 );
 rejectsMutation(
   "wrong checkout action version fails",
-  (text) => text.replace("actions/checkout@v7", "actions/checkout@v6"),
-  "checkout must use v7",
+  (text) => text.replaceAll(actionPin("actions/checkout"), "actions/checkout@v6"),
+  "checkout must use",
 );
 rejectsMutation(
   "wrong checkout ref fails",

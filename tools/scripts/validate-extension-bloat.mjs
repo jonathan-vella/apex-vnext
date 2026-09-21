@@ -2,7 +2,7 @@
 
 // validate-extension-bloat.mjs
 //
-// Rejects dev-container additions of VS Code extensions known to ship heavy
+// Rejects workspace recommendations of VS Code extensions known to ship heavy
 // Copilot chat customizations (chatSkills / chatAgents / chatPromptFiles)
 // that duplicate the APEX workflow and inflate per-turn input-token cost
 // by ~5-7k each.
@@ -13,7 +13,7 @@
 // `unwantedRecommendations` only.
 //
 // Linked docs:
-//   - docs/devcontainer-hygiene.md (rationale + per-developer cleanup)
+//   - docs/how-to/prepare-windows-11.md (WSL editor setup)
 //   - .vscode/extensions.json (unwantedRecommendations dialog)
 //
 // Extension packs are also denied because their transitive members bypass
@@ -28,7 +28,7 @@ import { Reporter } from "./_lib/reporter.mjs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const repoRoot = resolve(__dirname, "../..");
-const devcontainerPath = resolve(repoRoot, ".devcontainer/devcontainer.json");
+const extensionsPath = resolve(repoRoot, ".vscode/extensions.json");
 
 // Extensions audited as contributing heavy Copilot chat customizations
 // without serving the APEX workflow. Source: extension package.json
@@ -47,43 +47,43 @@ const DENYLIST = new Map([
 const r = new Reporter("Extension Bloat Validator");
 r.header();
 
-if (!existsSync(devcontainerPath)) {
-  r.error("Missing .devcontainer/devcontainer.json");
+if (!existsSync(extensionsPath)) {
+  r.error("Missing .vscode/extensions.json");
   r.summary();
   r.exitOnError();
 }
 
-let dc;
+let config;
 try {
-  dc = parseJsonc(readFileSync(devcontainerPath, "utf-8"));
+  config = parseJsonc(readFileSync(extensionsPath, "utf-8"));
 } catch (error) {
-  r.error(`Invalid JSONC in .devcontainer/devcontainer.json: ${error.message}`);
+  r.error(`Invalid JSONC in .vscode/extensions.json: ${error.message}`);
   r.summary();
   r.exitOnError();
 }
 
-const extensions = dc?.customizations?.vscode?.extensions ?? [];
+const extensions = config?.recommendations;
 if (!Array.isArray(extensions)) {
-  r.error("customizations.vscode.extensions is not an array");
+  r.error("recommendations is not an array");
   r.summary();
   r.exitOnError();
 }
 
 // Case-insensitive compare (VS Code extension IDs are typically lowercase but
-// `.devcontainer/devcontainer.json` may use mixed case e.g. `HashiCorp.terraform`).
+// `.vscode/extensions.json` may use mixed case e.g. `HashiCorp.terraform`).
 const lowerDenylist = new Map(Array.from(DENYLIST, ([k, v]) => [k.toLowerCase(), { id: k, reason: v }]));
 
 for (const ext of extensions) {
   if (typeof ext !== "string") continue;
   const hit = lowerDenylist.get(ext.toLowerCase());
   if (hit) {
-    r.errorAnnotation(".devcontainer/devcontainer.json", `Bloat extension declared: ${hit.id} — ${hit.reason}`);
-    console.log(`  Fix: Remove "${hit.id}" from customizations.vscode.extensions[]. See docs/devcontainer-hygiene.md.`);
+    r.errorAnnotation(".vscode/extensions.json", `Bloat extension declared: ${hit.id} — ${hit.reason}`);
+    console.log(`  Fix: Remove "${hit.id}" from recommendations[]. See docs/how-to/prepare-windows-11.md.`);
   }
 }
 
 console.log(
-  `Checked ${extensions.length} dev-container extension(s) against ${DENYLIST.size} denylisted bloat contributor(s).`,
+  `Checked ${extensions.length} workspace extension(s) against ${DENYLIST.size} denylisted bloat contributor(s).`,
 );
 
 r.summary();

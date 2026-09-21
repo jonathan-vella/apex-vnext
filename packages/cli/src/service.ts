@@ -10,6 +10,8 @@ import {
   EvidenceManifestV1Schema,
   ExecutionPlanAttestationV1Schema,
   GovernanceConstraintsV1Schema,
+  GovernanceObservationReceiptV1Schema,
+  GOVERNANCE_MAX_AGE_MS,
   IacBindingV1Schema,
   IacHandoffV1Schema,
   InputRequestV1Schema,
@@ -30,14 +32,24 @@ import {
   hasValidInputRequestQuestions,
   hasValidCostArithmetic,
   hasValidLogicalResourceReferences,
+  hasValidPolicyValidation,
+  isGovernanceObservationCurrent,
+  hasValidNativeValidationReceipt,
+  NATIVE_VALIDATION_COMMANDS,
+  calculatePolicyValidationDigest,
+  type PolicyValidationBinding,
   type ApprovalEvidenceV1,
   type ArchitectureAvailabilityV1,
   type ArchitectureV1,
   type CostEstimateV1,
   type DeploymentPreviewV1,
   type EnvironmentInputsV1,
+  type GovernanceConstraintsV1,
+  type GovernanceObservationReceiptV1,
+  type PolicyPropertyMapV1,
   type EvidenceManifestV1,
   type IacBindingV1,
+  type IacHandoffV1,
   type InputRequestV1,
   type InputValueV1,
   type RequirementsIntakeRoundV1,
@@ -67,12 +79,18 @@ import {
   type ExecutionPlanAttestationV1,
 } from "@apexops/contracts";
 import { Value } from "@sinclair/typebox/value";
+import { Ajv2020 } from "ajv/dist/2020.js";
 import {
   CapabilityPackManager,
   FakeIaCProvider,
   ProcessRunner,
   generateBicepTree,
   generateTerraformTree,
+  importGovernanceBaseline,
+  inspectGovernanceBaseline,
+  GovernanceBaselineError,
+  nativePolicyValidationBinding,
+  type GovernanceBaselineSelection,
   type CapabilityPackInstallOptions,
   type IacProvider,
   type ProviderExecutionEvidence,
@@ -119,15 +137,16 @@ import {
   type DiagramSource,
 } from "@apexops/renderers";
 import { constants } from "node:fs";
-import { access, cp, lstat, mkdir, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
+import { access, cp, lstat, mkdir, open, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
 import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { resolveBundledAssets, type BundledClientProjection } from "./assets.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
 import { ApexError, EXIT_CODES } from "./errors.js";
-import { APEX_VERSION } from "./version.js";
+import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "./version.js";
 import {
   registerWorkflowValidators,
+  resolveNativeBicepResourceOwnership,
   taskWorkflowValidatorInput,
   type WorkflowGateValidatorContext,
   type WorkflowDeployValidatorContext,
@@ -396,7 +415,7 @@ interface ArchitectureDecision {
   questions: InputRequestV1["questions"];
 }
 
-const LEGACY_REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
+const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
   {
     round: "business-discovery",
     questions: [
@@ -437,6 +456,12 @@ const LEGACY_REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
           rationale: "Plan development and production intent; each environment remains a separate governed run.",
         },
       },
+      {
+        id: "workload-profile",
+        prompt:
+          "Choose ALZ-backed to use supplied networking, identity and monitoring, or standalone-lab for a single-subscription lab/demo with workload support resources. Both require Azure Policy, security and deployment approval.",
+        options: ["alz-backed", "standalone-lab"],
+      },
     ],
   },
   {
@@ -460,12 +485,6 @@ const LEGACY_REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
           rationale: "Use internal as the baseline unless the workload handles public-only or more sensitive data.",
         },
       },
-      { id: "iac-preference", prompt: "Choose the preferred infrastructure tool.", options: ["bicep", "terraform"] },
-    ],
-  },
-  {
-    round: "service-preferences",
-    questions: [
       {
         id: "prohibited-services",
         prompt: "List prohibited services, use 'none', or explicitly defer the constraint.",
@@ -571,18 +590,6 @@ const LEGACY_REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
       },
     ],
   },
-];
-
-const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
-  LEGACY_REQUIREMENTS_INTAKE[0]!,
-  {
-    round: "workload-pattern",
-    questions: [
-      ...LEGACY_REQUIREMENTS_INTAKE[1]!.questions.filter(({ id }) => id !== "iac-preference"),
-      ...LEGACY_REQUIREMENTS_INTAKE[2]!.questions,
-    ],
-  },
-  LEGACY_REQUIREMENTS_INTAKE[3]!,
 ];
 
 const ARCHITECTURE_DECISIONS: readonly ArchitectureDecision[] = [
@@ -908,10 +915,7 @@ export class ApexService {
       await readFile(join(this.root, ".apex", "apex.lock.json"), "utf8"),
     ) as RuntimeBundleLockV1;
     await this.installRuntimeGeneration(previousRuntimeLock);
-    const lock = JSON.parse(
-      await readFile(join(this.root, ".apex", "customizations.lock.json"), "utf8"),
-    ) as CustomizationLock;
-    const persisted = await this.customizationSelection(lock.clientId);
+    const persisted = await this.customizationSelection();
     const clientId = persisted.clientId;
     if (persisted.sourceMode === "custom-source" && customizationsSource === undefined) {
       throw new ApexError("APEX_USAGE", "Custom-source updates require --customizations-source", EXIT_CODES.usage);
@@ -1006,11 +1010,11 @@ export class ApexService {
     customizationsSource?: string,
   ): Promise<{ installed: string[]; clientId: BundledClientProjection["id"] }> {
     await this.recoverCustomizationTransaction();
+    const selection = await this.customizationSelection();
     const lockPath = join(this.root, ".apex", "customizations.lock.json");
     if (await this.exists(lockPath)) {
       throw new ApexError("APEX_CONFLICT", "Managed customizations are already installed", EXIT_CODES.conflict);
     }
-    const selection = await this.customizationSelection();
     if (selection.sourceMode === "custom-source" && customizationsSource === undefined) {
       throw new ApexError("APEX_USAGE", "Custom-source reinstall requires --customizations-source", EXIT_CODES.usage);
     }
@@ -1160,16 +1164,9 @@ export class ApexService {
     blockers: string[];
   }> {
     const selection = await this.selection();
-    const run = await this.run(selection);
-    let events = await this.journal(run).replay();
-    let route = await this.route(run, events);
-    if (route.task === undefined && route.blockers.length === 0) {
-      const completedEvents = await this.ensureTerminalCompletion(run, events);
-      if (completedEvents !== events) {
-        events = completedEvents;
-        route = await this.route(run, events);
-      }
-    }
+    const run = await this.run(selection, { readOnly: true });
+    const events = await this.journal(run).replay();
+    const route = await this.route(run, events);
     return {
       run,
       head: events.at(-1)?.hash ?? null,
@@ -1188,6 +1185,17 @@ export class ApexService {
     const run = await this.run(selection);
     const events = await this.journal(run).replay();
     const requirements = this.artifactHash(events, "requirements");
+    const governanceInput = await this.governanceInputState(run, events);
+    if (governanceInput !== undefined && !governanceInput.fulfilled) {
+      this.assertGovernanceInputBinding(run, governanceInput.request, governanceInput.choice === undefined);
+      if (governanceInput.choice === undefined) {
+        if (events.at(-1)?.hash !== governanceInput.request.expectedHead)
+          throw new ApexError("APEX_STALE", "Governance input journal head is stale", EXIT_CODES.stale);
+        return { status: "needs_input", request: governanceInput.request };
+      }
+      if (governanceInput.choice === "refresh") this.governanceRefreshRequired();
+      await this.assertGovernanceCandidate(run, governanceInput.request, "reuse");
+    }
     if (requirements === undefined) {
       const pending = this.nextRequirementsIntakeRound(events);
       if (pending !== undefined)
@@ -1200,8 +1208,10 @@ export class ApexService {
     }
     if (route.blockers.length > 0)
       throw new ApexError("APEX_AUTHORIZATION", route.blockers.join("; "), EXIT_CODES.authorization, route.blockers);
-    if (route.task === undefined)
+    if (route.task === undefined) {
+      await this.ensureTerminalCompletion(run, events);
       throw new ApexError("APEX_NOT_FOUND", "No task is currently available", EXIT_CODES.notFound);
+    }
     if (route.task.id === "architecture") {
       const decision = this.architectureDecisionState(events, run.ownerEpoch);
       if (decision.pending !== undefined) return { status: "needs_input", request: decision.pending };
@@ -1216,12 +1226,18 @@ export class ApexService {
         if (task.expectedHead === events.at(-1)?.hash && task.ownerEpoch === run.ownerEpoch) {
           return { status: "task", task };
         }
-        return { status: "task", task: await this.issueTask(run, route.task, this.inputRefs(events, route.task)) };
+        return {
+          status: "task",
+          task: await this.issueTask(run, route.task, await this.inputRefs(run, events, route.task)),
+        };
       }
-      const task = await this.issueTask(run, route.task, this.inputRefs(events, route.task));
+      const task = await this.issueTask(run, route.task, await this.inputRefs(run, events, route.task));
       return { status: "needs_input", request: await this.issueArchitectureDecision(run, task) };
     }
-    return { status: "task", task: await this.issueTask(run, route.task, this.inputRefs(events, route.task)) };
+    return {
+      status: "task",
+      task: await this.issueTask(run, route.task, await this.inputRefs(run, events, route.task)),
+    };
   }
 
   async recordInput(input: InputSubmissionV1): Promise<{ recorded: true; requestId: string }> {
@@ -1242,7 +1258,10 @@ export class ApexService {
     const requested = [...events]
       .reverse()
       .find(
-        (event) => event.type === "requirements.input-requested" || event.type === "architecture.decision-requested",
+        (event) =>
+          event.type === "requirements.input-requested" ||
+          event.type === "architecture.decision-requested" ||
+          event.type === "governance.input-requested",
       );
     if (requested === undefined) {
       throw new ApexError("APEX_CONFLICT", "No input request is pending", EXIT_CODES.conflict);
@@ -1250,15 +1269,21 @@ export class ApexService {
     const request =
       requested.type === "requirements.input-requested"
         ? this.inputRequest(requested, run.ownerEpoch)
-        : this.architectureDecisionRequest(requested, run.ownerEpoch);
+        : requested.type === "governance.input-requested"
+          ? this.governanceInputRequest(requested)
+          : this.architectureDecisionRequest(requested, run.ownerEpoch);
     const recordedType =
       requested.type === "requirements.input-requested"
         ? "requirements.input-recorded"
-        : "architecture.decision-recorded";
+        : requested.type === "governance.input-requested"
+          ? "governance.input-recorded"
+          : "architecture.decision-recorded";
+    if (request.governance !== undefined) await this.governanceInputState(run, events);
     if (
       events.some(
         (event) =>
-          event.type === recordedType && (event.payload as { requestId?: unknown }).requestId === request.requestId,
+          event.type === recordedType &&
+          (event.payload as { requestId?: unknown } | null)?.requestId === request.requestId,
       )
     ) {
       throw new ApexError("APEX_CONFLICT", "Input request was already recorded", EXIT_CODES.conflict);
@@ -1282,13 +1307,25 @@ export class ApexService {
         EXIT_CODES.validation,
       );
     }
+    if (request.governance !== undefined) {
+      this.assertGovernanceInputBinding(run, request);
+      await this.assertCurrentWriterAuthority(
+        run,
+        new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock),
+      );
+      await this.assertGovernanceCandidate(run, request, normalizedAnswers[0]!.value === "reuse" ? "reuse" : "answer");
+    }
     try {
       await this.append(
         run,
         recordedType,
         {
           requestId: request.requestId,
-          ...("intake" in request ? { intake: request.intake } : { decision: request.decision }),
+          ...(request.governance !== undefined
+            ? { governance: request.governance }
+            : request.intake !== undefined
+              ? { intake: request.intake }
+              : { decision: request.decision! }),
           answers: normalizedAnswers,
         },
         request.expectedHead,
@@ -1304,42 +1341,73 @@ export class ApexService {
     return { recorded: true, requestId: request.requestId };
   }
 
-  async recordRequirementsInput(value: unknown): Promise<void> {
-    const pending = await this.nextTask();
-    if (pending.status !== "needs_input") {
-      throw new ApexError("APEX_CONFLICT", "No requirements input request is pending", EXIT_CODES.conflict);
-    }
-    const source =
-      value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
-    const missing = pending.request.questions.filter(
-      ({ id }) => typeof source[id] !== "string" || (source[id] as string).length === 0,
+  private async taskReviewMetadata(
+    run: RunConfigV1,
+    task: TaskEnvelopeV1,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+    descriptor: WorkflowTaskDescriptor,
+  ) {
+    const subjectKind = this.reviewSubjectArtifactKind(descriptor);
+    if (subjectKind === undefined) return undefined;
+    const subjectHash = this.artifactHash(events, subjectKind);
+    if (subjectHash === undefined || !task.inputRefs.includes(subjectHash))
+      throw new ApexError("APEX_STALE", "Review task input is unavailable or stale", EXIT_CODES.stale);
+    const node = (await this.lockedWorkflowEngine(run)).manifest.nodes.find(
+      ({ id }) => id === descriptor.reviewSubject,
     );
-    if (missing.length > 0) {
-      throw new ApexError(
-        "APEX_VALIDATION",
-        `Missing requirements input: ${missing.map(({ id }) => id).join(", ")}`,
-        EXIT_CODES.validation,
-      );
+    if (node === undefined)
+      throw new ApexError("APEX_AUTHORIZATION", "Task has no locked workflow node", EXIT_CODES.authorization);
+    const reviewIndex = events.findLastIndex(
+      (event) => event.type === "task.completed" && (event.payload as { nodeId?: unknown }).nodeId === task.taskType,
+    );
+    const currentReview = events[reviewIndex]?.payload as
+      { reviewHash?: string; subjectHash?: string; dependencyHash?: string } | undefined;
+    const dispositions = new Map<string, ReviewResolution>();
+    if (currentReview?.subjectHash === subjectHash && currentReview.reviewHash !== undefined) {
+      for (const event of events.slice(reviewIndex + 1)) {
+        if (event.type !== "review.resolved") continue;
+        const resolution = (event.payload as { resolution?: ReviewResolution }).resolution;
+        if (
+          resolution?.subjectHash === subjectHash &&
+          resolution.reviewHash === currentReview.reviewHash &&
+          resolution.dependencyHash === currentReview.dependencyHash
+        ) {
+          const { findingId, reviewHash, dependencyHash, disposition, actor, rationale, evidenceRefs, expiresAt } =
+            resolution;
+          dispositions.set(findingId, {
+            findingId,
+            reviewHash,
+            subjectHash,
+            dependencyHash,
+            disposition,
+            actor,
+            rationale,
+            evidenceRefs,
+            ...(expiresAt === undefined ? {} : { expiresAt }),
+          });
+        }
+      }
     }
-    await this.recordInput({
-      schemaVersion: CONTRACT_VERSION,
-      requestId: pending.request.requestId,
-      expectedHead: pending.request.expectedHead,
-      ownerEpoch: pending.request.ownerEpoch,
-      answers: pending.request.questions.map(({ id }) => ({
-        questionId: id,
-        value: source[id] as string,
-      })),
-    });
+    return {
+      subjectKind,
+      subjectHash,
+      criteria: node.validators.filter((id) => workflowValidatorOwnership(id)?.boundary === "review"),
+      dispositions: [...dispositions.values()],
+      evidenceRefs: task.inputRefs,
+      evidenceRefsRequired: true,
+    };
   }
 
   async taskContext(taskId: string): Promise<{
     task: TaskEnvelopeV1;
     inputs: unknown[];
+    inputReferences: Array<{ hash: string; bytes: number; inlined: boolean }>;
     artifactHashes: Record<string, string>;
     recordedInput: Record<string, InputValueV1> | null;
     decisions: Record<string, InputValueV1>;
     outputTemplates: Partial<Record<ArtifactKind, unknown>>;
+    reviewMetadata?: Awaited<ReturnType<ApexService["taskReviewMetadata"]>>;
+    reviewMetadataReference?: { selector: "review-metadata"; bytes: number; inlined: boolean };
     outputRoot: string;
     status: string;
     blockers: string[];
@@ -1347,6 +1415,20 @@ export class ApexService {
     const run = await this.currentRun();
     const task = await this.readTask(run, taskId);
     const events = await this.journal(run).replay();
+    const head = events.at(-1)?.hash;
+    if (head === undefined) throw new ApexError("APEX_STALE", "Task journal is empty", EXIT_CODES.stale);
+    assertTaskCurrent(task, head, run.ownerEpoch, this.clock);
+    const limits = await this.taskLimits(run);
+    const descriptor = TASKS.find(({ id }) => id === task.taskType);
+    if (descriptor === undefined)
+      throw new ApexError("APEX_AUTHORIZATION", "Task type is unsupported", EXIT_CODES.authorization);
+    const authorizedRefs = await this.inputRefs(run, events, descriptor);
+    if (task.inputRefs.some((hash) => !authorizedRefs.includes(hash)))
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Task contains an unauthorized input reference",
+        EXIT_CODES.authorization,
+      );
     const route = await this.route(run, events);
     const outputTemplates: Partial<Record<ArtifactKind, unknown>> = {};
     if (
@@ -1362,24 +1444,63 @@ export class ApexService {
         outputTemplates[kind as ArtifactKind] = this.outputTemplate(kind as ArtifactKind, run, events, task.taskType);
       }
     }
-    const artifactHashes = this.acceptedArtifactHashes(events);
-    return {
+    const artifactHashes = Object.fromEntries(
+      Object.entries(this.acceptedArtifactHashes(events)).filter(([, hash]) => task.inputRefs.includes(hash)),
+    );
+    const values = await Promise.all(task.inputRefs.map((hash) => this.objects.getJson(hash)));
+    const reviewMetadata = await this.taskReviewMetadata(run, task, events, descriptor);
+    const context = {
       task,
-      inputs: await Promise.all(task.inputRefs.map((hash) => this.objects.getJson(hash))),
+      inputs: [] as unknown[],
+      inputReferences: task.inputRefs.map((hash, index) => ({
+        hash,
+        bytes: Buffer.byteLength(JSON.stringify(values[index])),
+        inlined: false,
+      })),
       artifactHashes,
       recordedInput: task.taskType === "requirements" ? this.recordedRequirementsInput(events) : null,
       decisions: task.taskType === "architecture" ? this.architectureDecisionValues(events, task.taskId) : {},
       outputTemplates,
+      reviewMetadata,
+      ...(reviewMetadata === undefined
+        ? {}
+        : {
+            reviewMetadataReference: {
+              selector: "review-metadata" as const,
+              bytes: Buffer.byteLength(JSON.stringify(reviewMetadata)),
+              inlined: true,
+            },
+          }),
       outputRoot: join(this.root, ".apex", "work", run.runId, taskId),
       status: this.completedNodeIds(events).has(task.taskType) ? "completed" : "active",
       blockers: route.blockers,
     };
+    if (Buffer.byteLength(JSON.stringify(context)) > limits.maxInputBytes && context.reviewMetadata !== undefined) {
+      context.reviewMetadata = undefined;
+      context.reviewMetadataReference!.inlined = false;
+    }
+    if (Buffer.byteLength(JSON.stringify(context)) > limits.maxInputBytes)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Task context metadata exceeds the locked input byte limit",
+        EXIT_CODES.validation,
+      );
+    for (const [index, value] of values.entries()) {
+      context.inputs.push(value);
+      context.inputReferences[index]!.inlined = true;
+      if (Buffer.byteLength(JSON.stringify(context)) > limits.maxInputBytes) {
+        context.inputs.pop();
+        context.inputReferences[index]!.inlined = false;
+      }
+    }
+    return context;
   }
 
   async readTaskInput(
     taskId: string,
     offset = 0,
     limit = 6_000,
+    inputHash?: string,
   ): Promise<{
     subjectHash: string;
     content: string;
@@ -1396,8 +1517,17 @@ export class ApexService {
       throw new ApexError("APEX_VALIDATION", "Input read range is invalid", EXIT_CODES.validation);
     }
     const events = await this.journal(run).replay();
-    const reviewSubjectKind =
-      descriptor.reviewSubject === "governance-reconciliation" ? "policy-property-map" : descriptor.reviewSubject;
+    const head = events.at(-1)?.hash;
+    if (head === undefined) throw new ApexError("APEX_STALE", "Task journal is empty", EXIT_CODES.stale);
+    assertTaskCurrent(task, head, run.ownerEpoch, this.clock);
+    const authorizedRefs = await this.inputRefs(run, events, descriptor);
+    if (task.inputRefs.some((hash) => !authorizedRefs.includes(hash)))
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Task contains an unauthorized input reference",
+        EXIT_CODES.authorization,
+      );
+    const reviewSubjectKind = this.reviewSubjectArtifactKind(descriptor);
     const reviewSubjectHash =
       reviewSubjectKind === undefined ? undefined : this.artifactHash(events, reviewSubjectKind as ArtifactKind);
     if (
@@ -1406,24 +1536,51 @@ export class ApexService {
     ) {
       throw new ApexError("APEX_STALE", "Review task input is unavailable or stale", EXIT_CODES.stale);
     }
-    const context = await this.taskContext(taskId);
+    const metadataSelected = inputHash === "review-metadata" && descriptor.reviewSubject !== undefined;
+    if (
+      !metadataSelected &&
+      inputHash !== undefined &&
+      (!task.inputRefs.includes(inputHash) || !authorizedRefs.includes(inputHash))
+    )
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Input hash is not a current task dependency",
+        EXIT_CODES.authorization,
+      );
+    const selectedHash = metadataSelected ? undefined : (inputHash ?? reviewSubjectHash);
+    const context = !metadataSelected && selectedHash === undefined ? await this.taskContext(taskId) : undefined;
     const serialized = JSON.stringify(
-      descriptor.reviewSubject === undefined
-        ? {
-            inputs: context.inputs,
-            artifactHashes: context.artifactHashes,
-            decisions: context.decisions,
-            outputTemplates: context.outputTemplates,
-          }
-        : await this.objects.getJson(reviewSubjectHash!),
+      metadataSelected
+        ? await this.taskReviewMetadata(run, task, events, descriptor)
+        : context !== undefined
+          ? {
+              inputs: context.inputs,
+              inputReferences: context.inputReferences,
+              artifactHashes: context.artifactHashes,
+              recordedInput: context.recordedInput,
+              decisions: context.decisions,
+              outputTemplates: context.outputTemplates,
+              reviewMetadata: context.reviewMetadata,
+              reviewMetadataReference: context.reviewMetadataReference,
+            }
+          : await this.objects.getJson(selectedHash!),
     );
     if (offset >= serialized.length) {
       throw new ApexError("APEX_VALIDATION", "Input read offset is outside the review subject", EXIT_CODES.validation);
     }
-    const content = serialized.slice(offset, offset + limit);
+    let content = "";
+    let bytes = 0;
+    for (const character of serialized.slice(offset)) {
+      const characterBytes = Buffer.byteLength(character);
+      if (bytes + characterBytes > limit) break;
+      content += character;
+      bytes += characterBytes;
+    }
+    if (content.length === 0)
+      throw new ApexError("APEX_VALIDATION", "Input read limit cannot fit the next character", EXIT_CODES.validation);
     const nextOffset = offset + content.length;
     return {
-      subjectHash: reviewSubjectHash ?? sha256Bytes(Buffer.from(serialized, "utf8")),
+      subjectHash: selectedHash ?? sha256Bytes(Buffer.from(serialized, "utf8")),
       content,
       offset,
       ...(offset === 0 && descriptor.reviewSubject !== undefined
@@ -1460,6 +1617,829 @@ export class ApexService {
       expectedHead,
     });
     return { taskId, kind: output.kind, path, bytes: bytes.byteLength, hash };
+  }
+
+  private async readGovernanceBaselineBytes(path: string): Promise<Buffer> {
+    const sourcePath = resolve(this.root, path);
+    await this.assertSafeDestination(this.root, sourcePath);
+    const canonicalRoot = await realpath(this.root);
+    const canonicalSource = await realpath(sourcePath);
+    const metadata = await lstat(sourcePath);
+    if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > 20_000_000)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Baseline must be a regular JSON file within the size limit",
+        EXIT_CODES.validation,
+      );
+    const handle = await open(sourcePath, constants.O_RDONLY | constants.O_NOFOLLOW);
+    let bytes: Buffer;
+    try {
+      const assertUnchanged = async () => {
+        await this.assertSafeDestination(this.root, sourcePath);
+        const actual = await realpath(sourcePath);
+        const currentPath = await lstat(sourcePath);
+        const current = await handle.stat();
+        if (
+          actual !== canonicalSource ||
+          !actual.startsWith(`${canonicalRoot}${sep}`) ||
+          [currentPath, current].some(
+            (entry) =>
+              !entry.isFile() ||
+              entry.isSymbolicLink() ||
+              entry.dev !== metadata.dev ||
+              entry.ino !== metadata.ino ||
+              entry.size !== metadata.size ||
+              entry.mtimeMs !== metadata.mtimeMs ||
+              entry.ctimeMs !== metadata.ctimeMs,
+          )
+        )
+          throw new ApexError("APEX_STALE", "Governance baseline file changed", EXIT_CODES.stale);
+      };
+      await assertUnchanged();
+      const buffer = Buffer.alloc(20_000_001);
+      let length = 0;
+      while (length < buffer.length) {
+        const read = await handle.read(buffer, length, buffer.length - length, length);
+        if (read.bytesRead === 0) break;
+        length += read.bytesRead;
+      }
+      if (length > 20_000_000)
+        throw new ApexError("APEX_VALIDATION", "Governance baseline exceeds the size limit", EXIT_CODES.validation);
+      await assertUnchanged();
+      bytes = buffer.subarray(0, length);
+    } finally {
+      await handle.close();
+    }
+    return bytes;
+  }
+
+  private async governanceBaselineValidator() {
+    const assets = await resolveBundledAssets();
+    const schema = JSON.parse(await readFile(join(assets.root, "schemas", "governance-baseline.schema.json"), "utf8"));
+    return new Ajv2020({ strict: false }).compile(schema);
+  }
+
+  private governanceBaselineOptions(run: RunConfigV1) {
+    const subscription = /^\/subscriptions\/([0-9a-f-]{36})(?:\/resourceGroups\/[^/]+)?$/iu.exec(run.targetScope);
+    if (subscription === null)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Governance import requires a subscription-scoped run target",
+        EXIT_CODES.validation,
+      );
+    return { subscriptionId: subscription[1]!, targetScope: run.targetScope, now: this.clock().toISOString() };
+  }
+
+  private governanceQuestions(
+    observedAt: string,
+    refreshRequired: boolean,
+    requestedAt: string,
+  ): InputRequestV1["questions"] {
+    return [
+      {
+        id: "governance-baseline-choice",
+        prompt: `Azure policy was collected ${Math.floor((Date.parse(requestedAt) - Date.parse(observedAt)) / 86_400_000)} days ago, at ${observedAt}. Use this snapshot or refresh it from Azure?`,
+        options: refreshRequired ? ["refresh"] : ["reuse", "refresh"],
+        recommendation: {
+          value: refreshRequired ? "refresh" : "reuse",
+          source: "derived",
+          rationale: refreshRequired
+            ? "The observation is at least 30 days old; refresh is required."
+            : "The successful observation is less than 30 days old.",
+        },
+      },
+    ];
+  }
+
+  private governanceInputRequest(event: EventV1): InputRequestV1 {
+    if (event.payload === null || typeof event.payload !== "object" || Array.isArray(event.payload))
+      throw new ApexError("APEX_VALIDATION", "Persisted governance input request is invalid", EXIT_CODES.validation);
+    const payload = event.payload as {
+      requestId: string;
+      governance: NonNullable<InputRequestV1["governance"]>;
+      questions: InputRequestV1["questions"];
+    };
+    const request = {
+      schemaVersion: CONTRACT_VERSION,
+      requestId: payload.requestId,
+      expectedHead: event.hash,
+      ownerEpoch: event.ownerEpoch,
+      governance: payload.governance,
+      questions: payload.questions,
+    };
+    if (
+      !Value.Check(InputRequestV1Schema, request) ||
+      !hasValidInputRequestQuestions(request.questions) ||
+      sha256Json(request.questions) !==
+        sha256Json(
+          this.governanceQuestions(
+            request.governance.observedAt,
+            request.governance.refreshRequired,
+            request.governance.requestedAt,
+          ),
+        ) ||
+      Date.parse(request.governance.requestedAt) > Date.parse(event.timestamp) ||
+      Date.parse(event.timestamp) - Date.parse(request.governance.requestedAt) >= 86_400_000 ||
+      Date.parse(request.governance.observedAt) > Date.parse(request.governance.requestedAt) ||
+      request.governance.refreshRequired !==
+        Date.parse(request.governance.requestedAt) - Date.parse(request.governance.observedAt) >=
+          GOVERNANCE_MAX_AGE_MS ||
+      Date.parse(request.governance.expiresAt) <= Date.parse(event.timestamp) ||
+      Date.parse(request.governance.expiresAt) !== Date.parse(request.governance.requestedAt) + 86_400_000
+    )
+      throw new ApexError("APEX_VALIDATION", "Persisted governance input request is invalid", EXIT_CODES.validation);
+    return request;
+  }
+
+  private async governanceInputState(
+    run: RunConfigV1,
+    events: EventV1[],
+  ): Promise<{ request: InputRequestV1; choice?: "reuse" | "refresh"; fulfilled: boolean } | undefined> {
+    const requestedIndex = events.findLastIndex(({ type }) => type === "governance.input-requested");
+    if (requestedIndex < 0) return undefined;
+    if (events.slice(requestedIndex + 1).some((event) => this.governanceRevision(event) !== undefined))
+      return undefined;
+    const request = this.governanceInputRequest(events[requestedIndex]!);
+    for (const event of events.slice(requestedIndex + 1)) {
+      if (event.type !== "governance.input-recorded") continue;
+      if (
+        event.payload === null ||
+        typeof event.payload !== "object" ||
+        Array.isArray(event.payload) ||
+        !Value.Check(InputSubmissionV1Schema, {
+          schemaVersion: CONTRACT_VERSION,
+          requestId: (event.payload as { requestId?: unknown }).requestId,
+          expectedHead: request.expectedHead,
+          ownerEpoch: event.ownerEpoch,
+          answers: (event.payload as { answers?: unknown }).answers,
+        })
+      )
+        throw new ApexError("APEX_VALIDATION", "Persisted governance choice is invalid", EXIT_CODES.validation);
+    }
+    const recordedIndex = events.findIndex(
+      (event, index) =>
+        index > requestedIndex &&
+        event.type === "governance.input-recorded" &&
+        (event.payload as { requestId?: string }).requestId === request.requestId,
+    );
+    if (recordedIndex < 0) return { request, fulfilled: false };
+    const recorded = events[recordedIndex]!;
+    const payload = recorded.payload as { governance: unknown; answers: InputSubmissionV1["answers"] };
+    let answers;
+    try {
+      answers = validateInputAnswers(request.questions, payload.answers);
+    } catch {
+      throw new ApexError("APEX_VALIDATION", "Persisted governance choice is invalid", EXIT_CODES.validation);
+    }
+    const choice = answers[0]?.value;
+    if (
+      (choice !== "reuse" && choice !== "refresh") ||
+      payload.governance == null ||
+      sha256Json(payload.governance) !== sha256Json(request.governance!) ||
+      recorded.ownerEpoch !== request.ownerEpoch ||
+      events[recordedIndex - 1]?.hash !== request.expectedHead
+    )
+      throw new ApexError("APEX_VALIDATION", "Persisted governance choice is invalid", EXIT_CODES.validation);
+    for (let index = recordedIndex + 1; index < events.length; index++) {
+      const event = events[index]!;
+      if (event.type !== "governance.selection-applied" && event.type !== "governance.observation-renewed") continue;
+      const metadata = event.payload as Record<string, unknown> | null;
+      const candidate = request.governance!;
+      if (
+        metadata === null ||
+        (event.type === "governance.selection-applied" ? metadata.requestId : metadata.selectionRequestId) !==
+          request.requestId ||
+        event.ownerEpoch !== request.ownerEpoch ||
+        metadata.selectedPath !== candidate.candidatePath ||
+        typeof metadata.rawSourceDigest !== "string" ||
+        !/^[0-9a-f]{64}$/u.test(metadata.rawSourceDigest) ||
+        typeof metadata.observedAt !== "string" ||
+        !isGovernanceObservationCurrent(metadata.observedAt, event.timestamp) ||
+        (choice === "refresh"
+          ? metadata.rawSourceDigest === candidate.candidateHash ||
+            Date.parse(metadata.observedAt) <= Date.parse(candidate.observedAt)
+          : metadata.rawSourceDigest !== candidate.candidateHash || metadata.observedAt !== candidate.observedAt)
+      )
+        continue;
+      const prior = events.slice(0, index + 1);
+      const governanceHash = this.acceptedArtifactHashes(prior)["governance-constraints"];
+      if (governanceHash === undefined || metadata.governanceHash !== governanceHash) continue;
+      const governance = await this.objects.getJson<GovernanceConstraintsV1>(governanceHash);
+      if (
+        !Value.Check(GovernanceConstraintsV1Schema, governance) ||
+        governance.constraintsRef.uri !== `apex-object:${governance.constraintsRef.digest}`
+      )
+        continue;
+      const snapshot = await this.selectedGovernanceSnapshot(run, governance);
+      const observation = await this.latestGovernanceObservation(run, prior, governanceHash, governance, snapshot);
+      if (metadata.observedAt !== (observation?.observedAt ?? governance.discoveredAt)) continue;
+      if (event.type === "governance.observation-renewed" && observation?.rawSourceDigest !== metadata.rawSourceDigest)
+        continue;
+      if (
+        choice === "refresh" &&
+        event.type === "governance.selection-applied" &&
+        !this.governanceInitialImportProof(prior, request.requestId, metadata) &&
+        !(
+          observation?.rawSourceDigest === metadata.rawSourceDigest &&
+          prior.some(
+            (entry) =>
+              entry.type === "governance.observation-renewed" &&
+              (entry.payload as { receiptHash?: unknown } | null)?.receiptHash === metadata.receiptHash &&
+              typeof metadata.receiptHash === "string",
+          )
+        )
+      )
+        continue;
+      return { request, choice, fulfilled: true };
+    }
+    return { request, choice, fulfilled: false };
+  }
+
+  private governanceInitialImportProof(
+    events: EventV1[],
+    requestId: string,
+    metadata: Record<string, unknown>,
+  ): boolean {
+    const prepared = events.findLastIndex((event) => {
+      const payload = event.payload as Record<string, unknown> | null;
+      return (
+        event.type === "governance.selection-importing" &&
+        payload?.selectionRequestId === requestId &&
+        ["governanceHash", "selectedPath", "rawSourceDigest", "observedAt"].every(
+          (key) => payload[key] === metadata[key],
+        )
+      );
+    });
+    return (
+      prepared >= 0 &&
+      events
+        .slice(prepared + 1)
+        .some(
+          (event) =>
+            event.type === "task.completed" &&
+            (event.payload as { nodeId?: string; artifactHashes?: Record<string, string> } | null)?.nodeId ===
+              "governance-discovery" &&
+            (event.payload as { artifactHashes?: Record<string, string> }).artifactHashes?.[
+              "governance-constraints"
+            ] === metadata.governanceHash,
+        )
+    );
+  }
+
+  private assertGovernanceInputBinding(run: RunConfigV1, request: InputRequestV1, answering = true): void {
+    if (request.ownerEpoch !== run.ownerEpoch || request.governance!.targetScope !== run.targetScope)
+      throw new ApexError("APEX_STALE", "Governance input target or owner epoch is stale", EXIT_CODES.stale);
+    if (answering && Date.parse(request.governance!.expiresAt) <= this.clock().getTime())
+      throw new ApexError(
+        "APEX_STALE",
+        "Governance input request expired; select the candidate again",
+        EXIT_CODES.stale,
+      );
+  }
+
+  private governanceRefreshRequired(): never {
+    throw new ApexError(
+      "APEX_STALE",
+      "Governance refresh required: collect a newer successful baseline, replace the selected file, then explicitly import it. No cloud collection has been performed.",
+      EXIT_CODES.stale,
+    );
+  }
+
+  private async assertGovernanceCandidate(
+    run: RunConfigV1,
+    request: InputRequestV1,
+    mode: "reuse" | "answer" | "refresh",
+    bytes?: Buffer,
+  ): Promise<void> {
+    this.assertGovernanceInputBinding(run, request, mode === "answer");
+    const candidate = request.governance!;
+    const raw = bytes ?? (await this.readGovernanceBaselineBytes(candidate.candidatePath));
+    const inspected = inspectGovernanceBaseline(
+      raw,
+      this.governanceBaselineOptions(run),
+      await this.governanceBaselineValidator(),
+    );
+    if (mode === "refresh") {
+      if (
+        sha256Bytes(raw) === candidate.candidateHash ||
+        Date.parse(inspected.observedAt) <= Date.parse(candidate.observedAt) ||
+        inspected.refreshRequired
+      )
+        this.governanceRefreshRequired();
+    } else {
+      if (sha256Bytes(raw) !== candidate.candidateHash || inspected.observedAt !== candidate.observedAt)
+        throw new ApexError(
+          "APEX_STALE",
+          "Governance candidate changed; reconcile the candidate before answering or importing",
+          EXIT_CODES.stale,
+        );
+      if (mode === "reuse" && inspected.refreshRequired) this.governanceRefreshRequired();
+    }
+  }
+
+  async selectGovernanceBaseline(
+    path: string,
+    options: { reopen?: boolean } = {},
+  ): Promise<
+    | { status: "needs_input"; request: InputRequestV1 }
+    | {
+        status: "selected";
+        choice: "reuse" | "refresh";
+        candidateHash: string;
+        observedAt: string;
+        refreshRequired: boolean;
+      }
+  > {
+    const run = await this.currentRun();
+    const events = await this.journal(run).replay();
+    await this.assertCurrentWriterAuthority(
+      run,
+      new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock),
+    );
+    const governanceHash = this.acceptedArtifactHashes(events)["governance-constraints"];
+    if (governanceHash === undefined) {
+      const route = await this.route(run, events);
+      if (route.task?.id !== "governance-discovery" || route.blockers.length > 0)
+        throw new ApexError(
+          "APEX_AUTHORIZATION",
+          "Governance selection requires the active discovery task or accepted imported governance",
+          EXIT_CODES.authorization,
+        );
+    } else {
+      const governance = await this.objects.getJson<GovernanceConstraintsV1>(governanceHash);
+      await this.selectedGovernanceSnapshot(run, governance);
+    }
+    const bytes = await this.readGovernanceBaselineBytes(path);
+    const candidatePath = relative(this.root, resolve(this.root, path)).split(sep).join("/");
+    const inspected = inspectGovernanceBaseline(
+      bytes,
+      this.governanceBaselineOptions(run),
+      await this.governanceBaselineValidator(),
+    );
+    const candidateHash = sha256Bytes(bytes);
+    const state = await this.governanceInputState(run, events);
+    if (options.reopen === true && (state === undefined || state.choice !== "refresh" || state.fulfilled))
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "Only a pending recorded refresh choice can be reopened",
+        EXIT_CODES.conflict,
+      );
+    if (state !== undefined) {
+      this.assertGovernanceInputBinding(run, state.request, false);
+      const same =
+        state.request.governance!.candidatePath === candidatePath &&
+        state.request.governance!.candidateHash === candidateHash;
+      if (!same && !state.fulfilled)
+        throw new ApexError(
+          "APEX_STALE",
+          "Governance candidate changed; explicitly import a newer refresh at the selected path or reconcile the candidate",
+          EXIT_CODES.stale,
+        );
+      if (
+        options.reopen !== true &&
+        same &&
+        state.choice !== undefined &&
+        !(state.choice === "reuse" && inspected.refreshRequired)
+      )
+        return {
+          status: "selected",
+          choice: state.choice,
+          candidateHash,
+          observedAt: inspected.observedAt,
+          refreshRequired: inspected.refreshRequired || state.choice === "refresh",
+        };
+      if (
+        same &&
+        state.choice === undefined &&
+        state.request.governance!.refreshRequired === inspected.refreshRequired &&
+        Date.parse(state.request.governance!.expiresAt) > this.clock().getTime()
+      ) {
+        if (events.at(-1)?.hash !== state.request.expectedHead)
+          throw new ApexError("APEX_STALE", "Governance input journal head is stale", EXIT_CODES.stale);
+        return { status: "needs_input", request: state.request };
+      }
+    }
+    const now = this.clock();
+    const governance = {
+      candidatePath,
+      candidateHash,
+      observedAt: inspected.observedAt,
+      requestedAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + 86_400_000).toISOString(),
+      targetScope: run.targetScope,
+      refreshRequired: now.getTime() - Date.parse(inspected.observedAt) >= GOVERNANCE_MAX_AGE_MS,
+    };
+    const questions = this.governanceQuestions(governance.observedAt, governance.refreshRequired, now.toISOString());
+    const requestId = this.idSource();
+    if (
+      !Value.Check(InputRequestV1Schema, {
+        schemaVersion: CONTRACT_VERSION,
+        requestId,
+        expectedHead: events.at(-1)?.hash,
+        ownerEpoch: run.ownerEpoch,
+        governance,
+        questions,
+      })
+    )
+      throw new ApexError("APEX_VALIDATION", "Governance input request is invalid", EXIT_CODES.validation);
+    const event = await this.append(
+      run,
+      "governance.input-requested",
+      { requestId, governance, questions },
+      events.at(-1)?.hash ?? null,
+    );
+    return { status: "needs_input", request: this.governanceInputRequest(event) };
+  }
+
+  private governanceRevision(event: EventV1) {
+    return event.type === "workflow.invalidated"
+      ? (
+          event.payload as {
+            governanceRevision?: {
+              previousGovernanceHash: string;
+              candidatePath: string;
+              candidateHash: string;
+              retainedReviewHash?: string;
+            };
+          }
+        ).governanceRevision
+      : undefined;
+  }
+
+  private pendingGovernanceRevision(events: EventV1[]) {
+    const index = events.findLastIndex((event) => this.governanceRevision(event) !== undefined);
+    if (index < 0 || this.acceptedArtifactHashes(events)["governance-constraints"] !== undefined) return undefined;
+    return this.governanceRevision(events[index]!);
+  }
+
+  private governanceWorkflowEvents(events: EventV1[]): EventV1[] {
+    const revisionIndex = events.findLastIndex((event) => this.governanceRevision(event) !== undefined);
+    if (revisionIndex < 0) return events;
+    const nodeIds = new Set((events[revisionIndex]!.payload as { nodeIds: string[] }).nodeIds);
+    return events.filter((event, index) => {
+      if (index >= revisionIndex) return true;
+      const payload = event.payload as { nodeId?: string; gate?: number };
+      if (event.type === "task.completed") return !nodeIds.has(payload.nodeId ?? "");
+      if (event.type.startsWith("gate.")) return !nodeIds.has(`gate-${payload.gate}`);
+      if (event.type === "preview.created") return ![...nodeIds].some((id) => id.startsWith("preview-"));
+      if (event.type.startsWith("deployment.")) return !nodeIds.has("inventory");
+      return event.type !== "workflow.completed";
+    });
+  }
+
+  async reviseGovernanceBaseline(
+    path: string,
+    options: { confirm: boolean; reason: string },
+  ): Promise<{ invalidatedNodes: string[]; previousGovernanceHash: string; candidateHash: string }> {
+    if (options?.confirm !== true)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Material governance revision requires explicit confirmation",
+        EXIT_CODES.authorization,
+      );
+    if (typeof options.reason !== "string" || options.reason.trim().length === 0)
+      throw new ApexError("APEX_VALIDATION", "Governance revision requires a reason", EXIT_CODES.validation);
+    const run = await this.currentRun();
+    const events = await this.journal(run).replay();
+    const transfers = new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock);
+    await this.assertCurrentWriterAuthority(run, transfers);
+    const pending = this.pendingGovernanceRevision(events);
+    const previousGovernanceHash =
+      this.acceptedArtifactHashes(events)["governance-constraints"] ?? pending?.previousGovernanceHash;
+    if (previousGovernanceHash === undefined)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Revision requires accepted imported governance",
+        EXIT_CODES.authorization,
+      );
+    const governance = await this.objects.getJson<GovernanceConstraintsV1>(previousGovernanceHash);
+    if (
+      !Value.Check(GovernanceConstraintsV1Schema, governance) ||
+      governance.constraintsRef.uri !== `apex-object:${governance.constraintsRef.digest}`
+    )
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Revision requires accepted imported governance, not synthetic evidence",
+        EXIT_CODES.validation,
+      );
+    const snapshot = await this.selectedGovernanceSnapshot(run, governance);
+    if (typeof snapshot.contentHash !== "string")
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Governance snapshot has no content digest; start a new run",
+        EXIT_CODES.validation,
+      );
+    for (const [index, event] of events.entries()) {
+      if (!["deployment.started", "deployment.executed", "deployment.indeterminate"].includes(event.type)) continue;
+      const previewHash = (event.payload as { previewHash?: string }).previewHash;
+      if (
+        !events
+          .slice(index + 1)
+          .some(
+            (entry) =>
+              entry.type === "deployment.completed" &&
+              (entry.payload as { previewHash?: string }).previewHash === previewHash,
+          )
+      )
+        throw new ApexError(
+          "APEX_CONFLICT",
+          "Deployment is in-flight or indeterminate; reconcile before governance revision",
+          EXIT_CODES.conflict,
+        );
+    }
+    const bytes = await this.readGovernanceBaselineBytes(path);
+    let selection: GovernanceBaselineSelection;
+    try {
+      selection = importGovernanceBaseline(
+        bytes,
+        this.governanceBaselineOptions(run),
+        await this.governanceBaselineValidator(),
+      );
+    } catch (error) {
+      if (!(error instanceof GovernanceBaselineError)) throw error;
+      throw new ApexError(
+        error.code === "stale" ? "APEX_STALE" : "APEX_VALIDATION",
+        error.message,
+        error.code === "stale" ? EXIT_CODES.stale : EXIT_CODES.validation,
+      );
+    }
+    if (selection.snapshot.contentHash === snapshot.contentHash)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Governance content is unchanged; use normal import renewal",
+        EXIT_CODES.validation,
+      );
+    const workflow = await this.lockedWorkflowEngine(run);
+    const nodeIds = new Set([
+      "governance-discovery",
+      ...workflow.invalidationPlan("governance-discovery", options.reason.trim()).map(({ nodeId }) => nodeId),
+    ]);
+    for (const descriptor of TASKS)
+      if (descriptor.reviewSubject !== undefined && nodeIds.has(descriptor.reviewSubject)) nodeIds.add(descriptor.id);
+    const invalidatedNodes = [...nodeIds];
+    const completed = this.completedNodeIds(events);
+    const retainedReview = events.findLast((event) => {
+      const payload = event.payload as { nodeId?: string; artifactHashes?: Record<string, string> };
+      return (
+        event.type === "task.completed" &&
+        payload.nodeId !== undefined &&
+        completed.has(payload.nodeId) &&
+        !nodeIds.has(payload.nodeId) &&
+        typeof payload.artifactHashes?.["review-findings"] === "string"
+      );
+    });
+    const retainedReviewHash = (retainedReview?.payload as { artifactHashes?: Record<string, string> } | undefined)
+      ?.artifactHashes?.["review-findings"];
+    const candidateHash = sha256Bytes(bytes);
+    const payload = {
+      reason: options.reason.trim(),
+      nodeIds: invalidatedNodes,
+      artifactKinds: [...new Set(TASKS.filter(({ id }) => nodeIds.has(id)).flatMap(({ outputs }) => outputs))],
+      governanceRevision: {
+        previousGovernanceHash,
+        candidatePath: relative(this.root, resolve(this.root, path)).split(sep).join("/"),
+        candidateHash,
+        ...(retainedReviewHash === undefined ? {} : { retainedReviewHash }),
+      },
+    };
+    const dependencyHash = this.dependencyRevision(run, [
+      ...events,
+      { type: "workflow.invalidated", payload } as EventV1,
+    ]);
+    await this.assertCurrentWriterAuthority(run, transfers);
+    if (!isGovernanceObservationCurrent(selection.constraints.discoveredAt, this.clock().toISOString()))
+      this.governanceRefreshRequired();
+    await this.mutateRun(
+      run,
+      {
+        ...run,
+        gates: run.gates.map((gate) =>
+          nodeIds.has(`gate-${gate.gate}`) ? invalidateGate(gate, dependencyHash, options.reason.trim()) : gate,
+        ),
+      },
+      "workflow.invalidated",
+      payload,
+      events.at(-1)?.hash ?? null,
+    );
+    return { invalidatedNodes, previousGovernanceHash, candidateHash };
+  }
+
+  async importGovernanceBaseline(path: string): Promise<{ outputHash: string; summary: string }> {
+    const run = await this.currentRun();
+    const options = this.governanceBaselineOptions(run);
+    const events = await this.journal(run).replay();
+    const governanceHash = this.acceptedArtifactHashes(events)["governance-constraints"];
+    const transfers = new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock);
+    await this.assertCurrentWriterAuthority(run, transfers);
+    const state = await this.governanceInputState(run, events);
+    const bytes = await this.readGovernanceBaselineBytes(path);
+    const revision = this.pendingGovernanceRevision(events);
+    if (
+      revision !== undefined &&
+      (revision.candidatePath !== relative(this.root, resolve(this.root, path)).split(sep).join("/") ||
+        revision.candidateHash !== sha256Bytes(bytes))
+    )
+      throw new ApexError(
+        "APEX_STALE",
+        "Governance candidate changed; confirm a new material revision before import",
+        EXIT_CODES.stale,
+      );
+    if (state !== undefined && !state.fulfilled) {
+      if (state.choice === undefined)
+        throw new ApexError(
+          "APEX_AUTHORIZATION",
+          "Governance selection requires an explicit input answer before import",
+          EXIT_CODES.authorization,
+        );
+      if (
+        relative(this.root, resolve(this.root, path)).split(sep).join("/") !== state.request.governance!.candidatePath
+      )
+        throw new ApexError("APEX_STALE", "Governance import must use the selected candidate path", EXIT_CODES.stale);
+      await this.assertGovernanceCandidate(run, state.request, state.choice, bytes);
+    }
+    if (governanceHash === undefined) {
+      const route = await this.route(run, events);
+      if (route.task?.id !== "governance-discovery" || route.blockers.length > 0)
+        throw new ApexError(
+          "APEX_AUTHORIZATION",
+          "Governance import requires the active discovery task",
+          EXIT_CODES.authorization,
+        );
+    }
+    const validate = await this.governanceBaselineValidator();
+    let selection;
+    try {
+      selection = importGovernanceBaseline(bytes, options, validate);
+    } catch (error) {
+      if (!(error instanceof GovernanceBaselineError)) throw error;
+      throw new ApexError(
+        error.code === "stale" ? "APEX_STALE" : "APEX_VALIDATION",
+        error.message,
+        error.code === "stale" ? EXIT_CODES.stale : EXIT_CODES.validation,
+      );
+    }
+    const selectedSnapshot = { ...selection.snapshot, projectId: run.projectId, runId: run.runId };
+    const selectionMetadata =
+      state?.choice !== undefined && !state.fulfilled
+        ? {
+            selectionRequestId: state.request.requestId,
+            selectedPath: state.request.governance!.candidatePath,
+            rawSourceDigest: sha256Bytes(bytes),
+            observedAt: selection.constraints.discoveredAt,
+          }
+        : undefined;
+    if (governanceHash !== undefined) {
+      const governance = await this.objects.getJson<GovernanceConstraintsV1>(governanceHash);
+      if (governance.constraintsRef.uri !== `apex-object:${governance.constraintsRef.digest}`)
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Governance is not an imported snapshot; reconcile governance before importing",
+          EXIT_CODES.validation,
+        );
+      const snapshot = await this.selectedGovernanceSnapshot(run, governance);
+      if (typeof snapshot.contentHash !== "string")
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Governance snapshot has no content digest; start a new run",
+          EXIT_CODES.validation,
+        );
+      if (
+        snapshot.contentHash !== selection.snapshot.contentHash ||
+        governance.constraintsRef.digest !== sha256Json(selectedSnapshot)
+      )
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Governance content changed; reconcile governance and obtain new policy, plan and gate approvals before proceeding",
+          EXIT_CODES.validation,
+        );
+      const latest = await this.latestGovernanceObservation(run, events, governanceHash, governance, snapshot);
+      const observedAt = selection.constraints.discoveredAt;
+      const rawSourceDigest = sha256Bytes(bytes);
+      const initialProof =
+        state?.choice !== undefined &&
+        this.governanceInitialImportProof(events, state.request.requestId, {
+          selectedPath: relative(this.root, resolve(this.root, path)).split(sep).join("/"),
+          rawSourceDigest,
+          observedAt,
+          governanceHash,
+        });
+      if (
+        selectionMetadata !== undefined &&
+        observedAt === (latest?.observedAt ?? governance.discoveredAt) &&
+        (state?.choice === "reuse" || initialProof || latest?.rawSourceDigest === rawSourceDigest)
+      ) {
+        await this.assertCurrentWriterAuthority(run, transfers);
+        if (!isGovernanceObservationCurrent(observedAt, this.clock().toISOString())) this.governanceRefreshRequired();
+        await this.append(
+          run,
+          "governance.selection-applied",
+          {
+            ...selectionMetadata,
+            requestId: selectionMetadata.selectionRequestId,
+            governanceHash,
+            ...(latest === undefined ? {} : { receiptHash: sha256Json(latest) }),
+          },
+          events.at(-1)?.hash ?? null,
+        );
+        return { outputHash: governanceHash, summary: "Existing governance observation reused" };
+      }
+      if (
+        (latest?.observedAt === observedAt && latest.rawSourceDigest === rawSourceDigest) ||
+        (state?.fulfilled && initialProof && observedAt === governance.discoveredAt)
+      ) {
+        await this.assertImportedGovernanceCurrent(run, events);
+        return { outputHash: governanceHash, summary: "Governance observation already current" };
+      }
+      if (Date.parse(observedAt) <= Date.parse(latest?.observedAt ?? governance.discoveredAt))
+        throw new ApexError(
+          "APEX_STALE",
+          "Governance renewal requires a newer successful Azure observation",
+          EXIT_CODES.stale,
+        );
+      const receipt: GovernanceObservationReceiptV1 = {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: run.projectId,
+        runId: run.runId,
+        targetScope: run.targetScope,
+        governanceHash,
+        snapshotDigest: governance.constraintsRef.digest,
+        contentHash: snapshot.contentHash,
+        observedAt,
+        expiresAt: selection.constraints.expiresAt,
+        rawSourceDigest,
+      };
+      if (!Value.Check(GovernanceObservationReceiptV1Schema, receipt))
+        throw new ApexError("APEX_VALIDATION", "Invalid governance observation receipt", EXIT_CODES.validation);
+      const receiptHash = await this.objects.putJson(receipt);
+      await this.assertCurrentWriterAuthority(run, transfers);
+      if (!isGovernanceObservationCurrent(observedAt, this.clock().toISOString()))
+        throw new ApexError(
+          "APEX_STALE",
+          "Governance observation expired during renewal; refresh from Azure",
+          EXIT_CODES.stale,
+        );
+      await this.append(
+        run,
+        "governance.observation-renewed",
+        { governanceHash, receiptHash, ...selectionMetadata },
+        events.at(-1)?.hash ?? null,
+      );
+      return { outputHash: governanceHash, summary: "Unchanged governance observation renewed" };
+    }
+    const route = await this.route(run, events);
+    if (route.task?.id !== "governance-discovery" || route.blockers.length > 0)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Governance import requires the active discovery task",
+        EXIT_CODES.authorization,
+      );
+    const digest = await this.objects.putJson(selectedSnapshot);
+    const constraints = {
+      ...selection.constraints,
+      projectId: run.projectId,
+      runId: run.runId,
+      targetScope: run.targetScope,
+      constraintsRef: {
+        mediaType: "application/json",
+        uri: `apex-object:${digest}`,
+        digest,
+        bytes: (await this.objects.getBytes(digest)).byteLength,
+      },
+    };
+    if (selectionMetadata !== undefined) {
+      await this.append(
+        run,
+        "governance.selection-importing",
+        {
+          ...selectionMetadata,
+          governanceHash: sha256Json(constraints),
+        },
+        events.at(-1)?.hash ?? null,
+      );
+    }
+    const task = await this.issueTask(run, route.task, await this.inputRefs(run, events, route.task));
+    const completed = await this.acceptTaskOutputs(
+      task.taskId,
+      [{ kind: "governance-constraints", value: constraints }],
+      revision,
+    );
+    if (selectionMetadata !== undefined) {
+      const completedEvents = await this.journal(run).replay();
+      const metadata = { ...selectionMetadata, governanceHash: completed.outputHashes["governance-constraints"]! };
+      if (!this.governanceInitialImportProof(completedEvents, selectionMetadata.selectionRequestId, metadata))
+        throw new ApexError("APEX_STALE", "Governance import completion proof is missing", EXIT_CODES.stale);
+      await this.assertCurrentWriterAuthority(run, transfers);
+      await this.append(
+        run,
+        "governance.selection-applied",
+        {
+          ...metadata,
+          requestId: selectionMetadata.selectionRequestId,
+        },
+        completedEvents.at(-1)?.hash ?? null,
+      );
+    }
+    return { outputHash: completed.outputHashes["governance-constraints"]!, summary: completed.summary };
   }
 
   async stageFile(
@@ -1605,16 +2585,11 @@ export class ApexService {
     return { valid: true, taskId, ...(staged === undefined ? {} : { staged }) };
   }
 
-  async completeTask(taskId: string, output: TaskOutput): Promise<{ outputHash: string; summary: string }> {
-    const completed = await this.acceptTaskOutputs(taskId, [output], true);
-    return { outputHash: completed.outputHashes[output.kind]!, summary: output.summary ?? `${output.kind} accepted` };
-  }
-
   async completeTaskOutputs(
     taskId: string,
     outputs: TaskOutput[],
   ): Promise<{ outputHashes: Partial<Record<ArtifactKind, string>>; summary: string }> {
-    return this.acceptTaskOutputs(taskId, outputs, false);
+    return this.acceptTaskOutputs(taskId, outputs);
   }
 
   async completeRequirements(
@@ -1818,8 +2793,9 @@ export class ApexService {
   private async acceptTaskOutputs(
     taskId: string,
     outputs: TaskOutput[],
-    legacy: boolean,
+    confirmedRevision?: ReturnType<ApexService["pendingGovernanceRevision"]>,
   ): Promise<{ outputHashes: Partial<Record<ArtifactKind, string>>; summary: string }> {
+    outputs = [...outputs];
     const run = await this.currentRun();
     const task = await this.readTask(run, taskId);
     const events = await this.journal(run).replay();
@@ -1834,13 +2810,28 @@ export class ApexService {
     const descriptor = TASKS.find(({ id }) => id === task.taskType);
     if (descriptor === undefined)
       throw new ApexError("APEX_VALIDATION", `Unknown task type ${task.taskType}`, EXIT_CODES.validation);
+    if (descriptor.id === "governance-discovery") {
+      const pending = this.pendingGovernanceRevision(events);
+      if (
+        (pending !== undefined || confirmedRevision !== undefined) &&
+        (pending === undefined ||
+          confirmedRevision === undefined ||
+          sha256Json(pending) !== sha256Json(confirmedRevision))
+      )
+        throw new ApexError(
+          "APEX_AUTHORIZATION",
+          "Pending governance revision requires explicit import of the confirmed candidate",
+          EXIT_CODES.authorization,
+        );
+      if (pending !== undefined)
+        await this.assertCurrentWriterAuthority(
+          run,
+          new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock),
+        );
+    }
     const missing = descriptor.outputs.filter((kind) => !kinds.includes(kind));
     if (missing.length > 0) {
-      if (legacy && descriptor.id === "plan" && kinds.length === 1 && kinds[0] === "implementation-intent") {
-        outputs = [...outputs, ...this.legacyPlanOutputs(run, outputs[0]!.value)];
-      } else {
-        throw new ApexError("APEX_VALIDATION", `Task bundle is missing: ${missing.join(", ")}`, EXIT_CODES.validation);
-      }
+      throw new ApexError("APEX_VALIDATION", `Task bundle is missing: ${missing.join(", ")}`, EXIT_CODES.validation);
     }
     for (const output of outputs) {
       if (!task.allowedOutputKinds.includes(output.kind))
@@ -1873,26 +2864,32 @@ export class ApexService {
         : undefined;
     const reviewBlockers = descriptor.reviewSubject === undefined ? [] : this.openReviewFindings(outputs[0]!.value);
     const dependencyHash = sha256Json(outputHashes);
-    await this.append(run, "task.completed", {
-      taskId,
-      nodeId: descriptor.id,
-      artifactHashes: outputHashes,
-      ...(renderedDocument === undefined ? {} : { renderedDocuments: [renderedDocument] }),
-      validatorIds: validation.validatorIds,
-      ...(Object.keys(validation.evidenceRefs).length === 0 ? {} : { validatorEvidenceRefs: validation.evidenceRefs }),
-      ...(Object.keys(validation.evidenceModes).length === 0
-        ? {}
-        : { validatorEvidenceModes: validation.evidenceModes }),
-      reviewBlockers,
-      ...(descriptor.reviewSubject === undefined
-        ? {}
-        : {
-            reviewHash: outputHashes["review-findings"],
-            subjectHash: (outputs[0]!.value as ReviewFindingsV1).subjectHash,
-            dependencyHash,
-          }),
-      legacy,
-    });
+    await this.append(
+      run,
+      "task.completed",
+      {
+        taskId,
+        nodeId: descriptor.id,
+        artifactHashes: outputHashes,
+        ...(renderedDocument === undefined ? {} : { renderedDocuments: [renderedDocument] }),
+        validatorIds: validation.validatorIds,
+        ...(Object.keys(validation.evidenceRefs).length === 0
+          ? {}
+          : { validatorEvidenceRefs: validation.evidenceRefs }),
+        ...(Object.keys(validation.evidenceModes).length === 0
+          ? {}
+          : { validatorEvidenceModes: validation.evidenceModes }),
+        reviewBlockers,
+        ...(descriptor.reviewSubject === undefined
+          ? {}
+          : {
+              reviewHash: outputHashes["review-findings"],
+              subjectHash: (outputs[0]!.value as ReviewFindingsV1).subjectHash,
+              dependencyHash,
+            }),
+      },
+      completionHead,
+    );
     if (descriptor.id === "requirements" && renderedDocument !== undefined) {
       await this.materializeRequirementsReviewPackage(
         run,
@@ -1952,14 +2949,23 @@ export class ApexService {
       await this.materializeReviewerSummary(run, descriptor.reviewSubject, outputs[0]!.value as ReviewFindingsV1);
     }
     if (descriptor.id === "validation-bicep" || descriptor.id === "validation-terraform") {
-      await this.materializeValidationReport(run, outputs[0]!.value as EvidenceManifestV1, descriptor.id);
+      await this.materializeValidationReport(
+        run,
+        outputs[0]!.value as EvidenceManifestV1,
+        descriptor.id,
+        validation.evidenceModes,
+      );
     }
     if (descriptor.reviewSubject !== undefined) {
       if (reviewBlockers.length === 0 && descriptor.gate !== undefined) {
         await this.openRunGate(await this.currentRun(), descriptor.gate, dependencyHash);
       }
-    } else if (legacy && descriptor.id === "requirements") {
-      await this.openRunGate(await this.currentRun(), 1, sha256Json(outputHashes));
+    }
+    const completedRun = await this.currentRun();
+    const completedEvents = await this.journal(completedRun).replay();
+    const route = await this.route(completedRun, completedEvents);
+    if (route.task === undefined && route.blockers.length === 0) {
+      await this.ensureTerminalCompletion(completedRun, completedEvents);
     }
     return { outputHashes, summary: outputs.map(({ kind }) => kind).join(", ") + " accepted" };
   }
@@ -2269,6 +3275,9 @@ export class ApexService {
       this.reviewMarkdownText(value.implementation),
       this.reviewMarkdownText(value.version),
       this.reviewMarkdownText(JSON.stringify(value.parameters)),
+      this.reviewMarkdownText(
+        value.physicalResources === undefined ? "Not declared" : JSON.stringify(value.physicalResources),
+      ),
     ]);
     const inputRows = Object.entries(inputs.inputs).map(([name, value]) => [
       this.reviewMarkdownText(name),
@@ -2298,7 +3307,7 @@ export class ApexService {
       atomicWriteBytes(
         join(directory, "iac-binding.md"),
         Buffer.from(
-          `# IaC Binding\n\n- Track: ${this.reviewMarkdownText(binding.track)}\n- Intent hash: ${binding.intentHash}\n\n${table(["Logical ID", "Implementation", "Version", "Parameters"], bindingRows)}\n`,
+          `# IaC Binding\n\n- Track: ${this.reviewMarkdownText(binding.track)}\n- Intent hash: ${binding.intentHash}\n\n${table(["Logical ID", "Implementation", "Version", "Parameters", "Physical Authorization Scope"], bindingRows)}\n\nPhysical scope declares intended managed and protected resources; it is not evidence of module expansion or resource existence.\n`,
           "utf8",
         ),
       ),
@@ -2360,6 +3369,7 @@ export class ApexService {
     run: RunConfigV1,
     evidence: EvidenceManifestV1,
     taskType: "validation-bicep" | "validation-terraform",
+    evidenceModes: Readonly<Record<string, string>>,
   ): Promise<void> {
     const directory = join(this.root, "agent-output", run.projectId, run.runId, "validation");
     const entries =
@@ -2368,14 +3378,14 @@ export class ApexService {
         : evidence.entries
             .map(
               ({ kind, hash, bytes, required, retention }) =>
-                `- ${this.reviewMarkdownText(kind)}: ${hash} (${bytes} bytes; ${required ? "required" : "optional"}; ${this.reviewMarkdownText(retention)})`,
+                `- ${this.reviewMarkdownText(kind)}: ${hash} (${bytes} bytes; ${required ? "required" : "optional"}; ${this.reviewMarkdownText(retention)}; ${this.reviewMarkdownText(evidenceModes[kind] ?? "simulated")})`,
             )
             .join("\n");
     await mkdir(directory, { recursive: true });
     await atomicWriteBytes(
       join(directory, "validation-report.md"),
       Buffer.from(
-        `# Validation Report\n\n- Task: ${this.reviewMarkdownText(taskType)}\n- Track: ${this.reviewMarkdownText(run.iacTool)}\n- Created: ${this.reviewMarkdownText(evidence.createdAt)}\n- Verdict: accepted deterministic validation evidence\n\n## Validator Evidence\n\n${entries}\n\nThe Validator reports evidence only. Artifact repair, risk acceptance, and gate decisions remain with their authorized owners.\n`,
+        `# Validation Report\n\n- Task: ${this.reviewMarkdownText(taskType)}\n- Track: ${this.reviewMarkdownText(run.iacTool)}\n- Created: ${this.reviewMarkdownText(evidence.createdAt)}\n- Verdict: accepted evidence with per-check execution modes\n\n## Validator Evidence\n\n${entries}\n\nOnly native entries reference runtime-executed source-bound command receipts. Simulated entries do not prove command execution or policy compliance. Artifact repair, risk acceptance, and gate decisions remain with their authorized owners.\n`,
         "utf8",
       ),
     );
@@ -2699,6 +3709,7 @@ export class ApexService {
     const gate = run.gates.find(({ gate }) => gate === gateNumber);
     if (gate === undefined) throw new ApexError("APEX_USAGE", `Unknown gate ${gateNumber}`, EXIT_CODES.usage);
     const events = await this.journal(run).replay();
+    if (gateNumber === 4 && decision === "approved") await this.assertImportedGovernanceCurrent(run, events);
     const previewHash = gateNumber === 4 ? this.latestPayloadHash(events, "preview.created", "previewHash") : undefined;
     if (gateNumber === 4 && previewHash === undefined) {
       throw new ApexError("APEX_VALIDATION", "Gate 4 requires a deployment preview", EXIT_CODES.validation);
@@ -2820,6 +3831,7 @@ export class ApexService {
     if (intentHash === undefined)
       throw new ApexError("APEX_VALIDATION", "Implementation intent is required", EXIT_CODES.validation);
     const intent = await this.objects.getJson<ImplementationIntentV1>(intentHash);
+    const managedResources = await this.managedPreviewResources(run, events, intent);
     if (options.provider !== "fake") {
       if (options.provider !== run.iacTool) {
         throw new ApexError(
@@ -2836,6 +3848,87 @@ export class ApexService {
           EXIT_CODES.validation,
         );
       }
+      const policyHash = this.artifactHash(events, "policy-property-map");
+      const policyMap =
+        policyHash === undefined ? undefined : await this.objects.getJson<PolicyPropertyMapV1>(policyHash);
+      const manifestHash = this.artifactHash(events, "logical-resource-manifest");
+      const logicalManifest =
+        manifestHash === undefined ? undefined : await this.objects.getJson<LogicalResourceManifestV1>(manifestHash);
+      const policyValidation =
+        options.operation === "apply" && policyMap !== undefined && policyMap.mappings.length > 0
+          ? {
+              policyMap,
+              logicalResourceManifest: Object.fromEntries(
+                (logicalManifest?.resources ?? [])
+                  .filter(({ ownership }) => ownership === "managed")
+                  .filter(({ executionAddress }) => executionAddress !== undefined)
+                  .map(({ logicalId, executionAddress }) => [
+                    logicalId,
+                    run.iacTool === "bicep"
+                      ? { codeSymbol: executionAddress! }
+                      : { terraformAddress: executionAddress! },
+                  ]),
+              ),
+            }
+          : undefined;
+      const handoffHash = this.artifactHash(events, "iac-handoff");
+      const handoff = handoffHash === undefined ? undefined : await this.objects.getJson<IacHandoffV1>(handoffHash);
+      if (provider.validateSource === undefined && provider.validationMode !== "simulated")
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Configured adapter does not support native source validation",
+          EXIT_CODES.validation,
+        );
+      if (provider.validateSource !== undefined) {
+        const completed = [...events]
+          .reverse()
+          .find(
+            (event) =>
+              event.type === "task.completed" &&
+              (event.payload as { nodeId?: string }).nodeId === `validation-${run.iacTool}`,
+          );
+        const payload = completed?.payload as
+          | { validatorEvidenceRefs?: Record<string, string>; validatorEvidenceModes?: Record<string, string> }
+          | undefined;
+        if (handoff === undefined || handoffHash === undefined || policyHash === undefined)
+          throw new ApexError(
+            "APEX_VALIDATION",
+            "Preview requires runtime-owned native validation",
+            EXIT_CODES.validation,
+          );
+        const binding = {
+          projectId: run.projectId,
+          runId: run.runId,
+          track: run.iacTool,
+          sourceHash: handoffHash,
+          treeHash: handoff.treeHash,
+          policyHash,
+          inputHash: intentHash,
+        };
+        for (const { validatorId } of NATIVE_VALIDATION_COMMANDS[run.iacTool]) {
+          const receiptHash = payload?.validatorEvidenceRefs?.[validatorId];
+          if (
+            payload?.validatorEvidenceModes?.[validatorId] !== "native" ||
+            receiptHash === undefined ||
+            !hasValidNativeValidationReceipt(await this.objects.getJson(receiptHash), binding)
+          )
+            throw new ApexError(
+              "APEX_VALIDATION",
+              "Preview requires current runtime-owned native validation",
+              EXIT_CODES.validation,
+            );
+        }
+      }
+      const generatedRoot = handoff === undefined ? undefined : resolve(this.root, handoff.rootPath);
+      if (options.operation === "apply") {
+        if (generatedRoot === undefined || handoff === undefined)
+          throw new ApexError(
+            "APEX_STALE",
+            "Accepted generated source is required for native preview",
+            EXIT_CODES.stale,
+          );
+        await this.assertSafeDestination(this.root, generatedRoot);
+      }
       const request = {
         projectId: run.projectId,
         runId: run.runId,
@@ -2848,19 +3941,53 @@ export class ApexService {
         inputHash: intentHash,
         iacHash: this.artifactHash(events, "iac-handoff") ?? sha256Json(intent.resources),
         policyHash: this.artifactHash(events, "policy-property-map") ?? run.runtimeLockHash,
-        resources: intent.resources.map((resource) => ({
-          logicalId: resource.id,
-          resourceId: `${options.provider}://${run.environment}/${resource.id}`,
-          type: resource.type,
-          location: run.environment,
-          properties: { purpose: resource.purpose },
-        })),
+        resources:
+          options.provider === "bicep"
+            ? await this.nativeBicepManagedResources(run, events)
+            : managedResources.map((resource) => ({
+                logicalId: resource.id,
+                resourceId: `${options.provider}://${run.environment}/${resource.id}`,
+                type: resource.type,
+                location: run.environment,
+                properties: { purpose: resource.purpose },
+              })),
         blockers: [],
         ttlMs: options.expiresInMs ?? PREVIEW_TTL_MS,
+        ...(policyValidation === undefined ? {} : { policyValidation }),
+        ...(options.operation !== "apply" || handoff === undefined || generatedRoot === undefined
+          ? {}
+          : { generatedSource: { rootPath: generatedRoot, treeHash: handoff.treeHash } }),
       };
       const preview =
         options.operation === "apply" ? await provider.previewApply(request) : await provider.previewDestroy(request);
       this.assertValid("preview", preview);
+      const policyReceipt =
+        policyValidation === undefined ? undefined : provider.policyValidation?.(preview.previewHash);
+      if (
+        policyValidation !== undefined &&
+        (policyReceipt === undefined ||
+          !hasValidPolicyValidation(policyReceipt, {
+            track: run.iacTool,
+            sourceHash: request.iacHash,
+            policyMapHash: request.policyHash,
+            policyMapContentHash: calculatePolicyValidationDigest(policyValidation.policyMap),
+            logicalResourceManifestHash: calculatePolicyValidationDigest(policyValidation.logicalResourceManifest),
+            inputHash: policyReceipt.inputHash,
+          }) ||
+          policyReceipt.projectId !== run.projectId ||
+          policyReceipt.runId !== run.runId ||
+          policyReceipt.outcome !== "pass" ||
+          policyReceipt.results.length !== policyValidation.policyMap.mappings.length ||
+          policyReceipt.results.some(
+            (result, index) =>
+              result.mappingHash !== calculatePolicyValidationDigest(policyValidation.policyMap.mappings[index]),
+          ))
+      )
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Native preview requires passing source-bound policy validation for every mapping",
+          EXIT_CODES.validation,
+        );
       let attestation: ExecutionPlanAttestationV1 | undefined;
       if (options.provider === "terraform" && "attestation" in provider && typeof provider.attestation === "function") {
         attestation = (provider.attestation as (previewHash: string) => ExecutionPlanAttestationV1 | undefined)(
@@ -2877,9 +4004,11 @@ export class ApexService {
         intent,
         attestation,
         intendedExecutionRecipientIdentity,
+        policyReceipt === undefined ? undefined : nativePolicyValidationBinding(policyReceipt),
       );
       const previewObjectHash = await this.objects.putJson(preview);
       const attestationHash = attestation === undefined ? undefined : await this.objects.putJson(attestation);
+      const policyValidationHash = policyReceipt === undefined ? undefined : await this.objects.putJson(policyReceipt);
       await this.append(run, "preview.requested", {
         provider: options.provider,
         operation: options.operation,
@@ -2896,6 +4025,7 @@ export class ApexService {
         evidenceMode: validation.evidenceMode,
         ...(validation.omittedValidatorIds.length === 0 ? {} : { omittedValidatorIds: validation.omittedValidatorIds }),
         ...(attestationHash === undefined ? {} : { attestationHash }),
+        ...(policyValidationHash === undefined ? {} : { policyValidationHash }),
       });
       await this.materializeOperationsPreviewPackage(run, preview, previewObjectHash);
       await this.openRunGate(await this.currentRun(), 4, preview.previewHash);
@@ -2916,7 +4046,7 @@ export class ApexService {
       inputHash: intentHash,
       iacHash: sha256Json(intent.resources),
       policyHash: this.artifactHash(events, "policy-property-map") ?? run.runtimeLockHash,
-      changes: intent.resources.map((resource) => ({
+      changes: managedResources.map((resource) => ({
         resourceId: `fake://${run.environment}/${resource.id}`,
         action: options.operation === "destroy" ? ("delete" as const) : ("create" as const),
         material: true,
@@ -3089,7 +4219,9 @@ export class ApexService {
       .reverse()
       .find(
         (event) =>
-          (event.type === "deployment.executed" || event.type === "deployment.indeterminate") &&
+          (event.type === "deployment.started" ||
+            event.type === "deployment.executed" ||
+            event.type === "deployment.indeterminate") &&
           (event.payload as { previewHash?: unknown }).previewHash === previewHash,
       );
     if (incompleteExecution !== undefined) {
@@ -3167,6 +4299,14 @@ export class ApexService {
           `${providerName.provider} provider is no longer configured`,
           EXIT_CODES.validation,
         );
+      await this.assertCurrentWriterAuthority(run, transferStore);
+      await this.mutateRun(
+        run,
+        run,
+        "deployment.started",
+        { previewHash, approvalHash, provider: providerName.provider },
+        events.at(-1)?.hash ?? null,
+      );
       let operation: OperationRecordV1;
       try {
         operation =
@@ -3224,6 +4364,14 @@ export class ApexService {
         writerTransferClaimHash ?? undefined,
       );
     }
+    await this.assertCurrentWriterAuthority(run, transferStore);
+    await this.mutateRun(
+      run,
+      run,
+      "deployment.started",
+      { previewHash, approvalHash, provider: "fake" },
+      events.at(-1)?.hash ?? null,
+    );
     const now = this.clock().toISOString();
     const operation = {
       schemaVersion: CONTRACT_VERSION,
@@ -3329,6 +4477,28 @@ export class ApexService {
     const operationHash = await this.objects.putJson(operation);
     const inventory = await provider.inventory(run.projectId, run.runId);
     this.assertValid("inventory", inventory);
+    if (providerName === "bicep") {
+      const managed = new Map(
+        (await this.nativeBicepManagedResources(run, events)).map((resource) => [
+          resource.resourceId.toLowerCase(),
+          resource,
+        ]),
+      );
+      const seen = new Set<string>();
+      inventory.resources = inventory.resources.map((resource) => {
+        const identity = resource.resourceId.toLowerCase();
+        const accepted = managed.get(identity);
+        if (accepted === undefined || seen.has(identity)) {
+          throw new ApexError(
+            "APEX_VALIDATION",
+            "Native inventory violates accepted Bicep ownership",
+            EXIT_CODES.validation,
+          );
+        }
+        seen.add(identity);
+        return { ...resource, resourceId: accepted.resourceId, logicalId: accepted.logicalId };
+      });
+    }
     const inventoryValidatorIds = await this.validateInventoryValidators(run, preview, operation, inventory);
     const inventoryHash = await this.objects.putJson(inventory);
     const declaredValidatorIds = await this.deployValidatorIds(run);
@@ -3450,10 +4620,7 @@ export class ApexService {
     if (fix && yes && apexExists) {
       await this.ensureLocalGitBoundary(true);
       const assets = await resolveBundledAssets();
-      const lock = JSON.parse(
-        await readFile(join(this.root, ".apex", "customizations.lock.json"), "utf8"),
-      ) as CustomizationLock;
-      const selection = await this.customizationSelection(lock.clientId);
+      const selection = await this.customizationSelection();
       if (selection.sourceMode === "custom-source") {
         throw new ApexError(
           "APEX_USAGE",
@@ -3469,9 +4636,9 @@ export class ApexService {
     const checks: DoctorCheck[] = [
       {
         id: "node",
-        ok: Number(process.versions.node.split(".")[0]) >= 24,
+        ok: meetsMinimumVersion(process.versions.node, MINIMUM_NODE_VERSION),
         value: process.versions.node,
-        remedy: "Install Node.js 24 or newer",
+        remedy: `Install Node.js ${MINIMUM_NODE_VERSION} or newer`,
       },
       { id: "workspace", ok: await this.exists(this.root), value: this.root, remedy: "Restore the workspace root" },
       { id: "apex", ok: apexExists, value: join(this.root, ".apex"), remedy: "Run apex init" },
@@ -3834,9 +5001,11 @@ export class ApexService {
     descriptor: WorkflowTaskDescriptor,
     inputRefs: string[] = [],
   ): Promise<TaskEnvelopeV1> {
+    if (descriptor.id === "plan") await this.assertImportedGovernanceCurrent(run, await this.journal(run).replay());
     const head = await this.journal(run).head();
     if (head === null)
       throw new ApexError("APEX_STALE", "Cannot issue a task before run initialization", EXIT_CODES.stale);
+    const limits = await this.taskLimits(run);
     const task = createTaskEnvelope(
       {
         projectId: run.projectId,
@@ -3852,7 +5021,7 @@ export class ApexService {
           sideEffect: "remote" as const,
           expiresAt: new Date(this.clock().getTime() + TASK_TTL_MS).toISOString(),
         })),
-        maxOutputBytes: 4 * 1024 * 1024,
+        maxOutputBytes: limits.maxOutputBytes,
         ttlMs: TASK_TTL_MS,
       },
       this.clock,
@@ -4049,7 +5218,7 @@ export class ApexService {
           : [],
       ),
     );
-    const catalog = this.requirementsIntakeCatalog(requests);
+    const catalog = REQUIREMENTS_INTAKE;
     const latest = requests.at(-1);
     if (latest !== undefined && !recordedRequestIds.has((latest.payload as { requestId: string }).requestId)) {
       const intake = (latest.payload as { intake: { ordinal?: unknown; round?: unknown; total?: unknown } }).intake;
@@ -4065,13 +5234,6 @@ export class ApexService {
       return round;
     }
     return catalog[recordedRequestIds.size];
-  }
-
-  private requirementsIntakeCatalog(
-    requests: Array<Awaited<ReturnType<EventJournal["replay"]>>[number]>,
-  ): readonly RequirementsIntakeRound[] {
-    const total = (requests[0]?.payload as { intake?: { total?: unknown } } | undefined)?.intake?.total;
-    return total === LEGACY_REQUIREMENTS_INTAKE.length ? LEGACY_REQUIREMENTS_INTAKE : REQUIREMENTS_INTAKE;
   }
 
   private async issueRequirementsInput(run: RunConfigV1, round: RequirementsIntakeRound): Promise<InputRequestV1> {
@@ -4091,9 +5253,7 @@ export class ApexService {
         return this.inputRequest(latest, run.ownerEpoch);
       }
     }
-    const catalog = this.requirementsIntakeCatalog(
-      events.filter((event) => event.type === "requirements.input-requested"),
-    );
+    const catalog = REQUIREMENTS_INTAKE;
     const ordinal = catalog.findIndex((candidate) => candidate === round) + 1;
     const event = await this.append(run, "requirements.input-requested", {
       requestId: this.idSource(),
@@ -4107,8 +5267,7 @@ export class ApexService {
     round: RequirementsIntakeRound,
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): InputRequestV1["questions"] {
-    const hasServicePreferences = round.questions.some(({ id }) => id === "service-preferences");
-    if (round.round === "service-preferences" || (round.round === "workload-pattern" && hasServicePreferences)) {
+    if (round.round === "workload-pattern") {
       const input = this.recordedRequirementsInput(events);
       const scenario = input?.["delivery-scenario"];
       const workload = typeof input?.workload === "string" ? input.workload : "";
@@ -4143,7 +5302,6 @@ export class ApexService {
         scenario === "migration" || scenario === "modernization" || scenario === "extension"
           ? [{ id: "retained-services", prompt: "List Azure services or integrations that must be retained." }]
           : [];
-      if (round.round === "service-preferences") return [...retained, ...questions];
       const migration =
         scenario === "migration" || scenario === "modernization"
           ? [
@@ -4157,32 +5315,7 @@ export class ApexService {
           : [];
       return [...questions, ...retained, ...migration];
     }
-    if (round.round !== "workload-pattern") return round.questions;
-    const input = this.recordedRequirementsInput(events);
-    const scenario = input?.["delivery-scenario"];
-    const workload = typeof input?.workload === "string" ? input.workload : "";
-    const pattern = this.recommendedWorkloadPattern(workload);
-    const questions = round.questions.map((question) =>
-      question.id === "workload-pattern"
-        ? {
-            ...question,
-            recommendation: {
-              value: pattern,
-              source: "derived" as const,
-              rationale: "Derived from the confirmed workload description; confirm or choose another pattern.",
-            },
-          }
-        : question.id === "scale"
-          ? { ...question, prompt: this.workloadScalePrompt(pattern) }
-          : question,
-    );
-    if (scenario !== "migration" && scenario !== "modernization") return questions;
-    return [
-      ...questions,
-      { id: "current-platform", prompt: "Describe the current platform and hosting model." },
-      { id: "migration-pain-points", prompt: "Describe the problems the migration or modernization must address." },
-      { id: "preserve-components", prompt: "List components, integrations, or data that must be preserved." },
-    ];
+    return round.questions;
   }
 
   private recommendedWorkloadPattern(
@@ -4258,8 +5391,20 @@ export class ApexService {
     await this.recoverCustomizationTransaction();
     return this.run(await this.selection());
   }
-  private async run(selection: Selection): Promise<RunConfigV1> {
-    const run = await this.runRepository(selection).read();
+  private async run(selection: Selection, options: { readOnly?: boolean } = {}): Promise<RunConfigV1> {
+    const directory = this.projects.runDirectory(selection.projectId, selection.runId);
+    if (options.readOnly) {
+      const pending = await readFile(join(directory, ".run-transaction.json")).catch((error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+        throw error;
+      });
+      if (pending !== undefined) {
+        throw new ApexError("APEX_CONFLICT", "Run transaction recovery is required", EXIT_CODES.conflict);
+      }
+    }
+    const run = options.readOnly
+      ? (JSON.parse(await readFile(join(directory, "run.json"), "utf8")) as RunConfigV1)
+      : await this.runRepository(selection).read();
     const events = await this.journal(run).replay();
     this.assertRequirementsIntakeAdmitted(events, run.ownerEpoch);
     const retired = events.some((event) => {
@@ -4299,14 +5444,14 @@ export class ApexService {
         );
       }
       const intake = request.intake;
-      const catalog =
-        intake?.total === LEGACY_REQUIREMENTS_INTAKE.length ? LEGACY_REQUIREMENTS_INTAKE : REQUIREMENTS_INTAKE;
+      const catalog = REQUIREMENTS_INTAKE;
       const round = intake === undefined ? undefined : catalog[intake.ordinal - 1];
       if (
         round === undefined ||
         intake === undefined ||
         round.round !== intake.round ||
-        intake.total !== catalog.length
+        intake.total !== catalog.length ||
+        round.questions.some(({ id }) => !request.questions.some((question) => question.id === id))
       ) {
         throw new ApexError(
           "APEX_CONFLICT",
@@ -4350,30 +5495,23 @@ export class ApexService {
         event.type === "workflow.invalidated" &&
         ((event.payload as { artifactKinds?: unknown }).artifactKinds as unknown[])?.includes?.(kind)
       ) {
-        return undefined;
+        return kind === "review-findings" ? this.governanceRevision(event)?.retainedReviewHash : undefined;
       }
       if (event.type !== "task.completed") continue;
       const hashes = (event.payload as { artifactHashes?: Partial<Record<ArtifactKind, unknown>> }).artifactHashes;
       if (typeof hashes?.[kind] === "string") return hashes[kind];
     }
-    const legacyFields: Partial<Record<ArtifactKind, string>> = {
-      requirements: "requirementsHash",
-      "implementation-intent": "intentHash",
-    };
-    const field = legacyFields[kind];
-    return field === undefined ? undefined : this.latestPayloadHash(events, "task.completed", field);
+    return undefined;
   }
 
   private acceptedArtifactHashes(events: Awaited<ReturnType<EventJournal["replay"]>>): Record<string, string> {
     const hashes: Record<string, string> = {};
-    const legacyFields: Partial<Record<ArtifactKind, string>> = {
-      requirements: "requirementsHash",
-      "implementation-intent": "intentHash",
-    };
     for (const event of events) {
       if (event.type === "workflow.invalidated") {
         const kinds = (event.payload as { artifactKinds?: unknown }).artifactKinds;
         if (Array.isArray(kinds)) for (const kind of kinds) if (typeof kind === "string") delete hashes[kind];
+        const retainedReviewHash = this.governanceRevision(event)?.retainedReviewHash;
+        if (retainedReviewHash !== undefined) hashes["review-findings"] = retainedReviewHash;
         continue;
       }
       if (event.type !== "task.completed") continue;
@@ -4381,15 +5519,36 @@ export class ApexService {
       for (const [kind, hash] of Object.entries(payload.artifactHashes ?? {})) {
         if (typeof hash === "string") hashes[kind] = hash;
       }
-      for (const [kind, field] of Object.entries(legacyFields)) {
-        const hash = payload[field];
-        if (typeof hash === "string" && hashes[kind] === undefined) hashes[kind] = hash;
-      }
     }
     return hashes;
   }
 
-  private inputRefs(events: Awaited<ReturnType<EventJournal["replay"]>>, descriptor: WorkflowTaskDescriptor): string[] {
+  private async inputRefs(
+    run: RunConfigV1,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+    descriptor: WorkflowTaskDescriptor,
+  ): Promise<string[]> {
+    events = this.governanceWorkflowEvents(events);
+    if (descriptor.id === "plan") await this.assertImportedGovernanceCurrent(run, events);
+    const manifest = (await this.lockedWorkflowEngine(run)).manifest;
+    const node = manifest.nodes.find(({ id }) => id === (descriptor.reviewSubject ?? descriptor.id));
+    if (node === undefined)
+      throw new ApexError("APEX_AUTHORIZATION", "Task has no locked workflow node", EXIT_CODES.authorization);
+    const dependencies = new Set([
+      ...node.sourceDependencies,
+      ...(descriptor.reviewSubject === undefined ? [] : (node.outputs ?? [])),
+    ]);
+    const artifactHashes = Object.entries(this.acceptedArtifactHashes(events))
+      .filter(([kind]) => dependencies.has(`${kind}-v1`))
+      .map(([, hash]) => hash);
+    const governanceHash = this.artifactHash(events, "governance-constraints");
+    if (governanceHash !== undefined && artifactHashes.includes(governanceHash)) {
+      const governance = await this.objects.getJson<GovernanceConstraintsV1>(governanceHash);
+      if (governance.constraintsRef.uri === `apex-object:${governance.constraintsRef.digest}`) {
+        await this.selectedGovernanceSnapshot(run, governance);
+        artifactHashes.push(governance.constraintsRef.digest);
+      }
+    }
     const availabilityKinds = new Set([
       "architecture-availability-v1",
       "pricing-evidence",
@@ -4398,10 +5557,6 @@ export class ApexService {
       "regional-availability-evidence",
     ]);
     const hashes = events.flatMap((event) => {
-      if (event.type === "task.completed") {
-        const artifactHashes = (event.payload as { artifactHashes?: Record<string, unknown> }).artifactHashes ?? {};
-        return Object.values(artifactHashes).filter((hash): hash is string => typeof hash === "string");
-      }
       if (event.type === "evidence.accepted" && descriptor.id === "architecture") {
         const payload = event.payload as { hash?: unknown; kind?: unknown; status?: unknown };
         return typeof payload.hash === "string" &&
@@ -4419,7 +5574,116 @@ export class ApexService {
       }
       return [];
     });
-    return [...new Set(hashes)];
+    return [...new Set([...artifactHashes, ...hashes])];
+  }
+
+  private reviewSubjectArtifactKind(descriptor: WorkflowTaskDescriptor): ArtifactKind | undefined {
+    if (descriptor.reviewSubject === "governance-reconciliation") return "policy-property-map";
+    if (descriptor.reviewSubject === "plan") return "implementation-intent";
+    return descriptor.reviewSubject as ArtifactKind | undefined;
+  }
+
+  private async assertImportedGovernanceCurrent(
+    run: RunConfigV1,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+  ): Promise<void> {
+    const selection = await this.governanceInputState(run, events);
+    if (selection !== undefined && !selection.fulfilled) {
+      this.assertGovernanceInputBinding(run, selection.request, selection.choice === undefined);
+      if (selection.choice === undefined)
+        throw new ApexError(
+          "APEX_AUTHORIZATION",
+          "Governance selection requires an explicit input answer",
+          EXIT_CODES.authorization,
+        );
+      if (selection.choice === "refresh") this.governanceRefreshRequired();
+      await this.assertGovernanceCandidate(run, selection.request, "reuse");
+    }
+    const hash = this.acceptedArtifactHashes(events)["governance-constraints"];
+    if (hash === undefined) return;
+    const governance = await this.objects.getJson<GovernanceConstraintsV1>(hash);
+    if (governance.constraintsRef.uri !== `apex-object:${governance.constraintsRef.digest}`) return;
+    const snapshot = await this.selectedGovernanceSnapshot(run, governance);
+    const latest = await this.latestGovernanceObservation(run, events, hash, governance, snapshot);
+    if (!isGovernanceObservationCurrent(latest?.observedAt ?? governance.discoveredAt, this.clock().toISOString()))
+      throw new ApexError(
+        "APEX_STALE",
+        "Governance snapshot requires refresh from Azure: observation is future-dated or at least 30 days old",
+        EXIT_CODES.stale,
+      );
+  }
+
+  private async latestGovernanceObservation(
+    run: RunConfigV1,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+    governanceHash: string,
+    governance: GovernanceConstraintsV1,
+    snapshot: GovernanceBaselineSelection["snapshot"],
+  ): Promise<GovernanceObservationReceiptV1 | undefined> {
+    let latest: GovernanceObservationReceiptV1 | undefined;
+    for (const event of events) {
+      if (event.type !== "governance.observation-renewed") continue;
+      const payload = event.payload as { governanceHash?: unknown; receiptHash?: unknown };
+      if (payload.governanceHash !== governanceHash) continue;
+      if (typeof payload.receiptHash !== "string" || !/^[0-9a-f]{64}$/u.test(payload.receiptHash))
+        throw new ApexError("APEX_STALE", "Governance observation receipt reference is invalid", EXIT_CODES.stale);
+      const receipt = await this.objects.getJson<GovernanceObservationReceiptV1>(payload.receiptHash);
+      if (
+        !Value.Check(GovernanceObservationReceiptV1Schema, receipt) ||
+        receipt.projectId !== run.projectId ||
+        receipt.runId !== run.runId ||
+        receipt.targetScope !== run.targetScope ||
+        receipt.governanceHash !== governanceHash ||
+        receipt.snapshotDigest !== governance.constraintsRef.digest ||
+        receipt.contentHash !== snapshot.contentHash ||
+        !isGovernanceObservationCurrent(receipt.observedAt, event.timestamp) ||
+        Date.parse(receipt.expiresAt) - Date.parse(receipt.observedAt) !== GOVERNANCE_MAX_AGE_MS ||
+        Date.parse(receipt.observedAt) <= Date.parse(latest?.observedAt ?? governance.discoveredAt)
+      )
+        throw new ApexError(
+          "APEX_STALE",
+          "Governance observation receipt does not match accepted governance and target; reconcile governance",
+          EXIT_CODES.stale,
+        );
+      latest = receipt;
+    }
+    return latest;
+  }
+
+  private async selectedGovernanceSnapshot(
+    run: RunConfigV1,
+    governance: GovernanceConstraintsV1,
+  ): Promise<GovernanceBaselineSelection["snapshot"]> {
+    const bytes = await this.objects.getBytes(governance.constraintsRef.digest);
+    const snapshot = JSON.parse(bytes.toString("utf8")) as GovernanceBaselineSelection["snapshot"] & {
+      projectId: string;
+      runId: string;
+    };
+    const subscriptionScope =
+      typeof snapshot?.subscriptionId === "string"
+        ? `/subscriptions/${snapshot.subscriptionId.toLowerCase()}`
+        : undefined;
+    if (
+      snapshot === null ||
+      snapshot.schemaVersion !== "governance-baseline-selection-v2" ||
+      snapshot.targetScope !== run.targetScope.toLowerCase() ||
+      !Array.isArray(snapshot.findings) ||
+      snapshot.projectId !== run.projectId ||
+      snapshot.runId !== run.runId ||
+      governance.projectId !== run.projectId ||
+      governance.runId !== run.runId ||
+      governance.targetScope !== run.targetScope ||
+      bytes.byteLength !== governance.constraintsRef.bytes ||
+      subscriptionScope === undefined ||
+      (run.targetScope.toLowerCase() !== subscriptionScope &&
+        !run.targetScope.toLowerCase().startsWith(`${subscriptionScope}/resourcegroups/`))
+    )
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Governance evidence does not belong to this run and target",
+        EXIT_CODES.authorization,
+      );
+    return snapshot;
   }
 
   private recordedRequirementsInput(
@@ -4461,11 +5725,9 @@ export class ApexService {
     }
     if (kind === "review-findings") {
       const review = TASKS.find(({ id }) => id === taskType);
-      const subjectKind =
-        review?.reviewSubject === "governance-reconciliation" ? "policy-property-map" : review?.reviewSubject;
-      const artifactKind = subjectKind === "plan" ? "implementation-intent" : subjectKind;
-      const subjectHash =
-        artifactKind === undefined ? undefined : this.artifactHash(events, artifactKind as ArtifactKind);
+      const subjectKind = review?.reviewSubject;
+      const artifactKind = review === undefined ? undefined : this.reviewSubjectArtifactKind(review);
+      const subjectHash = artifactKind === undefined ? undefined : this.artifactHash(events, artifactKind);
       if (subjectKind === undefined || subjectHash === undefined) {
         throw new ApexError("APEX_STALE", "Review subject is unavailable", EXIT_CODES.stale);
       }
@@ -4709,6 +5971,7 @@ export class ApexService {
       { id: "workload-pattern", label: "Workload pattern", priority: "should" },
       { id: "delivery-scenario", label: "Delivery scenario", priority: "should" },
       { id: "region", label: "Region", priority: "should" },
+      { id: "workload-profile", label: "Workload profile", priority: "must" },
     ];
     const requirements = fields.flatMap(({ id, label, priority }, index) => {
       const value = input?.[id];
@@ -4743,14 +6006,34 @@ export class ApexService {
       const values = ids.map(text).filter((value): value is string => value !== undefined);
       return values.length === 0 ? undefined : values.join("; ");
     };
+    const recommend = (value: string | undefined, recommendation: string): string =>
+      [value, `Recommendation (proposed, not confirmed): ${recommendation}`].filter(Boolean).join("\n\n");
+    const compliance = input?.compliance;
+    const gdpr =
+      typeof compliance === "object" &&
+      compliance !== null &&
+      !Array.isArray(compliance) &&
+      compliance.kind === "compliance" &&
+      compliance.scopes.includes("gdpr");
     const reviewFields = {
       businessContext: joinValues("industry", "delivery-scenario", "workload-pattern"),
-      successCriteria: text("scale"),
+      successCriteria: recommend(
+        text("scale"),
+        "Measure end-to-end latency at normal and peak load using p95 and p99, with error rate and test duration recorded. Use the stated latency target; do not invent an acceptance threshold. Suggested role: application team; no assignment is implied.",
+      ),
       nonFunctionalRequirements: text("availability-recovery") ?? text("recovery"),
-      securityAndCompliance: joinValues("security-controls", "compliance", "authentication", "data-sensitivity"),
+      securityAndCompliance: gdpr
+        ? recommend(
+            joinValues("security-controls", "compliance", "authentication", "data-sensitivity"),
+            "Inventory personal data, minimize collection and telemetry, and document retention/deletion and data-subject handling before production use. Suggested role: privacy/data owner; no assignment, retention period or GDPR compliance is asserted.",
+          )
+        : joinValues("security-controls", "compliance", "authentication", "data-sensitivity"),
       budgetAndOperations: joinValues("budget", "operations"),
       regionalConstraints: text("region"),
-      architectureHandoff: text("service-preferences"),
+      architectureHandoff: recommend(
+        text("service-preferences"),
+        "Have Architecture define authorized client access, identity, ingress and DNS using the confirmed security requirements and target Azure Policy. Prefer least privilege; do not infer public access. Suggested role: platform/application team; no assignment is implied.",
+      ),
     };
     return {
       requirements:
@@ -4818,6 +6101,26 @@ export class ApexService {
     return new WorkflowEngine(JSON.parse(workflowBytes.toString("utf8")));
   }
 
+  private async taskLimits(run: RunConfigV1): Promise<{ maxInputBytes: number; maxOutputBytes: number }> {
+    const runtimeRoot = await this.runtimeRootForRun(run);
+    const bytes = await readFile(join(runtimeRoot, "defaults.v1.json"));
+    const lock = JSON.parse(await readFile(join(runtimeRoot, "apex.lock.json"), "utf8")) as RuntimeBundleLockV1;
+    this.assertValid("runtime-lock", lock);
+    if (sha256Json(lock) !== run.runtimeLockHash || sha256Bytes(bytes) !== lock.defaultsHash)
+      throw new ApexError("APEX_STALE", "Runtime defaults lock is not current", EXIT_CODES.stale);
+    const limits = (
+      JSON.parse(bytes.toString("utf8")) as { tasks?: { maxInputBytes?: number; maxOutputBytes?: number } }
+    ).tasks;
+    if (
+      !Number.isSafeInteger(limits?.maxInputBytes) ||
+      !Number.isSafeInteger(limits?.maxOutputBytes) ||
+      limits!.maxInputBytes! < 1 ||
+      limits!.maxOutputBytes! < 1
+    )
+      throw new ApexError("APEX_VALIDATION", "Locked task byte limits are invalid", EXIT_CODES.validation);
+    return { maxInputBytes: limits!.maxInputBytes!, maxOutputBytes: limits!.maxOutputBytes! };
+  }
+
   private async route(
     run: RunConfigV1,
     events: Awaited<ReturnType<EventJournal["replay"]>>,
@@ -4826,16 +6129,8 @@ export class ApexService {
     blockers: string[];
     reviewGate?: number;
   }> {
+    events = this.governanceWorkflowEvents(events);
     const completed = this.completedNodeIds(events);
-    const legacy = events.some(
-      (event) => event.type === "task.completed" && (event.payload as { legacy?: unknown }).legacy === true,
-    );
-    if (legacy) {
-      if (!completed.has("requirements")) return { task: TASKS[0]!, blockers: [] };
-      if (!this.gateApproved(run, 1)) return { blockers: ["Gate 1 approval is required"] };
-      if (!completed.has("plan")) return { task: TASKS.find(({ id }) => id === "plan")!, blockers: [] };
-      return { blockers: [] };
-    }
     const manifest = (await this.lockedWorkflowEngine(run)).manifest;
     const ordered = manifest.nodes
       .flatMap((node) => {
@@ -4920,6 +6215,8 @@ export class ApexService {
     run: RunConfigV1,
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): Promise<void> {
+    events = this.governanceWorkflowEvents(events);
+    await this.assertImportedGovernanceCurrent(run, events);
     if (!this.gateApproved(run, 3))
       throw new ApexError("APEX_AUTHORIZATION", "Gate 3 approval is required before preview", EXIT_CODES.authorization);
     const engine = await this.lockedWorkflowEngine(run);
@@ -5055,7 +6352,11 @@ export class ApexService {
       output.kind === "logical-resource-manifest" &&
       !hasValidLogicalResourceReferences(output.value as LogicalResourceManifestV1)
     ) {
-      throw new ApexError("APEX_VALIDATION", "Logical resource dependencies are invalid", EXIT_CODES.validation);
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Logical resource dependencies or ownership declarations are invalid",
+        EXIT_CODES.validation,
+      );
     }
   }
 
@@ -5090,6 +6391,7 @@ export class ApexService {
     }
     if (descriptor.id === "plan") {
       const intent = byKind["implementation-intent"] as ImplementationIntentV1;
+      await this.assertImportedGovernanceCurrent(run, events);
       const binding = byKind["iac-binding"] as IacBindingV1;
       const resourceIds = new Set(intent.resources.map(({ id }) => id));
       const bindingIds = Object.keys(binding.resourceBindings);
@@ -5130,13 +6432,33 @@ export class ApexService {
       }
     }
     if (descriptor.id === "governance-reconciliation") {
-      const policy = byKind["policy-property-map"] as { governanceHash: string };
+      const policy = byKind["policy-property-map"] as PolicyPropertyMapV1;
       if (policy.governanceHash !== this.artifactHash(events, "governance-constraints")) {
         throw new ApexError(
           "APEX_VALIDATION",
           "Policy property map does not bind accepted governance constraints",
           EXIT_CODES.validation,
         );
+      }
+      const governance = await this.objects.getJson<GovernanceConstraintsV1>(policy.governanceHash);
+      if (governance.constraintsRef.uri === `apex-object:${governance.constraintsRef.digest}`) {
+        const snapshot = await this.selectedGovernanceSnapshot(run, governance);
+        for (const finding of snapshot.findings) {
+          if (!["deny", "modify", "deployIfNotExists"].includes(finding.effect)) continue;
+          const mappings = policy.mappings.filter(
+            (mapping) =>
+              mapping.policyAssignmentId === finding.assignmentId &&
+              mapping.policyDefinitionId === finding.policyId &&
+              mapping.policyDefinitionReferenceId === finding.policyDefinitionReferenceId &&
+              mapping.effect === finding.effect,
+          );
+          if (mappings.length === 0 || mappings.some(({ disposition }) => disposition === "exempt"))
+            throw new ApexError(
+              "APEX_VALIDATION",
+              "Imported policy controls require explicit mappings; reported exemptions are not verified",
+              EXIT_CODES.validation,
+            );
+        }
       }
     }
     if (descriptor.reviewSubject !== undefined) {
@@ -5199,6 +6521,17 @@ export class ApexService {
     let availabilityHash: string | undefined;
     let deploymentOperation: OperationRecordV1 | undefined;
     let deploymentInventory: ResourceInventoryV1 | undefined;
+    let importedPolicyEffects: string[] | undefined;
+    const governance = artifacts["governance-constraints"] as GovernanceConstraintsV1 | undefined;
+    if (
+      descriptor.id === "governance-reconciliation" &&
+      governance !== undefined &&
+      governance.constraintsRef.uri === `apex-object:${governance.constraintsRef.digest}`
+    ) {
+      importedPolicyEffects = (await this.selectedGovernanceSnapshot(run, governance)).findings.map(
+        ({ effect }) => effect,
+      );
+    }
     if (descriptor.id === "architecture") {
       const pinnedRefs = new Set(task.inputRefs);
       availabilityHash = this.latestPayloadHash(
@@ -5231,7 +6564,7 @@ export class ApexService {
         this.assertValid("inventory", deploymentInventory);
       }
     }
-    const context: WorkflowTaskValidatorContext = {
+    let context: WorkflowTaskValidatorContext = {
       nodeId,
       now: this.clock().toISOString(),
       track: run.iacTool,
@@ -5243,16 +6576,86 @@ export class ApexService {
       ...(availabilityEvidence === undefined ? {} : { availabilityEvidence }),
       ...(deploymentOperation === undefined ? {} : { deploymentOperation }),
       ...(deploymentInventory === undefined ? {} : { deploymentInventory }),
+      ...(importedPolicyEffects === undefined ? {} : { importedPolicyEffects }),
       ...(nodeId === "quality" ? await this.qualityValidatorContext(run) : {}),
     };
+    const nativeEvidenceRefs: Record<string, string> = {};
+    const nativeEvidenceModes: Record<string, "native" | "simulated"> = {};
+    if (descriptor.id === `validation-${run.iacTool}`) {
+      for (const id of validatorIds) nativeEvidenceModes[id] = "simulated";
+      const provider = this.providers[run.iacTool];
+      if (provider !== undefined && provider.validateSource === undefined && provider.validationMode !== "simulated")
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Configured adapter does not support native source validation",
+          EXIT_CODES.validation,
+        );
+      if (provider?.validateSource !== undefined) {
+        const handoff = artifacts["iac-handoff"] as IacHandoffV1 | undefined;
+        const sourceHash = artifactHashes["iac-handoff"];
+        const inputHash = artifactHashes["implementation-intent"];
+        const policyHash = artifactHashes["policy-property-map"];
+        if (handoff === undefined || sourceHash === undefined || inputHash === undefined || policyHash === undefined)
+          throw new ApexError(
+            "APEX_VALIDATION",
+            "Native validation requires accepted source, intent and policy inputs",
+            EXIT_CODES.validation,
+          );
+        const rootPath = resolve(this.root, handoff.rootPath);
+        await this.assertSafeDestination(this.root, rootPath);
+        const binding = {
+          projectId: run.projectId,
+          runId: run.runId,
+          track: run.iacTool,
+          sourceHash,
+          treeHash: handoff.treeHash,
+          inputHash,
+          policyHash,
+        };
+        const receipt = await provider.validateSource({
+          ...binding,
+          generatedSource: { rootPath, treeHash: handoff.treeHash },
+        });
+        if (!hasValidNativeValidationReceipt(receipt, binding))
+          throw new ApexError(
+            "APEX_VALIDATION",
+            "Native validation receipt is invalid or stale",
+            EXIT_CODES.validation,
+          );
+        const receiptHash = await this.objects.putJson(receipt);
+        const receiptBytes = Buffer.byteLength(JSON.stringify(receipt));
+        const executed = new Set<string>(receipt.commands.map(({ validatorId }) => validatorId));
+        for (const id of validatorIds) {
+          if (executed.has(id)) {
+            nativeEvidenceRefs[id] = receiptHash;
+            nativeEvidenceModes[id] = "native";
+          }
+        }
+        const index = outputs.findIndex(({ kind }) => kind === "validation-evidence");
+        const evidence = outputs[index]!.value as EvidenceManifestV1;
+        const acceptedEvidence = {
+          ...evidence,
+          entries: evidence.entries.map((entry) =>
+            executed.has(entry.kind) ? { ...entry, hash: receiptHash, bytes: receiptBytes } : entry,
+          ),
+        };
+        outputs[index] = { ...outputs[index]!, value: acceptedEvidence };
+        context = { ...context, outputs: { ...context.outputs, "validation-evidence": acceptedEvidence } };
+      }
+    }
     for (const id of validatorIds) {
       this.assertValid(id, taskWorkflowValidatorInput(id, context));
     }
     return {
       validatorIds,
-      evidenceRefs: availabilityHash === undefined ? {} : { "business:availability-current": availabilityHash },
-      evidenceModes:
-        availabilityEvidence === undefined ? {} : { "business:availability-current": availabilityEvidence.mode },
+      evidenceRefs: {
+        ...nativeEvidenceRefs,
+        ...(availabilityHash === undefined ? {} : { "business:availability-current": availabilityHash }),
+      },
+      evidenceModes: {
+        ...nativeEvidenceModes,
+        ...(availabilityEvidence === undefined ? {} : { "business:availability-current": availabilityEvidence.mode }),
+      },
     };
   }
 
@@ -5311,8 +6714,7 @@ export class ApexService {
       3: ["plan-review"],
       4: ["requirements-review", "architecture-review", "governance-review", "plan-review"],
     };
-    let reviewNodes = reviewNodesByGate[gate.gate] ?? [];
-    let legacyRequirements = false;
+    const reviewNodes = reviewNodesByGate[gate.gate] ?? [];
     let expectedDependencyHash: string | undefined;
     const dependencyReview = { 1: "requirements-review", 2: "governance-review", 3: "plan-review" }[gate.gate];
     if (dependencyReview !== undefined) {
@@ -5323,23 +6725,6 @@ export class ApexService {
         (payload) => payload.nodeId === dependencyReview,
       );
     }
-    if (gate.gate === 1 && expectedDependencyHash === undefined) {
-      const legacyEvent = [...events]
-        .reverse()
-        .find(
-          (event) =>
-            event.type === "task.completed" &&
-            (event.payload as { nodeId?: unknown; legacy?: unknown }).nodeId === "requirements" &&
-            (event.payload as { legacy?: unknown }).legacy === true,
-        );
-      const hashes = (legacyEvent?.payload as { artifactHashes?: Record<string, string> } | undefined)?.artifactHashes;
-      if (hashes !== undefined) {
-        legacyRequirements = true;
-        reviewNodes = [];
-        expectedDependencyHash = sha256Json(hashes);
-      }
-    }
-
     let preview: DeploymentPreviewV1 | undefined;
     if (gate.gate === 4) {
       const previewObjectHash = this.latestPayloadHash(events, "preview.created", "previewObjectHash");
@@ -5363,7 +6748,6 @@ export class ApexService {
       completedNodes,
       reviewBlockers: reviewNodes.flatMap((reviewNode) => this.reviewBlockers(events, reviewNode)),
       currentDependencyRevision: this.dependencyRevision(run, events),
-      legacyRequirements,
       expectedApprovalRecipientIdentity,
       ...(provedPreviewTransferClaimHash === undefined ? {} : { provedPreviewTransferClaimHash }),
       ...(expectedDependencyHash === undefined ? {} : { expectedDependencyHash }),
@@ -5371,6 +6755,69 @@ export class ApexService {
     };
     for (const id of validatorIds) this.assertValid(id, context);
     return validatorIds;
+  }
+
+  private async nativeBicepManagedResources(
+    run: RunConfigV1,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+  ): Promise<ResourceInventoryV1["resources"]> {
+    const artifacts = this.acceptedArtifactHashes(events);
+    if (!artifacts["implementation-intent"] || !artifacts["iac-binding"] || !artifacts["logical-resource-manifest"])
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "preview:coverage requires accepted Bicep ownership inputs",
+        EXIT_CODES.validation,
+      );
+    const intent = await this.objects.getJson<ImplementationIntentV1>(artifacts["implementation-intent"]);
+    const binding = await this.objects.getJson<IacBindingV1>(artifacts["iac-binding"]);
+    const manifest = await this.objects.getJson<LogicalResourceManifestV1>(artifacts["logical-resource-manifest"]);
+    const ownership = resolveNativeBicepResourceOwnership({ intent, binding, manifest, targetScope: run.targetScope });
+    if (ownership.issues.length > 0)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "preview:coverage cannot resolve accepted Bicep ownership",
+        EXIT_CODES.validation,
+      );
+    return intent.resources.flatMap((resource) => {
+      const primaryId = ownership.resourceIdsByLogicalId[resource.id];
+      if (primaryId === undefined) return [];
+      const physical = binding.resourceBindings[resource.id]!.physicalResources;
+      return (
+        physical?.filter(({ ownership }) => ownership === "managed") ?? [{ resourceId: primaryId, type: resource.type }]
+      ).map(({ resourceId, type }) => ({
+        logicalId: resourceId.toLowerCase() === primaryId.toLowerCase() ? resource.id : `${resource.id}:${resourceId}`,
+        resourceId,
+        type,
+        location: run.environment,
+        properties: { purpose: resource.purpose },
+      }));
+    });
+  }
+
+  private async managedPreviewResources(
+    run: RunConfigV1,
+    events: Awaited<ReturnType<EventJournal["replay"]>>,
+    intent: ImplementationIntentV1,
+  ): Promise<ImplementationIntentV1["resources"]> {
+    const manifestHash = this.artifactHash(events, "logical-resource-manifest");
+    if (manifestHash === undefined) {
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Logical resource manifest is required for preview",
+        EXIT_CODES.validation,
+      );
+    }
+    const manifest = await this.objects.getJson<LogicalResourceManifestV1>(manifestHash);
+    this.validateOutput(run, { kind: "logical-resource-manifest", value: manifest });
+    const ownership = new Map(manifest.resources.map(({ logicalId, ownership }) => [logicalId, ownership]));
+    if (ownership.size !== intent.resources.length || intent.resources.some(({ id }) => !ownership.has(id))) {
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Logical resource ownership coverage is incomplete",
+        EXIT_CODES.validation,
+      );
+    }
+    return intent.resources.filter(({ id }) => ownership.get(id) === "managed");
   }
 
   private async validatePreviewValidators(
@@ -5382,6 +6829,7 @@ export class ApexService {
     intent: ImplementationIntentV1,
     attestation?: ExecutionPlanAttestationV1,
     intendedExecutionRecipientIdentity = "local",
+    policyValidationBinding?: PolicyValidationBinding & { readonly receiptHash: string },
   ): Promise<{ validatorIds: string[]; omittedValidatorIds: string[]; evidenceMode: "native" | "simulated" }> {
     const workflow = await this.lockedWorkflowEngine(run);
     const nodeId = `preview-${run.iacTool}`;
@@ -5391,6 +6839,25 @@ export class ApexService {
     const omittedValidatorIds: string[] =
       provider === "fake" ? declaredIds.filter((id) => id === "terraform:saved-plan-binding") : [];
     const validatorIds = declaredIds.filter((id) => !omittedValidatorIds.includes(id));
+    const logicalManifestHash = this.artifactHash(events, "logical-resource-manifest");
+    const logicalManifest =
+      provider === "fake" || logicalManifestHash === undefined
+        ? undefined
+        : await this.objects.getJson<LogicalResourceManifestV1>(logicalManifestHash);
+    const bindingHash = this.artifactHash(events, "iac-binding");
+    const binding =
+      provider !== "bicep" || bindingHash === undefined
+        ? undefined
+        : await this.objects.getJson<IacBindingV1>(bindingHash);
+    const bicepOwnership =
+      provider === "bicep" && binding !== undefined && logicalManifest !== undefined
+        ? resolveNativeBicepResourceOwnership({
+            intent,
+            binding,
+            manifest: logicalManifest,
+            targetScope: run.targetScope,
+          })
+        : undefined;
     const context: WorkflowPreviewValidatorContext = {
       now: this.clock().toISOString(),
       run,
@@ -5405,8 +6872,46 @@ export class ApexService {
           : (this.artifactHash(events, "iac-handoff") ?? sha256Json(intent.resources)),
       expectedPolicyHash: this.artifactHash(events, "policy-property-map") ?? run.runtimeLockHash,
       currentDependencyRevision: this.dependencyRevision(run, events),
-      expectedResourceIds: intent.resources.map(({ id }) => `${provider}://${run.environment}/${id}`),
+      expectedResourceIds:
+        provider === "terraform"
+          ? (logicalManifest?.resources ?? [])
+              .filter(({ ownership }) => ownership === "managed")
+              .flatMap(({ executionAddress }) => (executionAddress === undefined ? [] : [executionAddress]))
+          : provider === "bicep"
+            ? (bicepOwnership?.expectedResourceIds ?? [])
+            : (await this.managedPreviewResources(run, events, intent)).map(
+                ({ id }) => `${provider}://${run.environment}/${id}`,
+              ),
       intendedExecutionRecipientIdentity,
+      ...(bicepOwnership === undefined ? {} : { protectedResourceIds: bicepOwnership.protectedResourceIds }),
+      ...(provider !== "terraform"
+        ? {}
+        : {
+            ownershipIssues:
+              logicalManifest === undefined
+                ? [{ path: "/ownership", message: "Accepted Terraform manifest is required to resolve ownership" }]
+                : logicalManifest.resources
+                    .filter(
+                      ({ ownership, implementationKind, executionAddress }) =>
+                        ownership === "managed" && (implementationKind === "module" || executionAddress === undefined),
+                    )
+                    .map(({ logicalId }) => ({
+                      path: `/ownership/${logicalId}`,
+                      message:
+                        "Terraform managed ownership requires resolved resource addresses; module descendants are unresolved",
+                    })),
+          }),
+      ...(provider !== "bicep"
+        ? {}
+        : {
+            ownershipIssues: bicepOwnership?.issues ?? [
+              {
+                path: "/ownership",
+                message: "Accepted Bicep binding and manifest are required to resolve ownership",
+              },
+            ],
+          }),
+      ...(policyValidationBinding === undefined ? {} : { policyValidationBinding }),
       ...(attestation === undefined ? {} : { attestation }),
     };
     for (const id of validatorIds) this.assertValid(id, context);
@@ -5480,11 +6985,9 @@ export class ApexService {
     run: RunConfigV1,
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): Promise<Awaited<ReturnType<EventJournal["replay"]>>> {
+    events = this.governanceWorkflowEvents(events);
     if (events.some(({ type }) => type === "workflow.completed")) return events;
     const workflow = await this.lockedWorkflowEngine(run);
-    const legacy = events.some(
-      (event) => event.type === "task.completed" && (event.payload as { legacy?: unknown }).legacy === true,
-    );
     const artifactAliases: Readonly<Record<string, string>> = {
       requirements: "requirements-v1",
       "workload-decision-manifest": "workload-decision-manifest-v1",
@@ -5521,16 +7024,10 @@ export class ApexService {
         if (typeof payload.inventoryHash === "string") artifacts["resource-inventory-v1"] = payload.inventoryHash;
       }
     }
-    const activeValidatorIds = legacy
-      ? events.flatMap((event) => {
-          if (event.type !== "task.completed") return [];
-          const ids = (event.payload as { validatorIds?: unknown }).validatorIds;
-          return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : [];
-        })
-      : workflow.activeValidatorIds({
-          run: { iacTool: run.iacTool, targetScope: run.targetScope },
-          artifacts,
-        });
+    const activeValidatorIds = workflow.activeValidatorIds({
+      run: { iacTool: run.iacTool, targetScope: run.targetScope },
+      artifacts,
+    });
     const executedValidatorIds = new Set<string>();
     const simulatedOmittedValidatorIds = new Set<string>();
     for (const event of events) {
@@ -5588,39 +7085,8 @@ export class ApexService {
       activeValidatorIds: deduplicatedActiveValidatorIds,
       executedValidatorIds: [...context.executedValidatorIds],
       simulatedOmittedValidatorIds: [...context.simulatedOmittedValidatorIds],
-      ...(legacy ? { legacy: true } : {}),
     });
     return this.journal(run).replay();
-  }
-
-  private legacyPlanOutputs(run: RunConfigV1, intent: unknown): TaskOutput[] {
-    const intentHash = sha256Json(intent);
-    const resources = (intent as ImplementationIntentV1).resources;
-    return [
-      {
-        kind: "iac-binding",
-        value: {
-          schemaVersion: CONTRACT_VERSION,
-          projectId: run.projectId,
-          runId: run.runId,
-          track: run.iacTool,
-          intentHash,
-          resourceBindings: Object.fromEntries(
-            resources.map(({ id, type }) => [id, { implementation: type, version: "legacy", parameters: {} }]),
-          ),
-        },
-      },
-      {
-        kind: "environment-inputs",
-        value: {
-          schemaVersion: CONTRACT_VERSION,
-          projectId: run.projectId,
-          runId: run.runId,
-          environment: run.environment,
-          inputs: {},
-        },
-      },
-    ];
   }
 
   private async readTask(run: RunConfigV1, taskId: string): Promise<TaskEnvelopeV1> {
@@ -5765,9 +7231,7 @@ export class ApexService {
     return latest.runId;
   }
 
-  private async customizationSelection(
-    legacyClientId: BundledClientProjection["id"] = "github-copilot-vscode",
-  ): Promise<CustomizationSelection> {
+  private async customizationSelection(): Promise<CustomizationSelection> {
     try {
       const value = JSON.parse(
         await readFile(join(this.root, ".apex", "customizations.selection.json"), "utf8"),
@@ -5783,7 +7247,7 @@ export class ApexService {
       return value;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      return { version: 1, clientId: legacyClientId, sourceMode: "bundled-projection" };
+      throw new ApexError("APEX_VALIDATION", "Customization selection is missing", EXIT_CODES.validation);
     }
   }
 

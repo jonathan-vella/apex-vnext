@@ -4,9 +4,6 @@
 > hooks, RBAC post-provision, service discovery, idempotent deploys)
 > in the **azd-deployment** plugin skill if installed.
 >
-> **See also**: [azd vs deploy.ps1 guide](../../iac-common/references/azd-vs-deploy-guide.md)
-> for comparison, per-project conventions, and full workflow.
-
 ## Install
 
 > **Security note**: Piping a remote script directly into `bash` carries supply-chain risk.

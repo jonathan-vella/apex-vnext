@@ -311,6 +311,7 @@
         "iac-handoff-v1",
         "logical-resource-manifest-v1",
         "governance-constraints-v1",
+        "policy-property-map-v1",
         "defaults",
         "toolchain"
       ],
@@ -342,6 +343,7 @@
         "iac-handoff-v1",
         "logical-resource-manifest-v1",
         "governance-constraints-v1",
+        "policy-property-map-v1",
         "defaults",
         "toolchain"
       ],

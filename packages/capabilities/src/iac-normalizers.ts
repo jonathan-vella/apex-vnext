@@ -101,13 +101,29 @@ export function normalizeTerraformPlan(value: unknown): NormalizedPreview {
     throw new IacOutputParseError("terraform-plan", "Terraform plan output must be a JSON object");
   }
   const blockers: string[] = [];
+  if (root.resource_changes !== undefined && !Array.isArray(root.resource_changes)) {
+    blockers.push("Terraform resource_changes must be an array when present");
+  }
+  if (root.complete === false) blockers.push("Terraform plan is incomplete");
+  if (root.complete !== undefined && typeof root.complete !== "boolean") {
+    blockers.push("Terraform plan completeness is malformed");
+  }
+  if (root.errored !== undefined && typeof root.errored !== "boolean") {
+    blockers.push("Terraform plan error status is malformed");
+  }
+  if (root.deferred_changes !== undefined && !Array.isArray(root.deferred_changes)) {
+    blockers.push("Terraform deferred changes are malformed");
+  }
   const changes: DeploymentPreviewV1["changes"] = array(root.resource_changes).map((entry, index) => {
     const resource = object(entry);
     const change = object(resource?.change);
     if (resource === undefined || change === undefined || !Array.isArray(change?.actions)) {
       blockers.push(`Terraform resource change ${index} is malformed`);
     }
-    const actions = array(change?.actions).filter((action): action is string => typeof action === "string");
+    const rawActions = array(change?.actions);
+    const validActions = rawActions.length > 0 && rawActions.every((action) => typeof action === "string");
+    const actions = validActions ? (rawActions as string[]) : [];
+    if (!validActions) blockers.push(`Terraform resource change ${index} has malformed actions`);
     const resourceId = text(resource?.address) ?? `unknown-terraform-resource-${index}`;
     const signature = actions.join(",");
     const action =

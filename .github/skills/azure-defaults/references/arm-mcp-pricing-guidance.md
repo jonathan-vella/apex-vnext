@@ -36,8 +36,3 @@ Managed agents do not receive:
 
 APEX remains authoritative for workflow state, evidence acceptance, approvals, and deployment. Direct ARM MCP output is
 data for the active task; it does not approve a gate or authorize a side effect.
-
-## Legacy Reference
-
-The former custom server guide in [pricing-guidance.md](pricing-guidance.md) is retained only to interpret historical
-artifacts. Do not use its custom tool names for new work.

@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
-import { releaseSbomArguments } from "../../scripts/pack-vnext.mjs";
+import { parseNpmPackResult, releaseSbomArguments } from "../../scripts/pack-vnext.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
 const resistantProcessTree = join(import.meta.dirname, "fixtures", "resistant-process-tree.mjs");
@@ -15,11 +15,145 @@ const defaultRunTimeoutMs = 120_000;
 const defaultTerminationGraceMs = 1_000;
 const defaultMaxOutputBytes = 1_048_576;
 
+test("governance package payload installs and updates both clients without cloud activation", async (context) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "apex-governance-pack-"));
+  context.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const packed = parseNpmPackResult(
+    (
+      await run("npm", [
+        "pack",
+        "--workspace=@apexops/cli",
+        "--ignore-scripts",
+        "--json",
+        "--pack-destination",
+        temporaryRoot,
+      ])
+    ).stdout,
+    "@apexops/cli",
+  );
+  const paths = [
+    ".github/workflows/governance-policy-baseline.yml",
+    "tools/scripts/collect-governance-baseline.ps1",
+    "tools/schemas/governance-baseline.schema.json",
+  ];
+  for (const prefix of [
+    "customizations",
+    "client-projections/github-copilot-cli",
+    "client-projections/github-copilot-vscode",
+  ]) {
+    for (const path of paths) assert.ok(packed.files.some((file) => file.path === `assets/${prefix}/${path}`));
+  }
+  assert.ok(!packed.files.some(({ path }) => /governance-policy-(?:raw|baseline)\.json$/u.test(path)));
+  await run("tar", ["-xzf", join(temporaryRoot, packed.filename), "-C", temporaryRoot]);
+  await symlink(join(root, "node_modules"), join(temporaryRoot, "node_modules"), "dir");
+  const packageRoot = join(temporaryRoot, "package");
+  const { ApexService } = await import(pathToFileURL(join(packageRoot, "dist/service.js")).href);
+  const { resolveBundledAssets, verifyBundledAssetManifest, bundleLockDigest } = await import(
+    pathToFileURL(join(packageRoot, "dist/assets.js")).href
+  );
+  const assets = await resolveBundledAssets();
+  for (const mutate of [
+    (manifest) => {
+      manifest.composition.mappings
+        .find(({ entries }) => entries)
+        ?.entries.push({ source: "tools/scripts/extra.ps1", target: "customizations/tools/scripts/extra.ps1" });
+    },
+    (manifest) => {
+      manifest.composition.mappings.find(({ entries }) => entries).entries[0].source = "../escape";
+    },
+    (manifest) => {
+      manifest.composition.mappings.find(({ entries }) => entries).entries[0].target = "customizations/manifest.json";
+    },
+    (manifest) => {
+      manifest.files.find(({ path }) => path === `customizations/${paths[0]}`).source = {
+        kind: "repository-file",
+        path: `customizations/${paths[0]}`,
+        mapping: "customizations",
+      };
+    },
+    (manifest) => {
+      manifest.files.find(({ path }) => path === `customizations/${paths[1]}`).source.path =
+        "tools/scripts/unreviewed.ps1";
+    },
+    (manifest) => {
+      manifest.files.find(
+        ({ path }) => path === `client-projections/github-copilot-cli/${paths[1]}`,
+      ).source.sourceHash = "0".repeat(64);
+    },
+  ]) {
+    const changed = structuredClone(assets.manifest);
+    mutate(changed);
+    changed.lock.digest = bundleLockDigest(changed);
+    await assert.rejects(verifyBundledAssetManifest(assets.root, changed), /copy entr|source|mapping/u);
+  }
+  for (const clientId of ["github-copilot-vscode", "github-copilot-cli"]) {
+    const consumer = join(temporaryRoot, clientId);
+    const service = new ApexService(consumer);
+    await service.init({ projectId: "test", clientId });
+    await service.update();
+    const lock = JSON.parse(await readFile(join(consumer, ".apex/customizations.lock.json"), "utf8"));
+    for (const path of paths) {
+      const bytes = await readFile(join(root, path));
+      assert.deepEqual(await readFile(join(consumer, path)), bytes);
+      assert.equal(
+        lock.files.find((file) => file.path === path).sourceHash,
+        createHash("sha256").update(bytes).digest("hex"),
+      );
+    }
+    await assert.rejects(readFile(join(consumer, ".github/data/governance-policy-baseline.json")), { code: "ENOENT" });
+    const upstream = join(temporaryRoot, `${clientId}-upstream`);
+    await cp(assets.clientProjections[clientId], upstream, { recursive: true });
+    for (const path of paths) {
+      await writeFile(join(consumer, path), "local change\n");
+      await writeFile(join(upstream, path), "upstream change\n");
+      await assert.rejects(service.update(upstream), (error) => error.code === "APEX_CONFLICT");
+      assert.equal(await readFile(join(consumer, path), "utf8"), "local change\n");
+      await writeFile(join(consumer, path), await readFile(join(root, path)));
+      await writeFile(join(upstream, path), await readFile(join(root, path)));
+    }
+    const removed = await service.uninstallCustomizations();
+    for (const path of paths) assert.ok(removed.removed.includes(path));
+    await mkdir(join(consumer, "tools/scripts"), { recursive: true });
+    await writeFile(join(consumer, paths[1]), "existing consumer collector\n");
+    await assert.rejects(service.reinstallCustomizations(), (error) => error.code === "APEX_CONFLICT");
+    assert.equal(await readFile(join(consumer, paths[1]), "utf8"), "existing consumer collector\n");
+  }
+});
+
 test("release SBOM is derived from the lockfile instead of ambient node_modules", () => {
   assert.deepEqual(releaseSbomArguments, ["sbom", "--omit=dev", "--package-lock-only", "--sbom-format=cyclonedx"]);
 });
 
 const delay = (milliseconds) => new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
+
+test("npm pack results accept array and workspace-keyed formats", () => {
+  const entry = {
+    name: "@apexops/contracts",
+    filename: "apexops-contracts-0.10.0-next.5.tgz",
+    files: [{ path: "package.json" }],
+  };
+  for (const result of [[entry], { [entry.name]: entry }]) {
+    assert.deepEqual(parseNpmPackResult(JSON.stringify(result), entry.name), entry);
+  }
+});
+
+test("npm pack results reject malformed, missing, mismatched and ambiguous packages", () => {
+  const name = "@apexops/contracts";
+  const entry = { name, filename: "contracts.tgz" };
+  assert.throws(() => parseNpmPackResult("not JSON", name), /invalid JSON/);
+  for (const result of [
+    null,
+    [],
+    {},
+    [entry, entry],
+    [{ name }],
+    { [name]: null },
+    { [name]: { ...entry, name: "@apexops/kernel" } },
+    { [name]: { ...entry, filename: "" } },
+  ]) {
+    assert.throws(() => parseNpmPackResult(JSON.stringify(result), name), /unique filename/);
+  }
+});
 
 function processExists(pid) {
   try {
@@ -299,10 +433,11 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     assert.equal(entry.bytes, (await stat(tarball)).size);
     assert.equal(entry.sha256, createHash("sha256").update(bytes).digest("hex"));
 
-    const dryRun = JSON.parse(
+    const dryRun = parseNpmPackResult(
       (await runInTest("npm", ["pack", "--workspace", entry.package, "--json", "--dry-run"])).stdout,
+      entry.package,
     );
-    const expectedFiles = dryRun[0].files.map(({ path }) => path).sort();
+    const expectedFiles = dryRun.files.map(({ path }) => path).sort();
     const actualFiles = (await runInTest("tar", ["-tzf", tarball])).stdout
       .split("\n")
       .filter((path) => path.startsWith("package/") && !path.endsWith("/"))
@@ -448,28 +583,10 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     /failed \(1\)/,
   );
   await readFile(join(project, ".apex", "runtime", "workflow.v1.json"));
-  const governancePack = "azure-governance-discovery";
   const capability = async (args) =>
     JSON.parse((await runInTest(apexBin, ["capability", ...args, "--json"], project)).stdout).result;
-  const absentPack = await capability(["status", "--pack", governancePack]);
-  assert.equal(absentPack.state, "not-installed");
-  const installedPack = await capability(["install", "--pack", governancePack, "--yes"]);
-  assert.equal(installedPack.state, "installed");
-  assert.equal(installedPack.changed, true);
-  assert.equal((await capability(["verify", "--pack", governancePack])).state, "installed");
-  const updatedPack = await capability(["update", "--pack", governancePack, "--yes"]);
-  assert.equal(updatedPack.state, "installed");
-  assert.equal(updatedPack.changed, true);
-  const rolledBackPack = await capability(["rollback", "--pack", governancePack, "--yes"]);
-  assert.equal(rolledBackPack.state, "installed");
-  assert.equal(rolledBackPack.changed, true);
-  const removedPack = await capability(["uninstall", "--pack", governancePack, "--yes"]);
-  assert.equal(removedPack.state, "not-installed");
-  assert.equal(removedPack.changed, true);
-  assert.equal((await capability(["status", "--pack", governancePack])).state, "not-installed");
-  await assert.rejects(readFile(join(project, ".apex", "capability-packs", governancePack, "pack.lock.json")), {
-    code: "ENOENT",
-  });
+  assert.deepEqual(await capability(["list"]), []);
+  await assert.rejects(capability(["install", "--pack", "azure-governance-discovery", "--yes"]));
   await readFile(join(project, ".apex", "runtime", "capability-packs.registry.json"));
   await writeFile(join(project, "keep.txt"), "preserve me\n", "utf8");
   const lock = JSON.parse(await readFile(join(project, ".apex", "customizations.lock.json"), "utf8"));

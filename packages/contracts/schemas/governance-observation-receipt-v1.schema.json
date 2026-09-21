@@ -1,0 +1,60 @@
+{
+  "$id": "https://schemas.apexops.dev/governance-observation-receipt-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "contentHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "expiresAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "governanceHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "observedAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "projectId": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "rawSourceDigest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "runId": {
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "snapshotDigest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "targetScope": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "runId",
+    "targetScope",
+    "governanceHash",
+    "snapshotDigest",
+    "contentHash",
+    "observedAt",
+    "expiresAt",
+    "rawSourceDigest"
+  ],
+  "type": "object"
+}

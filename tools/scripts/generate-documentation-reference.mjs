@@ -78,15 +78,11 @@ if (check) {
     console.error("❌ Superseded docs/guides must remain archived");
     process.exitCode = 1;
   }
-  const activeDocs = walk(join(root, "docs")).filter(
-    (path) => !repositoryPath(path).startsWith("docs/vnext/phase-0a/") && repositoryPath(path) !== "docs/MIGRATION.md",
-  );
+  const activeDocs = walk(join(root, "docs"));
   const forbidden = /original APEX|github\.com\/jonathan-vella\/apex(?!-vnext)/iu;
   for (const path of activeDocs) {
     if (forbidden.test(readFileSync(path, "utf8"))) {
-      console.error(
-        `❌ Predecessor history must stay in docs/MIGRATION.md or frozen evidence: ${repositoryPath(path)}`,
-      );
+      console.error(`❌ Product documentation must describe current vNext behavior: ${repositoryPath(path)}`);
       process.exitCode = 1;
     }
   }

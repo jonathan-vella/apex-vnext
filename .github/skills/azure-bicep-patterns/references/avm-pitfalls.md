@@ -84,22 +84,22 @@ module call to force MCR to populate it, then re-inspect.
 
 ### Catalogue of drift we have hit (extend on every new occurrence)
 
-| Module | Pinned version | Wrong (from docs/older versions) | Correct |
-|---|---|---|---|
-| `avm/res/key-vault/vault` | `0.13.3` | `enabledForDeployment` / `enabledForTemplateDeployment` / `enabledForDiskEncryption` | `enableVaultForDeployment` / `enableVaultForTemplateDeployment` / `enableVaultForDiskEncryption` |
-| `avm/res/web/site` | `0.23.0` | `virtualNetworkSubnetId` | `virtualNetworkSubnetResourceId` |
-| `avm/res/web/site` | `0.23.0` | `appSettingsKeyValuePairs: { ... }` | `configs: [{ name: 'appsettings', properties: { ... } }]` |
-| `avm/res/web/site` | `0.23.0` | `authSettingV2Configuration: { ... }` on the module | Module has no auth-v2 param — author raw `Microsoft.Web/sites/config@authsettingsV2` child resource (see [Bicep `parent:` BCP120](#bicep-parent-bcp120-static-name-required-on-child-resources) below) |
-| `avm/res/sql/server` | `0.21.2` | `administrators: { ..., azureAdOnlyAuthentication: true }` (missing `principalType`) | Add `principalType: 'User'` (required by AVM schema) |
-| `avm/res/sql/server` | `0.21.2` | `databaseType: { ..., transparentDataEncryption: { state: 'Enabled' } }` | Remove — TDE is enabled by default; not in the AVM `databaseType` schema |
-| `avm/res/sql/server` | `0.21.2` | `databaseType: { ... }` without `availabilityZone` | `availabilityZone` is **required** (allowed values `-1`/`1`/`2`/`3`; use `-1` when zone-redundancy is not needed) |
-| `avm/res/sql/server` | `0.21.2` | Server-level `diagnosticSettings: [ ... ]` on the module | Not a server-level param — wire diagnostics on the database via `databaseType.diagnosticSettings` |
-| `avm/res/operational-insights/workspace` | `0.15.1` | `dailyQuotaGb: 1` (int) | `dailyQuotaGb: '1'` (string; default `'-1'`) |
-| `avm/res/insights/scheduled-query-rule` | `0.6.0` | `criteria: { allOf: [...] }` | `criterias: { allOf: [...] }` (pluralised) |
-| `avm/res/consumption/budget` | `0.3.8` | Nested `notifications`, `budgetCategory`, `timeGrain`, `filters` | Flat structure: `category`, `resetPeriod`, `thresholds: [int, int]`, `thresholdType: 'Actual' \| 'Forecasted'` (one per module instance), `actionGroups`, `contactEmails`, `contactRoles`, `operator`. To cover Actual + Forecasted, deploy **two budget module instances**. `startDate` has a built-in `utcNow()` default — do not pass it. |
-| `avm/res/consumption/budget` | `0.3.8` | Called from an RG-scoped module without `scope:` | Requires `scope: subscription()` on the module call |
-| `avm/res/db-for-my-sql/flexible-server` | `0.10.3` | `delegatedSubnetResourceId` into a shared PE subnet; `aad_auth_only` via `configurations[]` | Use `privateEndpoints[]` (`service: 'mysqlServer'`) — mutually exclusive with delegated subnet; `aad_auth_only` is read-only (enforce post-deploy). See [MySQL section](#mysql-flexible-server-apply-time-gotchas) |
-| `avm/res/automation/automation-account` | `0.19.1` | runbook `runbookType` + inline `content`/`publishContentLink`; `jobSchedules` to a draft runbook | runbook `type` (no inline content; `uri` only); create `jobSchedules` post-deploy after publishing. See [Automation section](#automation-account-runbook-and-jobschedule) |
+| Module                                   | Pinned version | Wrong (from docs/older versions)                                                                 | Correct                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `avm/res/key-vault/vault`                | `0.13.3`       | `enabledForDeployment` / `enabledForTemplateDeployment` / `enabledForDiskEncryption`             | `enableVaultForDeployment` / `enableVaultForTemplateDeployment` / `enableVaultForDiskEncryption`                                                                                                                                                                                                                                             |
+| `avm/res/web/site`                       | `0.23.0`       | `virtualNetworkSubnetId`                                                                         | `virtualNetworkSubnetResourceId`                                                                                                                                                                                                                                                                                                             |
+| `avm/res/web/site`                       | `0.23.0`       | `appSettingsKeyValuePairs: { ... }`                                                              | `configs: [{ name: 'appsettings', properties: { ... } }]`                                                                                                                                                                                                                                                                                    |
+| `avm/res/web/site`                       | `0.23.0`       | `authSettingV2Configuration: { ... }` on the module                                              | Module has no auth-v2 param — author raw `Microsoft.Web/sites/config@authsettingsV2` child resource (see [Bicep `parent:` BCP120](#bicep-parent-bcp120-static-name-required-on-child-resources) below)                                                                                                                                       |
+| `avm/res/sql/server`                     | `0.21.2`       | `administrators: { ..., azureAdOnlyAuthentication: true }` (missing `principalType`)             | Add `principalType: 'User'` (required by AVM schema)                                                                                                                                                                                                                                                                                         |
+| `avm/res/sql/server`                     | `0.21.2`       | `databaseType: { ..., transparentDataEncryption: { state: 'Enabled' } }`                         | Remove — TDE is enabled by default; not in the AVM `databaseType` schema                                                                                                                                                                                                                                                                     |
+| `avm/res/sql/server`                     | `0.21.2`       | `databaseType: { ... }` without `availabilityZone`                                               | `availabilityZone` is **required** (allowed values `-1`/`1`/`2`/`3`; use `-1` when zone-redundancy is not needed)                                                                                                                                                                                                                            |
+| `avm/res/sql/server`                     | `0.21.2`       | Server-level `diagnosticSettings: [ ... ]` on the module                                         | Not a server-level param — wire diagnostics on the database via `databaseType.diagnosticSettings`                                                                                                                                                                                                                                            |
+| `avm/res/operational-insights/workspace` | `0.15.1`       | `dailyQuotaGb: 1` (int)                                                                          | `dailyQuotaGb: '1'` (string; default `'-1'`)                                                                                                                                                                                                                                                                                                 |
+| `avm/res/insights/scheduled-query-rule`  | `0.6.0`        | `criteria: { allOf: [...] }`                                                                     | `criterias: { allOf: [...] }` (pluralised)                                                                                                                                                                                                                                                                                                   |
+| `avm/res/consumption/budget`             | `0.3.8`        | Nested `notifications`, `budgetCategory`, `timeGrain`, `filters`                                 | Flat structure: `category`, `resetPeriod`, `thresholds: [int, int]`, `thresholdType: 'Actual' \| 'Forecasted'` (one per module instance), `actionGroups`, `contactEmails`, `contactRoles`, `operator`. To cover Actual + Forecasted, deploy **two budget module instances**. `startDate` has a built-in `utcNow()` default — do not pass it. |
+| `avm/res/consumption/budget`             | `0.3.8`        | Called from an RG-scoped module without `scope:`                                                 | Requires `scope: subscription()` on the module call                                                                                                                                                                                                                                                                                          |
+| `avm/res/db-for-my-sql/flexible-server`  | `0.10.3`       | `delegatedSubnetResourceId` into a shared PE subnet; `aad_auth_only` via `configurations[]`      | Use `privateEndpoints[]` (`service: 'mysqlServer'`) — mutually exclusive with delegated subnet; `aad_auth_only` is read-only (enforce post-deploy). See [MySQL section](#mysql-flexible-server-apply-time-gotchas)                                                                                                                           |
+| `avm/res/automation/automation-account`  | `0.19.1`       | runbook `runbookType` + inline `content`/`publishContentLink`; `jobSchedules` to a draft runbook | runbook `type` (no inline content; `uri` only); create `jobSchedules` post-deploy after publishing. See [Automation section](#automation-account-runbook-and-jobschedule)                                                                                                                                                                    |
 
 ### Why what-if and lint don't catch this
 
@@ -206,7 +206,7 @@ but `bicep build` fails at compile time.
 
 ### Rule
 
-**RBAC role assignments live in the *target resource's* module**, never in
+**RBAC role assignments live in the _target resource's_ module**, never in
 `identity.bicep`. The identity module's only job is to create the User Assigned
 Managed Identity and surface its `id`, `principalId`, and `clientId` outputs.
 
@@ -459,14 +459,14 @@ For every `Microsoft.Insights/scheduledQueryRules` resource in the
 rendered template, the 06b validator + 07b deploy agent must grep the
 KQL body for:
 
-| Token           | Allowed table(s)                                            | Action if mismatched                       |
-| --------------- | ----------------------------------------------------------- | ------------------------------------------ |
-| `OperationName` | `AzureActivity`, `AzureDiagnostics` (some resource types)   | Reject when KQL targets `_LogOperation`    |
-| `Message`       | `AppTraces`, `AppExceptions`, `Syslog`, `Event`             | Reject when KQL targets `_LogOperation`    |
-| `_LogOperation` | Workspace meta (`Operation`, `Category`, `Detail`)          | Allowed columns only — see Microsoft docs  |
+| Token           | Allowed table(s)                                          | Action if mismatched                      |
+| --------------- | --------------------------------------------------------- | ----------------------------------------- |
+| `OperationName` | `AzureActivity`, `AzureDiagnostics` (some resource types) | Reject when KQL targets `_LogOperation`   |
+| `Message`       | `AppTraces`, `AppExceptions`, `Syslog`, `Event`           | Reject when KQL targets `_LogOperation`   |
+| `_LogOperation` | Workspace meta (`Operation`, `Category`, `Detail`)        | Allowed columns only — see Microsoft docs |
 
 The deploy-side preflight is captured in
-[`deploy-validation-checklist.md` § KQL alert queries](../../iac-common/references/deploy-validation-checklist.md#kql-alert-queries-reference-valid-columns).
+[`deploy-validation-checklist.md` § KQL alert queries](../../../../customizations/.github/skills/apex-azure-deploy/SKILL.md).
 
 ---
 
@@ -522,7 +522,7 @@ The deploy preflight (07b Phase 1.5) MUST call `az ad ... show` for
 every param flagged as `entra-object-id` in
 `04-environment-manifest.json` and fail-closed on empty / non-GUID
 responses. See
-[`deploy-validation-checklist.md` § Entra principal object IDs](../../iac-common/references/deploy-validation-checklist.md#entra-principal-object-ids-are-real).
+[`deploy-validation-checklist.md` § Entra principal object IDs](../../../../customizations/.github/skills/apex-azure-deploy/SKILL.md).
 
 ---
 
@@ -542,12 +542,12 @@ network access (e.g. API Server VNet Integration), the RP fails:
 BadRequest: UserDefinedRouting is not supported when Cluster has public network access set to Disabled.
 ```
 
-| Egress topology                              | Correct `outboundType`   |
-| -------------------------------------------- | ------------------------ |
-| NAT Gateway on the node subnet (BYO-VNet)    | `userAssignedNATGateway` |
-| AKS-managed NAT Gateway                      | `managedNATGateway`      |
-| 0.0.0.0/0 UDR to a firewall/NVA you operate  | `userDefinedRouting`     |
-| Default public load balancer                 | `loadBalancer`           |
+| Egress topology                             | Correct `outboundType`   |
+| ------------------------------------------- | ------------------------ |
+| NAT Gateway on the node subnet (BYO-VNet)   | `userAssignedNATGateway` |
+| AKS-managed NAT Gateway                     | `managedNATGateway`      |
+| 0.0.0.0/0 UDR to a firewall/NVA you operate | `userDefinedRouting`     |
+| Default public load balancer                | `loadBalancer`           |
 
 ### BYO-VNet clusters need Network Contributor on the VNet
 
@@ -715,8 +715,8 @@ then `az automation job-schedule create`). Record both as post-deploy tasks.
 
 ## Learn More
 
-| Topic                | How to Find                                                                                          |
-| -------------------- | ---------------------------------------------------------------------------------------------------- |
+| Topic                | How to Find                                                                                                             |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | AVM module catalog   | `mcp_azure-mcp_documentation` — `command: "microsoft_docs_search"`, `query: "Azure Verified Modules registry Bicep"`    |
 | Resource type schema | `mcp_azure-mcp_documentation` — `command: "microsoft_docs_search"`, `query: "{resource-type} Bicep template reference"` |
 | Networking patterns  | `mcp_azure-mcp_documentation` — `command: "microsoft_docs_search"`, `query: "Azure hub-spoke network topology Bicep"`   |

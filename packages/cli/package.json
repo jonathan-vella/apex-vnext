@@ -36,15 +36,16 @@
     "@apexops/contracts": "0.10.0-next.5",
     "@apexops/kernel": "0.10.0-next.5",
     "@apexops/renderers": "0.10.0-next.5",
-    "@azure/mcp": "3.0.0-beta.37",
-    "@hono/node-server": "2.0.11",
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@azure/mcp": "3.0.0-beta.45",
+    "@hono/node-server": "2.1.1",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@sinclair/typebox": "0.34.52",
-    "hono": "4.12.34",
-    "zod": "4.4.3"
+    "ajv": "8.20.0",
+    "hono": "4.13.8",
+    "zod": "4.6.5"
   },
   "devDependencies": {
-    "js-yaml": "5.2.2"
+    "js-yaml": "5.4.2"
   },
   "scripts": {
     "build": "tsc -b",
@@ -53,6 +54,6 @@
     "test": "node --test dist/test/*.test.js"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=26.9.0"
   }
 }

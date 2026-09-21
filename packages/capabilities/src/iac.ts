@@ -3,10 +3,14 @@ import type {
   ApprovalEvidenceV1,
   DeploymentPreviewV1,
   IacTool,
+  NativeValidationReceiptV1,
   Operation,
   OperationRecordV1,
+  PolicyPropertyMapV1,
+  PolicyValidationV1,
   ResourceInventoryV1,
 } from "@apexops/contracts";
+import type { PolicyResourceBinding } from "./policy-validation.js";
 
 export type IacProviderErrorCode =
   | "APPROVAL_EXPIRED"
@@ -15,6 +19,8 @@ export type IacProviderErrorCode =
   | "APPROVAL_RECIPIENT_MISMATCH"
   | "APPROVAL_REJECTED"
   | "APPROVAL_WRITER_EPOCH_MISMATCH"
+  | "NATIVE_VALIDATION_FAILED"
+  | "NATIVE_VALIDATION_INPUT_INVALID"
   | "PREVIEW_BLOCKED"
   | "PREVIEW_EXPIRED"
   | "PREVIEW_HASH_MISMATCH"
@@ -53,9 +59,26 @@ export interface PreviewRequest {
   readonly inputHash: string;
   readonly iacHash: string;
   readonly policyHash: string;
+  readonly generatedSource?: {
+    readonly rootPath: string;
+    readonly treeHash: string;
+  };
+  readonly policyValidation?: {
+    readonly policyMap: PolicyPropertyMapV1;
+    readonly logicalResourceManifest: Record<string, PolicyResourceBinding>;
+  };
   readonly resources: readonly IacResourceSpec[];
   readonly blockers?: readonly string[];
   readonly ttlMs: number;
+}
+
+export interface NativeValidationRequest {
+  readonly projectId: string;
+  readonly runId: string;
+  readonly sourceHash: string;
+  readonly generatedSource: NonNullable<PreviewRequest["generatedSource"]>;
+  readonly policyHash: string;
+  readonly inputHash: string;
 }
 
 export interface CurrentDeploymentAuthority {
@@ -151,7 +174,9 @@ export function authorizeDeploymentPreview(context: PreviewAuthorizationContext)
 
 export interface IacProvider {
   readonly track: IacTool;
+  readonly validationMode?: "simulated";
   validate(request: PreviewRequest): Promise<readonly string[]>;
+  validateSource?(request: NativeValidationRequest): Promise<NativeValidationReceiptV1>;
   previewApply(request: PreviewRequest): Promise<DeploymentPreviewV1>;
   previewDestroy(request: PreviewRequest): Promise<DeploymentPreviewV1>;
   apply(
@@ -167,6 +192,7 @@ export interface IacProvider {
   inventory(projectId: string, runId: string): Promise<ResourceInventoryV1>;
   reconcile(operationId: string): Promise<OperationRecordV1 | undefined>;
   executionEvidence?(operationId: string): ProviderExecutionEvidence | undefined;
+  policyValidation?(previewHash: string): PolicyValidationV1 | undefined;
 }
 
 export interface FakeIaCProviderOptions {

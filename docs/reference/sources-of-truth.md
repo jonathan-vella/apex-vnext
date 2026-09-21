@@ -2,8 +2,9 @@
 
 > [Current Version](../../VERSION.md) | Authority boundaries for the APEX repository and consumer workspaces.
 
-Use the authority that owns the concern. Source code and versioned configuration override prose. Chat, rendered views,
-generated summaries, and historical evidence do not create authority.
+Use the authority that owns the concern. Source code and versioned configuration establish implemented behavior; the
+PRD establishes target requirements. A mismatch needs an explicit tested implementation change, not a claim that prose
+changed the runtime. Chat, rendered views and historical evidence do not create execution authority.
 
 ## Authority Matrix
 
@@ -35,7 +36,7 @@ In a consumer workspace, accepted artifacts are immutable content-addressed obje
 run journal under `.apex/projects/<project>/runs/<run>/` binds their hashes to the project and run. The physical object
 path is a storage detail, not part of an artifact contract.
 
-Consumer state cannot change product requirements, release status, or npm distribution authority. Repository prose
+Consumer state cannot change product requirements, release status, or the selected distribution authority. Repository prose
 cannot override a consumer run's accepted evidence, gates, or approvals.
 
 ## Workload Decision Manifest
@@ -51,6 +52,24 @@ cannot override a consumer run's accepted evidence, gates, or approvals.
 The contract is run-bound through `projectId`, `runId`, and accepted artifact hashes. The architecture stage owns its
 production because it has the requirements, resource design, cost evidence, and governance context needed to make these
 decisions.
+
+## Planned Portable Intent And Editing
+
+The [COE and change requirements](../vnext/PRD.md#req-reuse-001-coe-archetype-import) extend this ownership model, not
+replace it with another project-definition format. Use the existing owner for each fact and derive other views:
+
+| Concern                                             | Intended ownership                                                           |
+| --------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Business/compliance requirements                    | Accepted requirements, referenced by design and review                       |
+| Service/SKU choices and rationale                   | Accepted architecture and workload decisions                                 |
+| Environment values and supplied-resource references | Existing environment inputs and IaC bindings/parameters                      |
+| Target constraints                                  | Selected subscription's reviewed policy baseline and accepted reconciliation |
+| Documents and diagrams                              | Derived from those accepted sources and observed deployment evidence         |
+
+COE imports create independent projects with origin/revision, not inherited writer or approval authority. Legacy files
+may be inspected once to recover proposed intent, then confirmed; they are not executable runtime state. Manual edits
+require detection and reconciliation before an affected file is overwritten. This conflict-aware adaptation is planned
+work; current rendered review packages can still overwrite local edits, as documented in the workflow guide.
 
 ## Cutover Policy
 

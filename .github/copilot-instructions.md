@@ -37,7 +37,7 @@ the APEX-standard 9-tag set — `environment`, `owner`, `costcenter`,
 `technical-contact` — all lowercase. This mirrors the org-wide
 resource-group tag-deny policy (every key must exist on the RG or the
 deployment is denied). Citation + greenfield decision checklist:
-[`azure-defaults/references/tag-strategy.md`](skills/azure-defaults/references/tag-strategy.md).
+[`customizations/.github/skills/apex-azure-defaults/references/tag-precedence.md`](../customizations/.github/skills/apex-azure-defaults/references/tag-precedence.md).
 
 > The PascalCase set (`Environment`, `ManagedBy`, `Project`, `Owner`)
 > is a **deprecated convention** retained only for backward
@@ -69,12 +69,15 @@ improvement. `packages/contracts/` owns versioned schemas; `packages/capabilitie
 delegate, but may not create an independent state machine or bypass kernel authorization.
 
 Use the packaged `apex` CLI for consumer-project lifecycle. Repository changes target source packages, config, and
-managed customizations, then run `npm run qualify:vnext`. Live qualification and deployment require explicit human
+managed customizations. Follow the change-scoped validation policy in `AGENTS.md`; run `npm run qualify:vnext` at
+product integration checkpoints, not after every prose edit. Live qualification and deployment require explicit human
 authorization and are never implied by a code-generation or maintenance request.
 
 ## Skills
 
 Skills auto-discover via the `description` field in `.github/skills/{name}/SKILL.md`.
+Skills with `disable-model-invocation: true` are manual-only. Invoke `/docs-writer` explicitly for documentation workflow;
+it loads `apex-unslop` within that scope. Ordinary edits do not implicitly invoke docs-writer.
 Agents read `SKILL.md` files on demand and load `references/*.md` only when the
 body explicitly points to one. There is one tier — no digest, no minimal.
 

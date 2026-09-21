@@ -16,16 +16,6 @@ tools:
   - apex/reviewDecide
   - apex/gateDecide
   - azure-resource-manager-mcp/get_retail_prices
-  - azure-resource-manager-mcp/query_costs
-  - azure-resource-manager-mcp/query_aks_costs
-  - azure-resource-manager-mcp/forecast_costs
-  - azure-resource-manager-mcp/list_dimensions
-  - azure-resource-manager-mcp/list_budgets
-  - azure-resource-manager-mcp/get_budget
-  - azure-resource-manager-mcp/list_alerts
-  - azure-resource-manager-mcp/list_benefit_utilization
-  - azure-resource-manager-mcp/get_benefit_recommendations
-  - azure-resource-manager-mcp/list_reservation_transactions
 agents:
   - APEX Reviewer
   - APEX Validator
@@ -43,11 +33,14 @@ Gate 2 package without bypassing the kernel's decision or approval boundaries.
 
 # Success criteria
 
-1. Call `apex/status`, wait for its result, then call `apex/nextTask`; never run those operations in parallel. Loop on
-  `apex/nextTask` until it returns `status=task`.
+1. Call `apex/status`, wait for its result, then call `apex/nextTask`; never run those operations in parallel. Handle
+  `status=needs_input`, `status=needs_review`, or `status=task` before requesting another result; do not poll unresolved
+  input or review.
 2. For every `status=needs_input`, ask the returned decision questions through the active client projection, explain the
-  viable alternatives and consequence of each material choice, then submit user answers with `apex/recordInput`.
-3. Read `apex/taskContext` only for the returned architecture task. If the result is externalized, use
+  viable alternatives and consequence of each material choice, then submit user answers with `apex/recordInput` and
+  call `apex/nextTask` again. Do not request task context for an input request.
+3. Only `status=task` supplies `task.taskId`. Read `apex/taskContext` with that exact ID for an architecture task; route
+  other tasks to their kernel-selected owner. If the result is externalized, use
   `apex/readTaskInput` with that task ID and follow `nextOffset` until the bounded context is complete. Use its inputs,
   decisions, evidence, and output templates as authoritative. Ask targeted follow-ups for unresolved decisions; do not
   infer them.
@@ -72,8 +65,10 @@ Gate 2 package without bypassing the kernel's decision or approval boundaries.
 7. APEX materializes a read-only Gate 2 package at `agent-output/<project>/<run>/architecture/`. Report its Architecture,
   qualitative WAF, priced-cost breakdown, and uncertainty diagrams together with `architecture-assessment.md`,
   `cost-estimate.md`, `sku-comparison.md`, and `challenger-findings.md`. Diagrams are derived views, not gate evidence.
-8. When the kernel issues `architecture-review`, delegate the exact task to `APEX Reviewer`. Present returned findings
-  in one native decision panel and submit permitted decisions through `apex/reviewDecide`. Automatically dismiss
+8. When `status=task` issues `architecture-review`, delegate the exact task to `APEX Reviewer` only on a client that
+  supports that worker; otherwise report the pending task and stop. For `status=needs_review`, do not request task
+  context or invoke the Reviewer again. Present findings in one native decision panel and submit permitted decisions
+  through `apex/reviewDecide` with the returned review hash, then call `apex/nextTask` again. Automatically dismiss
   findings that only request regional/zonal support, quota, deployment, restore, failover, or complete pricing checks;
   these are outside APEX Architecture review and require no user confirmation.
 9. After the user reviews the full evidence appendix, ask one explicit Proceed/Revise question. Only after Proceed,

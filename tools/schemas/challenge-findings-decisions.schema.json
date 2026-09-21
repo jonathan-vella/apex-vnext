@@ -54,7 +54,7 @@
         },
         "finding_id": {
           "type": "string",
-          "description": "Finding ID alias 2 (legacy: 04g-Governance, schema_version 1.0)."
+          "description": "Finding identifier in imported review records."
         },
         "severity": {
           "type": "string",

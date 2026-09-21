@@ -8,17 +8,6 @@ tools:
   - apex/taskContext
   - apex/validateTask
   - apex/completeTask
-  - azure-resource-manager-mcp/get_retail_prices
-  - azure-resource-manager-mcp/query_costs
-  - azure-resource-manager-mcp/query_aks_costs
-  - azure-resource-manager-mcp/forecast_costs
-  - azure-resource-manager-mcp/list_dimensions
-  - azure-resource-manager-mcp/list_budgets
-  - azure-resource-manager-mcp/get_budget
-  - azure-resource-manager-mcp/list_alerts
-  - azure-resource-manager-mcp/list_benefit_utilization
-  - azure-resource-manager-mcp/get_benefit_recommendations
-  - azure-resource-manager-mcp/list_reservation_transactions
 agents: []
 ---
 
@@ -43,9 +32,9 @@ Read `.github/skills/apex-terraform-test/SKILL.md` only for accepted Terraform t
 
 # Constraints
 
-Do not ask the user, repair artifacts, accept risk, or reinterpret findings. ARM MCP access is read-only and only for
-a validation set that requests current Azure evidence. The kernel owns validator selection, caches, acceptance, and
-state. The owning CodeGen, Planner, Reviewer, or Operator role handles remediation and targeted follow-up.
+Do not ask the user, repair artifacts, accept risk, or reinterpret findings. Request validation through the kernel;
+do not query ARM or replace missing validator evidence with an independent lookup. The kernel owns validator selection,
+caches, acceptance, and state. The owning CodeGen, Planner, Reviewer, or Operator role handles remediation and follow-up.
 
 # Output
 

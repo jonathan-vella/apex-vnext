@@ -36,6 +36,6 @@
     "test": "node --test dist/test/*.test.js"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=26.9.0"
   }
 }

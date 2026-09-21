@@ -7,7 +7,7 @@ Create Dockerfiles for containerized services.
 | Include             | Exclude                               |
 | ------------------- | ------------------------------------- |
 | APIs, microservices | Static websites (use Static Web Apps) |
-| Web apps (SSR)      | Azure Functions (native deploy)       |
+| Web apps (SSR)      | Azure Functions (assessment only)     |
 | Background workers  | Database services                     |
 | Message processors  | Logic Apps                            |
 

@@ -47,17 +47,17 @@
     {
       "id": "conductor-agent-name",
       "pattern": "01-Conductor",
-      "replacement": "01-Orchestrator",
+      "replacement": "APEX",
       "severity": "error",
-      "reason": "Agent file/reference renamed to 01-Orchestrator"
+      "reason": "Use the current APEX coordinator name"
     },
     {
       "id": "conductor-filename",
       "pattern": "01-conductor\\.agent\\.md",
-      "replacement": "01-orchestrator.agent.md",
+      "replacement": "apex.agent.md",
       "severity": "error",
       "isRegex": true,
-      "reason": "Agent file renamed to 01-orchestrator.agent.md"
+      "reason": "Use the current managed coordinator filename"
     },
     {
       "id": "e2e-conductor-filename",

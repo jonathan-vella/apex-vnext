@@ -52,7 +52,7 @@ Templates and generated artifacts are validated by:
 - **npm script**: `npm run validate:artifacts` *(invoked by the lefthook
   `artifact-validation` pre-commit hook and CI \u2014 agents do not invoke this
   directly; see
-  [`agent-authoring.instructions.md`](../../../instructions/agent-authoring.instructions.md#no-direct-markdownlint-on-agent-output-rule))*
+  [`agent-authoring.instructions.md`](../../../../customizations/.github/instructions/apex-agent-authoring.instructions.md))*
 
 All 16 templates use `standard` strictness (missing/out-of-order headings
 are errors, not warnings).

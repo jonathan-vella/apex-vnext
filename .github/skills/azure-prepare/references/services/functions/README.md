@@ -2,16 +2,11 @@
 
 Serverless compute for event-driven workloads, APIs, and scheduled tasks.
 
-> **⚠️ MANDATORY: Use Composition Algorithm**
+> **Assessment-only boundary**
 >
-> **NEVER synthesize Bicep or Terraform from scratch for Azure Functions.**
->
-> You MUST follow the base + recipe composition workflow:
->
-> 1. Load [selection.md](templates/selection.md) — decision tree for choosing base template + recipe
-> 2. Follow [composition.md](templates/recipes/composition.md) — the algorithm for fetching and composing
->
-> This ensures proven IaC patterns, correct RBAC, and Flex Consumption defaults.
+> Azure Functions materialization is unavailable. Assess the workload, record the selected hosting and supporting
+> resource requirements, then create a blocked future backlog item. Do not select templates, generate infrastructure,
+> run deployment initialization, or mark the plan ready for validation.
 
 ## When to Use
 
@@ -43,7 +38,7 @@ services:
 
 ## Hosting Plans
 
-**Use Flex Consumption for new deployments** (all AZD templates default to Flex).
+Prefer Flex Consumption when a future reviewed materialization capability becomes available.
 
 | Plan                    | Use Case                               | Scaling                 | VNET |
 | ----------------------- | -------------------------------------- | ----------------------- | ---- |
@@ -83,11 +78,8 @@ services:
 
 ## References
 
-- **[Selection Guide](templates/selection.md)** — Start here: decision tree for base + recipe
-- **[Composition Algorithm](templates/recipes/composition.md)** — How to fetch and compose templates
-- [AZD Templates](templates/README.md) — Template overview
-- [Bicep Patterns](bicep.md)
-- [Terraform Patterns](terraform.md)
+- [Bicep assessment patterns](bicep.md)
+- [Terraform assessment patterns](terraform.md)
 - [Trigger Types](triggers.md)
 - [Durable Functions](durable.md)
 - [Aspire + Container Apps](aspire-containerapps.md)

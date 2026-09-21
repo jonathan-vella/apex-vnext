@@ -44,7 +44,7 @@ For repo-local agent / instruction issues, use bug-report.yml instead.
 
 - VS Code version:
 - Copilot Chat extension version:
-- Dev container: yes / no
+- Host environment (for example, Ubuntu WSL2):
 - Model(s) involved:
 
 ## Related upstream tracking
@@ -55,5 +55,4 @@ For repo-local agent / instruction issues, use bug-report.yml instead.
 
 ## APEX cross-reference
 
-<!-- Pointer to the in-repo doc that captured this symptom, e.g.
-     docs/devcontainer-hygiene.md → "Parallel chat retry race". -->
+<!-- Link the relevant current documentation or reproducible issue evidence. -->

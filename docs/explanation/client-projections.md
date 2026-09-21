@@ -29,6 +29,10 @@ roles. It also supports autonomous code generation, review, and validation worke
 The Copilot CLI projection supports the coordinator and interactive specialists. Autonomous workers are omitted because
 the required hidden-but-delegable boundary is unavailable. The projection must not advertise or attempt those edges.
 
+The target product nevertheless requires complete generation, review and validation outcomes in both clients. Any
+missing bounded CLI path is implementation work, not an acceptable omission of the workload lifecycle. See the
+[client qualification matrix](../vnext/CLIENT-QUALIFICATION.md).
+
 ## Installation Lifecycle
 
 `apex init` selects one bundled client projection and records that selection. `apex update` performs a managed three-way
@@ -40,6 +44,11 @@ the runtime that workspace MCP configuration executes, then delegates workspace 
 The optional VS Code profile bootstrap agent is deliberately outside the customization manifest and both client
 projections. It is a discovery and command-launching aid only; it cannot own workspace MCP configuration or kernel
 state.
+
+This is the current npm-managed mechanism. [The roadmap](../vnext/ROADMAP.md#phase-6-distribution-last) defers Agent
+Plugins evaluation until feature completion and couples it with APEX MCP redistribution. A plugin format alone does
+not prove workspace selection, credential handling, runtime compatibility or rollback. Do not maintain a second set of
+editable agents/skills or introduce duplicate MCP registrations during a future migration.
 
 ## Support Versus Qualification
 

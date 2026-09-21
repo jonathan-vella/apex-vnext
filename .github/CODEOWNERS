@@ -10,7 +10,8 @@
 
 customizations/.github/agents/ @jonathan-vella
 .github/instructions/ @jonathan-vella
-tools/apex-prompts/ @jonathan-vella
+customizations/.github/skills/ @jonathan-vella
+.github/skills/ @jonathan-vella
 
 # Workflow changes require careful review
 
@@ -22,33 +23,17 @@ infra/ @jonathan-vella
 
 # MCP server code
 
-mcp/ @jonathan-vella
+packages/ @jonathan-vella
 
 # Scripts and automation
 
-scripts/ @jonathan-vella
+tools/scripts/ @jonathan-vella
 
 # Documentation (lower barrier for contributions)
 
 docs/ @jonathan-vella
 
-# Scenarios and examples
+# Runtime configuration and validation contracts
 
-scenarios/ @jonathan-vella
-
-# Sensei plugin tooling — must stay on feat/skills-sensei only.
-
-# Any PR that touches these paths against main needs explicit maintainer review
-
-# Keep branch-only Sensei paths out of ordinary mainline changes.
-
-.gitmodules @jonathan-vella
-.github/skills/sensei/ @jonathan-vella
-.github/skills/_audits/ @jonathan-vella
-.github/prompts/sensei/ @jonathan-vella
-.github/prompts/plan-skillsAuditOptimize.prompt.md @jonathan-vella
-tools/scripts/run-sensei-audit.mjs @jonathan-vella
-tools/scripts/scaffold-trigger-tests.mjs @jonathan-vella
-tools/scripts/audit-gepa-candidate.mjs @jonathan-vella
-tools/scripts/run-stage5-audit.mjs @jonathan-vella
-.token-limits.json @jonathan-vella
+config/ @jonathan-vella
+tools/registry/ @jonathan-vella

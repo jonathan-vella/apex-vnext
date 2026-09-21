@@ -106,8 +106,8 @@ export function validateClientOutcomeScenarios(corpus, toolchain, receipt, recei
   if (
     corpus.fixtureClients?.vscodeVersion !== expectedVscodeVersion ||
     corpus.fixtureClients?.vscodeExtensionVersion !== expectedExtensionVersion ||
-    corpus.fixtureClients?.cliVersion !== cli?.selectedExactVersion ||
-    corpus.fixtureClients?.cliArtifactHash !== cli?.releaseArtifact?.sha256
+    corpus.fixtureClients?.cliVersion !== cli?.historicalFixtureVersion ||
+    corpus.fixtureClients?.cliArtifactHash !== cli?.historicalFixtureArtifactHash
   ) {
     errors.push("fixtureClients must match canonical toolchain fixture and pinned values");
   }
@@ -133,7 +133,7 @@ export function validateClientOutcomeScenarios(corpus, toolchain, receipt, recei
     receipt?.coverageComplete !== true ||
     receiptVscode?.version !== expectedVscodeVersion ||
     receiptVscode?.extensionVersion !== expectedExtensionVersion ||
-    receiptCli?.version !== cli?.selectedExactVersion
+    receiptCli?.version !== cli?.historicalFixtureVersion
   ) {
     errors.push("historical client fixtures must match the complete bound context receipt");
   }

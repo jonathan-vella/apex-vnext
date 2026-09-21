@@ -10,6 +10,7 @@ export interface BundledAssetMapping {
   sourceRoot?: string;
   generatedRoot?: string;
   generatedPath?: string;
+  entries?: Array<{ source: string; target: string }>;
 }
 
 export interface BundledAssetSource {
@@ -261,7 +262,8 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
   }
   const mappings = new Map(manifest.composition.mappings.map((mapping) => [mapping.id, mapping]));
   if (mappings.size !== manifest.composition.mappings.length) throw new Error("Duplicate bundled asset mapping ID");
-  const generatedDestinations: string[] = [];
+  const generatedDestinations: Array<{ path: string; mapping: BundledAssetMapping }> = [];
+  const explicitTargets = new Map<string, string>();
   for (const mapping of mappings.values()) {
     if (!(["copy-tree", "copy-entries", "compose-json", "render-client-projections"] as const).includes(mapping.mode)) {
       throw new Error(`Invalid bundled asset mapping: ${mapping.id}`);
@@ -273,23 +275,64 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
         mapping.generatedRoot !== undefined
       )
         throw new Error(`Invalid bundled asset mapping: ${mapping.id}`);
-      generatedDestinations.push(mapping.generatedPath!);
+      generatedDestinations.push({ path: mapping.generatedPath!, mapping });
     } else if (
       !safeRelativePath(mapping.sourceRoot ?? "") ||
       !safeRelativePath(mapping.generatedRoot ?? "") ||
       mapping.generatedPath !== undefined
     ) {
       throw new Error(`Invalid bundled asset mapping: ${mapping.id}`);
-    } else generatedDestinations.push(`${mapping.generatedRoot}/`);
+    } else if (mapping.entries === undefined) {
+      generatedDestinations.push({ path: `${mapping.generatedRoot}/`, mapping });
+    }
+    if (mapping.entries !== undefined) {
+      if (
+        mapping.mode !== "copy-entries" ||
+        !Array.isArray(mapping.entries) ||
+        mapping.entries.length === 0 ||
+        mapping.entries.some(
+          (entry) =>
+            entry === null ||
+            typeof entry !== "object" ||
+            typeof entry.source !== "string" ||
+            typeof entry.target !== "string" ||
+            !safeRelativePath(entry.source) ||
+            !safeRelativePath(entry.target) ||
+            !entry.source.startsWith(`${mapping.sourceRoot}/`) ||
+            !entry.target.startsWith(`${mapping.generatedRoot}/`),
+        ) ||
+        new Set(mapping.entries.map(({ source }) => source)).size !== mapping.entries.length
+      )
+        throw new Error(`Invalid bundled asset copy entries: ${mapping.id}`);
+      for (const entry of mapping.entries) {
+        if (explicitTargets.has(entry.target))
+          throw new Error(`Overlapping bundled asset mapping destination: ${entry.target}`);
+        explicitTargets.set(entry.target, mapping.id);
+        generatedDestinations.push({ path: entry.target, mapping });
+      }
+    }
   }
   for (const [index, destination] of generatedDestinations.entries()) {
     if (
       generatedDestinations.some(
         (candidate, candidateIndex) =>
-          candidateIndex !== index && (destination.startsWith(candidate) || candidate.startsWith(destination)),
+          candidateIndex !== index &&
+          (destination.path.startsWith(candidate.path) || candidate.path.startsWith(destination.path)) &&
+          !(
+            destination.mapping.entries !== undefined &&
+            candidate.mapping.mode === "copy-tree" &&
+            destination.path.startsWith(candidate.path) &&
+            destination.mapping.entries.every(({ source }) => !source.startsWith(`${candidate.mapping.sourceRoot}/`))
+          ) &&
+          !(
+            candidate.mapping.entries !== undefined &&
+            destination.mapping.mode === "copy-tree" &&
+            candidate.path.startsWith(destination.path) &&
+            candidate.mapping.entries.every(({ source }) => !source.startsWith(`${destination.mapping.sourceRoot}/`))
+          ),
       )
     )
-      throw new Error(`Overlapping bundled asset mapping destination: ${destination}`);
+      throw new Error(`Overlapping bundled asset mapping destination: ${destination.path}`);
   }
   const paths = new Set<string>();
   for (const file of manifest.files) {
@@ -304,15 +347,19 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
       if (
         !safeRelativePath(file.source.path ?? "") ||
         mapping === undefined ||
-        mapping.mode === "compose-json" ||
+        !["copy-tree", "copy-entries"].includes(mapping.mode) ||
+        (explicitTargets.has(file.path) && explicitTargets.get(file.path) !== mapping.id) ||
         !file.source.path!.startsWith(`${mapping.sourceRoot}/`) ||
         !file.path.startsWith(`${mapping.generatedRoot}/`) ||
-        relative(mapping.sourceRoot!, file.source.path!).split(sep).join("/") !==
-          relative(mapping.generatedRoot!, file.path).split(sep).join("/")
+        (mapping.entries !== undefined
+          ? !mapping.entries.some(({ source, target }) => source === file.source.path && target === file.path)
+          : relative(mapping.sourceRoot!, file.source.path!).split(sep).join("/") !==
+            relative(mapping.generatedRoot!, file.path).split(sep).join("/"))
       ) {
         throw new Error(`Invalid bundled asset source: ${file.path}`);
       }
     } else if (file.source.kind === "generated") {
+      if (explicitTargets.has(file.path)) throw new Error(`Invalid bundled asset source: ${file.path}`);
       const mapping = mappings.get(file.source.composition ?? "");
       if (
         mapping === undefined ||
@@ -326,7 +373,7 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
         const expectedPrefix = `${mapping.generatedRoot}/${file.source.clientId}/`;
         if (
           !["github-copilot-cli", "github-copilot-vscode"].includes(file.source.clientId ?? "") ||
-          file.source.adapterVersion !== "1.1.0" ||
+          file.source.adapterVersion !== "1.2.0" ||
           !safeRelativePath(file.source.target ?? "") ||
           !file.path.startsWith(expectedPrefix) ||
           file.path !== `${expectedPrefix}${file.source.target}` ||
@@ -337,6 +384,9 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
         }
       }
     } else throw new Error(`Invalid bundled asset source: ${file.path}`);
+  }
+  for (const target of explicitTargets.keys()) {
+    if (!paths.has(target)) throw new Error(`Missing bundled asset copy entry: ${target}`);
   }
   const projectionIds = new Set<string>();
   for (const projection of manifest.projections) {
@@ -411,7 +461,8 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
       (file.source.roleId !== undefined &&
         (role === undefined || role.source !== file.source.sourcePath || !role.supportedTargets.includes(target))) ||
       canonical?.source.kind !== "repository-file" ||
-      canonical.sha256 !== file.source.sourceHash
+      canonical.sha256 !== file.source.sourceHash ||
+      (file.source.roleId === undefined && canonical.sha256 !== file.sha256)
     ) {
       throw new Error(`Generated client projection source binding mismatch: ${file.path}`);
     }

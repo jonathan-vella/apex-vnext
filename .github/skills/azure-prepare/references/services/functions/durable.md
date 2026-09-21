@@ -12,7 +12,10 @@ Durable Functions requires a storage backend to persist orchestration state, que
 | Azure Storage (default)    | ⛔ Do not use   | Legacy backend. Higher latency, harder to monitor, no built-in RBAC. Not permitted for new projects.                                         |
 | MSSQL                      | Specialized     | SQL Server backend. Only when SQL infrastructure already exists and user explicitly requests it.                                             |
 
-> **⛔ MANDATORY**: You **MUST** use **Durable Task Scheduler** as the storage backend for ALL new Durable Functions projects. Do NOT use Azure Storage as the backend — it is legacy and not permitted. Generate the DTS Bicep module (`Microsoft.DurableTask/schedulers` + `taskHubs`), RBAC role assignment (Durable Task Data Contributor), and `DURABLE_TASK_SCHEDULER_CONNECTION_STRING` app setting. See the [Durable Task Scheduler reference](../durable-task-scheduler/README.md) for setup, language-specific guidance, and Bicep templates.
+For new Durable Functions assessments, select Durable Task Scheduler and record the scheduler, task hub, RBAC, and app
+setting requirements. Do not generate those resources here; Functions materialization is unavailable and must be
+recorded as blocked future work. See the [Durable Task Scheduler reference](../durable-task-scheduler/README.md) for
+assessment details.
 
 ## When to Use
 

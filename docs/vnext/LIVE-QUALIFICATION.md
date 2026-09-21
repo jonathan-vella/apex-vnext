@@ -7,7 +7,8 @@ package qualification does not authorize cloud access or mutation.
 
 - exact clean candidate commit and package set;
 - explicit human authorization naming subscription, target, tracks, operations, budget, and expiry;
-- current Azure Policy, quota, regional availability, and pricing evidence;
+- target-subscription reviewed policy baseline and pricing evidence;
+- explicit ALZ-backed or standalone lab/demo profile and supplied-versus-owned resource boundaries;
 - authenticated least-privilege Azure CLI identity;
 - isolated Bicep and Terraform targets with cleanup ownership;
 - deterministic and package qualification already passing;
@@ -15,9 +16,18 @@ package qualification does not authorize cloud access or mutation.
 
 Stop when any precondition is missing, stale, ambiguous, or outside the authorization.
 
+Quota and regional/SKU availability are assumptions, not separate approval prerequisites. Do not infer no policy from
+the absence of an ALZ. Missing or stale target policy evidence remains blocking. The target baseline path follows
+[REQ-GOV-001](PRD.md#req-gov-001-governance-and-policy); no local discovery fallback is authorized by this procedure.
+If the executable qualification path still requires superseded evidence, align and test it before use, not bypass it.
+
 ## Prepare Each Track
 
 Run Bicep and Terraform as separate environment runs. For each track:
+
+Cover both profiles with separately authorized scenarios. In ALZ-backed cases, reference supplied networking, identity
+and monitoring and prove they survive cleanup. In labs, create only the supporting resources owned by that workload.
+Include at least one adapted archetype with fresh consumer governance and no inherited deployment authority.
 
 1. create the run and complete Gates 1 through 3 through production APIs;
 2. configure only nonsecret provider settings;
@@ -45,6 +55,10 @@ output.
 Do not repair state manually. Preserve diagnostics, reject stale evidence, reconcile only through supported operations,
 and create a fresh preview after any dependency or ownership change. A failed or partial run remains failed until its
 cleanup and evidence disposition are explicit.
+
+Quota, regional or service failures remain real failures even though availability is assumed during design. Report them,
+ask relevant recovery questions and approve any revised intent before regenerating the preview. Never substitute a SKU
+or region silently, and never weaken policy or security to complete a demo.
 
 ## Acceptance
 

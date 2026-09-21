@@ -82,29 +82,12 @@
 ## 🚀 To Actually Deploy
 
 <details>
-<summary><strong>� PowerShell (deploy.ps1 — Deprecated)</strong></summary>
-
-```powershell
-# Navigate to Bicep directory
-cd infra/bicep/{project-name}
-
-# Preview changes
-./deploy.ps1 -WhatIf
-
-# Deploy
-./deploy.ps1
-```
-
-</details>
-
-<details>
-<summary><strong>🚀 Azure CLI</strong></summary>
+<summary><strong>Kernel-Authorized Deployment</strong></summary>
 
 ```bash
-az deployment group create \
-  --resource-group "rg-{project}-{env}" \
-  --template-file main.bicep \
-  --parameters main.bicepparam
+apex preview --provider bicep --operation apply
+# Review the exact preview and complete Gate 4 approval.
+apex deploy
 ```
 
 </details>

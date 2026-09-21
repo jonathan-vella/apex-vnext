@@ -1,0 +1,674 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { Value } from "@sinclair/typebox/value";
+import {
+  POLICY_VALIDATION_LIMITS,
+  PolicyValidationV1Schema,
+  assertPolicyValidationJson,
+  calculatePolicyValidationDigest,
+  calculatePolicyValidationHash,
+  hasValidPolicyValidation,
+  type PolicyPropertyMapV1,
+} from "@apexops/contracts";
+import { validatePolicyProperties, type PolicyValidationInput } from "../policy-validation.js";
+
+const hash = "a".repeat(64);
+
+function terraformSource(values: Record<string, unknown>) {
+  const identity = {
+    address: "azurerm_storage_account.main",
+    mode: "managed",
+    type: "azurerm_storage_account",
+    name: "main",
+    provider_name: "registry.terraform.io/hashicorp/azurerm",
+  };
+  const after = { id: "/resources/storage", ...values };
+  return {
+    format_version: "1.2",
+    terraform_version: "1.9.8",
+    planned_values: { root_module: { resources: [{ ...identity, schema_version: 4, values: after }] } },
+    resource_changes: [{ ...identity, change: { actions: ["no-op"], before: after, after, after_unknown: {} } }],
+  };
+}
+
+function nestedValue(depth: number): unknown {
+  let value: unknown = true;
+  for (let index = 0; index < depth; index++) value = { nested: value };
+  return value;
+}
+
+function input(track: "bicep" | "terraform"): PolicyValidationInput {
+  const mappings: PolicyPropertyMapV1["mappings"] = ["deny", "modify", "deployIfNotExists"].map((effect, index) => ({
+    policyAssignmentId: "/assignments/baseline",
+    policyDefinitionId: `/definitions/${index}`,
+    policyDefinitionReferenceId: `member-${index}`,
+    effect: effect as PolicyPropertyMapV1["mappings"][number]["effect"],
+    logicalResourceId: "storage",
+    propertyPath: "properties.security.enabled",
+    expectedValue: true,
+    disposition: "planned",
+  }));
+  return {
+    track,
+    sourceHash: hash,
+    policyMapHash: "b".repeat(64),
+    policyMap: { schemaVersion: "1.0.0", projectId: "policy-test", runId: "run-1", governanceHash: hash, mappings },
+    logicalResourceManifest: {
+      storage: { physicalId: "/resources/storage", codeSymbol: "azurerm_storage_account.main" },
+    },
+    json: JSON.stringify(
+      track === "bicep"
+        ? { resources: [{ id: "/resources/storage", properties: { security: { enabled: true } } }] }
+        : terraformSource({ properties: { security: { enabled: true } } }),
+    ),
+  };
+}
+
+describe("bounded policy property validation", () => {
+  for (const track of ["bicep", "terraform"] as const) {
+    it(`${track}: requires an exact physical ID whenever the binding supplies one`, () => {
+      const request = input(track);
+      for (const physicalId of ["/resources/storage", "/resources/other", "/RESOURCES/storage", undefined]) {
+        const values = { properties: { security: { enabled: true } } };
+        const source = terraformSource(values);
+        const resourceValues: Record<string, unknown> = source.planned_values.root_module.resources[0]!.values;
+        if (physicalId === undefined) delete resourceValues.id;
+        else resourceValues.id = physicalId;
+        const json = JSON.stringify(
+          track === "terraform"
+            ? source
+            : {
+                languageVersion: "2.0",
+                resources: {
+                  "azurerm_storage_account.main": {
+                    ...values,
+                    ...(physicalId === undefined ? {} : { id: physicalId }),
+                  },
+                },
+              },
+        );
+        const receipt = validatePolicyProperties({ ...request, json });
+        assert.equal(receipt.outcome, physicalId === "/resources/storage" ? "pass" : "unsupported");
+        assert.equal(
+          validatePolicyProperties({
+            ...request,
+            json,
+            logicalResourceManifest: { storage: { codeSymbol: "azurerm_storage_account.main" } },
+          }).outcome,
+          "pass",
+        );
+      }
+      assert.equal(
+        validatePolicyProperties({
+          ...request,
+          logicalResourceManifest: { storage: { codeSymbol: "azurerm_storage_account.main", physicalId: "" } },
+        }).outcome,
+        "unsupported",
+      );
+    });
+
+    it(`${track}: rejects deeply nested expected values and manifests before recursive work`, () => {
+      const request = input(track);
+      request.policyMap.mappings[0]!.expectedValue = nestedValue(6000);
+      assert.throws(() => validatePolicyProperties(request), {
+        name: "TypeError",
+        message: "POLICY_VALIDATION_LIMIT_EXCEEDED",
+      });
+      assert.throws(
+        () =>
+          validatePolicyProperties({
+            ...input(track),
+            logicalResourceManifest: { storage: nestedValue(6000) } as PolicyValidationInput["logicalResourceManifest"],
+          }),
+        { name: "TypeError", message: "POLICY_VALIDATION_LIMIT_EXCEEDED" },
+      );
+    });
+
+    it(`${track}: treats 66KB deeply nested observed JSON as unsupported`, () => {
+      const request = input(track);
+      const json = request.json.replaceAll(
+        '"enabled":true',
+        `"enabled":${'{"nested":'.repeat(6000)}true${"}".repeat(6000)}`,
+      );
+      assert.ok(Buffer.byteLength(json) >= 66_000);
+      const receipt = validatePolicyProperties({ ...request, json });
+      assert.equal(receipt.outcome, "unsupported");
+      assert.equal(receipt.results[0]!.reason, "invalid-source");
+      assert.equal(hasValidPolicyValidation(receipt, receipt), true);
+    });
+
+    it(`${track}: checks every deny, modify and DINE mapping and validates the receipt`, () => {
+      const request = input(track);
+      const receipt = validatePolicyProperties(request);
+      assert.equal(receipt.outcome, "pass");
+      assert.deepEqual(
+        receipt.results.map(({ outcome }) => outcome),
+        ["pass", "pass", "pass"],
+      );
+      assert.equal(Value.Check(PolicyValidationV1Schema, receipt), true);
+      assert.equal(hasValidPolicyValidation(receipt, receipt), true);
+      assert.equal(hasValidPolicyValidation(receipt, { ...receipt, sourceHash: "c".repeat(64) }), false);
+      assert.equal(hasValidPolicyValidation(receipt, { ...receipt, policyMapHash: "c".repeat(64) }), false);
+      assert.deepEqual(validatePolicyProperties(request), receipt);
+    });
+
+    it(`${track}: fails mismatches and missing properties without recording raw values`, () => {
+      const request = input(track);
+      request.policyMap.mappings[0]!.expectedValue = "sensitive-expected-value";
+      request.policyMap.mappings[1]!.propertyPath = "properties.missing";
+      const receipt = validatePolicyProperties(request);
+      assert.equal(receipt.outcome, "fail");
+      assert.deepEqual(
+        receipt.results.map(({ outcome }) => outcome),
+        ["fail", "fail", "pass"],
+      );
+      assert.equal(JSON.stringify(receipt).includes("sensitive-expected-value"), false);
+    });
+
+    it(`${track}: absent expectedValue and unverified exemptions cannot pass`, () => {
+      const request = input(track);
+      delete request.policyMap.mappings[0]!.expectedValue;
+      request.policyMap.mappings[1]!.disposition = "exempt";
+      request.policyMap.mappings[2]!.disposition = "blocked";
+      const receipt = validatePolicyProperties(request);
+      assert.deepEqual(
+        receipt.results.map(({ outcome }) => outcome),
+        ["unsupported", "unsupported", "fail"],
+      );
+      assert.equal(receipt.outcome, "fail");
+    });
+
+    it(`${track}: out-of-scope logical resources and dangerous paths are unsupported`, () => {
+      const request = input(track);
+      request.policyMap.mappings[0]!.logicalResourceId = "logresource";
+      request.policyMap.mappings[1]!.propertyPath = "properties.__proto__.enabled";
+      request.policyMap.mappings[2]!.propertyPath = "properties.security[0]";
+      assert.deepEqual(
+        validatePolicyProperties(request).results.map(({ outcome }) => outcome),
+        ["unsupported", "unsupported", "unsupported"],
+      );
+    });
+
+    it(`${track}: preserves distinct same-effect initiative member identities`, () => {
+      const request = input(track);
+      request.policyMap.mappings[1]!.effect = "deny";
+      const receipt = validatePolicyProperties(request);
+      assert.equal(receipt.results.length, 3);
+      assert.notEqual(receipt.results[0]!.mappingHash, receipt.results[1]!.mappingHash);
+      assert.equal(receipt.results[1]!.policyDefinitionReferenceId, "member-1");
+    });
+
+    it(`${track}: rejects stale bindings, mutated results and extra receipt fields`, () => {
+      const receipt = validatePolicyProperties(input(track));
+      for (const field of [
+        "sourceHash",
+        "policyMapHash",
+        "policyMapContentHash",
+        "logicalResourceManifestHash",
+        "inputHash",
+      ] as const) {
+        assert.equal(hasValidPolicyValidation(receipt, { ...receipt, [field]: "c".repeat(64) }), false);
+      }
+      assert.equal(
+        hasValidPolicyValidation(receipt, { ...receipt, track: track === "bicep" ? "terraform" : "bicep" }),
+        false,
+      );
+      assert.equal(hasValidPolicyValidation({ ...receipt, results: receipt.results.slice(1) }, receipt), false);
+      assert.equal(Value.Check(PolicyValidationV1Schema, { ...receipt, sourceHash: "stale" }), false);
+      assert.equal(Value.Check(PolicyValidationV1Schema, { ...receipt, observedValue: "secret" }), false);
+      const altered = structuredClone(receipt);
+      delete altered.results[0]!.expectedValueDigest;
+      const { receiptHash: ignoredHash, ...body } = altered;
+      assert.equal(ignoredHash.length, 64);
+      altered.receiptHash = calculatePolicyValidationHash(body);
+      assert.equal(hasValidPolicyValidation(altered, receipt), false);
+      assert.equal(Object.isFrozen(receipt), true);
+      assert.equal(Object.isFrozen(receipt.results), true);
+      assert.equal(Object.isFrozen(receipt.results[0]), true);
+    });
+
+    it(`${track}: binds exact supplied hashes and content without trusting dispositions`, () => {
+      const request = input(track);
+      request.policyMap.mappings[0]!.disposition = "satisfied";
+      request.policyMap.mappings[0]!.expectedValue = false;
+      delete request.policyMap.mappings[2]!.policyDefinitionId;
+      delete request.policyMap.mappings[2]!.policyDefinitionReferenceId;
+      const receipt = validatePolicyProperties(request);
+      assert.equal(receipt.results[0]!.outcome, "fail");
+      assert.equal(receipt.sourceHash, request.sourceHash);
+      assert.equal(receipt.policyMapHash, request.policyMapHash);
+      assert.equal(receipt.policyMapContentHash, calculatePolicyValidationDigest(request.policyMap));
+      assert.equal(
+        receipt.logicalResourceManifestHash,
+        calculatePolicyValidationDigest(request.logicalResourceManifest),
+      );
+      assert.equal(Object.hasOwn(receipt.results[2]!, "policyDefinitionId"), false);
+      assert.equal(hasValidPolicyValidation(receipt, receipt), true);
+      const reordered = {
+        ...request,
+        policyMap: { ...request.policyMap, mappings: [...request.policyMap.mappings].reverse() },
+      };
+      assert.notEqual(validatePolicyProperties(reordered).receiptHash, receipt.receiptHash);
+    });
+
+    it(`${track}: treats malformed output and an empty map as unsupported`, () => {
+      const request = input(track);
+      for (const json of ["not-json secret-value", "[]", "{}", "null"]) {
+        const receipt = validatePolicyProperties({ ...request, json });
+        assert.equal(receipt.outcome, "unsupported");
+        assert.equal(receipt.results[0]!.reason, "invalid-source");
+        assert.equal(JSON.stringify(receipt).includes("secret-value"), false);
+      }
+      request.policyMap.mappings = [];
+      const receipt = validatePolicyProperties(request);
+      assert.equal(receipt.outcome, "unsupported");
+      assert.equal(hasValidPolicyValidation(receipt, receipt), true);
+    });
+
+    it(`${track}: rejects prototype, alias, indexed and wildcard paths`, () => {
+      for (const propertyPath of [
+        "constructor.name",
+        "properties.prototype.enabled",
+        "properties..enabled",
+        "properties.*",
+        "properties.security[0]",
+        "Microsoft.Storage/storageAccounts/enabled",
+      ]) {
+        const request = input(track);
+        request.policyMap.mappings[0]!.propertyPath = propertyPath;
+        assert.equal(validatePolicyProperties(request).results[0]!.reason, "unsupported-path");
+      }
+    });
+
+    it(`${track}: compares concrete JSON values structurally and omits source secrets`, () => {
+      const request = input(track);
+      const values = {
+        properties: {
+          security: { secret: "sensitive-observed-value", enabled: true },
+          nullable: null,
+          count: 0,
+          disabled: false,
+          items: ["one", "two"],
+        },
+      };
+      const json = JSON.stringify(
+        track === "bicep" ? { resources: [{ id: "/resources/storage", ...values }] } : terraformSource(values),
+      );
+      for (const [propertyPath, expectedValue] of [
+        ["properties.security", { enabled: true, secret: "sensitive-observed-value" }],
+        ["properties.nullable", null],
+        ["properties.count", 0],
+        ["properties.disabled", false],
+        ["properties.items", ["one", "two"]],
+      ] as const) {
+        request.policyMap.mappings[0]!.propertyPath = propertyPath;
+        request.policyMap.mappings[0]!.expectedValue = expectedValue;
+        const receipt = validatePolicyProperties({ ...request, json });
+        assert.equal(receipt.results[0]!.outcome, "pass");
+        assert.equal(JSON.stringify(receipt).includes("sensitive-observed-value"), false);
+      }
+      request.policyMap.mappings[0]!.expectedValue = ["two", "one"];
+      assert.equal(validatePolicyProperties({ ...request, json }).results[0]!.outcome, "fail");
+    });
+
+    it(`${track}: checks mixed deny, modify and DINE properties independently`, () => {
+      const request = input(track);
+      const paths = ["properties.minimumTlsVersion", "tags.owner", "properties.diagnostics.enabled"];
+      const expected = ["TLS1_2", "operations", true];
+      for (const [index, mapping] of request.policyMap.mappings.entries()) {
+        mapping.propertyPath = paths[index]!;
+        mapping.expectedValue = expected[index];
+      }
+      const values = {
+        properties: { minimumTlsVersion: "TLS1_2", diagnostics: { enabled: true } },
+        tags: { owner: "operations" },
+      };
+      const json = JSON.stringify(
+        track === "bicep" ? { resources: [{ id: "/resources/storage", ...values }] } : terraformSource(values),
+      );
+      assert.equal(validatePolicyProperties({ ...request, json }).outcome, "pass");
+      for (const [index, mapping] of request.policyMap.mappings.entries()) {
+        mapping.expectedValue = "wrong";
+        assert.equal(validatePolicyProperties({ ...request, json }).results[index]!.reason, "value-mismatch");
+        mapping.expectedValue = expected[index];
+        mapping.propertyPath = "properties.absent";
+        assert.equal(validatePolicyProperties({ ...request, json }).results[index]!.reason, "missing-property");
+        mapping.propertyPath = paths[index]!;
+      }
+    });
+  }
+
+  it("uses compiled ARM symbolic keys, not inferred resource names", () => {
+    const request = input("bicep");
+    const logicalResourceManifest = { storage: { codeSymbol: "azurerm_storage_account.main" } };
+    const json = JSON.stringify({
+      languageVersion: "2.0",
+      resources: {
+        "azurerm_storage_account.main": {
+          type: "Microsoft.Storage/storageAccounts",
+          apiVersion: "2025-01-01",
+          name: "[parameters('storageName')]",
+          properties: { security: { enabled: true } },
+        },
+      },
+    });
+    assert.equal(validatePolicyProperties({ ...request, logicalResourceManifest, json }).outcome, "pass");
+    assert.equal(validatePolicyProperties({ ...request, json }).results[0]!.reason, "unsupported-resource");
+    const nameOnly = JSON.stringify({ resources: [{ name: "storage", properties: { security: { enabled: true } } }] });
+    assert.equal(validatePolicyProperties({ ...request, json: nameOnly }).results[0]!.reason, "resource-not-found");
+  });
+
+  it("rejects ARM expressions at the leaf, ancestor and inside a compared object", () => {
+    for (const security of [
+      { enabled: "[parameters('secret')]" },
+      "[variables('settings')]",
+      { enabled: { nested: "[reference('id')]" } },
+    ]) {
+      const request = input("bicep");
+      const receipt = validatePolicyProperties({
+        ...request,
+        json: JSON.stringify({ resources: [{ id: "/resources/storage", properties: { security } }] }),
+      });
+      assert.equal(receipt.results[0]!.reason, "unsupported-expression");
+      assert.equal(JSON.stringify(receipt).includes("parameters"), false);
+    }
+  });
+
+  it("rejects ambiguous ARM bindings, loops and conditional resources", () => {
+    const request = input("bicep");
+    const resource = { id: "/resources/storage", properties: { security: { enabled: true } } };
+    assert.equal(
+      validatePolicyProperties({ ...request, json: JSON.stringify({ resources: [resource, resource] }) }).results[0]!
+        .reason,
+      "ambiguous-resource",
+    );
+    for (const extra of [{ condition: false }, { condition: "[parameters('enabled')]" }, { copy: { count: 2 } }]) {
+      assert.equal(
+        validatePolicyProperties({ ...request, json: JSON.stringify({ resources: [{ ...resource, ...extra }] }) })
+          .results[0]!.reason,
+        "unsupported-resource",
+      );
+    }
+  });
+
+  it("uses exact Terraform child-module addresses and honors after_unknown masks", () => {
+    const request = input("terraform");
+    const address = 'module.storage.azurerm_storage_account.main["east"]';
+    const logicalResourceManifest = { storage: { terraformAddress: address } };
+    const resource = { address, mode: "managed", values: { properties: { security: { enabled: true } } } };
+    const source = {
+      planned_values: { root_module: { child_modules: [{ address: "module.storage", resources: [resource] }] } },
+      resource_changes: [
+        { address, mode: "managed", change: { actions: ["create"], after: resource.values, after_unknown: {} } },
+      ],
+    };
+    assert.equal(
+      validatePolicyProperties({ ...request, logicalResourceManifest, json: JSON.stringify(source) }).outcome,
+      "pass",
+    );
+    assert.equal(
+      validatePolicyProperties({ ...request, json: JSON.stringify(source) }).results[0]!.reason,
+      "resource-not-found",
+    );
+    for (const after_unknown of [true, { properties: true }, { properties: { security: { enabled: true } } }]) {
+      const receipt = validatePolicyProperties({
+        ...request,
+        logicalResourceManifest,
+        json: JSON.stringify({
+          ...source,
+          resource_changes: [
+            { ...source.resource_changes[0], change: { ...source.resource_changes[0]!.change, after_unknown } },
+          ],
+        }),
+      });
+      assert.equal(receipt.results[0]!.reason, "unsupported-expression");
+    }
+  });
+
+  it("does not accept malformed Terraform unknown metadata or unresolved template strings", () => {
+    const request = input("terraform");
+    const source = terraformSource({ properties: { security: { enabled: true } } });
+    for (const after_unknown of [
+      "unknown",
+      [],
+      [true],
+      { properties: [true] },
+      { properties: { security: { enabled: {} } } },
+      { properties: { security: { enabled: "unknown" } } },
+    ]) {
+      const json = JSON.stringify({
+        ...source,
+        resource_changes: [
+          { ...source.resource_changes[0], change: { ...source.resource_changes[0]!.change, after_unknown } },
+        ],
+      });
+      assert.equal(validatePolicyProperties({ ...request, json }).outcome, "unsupported");
+    }
+    const json = JSON.stringify(terraformSource({ properties: { security: { enabled: "${var.enabled}" } } }));
+    assert.equal(validatePolicyProperties({ ...request, json }).results[0]!.reason, "unsupported-expression");
+  });
+
+  it("fails closed on invalid caller contracts without leaking inputs", () => {
+    const request = input("bicep");
+    assert.throws(() => validatePolicyProperties({ ...request, sourceHash: "bad" }), /POLICY_VALIDATION_INVALID_INPUT/);
+    assert.throws(
+      () => validatePolicyProperties({ ...request, policyMapHash: "bad" }),
+      /POLICY_VALIDATION_INVALID_INPUT/,
+    );
+    assert.throws(
+      () =>
+        validatePolicyProperties({
+          ...request,
+          policyMap: { ...request.policyMap, secret: "sensitive" },
+        } as PolicyValidationInput),
+      /POLICY_VALIDATION_INVALID_INPUT/,
+    );
+  });
+
+  it("checks concrete Azure storage properties in Terraform show plan JSON", () => {
+    const physicalId =
+      "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-policy/providers/Microsoft.Storage/storageAccounts/stpolicy";
+    const source = terraformSource({
+      id: physicalId,
+      name: "stpolicy",
+      resource_group_name: "rg-policy",
+      location: "swedencentral",
+      account_tier: "Standard",
+      account_replication_type: "LRS",
+      min_tls_version: "TLS1_2",
+      https_traffic_only_enabled: true,
+      allow_nested_items_to_be_public: false,
+      shared_access_key_enabled: false,
+      tags: { owner: "operations" },
+    });
+    const request = input("terraform");
+    request.policyMap.mappings = [
+      ["min_tls_version", "TLS1_2"],
+      ["https_traffic_only_enabled", true],
+      ["allow_nested_items_to_be_public", false],
+    ].map(([propertyPath, expectedValue], index) => ({
+      ...request.policyMap.mappings[index]!,
+      propertyPath: propertyPath as string,
+      expectedValue,
+    }));
+    for (const actions of [["no-op"], ["update"], ["create"], ["delete", "create"], ["create", "delete"]]) {
+      source.resource_changes[0]!.change.actions = actions;
+      assert.equal(
+        validatePolicyProperties({
+          ...request,
+          logicalResourceManifest: { storage: { terraformAddress: "azurerm_storage_account.main", physicalId } },
+          json: JSON.stringify(source),
+        }).outcome,
+        "pass",
+      );
+    }
+  });
+
+  it("requires complete, unambiguous Terraform change evidence for every evaluated resource", () => {
+    const request = input("terraform");
+    const source = terraformSource({ properties: { security: { enabled: true } } });
+    const change = source.resource_changes[0]!;
+    const { resource_changes: omitted, ...withoutChanges } = source;
+    assert.equal(omitted.length, 1);
+    for (const json of [
+      JSON.stringify(withoutChanges),
+      ...[
+        [],
+        [null],
+        [{ ...change, address: "azurerm_storage_account.other" }],
+        [change, change],
+        [{ ...change, mode: "data" }],
+        [{ address: change.address, change: change.change }],
+        [{ ...change, change: null }],
+        ...["actions", "after_unknown", "after"].map((field) => {
+          const partial: Record<string, unknown> = { ...change.change };
+          delete partial[field];
+          return [{ ...change, change: partial }];
+        }),
+        ...[
+          [],
+          ["delete"],
+          ["read"],
+          ["forget"],
+          ["invalid"],
+          ["create,delete"],
+          ["update", "update"],
+          "update",
+          null,
+        ].map((actions) => [{ ...change, change: { ...change.change, actions } }]),
+        ...[null, [], false, { id: "/resources/storage", properties: { security: { enabled: false } } }].map(
+          (after) => [{ ...change, change: { ...change.change, after } }],
+        ),
+      ].map((resource_changes) => JSON.stringify({ ...source, resource_changes })),
+    ]) {
+      const receipt = validatePolicyProperties({ ...request, json });
+      assert.equal(receipt.outcome, "unsupported");
+      assert.equal(receipt.results[0]!.reason, "unsupported-resource");
+    }
+
+    const otherAddress = "azurerm_storage_account.other";
+    const secondResource = { ...source.planned_values.root_module.resources[0]!, address: otherAddress };
+    source.planned_values.root_module.resources.push(secondResource);
+    request.policyMap.mappings[1]!.logicalResourceId = "other";
+    const logicalResourceManifest = { ...request.logicalResourceManifest, other: { terraformAddress: otherAddress } };
+    assert.deepEqual(
+      validatePolicyProperties({ ...request, logicalResourceManifest, json: JSON.stringify(source) }).results.map(
+        ({ outcome }) => outcome,
+      ),
+      ["pass", "unsupported", "pass"],
+    );
+    source.resource_changes.push({ ...change, address: otherAddress });
+    assert.equal(
+      validatePolicyProperties({ ...request, logicalResourceManifest, json: JSON.stringify(source) }).outcome,
+      "pass",
+    );
+  });
+
+  it("allows unknown unrelated Terraform properties without treating them as physical-ID evidence", () => {
+    const request = input("terraform");
+    const source = terraformSource({ properties: { security: { enabled: true } } });
+    const values: Record<string, unknown> = { properties: { security: { enabled: true } } };
+    const json = JSON.stringify({
+      ...source,
+      planned_values: { root_module: { resources: [{ ...source.planned_values.root_module.resources[0], values }] } },
+      resource_changes: [
+        {
+          ...source.resource_changes[0],
+          change: { actions: ["create"], before: null, after: { ...values, id: null }, after_unknown: { id: true } },
+        },
+      ],
+    });
+    assert.equal(validatePolicyProperties({ ...request, json }).outcome, "unsupported");
+    assert.equal(
+      validatePolicyProperties({
+        ...request,
+        json,
+        logicalResourceManifest: { storage: { codeSymbol: "azurerm_storage_account.main" } },
+      }).outcome,
+      "pass",
+    );
+  });
+
+  it("bounds JSON depth, nodes and UTF-8 bytes, preserving valid JSON digest behavior", () => {
+    assert.doesNotThrow(() => calculatePolicyValidationDigest(nestedValue(POLICY_VALIDATION_LIMITS.depth)));
+    assert.doesNotThrow(() => assertPolicyValidationJson(Array(POLICY_VALIDATION_LIMITS.nodes - 1).fill(null)));
+    assert.doesNotThrow(() => assertPolicyValidationJson("a".repeat(POLICY_VALIDATION_LIMITS.bytes - 2)));
+    for (const value of [
+      nestedValue(POLICY_VALIDATION_LIMITS.depth + 1),
+      Array(POLICY_VALIDATION_LIMITS.nodes).fill(null),
+      "a".repeat(POLICY_VALIDATION_LIMITS.bytes - 1),
+      "\u00e9".repeat(POLICY_VALIDATION_LIMITS.bytes / 2),
+    ])
+      assert.throws(() => calculatePolicyValidationDigest(value), {
+        name: "TypeError",
+        message: "POLICY_VALIDATION_LIMIT_EXCEEDED",
+      });
+    const shared = { enabled: true };
+    assert.equal(
+      calculatePolicyValidationDigest([shared, shared]),
+      calculatePolicyValidationDigest([{ enabled: true }, { enabled: true }]),
+    );
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    for (const value of [cyclic, { nested: undefined }, { nested: Number.NaN }]) {
+      assert.throws(() => calculatePolicyValidationDigest(value), {
+        name: "TypeError",
+        message: "POLICY_VALIDATION_NON_JSON_VALUE",
+      });
+    }
+  });
+
+  it("bounds mapping counts and oversized or wide source JSON before evaluation", () => {
+    const request = input("bicep");
+    request.policyMap.mappings = Array(POLICY_VALIDATION_LIMITS.mappings).fill(request.policyMap.mappings[0]);
+    assert.equal(validatePolicyProperties(request).outcome, "pass");
+    request.policyMap.mappings.push(request.policyMap.mappings[0]!);
+    assert.throws(() => validatePolicyProperties(request), {
+      name: "TypeError",
+      message: "POLICY_VALIDATION_LIMIT_EXCEEDED",
+    });
+    for (const track of ["bicep", "terraform"] as const) {
+      const valid = input(track);
+      for (const json of [
+        valid.json + " ".repeat(POLICY_VALIDATION_LIMITS.bytes),
+        valid.json.replaceAll(
+          '"enabled":true',
+          `"enabled":${JSON.stringify(Array(POLICY_VALIDATION_LIMITS.nodes).fill(null))}`,
+        ),
+      ])
+        assert.equal(validatePolicyProperties({ ...valid, json }).results[0]!.reason, "invalid-source");
+      const wide = input(track);
+      wide.policyMap.mappings[0]!.expectedValue = Array(POLICY_VALIDATION_LIMITS.nodes).fill(null);
+      assert.throws(() => validatePolicyProperties(wide), {
+        name: "TypeError",
+        message: "POLICY_VALIDATION_LIMIT_EXCEEDED",
+      });
+    }
+  });
+
+  it("returns false for invalid contract data including deeply nested expected values", () => {
+    const receipt = validatePolicyProperties(input("bicep"));
+    const deep = nestedValue(6000);
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    for (const value of [
+      { ...receipt, expectedValue: deep },
+      { ...receipt, results: [{ ...receipt.results[0], expectedValue: deep }] },
+      { ...receipt, results: [{ ...receipt.results[0], expectedValueDigest: deep }] },
+      { ...receipt, results: Array(POLICY_VALIDATION_LIMITS.mappings + 1).fill(receipt.results[0]) },
+      cyclic,
+    ])
+      assert.equal(hasValidPolicyValidation(value, receipt), false);
+    assert.equal(
+      hasValidPolicyValidation(receipt, { ...receipt, sourceHash: deep } as unknown as typeof receipt),
+      false,
+    );
+    assert.equal(hasValidPolicyValidation(receipt, null as unknown as typeof receipt), false);
+    const request = input("bicep");
+    request.policyMap.mappings[0]!.expectedValue = cyclic;
+    assert.throws(() => validatePolicyProperties(request), {
+      name: "TypeError",
+      message: "POLICY_VALIDATION_NON_JSON_VALUE",
+    });
+  });
+});

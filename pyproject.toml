@@ -30,7 +30,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["mcp", "scripts", "apex_recall"]
+known-first-party = ["scripts"]
 
 [tool.ruff.format]
 quote-style = "double"

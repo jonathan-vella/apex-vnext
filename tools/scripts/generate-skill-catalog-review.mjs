@@ -16,10 +16,10 @@ function escapeCell(value) {
   return String(value).replaceAll("|", "\\|").replaceAll("\n", " ");
 }
 
-function sourceResources(skill) {
-  const directory = join(root, sourceSkillsDirectory, skill);
+export function sourceResources(directory) {
   const walk = (current) =>
     readdirSync(current, { withFileTypes: true }).flatMap((entry) => {
+      if (entry.name === "__pycache__" || /\.(pyc|pyo)$/.test(entry.name)) return [];
       const entryPath = join(current, entry.name);
       return entry.isDirectory() ? walk(entryPath) : [relative(directory, entryPath).replaceAll("\\", "/")];
     });
@@ -33,7 +33,7 @@ function render(matrix) {
   const resourceRows = entries.flatMap((entry) => {
     if (!existsSync(join(root, sourceSkillsDirectory, entry.source))) return [];
     const dispositions = new Map((entry.resourceDispositions ?? []).map((resource) => [resource.source, resource]));
-    return sourceResources(entry.source).map((source) => {
+    return sourceResources(join(root, sourceSkillsDirectory, entry.source)).map((source) => {
       const resource = dispositions.get(source);
       return {
         source: entry.source,
@@ -93,17 +93,21 @@ function render(matrix) {
   ].join("\n");
 }
 
-const matrix = JSON.parse(readFileSync(join(root, matrixPath), "utf8"));
-const content = await format(render(matrix), { parser: "markdown" });
-const destination = join(root, outputPath);
-if (check) {
-  if (!existsSync(destination) || readFileSync(destination, "utf8") !== content) {
-    console.error(`ERROR Generated catalog review is stale: ${outputPath}`);
-    process.exitCode = 1;
+async function main() {
+  const matrix = JSON.parse(readFileSync(join(root, matrixPath), "utf8"));
+  const content = await format(render(matrix), { parser: "markdown" });
+  const destination = join(root, outputPath);
+  if (check) {
+    if (!existsSync(destination) || readFileSync(destination, "utf8") !== content) {
+      console.error(`ERROR Generated catalog review is stale: ${outputPath}`);
+      process.exitCode = 1;
+    } else {
+      console.log("Skill catalog review is current");
+    }
   } else {
-    console.log("Skill catalog review is current");
+    writeFileSync(destination, content);
+    console.log(`Generated ${outputPath}`);
   }
-} else {
-  writeFileSync(destination, content);
-  console.log(`Generated ${outputPath}`);
 }
+
+if (process.argv[1]?.endsWith("generate-skill-catalog-review.mjs")) await main();

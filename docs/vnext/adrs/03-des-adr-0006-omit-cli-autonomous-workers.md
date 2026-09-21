@@ -21,6 +21,13 @@
 > Date: 2026-07-29
 > Deciders: APEX maintainers
 
+## Current Scope Note
+
+The client observations below remain dated evidence and the current worker restriction remains intact. The revised
+[PRD client requirement](../PRD.md#req-customization-001-managed-copilot-experiences) requires complete workflow outcomes
+in both clients. Missing worker-dependent outcomes are implementation gaps, not a permanent reduction of product scope.
+Provide a tested bounded supported path without broadening tools or pretending that unavailable controls exist.
+
 ## 🔍 Context
 
 APEX autonomous workers must be unavailable for direct user selection while remaining callable only through declared

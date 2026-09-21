@@ -2,15 +2,28 @@
 /** Detect supported-client measurement readiness without installing or interacting with either client. */
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
+import { parseStrictJson } from "./_lib/strict-json.mjs";
 
 const GATE_PATH = "tools/registry/optimization-gate.v1.json";
 const TOOLCHAIN_PATH = "config/toolchain.v1.json";
 const SCHEMA_PATH = "tools/registry/schemas/optimization-client-preflight.schema.json";
+const VERSION_PATTERN = /^[0-9]+(?:\.[0-9]+){1,3}(?:-[0-9A-Za-z.-]+)?$/u;
+const MAX_EXTENSION_MANIFEST_BYTES = 1024 * 1024;
 
 function commandOutput(file, args, run = execFileSync) {
   try {
@@ -54,6 +67,61 @@ function extensionVersion(output) {
     .find(Boolean);
 }
 
+function bundledExtensionVersion(versionOutput, hostVersion, home) {
+  const commit = versionOutput.split(/\r?\n/u)[1]?.trim();
+  if (!/^[0-9a-f]{40}$/u.test(commit ?? "") || typeof home !== "string" || home.length === 0) return undefined;
+  const installRoot = join(home, ".vscode-server", "bin", commit);
+  const manifestPath = join(installRoot, "extensions", "copilot", "package.json");
+  let descriptor;
+  try {
+    const expectedPath = join(realpathSync(installRoot), "extensions", "copilot", "package.json");
+    const before = lstatSync(manifestPath, { bigint: true });
+    if (
+      !before.isFile() ||
+      before.isSymbolicLink() ||
+      before.size > BigInt(MAX_EXTENSION_MANIFEST_BYTES) ||
+      realpathSync(manifestPath) !== expectedPath
+    ) {
+      throw new Error("bundled Copilot Chat manifest is not a bounded regular file");
+    }
+    descriptor = openSync(manifestPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+    const opened = fstatSync(descriptor, { bigint: true });
+    if (!opened.isFile() || opened.dev !== before.dev || opened.ino !== before.ino || opened.size !== before.size) {
+      throw new Error("bundled Copilot Chat manifest changed before read");
+    }
+    const bytes = readFileSync(descriptor, "utf8");
+    const after = lstatSync(manifestPath, { bigint: true });
+    if (
+      after.isSymbolicLink() ||
+      after.dev !== opened.dev ||
+      after.ino !== opened.ino ||
+      Buffer.byteLength(bytes) > MAX_EXTENSION_MANIFEST_BYTES ||
+      realpathSync(manifestPath) !== expectedPath
+    ) {
+      throw new Error("bundled Copilot Chat manifest changed during read");
+    }
+    return parseBundledExtensionManifest(bytes, hostVersion);
+  } catch (error) {
+    if (error?.code === "ENOENT") return undefined;
+    throw error;
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
+}
+
+function parseBundledExtensionManifest(bytes, hostVersion) {
+  const manifest = parseStrictJson(bytes);
+  if (
+    manifest?.publisher !== "GitHub" ||
+    manifest.name !== "copilot-chat" ||
+    !VERSION_PATTERN.test(manifest.version ?? "") ||
+    manifest.engines?.vscode !== `^${hostVersion}`
+  ) {
+    throw new Error("bundled Copilot Chat manifest is invalid");
+  }
+  return manifest.version;
+}
+
 export function parsePreflightArgs(args) {
   if (args.length !== 2 || args[0] !== "--output" || !args[1] || args[1].startsWith("--")) {
     throw new Error("only --output <path> is supported");
@@ -61,7 +129,7 @@ export function parsePreflightArgs(args) {
   return { output: args[1] };
 }
 
-export function buildOptimizationClientPreflight({ gate, toolchain, run = execFileSync }) {
+export function buildOptimizationClientPreflight({ gate, toolchain, run = execFileSync, home = process.env.HOME }) {
   if (
     gate.state !== "authorized" ||
     gate.authorization.status !== "approved" ||
@@ -75,7 +143,8 @@ export function buildOptimizationClientPreflight({ gate, toolchain, run = execFi
   const vscodeExtensions = commandOutput("code", ["--list-extensions", "--show-versions"], run);
   const cli = commandOutput("copilot", ["--version"], run);
   const vscodeVersion = firstVersion(vscode.output);
-  const copilotChatVersion = extensionVersion(vscodeExtensions.output);
+  const copilotChatVersion =
+    extensionVersion(vscodeExtensions.output) ?? bundledExtensionVersion(vscode.output, vscodeVersion, home);
   const cliVersion = firstVersion(cli.output);
   const expectedVscode = toolchain.core.vscode.minimumSupportedVersion;
   const expectedCli = toolchain.core.copilotCli.selectedExactVersion;

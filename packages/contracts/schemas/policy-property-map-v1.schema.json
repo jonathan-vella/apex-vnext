@@ -68,6 +68,14 @@
             "minLength": 1,
             "type": "string"
           },
+          "policyDefinitionId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "policyDefinitionReferenceId": {
+            "minLength": 1,
+            "type": "string"
+          },
           "propertyPath": {
             "minLength": 1,
             "type": "string"

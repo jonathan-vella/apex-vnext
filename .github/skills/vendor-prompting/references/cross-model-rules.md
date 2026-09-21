@@ -37,7 +37,7 @@ stale during model rollouts.
 # Bad
 handoffs:
   - agent: 03-Architect
-    model: "Claude Opus 4.8"   # redundant — matches Architect's own
+    model: "Claude Opus 4.8" # redundant — matches Architect's own
     prompt: "..."
 
 # Good
@@ -48,7 +48,7 @@ handoffs:
 
 ## Rule R-X-3 — Frontmatter model style
 
-> Source: [agent-authoring.instructions.md](../../../instructions/agent-authoring.instructions.md#L113-L120)
+> Source: [agent-authoring.instructions.md](../../../../customizations/.github/instructions/apex-agent-authoring.instructions.md)
 > (existing repo convention).
 
 **Rule** (`frontmatter-model-style-001`):
@@ -62,7 +62,7 @@ handoffs:
 
 ## Rule R-X-4 — Handoff prompt enrichment
 
-> Source: [agent-authoring.instructions.md](../../../instructions/agent-authoring.instructions.md#L471-L478)
+> Source: [agent-authoring.instructions.md](../../../../customizations/.github/instructions/apex-agent-authoring.instructions.md)
 > (existing repo convention).
 
 **Rule** (`handoff-enrichment-001`): every `handoffs[].prompt` must
@@ -92,31 +92,9 @@ handoffs:
 
 ## Rule R-X-5 — Decision logging
 
-> Source: [agent-authoring.instructions.md](../../../instructions/agent-authoring.instructions.md)
-> "Decision Logging" section.
-
-**Rule** (reviewer-only): when an agent makes a significant choice
-(architecture pattern, SKU/tier selection, deployment strategy, IaC
-tool choice, security approach, networking topology, rejected
-viable alternative), append an entry to `decision_log` in
-`00-session-state.json`. Format:
-
-```json
-{
-  "id": "D001",
-  "step": 2,
-  "agent": "03-Architect",
-  "timestamp": "2026-05-04T15:10:00Z",
-  "title": "B1 App Service over Container Apps",
-  "choice": "App Service Plan B1 (Linux)",
-  "alternatives": ["Container Apps Consumption", "AKS"],
-  "rationale": "Budget < EUR1000/mo; no container expertise.",
-  "impact": "No container registry needed; simplifies deployment"
-}
-```
-
-Not auto-validated (no per-step inspector). Reviewer checklist item
-in [checklists.md](checklists.md).
+Record significant architecture, SKU, security, networking and deployment choices in the owning typed artifact with
+rationale, alternatives and consequences. Submit through the current stage-specific completion operation; reviewers do
+not write state or approve their own findings. See [checklists.md](checklists.md).
 
 ## Rule R-X-6 — Few-shot example placement
 

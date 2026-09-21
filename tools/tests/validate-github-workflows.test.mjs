@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import * as yaml from "js-yaml";
@@ -8,12 +7,15 @@ import {
   loadWorkflowTexts,
   validateGithubWorkflowContract,
   workflowContractDigest,
+  workflowJobsDigest,
+  localActionDigest,
 } from "../scripts/validate-github-workflows.mjs";
 
 const contract = JSON.parse(readFileSync("tools/registry/github-workflow-contract.json", "utf8"));
 const schema = JSON.parse(readFileSync("tools/registry/schemas/github-workflow-contract.schema.json", "utf8"));
 const workflowTexts = loadWorkflowTexts();
 const localActionTexts = loadLocalActionTexts(Object.keys(contract.localActions));
+const checkoutPin = `actions/checkout@${contract.actionVersions["actions/checkout"].sha}`;
 
 function validate(texts = workflowTexts, value = contract) {
   return validateGithubWorkflowContract({ contract: value, schema, workflowTexts: texts, localActionTexts });
@@ -33,7 +35,7 @@ function rebaseline(path, texts, value = structuredClone(contract)) {
   workflow.triggerDigest = workflowContractDigest(parsed.on);
   workflow.permissionsDigest = workflowContractDigest(parsed.permissions);
   workflow.concurrencyDigest = workflowContractDigest(parsed.concurrency);
-  workflow.jobsDigest = workflowContractDigest(parsed.jobs);
+  workflow.jobsDigest = workflowJobsDigest(parsed.jobs);
   workflow.jobs = Object.fromEntries(Object.entries(parsed.jobs).map(([id, job]) => [id, job.name ?? id]));
   return value;
 }
@@ -42,7 +44,62 @@ test("current GitHub workflows satisfy the hosted contract", () => {
   assert.deepEqual(validate(), []);
 });
 
-test("rejects required context and external-runtime check drift", () => {
+test("structural digests ignore only immutable action revisions", () => {
+  const jobs = { check: { steps: [{ uses: checkoutPin, with: { ref: "main" } }] } };
+  const updated = structuredClone(jobs);
+  updated.check.steps[0].uses = `actions/checkout@${"a".repeat(40)}`;
+  assert.equal(workflowJobsDigest(updated), workflowJobsDigest(jobs));
+  assert.equal(jobs.check.steps[0].uses, checkoutPin);
+  for (const uses of ["actions/checkout@v7", `other/checkout@${"a".repeat(40)}`]) {
+    updated.check.steps[0].uses = uses;
+    assert.notEqual(workflowJobsDigest(updated), workflowJobsDigest(jobs));
+  }
+  updated.check.steps[0].uses = checkoutPin;
+  updated.check.steps[0].with.ref = "unreviewed";
+  assert.notEqual(workflowJobsDigest(updated), workflowJobsDigest(jobs));
+  const action = localActionTexts[".github/actions/setup-node-repo/action.yml"];
+  const oldSha = contract.actionVersions["actions/setup-node"].sha;
+  assert.equal(localActionDigest(action.replace(oldSha, "a".repeat(40))), localActionDigest(action));
+  assert.notEqual(localActionDigest(action.replace("run: npm ci", "run: npm install")), localActionDigest(action));
+});
+
+test("approved Action updates need no structural hash changes", () => {
+  const changedContract = structuredClone(contract);
+  const texts = structuredClone(workflowTexts);
+  const actions = structuredClone(localActionTexts);
+  for (const [name, pin] of Object.entries(changedContract.actionVersions)) {
+    const oldReference = `${name}@${pin.sha}`;
+    pin.sha = "a".repeat(40);
+    for (const path of Object.keys(texts)) texts[path] = texts[path].replaceAll(oldReference, `${name}@${pin.sha}`);
+    for (const path of Object.keys(actions))
+      actions[path] = actions[path].replaceAll(oldReference, `${name}@${pin.sha}`);
+  }
+  assert.deepEqual(
+    validateGithubWorkflowContract({
+      contract: changedContract,
+      schema,
+      workflowTexts: texts,
+      localActionTexts: actions,
+    }),
+    [],
+  );
+  const errors = validateGithubWorkflowContract({ contract, schema, workflowTexts: texts, localActionTexts: actions });
+  assert.ok(errors.some((error) => error.includes("unapproved immutable action pin")));
+  assert.ok(
+    errors.some((error) => error.startsWith(".github/actions/") && error.includes("unapproved immutable action pin")),
+  );
+});
+
+test("pin normalization never masks executable workflow changes", () => {
+  const path = ".github/workflows/ci.yml";
+  const texts = mutate(path, checkoutPin, `actions/checkout@${"a".repeat(40)}`);
+  texts[path] = texts[path].replace("run: npm run qualify:vnext", "run: echo skipped");
+  const changedContract = structuredClone(contract);
+  changedContract.actionVersions["actions/checkout"].sha = "a".repeat(40);
+  assert.ok(validate(texts, changedContract).some((error) => error.includes("complete job contract drift")));
+});
+
+test("rejects required vNext context drift", () => {
   const changedContract = structuredClone(contract);
   changedContract.expectedRequiredContexts[0] = "renamed-ci";
   assert.ok(
@@ -51,11 +108,12 @@ test("rejects required context and external-runtime check drift", () => {
     ),
   );
 
-  const errors = validate(
-    mutate(".github/workflows/ci.yml", "name: External Python tests (apex-recall)", "name: Combined tests"),
-  );
+  const errors = validate(mutate(".github/workflows/ci.yml", "    name: ci", "    name: renamed-ci"));
   assert.ok(errors.some((error) => error.includes("job/check name drift")));
-  assert.ok(errors.some((error) => error.includes("separate required Node and external Python checks")));
+  assert.ok(errors.some((error) => error.includes("required vNext job")));
+  const extra = structuredClone(contract);
+  extra.expectedRequiredContexts.push("retired-external-check");
+  assert.ok(validate(workflowTexts, extra).some((error) => error.includes("status contexts drift")));
 });
 
 test("rejects trigger, permission, and action-version drift", () => {
@@ -70,7 +128,7 @@ test("rejects trigger, permission, and action-version drift", () => {
     ).some((error) => error.includes("permissions contract drift")),
   );
   assert.ok(
-    validate(mutate(".github/workflows/ci.yml", "actions/checkout@v7", "actions/checkout@latest")).some((error) =>
+    validate(mutate(".github/workflows/ci.yml", checkoutPin, "actions/checkout@latest")).some((error) =>
       error.includes("mutable or malformed action reference"),
     ),
   );
@@ -89,12 +147,12 @@ test("rejects job permission escalation, no-op execution, and exact action subst
     ),
   );
   assert.ok(
-    validate(mutate(path, "actions/checkout@v7", "actions/checkout@v6")).some((error) =>
+    validate(mutate(path, checkoutPin, "actions/checkout@v6")).some((error) =>
       error.includes("complete job contract drift"),
     ),
   );
   assert.ok(
-    validate(mutate(path, "run: npm run test:apex-recall", "run: echo skipped-apex-recall")).some((error) =>
+    validate(mutate(path, "run: npm run qualify:vnext", "run: echo skipped-qualification")).some((error) =>
       error.includes("complete job contract drift"),
     ),
   );
@@ -120,7 +178,7 @@ test("rejects Node dependency registry drift after action rebaselining", () => {
       [actionPath]: mutateAction(localActionTexts[actionPath]),
     };
     const changedContract = structuredClone(contract);
-    changedContract.localActions[actionPath] = createHash("sha256").update(changed[actionPath]).digest("hex");
+    changedContract.localActions[actionPath] = localActionDigest(changed[actionPath]);
     const errors = validateGithubWorkflowContract({
       contract: changedContract,
       schema,
@@ -136,11 +194,6 @@ test("rejects Python validation setup weakening and caller removal", () => {
   for (const [search, replacement, expected] of [
     ['python-version: "3.14"', 'python-version: "3.13"', "version or cache contract drift"],
     ["cache: pip", "cache: none", "version or cache contract drift"],
-    [
-      "python -m pip install --no-deps --no-build-isolation -e tools/apex-recall",
-      "python -m pip install tools/apex-recall",
-      "dependency bootstrap drift",
-    ],
     ["--require-hashes", "--no-deps", "dependency bootstrap drift"],
     [".github/python-validation-requirements.txt", ".github/other-requirements.txt", "dependency bootstrap drift"],
     ["using: composite", "using: node20", "structure or runtime drift"],
@@ -155,7 +208,7 @@ test("rejects Python validation setup weakening and caller removal", () => {
     assert.ok(localActionTexts[actionPath].includes(search), `${search} missing from ${actionPath}`);
     const changed = { ...localActionTexts, [actionPath]: localActionTexts[actionPath].replace(search, replacement) };
     const changedContract = structuredClone(contract);
-    changedContract.localActions[actionPath] = createHash("sha256").update(changed[actionPath]).digest("hex");
+    changedContract.localActions[actionPath] = localActionDigest(changed[actionPath]);
     const errors = validateGithubWorkflowContract({
       contract: changedContract,
       schema,
@@ -165,13 +218,29 @@ test("rejects Python validation setup weakening and caller removal", () => {
     assert.ok(errors.some((error) => error.startsWith(`${actionPath}: `) && error.includes(expected)));
   }
 
-  for (const path of [".github/workflows/ci.yml"]) {
+  for (const path of [".github/workflows/ci.yml", ".github/workflows/publish-npm.yml"]) {
     const texts = mutate(
       path,
       "      - name: Setup Python validation\n        uses: ./.github/actions/setup-python-validation\n",
       "",
     );
     assert.ok(validate(texts).some((error) => error.includes("complete job contract drift")));
+  }
+});
+
+test("rejects protected Python lane and canonical Terraform pin drift", () => {
+  const ciPath = ".github/workflows/ci.yml";
+  const withoutPythonTests = mutate(ciPath, "      - name: Test Python\n        run: npm run test:python\n\n", "");
+  assert.ok(
+    validate(withoutPythonTests, rebaseline(ciPath, withoutPythonTests)).includes(
+      "ci workflow must retain pinned Python lint and test coverage",
+    ),
+  );
+
+  for (const path of [".github/workflows/publish-npm.yml", ".github/workflows/vnext-live-qualification.yml"]) {
+    const staleTerraform = mutate(path, "          terraform_version: 1.16.3", "          terraform_version: 1.15.8");
+    const errors = validate(staleTerraform, rebaseline(path, staleTerraform));
+    assert.ok(errors.some((error) => error.includes("must install the canonical Terraform version")));
   }
 });
 

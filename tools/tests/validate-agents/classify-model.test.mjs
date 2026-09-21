@@ -51,9 +51,10 @@ test("classifyModel: GPT-4o → gpt-4o", () => {
   assert.equal(classifyModel("GPT-4o"), "gpt-4o");
 });
 
-test("classifyModel: MAI-Code-1.1-Flash → mai-code", () => {
-  assert.equal(classifyModel("MAI-Code-1.1-Flash"), "mai-code");
-  assert.equal(classifyModel(["MAI-Code-1.1-Flash"]), "mai-code");
+test("classifyModel: mai-code-1.1-flash → mai-code", () => {
+  assert.equal(classifyModel("mai-code-1.1-flash"), "mai-code");
+  assert.equal(classifyModel(["mai-code-1.1-flash"]), "mai-code");
+  assert.equal(classifyModel("MAI-Code-1.1-Flash (copilot)"), "mai-code");
 });
 
 test("classifyModel: MAI-Code-1-Flash → mai-code (deprecated label)", () => {

@@ -23,7 +23,7 @@ import { resolveBundledAssets } from "./assets.js";
 import { serveMcp } from "./mcp.js";
 import { createFileProviderRuntime, hashTerraformConfiguration, hashTerraformLockFile } from "./provider-runtime.js";
 import { exportProviderTransfer, importProviderTransfer } from "./provider-transfer.js";
-import { ApexService, type ArtifactKind, type ServiceOptions, type TaskOutput } from "./service.js";
+import { ApexService, type ServiceOptions, type TaskOutput } from "./service.js";
 import { exportStateTransfer, importStateTransfer } from "./state-transfer.js";
 import { APEX_VERSION } from "./version.js";
 
@@ -611,23 +611,30 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
     }
     case "status":
       return service.status();
+    case "governance import":
+      return service.importGovernanceBaseline(required(flags, "path"));
+    case "governance revise": {
+      confirmed(flags, "governance revise");
+      return service.reviseGovernanceBaseline(required(flags, "path"), {
+        confirm: true,
+        reason: required(flags, "reason"),
+      });
+    }
+    case "governance select":
+      return service.selectGovernanceBaseline(
+        required(flags, "path"),
+        ...(flags.reopen === true ? [{ reopen: true }] : []),
+      );
     case "task next":
       return service.nextTask();
     case "task context":
       return service.taskContext(required(flags, "task"));
     case "task complete": {
       const paths = files(flags);
-      if (paths.length > 1) {
-        const outputs = await Promise.all(
-          paths.map(async (path) => JSON.parse(await readFile(path, "utf8")) as TaskOutput),
-        );
-        return service.completeTaskOutputs(required(flags, "task"), outputs);
-      }
-      return service.completeTask(required(flags, "task"), {
-        kind: required(flags, "kind") as ArtifactKind,
-        value: JSON.parse(await readFile(paths[0]!, "utf8")) as unknown,
-        ...(typeof flags.summary === "string" ? { summary: flags.summary } : {}),
-      });
+      const outputs = await Promise.all(
+        paths.map(async (path) => JSON.parse(await readFile(path, "utf8")) as TaskOutput),
+      );
+      return service.completeTaskOutputs(required(flags, "task"), outputs);
     }
     case "task complete-bundle": {
       const bundle = (await inputJson(flags)) as { taskId?: string; outputs?: TaskOutput[] } | TaskOutput[];
@@ -690,8 +697,6 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
       return service.diagnose();
     case "render":
       return service.render(required(flags, "kind") as never);
-    case "promote":
-      return service.promote(required(flags, "environment"), required(flags, "target"));
     case "customizations rollback":
       return service.rollbackCustomizations();
     case "customizations uninstall":

@@ -15,6 +15,7 @@ import {
 const ROOT = resolve(import.meta.dirname, "../..");
 const CANDIDATE_SHA = "a".repeat(40);
 const SUBSCRIPTION = "b47d2942-f5ad-4d3c-b28e-c23e4f83d97e";
+const TOOL_PINS = JSON.parse(readFileSync(join(ROOT, "tools/registry/tool-version-pins.json"), "utf8")).pins;
 const GOVERNANCE_DISCOVERED_AT = JSON.parse(
   readFileSync(join(ROOT, "agent-output/vnext-qualification/04-governance-constraints.json"), "utf8"),
 ).discovered_at;
@@ -134,6 +135,7 @@ for (const track of ["bicep", "terraform"]) {
     assert.equal(artifacts.intent.resources[0].id, "qualification-storage");
     assert.equal(artifacts.binding.track, track);
     assert.match(artifacts.handoff.treeHash, /^[0-9a-f]{64}$/);
+    assert.deepEqual(artifacts.handoff.requiredToolVersions, { [track]: TOOL_PINS[track].min });
     assert.match(artifacts.governanceArtifact.constraintsRef.digest, /^[0-9a-f]{64}$/);
     assert.equal(artifacts.governanceArtifact.targetScope, `${artifacts.targetScope}`);
   });
@@ -174,12 +176,15 @@ test("preparation creates a validated run with Gates 1-3 approved and Gate 4 clo
     assert.deepEqual(customizationLock.files, []);
     assert.ok(customizationLock.runtime.length > 0);
 
-    const legacyLockPath = join(stateRoot, ".apex/apex.lock.json");
-    const legacyLock = JSON.parse(await readFile(legacyLockPath, "utf8"));
+    const runDirectory = join(stateRoot, ".apex/projects/vnext-qualification/runs", result.runId);
+    const run = JSON.parse(await readFile(join(runDirectory, "run.json"), "utf8"));
+    const lockPath = join(stateRoot, ".apex/runtime-generations", run.runtimeLockHash, "apex.lock.json");
+    const originalLock = await readFile(lockPath, "utf8");
+    const originalSelection = await readFile(join(stateRoot, ".apex/config.json"), "utf8");
+    const legacyLock = JSON.parse(originalLock);
     delete legacyLock.improvementPolicyHash;
-    await writeFile(legacyLockPath, `${JSON.stringify(legacyLock, null, 2)}\n`, "utf8");
-    const ownershipPath = join(stateRoot, ".apex/projects/vnext-qualification/runs", result.runId, "ownership.json");
-    await writeFile(ownershipPath, "{}\n", "utf8");
+    const invalidLock = `${JSON.stringify(legacyLock, null, 2)}\n`;
+    await writeFile(lockPath, invalidLock, "utf8");
     await assert.rejects(
       prepareQualificationState(
         {
@@ -198,7 +203,37 @@ test("preparation creates a validated run with Gates 1-3 approved and Gate 4 clo
           validationEntries: validationEntries("bicep"),
         },
       ),
+      /runtime-lock validation failed/,
+    );
+    assert.equal(await readFile(lockPath, "utf8"), invalidLock);
+    assert.equal(await readFile(join(stateRoot, ".apex/config.json"), "utf8"), originalSelection);
+    assert.deepEqual(
+      (await readdir(stateRoot)).filter((entry) => entry.startsWith(".apex-state-backup-")),
+      [],
+    );
+    await writeFile(lockPath, originalLock, "utf8");
+
+    const ownershipPath = join(runDirectory, "ownership.json");
+    await writeFile(ownershipPath, "{}\n", "utf8");
+    await assert.rejects(
+      prepareQualificationState(
+        { yes: true, replace_existing: true, track: "bicep", actor: "maintainer", subscription: SUBSCRIPTION },
+        {
+          root: stateRoot,
+          sourceRoot: ROOT,
+          candidateSha: CANDIDATE_SHA,
+          now: minutesAfterGovernance(20),
+          availability: availability(),
+          validationEntries: validationEntries("bicep"),
+        },
+      ),
       /writer ownership/,
+    );
+    assert.equal(await readFile(ownershipPath, "utf8"), "{}\n");
+    assert.equal(await readFile(join(stateRoot, ".apex/config.json"), "utf8"), originalSelection);
+    assert.deepEqual(
+      (await readdir(stateRoot)).filter((entry) => entry.startsWith(".apex-state-backup-")),
+      [],
     );
     await rm(ownershipPath);
 

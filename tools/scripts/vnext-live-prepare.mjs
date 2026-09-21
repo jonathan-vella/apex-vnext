@@ -201,6 +201,11 @@ function validationEntry(kind, value) {
 
 export async function buildQualificationArtifacts({ root, track, subscription, runId, now, availability }) {
   const tree = await sourceTree(root, track);
+  const toolPins = JSON.parse(await readFile(join(root, "tools/registry/tool-version-pins.json"), "utf8")).pins;
+  const requiredToolVersion = toolPins?.[track]?.min;
+  if (typeof requiredToolVersion !== "string" || !/^\d+\.\d+\.\d+$/u.test(requiredToolVersion)) {
+    throw new Error(`Missing canonical ${track} tool version pin`);
+  }
   const governancePath = join(root, "agent-output/vnext-qualification/04-governance-constraints.json");
   const governanceBytes = await readFile(governancePath);
   const governance = JSON.parse(governanceBytes.toString("utf8"));
@@ -466,7 +471,7 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
     bindingHash: sha256Json(binding),
     environmentInputsHash: sha256Json(environmentInputs),
     logicalResourceManifestHash: sha256Json(logicalManifest),
-    requiredToolVersions: { [track]: track === "bicep" ? "0.45.6" : "1.15.8" },
+    requiredToolVersions: { [track]: requiredToolVersion },
     generatedAt: now,
   };
   return {
@@ -643,37 +648,6 @@ async function complete(service, expected, outputs) {
   return service.completeTaskOutputs(await taskId(service, expected), outputs);
 }
 
-async function inspectLegacyReplaceableState(root) {
-  const selection = JSON.parse(await readFile(join(root, ".apex", "config.json"), "utf8"));
-  if (selection.projectId !== PROJECT_ID || !UUID_PATTERN.test(selection.runId ?? "")) {
-    throw new Error("Legacy qualification state has an invalid selection");
-  }
-  const runDirectory = join(root, ".apex", "projects", PROJECT_ID, "runs", selection.runId);
-  const run = JSON.parse(await readFile(join(runDirectory, "run.json"), "utf8"));
-  if (
-    run.projectId !== PROJECT_ID ||
-    run.runId !== selection.runId ||
-    run.gates?.find(({ gate }) => gate === 4)?.state !== "closed"
-  ) {
-    throw new Error("Existing qualification state must select vnext-qualification with Gate 4 closed");
-  }
-  for (const artifact of ["ownership.json", "writer-lease.json"]) {
-    try {
-      await readFile(join(runDirectory, artifact));
-      throw new Error("Existing qualification state has writer ownership and cannot be replaced");
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
-    }
-  }
-  try {
-    if ((await readdir(join(runDirectory, "transfers"))).length > 0) {
-      throw new Error("Existing qualification state has writer ownership and cannot be replaced");
-    }
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-  }
-}
-
 export async function prepareQualificationState(args, dependencies = {}) {
   const root = dependencies.root ?? process.cwd();
   const sourceRoot = dependencies.sourceRoot ?? root;
@@ -689,21 +663,16 @@ export async function prepareQualificationState(args, dependencies = {}) {
   let backupRoot;
   let backupPath;
   if (args.replace_existing === true) {
-    try {
-      const existing = new ApexService(root);
-      const existingStatus = await existing.status();
-      if (
-        existingStatus.run.projectId !== PROJECT_ID ||
-        existingStatus.run.gates.find(({ gate }) => gate === 4)?.state !== "closed"
-      ) {
-        throw new Error("Existing qualification state must select vnext-qualification with Gate 4 closed");
-      }
-      if ((await existing.currentWriter()) !== null) {
-        throw new Error("Existing qualification state has writer ownership and cannot be replaced");
-      }
-    } catch (error) {
-      if (!String(error.message).includes("runtime-lock validation failed")) throw error;
-      await inspectLegacyReplaceableState(root);
+    const existing = new ApexService(root);
+    const existingStatus = await existing.status();
+    if (
+      existingStatus.run.projectId !== PROJECT_ID ||
+      existingStatus.run.gates.find(({ gate }) => gate === 4)?.state !== "closed"
+    ) {
+      throw new Error("Existing qualification state must select vnext-qualification with Gate 4 closed");
+    }
+    if ((await existing.currentWriter()) !== null) {
+      throw new Error("Existing qualification state has writer ownership and cannot be replaced");
     }
     backupRoot = await mkdtemp(join(root, ".apex-state-backup-"));
     backupPath = join(backupRoot, "apex");

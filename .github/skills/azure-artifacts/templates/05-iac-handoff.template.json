@@ -18,8 +18,8 @@
   "validation_summary": {
     "verdict": "APPROVED",
     "tool_versions": {
-      "bicep": "0.21.0",
-      "az": "2.55.0"
+      "bicep": "0.47.16",
+      "az": "2.90.0"
     },
     "validate_gate": {
       "command": "az deployment sub validate --location swedencentral --template-file main.bicep --parameters main.dev.bicepparam",

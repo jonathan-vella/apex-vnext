@@ -1,0 +1,69 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 127.0.0.1:14318
+
+extensions:
+  azure_auth:
+    use_default: true
+    scopes:
+      - https://monitor.azure.com/.default
+  file_storage:
+    directory: /var/lib/otelcol
+    create_directory: true
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+  transform/privacy:
+    error_mode: propagate
+    trace_statements:
+      - context: span
+        statements:
+          - delete_matching_keys(attributes, "^(gen_ai[.](input|output|system_instructions|tool[.](definitions|call[.](arguments|result)))|copilot_chat[.]hook_(input|output)|github[.]copilot[.]tool[.]parameters[.](command|file_path|mcp_server_name)$)")
+          - set(status.message, "")
+      - context: spanevent
+        statements:
+          - keep_keys(attributes, ["error.type", "exception.type", "github.copilot.hook.type", "github.copilot.skill.name", "github.copilot.success"])
+    log_statements:
+      - context: log
+        statements:
+          - set(body, "Copilot diagnostic event; content omitted")
+          - delete_matching_keys(attributes, "^(gen_ai[.](input|output|system_instructions|tool[.](definitions|call[.](arguments|result)))|exception[.](message|stacktrace)|copilot_chat[.]hook_(input|output))")
+  batch:
+    timeout: 2s
+    send_batch_size: 128
+    send_batch_max_size: 256
+
+exporters:
+  azuremonitor:
+    connection_string: ${env:APPLICATIONINSIGHTS_CONNECTION_STRING}
+    auth:
+      authenticator: azure_auth
+    spaneventsenabled: true
+    maxbatchinterval: 2s
+    shutdown_timeout: 20s
+    sending_queue:
+      enabled: true
+      num_consumers: 2
+      queue_size: 1000
+      storage: file_storage
+
+service:
+  extensions: [azure_auth, file_storage]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/privacy, batch]
+      exporters: [azuremonitor]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/privacy, batch]
+      exporters: [azuremonitor]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [azuremonitor]

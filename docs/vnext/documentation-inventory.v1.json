@@ -3,11 +3,10 @@
   "inventoryBinding": {
     "commit": "da708ef5e0ff63a9ff1bf1a43112c6670e3bfc0a",
     "capturedAt": "2026-08-01",
-    "scope": "mutable repository documentation; docs/vnext/phase-0a is frozen"
+    "scope": "Current vNext repository documentation"
   },
   "authorities": {
     "productStatus": "VERSION.md",
-    "migrationHistory": "docs/MIGRATION.md",
     "workflow": "config/workflow.v1.json",
     "defaults": "config/defaults.v1.json",
     "clients": "customizations/manifest.json",
@@ -52,33 +51,6 @@
       "authorityBindings": ["productStatus", "projectControls"]
     },
     {
-      "id": "migration",
-      "currentPath": "docs/MIGRATION.md",
-      "contentClass": "historical",
-      "audiences": ["repository-contributor", "maintainer"],
-      "lifecycle": "active",
-      "classification": "keep",
-      "targetFamily": "migration",
-      "targetPaths": ["docs/MIGRATION.md"],
-      "authorityBindings": ["migrationHistory"]
-    },
-    {
-      "id": "legacy-user-guides",
-      "currentPath": ".archive/documentation/guides-v1/docs/guides/**",
-      "contentClass": "user-doc",
-      "audiences": ["platform-engineer", "repository-contributor"],
-      "lifecycle": "archived",
-      "classification": "retire",
-      "targetFamily": "none",
-      "targetPaths": ["docs/tutorials/**", "docs/how-to/**", "docs/reference/**", "docs/explanation/**"],
-      "authorityBindings": ["cli", "workflow", "clients", "qualification"],
-      "archive": {
-        "destination": ".archive/documentation/guides-v1",
-        "provenanceRequired": true,
-        "negativeGuardRequired": true
-      }
-    },
-    {
       "id": "project-controls",
       "currentPath": "docs/vnext/{README,PRD,ROADMAP,REGISTER,DECISIONS,CLIENT-QUALIFICATION,LIVE-QUALIFICATION}.md",
       "contentClass": "project-control",
@@ -88,33 +60,6 @@
       "targetFamily": "project-control",
       "targetPaths": ["docs/vnext/**"],
       "authorityBindings": ["projectControls", "qualification"]
-    },
-    {
-      "id": "phase-0a",
-      "currentPath": "docs/vnext/phase-0a/**",
-      "contentClass": "qualification-evidence",
-      "audiences": ["maintainer", "release-reviewer"],
-      "lifecycle": "frozen",
-      "classification": "keep",
-      "targetFamily": "project-control",
-      "targetPaths": ["docs/vnext/phase-0a/**"],
-      "authorityBindings": ["projectControls"]
-    },
-    {
-      "id": "candidate-evidence",
-      "currentPath": ".archive/documentation/candidate-evidence-v1/docs/vnext/**",
-      "contentClass": "qualification-evidence",
-      "audiences": ["maintainer", "release-reviewer"],
-      "lifecycle": "archived",
-      "classification": "retire",
-      "targetFamily": "none",
-      "targetPaths": ["docs/reference/client-support.md", "docs/explanation/client-projections.md"],
-      "authorityBindings": ["clients", "qualification"],
-      "archive": {
-        "destination": ".archive/documentation/candidate-evidence-v1",
-        "provenanceRequired": true,
-        "negativeGuardRequired": true
-      }
     },
     {
       "id": "terraform-reference",

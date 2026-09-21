@@ -1,0 +1,13 @@
+{
+  "subscriptionId": "b47d2942-f5ad-4d3c-b28e-c23e4f83d97e",
+  "location": "swedencentral",
+  "resourceGroupName": "rg-apex-insights-swc01",
+  "workspaceName": "law-apex-insights-swc01",
+  "insightsName": "appi-apex-insights-swc01",
+  "identityName": "sp-apex-insights",
+  "resourceTags": {
+    "owner": "jonathan",
+    "costcenter": "development",
+    "technical-contact": "jonathan"
+  }
+}

@@ -6,6 +6,9 @@
 This runbook installs the published preview from npm and creates one APEX workspace with the VS Code projection. It
 creates local project state only; it does not deploy Azure resources.
 
+Docker, a devcontainer and the APEX source repository are not required. npm is the current route; plugin and APEX MCP
+redistribution work comes at the end of the [roadmap](../vnext/ROADMAP.md#phase-6-distribution-last).
+
 ## Prepare Windows And Ubuntu
 
 Open PowerShell as an administrator and install Ubuntu on WSL2 when it is not already installed:
@@ -46,7 +49,7 @@ from the Command Palette before retrying.
 
 ## Install Node.js
 
-Install Node.js 24 or later in Ubuntu. The Linux runtime is separate from any Node.js installation on Windows:
+Install Node.js 26.9.0 or later in Ubuntu. The Linux runtime is separate from any Node.js installation on Windows:
 
 ```bash
 NVM_VERSION=v0.40.1
@@ -135,6 +138,12 @@ content-bound to that run. The current preview does not materialize the legacy `
 `infra/bicep/<workload>/`, or `infra/terraform/<workload>/` directory convention automatically.
 
 ## Start APEX In VS Code
+
+For COE reuse, the target experience is to identify a COE repository, select one archetype, then ask APEX for changes.
+That independent import/adaptation flow and explicit ALZ/lab profiles are [planned requirements](../vnext/PRD.md), not
+features implied by copying `.apex` state. Do not copy source credentials, Terraform state/plans or approvals. Current
+stage review packages are described in [Run the workflow](../how-to/run-workflow.md); their layout is not a portable
+execution-state contract.
 
 Reload the VS Code window after bootstrap. Open GitHub Copilot Chat, select the workspace **APEX** agent, and provide
 the initial workload requirements. The agent reads the kernel-owned workspace state; it does not grant deployment

@@ -10,9 +10,9 @@ import { reportRegistryValidation, requestedReportFormat } from "./_lib/registry
 const CONTRACT_PATH = "tools/registry/github-workflow-contract.json";
 const SCHEMA_PATH = "tools/registry/schemas/github-workflow-contract.schema.json";
 const WORKFLOW_DIRECTORY = ".github/workflows";
+const TOOL_VERSION_PINS = JSON.parse(readFileSync("tools/registry/tool-version-pins.json", "utf8")).pins;
 
-export const EXPECTED_REQUIRED_CONTEXTS = ["ci", "External Python tests (apex-recall)", "CodeQL"];
-const EXTERNAL_PYTHON_CONTEXT = "External Python tests (apex-recall)";
+export const EXPECTED_REQUIRED_CONTEXTS = ["ci", "CodeQL"];
 
 function canonicalJson(value) {
   if (value === null || typeof value === "boolean" || typeof value === "number" || typeof value === "string") {
@@ -30,10 +30,31 @@ export function workflowContractDigest(value) {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
 }
 
+function normalizeActionPin(step) {
+  if (step !== null && typeof step === "object" && typeof step.uses === "string") {
+    step.uses = step.uses.replace(/@[0-9a-f]{40}$/u, "@approved-sha");
+  }
+}
+
+export function workflowJobsDigest(jobs) {
+  const normalized = structuredClone(jobs);
+  for (const job of Object.values(normalized)) {
+    normalizeActionPin(job);
+    if (Array.isArray(job?.steps)) job.steps.forEach(normalizeActionPin);
+  }
+  return workflowContractDigest(normalized);
+}
+
+export function localActionDigest(text) {
+  const value = yaml.load(text);
+  if (Array.isArray(value?.runs?.steps)) value.runs.steps.forEach(normalizeActionPin);
+  return workflowContractDigest(value);
+}
+
 function sectionDigest(value, path, section, errors) {
   try {
     if (value === undefined) throw new TypeError("section is missing");
-    return workflowContractDigest(value);
+    return section === "jobs" ? workflowJobsDigest(value) : workflowContractDigest(value);
   } catch (error) {
     errors.push(`${path}: ${section} contract cannot be hashed: ${error.message}`);
     return null;
@@ -51,6 +72,17 @@ function workflowActions(value) {
     }
   }
   return actions.filter((action) => !action.startsWith("./"));
+}
+
+function actionPinError(action, approved) {
+  const separator = action.lastIndexOf("@");
+  const name = action.slice(0, separator);
+  const version = action.slice(separator + 1);
+  if (separator < 1 || !/^[0-9a-f]{40}$/u.test(version)) {
+    return `mutable or malformed action reference: ${action}`;
+  }
+  if (approved[name]?.sha !== version) return `unapproved immutable action pin: ${action}`;
+  return undefined;
 }
 
 function workflowLocalActions(value) {
@@ -79,7 +111,7 @@ function workflowScripts(value) {
     .join("\n");
 }
 
-function validatePythonSetupAction(text) {
+function validatePythonSetupAction(text, setupAction) {
   let value;
   try {
     value = yaml.load(text);
@@ -104,7 +136,6 @@ function validatePythonSetupAction(text) {
   const [setup, install] = steps;
   const expectedInstall = [
     "python -m pip install --require-hashes --only-binary=:all: -r .github/python-validation-requirements.txt",
-    "python -m pip install --no-deps --no-build-isolation -e tools/apex-recall",
   ];
   const actualInstall = String(install?.run ?? "")
     .split(/\r?\n/u)
@@ -113,7 +144,7 @@ function validatePythonSetupAction(text) {
   if (
     !exactKeys(setup, ["name", "uses", "with"]) ||
     !exactKeys(setup?.with, ["python-version", "cache"]) ||
-    setup?.uses !== "actions/setup-python@v6" ||
+    setup?.uses !== setupAction ||
     setup.with?.["python-version"] !== "3.14" ||
     setup.with?.cache !== "pip"
   ) {
@@ -129,7 +160,7 @@ function validatePythonSetupAction(text) {
   return errors;
 }
 
-function validateNodeSetupAction(text) {
+function validateNodeSetupAction(text, setupAction) {
   let value;
   try {
     value = yaml.load(text);
@@ -142,6 +173,7 @@ function validateNodeSetupAction(text) {
     : [];
   const install = dependencyInstalls[0];
   if (
+    steps?.[0]?.uses !== setupAction ||
     dependencyInstalls.length !== 1 ||
     install?.name !== "Install Node dependencies" ||
     install?.if !== "inputs.install-deps == 'true'" ||
@@ -253,19 +285,38 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
   for (const [path, expectedDigest] of Object.entries(contract.localActions)) {
     const text = localActionTexts[path];
     if (text === undefined) errors.push(`${path}: local action is missing`);
-    else if (createHash("sha256").update(text).digest("hex") !== expectedDigest) {
-      errors.push(`${path}: local action content drift`);
+    else {
+      try {
+        if (localActionDigest(text) !== expectedDigest) errors.push(`${path}: local action content drift`);
+        const value = yaml.load(text);
+        for (const action of workflowActions({ jobs: { composite: { steps: value?.runs?.steps } } })) {
+          const error = actionPinError(action, contract.actionVersions);
+          if (error !== undefined) errors.push(`${path}: ${error}`);
+        }
+      } catch (error) {
+        errors.push(`${path}: local action contract cannot be hashed: ${error.message}`);
+      }
     }
   }
   const pythonActionPath = ".github/actions/setup-python-validation/action.yml";
   const pythonAction = localActionTexts[pythonActionPath];
   if (pythonAction !== undefined) {
-    errors.push(...validatePythonSetupAction(pythonAction).map((error) => `${pythonActionPath}: ${error}`));
+    errors.push(
+      ...validatePythonSetupAction(
+        pythonAction,
+        `actions/setup-python@${contract.actionVersions["actions/setup-python"].sha}`,
+      ).map((error) => `${pythonActionPath}: ${error}`),
+    );
   }
   const nodeActionPath = ".github/actions/setup-node-repo/action.yml";
   const nodeAction = localActionTexts[nodeActionPath];
   if (nodeAction !== undefined) {
-    errors.push(...validateNodeSetupAction(nodeAction).map((error) => `${nodeActionPath}: ${error}`));
+    errors.push(
+      ...validateNodeSetupAction(
+        nodeAction,
+        `actions/setup-node@${contract.actionVersions["actions/setup-node"].sha}`,
+      ).map((error) => `${nodeActionPath}: ${error}`),
+    );
   }
 
   const values = new Map();
@@ -334,14 +385,8 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
     }
 
     for (const action of workflowActions(value)) {
-      const separator = action.lastIndexOf("@");
-      const name = action.slice(0, separator);
-      const version = action.slice(separator + 1);
-      if (separator < 1 || version === "main" || version === "master" || version === "latest") {
-        errors.push(`${expected.path}: mutable or malformed action reference: ${action}`);
-      } else if (!(contract.actionVersions[name] ?? []).includes(version)) {
-        errors.push(`${expected.path}: unapproved action version: ${action}`);
-      }
+      const error = actionPinError(action, contract.actionVersions);
+      if (error !== undefined) errors.push(`${expected.path}: ${error}`);
     }
     for (const action of workflowLocalActions(value)) referencedLocalActions.add(action);
   }
@@ -352,8 +397,33 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
   }
 
   const ci = values.get("ci");
-  if (ci?.jobs?.ci?.name !== "ci" || ci?.jobs?.["external-tests"]?.name !== EXTERNAL_PYTHON_CONTEXT) {
-    errors.push("ci workflow must preserve separate required Node and external Python checks");
+  if (ci?.jobs?.ci?.name !== "ci" || Object.keys(ci?.jobs ?? {}).join() !== "ci") {
+    errors.push("ci workflow must preserve the required vNext job without retired external jobs");
+  }
+  const ciSteps = Array.isArray(ci?.jobs?.ci?.steps) ? ci.jobs.ci.steps : [];
+  const pythonSetup = ciSteps.filter((step) => step?.uses === "./.github/actions/setup-python-validation");
+  const pythonCommands = ciSteps.filter((step) => ["npm run lint:python", "npm run test:python"].includes(step?.run));
+  if (pythonSetup.length !== 1 || pythonCommands.length !== 2) {
+    errors.push("ci workflow must retain pinned Python lint and test coverage");
+  }
+
+  for (const [workflowId, jobId] of [
+    ["publish-npm", "publish"],
+    ["vnext-live-qualification", "apply"],
+  ]) {
+    const steps = values.get(workflowId)?.jobs?.[jobId]?.steps;
+    const terraformSetup = Array.isArray(steps)
+      ? steps.filter(
+          (step) =>
+            step?.uses === `hashicorp/setup-terraform@${contract.actionVersions["hashicorp/setup-terraform"].sha}`,
+        )
+      : [];
+    if (
+      terraformSetup.length !== 1 ||
+      String(terraformSetup[0]?.with?.terraform_version ?? "") !== TOOL_VERSION_PINS.terraform.min
+    ) {
+      errors.push(`${workflowId} must install the canonical Terraform version`);
+    }
   }
 
   const release = values.get("release-candidate-qualification");
@@ -369,7 +439,9 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
     errors.push("release qualification permissions must remain exactly contents read with no job override");
   }
   const releaseActions = workflowActions({ jobs: { qualify: releaseJob } });
-  const allowedReleaseActions = ["actions/checkout@v7", "actions/upload-artifact@v7"];
+  const checkoutAction = `actions/checkout@${contract.actionVersions["actions/checkout"].sha}`;
+  const uploadArtifactAction = `actions/upload-artifact@${contract.actionVersions["actions/upload-artifact"].sha}`;
+  const allowedReleaseActions = [checkoutAction, uploadArtifactAction];
   const localReleaseActions = releaseSteps
     .filter((step) => step !== null && typeof step === "object" && String(step.uses ?? "").startsWith("./"))
     .map((step) => step.uses);
@@ -385,7 +457,7 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
   const checkout = checkouts.find((step) => step.name === "Checkout exact candidate");
   if (
     checkouts.length !== 1 ||
-    checkout?.uses !== "actions/checkout@v7" ||
+    checkout?.uses !== checkoutAction ||
     checkout.with?.ref !== "${{ github.event.pull_request.head.sha || github.sha }}" ||
     checkout.with?.["persist-credentials"] !== false
   ) {
@@ -411,7 +483,7 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
     .filter(Boolean);
   if (
     uploads.length !== 1 ||
-    upload?.uses !== "actions/upload-artifact@v7" ||
+    upload?.uses !== uploadArtifactAction ||
     upload.if !== "always()" ||
     upload.with?.name !== "release-qualification-${{ steps.candidate.outputs.candidate_sha }}" ||
     upload.with?.["if-no-files-found"] !== "error" ||

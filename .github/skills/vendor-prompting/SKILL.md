@@ -14,7 +14,7 @@ The machine-readable source of truth is
 [rules.json](rules.json) — every rule has an ID, source citation,
 severity, applies-to, and validator-check binding. The skill prose, the
 thin enforcement instruction
-[vendor-prompting.instructions.md](../../instructions/vendor-prompting.instructions.md),
+[vendor-prompting.instructions.md](../../../customizations/.github/instructions/apex-prompt-authoring.instructions.md),
 and `validate-agents.mjs` all reference rule IDs from that file.
 
 ---
@@ -33,7 +33,7 @@ and `validate-agents.mjs` all reference rule IDs from that file.
 
 **Do NOT load this skill** for routine edits where the format is
 already known. The thin instruction
-[vendor-prompting.instructions.md](../../instructions/vendor-prompting.instructions.md)
+[vendor-prompting.instructions.md](../../../customizations/.github/instructions/apex-prompt-authoring.instructions.md)
 auto-loads on `*.agent.md` / `*.prompt.md` edits and carries the
 hard-rule shortlist.
 

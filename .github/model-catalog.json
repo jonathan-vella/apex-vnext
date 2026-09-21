@@ -154,7 +154,7 @@
         "orchestration",
         "handoff-routing"
       ],
-      "notes": "Retired Microsoft fast coding model. Retained only for audit history; active assignments use MAI-Code-1.1-Flash."
+      "notes": "Retired Microsoft fast coding model. Retained only for audit history; active assignments use MAI-Code-1.1-Flash (copilot)."
     },
     "MAI-Code-1.1-Flash": {
       "vendor": "Microsoft",

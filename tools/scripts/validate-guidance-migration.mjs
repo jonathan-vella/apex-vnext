@@ -220,6 +220,11 @@ export function validateGuidanceMigration({
     for (const source of sourceInstructions) {
       if (!seenInstructions.has(source)) reportError(`Missing instruction disposition: ${source}`);
     }
+    for (const target of managedInstructions) {
+      if (!instructionDispositions.some((entry) => Array.isArray(entry?.targets) && entry.targets.includes(target))) {
+        reportError(`Managed instruction has no owning mapping: ${target}`);
+      }
+    }
   }
   return errors;
 }
@@ -227,7 +232,6 @@ export function validateGuidanceMigration({
 export function collectGuidanceMigrationInputs(root = process.cwd()) {
   const matrixPath = join(root, "tools", "registry", "guidance-migration.v1.json");
   const sourceSkillsDirectory = join(root, ".github", "skills");
-  const sourceInstructionsDirectory = join(root, ".archive", "retired-instructions-v1");
   const customizationsDirectory = join(root, "customizations", ".github", "skills");
   const consumerInstructionsDirectory = join(root, "customizations", ".github", "instructions");
   const manifestPath = join(root, "customizations", "manifest.json");
@@ -249,9 +253,9 @@ export function collectGuidanceMigrationInputs(root = process.cwd()) {
   const matrix = JSON.parse(readFileSync(matrixPath, "utf8"));
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const managedFiles = Array.isArray(manifest.managedFiles) ? new Set(manifest.managedFiles) : null;
-  const sourceInstructions = existsSync(sourceInstructionsDirectory)
-    ? readdirSync(sourceInstructionsDirectory).filter((name) => name.endsWith(".instructions.md"))
-    : [];
+  const sourceInstructions = (matrix.instructionDispositions ?? [])
+    .map((entry) => entry?.source)
+    .filter(isNonEmptyString);
   const consumerInstructions = existsSync(consumerInstructionsDirectory)
     ? new Set(readdirSync(consumerInstructionsDirectory).filter((name) => name.endsWith(".instructions.md")))
     : new Set();
@@ -275,7 +279,6 @@ function main() {
     process.exit(1);
   }
   const errors = validateGuidanceMigration(inputs);
-  if (inputs.sourceInstructions.length === 0) errors.push("No retired source instruction files were found");
   for (const error of errors) console.error(`❌ ${error}`);
   if (errors.length > 0) process.exit(1);
   console.log(

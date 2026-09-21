@@ -32,16 +32,12 @@ SVG → scalable vector, text-selectable, screen-reader friendly, diff-friendly.
 DEFAULT_DPI = 150  # matches design tokens in references/python-charts.md
 
 
-def _strip_known_suffix(base_path: str | Path) -> Path:
-    """Return `base_path` with any known FORMATS suffix removed.
-
-    `diagram_io` accepts call sites that pass either `"foo"` or `"foo.png"`
-    so the contract is forgiving when refactoring legacy scripts.
-    """
-    p = Path(base_path)
-    if p.suffix.lower().lstrip(".") in FORMATS:
-        return p.with_suffix("")
-    return p
+def _output_base(base_path: str | Path) -> Path:
+    """Require an extension-free output base path."""
+    path = Path(base_path)
+    if path.suffix.lower().lstrip(".") in FORMATS:
+        raise ValueError("Diagram output base path must not include a format extension")
+    return path
 
 
 def save_figure(
@@ -54,13 +50,12 @@ def save_figure(
 ) -> list[Path]:
     """Save a matplotlib `Figure` as `<base>.png` + `<base>.svg` siblings.
 
-    `base_path` may include or omit a known extension — it is normalised.
     Extra `savefig_kwargs` (e.g. `bbox_inches="tight"`,
     `facecolor=fig.get_facecolor()`) are forwarded to every format.
 
     Returns the list of written file paths, in `formats` order.
     """
-    base = _strip_known_suffix(base_path)
+    base = _output_base(base_path)
     if base.parent != Path():
         base.parent.mkdir(parents=True, exist_ok=True)
     saved: list[Path] = []
@@ -94,7 +89,7 @@ def diagram_kwargs(
     formats from a single render. Explicit `overrides` (e.g. `direction`,
     `graph_attr`, `node_attr`) win over the defaults.
     """
-    base = str(_strip_known_suffix(filename))
+    base = str(_output_base(filename))
     defaults: dict[str, Any] = {
         "filename": base,
         "outformat": list(formats),
@@ -116,7 +111,7 @@ def render_graphviz(
     Graphviz only renders one format per `render()` call, so we set
     `.format` and call `.render()` per format. Returns the written paths.
     """
-    base = _strip_known_suffix(base_path)
+    base = _output_base(base_path)
     if base.parent != Path():
         base.parent.mkdir(parents=True, exist_ok=True)
     saved: list[Path] = []

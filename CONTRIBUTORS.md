@@ -2,7 +2,7 @@
 
 # Contributors
 
-Thank you to everyone who has contributed to APEX and its vNext runtime.
+Thank you to everyone who has contributed to APEX vNext.
 
 ## Project Contributors
 
@@ -19,8 +19,7 @@ Thank you to everyone who has contributed to APEX and its vNext runtime.
 - **Mike** ([@notoriousmic](https://github.com/notoriousmic)) - Azure Pricing MCP testing infrastructure
 - **cmb211087** ([@cmb211087](https://github.com/cmb211087)) - Original Azure diagrams skill
 
-These components informed the original APEX repository and are retained in project history. They are not active vNext
-runtime components.
+These credits acknowledge prior contributions; they do not declare active runtime dependencies.
 
 ## How to Contribute
 

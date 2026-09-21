@@ -8,19 +8,18 @@ dependency-complete change.
 
 ## Quick links
 
-| Resource           | Link                                                                    |
-| ------------------ | ----------------------------------------------------------------------- |
-| User guides        | [Documentation](docs/README.md)                                          |
-| Contributor guide  | [Contribute to APEX vNext](docs/how-to/contribute.md)                    |
-| Project controls   | [vNext project hub](docs/vnext/README.md)                                |
-| Open issues        | Use the repository's **Issues** tab                                     |
-| Source provenance  | [Migration record](docs/MIGRATION.md)                                    |
-| Security reports   | [Private vulnerability reporting](SECURITY.md)                           |
+| Resource          | Link                                                  |
+| ----------------- | ----------------------------------------------------- |
+| User guides       | [Documentation](docs/README.md)                       |
+| Contributor guide | [Contribute to APEX vNext](docs/how-to/contribute.md) |
+| Project controls  | [vNext project hub](docs/vnext/README.md)             |
+| Open issues       | Use the repository's **Issues** tab                   |
+| Security reports  | [Private vulnerability reporting](SECURITY.md)        |
 
 ## Validate Changes
 
-Run focused checks while editing, then the complete qualification lane before
-opening a pull request:
+Run checks for the changed behavior while editing. Follow [AGENTS.md](AGENTS.md) for the required integration checks;
+documentation-only changes do not require runtime packaging tests. For a product integration checkpoint:
 
 ```bash
 npm ci

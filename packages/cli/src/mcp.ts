@@ -3,6 +3,20 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { ApexService, SUPPORTED_ARTIFACT_KINDS } from "./service.js";
 import { APEX_VERSION } from "./version.js";
+import { ApexError, EXIT_CODES, normalizeError, type ApexErrorCode } from "./errors.js";
+import { MCP_OUTPUT_SCHEMAS } from "./mcp-output-schemas.js";
+import { ListToolsRequestSchema, type Tool } from "@modelcontextprotocol/sdk/types.js";
+
+const errorMessages: Record<ApexErrorCode, string> = {
+  APEX_USAGE: "Invalid operation arguments; check the tool input contract.",
+  APEX_NOT_FOUND: "Requested APEX state was not found; refresh status and check the identifier.",
+  APEX_CONFLICT: "The operation conflicts with current state; refresh status before retrying.",
+  APEX_VALIDATION: "APEX validation failed; check the supplied input against the current task contract.",
+  APEX_STALE: "Task is stale or expired; refresh status before retrying.",
+  APEX_AUTHORIZATION:
+    "Operation is not authorized in the current workflow state; check status and approval requirements.",
+  APEX_INTERNAL: "APEX could not complete the operation.",
+};
 
 const artifactKind = z.enum(
   SUPPORTED_ARTIFACT_KINDS as [
@@ -10,7 +24,66 @@ const artifactKind = z.enum(
     ...(typeof SUPPORTED_ARTIFACT_KINDS)[number][],
   ],
 );
-const taskOutput = z.object({ kind: artifactKind, value: z.unknown(), summary: z.string().optional() });
+const taskOutput = z.object({ kind: artifactKind, value: z.unknown(), summary: z.string().optional() }).strict();
+const stagingInput = (optional: boolean) =>
+  z
+    .object({
+      taskId: z.string().min(1).max(128),
+      kind: artifactKind.optional(),
+      value: z.unknown().optional(),
+      summary: z.string().max(4096).optional(),
+      outputs: z.array(taskOutput).min(1).max(32).optional(),
+    })
+    .strict()
+    .superRefine((input, context) => {
+      const single = input.kind !== undefined && Object.hasOwn(input, "value");
+      const anySingle = input.kind !== undefined || Object.hasOwn(input, "value") || input.summary !== undefined;
+      if (
+        (input.outputs !== undefined && anySingle) ||
+        (input.outputs === undefined && (anySingle ? !single : !optional))
+      )
+        context.addIssue({
+          code: "custom",
+          message: "Supply exactly one complete kind/value form or a nonempty outputs bundle.",
+        });
+      if (input.outputs && new Set(input.outputs.map(({ kind }) => kind)).size !== input.outputs.length)
+        context.addIssue({ code: "custom", message: "Output kinds must be unique." });
+    })
+    .meta({
+      oneOf: [
+        { required: ["outputs"], not: { anyOf: ["kind", "value", "summary"].map((key) => ({ required: [key] })) } },
+        { required: ["kind", "value"], not: { required: ["outputs"] } },
+        ...(optional
+          ? [{ not: { anyOf: ["kind", "value", "summary", "outputs"].map((key) => ({ required: [key] })) } }]
+          : []),
+      ],
+    });
+
+const readOnlyTools = new Set(["status", "projectList"]);
+const externalTools = new Set(["reconcile", "inventory", "diagnose", "doctor"]);
+
+function assertBoundedInput(value: unknown): void {
+  const stack = [{ value, depth: 0 }];
+  let nodes = 0;
+  let bytes = 0;
+  while (stack.length > 0) {
+    const entry = stack.pop()!;
+    if (++nodes > 100_000 || entry.depth > 64 || bytes > 4 * 1024 * 1024)
+      throw new ApexError("APEX_VALIDATION", "Input budget exceeded", EXIT_CODES.validation);
+    if (typeof entry.value === "string") bytes += Buffer.byteLength(entry.value);
+    else if (entry.value !== null && typeof entry.value === "object") {
+      const children = Object.entries(entry.value);
+      if (children.length + stack.length + nodes > 100_000)
+        throw new ApexError("APEX_VALIDATION", "Input budget exceeded", EXIT_CODES.validation);
+      for (const [key, child] of children) {
+        bytes += Buffer.byteLength(key);
+        stack.push({ value: child, depth: entry.depth + 1 });
+      }
+    }
+  }
+  if (Buffer.byteLength(JSON.stringify(value)) > 4 * 1024 * 1024)
+    throw new ApexError("APEX_VALIDATION", "Input budget exceeded", EXIT_CODES.validation);
+}
 const reviewFinding = z
   .object({
     id: z.string().min(1),
@@ -143,17 +216,129 @@ const normalizeOutputs = (outputs: z.infer<typeof taskOutput>[]) =>
     ...(summary === undefined ? {} : { summary }),
   }));
 
-export function createMcpServer(service: ApexService): McpServer {
+export function createMcpServer(service: ApexService, options: { queueTimeoutMs?: number } = {}): McpServer {
+  const queueTimeoutMs = options.queueTimeoutMs ?? 30_000;
+  if (!Number.isSafeInteger(queueTimeoutMs) || queueTimeoutMs < 1 || queueTimeoutMs > 30_000)
+    throw new Error("Invalid MCP queue timeout");
   const server = new McpServer({ name: "apex", version: APEX_VERSION });
-  const result = (value: unknown) => ({
-    content: [{ type: "text" as const, text: JSON.stringify(value) }],
-    structuredContent: value as Record<string, unknown>,
-  });
+  const result = (value: unknown) => {
+    if (value === null || typeof value !== "object" || Array.isArray(value))
+      throw new Error("MCP success results require an object envelope");
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify(value) }],
+      structuredContent: value as Record<string, unknown>,
+    };
+  };
+  const registerTool = server.registerTool.bind(server);
+  const toolDefinitions: Tool[] = [];
+  let active = false;
+  const waiting: Array<{ start: () => void }> = [];
+  const release = () => {
+    const next = waiting.shift();
+    if (next === undefined) active = false;
+    else next.start();
+  };
+  const acquire = (signal?: AbortSignal): Promise<() => void> => {
+    if (signal?.aborted) return Promise.reject(new ApexError("APEX_CONFLICT", "Cancelled", EXIT_CODES.conflict));
+    if (!active) {
+      active = true;
+      return Promise.resolve(release);
+    }
+    if (waiting.length >= 31) return Promise.reject(new ApexError("APEX_CONFLICT", "Queue full", EXIT_CODES.conflict));
+    return new Promise((resolve, reject) => {
+      const cleanup = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", cancel);
+      };
+      const cancel = () => {
+        const index = waiting.indexOf(waiter);
+        if (index < 0) return;
+        waiting.splice(index, 1);
+        cleanup();
+        reject(new ApexError("APEX_CONFLICT", "Queue cancelled or expired", EXIT_CODES.conflict));
+      };
+      const waiter = {
+        start: () => {
+          cleanup();
+          resolve(release);
+        },
+      };
+      const timer = setTimeout(cancel, queueTimeoutMs);
+      waiting.push(waiter);
+      signal?.addEventListener("abort", cancel, { once: true });
+      if (signal?.aborted) cancel();
+    });
+  };
+  let rateWindowStart = Date.now();
+  let rateCount = 0;
+  server.registerTool = (name, config, callback) => {
+    const outputSchema = MCP_OUTPUT_SCHEMAS[name as keyof typeof MCP_OUTPUT_SCHEMAS];
+    if (outputSchema === undefined) throw new Error(`Missing output schema for ${name}`);
+    const inputSchema =
+      config.inputSchema === undefined
+        ? z.object({}).strict()
+        : config.inputSchema instanceof z.ZodObject
+          ? config.inputSchema.strict().meta(config.inputSchema.meta() ?? {})
+          : z.object(config.inputSchema as z.ZodRawShape).strict();
+    const guarded = async (...args: Parameters<typeof callback>) => {
+      const extra = args.at(-1) as { signal?: AbortSignal };
+      const checkCancelled = () => {
+        if (extra.signal?.aborted) throw new ApexError("APEX_CONFLICT", "Cancelled", EXIT_CODES.conflict);
+      };
+      let releaseSlot: (() => void) | undefined;
+      try {
+        checkCancelled();
+        if (Date.now() - rateWindowStart >= 60_000) {
+          rateWindowStart = Date.now();
+          rateCount = 0;
+        }
+        if (++rateCount > 240) throw new ApexError("APEX_CONFLICT", "Call rate exceeded", EXIT_CODES.conflict);
+        assertBoundedInput(args[0]);
+        const input = inputSchema.safeParse(args[0]);
+        if (!input.success) throw new ApexError("APEX_VALIDATION", "Invalid tool arguments", EXIT_CODES.validation);
+        releaseSlot = await acquire(extra.signal);
+        checkCancelled();
+        const response = await Reflect.apply(
+          callback,
+          undefined,
+          config.inputSchema === undefined ? [extra] : [input.data, extra],
+        );
+        assertBoundedInput(response.structuredContent);
+        if (!outputSchema.safeParse(response.structuredContent).success) throw new Error("Invalid MCP result contract");
+        return response;
+      } catch (error) {
+        const { code } = normalizeError(error);
+        return { ...result({ error: { code, message: errorMessages[code] } }), isError: true };
+      } finally {
+        releaseSlot?.();
+      }
+    };
+    const inputJson = z.toJSONSchema(inputSchema, { target: "draft-7" });
+    const wireInput = z.object({}).passthrough().default({});
+    const annotations = {
+      readOnlyHint: readOnlyTools.has(name),
+      destructiveHint: !readOnlyTools.has(name),
+      idempotentHint: readOnlyTools.has(name),
+      openWorldHint: externalTools.has(name),
+    };
+    toolDefinitions.push({
+      name,
+      ...(config.description === undefined ? {} : { description: config.description }),
+      inputSchema: inputJson as Tool["inputSchema"],
+      outputSchema: z.toJSONSchema(outputSchema, { target: "draft-7" }) as NonNullable<Tool["outputSchema"]>,
+      annotations,
+    });
+    return Reflect.apply(registerTool, server, [
+      name,
+      { ...config, inputSchema: wireInput, outputSchema, annotations },
+      guarded,
+    ]);
+  };
   server.registerTool("status", { description: "Read selected APEX run status" }, async () =>
     result(await service.status()),
   );
   server.registerTool("capabilityList", { description: "Read capability pack availability" }, async () =>
-    result(await service.capabilityList()),
+    result({ packs: await service.capabilityList() }),
   );
   server.registerTool(
     "capabilityStatus",
@@ -164,7 +349,7 @@ export function createMcpServer(service: ApexService): McpServer {
     "nextTask",
     {
       description:
-        "Get the next workflow result. Handle needs_input before requesting context; only status=task returns a task.taskId.",
+        "Advance the workflow by issuing a request or task; this can write state and is not retry-safe. For status=needs_input, collect answers and call recordInput; for status=needs_review, present findings and call reviewDecide with the user's decisions. Only status=task returns a task.taskId for taskContext. Do not poll unresolved input or review results.",
     },
     async () => result(await service.nextTask()),
   );
@@ -179,19 +364,45 @@ export function createMcpServer(service: ApexService): McpServer {
   server.registerTool(
     "readTaskInput",
     {
-      description: "Read a bounded chunk of authoritative context for the exact active task.",
+      description:
+        "Read authoritative UTF-8-bounded task input; inputHash selects an authorized dependency or review-metadata from taskContext.",
       inputSchema: {
         taskId: z.string(),
         offset: z.number().int().nonnegative().optional(),
         limit: z.number().int().min(1).max(6_000).optional(),
+        inputHash: z.union([z.string().regex(/^[0-9a-f]{64}$/u), z.literal("review-metadata")]).optional(),
       },
     },
-    async ({ taskId, offset, limit }) => result(await service.readTaskInput(taskId, offset, limit)),
+    async ({ taskId, offset, limit, inputHash }) =>
+      result(await service.readTaskInput(taskId, offset, limit, inputHash)),
   );
   server.registerTool(
     "recordInput",
-    { description: "Record answers for the exact pending kernel input request", inputSchema: inputSubmission },
+    {
+      description: "Record answers for the exact pending kernel input request",
+      inputSchema: inputSubmission,
+      outputSchema: z.object({ recorded: z.literal(true), requestId: z.string().min(1) }).strict(),
+    },
     async (input) => result(await service.recordInput(input)),
+  );
+  server.registerTool(
+    "governanceImport",
+    {
+      description:
+        "Import the active subscription from a reviewed local governance baseline; provide only its path, never baseline contents.",
+      inputSchema: { path: z.string().min(1) },
+    },
+    async ({ path }) => result(await service.importGovernanceBaseline(path)),
+  );
+  server.registerTool(
+    "governanceSelect",
+    {
+      description:
+        "Prepare or recall the target governance snapshot reuse/refresh question; only a local path is accepted. Does not import or collect Azure policy.",
+      inputSchema: { path: z.string().min(1), reopen: z.boolean().optional() },
+    },
+    async ({ path, reopen }) =>
+      result(await service.selectGovernanceBaseline(path, ...(reopen === undefined ? [] : [{ reopen }]))),
   );
   server.registerTool(
     "projectCreate",
@@ -253,19 +464,19 @@ export function createMcpServer(service: ApexService): McpServer {
   server.registerTool(
     "stageArtifact",
     {
-      inputSchema: {
-        taskId: z.string(),
-        kind: artifactKind.optional(),
-        value: z.unknown().optional(),
-        summary: z.string().optional(),
-        outputs: z.array(taskOutput).optional(),
-      },
+      description:
+        "Stage one typed artifact or an outputs[] bundle for the exact active task; staging does not complete the task.",
+      inputSchema: stagingInput(false),
     },
-    async ({ taskId, kind, value, summary, outputs }) => {
-      if (outputs !== undefined)
-        return result(
-          await Promise.all(normalizeOutputs(outputs).map((output) => service.stageArtifact(taskId, output))),
-        );
+    async ({ taskId, kind, value, summary, outputs }, extra) => {
+      if (outputs !== undefined) {
+        const artifacts = [];
+        for (const output of normalizeOutputs(outputs)) {
+          if (extra.signal.aborted) throw new ApexError("APEX_CONFLICT", "Cancelled", EXIT_CODES.conflict);
+          artifacts.push(await service.stageArtifact(taskId, output));
+        }
+        return result({ artifacts });
+      }
       if (kind === undefined) throw new Error("stageArtifact requires kind/value or outputs[]");
       return result(
         await service.stageArtifact(taskId, { kind, value, ...(summary === undefined ? {} : { summary }) }),
@@ -275,6 +486,8 @@ export function createMcpServer(service: ApexService): McpServer {
   server.registerTool(
     "stageFile",
     {
+      description:
+        "Stage a generated file for the exact active task, optionally checking its expected SHA; does not deploy it.",
       inputSchema: {
         taskId: z.string(),
         path: z.string(),
@@ -291,6 +504,8 @@ export function createMcpServer(service: ApexService): McpServer {
   server.registerTool(
     "generateIac",
     {
+      description:
+        "Generate IaC for the active CodeGen task from accepted inputs and bindings; does not authorize deployment.",
       inputSchema: {
         taskId: z.string(),
         existingResources: z.array(z.string()).optional(),
@@ -312,25 +527,27 @@ export function createMcpServer(service: ApexService): McpServer {
   server.registerTool(
     "validateTask",
     {
-      inputSchema: {
-        taskId: z.string(),
-        kind: artifactKind.optional(),
-        value: z.unknown().optional(),
-        summary: z.string().optional(),
-        outputs: z.array(taskOutput).optional(),
-      },
+      description: "Validate the active task's staged outputs or supplied artifacts without completing the task.",
+      inputSchema: stagingInput(true),
     },
-    async ({ taskId, kind, value, summary, outputs }) =>
-      result(
+    async ({ taskId, kind, value, summary, outputs }, extra) => {
+      if (outputs !== undefined) {
+        const staged = [];
+        for (const output of normalizeOutputs(outputs)) {
+          if (extra.signal.aborted) throw new ApexError("APEX_CONFLICT", "Cancelled", EXIT_CODES.conflict);
+          const validated = await service.validateTask(taskId, output);
+          if (validated.staged !== undefined)
+            staged.push(...(Array.isArray(validated.staged) ? validated.staged : [validated.staged]));
+        }
+        return result({ valid: true, taskId, staged });
+      }
+      return result(
         await service.validateTask(
           taskId,
-          outputs === undefined
-            ? kind === undefined
-              ? undefined
-              : { kind, value, ...(summary === undefined ? {} : { summary }) }
-            : normalizeOutputs(outputs),
+          kind === undefined ? undefined : { kind, value, ...(summary === undefined ? {} : { summary }) },
         ),
-      ),
+      );
+    },
   );
   server.registerTool(
     "completeTask",
@@ -407,11 +624,23 @@ export function createMcpServer(service: ApexService): McpServer {
       ),
   );
   server.registerTool("preview", { description: "Read the current operator-created deployment preview" }, async () =>
-    result(await service.currentPreview()),
+    result({ markdown: await service.currentPreview() }),
   );
-  server.registerTool("reconcile", {}, async () => result(await service.reconcile()));
-  server.registerTool("inventory", {}, async () => result(await service.inventory()));
-  server.registerTool("diagnose", {}, async () => result(await service.diagnose()));
+  server.registerTool(
+    "reconcile",
+    { description: "Run the kernel-authorized reconciliation operation for the selected run." },
+    async () => result(await service.reconcile()),
+  );
+  server.registerTool(
+    "inventory",
+    { description: "Run the bounded inventory operation for the selected run and return its evidence." },
+    async () => result(await service.inventory()),
+  );
+  server.registerTool(
+    "diagnose",
+    { description: "Run bounded diagnosis for the selected run and return the kernel-recorded result." },
+    async () => result(await service.diagnose()),
+  );
   server.registerTool(
     "improvementObserve",
     {
@@ -454,29 +683,44 @@ export function createMcpServer(service: ApexService): McpServer {
       ),
   );
   server.registerTool("improvementObservations", { description: "Read bounded observations" }, async () =>
-    result(await service.improvementObservations()),
+    result({ observations: await service.improvementObservations() }),
   );
   server.registerTool("improvementProposals", { description: "Read inert improvement proposals" }, async () =>
-    result(await service.improvementProposals()),
+    result({ proposals: await service.improvementProposals() }),
   );
   server.registerTool(
     "render",
-    { inputSchema: { kind: z.enum(["status", "requirements", "preview", "approval", "inventory"]) } },
-    async ({ kind }) => result(await service.render(kind)),
+    {
+      description:
+        "Render the selected run's status, requirements, preview, approval, or inventory as a human-readable projection.",
+      inputSchema: { kind: z.enum(["status", "requirements", "preview", "approval", "inventory"]) },
+      outputSchema: z.object({ markdown: z.string() }).strict(),
+    },
+    async ({ kind }) => result({ markdown: await service.render(kind) }),
   );
   server.registerTool(
     "promote",
-    { inputSchema: { environment: z.string(), target: z.string() } },
+    {
+      description:
+        "Promote the selected run to a target environment through kernel checks; does not approve or execute deployment.",
+      inputSchema: { environment: z.string(), target: z.string() },
+    },
     async ({ environment, target }) => result(await service.promote(environment, target)),
   );
   server.registerTool(
     "doctor",
-    { inputSchema: { fix: z.boolean().optional(), yes: z.boolean().optional() } },
+    {
+      description:
+        "Inspect local APEX installation health; request repairs with fix and explicit confirmation with yes.",
+      inputSchema: { fix: z.boolean().optional(), yes: z.boolean().optional() },
+    },
     async ({ fix, yes }) => result(await service.doctor(fix, yes)),
   );
   server.registerTool(
     "submitEvidence",
     {
+      description:
+        "Submit JSON evidence bound to the exact active task after validating its context; does not complete the task.",
       inputSchema: {
         taskId: z.string(),
         kind: z.string(),
@@ -491,6 +735,7 @@ export function createMcpServer(service: ApexService): McpServer {
       );
     },
   );
+  server.server.setRequestHandler(ListToolsRequestSchema, () => ({ tools: toolDefinitions }));
   return server;
 }
 
