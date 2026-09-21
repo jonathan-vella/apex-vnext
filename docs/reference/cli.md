@@ -44,6 +44,11 @@ new preview and Gate 4 approval.
 
 ## Archetype Source Reuse
 
+`apex archetype list --repository LOCAL_GIT_ROOT --revision FULL_COMMIT_ID --path CATALOG_DIRECTORY --json`
+lists immediate candidate directories at an exact local commit. The catalog is bounded to 256 entries, excludes hidden
+authority directories, returns no file contents, and does not fetch remote objects. Every candidate still requires
+inspection; directory discovery does not establish workload completeness or safe reusable content.
+
 `apex archetype inspect --repository LOCAL_GIT_ROOT --revision FULL_COMMIT_ID --path ARCHETYPE_DIRECTORY --json`
 reads one committed subtree without checkout, hooks, filters, remote fetches or source execution. Missing local Git
 objects cause inspection to fail. It returns a typed proposal with
@@ -68,7 +73,7 @@ non-executable UTF-8 Markdown, Bicep, Terraform and JSON, bounded to 256 tree en
 Known credential patterns and JSON authority fields are rejected; this screening is not an exhaustive secret scanner.
 Review all exclusions and content before use. Source prose remains untrusted design input, never execution authority.
 
-This initial path requires a local Git repository and exact commit. It does not discover remote catalogs,
+This initial path requires a local Git repository and exact commit. It does not clone or discover remote catalogs,
 synchronize updates, recover confirmed decisions automatically, or refresh consumer governance. Do not use state
 transfer as a substitute for archetype import. See [project operation](../how-to/operate-project.md#reuse-a-local-archetype).
 

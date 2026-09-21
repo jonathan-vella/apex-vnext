@@ -54,6 +54,20 @@ test("CLI archetype inspection requires explicit repository, revision and select
     { status: "inspected" },
   );
   assert.deepEqual(inspected.mock.calls[0]!.arguments, ["source", "a".repeat(40), "archetypes/storage"]);
+  const listed = context.mock.method(ApexService.prototype, "listArchetypes", async () => ({ candidates: [] }));
+  await assert.rejects(
+    execute(["archetype", "list", "--repository", "source", "--revision", "a".repeat(40)], root),
+    /Missing/,
+  );
+  assert.equal(listed.mock.callCount(), 0);
+  assert.deepEqual(
+    await execute(
+      ["archetype", "list", "--repository", "source", "--revision", "a".repeat(40), "--path", "archetypes"],
+      root,
+    ),
+    { candidates: [] },
+  );
+  assert.deepEqual(listed.mock.calls[0]!.arguments, ["source", "a".repeat(40), "archetypes"]);
 });
 
 test("CLI archetype inspection and confirmed copy preserve independent origin and conflicts", async (context) => {

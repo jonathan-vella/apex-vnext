@@ -7,9 +7,10 @@ commands below describe the runtime boundary; they do not authorize a deployment
 
 ## Reuse A Local Archetype
 
-In the consumer workspace, inspect one archetype directory at an exact commit in a local COE checkout:
+In the consumer workspace, list candidate directories at an exact commit in a local COE checkout, then inspect one:
 
 ```bash
+apex archetype list --repository /path/to/coe --revision FULL_COMMIT_ID --path archetypes --json
 apex archetype inspect --repository /path/to/coe --revision FULL_COMMIT_ID --path archetypes/storage --json
 ```
 

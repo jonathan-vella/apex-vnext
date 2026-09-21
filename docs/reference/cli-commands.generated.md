@@ -9,6 +9,7 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 - `approval show`
 - `archetype import`
 - `archetype inspect`
+- `archetype list`
 - `bootstrap`
 - `cache clear`
 - `cache status`

@@ -5,7 +5,7 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { inspectArchetypeSource } from "../archetype-source.js";
+import { inspectArchetypeSource, listArchetypeSources } from "../archetype-source.js";
 import { hasValidArchetypeSourceProposal, calculatePolicyValidationDigest } from "@apexops/contracts";
 
 const execute = promisify(execFile);
@@ -23,6 +23,7 @@ test("archetype inspection pins committed content and excludes source authority"
     "archetypes/storage/agent-output/deployment.json": "{}\n",
     "archetypes/storage/deploy.sh": "exit 1\n",
     "archetypes/other/main.tf": "terraform {}\n",
+    "archetypes/.apex/main.tf": "terraform {}\n",
   };
   for (const [path, content] of Object.entries(files)) {
     await mkdir(join(root, path, ".."), { recursive: true });
@@ -42,6 +43,29 @@ test("archetype inspection pins committed content and excludes source authority"
   );
   const revision = (await git("rev-parse", "HEAD")).stdout.trim();
   await writeFile(join(root, "archetypes/storage/main.bicep"), "uncommitted edit\n");
+  const catalog = await listArchetypeSources({ repositoryPath: root, revision, catalogPath: "archetypes" });
+  assert.deepEqual(
+    catalog.candidates.map(({ selectedPath }) => selectedPath),
+    ["archetypes/other", "archetypes/storage"],
+  );
+  assert.ok(
+    catalog.candidates.every(
+      ({ requiresInspection, treeObjectId }) => requiresInspection && /^[a-f0-9]{40,64}$/.test(treeObjectId),
+    ),
+  );
+  assert.doesNotMatch(JSON.stringify(catalog), /targetScope|untrusted instruction/);
+  await assert.rejects(
+    listArchetypeSources({ repositoryPath: root, revision: "HEAD", catalogPath: "archetypes" }),
+    /invalid/,
+  );
+  await assert.rejects(
+    listArchetypeSources({ repositoryPath: root, revision, catalogPath: "archetypes/../outside" }),
+    /invalid/,
+  );
+  await assert.rejects(
+    listArchetypeSources({ repositoryPath: root, revision, catalogPath: "archetypes/storage/.apex" }),
+    /invalid/,
+  );
   const result = await inspectArchetypeSource({ repositoryPath: root, revision, selectedPath: "archetypes/storage" });
   assert.equal(result.proposal.revision, revision);
   assert.deepEqual(
@@ -181,6 +205,11 @@ test("archetype inspection rejects secrets, collisions, binary and oversized sel
         "fixture",
       );
       const revision = (await git("rev-parse", "HEAD")).stdout.trim();
+      if (scenario === "collision")
+        await assert.rejects(
+          listArchetypeSources({ repositoryPath: root, revision, catalogPath: "workload" }),
+          /collides/,
+        );
       await assert.rejects(
         inspectArchetypeSource({ repositoryPath: root, revision, selectedPath: "workload" }),
         (error: unknown) => {
@@ -191,4 +220,30 @@ test("archetype inspection rejects secrets, collisions, binary and oversized sel
       );
     });
   }
+});
+
+test("archetype catalog rejects more than 256 entries instead of returning a partial list", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "apex-archetype-catalog-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const git = (...args: string[]) => execute("git", ["-C", root, ...args]);
+  await git("init", "-q");
+  await mkdir(join(root, "archetypes"));
+  for (let index = 0; index < 257; index++) await writeFile(join(root, "archetypes", `${index}.md`), "input\n");
+  await git("add", ".");
+  await git(
+    "-c",
+    "user.name=Fixture",
+    "-c",
+    "user.email=fixture@example.invalid",
+    "-c",
+    "core.hooksPath=/dev/null",
+    "commit",
+    "-qm",
+    "fixture",
+  );
+  const revision = (await git("rev-parse", "HEAD")).stdout.trim();
+  await assert.rejects(
+    listArchetypeSources({ repositoryPath: root, revision, catalogPath: "archetypes" }),
+    /entry limits/,
+  );
 });

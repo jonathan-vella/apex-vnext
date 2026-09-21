@@ -92,6 +92,7 @@ import {
   importGovernanceBaseline,
   inspectGovernanceBaseline,
   inspectArchetypeSource,
+  listArchetypeSources,
   GovernanceBaselineError,
   nativePolicyValidationBinding,
   assertGeneratedSourceUnchanged,
@@ -1175,6 +1176,18 @@ export class ApexService {
       throw new ApexError(
         "APEX_VALIDATION",
         "Archetype inspection failed: use an exact local Git commit and a bounded reusable directory without secrets or unsafe files",
+        EXIT_CODES.validation,
+      );
+    }
+  }
+
+  async listArchetypes(repositoryPath: string, revision: string, catalogPath: string) {
+    try {
+      return await listArchetypeSources({ repositoryPath: resolve(this.root, repositoryPath), revision, catalogPath });
+    } catch {
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Archetype discovery requires an exact local commit and a bounded safe catalog directory",
         EXIT_CODES.validation,
       );
     }

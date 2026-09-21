@@ -610,6 +610,12 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
         required(flags, "recipient"),
       );
     }
+    case "archetype list":
+      return service.listArchetypes(
+        required(flags, "repository"),
+        required(flags, "revision"),
+        required(flags, "path"),
+      );
     case "archetype inspect":
       return service.inspectArchetype(
         required(flags, "repository"),

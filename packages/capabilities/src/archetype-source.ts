@@ -114,15 +114,9 @@ function assertReusableContent(path: string, content: string): void {
   }
 }
 
-export async function inspectArchetypeSource(request: {
-  readonly repositoryPath: string;
-  readonly revision: string;
-  readonly selectedPath: string;
-}): Promise<{ readonly proposal: ArchetypeSourceProposalV1; readonly contents: ReadonlyMap<string, string> }> {
-  if (!isAbsolute(request.repositoryPath) || !OBJECT_ID.test(request.revision) || !safePath(request.selectedPath))
+async function openArchetypeRepository(request: { readonly repositoryPath: string; readonly revision: string }) {
+  if (!isAbsolute(request.repositoryPath) || !OBJECT_ID.test(request.revision))
     throw new TypeError("Archetype source selection is invalid");
-  if (exclusion(`${request.selectedPath}/main.bicep`) === "source-authority")
-    throw new Error("Archetype source authority directory is not reusable");
   const info = await lstat(request.repositoryPath);
   if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Archetype repository must be a regular directory");
   const repositoryPath = await realpath(request.repositoryPath);
@@ -155,10 +149,51 @@ export async function inspectArchetypeSource(request: {
   };
   const root = (await git(["rev-parse", "--show-toplevel"])).toString("utf8").trim();
   if ((await realpath(root)) !== repositoryPath) throw new Error("Archetype source must be a repository root");
-  if (
-    (await git(["cat-file", "-t", request.revision])).toString("utf8").trim() !== "commit" ||
-    (await git(["cat-file", "-t", `${request.revision}:${request.selectedPath}`])).toString("utf8").trim() !== "tree"
-  )
+  if ((await git(["cat-file", "-t", request.revision])).toString("utf8").trim() !== "commit")
+    throw new Error("Archetype revision must identify an exact commit");
+  return { repositoryPath, git };
+}
+
+export async function listArchetypeSources(request: {
+  readonly repositoryPath: string;
+  readonly revision: string;
+  readonly catalogPath: string;
+}) {
+  if (!safePath(request.catalogPath) || exclusion(`${request.catalogPath}/main.bicep`) === "source-authority")
+    throw new TypeError("Archetype catalog path is invalid");
+  const { repositoryPath, git } = await openArchetypeRepository(request);
+  const listing = await git(["ls-tree", "-z", `${request.revision}:${request.catalogPath}`]);
+  const entries = new TextDecoder("utf-8", { fatal: true }).decode(listing).split("\0").filter(Boolean);
+  if (entries.length > LIMITS.files) throw new Error("Archetype catalog exceeds entry limits");
+  const paths = new Set<string>();
+  const candidates: Array<{ selectedPath: string; treeObjectId: string; requiresInspection: true }> = [];
+  for (const entry of entries) {
+    const match = /^(\d{6}) (tree|blob|commit) ([a-f0-9]+)\t([\s\S]+)$/u.exec(entry);
+    if (!match || !OBJECT_ID.test(match[3]!) || !safePath(match[4]!) || paths.has(match[4]!.toLowerCase()))
+      throw new Error("Archetype catalog entry is invalid or collides");
+    paths.add(match[4]!.toLowerCase());
+    const selectedPath = `${request.catalogPath}/${match[4]!}`;
+    if (match[1] !== "040000" || match[2] !== "tree" || exclusion(`${selectedPath}/main.bicep`) === "source-authority")
+      continue;
+    if (!safePath(selectedPath)) throw new Error("Archetype candidate path exceeds limits");
+    candidates.push({ selectedPath, treeObjectId: match[3]!, requiresInspection: true });
+  }
+  candidates.sort((left, right) =>
+    left.selectedPath < right.selectedPath ? -1 : left.selectedPath > right.selectedPath ? 1 : 0,
+  );
+  return { repositoryPath, revision: request.revision, catalogPath: request.catalogPath, candidates };
+}
+
+export async function inspectArchetypeSource(request: {
+  readonly repositoryPath: string;
+  readonly revision: string;
+  readonly selectedPath: string;
+}): Promise<{ readonly proposal: ArchetypeSourceProposalV1; readonly contents: ReadonlyMap<string, string> }> {
+  if (!safePath(request.selectedPath)) throw new TypeError("Archetype source selection is invalid");
+  if (exclusion(`${request.selectedPath}/main.bicep`) === "source-authority")
+    throw new Error("Archetype source authority directory is not reusable");
+  const { repositoryPath, git } = await openArchetypeRepository(request);
+  if ((await git(["cat-file", "-t", `${request.revision}:${request.selectedPath}`])).toString("utf8").trim() !== "tree")
     throw new Error("Archetype selection must identify an exact commit and directory");
   const listing = await git([
     "ls-tree",
