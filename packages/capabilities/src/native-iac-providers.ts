@@ -8,6 +8,7 @@ import {
   NATIVE_VALIDATION_COMMANDS,
   calculateNativeValidationCommandHash,
   calculateNativeValidationReceiptHash,
+  calculatePolicyValidationDigest,
   hasValidNativeValidationReceipt,
 } from "@apexops/contracts";
 import type {
@@ -306,7 +307,18 @@ abstract class NativeProviderBase {
     const generatedSource = { ...request.generatedSource };
     const commands = NATIVE_VALIDATION_COMMANDS[track];
     let receipt: NativeValidationReceiptV1;
+    let policyInput: NativeValidationRequest["policyValidation"];
     try {
+      if (track === "bicep" && request.policyValidation !== undefined) {
+        calculatePolicyValidationDigest(request.policyValidation);
+        policyInput = structuredClone(request.policyValidation);
+        if (
+          calculatePolicyValidationDigest(policyInput.policyMap) !== request.policyHash ||
+          policyInput.policyMap.projectId !== request.projectId ||
+          policyInput.policyMap.runId !== request.runId
+        )
+          throw new Error();
+      }
       const body: Omit<NativeValidationReceiptV1, "receiptHash"> = {
         schemaVersion: "1.0.0",
         projectId: request.projectId,
@@ -375,6 +387,7 @@ abstract class NativeProviderBase {
         }
         await readGeneratedSource(scratch, scratch, outputs);
       };
+      let compiledTemplate: string | undefined;
       for (const command of commands) {
         await verify();
         try {
@@ -392,11 +405,34 @@ abstract class NativeProviderBase {
             result.outputTruncated !== false
           )
             throw new Error();
+          if (command.validatorId === "bicep:build") compiledTemplate = result.stdout;
         } catch {
           throw new IacProviderError("NATIVE_VALIDATION_FAILED", "Native validation command failed");
         } finally {
           await verify();
         }
+      }
+      if (policyInput !== undefined && policyInput.policyMap.mappings.length > 0) {
+        let policyValidation: PolicyValidationV1;
+        try {
+          policyValidation = validatePolicyProperties({
+            ...policyInput,
+            track,
+            sourceHash: receipt.sourceHash,
+            policyMapHash: receipt.policyHash,
+            json: compiledTemplate ?? "",
+          });
+          if (policyValidation.outcome !== "pass") throw new Error();
+        } catch {
+          throw new IacProviderError("NATIVE_VALIDATION_FAILED", "Native policy property validation failed");
+        } finally {
+          await verify();
+        }
+        receipt.policyValidation = policyValidation;
+        const { receiptHash, ...updated } = receipt;
+        if (!receiptHash)
+          throw new IacProviderError("NATIVE_VALIDATION_FAILED", "Native validation receipt is missing");
+        receipt = { ...updated, receiptHash: calculateNativeValidationReceiptHash(updated) };
       }
       return receipt;
     } finally {
@@ -613,6 +649,14 @@ export class NativeBicepProvider extends NativeProviderBase implements IacProvid
   }
 
   async previewApply(request: PreviewRequest): Promise<DeploymentPreviewV1> {
+    if (request.policyValidation !== undefined) {
+      try {
+        calculatePolicyValidationDigest(request.policyValidation);
+        request = { ...request, policyValidation: structuredClone(request.policyValidation) };
+      } catch {
+        throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Bicep policy validation inputs are invalid");
+      }
+    }
     const source = await bindGeneratedSource(
       request,
       this.#target.cwd,
@@ -962,6 +1006,14 @@ export class NativeTerraformProvider extends NativeProviderBase implements IacPr
         "PREVIEW_HASH_MISMATCH",
         "Terraform local/reference plan transport requires injected key, artifact, and binding stores",
       );
+    }
+    if (operation === "apply" && request.policyValidation !== undefined) {
+      try {
+        calculatePolicyValidationDigest(request.policyValidation);
+        request = { ...request, policyValidation: structuredClone(request.policyValidation) };
+      } catch {
+        throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Terraform policy validation inputs are invalid");
+      }
     }
     const source = await bindGeneratedSource(request, this.#target.cwd);
     const requestedPlanPath = this.#target.planPath(request, operation);

@@ -1709,6 +1709,79 @@ test("plan task context projects source hashes and valid output templates", asyn
   assert.deepEqual(JSON.parse(chunks.join("")), plan[0]!.value);
 });
 
+test("direct worker calls preserve authority across missing, foreign, wrong, replayed and expired tasks", async () => {
+  let now = Date.parse("2026-09-21T00:00:00.000Z");
+  const root = await tempRoot();
+  const service = new ApexService(root, { clock: () => new Date(now) });
+  const { runId } = await service.init({ projectId: "demo" });
+  const runPath = join(root, ".apex", "projects", "demo", "runs", runId);
+  const journal = new EventJournal(join(runPath, "journal"));
+  const canary = join(root, "user-notes.md");
+  await writeFile(canary, "Preserve user content\n");
+  const unchangedAfterRejection = async (operation: () => Promise<unknown>, expected: RegExp) => {
+    const beforeEvents = await journal.replay();
+    const beforeRun = await readFile(join(runPath, "run.json"));
+    await assert.rejects(operation, expected);
+    assert.deepEqual(await journal.replay(), beforeEvents);
+    assert.deepEqual(await readFile(join(runPath, "run.json")), beforeRun);
+    assert.equal(await readFile(canary, "utf8"), "Preserve user content\n");
+  };
+  const missing = "00000000-0000-4000-8000-000000000000";
+  for (const operation of [
+    () => service.completeReview(missing, []),
+    () => service.generateIac(missing),
+    () => service.validateTask(missing),
+    () => service.stageFile(missing, "main.bicep", ""),
+  ])
+    await unchangedAfterRejection(operation, /task|ENOENT/i);
+  const issued = await nextTaskAfterInput(service);
+  if (issued.status !== "task") throw new Error("Expected requirements task");
+  for (const operation of [
+    () => service.completeReview(issued.task.taskId, []),
+    () => service.generateIac(issued.task.taskId),
+    () => service.stageFile(issued.task.taskId, "../user-notes.md", "overwrite"),
+    () => service.decideGateNumber(1, "approved", "direct-worker-probe"),
+  ])
+    await unchangedAfterRejection(operation, /task|gate|review|approval/i);
+  const other = new ApexService(await tempRoot());
+  await other.init({ projectId: "other" });
+  const foreign = await nextTaskAfterInput(other);
+  if (foreign.status !== "task") throw new Error("Expected foreign task");
+  await unchangedAfterRejection(() => service.completeReview(foreign.task.taskId, []), /task|ENOENT/i);
+  const accepted = await service.completeRequirements(issued.task.taskId, requirements());
+  assert.ok(accepted.outputHashes.requirements);
+  await unchangedAfterRejection(
+    () => service.completeRequirements(issued.task.taskId, requirements()),
+    /stale|head|completed/i,
+  );
+  const reviewTask = await service.nextTask();
+  if (reviewTask.status !== "task") throw new Error("Expected review task");
+  assert.equal(reviewTask.task.taskType, "requirements-review");
+  const reviewOutput = review(runId, "requirements", accepted.outputHashes.requirements!);
+  const wrongSubject = { ...reviewOutput, subjectHash: "f".repeat(64) };
+  await unchangedAfterRejection(
+    () => service.completeTaskOutputs(reviewTask.task.taskId, [{ kind: "review-findings", value: wrongSubject }]),
+    /bind|subject|hash/i,
+  );
+  now += 25 * 60 * 60 * 1_000;
+  await unchangedAfterRejection(() => service.completeReview(reviewTask.task.taskId, []), /expired/i);
+});
+
+test("same client can submit valid requirements and review without authenticating distinct agent identities", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo" });
+  const issued = await nextTaskAfterInput(service);
+  if (issued.status !== "task") throw new Error("Expected requirements task");
+  const accepted = await service.completeRequirements(issued.task.taskId, requirements());
+  const reviewTask = await service.nextTask();
+  if (reviewTask.status !== "task") throw new Error("Expected review task");
+  const completed = await service.completeReview(reviewTask.task.taskId, []);
+  const stored = await new ObjectStore(root).getJson(completed.outputHashes["review-findings"]!);
+  assert.equal((stored as { subjectHash: string }).subjectHash, accepted.outputHashes.requirements);
+  assert.notEqual((await service.status()).run.gates[0]!.state, "approved");
+});
+
 test("review input reads reject expired tasks", async () => {
   let now = Date.parse("2026-01-01T00:00:00.000Z");
   const service = new ApexService(await tempRoot(), { clock: () => new Date(now) });
@@ -1978,10 +2051,17 @@ test("a task remains current across stage then complete", async () => {
 
 test("expired preview and wrong preview hash are rejected", async () => {
   let now = Date.parse("2026-01-01T00:00:00.000Z");
-  const service = new ApexService(await tempRoot(), { clock: () => new Date(now) });
+  const root = await tempRoot();
+  const service = new ApexService(root, { clock: () => new Date(now) });
   const initialized = await service.init({ projectId: "demo" });
   await prepareValidatedRun(service, initialized.runId, "bicep");
   const preview = await service.preview({ operation: "apply", provider: "fake", expiresInMs: 1 });
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"));
+  const beforeApproval = await service.status();
+  const events = await journal.replay();
+  await assert.rejects(service.deploy(preview.previewHash), /approval|gate/i);
+  assert.deepEqual(await journal.replay(), events);
+  assert.deepEqual((await service.status()).run, beforeApproval.run);
   await service.decideGateNumber(4, "approved", "tester");
   await assert.rejects(
     service.deploy("f".repeat(64)),

@@ -8,9 +8,11 @@ import type {
   DeploymentPreviewV1,
   ExecutionPlanAttestationV1,
   GovernanceConstraintsV1,
+  IacHandoffV1,
   IacBindingV1,
   ImplementationIntentV1,
   LogicalResourceManifestV1,
+  NativeValidationReceiptV1,
   PolicyPropertyMapV1,
   PolicyValidationV1,
 } from "@apexops/contracts";
@@ -20,7 +22,12 @@ import {
   calculateNativeValidationReceiptHash,
   NATIVE_VALIDATION_COMMANDS,
 } from "@apexops/contracts";
-import { nativePolicyValidationBinding, validatePolicyProperties } from "@apexops/capabilities";
+import {
+  NativeBicepProvider,
+  NativeTerraformProvider,
+  nativePolicyValidationBinding,
+  validatePolicyProperties,
+} from "@apexops/capabilities";
 import type { IacProvider, PreviewRequest } from "@apexops/capabilities";
 import { EventJournal, ObjectStore, RunRepository, ValidatorRegistry, sha256Bytes, sha256Json } from "@apexops/kernel";
 import { ApexError } from "../errors.js";
@@ -28,6 +35,7 @@ import { dependencyRevision } from "../dependency-revision.js";
 import { createMcpServer } from "../mcp.js";
 import { ApexService, type TaskOutput } from "../service.js";
 import { registerWorkflowValidators } from "../workflow-validators.js";
+import { createFileProviderRuntime, hashTerraformConfiguration } from "../provider-runtime.js";
 import {
   architecture,
   acceptAvailabilityEvidence,
@@ -70,7 +78,7 @@ async function reachCodegen(
   configurePlan?: (plan: ReturnType<typeof planBundle>) => void | Promise<void>,
   revisePlan = false,
   baselinePath?: string,
-  configurePolicy?: (policy: PolicyPropertyMapV1) => void,
+  configurePolicy?: (policy: PolicyPropertyMapV1) => void | Promise<void>,
   beforeGovernanceImport?: () => Promise<void>,
 ): Promise<{ taskId: string; plan: ReturnType<typeof planBundle> }> {
   await service.nextTask();
@@ -127,7 +135,7 @@ async function reachCodegen(
     assert.match(chunk.content, /governance-baseline-selection-v2/);
   }
   const policy = policyMap(runId, governanceHashes["governance-constraints"]!) as PolicyPropertyMapV1;
-  configurePolicy?.(policy);
+  await configurePolicy?.(policy);
   const policyHashes = await complete(service, "governance-reconciliation", [
     { kind: "policy-property-map", value: policy },
   ]);
@@ -645,6 +653,69 @@ test("validation completion executes configured native checks instead of trustin
   assert.equal(await journal.head(), head);
 });
 
+test("native validation receives accepted concrete policy mappings and resource bindings on both tracks", async () => {
+  for (const track of ["bicep", "terraform"] as const) {
+    const root = await tempRoot();
+    let calls = 0;
+    let expectedPolicy: PolicyPropertyMapV1;
+    let expectedBindings: Record<string, { codeSymbol: string } | { terraformAddress: string }>;
+    const provider: IacProvider = {
+      ...(track === "bicep" ? bicepPreviewProvider(new Date()) : terraformPreviewProvider(new Date())),
+      async validateSource(request) {
+        calls++;
+        const input = request.policyValidation;
+        assert.ok(input, "Native validation must receive concrete policy inputs, not only a hash");
+        assert.deepEqual(input.policyMap, expectedPolicy);
+        assert.equal(sha256Json(input.policyMap), request.policyHash);
+        assert.deepEqual(input.logicalResourceManifest, expectedBindings);
+        throw new Error("policy inputs inspected");
+      },
+    };
+    const service = new ApexService(root, { providers: { [track]: provider } });
+    const { runId } = await service.init({ projectId: "demo", iacTool: track });
+    const generated = await reachCodegen(service, runId, track, undefined, false, undefined, (policy) => {
+      for (const effect of ["deny", "modify", "deployIfNotExists"] as const) {
+        policy.mappings.push({
+          policyAssignmentId: `assignment-${effect}`,
+          effect,
+          logicalResourceId: "api",
+          propertyPath: "properties.httpsOnly",
+          expectedValue: true,
+          disposition: "planned",
+        });
+      }
+    });
+    const objects = new ObjectStore(root);
+    const policyHash = (generated.plan[0]!.value as ImplementationIntentV1).sourceHashes["policy-property-map"]!;
+    expectedPolicy = await objects.getJson<PolicyPropertyMapV1>(policyHash);
+    const outputs = codegenBundle(runId, track, generated.plan);
+    const manifest = outputs.find(({ kind }) => kind === "logical-resource-manifest")!
+      .value as LogicalResourceManifestV1;
+    expectedBindings = Object.fromEntries(
+      manifest.resources
+        .filter(({ ownership, executionAddress }) => ownership === "managed" && executionAddress !== undefined)
+        .map(({ logicalId, executionAddress }) => [
+          logicalId,
+          track === "bicep" ? { codeSymbol: executionAddress! } : { terraformAddress: executionAddress! },
+        ]),
+    );
+    assert.ok(Object.keys(expectedBindings).length > 0);
+    await service.completeTaskOutputs(generated.taskId, outputs);
+    const validationTask = await task(service, `validation-${track}`);
+    const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+    const head = await journal.head();
+    await assert.rejects(
+      service.completeTaskOutputs(validationTask, [
+        { kind: "validation-evidence", value: validationEvidence(runId, track) },
+      ]),
+      /policy inputs inspected/,
+    );
+    assert.equal(calls, 1);
+    assert.equal(await journal.head(), head);
+    assert.equal((await service.status()).run.gates[3]!.state, "closed");
+  }
+});
+
 test("native adapters cannot silently fall back to simulated validation", async () => {
   const root = await tempRoot();
   const provider = bicepPreviewProvider(new Date());
@@ -663,9 +734,12 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
   for (const track of ["bicep", "terraform"] as const) {
     const root = await tempRoot();
     let stale = true;
+    let now = new Date();
+    let expireDuringValidation = false;
     const provider: IacProvider = {
       ...(track === "bicep" ? bicepPreviewProvider(new Date()) : terraformPreviewProvider(new Date())),
       async validateSource(request) {
+        if (expireDuringValidation) now = new Date(now.getTime() + 25 * 60 * 60 * 1000);
         const receipt = {
           schemaVersion: "1.0.0" as const,
           projectId: request.projectId,
@@ -688,7 +762,7 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
         return { ...receipt, receiptHash: calculateNativeValidationReceiptHash(receipt) };
       },
     };
-    const service = new ApexService(root, { providers: { [track]: provider } });
+    const service = new ApexService(root, { providers: { [track]: provider }, clock: () => now });
     const { runId } = await service.init({
       projectId: "demo",
       iacTool: track,
@@ -715,6 +789,53 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
     );
     assert.equal(await journal.head(), head);
     stale = false;
+    const originalTime = now;
+    expireDuringValidation = true;
+    await assert.rejects(service.validateTask(validationTask), /expired/i);
+    assert.equal(await journal.head(), head);
+    now = originalTime;
+    expireDuringValidation = false;
+    const checked = await service.validateTask(validationTask);
+    assert.equal(checked.valid, false);
+    assert.equal(checked.execution?.mode, "native");
+    assert.deepEqual(
+      [...checked.execution!.executedValidatorIds].sort(),
+      NATIVE_VALIDATION_COMMANDS[track].map(({ validatorId }) => validatorId).sort(),
+    );
+    assert.deepEqual(checked.execution?.blockedValidatorIds, [
+      "business:security-baseline",
+      "business:policy-property-map",
+      "business:logical-resource-parity",
+    ]);
+    assert.equal(await journal.head(), head);
+    const partial = checked.outputs![0]!.value as ReturnType<typeof validationEvidence>;
+    assert.equal(partial.entries.length, 3);
+    for (const entry of partial.entries) {
+      const stored = await new ObjectStore(root).getJson<{ sourceHash: string }>(entry.hash);
+      assert.equal(stored.sourceHash, generatedHashes.outputHashes["iac-handoff"]);
+    }
+    await assert.rejects(
+      service.completeTaskOutputs(validationTask, checked.outputs!),
+      /business:security-baseline validation failed/,
+    );
+    assert.equal(await journal.head(), head);
+    assert.equal((await service.status()).run.gates[3]!.state, "closed");
+    const server = createMcpServer(service);
+    const client = new Client({ name: "validation-evidence-test", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    try {
+      const response = await client.callTool({ name: "validateTask", arguments: { taskId: validationTask } });
+      assert.notEqual(response.isError, true);
+      const result = response.structuredContent as Record<string, unknown>;
+      assert.equal(result.valid, false);
+      assert.deepEqual(result.execution, checked.execution);
+      assert.equal(await journal.head(), head);
+    } finally {
+      await client.close();
+      await server.close();
+    }
     const submittedOutputs: TaskOutput[] = [{ kind: "validation-evidence", value: submitted }];
     Object.freeze(submittedOutputs);
     const accepted = await service.completeTaskOutputs(validationTask, submittedOutputs);
@@ -754,6 +875,103 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
   }
 });
 
+test("Bicep validation acceptance requires complete bound policy evidence before advancing", async () => {
+  const root = await tempRoot();
+  let mode = "missing";
+  const provider: IacProvider = {
+    ...bicepPreviewProvider(new Date()),
+    async validateSource(request) {
+      assert.ok(request.policyValidation);
+      const policy = structuredClone(
+        validatePolicyProperties({
+          ...request.policyValidation,
+          track: "bicep",
+          sourceHash: request.sourceHash,
+          policyMapHash: request.policyHash,
+          json: JSON.stringify({ resources: { api: { properties: { httpsOnly: true } } } }),
+        }),
+      );
+      if (mode === "wrong-map") policy.policyMapContentHash = "f".repeat(64);
+      if (mode === "wrong-manifest") policy.logicalResourceManifestHash = "f".repeat(64);
+      if (mode === "partial") policy.results.pop();
+      if (mode === "wrong-mapping") policy.results[0]!.mappingHash = "f".repeat(64);
+      const { receiptHash: policyHash, ...policyBody } = policy;
+      assert.ok(policyHash);
+      const body = {
+        schemaVersion: "1.0.0" as const,
+        projectId: request.projectId,
+        runId: request.runId,
+        track: "bicep" as const,
+        sourceHash: request.sourceHash,
+        treeHash: request.generatedSource.treeHash,
+        inputHash: request.inputHash,
+        policyHash: request.policyHash,
+        outcome: "pass" as const,
+        commands: NATIVE_VALIDATION_COMMANDS.bicep.map((command) => ({
+          validatorId: command.validatorId,
+          commandHash: calculateNativeValidationCommandHash(command),
+          exitCode: 0 as const,
+          signal: null,
+          timedOut: false as const,
+          outputTruncated: false as const,
+        })),
+        ...(mode === "missing"
+          ? {}
+          : {
+              policyValidation: { ...policyBody, receiptHash: calculatePolicyValidationHash(policyBody) },
+            }),
+      };
+      return { ...body, receiptHash: calculateNativeValidationReceiptHash(body) };
+    },
+  };
+  const service = new ApexService(root, { providers: { bicep: provider } });
+  const { runId } = await service.init({ projectId: "demo", iacTool: "bicep" });
+  const generated = await reachCodegen(service, runId, "bicep", undefined, false, undefined, (policy) => {
+    for (const effect of ["deny", "modify", "deployIfNotExists"] as const) {
+      policy.mappings.push({
+        policyAssignmentId: effect,
+        effect,
+        logicalResourceId: "api",
+        propertyPath: "properties.httpsOnly",
+        expectedValue: true,
+        disposition: "planned",
+      });
+    }
+  });
+  await service.completeTaskOutputs(generated.taskId, codegenBundle(runId, "bicep", generated.plan));
+  const validationTask = await task(service, "validation-bicep");
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+  const head = await journal.head();
+  for (mode of ["missing", "wrong-map", "wrong-manifest", "partial", "wrong-mapping"]) {
+    await assert.rejects(
+      service.completeTaskOutputs(validationTask, [
+        { kind: "validation-evidence", value: validationEvidence(runId, "bicep") },
+      ]),
+      /Native validation requires passing source-bound policy evidence/,
+    );
+    assert.equal(await journal.head(), head);
+    assert.equal((await service.status()).run.gates[3]!.state, "closed");
+  }
+  mode = "pass";
+  const accepted = await service.completeTaskOutputs(validationTask, [
+    { kind: "validation-evidence", value: validationEvidence(runId, "bicep") },
+  ]);
+  const event = (await journal.replay()).findLast(({ type }) => type === "task.completed")!;
+  const payload = event.payload as {
+    validatorEvidenceRefs: Record<string, string>;
+    validatorEvidenceModes: Record<string, string>;
+  };
+  assert.equal(payload.validatorEvidenceModes["business:policy-property-map"], "native");
+  const objects = new ObjectStore(root);
+  const evidence = await objects.getJson<ReturnType<typeof validationEvidence>>(
+    accepted.outputHashes["validation-evidence"]!,
+  );
+  assert.equal(
+    evidence.entries.find(({ kind }) => kind === "business:policy-property-map")!.hash,
+    payload.validatorEvidenceRefs["business:policy-property-map"],
+  );
+});
+
 test("native preview refuses historical label-only validation when source checks are available", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
@@ -781,6 +999,20 @@ test("native preview refuses historical label-only validation when source checks
   await assert.rejects(restarted.preview({ operation: "apply", provider: "bicep" }), /runtime-owned native validation/);
   assert.equal(previewCalls, 0);
   assert.equal((await restarted.status()).run.gates[3]!.state, "closed");
+});
+
+test("validation without a submitted bundle cannot claim executed checks", async () => {
+  for (const track of ["bicep", "terraform"] as const) {
+    const root = await tempRoot();
+    const service = new ApexService(root);
+    const { runId } = await service.init({ projectId: "demo", iacTool: track });
+    const generated = await reachCodegen(service, runId, track);
+    await service.completeTaskOutputs(generated.taskId, codegenBundle(runId, track, generated.plan));
+    const validationTask = await task(service, `validation-${track}`);
+    const before = await service.status();
+    await assert.rejects(service.validateTask(validationTask), /native source validation provider/i);
+    assert.deepEqual(await service.status(), before);
+  }
 });
 
 test("validation task inputs include the accepted policy map on both tracks", async () => {
@@ -2485,19 +2717,31 @@ test("MCP completeTask accepts an output bundle", async () => {
 });
 
 test("restricted staging and generateIac produce a real accepted tree", async () => {
-  const service = new ApexService(await tempRoot());
+  const root = await tempRoot();
+  const service = new ApexService(root);
   const { runId } = await service.init({ projectId: "demo", iacTool: "bicep" });
   const { taskId } = await reachCodegen(service, runId, "bicep");
   const first = await service.stageFile(taskId, "notes.md", "bounded\n");
   const second = await service.stageFile(taskId, "notes.md", "bounded\n");
   assert.equal(first.idempotent, false);
   assert.equal(second.idempotent, true);
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+  const head = await journal.head();
+  const before = (await service.status()).run;
   await assert.rejects(service.stageFile(taskId, "../escape.tf", "bad"), /unsafe/i);
   await assert.rejects(service.stageFile(taskId, "notes.md", "changed\n"), /overwrite/i);
+  assert.equal(await journal.head(), head);
+  assert.deepEqual((await service.status()).run, before);
+  assert.equal(await readFile(first.path, "utf8"), "bounded\n");
+  await assert.rejects(readFile(join(first.path, "..", "..", "escape.tf")), { code: "ENOENT" });
   const generated = await service.generateIac(taskId, { requiredToolVersions: { bicep: "test" } });
   assert.match(generated.treeHash, /^[0-9a-f]{64}$/);
   assert.ok(generated.files.some(({ path }) => path.endsWith("main.bicep")));
   assert.match(generated.outputHashes["iac-handoff"]!, /^[0-9a-f]{64}$/);
+  assert.equal((await service.status()).task, "validation-bicep");
+  const completedHead = await journal.head();
+  await assert.rejects(service.completeTaskOutputs(taskId, []), /stale/i);
+  assert.equal(await journal.head(), completedHead);
 });
 
 function emptyGovernanceBaseline(subscriptionId: string, discoveredAt: string) {
@@ -3356,6 +3600,367 @@ for (const track of ["bicep", "terraform"] as const) {
     const handoff = await new ObjectStore(root).getJson<{ intentHash: string }>(generated.outputHashes["iac-handoff"]!);
     assert.equal(handoff.intentHash, sha256Json(plan.find(({ kind }) => kind === "implementation-intent")!.value));
   });
+  for (const mode of ["simulated", "native", "native-module"] as const) {
+    test(`${track} imports nonempty policy identities through ${mode} workflow without copying unrelated data`, async () => {
+      const root = await tempRoot();
+      const now = new Date("2026-09-21T00:00:00Z");
+      const subscriptionId = "11111111-1111-1111-1111-111111111111";
+      const otherSubscriptionId = "22222222-2222-2222-2222-222222222222";
+      const baseline = emptyGovernanceBaseline(subscriptionId, now.toISOString());
+      const scope = `/subscriptions/${subscriptionId}`;
+      const findings = (["deny", "modify", "deployIfNotExists"] as const).map((effect) => ({
+        policy_id: `/providers/Microsoft.Authorization/policyDefinitions/${effect}`,
+        display_name: effect,
+        effect,
+        scope,
+        assignment_id: `${scope}/providers/Microsoft.Authorization/policyAssignments/${effect}`,
+        classification: effect === "deny" ? "blocker" : "auto-remediate",
+        resource_types: [mode !== "simulated" ? "Microsoft.Storage/storageAccounts" : "Microsoft.Web/sites"],
+        exemption: null,
+        reported_exemptions: [],
+        required_value: true,
+      }));
+      const entry = baseline.subscriptions[subscriptionId]!;
+      Object.assign(entry, {
+        findings,
+        policies: findings,
+        assignment_inventory: findings.map((finding) => ({
+          scope,
+          assignmentId: finding.assignment_id,
+          assignmentType: "subscription",
+          displayName: finding.display_name,
+          policyDefinitionId: finding.policy_id,
+        })),
+      });
+      Object.assign(entry.discovery_summary, {
+        assignment_total: 3,
+        assignment_kept: 3,
+        subscription_scope_count: 3,
+        blocker_count: 1,
+        auto_remediate_count: 2,
+        classified_policy_count: 3,
+      });
+      entry.discovery_metadata.page_counts.policyAssignments = findings.length;
+      entry.discovery_metadata.page_counts.policyDefinitions = findings.length;
+      const other = emptyGovernanceBaseline(otherSubscriptionId, now.toISOString()).subscriptions[otherSubscriptionId]!;
+      other.irrelevant_metadata = "UNRELATED_SUBSCRIPTION_SENTINEL";
+      baseline.subscriptions[otherSubscriptionId] = other;
+      baseline.subscriptions_discovered = baseline.subscriptions_processed = 2;
+      Object.assign(baseline.summary, {
+        total_findings: 3,
+        total_blockers: 1,
+        total_auto_remediate: 2,
+        subscriptions_complete: 2,
+      });
+      Reflect.deleteProperty(baseline, "subscription_id");
+      Object.assign(baseline, { management_group_id: "platform" });
+      const path = join(root, "baseline.json");
+      await writeJson(path, baseline);
+      const service = new ApexService(root, { clock: () => now });
+      const targetScope = mode !== "simulated" ? `${scope}/resourceGroups/rg-test` : scope;
+      const { runId } = await service.init({ projectId: "demo", iacTool: track, targetScope });
+      const generated = await reachCodegen(
+        service,
+        runId,
+        track,
+        mode !== "simulated"
+          ? (plan) => {
+              configureNativeBicepPlan(plan);
+              if (mode === "native-module" && track === "bicep") {
+                const binding = (plan[1]!.value as IacBindingV1).resourceBindings.api!;
+                binding.implementation = "avm:br/public:avm/res/storage/storage-account@0.9.0";
+                binding.version = "0.9.0";
+                binding.physicalResources = [
+                  {
+                    resourceId: `${targetScope}/providers/Microsoft.Storage/storageAccounts/apidemo`,
+                    type: "Microsoft.Storage/storageAccounts",
+                    ownership: "managed",
+                    role: "primary",
+                  },
+                ];
+              }
+            }
+          : undefined,
+        false,
+        path,
+        async (policy) => {
+          policy.mappings = findings.map((finding) => ({
+            policyAssignmentId: finding.assignment_id,
+            policyDefinitionId: finding.policy_id,
+            effect: finding.effect,
+            logicalResourceId: "api",
+            propertyPath: mode !== "simulated" ? "properties.supportsHttpsTrafficOnly" : "properties.httpsOnly",
+            expectedValue: true,
+            disposition: "planned",
+          }));
+          const reconciliationTask = await task(service, "governance-reconciliation");
+          const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+          const head = await journal.head();
+          for (const effect of ["deny", "modify", "deployIfNotExists"] as const) {
+            for (const mutation of ["omit", "assignment", "definition", "member", "effect", "exempt"] as const) {
+              const invalid = structuredClone(policy);
+              const mapping = invalid.mappings.find((value) => value.effect === effect)!;
+              if (mutation === "omit") invalid.mappings = invalid.mappings.filter((value) => value !== mapping);
+              else if (mutation === "assignment") mapping.policyAssignmentId += "-unrelated";
+              else if (mutation === "definition") mapping.policyDefinitionId += "-unrelated";
+              else if (mutation === "member") mapping.policyDefinitionReferenceId = "unrelated-member";
+              else if (mutation === "effect") mapping.effect = "audit";
+              else mapping.disposition = "exempt";
+              await assert.rejects(
+                service.completeTaskOutputs(reconciliationTask, [{ kind: "policy-property-map", value: invalid }]),
+                /Imported policy controls require explicit mappings/,
+              );
+              assert.equal(await journal.head(), head);
+              assert.equal((await service.status()).run.gates[1]!.state, "closed");
+            }
+          }
+        },
+      );
+      const objects = new ObjectStore(root);
+      const intent = generated.plan[0]!.value as ImplementationIntentV1;
+      const policyHash = intent.sourceHashes["policy-property-map"]!;
+      const acceptedPolicy = await objects.getJson<PolicyPropertyMapV1>(policyHash);
+      assert.deepEqual(
+        acceptedPolicy.mappings.map(({ policyAssignmentId }) => policyAssignmentId),
+        findings.map(({ assignment_id }) => assignment_id),
+      );
+      const acceptedGovernance = await objects.getJson<GovernanceConstraintsV1>(acceptedPolicy.governanceHash);
+      const snapshot = await objects.getJson(acceptedGovernance.constraintsRef.digest);
+      const serializedSnapshot = JSON.stringify(snapshot);
+      for (const finding of findings) assert.ok(serializedSnapshot.includes(finding.assignment_id));
+      for (const excluded of [otherSubscriptionId, "UNRELATED_SUBSCRIPTION_SENTINEL", "UNSELECTED_BASELINE_MARKER"])
+        assert.equal(serializedSnapshot.includes(excluded), false);
+      if (mode !== "simulated") {
+        const sourceRoot = join(root, ".apex/work/code");
+        await mkdir(sourceRoot, { recursive: true });
+        const source = {
+          path: track === "bicep" ? "main.bicep" : "main.tf",
+          content: track === "bicep" ? "targetScope = 'resourceGroup'\n" : "terraform {}\n",
+        };
+        await writeFile(join(sourceRoot, source.path), source.content);
+        const bundle = codegenBundle(runId, track, generated.plan);
+        const handoff = bundle.find(({ kind }) => kind === "iac-handoff")!.value as IacHandoffV1;
+        const terraformAddress = mode === "native-module" ? "module.api.azapi_resource.storage" : "azapi_resource.api";
+        if (mode === "native-module") {
+          const manifest = bundle.find(({ kind }) => kind === "logical-resource-manifest")!
+            .value as LogicalResourceManifestV1;
+          manifest.resources[0]!.executionAddress = track === "bicep" ? "api::storage" : terraformAddress;
+          if (track === "bicep") manifest.resources[0]!.implementationKind = "module";
+          handoff.logicalResourceManifestHash = sha256Json(manifest);
+        }
+        handoff.treeHash = sha256Json([source]);
+        const generatedHashes = (await service.completeTaskOutputs(generated.taskId, bundle)).outputHashes;
+        const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+        const runtime = await createFileProviderRuntime(root);
+        let observed = false;
+        let policyOutput = "";
+        const calls: string[] = [];
+        const runner = {
+          run: async (command: import("@apexops/capabilities").ProcessRequest) => {
+            calls.push(`${command.executable} ${command.args.join(" ")}`);
+            let stdout = "";
+            if (command.executable === "bicep" && command.args[0] === "build") {
+              const resource = { properties: { supportsHttpsTrafficOnly: observed } };
+              stdout = JSON.stringify({
+                resources: {
+                  api:
+                    mode === "native-module"
+                      ? {
+                          type: "Microsoft.Resources/deployments",
+                          properties: { template: { resources: { storage: resource } } },
+                        }
+                      : resource,
+                },
+              });
+            } else if (command.executable === "bicep" && ["format", "lint"].includes(command.args[0]!)) {
+              stdout = "";
+            } else if (command.executable === "az" && command.args.includes("what-if")) {
+              stdout = JSON.stringify({
+                changes: [
+                  {
+                    resourceId: `${targetScope}/providers/Microsoft.Storage/storageAccounts/apidemo`,
+                    changeType: "Create",
+                  },
+                ],
+              });
+            } else if (command.executable === "az" && command.args.includes("list")) {
+              stdout = "[]";
+            } else if (command.executable === "terraform" && ["init", "fmt", "validate"].includes(command.args[0]!)) {
+              stdout = "";
+            } else if (
+              command.executable === "terraform" &&
+              command.args[0] === "state" &&
+              command.args[1] === "pull"
+            ) {
+              stdout = JSON.stringify({ lineage: "imported-policy-test", serial: 1 });
+            } else if (command.executable === "terraform" && command.args[0] === "plan") {
+              const output = command.args.find((argument) => argument.startsWith("-out="));
+              assert.ok(output);
+              await writeFile(output.slice(5), "mock-saved-plan");
+            } else if (command.executable === "terraform" && command.args[0] === "show") {
+              const values = { properties: { supportsHttpsTrafficOnly: observed } };
+              stdout = JSON.stringify({
+                complete: true,
+                resource_changes: [
+                  {
+                    address: terraformAddress,
+                    mode: "managed",
+                    change: { actions: ["create"], before: null, after: values, after_unknown: {} },
+                  },
+                ],
+                planned_values: {
+                  root_module:
+                    mode === "native-module"
+                      ? {
+                          child_modules: [
+                            {
+                              address: "module.api",
+                              resources: [{ address: terraformAddress, mode: "managed", values }],
+                            },
+                          ],
+                        }
+                      : { resources: [{ address: terraformAddress, mode: "managed", values }] },
+                },
+              });
+            } else throw new Error(`Unexpected fixture command: ${command.executable} ${command.args.join(" ")}`);
+            if (
+              (command.executable === "bicep" && command.args[0] === "build") ||
+              (command.executable === "terraform" && command.args[0] === "show")
+            )
+              policyOutput = stdout;
+            return { exitCode: 0, signal: null, stdout, stderr: "", timedOut: false, outputTruncated: false };
+          },
+        };
+        const currentAuthority = async () => {
+          const run = (await service.status()).run;
+          const revision = dependencyRevision(run, await journal.replay());
+          return {
+            head: revision,
+            dependencyRevision: revision,
+            ownerEpoch: run.ownerEpoch,
+            recipientIdentity: "local",
+          };
+        };
+        const makeProvider = () =>
+          track === "bicep"
+            ? new NativeBicepProvider({
+                runner,
+                currentAuthority,
+                now: () => now,
+                bindingStore: runtime.bindingStores.bicep,
+                target: {
+                  cwd: sourceRoot,
+                  templateFile: "main.bicep",
+                  resourceGroup: "rg-test",
+                  deploymentName: "policy-test",
+                  stackName: "policy-test",
+                  denySettingsMode: "denyDelete",
+                },
+              })
+            : new NativeTerraformProvider({
+                runner,
+                currentAuthority,
+                now: () => now,
+                bindingStore: runtime.bindingStores.terraform,
+                artifactStore: runtime.artifactStore,
+                keyProvider: runtime.keyProvider,
+                target: {
+                  cwd: sourceRoot,
+                  target: targetScope,
+                  lockfileHash: "e".repeat(64),
+                  configHash: () => hashTerraformConfiguration(sourceRoot),
+                  planPath: () => join(sourceRoot, "policy.tfplan"),
+                },
+              });
+        const nativeService = new ApexService(root, { clock: () => now, providers: { [track]: makeProvider() } });
+        const validationTask = await task(nativeService, `validation-${track}`);
+        const evidence = [{ kind: "validation-evidence" as const, value: validationEvidence(runId, track) }];
+        if (track === "bicep") {
+          const head = await journal.head();
+          await assert.rejects(
+            nativeService.completeTaskOutputs(validationTask, evidence),
+            /Native policy property validation failed/,
+          );
+          assert.equal(await journal.head(), head);
+          assert.equal((await nativeService.status()).run.gates[3]!.state, "closed");
+        }
+        observed = true;
+        await nativeService.completeTaskOutputs(validationTask, evidence);
+        const validated = (await journal.replay()).findLast(({ type }) => type === "task.completed")!.payload as {
+          validatorEvidenceRefs: Record<string, string>;
+          validatorEvidenceModes: Record<string, string>;
+        };
+        const nativeReceipt = await objects.getJson<NativeValidationReceiptV1>(
+          validated.validatorEvidenceRefs[NATIVE_VALIDATION_COMMANDS[track][0]!.validatorId]!,
+        );
+        assert.equal(nativeReceipt.sourceHash, generatedHashes["iac-handoff"]);
+        assert.equal(nativeReceipt.policyHash, policyHash);
+        for (const { validatorId } of NATIVE_VALIDATION_COMMANDS[track])
+          assert.equal(validated.validatorEvidenceModes[validatorId], "native");
+        if (track === "bicep") {
+          assert.equal(validated.validatorEvidenceModes["business:policy-property-map"], "native");
+          assert.equal(nativeReceipt.policyValidation?.outcome, "pass");
+          assert.equal(nativeReceipt.policyValidation?.results.length, 3);
+          assert.equal(nativeReceipt.policyValidation?.inputHash, sha256Bytes(Buffer.from(policyOutput)));
+        } else {
+          assert.equal(validated.validatorEvidenceRefs["business:policy-property-map"], undefined);
+          assert.equal(nativeReceipt.policyValidation, undefined);
+        }
+        const restarted = new ApexService(root, { clock: () => now, providers: { [track]: makeProvider() } });
+        observed = false;
+        const head = await journal.head();
+        await assert.rejects(restarted.preview({ operation: "apply", provider: track }), /policy|blocker/i);
+        assert.equal(await journal.head(), head);
+        assert.equal((await restarted.status()).run.gates[3]!.state, "closed");
+        observed = true;
+        const preview = await restarted.preview({ operation: "apply", provider: track });
+        assert.equal(preview.policyHash, policyHash);
+        const created = (await journal.replay()).findLast(({ type }) => type === "preview.created")!;
+        const payload = created.payload as {
+          policyValidationHash: string;
+          evidenceMode: string;
+          attestationHash?: string;
+        };
+        assert.equal(payload.evidenceMode, "native");
+        const receipt = await objects.getJson<PolicyValidationV1>(payload.policyValidationHash);
+        assert.equal(receipt.sourceHash, generatedHashes["iac-handoff"]);
+        assert.equal(receipt.policyMapHash, policyHash);
+        assert.equal(receipt.inputHash, sha256Bytes(Buffer.from(policyOutput)));
+        assert.equal(receipt.outcome, "pass");
+        assert.equal(receipt.results.length, 3);
+        assert.deepEqual(
+          receipt.results.map(({ policyAssignmentId }) => policyAssignmentId),
+          findings.map(({ assignment_id }) => assignment_id),
+        );
+        if (track === "terraform") assert.ok(payload.attestationHash);
+        assert.equal((await restarted.status()).run.gates[3]!.state, "open");
+        assert.equal(
+          calls.some((command) => /\b(apply|create|delete)\b/.test(command)),
+          false,
+        );
+      } else {
+        await service.completeTaskOutputs(generated.taskId, codegenBundle(runId, track, generated.plan));
+        await complete(service, `validation-${track}`, [
+          { kind: "validation-evidence", value: validationEvidence(runId, track) },
+        ]);
+        const restarted = new ApexService(root, { clock: () => now });
+        const preview = await restarted.preview({ operation: "apply", provider: "fake" });
+        assert.equal(preview.policyHash, policyHash);
+        await restarted.decideGateNumber(4, "approved", "tester");
+        const deployed = await restarted.deploy(preview.previewHash);
+        assert.equal(deployed.inventory.resources.length, 1);
+        assert.deepEqual(await objects.getJson(policyHash), acceptedPolicy);
+      }
+      for (const file of await readdir(join(root, ".apex"), { recursive: true, withFileTypes: true })) {
+        if (!file.isFile()) continue;
+        assert.doesNotMatch(
+          await readFile(join(file.parentPath, file.name), "utf8"),
+          /UNRELATED_SUBSCRIPTION_SENTINEL|UNSELECTED_BASELINE_MARKER/,
+        );
+      }
+    });
+  }
+
   test(`${track} imports an evidenced-empty standalone baseline through deployment without copying other data`, async () => {
     const root = await tempRoot();
     const subscriptionId = "11111111-1111-1111-1111-111111111111";

@@ -43,8 +43,27 @@ omitting the protected child from what-if does not authorize its implicit remova
 
 This declaration is not proof of resource existence, AVM expansion or policy compliance. Unknown child resources block
 preview instead of inheriting permission from their parent. Nonempty policy maps still require source-bound native
-property receipts; declaring physical IDs does not resolve module property expressions. Terraform module descendant
-ownership and full AVM policy evaluation remain unsupported. No live Azure qualification is implied by offline tests.
+property receipts; declaring physical IDs does not resolve module property expressions. Terraform module containers
+with unresolved descendants and full AVM expression evaluation remain unsupported. No live Azure qualification is
+implied by offline tests.
+
+### Policy Execution Addresses
+
+Managed manifest entries use `executionAddress` to bind policy observations to generated resources. Bicep uses the
+exact compiled symbolic key, or `module::child` for a resource inside an embedded deployment template. Deeper templates
+extend that path, for example `outer::inner::storage`. Symbol paths are case-sensitive; resource names and unqualified
+child basenames are not substitutes. Compilation must preserve symbolic names. This policy address does not replace
+the exact physical-resource ownership map required for Bicep modules.
+
+Terraform uses the full planned resource address, including module paths and instance keys, such as
+`module.storage.azurerm_storage_account.main["east"]`. A resolved child resource is a `resource` entry; a module
+container is not evidence of descendant ownership. The saved plan must contain matching known values and change
+evidence for that address.
+
+Missing or ambiguous bindings, unnamed nested resources, loops, unresolved conditions, linked templates and ARM
+property expressions fail closed. The evaluator does not interpret ARM parameters, variables or deployment functions.
+Local-module compiler tests and mocked native workflows establish these bounded mechanics, not compatibility with
+every AVM version or live resource compliance.
 
 ## Differences
 
@@ -79,10 +98,19 @@ historical label-only validation must be invalidated and rerun before using an o
 with historical Bicep build-only receipts must likewise rerun validation to produce format/build/lint evidence. Providers
 without source-validation support must explicitly declare simulated validation to remain usable as test adapters.
 
-Validation reports distinguish `native` and `simulated` entries. Only the commands listed above are proved by these
-receipts; security checks and policy evaluation are not proved by a command receipt. Policy-map hashes
-bind inputs, not compliance outcomes. Source-bound policy-property receipts remain required at native preview for
-nonempty maps. `validateTask` still stages and checks artifacts; command execution occurs at task completion.
+Validation reports distinguish `native` and `simulated` entries. Command results do not prove security checks or policy
+compliance merely by including a policy-map hash. For nonempty Bicep maps, the runtime also evaluates properties from
+the captured build output and requires complete passing policy evidence within the native receipt. It records the
+policy validator as native only when that evaluation ran. Acceptance and subsequent preview check the accepted map,
+resource bindings and every mapping's evidence.
+
+Terraform source validation remains command-only: `terraform validate` does not resolve planned values. Native preview
+evaluates its saved plan and requires passing source-bound policy evidence before Gate 4. Both providers snapshot
+bounded policy inputs before awaited preview commands. `validateTask` with supplied artifacts stages/checks them. With
+only a task ID for an IaC validation task, it executes native checks and returns runtime-owned evidence plus executed
+and blocked validator IDs, without completing the task. `valid: false` means required execution evidence is incomplete;
+the worker must report the blockers rather than fabricate missing entries. Acceptance reexecutes current native checks.
+No authenticated planning is implicitly added to source validation.
 
 Deterministic and package qualification cover both tracks. Current-candidate live Azure qualification remains required
 before claiming production readiness or release acceptance.

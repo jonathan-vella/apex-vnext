@@ -81,6 +81,271 @@
       "pattern": "^[0-9a-f]{64}$",
       "type": "string"
     },
+    "policyValidation": {
+      "$id": "https://schemas.apexops.dev/policy-validation-v1.json",
+      "additionalProperties": false,
+      "properties": {
+        "inputHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "logicalResourceManifestHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "const": "pass",
+              "type": "string"
+            },
+            {
+              "const": "fail",
+              "type": "string"
+            },
+            {
+              "const": "unsupported",
+              "type": "string"
+            }
+          ]
+        },
+        "policyMapContentHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "policyMapHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "projectId": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "receiptHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "results": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "disposition": {
+                "anyOf": [
+                  {
+                    "const": "satisfied",
+                    "type": "string"
+                  },
+                  {
+                    "const": "planned",
+                    "type": "string"
+                  },
+                  {
+                    "const": "exempt",
+                    "type": "string"
+                  },
+                  {
+                    "const": "blocked",
+                    "type": "string"
+                  }
+                ]
+              },
+              "effect": {
+                "anyOf": [
+                  {
+                    "const": "deny",
+                    "type": "string"
+                  },
+                  {
+                    "const": "modify",
+                    "type": "string"
+                  },
+                  {
+                    "const": "append",
+                    "type": "string"
+                  },
+                  {
+                    "const": "audit",
+                    "type": "string"
+                  },
+                  {
+                    "const": "deployIfNotExists",
+                    "type": "string"
+                  },
+                  {
+                    "const": "disabled",
+                    "type": "string"
+                  }
+                ]
+              },
+              "expectedValueDigest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "logicalResourceId": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "mappingHash": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "mappingIndex": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "observedValueDigest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "outcome": {
+                "anyOf": [
+                  {
+                    "const": "pass",
+                    "type": "string"
+                  },
+                  {
+                    "const": "fail",
+                    "type": "string"
+                  },
+                  {
+                    "const": "unsupported",
+                    "type": "string"
+                  }
+                ]
+              },
+              "policyAssignmentId": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "policyDefinitionId": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "policyDefinitionReferenceId": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "propertyPath": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "reason": {
+                "anyOf": [
+                  {
+                    "const": "matched",
+                    "type": "string"
+                  },
+                  {
+                    "const": "value-mismatch",
+                    "type": "string"
+                  },
+                  {
+                    "const": "missing-property",
+                    "type": "string"
+                  },
+                  {
+                    "const": "blocked",
+                    "type": "string"
+                  },
+                  {
+                    "const": "missing-expected-value",
+                    "type": "string"
+                  },
+                  {
+                    "const": "unverified-exemption",
+                    "type": "string"
+                  },
+                  {
+                    "const": "unsupported-effect",
+                    "type": "string"
+                  },
+                  {
+                    "const": "unsupported-path",
+                    "type": "string"
+                  },
+                  {
+                    "const": "unsupported-expression",
+                    "type": "string"
+                  },
+                  {
+                    "const": "resource-not-bound",
+                    "type": "string"
+                  },
+                  {
+                    "const": "resource-not-found",
+                    "type": "string"
+                  },
+                  {
+                    "const": "ambiguous-resource",
+                    "type": "string"
+                  },
+                  {
+                    "const": "unsupported-resource",
+                    "type": "string"
+                  },
+                  {
+                    "const": "invalid-source",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "mappingIndex",
+              "mappingHash",
+              "policyAssignmentId",
+              "effect",
+              "disposition",
+              "logicalResourceId",
+              "propertyPath",
+              "outcome",
+              "reason"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "runId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "1.0.0",
+          "type": "string"
+        },
+        "sourceHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "track": {
+          "anyOf": [
+            {
+              "const": "bicep",
+              "type": "string"
+            },
+            {
+              "const": "terraform",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "projectId",
+        "runId",
+        "track",
+        "sourceHash",
+        "policyMapHash",
+        "policyMapContentHash",
+        "logicalResourceManifestHash",
+        "inputHash",
+        "outcome",
+        "results",
+        "receiptHash"
+      ],
+      "type": "object"
+    },
     "projectId": {
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"

@@ -1,7 +1,11 @@
 import { Type, type Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import { ContractVersionSchema, IacToolSchema, ProjectIdSchema, RunIdSchema, Sha256Schema } from "./common.js";
-import { calculatePolicyValidationDigest } from "./policy-validation.js";
+import {
+  calculatePolicyValidationDigest,
+  hasValidPolicyValidation,
+  PolicyValidationV1Schema,
+} from "./policy-validation.js";
 
 export const NATIVE_VALIDATION_COMMANDS = {
   bicep: [
@@ -39,6 +43,7 @@ export const NativeValidationReceiptV1Schema = Type.Object(
     treeHash: Sha256Schema,
     policyHash: Sha256Schema,
     inputHash: Sha256Schema,
+    policyValidation: Type.Optional(PolicyValidationV1Schema),
     outcome: Type.Literal("pass"),
     commands: Type.Array(
       Type.Object(
@@ -92,6 +97,22 @@ export function hasValidNativeValidationReceipt(
     const { receiptHash, ...receipt } = value;
     const keys = ["projectId", "runId", "track", "sourceHash", "treeHash", "policyHash", "inputHash"] as const;
     if (keys.some((key) => receipt[key] !== binding[key])) return false;
+    const policy = receipt.policyValidation;
+    if (
+      policy !== undefined &&
+      (policy.projectId !== receipt.projectId ||
+        policy.runId !== receipt.runId ||
+        policy.outcome !== "pass" ||
+        !hasValidPolicyValidation(policy, {
+          track: receipt.track,
+          sourceHash: receipt.sourceHash,
+          policyMapHash: receipt.policyHash,
+          policyMapContentHash: policy.policyMapContentHash,
+          logicalResourceManifestHash: policy.logicalResourceManifestHash,
+          inputHash: policy.inputHash,
+        }))
+    )
+      return false;
     const expected = NATIVE_VALIDATION_COMMANDS[receipt.track];
     return (
       receipt.commands.length === expected.length &&

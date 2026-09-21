@@ -1,5 +1,6 @@
 import {
   ApprovalEvidenceV1Schema,
+  EvidenceManifestV1Schema,
   ImprovementObservationV1Schema,
   ImprovementProposalV1Schema,
   InputRequestV1Schema,
@@ -233,11 +234,26 @@ export const MCP_OUTPUT_SCHEMAS = {
     object({ files: Type.Array(stagedFile), outputHashes: artifactHashes, treeHash: Sha256Schema }),
   ),
   validateTask: contract(
-    object({
-      valid: Type.Literal(true),
-      taskId: NonEmptyStringSchema,
-      staged: Type.Optional(Type.Union([stagedArtifact, Type.Array(stagedArtifact)])),
-    }),
+    Type.Union([
+      object({
+        valid: Type.Literal(true),
+        taskId: NonEmptyStringSchema,
+        staged: Type.Optional(Type.Union([stagedArtifact, Type.Array(stagedArtifact)])),
+      }),
+      object({
+        valid: Type.Boolean(),
+        taskId: NonEmptyStringSchema,
+        execution: object({
+          mode: Type.Literal("native"),
+          executedValidatorIds: strings,
+          blockedValidatorIds: strings,
+        }),
+        outputs: Type.Array(object({ kind: Type.Literal("validation-evidence"), value: EvidenceManifestV1Schema }), {
+          minItems: 1,
+          maxItems: 1,
+        }),
+      }),
+    ]),
   ),
   completeTask: contract(completion),
   requirementsComplete: contract(completion),

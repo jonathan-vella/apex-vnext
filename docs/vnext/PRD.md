@@ -12,7 +12,7 @@ work. Updating this plan does not implement new commands or authorize live opera
 ## Goals
 
 - Preserve existing APEX output quality while reducing input-token demand through reuse.
-- Complete the workload lifecycle in both GitHub Copilot for VS Code and GitHub Copilot CLI.
+- Complete the workload lifecycle in GitHub Copilot for VS Code and standalone GitHub Copilot CLI.
 - Support Windows through WSL2 without Docker or a devcontainer requirement.
 - Make installation, everyday use, updates, upgrades, rollback, and eventual distribution straightforward.
 - Reuse one COE archetype per consumer project, then adapt only what changes.
@@ -59,7 +59,7 @@ Use one canonical customization source and existing package tooling rather than 
 
 Agent Plugins evaluation and implementation belong at the end of feature delivery, together with easy redistribution
 of the APEX MCP server and its dependencies. Evaluate npm-only, plugin plus npm runtime, and bundled runtime delivery
-against actual VS Code and Copilot CLI lifecycle behavior on WSL2. No option is selected by this requirement. Cover
+against actual VS Code and Copilot CLI lifecycle behavior on WSL2. No option is selected here. Cover
 workspace binding, authentication, prerequisites, version pinning, updates, upgrades, rollback, uninstall, duplicate
 discovery, and preservation of active runs. Avoid competing updaters or a hosted service unless separately approved.
 Final package and client qualification follows any distribution change.
@@ -69,7 +69,10 @@ Final package and client qualification follows any distribution change.
 The initial supported Windows experience uses WSL2 with Ubuntu, VS Code or Copilot CLI, and the required local toolchain.
 Users must not need Docker, a devcontainer, a source-repository clone, or repository development tools to use APEX.
 Document and check prerequisites through existing setup/doctor surfaces; require only tools needed for the selected
-track and requested stage. Native Windows and additional host qualification are not initial scope promises.
+track and requested stage. These existing VS Code and CLI host paths remain unchanged.
+
+Native Windows runtime qualification and standalone desktop-app hosting are deferred under `REQ-COPILOT-APP-001`.
+They are not current release prerequisites or supported-host promises.
 
 ### REQ-REUSE-001: COE Archetype Import
 
@@ -249,14 +252,27 @@ otherwise.
 
 ### REQ-CUSTOMIZATION-001: Managed Copilot Experiences
 
-APEX must support GitHub Copilot in VS Code and GitHub Copilot CLI for this release. Both clients must produce equivalent
-typed workflow outcomes, state and resume behavior, authorization decisions, gates and evidence. Worker mechanics need
+APEX must support GitHub Copilot in VS Code Local sessions and standalone GitHub Copilot CLI for this release.
+Both clients must produce equivalent typed workflow outcomes, state and resume behavior,
+authorization decisions, gates and evidence. Worker mechanics need
 not be identical. VS Code may use direct handoffs and `vscode/askQuestions`; Copilot CLI may use delegation and
 `ask_user`. Both paths must resolve the kernel-owned `needs_input` contract and record typed answers without relying on
 chat history. Model availability, grants, agents, skills, managed files, and MCP inventory must be qualified per client.
 The current CLI hidden-worker omission is not permission to omit code generation, review or validation outcomes; provide
 a bounded supported path without pretending unavailable mechanics exist. Qualify both environment profiles and COE
-import/change workflows in each client on WSL2. Basic interaction checks accompany features; distribution work is last.
+import/change workflows on each client's selected host path. Basic checks accompany features; distribution work is last.
+
+### REQ-COPILOT-APP-001: Standalone Desktop App
+
+**Deferred by maintainer direction on 2026-09-21.** This supersedes the earlier mandatory-third-client decision.
+The standalone [GitHub Copilot app](https://github.com/github/app), its native Windows runtime, app-created worktree
+integration and app-specific qualification are outside the active release scope. Preserve the requirement ID, probe
+evidence and unresolved findings; do not represent deferred work as implemented or qualified.
+
+Resume only after the required VS Code and standalone CLI workflows are confirmed and the maintainer explicitly
+selects this backlog item. Upstream replies alone do not resume implementation. See the
+[desktop backlog](ROADMAP.md#deferred-standalone-copilot-desktop-app) for retained blockers and restart criteria.
+Historical desktop observations do not qualify standalone CLI behavior or replace current two-client evidence.
 
 ### REQ-GUIDANCE-001: Skill And Instruction Capability Parity
 
@@ -456,8 +472,8 @@ does not become the default for other workloads. Human quality review complement
 - **Reliability:** Runs survive restart at each gate, reject stale writers, reconcile partial commits, and retain evidence.
 - **Performance:** Release measurements meet [quality-scorecard.v1.json](../../config/quality-scorecard.v1.json) targets,
   tolerances, minimum samples, and unavailable-data rules.
-- **Portability:** Windows via WSL2 is the initial supported host path. Consumer use requires neither Docker nor a
-  devcontainer and must not depend on unpublished source-workspace state.
+- **Portability:** VS Code and standalone CLI use Windows via WSL2; native Windows desktop support is deferred.
+  Consumer use requires neither Docker nor a devcontainer and must not depend on unpublished source-workspace state.
 - **Accessibility:** User-facing CLI and documentation provide clear text status, actionable diagnostics, and no
   color-only meaning.
 - **Privacy:** Telemetry is separate, optional, exportable, and deletable; raw chat history is never scraped or replayed.
@@ -469,12 +485,12 @@ does not become the default for other workloads. Human quality review complement
 
 - Distributed collaborative writers.
 - Resume of state that does not satisfy current vNext contracts.
-- GitHub Copilot cloud coding-agent sessions, Copilot code review as an APEX client, and non-VS Code/non-Copilot-CLI
-  runtimes.
+- Standalone GitHub Copilot desktop-app work, GitHub Copilot cloud coding-agent sessions, Copilot code review as an
+  APEX client, and client runtimes other than VS Code Local and standalone Copilot CLI.
 - Early Agent Plugins implementation; the distribution decision is the final feature-delivery phase.
 - A second independent runtime/distribution authority or a new hosted control plane without explicit approval.
 - Continuous COE synchronization, cross-archetype composition, and a generic document/code synchronization engine.
-- ALZ foundation deployment, application development, and initial native-Windows/additional-host promises.
+- ALZ foundation deployment, application development, native Windows runtime and additional-host promises.
 - Token-baseline or comparative-token benchmarking work for now.
 - Application deployment pipelines and application-specific deployment configuration until follow-on work.
 - Autonomous issue creation, repository edits, pull requests, approvals, releases, or deployments from improvement data
@@ -501,7 +517,8 @@ document size alone or add a token measurement prerequisite to the roadmap.
 
 Cutover requires all of the following on the exact candidate head:
 
-- Every requirement above maps to passing automated evidence or an explicitly required manual/live result.
+- Every active requirement above maps to passing automated evidence or an explicitly required manual/live result.
+  Explicitly deferred requirements remain backlog items, not passing evidence or current cutover gates.
 - Both ALZ-backed and standalone lab/demo profiles pass without weakening policy or shared-resource ownership.
 - COE import and conversational changes preserve independent origin, exclude source authority, and leave unaffected
   outputs unchanged; manual conflicts require confirmation.
@@ -510,8 +527,8 @@ Cutover requires all of the following on the exact candidate head:
 - The final distribution decision covers the APEX MCP lifecycle and is followed by exact-candidate qualification.
 - Required CI and CodeQL checks pass, with no unresolved critical or high security finding.
 - Clean install, update, rollback, uninstall, package reproducibility, SBOM, provenance, and publication dry run pass.
-- Supported VS Code and Copilot CLI agents, questions, hidden workers, MCP startup, restart, and cross-device resume are
-  qualified against equivalent typed outcomes.
+- Supported VS Code and standalone Copilot CLI agents, questions, worker execution, MCP startup, restart,
+  and cross-device resume are qualified against equivalent typed outcomes and client-specific authority boundaries.
 - Astro, Terraform, custom pricing, and Draw.io MCP dependencies are absent from active discovery only after their
   applicable replacement gates pass.
 - ARM pricing and Python diagram replacements satisfy their measured compatibility, reliability, security, and

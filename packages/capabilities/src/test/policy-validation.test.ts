@@ -358,6 +358,57 @@ describe("bounded policy property validation", () => {
     assert.equal(validatePolicyProperties({ ...request, json: nameOnly }).results[0]!.reason, "resource-not-found");
   });
 
+  it("binds Bicep deployment-template children by qualified symbols without crossing siblings", () => {
+    const request = input("bicep");
+    const deployment = (enabled: unknown) => ({
+      type: "Microsoft.Resources/deployments",
+      properties: { template: { resources: { storage: { properties: { security: { enabled } } } } } },
+    });
+    const source = { resources: { primary: deployment(true), sibling: deployment(false) } };
+    const evaluate = (codeSymbol: string, json = JSON.stringify(source)) =>
+      validatePolicyProperties({
+        ...request,
+        json,
+        logicalResourceManifest: { storage: { codeSymbol } },
+      });
+    assert.equal(evaluate("primary::storage").outcome, "pass");
+    assert.equal(evaluate("sibling::storage").outcome, "fail");
+    assert.equal(evaluate("storage").results[0]!.reason, "resource-not-found");
+    assert.equal(evaluate("missing::storage").results[0]!.reason, "resource-not-found");
+    for (const extra of [{ condition: false }, { condition: "[parameters('enabled')]" }, { copy: { count: 2 } }]) {
+      const json = JSON.stringify({ resources: { primary: { ...deployment(true), ...extra } } });
+      assert.equal(evaluate("primary::storage", json).results[0]!.reason, "unsupported-resource");
+    }
+    const unresolved = JSON.stringify({ resources: { primary: deployment("[parameters('security')]") } });
+    assert.equal(evaluate("primary::storage", unresolved).results[0]!.reason, "unsupported-expression");
+    const nested = {
+      resources: { outer: { type: "Microsoft.Resources/deployments", properties: { template: source } } },
+    };
+    assert.equal(evaluate("outer::primary::storage", JSON.stringify(nested)).outcome, "pass");
+    const child = deployment(true).properties.template.resources.storage;
+    const ambiguous = { resources: { primary: deployment(true), "primary::storage": child } };
+    assert.equal(evaluate("primary::storage", JSON.stringify(ambiguous)).results[0]!.reason, "ambiguous-resource");
+    const unnamed = { resources: [{ ...deployment(true), name: "primary" }] };
+    assert.equal(evaluate("primary::storage", JSON.stringify(unnamed)).results[0]!.reason, "resource-not-found");
+    for (const properties of [{ template: null }, { template: {} }]) {
+      assert.equal(
+        evaluate(
+          "primary::storage",
+          JSON.stringify({ resources: { primary: { type: "Microsoft.Resources/deployments", properties } } }),
+        ).results[0]!.reason,
+        "invalid-source",
+      );
+    }
+    const linked = { ...deployment(true).properties, templateLink: { uri: "https://example.invalid/template.json" } };
+    assert.equal(
+      evaluate(
+        "primary::storage",
+        JSON.stringify({ resources: { primary: { type: "Microsoft.Resources/deployments", properties: linked } } }),
+      ).results[0]!.reason,
+      "unsupported-resource",
+    );
+  });
+
   it("rejects ARM expressions at the leaf, ancestor and inside a compared object", () => {
     for (const security of [
       { enabled: "[parameters('secret')]" },

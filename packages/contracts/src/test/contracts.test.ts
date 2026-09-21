@@ -165,7 +165,7 @@ describe("Wave 1 contracts", () => {
       assert.equal(Value.Check(NativeValidationReceiptV1Schema, receipt), true);
       assert.equal(hasValidNativeValidationReceipt(receipt, body), true);
       assert.equal(schemaById[NativeValidationReceiptV1Schema.$id!], NativeValidationReceiptV1Schema);
-      assert.equal(contractMetadata[NativeValidationReceiptV1Schema.$id!]?.maxBytes, 16_384);
+      assert.equal(contractMetadata[NativeValidationReceiptV1Schema.$id!]?.maxBytes, 4_210_688);
       assert.equal(
         calculateNativeValidationReceiptHash(Object.fromEntries(Object.entries(body).reverse()) as typeof body),
         receipt.receiptHash,

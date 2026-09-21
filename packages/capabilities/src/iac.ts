@@ -79,6 +79,7 @@ export interface NativeValidationRequest {
   readonly generatedSource: NonNullable<PreviewRequest["generatedSource"]>;
   readonly policyHash: string;
   readonly inputHash: string;
+  readonly policyValidation?: PreviewRequest["policyValidation"];
 }
 
 export interface CurrentDeploymentAuthority {

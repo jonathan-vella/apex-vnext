@@ -318,7 +318,9 @@ test("managed routing distinguishes input, review dispositions, and exact task c
       assert.doesNotMatch(handoff.prompt, /Output: complete typed requirements through APEX MCP/);
     }
     const requirements = await readFile(join(projection, ".github/agents/apex-requirements.agent.md"), "utf8");
-    const submission = requirements.indexOf("Immediately after the user answers a panel, call `apex/recordInput`");
+    const submission = requirements.indexOf(
+      "After the user answers a panel and any required fallback confirmation is complete, call `apex/recordInput`",
+    );
     const acknowledgment = requirements.indexOf("Wait for `recorded: true` with the same request ID");
     assert.ok(submission > 0 && acknowledgment > submission);
     for (const field of ["schemaVersion", "requestId", "expectedHead", "ownerEpoch", "questionId", "value"]) {
@@ -592,6 +594,13 @@ Gather requirements through the kernel.
   assert.match(cli, /model: Claude Sonnet 5/u);
   assert.match(cli, /target: github-copilot/u);
   assert.match(cli, /disable-model-invocation: false/u);
+  assert.match(cli, /collect one free-text answer/u);
+  assert.match(cli, /request correction for invalid, empty, or ambiguous input/u);
+  assert.match(cli, /A correction requires a fresh confirmation of the complete set/u);
+  assert.match(cli, /only after confirmation/u);
+  assert.match(cli, /Cancellation means no submission/u);
+  assert.match(cli, /Never pass unsupported `multiSelect` parameters/u);
+  assert.doesNotMatch(vscode, /collect one free-text answer/u);
   assert.doesNotMatch(cli, /vscode\/askQuestions|handoffs:|agents:|argument-hint:/u);
   const marker = "<!-- apex-shared-body -->";
   assert.equal(vscode.slice(vscode.indexOf(marker)), cli.slice(cli.indexOf(marker)));
@@ -667,16 +676,23 @@ test("asset generator rejects unsafe projection roots before generation", () => 
   }
 });
 
-test("APEX projections use exact client-specific MAI model identifiers", async () => {
-  const source = await readFile(join(root, "customizations/.github/agents/apex.agent.md"), "utf8");
+test("APEX projections use exact client-specific model identifiers for every role", async () => {
+  const manifest = JSON.parse(await readFile(join(root, "customizations/manifest.json"), "utf8"));
   const inventory = JSON.parse(await readFile(join(root, "tools/registry/copilot-cli-agent-tools.json"), "utf8"));
-  for (const [client, expectedModel] of [
-    ["github-copilot-vscode", "MAI-Code-1.1-Flash (copilot)"],
-    ["github-copilot-cli", "mai-code-1.1-flash"],
-  ]) {
-    const rendered = renderClientAgentProjection(source, client, inventory, { delegates: false });
-    const frontmatter = load(/^---\n([\s\S]*?)\n---/u.exec(rendered)[1]);
-    assert.equal(frontmatter.model, expectedModel);
+  const cliModels = new Map([
+    ["MAI-Code-1.1-Flash (copilot)", "mai-code-1.1-flash"],
+    ["GPT-5.6 Sol", "gpt-5.6-sol"],
+    ["GPT-5.6 Terra", "gpt-5.6-terra"],
+  ]);
+  for (const role of manifest.roles) {
+    const source = await readFile(join(root, "customizations", role.source), "utf8");
+    assert.ok(cliModels.has(role.model), `Missing expected CLI identifier for ${role.agent}`);
+    for (const client of ["github-copilot-vscode", "github-copilot-cli"]) {
+      const rendered = renderClientAgentProjection(source, client, inventory, { delegates: false });
+      const frontmatter = load(/^---\n([\s\S]*?)\n---/u.exec(rendered)[1]);
+      const projectedModel = Array.isArray(frontmatter.model) ? frontmatter.model[0] : frontmatter.model;
+      assert.equal(projectedModel, client === "github-copilot-cli" ? cliModels.get(role.model) : role.model);
+    }
   }
 });
 
@@ -715,6 +731,7 @@ Coordinate.
     { delegates },
   );
   assert.doesNotMatch(rendered, /\n\s+- task/u);
+  assert.doesNotMatch(rendered, /collect one free-text answer/u);
   assert.match(rendered, /foreground agent/);
 });
 

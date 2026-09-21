@@ -49,6 +49,7 @@ import {
   type PolicyPropertyMapV1,
   type EvidenceManifestV1,
   type IacBindingV1,
+  type NativeValidationReceiptV1,
   type IacHandoffV1,
   type InputRequestV1,
   type InputValueV1,
@@ -93,6 +94,7 @@ import {
   type GovernanceBaselineSelection,
   type CapabilityPackInstallOptions,
   type IacProvider,
+  type PreviewRequest,
   type ProviderExecutionEvidence,
   type ProcessRunnerLike,
 } from "@apexops/capabilities";
@@ -2570,12 +2572,105 @@ export class ApexService {
   async validateTask(
     taskId: string,
     output?: TaskOutput | TaskOutput[],
-  ): Promise<{ valid: true; taskId: string; staged?: StagedArtifact | StagedArtifact[] }> {
+  ): Promise<{
+    valid: boolean;
+    taskId: string;
+    staged?: StagedArtifact | StagedArtifact[];
+    execution?: { mode: "native"; executedValidatorIds: string[]; blockedValidatorIds: string[] };
+    outputs?: TaskOutput[];
+  }> {
     const run = await this.currentRun();
     const task = await this.readTask(run, taskId);
     const head = await this.journal(run).head();
     if (head === null) throw new ApexError("APEX_STALE", "Task journal is empty", EXIT_CODES.stale);
     assertTaskCurrent(task, head, run.ownerEpoch, this.clock);
+    if (output === undefined && task.taskType === `validation-${run.iacTool}`) {
+      const provider = this.providers[run.iacTool];
+      if (provider?.validateSource === undefined)
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "A native source validation provider is required",
+          EXIT_CODES.validation,
+        );
+      const events = await this.journal(run).replay();
+      const workflow = await this.lockedWorkflowEngine(run);
+      const node = workflow.manifest.nodes.find(({ id }) => id === task.taskType);
+      if (node === undefined) throw new ApexError("APEX_STALE", "Validation workflow is unavailable", EXIT_CODES.stale);
+      const required = node.validators.filter((id) => workflowValidatorOwnership(id)?.boundary === "validation");
+      const hashes = this.acceptedArtifactHashes(events);
+      const sourceHash = hashes["iac-handoff"];
+      const inputHash = hashes["implementation-intent"];
+      const policyHash = hashes["policy-property-map"];
+      const manifestHash = hashes["logical-resource-manifest"];
+      if (
+        inputHash === undefined ||
+        [sourceHash, policyHash, manifestHash].some((hash) => hash === undefined || !task.inputRefs.includes(hash))
+      )
+        throw new ApexError("APEX_STALE", "Validation requires current accepted task inputs", EXIT_CODES.stale);
+      const handoff = await this.objects.getJson<IacHandoffV1>(sourceHash!);
+      if (handoff.intentHash !== inputHash || handoff.logicalResourceManifestHash !== manifestHash)
+        throw new ApexError("APEX_STALE", "Validation handoff does not bind accepted inputs", EXIT_CODES.stale);
+      const policy = await this.objects.getJson<PolicyPropertyMapV1>(policyHash!);
+      const manifest = await this.objects.getJson<LogicalResourceManifestV1>(manifestHash!);
+      const rootPath = resolve(this.root, handoff.rootPath);
+      await this.assertSafeDestination(this.root, rootPath);
+      const transfers = new WriterTransferStore(this.projects.runDirectory(run.projectId, run.runId), this.clock);
+      await this.assertCurrentWriterAuthority(run, transfers);
+      const binding = {
+        projectId: run.projectId,
+        runId: run.runId,
+        track: run.iacTool,
+        sourceHash: sourceHash!,
+        treeHash: handoff.treeHash,
+        policyHash: policyHash!,
+        inputHash: inputHash!,
+      };
+      const policyValidation = this.policyValidationInput(run.iacTool, policy, manifest);
+      const receipt = await provider.validateSource({
+        ...binding,
+        generatedSource: { rootPath, treeHash: handoff.treeHash },
+        policyValidation: structuredClone(policyValidation),
+      });
+      if (
+        !hasValidNativeValidationReceipt(receipt, binding) ||
+        !this.hasRequiredNativePolicyEvidence(receipt, policyValidation)
+      )
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Native validation receipt is invalid or incomplete",
+          EXIT_CODES.validation,
+        );
+      const current = await this.currentRun();
+      if (current.runId !== run.runId || current.projectId !== run.projectId || current.ownerEpoch !== run.ownerEpoch)
+        throw new ApexError("APEX_STALE", "Validation writer or run changed", EXIT_CODES.stale);
+      assertTaskCurrent(task, (await this.journal(current).head())!, current.ownerEpoch, this.clock);
+      await this.assertCurrentWriterAuthority(current, transfers);
+      const receiptHash = await this.objects.putJson(receipt);
+      const executed = new Set<string>(receipt.commands.map(({ validatorId }) => validatorId));
+      if (receipt.policyValidation !== undefined) executed.add("business:policy-property-map");
+      const executedValidatorIds = required.filter((id) => executed.has(id));
+      const blockedValidatorIds = required.filter((id) => !executed.has(id));
+      const evidence: EvidenceManifestV1 = {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: run.projectId,
+        runId: run.runId,
+        createdAt: this.clock().toISOString(),
+        entries: executedValidatorIds.map((kind) => ({
+          kind,
+          hash: receiptHash,
+          bytes: Buffer.byteLength(JSON.stringify(receipt)),
+          required: true,
+          retention: "immutable",
+        })),
+      };
+      this.assertValid("validation-evidence", evidence);
+      return {
+        valid: blockedValidatorIds.length === 0,
+        taskId,
+        execution: { mode: "native", executedValidatorIds, blockedValidatorIds },
+        outputs: [{ kind: "validation-evidence", value: evidence }],
+      };
+    }
     const staged =
       output === undefined
         ? undefined
@@ -3855,22 +3950,7 @@ export class ApexService {
       const logicalManifest =
         manifestHash === undefined ? undefined : await this.objects.getJson<LogicalResourceManifestV1>(manifestHash);
       const policyValidation =
-        options.operation === "apply" && policyMap !== undefined && policyMap.mappings.length > 0
-          ? {
-              policyMap,
-              logicalResourceManifest: Object.fromEntries(
-                (logicalManifest?.resources ?? [])
-                  .filter(({ ownership }) => ownership === "managed")
-                  .filter(({ executionAddress }) => executionAddress !== undefined)
-                  .map(({ logicalId, executionAddress }) => [
-                    logicalId,
-                    run.iacTool === "bicep"
-                      ? { codeSymbol: executionAddress! }
-                      : { terraformAddress: executionAddress! },
-                  ]),
-              ),
-            }
-          : undefined;
+        options.operation === "apply" ? this.policyValidationInput(run.iacTool, policyMap, logicalManifest) : undefined;
       const handoffHash = this.artifactHash(events, "iac-handoff");
       const handoff = handoffHash === undefined ? undefined : await this.objects.getJson<IacHandoffV1>(handoffHash);
       if (provider.validateSource === undefined && provider.validationMode !== "simulated")
@@ -3907,10 +3987,11 @@ export class ApexService {
         };
         for (const { validatorId } of NATIVE_VALIDATION_COMMANDS[run.iacTool]) {
           const receiptHash = payload?.validatorEvidenceRefs?.[validatorId];
+          const nativeReceipt = receiptHash === undefined ? undefined : await this.objects.getJson(receiptHash);
           if (
             payload?.validatorEvidenceModes?.[validatorId] !== "native" ||
-            receiptHash === undefined ||
-            !hasValidNativeValidationReceipt(await this.objects.getJson(receiptHash), binding)
+            !hasValidNativeValidationReceipt(nativeReceipt, binding) ||
+            !this.hasRequiredNativePolicyEvidence(nativeReceipt, policyValidation)
           )
             throw new ApexError(
               "APEX_VALIDATION",
@@ -6485,6 +6566,51 @@ export class ApexService {
     }
   }
 
+  private hasRequiredNativePolicyEvidence(
+    receipt: NativeValidationReceiptV1,
+    input: PreviewRequest["policyValidation"],
+  ): boolean {
+    if (receipt.track !== "bicep" || input === undefined || input.policyMap.mappings.length === 0) return true;
+    const policy = receipt.policyValidation;
+    return (
+      policy !== undefined &&
+      hasValidPolicyValidation(policy, {
+        track: receipt.track,
+        sourceHash: receipt.sourceHash,
+        policyMapHash: receipt.policyHash,
+        policyMapContentHash: calculatePolicyValidationDigest(input.policyMap),
+        logicalResourceManifestHash: calculatePolicyValidationDigest(input.logicalResourceManifest),
+        inputHash: policy.inputHash,
+      }) &&
+      policy.outcome === "pass" &&
+      policy.projectId === receipt.projectId &&
+      policy.runId === receipt.runId &&
+      policy.results.length === input.policyMap.mappings.length &&
+      policy.results.every(
+        (result, index) => result.mappingHash === calculatePolicyValidationDigest(input.policyMap.mappings[index]),
+      )
+    );
+  }
+
+  private policyValidationInput(
+    track: RunConfigV1["iacTool"],
+    policyMap: PolicyPropertyMapV1 | undefined,
+    manifest: LogicalResourceManifestV1 | undefined,
+  ): PreviewRequest["policyValidation"] {
+    if (policyMap === undefined || policyMap.mappings.length === 0) return undefined;
+    return {
+      policyMap,
+      logicalResourceManifest: Object.fromEntries(
+        (manifest?.resources ?? [])
+          .filter(({ ownership, executionAddress }) => ownership === "managed" && executionAddress !== undefined)
+          .map(({ logicalId, executionAddress }) => [
+            logicalId,
+            track === "bicep" ? { codeSymbol: executionAddress! } : { terraformAddress: executionAddress! },
+          ]),
+      ),
+    };
+  }
+
   private async validateTaskValidators(
     run: RunConfigV1,
     task: TaskEnvelopeV1,
@@ -6612,9 +6738,15 @@ export class ApexService {
           inputHash,
           policyHash,
         };
+        const policyValidation = this.policyValidationInput(
+          run.iacTool,
+          artifacts["policy-property-map"] as PolicyPropertyMapV1 | undefined,
+          artifacts["logical-resource-manifest"] as LogicalResourceManifestV1 | undefined,
+        );
         const receipt = await provider.validateSource({
           ...binding,
           generatedSource: { rootPath, treeHash: handoff.treeHash },
+          policyValidation: structuredClone(policyValidation),
         });
         if (!hasValidNativeValidationReceipt(receipt, binding))
           throw new ApexError(
@@ -6622,9 +6754,16 @@ export class ApexService {
             "Native validation receipt is invalid or stale",
             EXIT_CODES.validation,
           );
+        if (!this.hasRequiredNativePolicyEvidence(receipt, policyValidation))
+          throw new ApexError(
+            "APEX_VALIDATION",
+            "Native validation requires passing source-bound policy evidence for every mapping",
+            EXIT_CODES.validation,
+          );
         const receiptHash = await this.objects.putJson(receipt);
         const receiptBytes = Buffer.byteLength(JSON.stringify(receipt));
         const executed = new Set<string>(receipt.commands.map(({ validatorId }) => validatorId));
+        if (run.iacTool === "bicep" && policyValidation !== undefined) executed.add("business:policy-property-map");
         for (const id of validatorIds) {
           if (executed.has(id)) {
             nativeEvidenceRefs[id] = receiptHash;

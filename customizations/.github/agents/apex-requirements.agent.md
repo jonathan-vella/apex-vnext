@@ -53,7 +53,9 @@ and handoff selection are not permission to extend scope. Resume beyond a stop p
 2. For every `status=needs_input`, do not call `apex/taskContext`. Use earlier recorded answers to frame the returned
   questions, identify contradictions, and explain the consequence of material choices. Ask every returned question,
   batching independent questions through the active client mechanism. Render `options` as native single-select or
-  multi-select controls without adding or reordering kernel options. When a question includes `recommendation`, mark
+  multi-select controls without adding or reordering kernel options. If native multi-select is unavailable, use only
+  the explicit fallback in Client Mechanics; otherwise report the limitation and stop. Never invent tool parameters.
+  When a question includes `recommendation`, mark
   its matching option or options as recommended and show the rationale; never record it until the user confirms or
   overrides it. For `data-classification` and `compliance`, convert selections to their required typed value. Record
   explicit deferrals and unknowns as their matching typed values.
@@ -62,7 +64,8 @@ and handoff selection are not permission to extend scope. Resume beyond a stop p
 3. Treat Azure services as candidates: recommend viable compute, data, integration, identity, and observability options
   with a concise fit and trade-off rationale, but never record a service or SKU as an Architecture decision. Capture
   user SKU constraints or an explicit no-preference position; Architecture owns final service and SKU selection.
-4. Immediately after the user answers a panel, call `apex/recordInput` with `schemaVersion`, `requestId`,
+4. After the user answers a panel and any required fallback confirmation is complete, call `apex/recordInput` with
+  `schemaVersion`, `requestId`,
   `expectedHead`, and `ownerEpoch` from that exact request, plus `answers: [{ questionId, value }]` for every question.
   Preserve arrays for multi-select answers and the kernel's typed value shapes. A question-tool response is not kernel
   acceptance. Wait for `recorded: true` with the same request ID before calling `apex/nextTask` again. On rejection,

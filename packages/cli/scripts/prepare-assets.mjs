@@ -11,7 +11,12 @@ const repositoryRoot = resolve(packageRoot, "../..");
 const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
-const CLIENT_ADAPTER_VERSION = "1.2.0";
+const CLIENT_ADAPTER_VERSION = "1.3.0";
+const CLI_MODEL_IDS = new Map([
+  ["MAI-Code-1.1-Flash (copilot)", "mai-code-1.1-flash"],
+  ["GPT-5.6 Sol", "gpt-5.6-sol"],
+  ["GPT-5.6 Terra", "gpt-5.6-terra"],
+]);
 export const GENERATED_SHARED_FILES = [
   ".github/workflows/governance-policy-baseline.yml",
   "tools/scripts/collect-governance-baseline.ps1",
@@ -121,7 +126,7 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
     name: frontmatter.name,
     description: frontmatter.description,
     target: "github-copilot",
-    model: model === "MAI-Code-1.1-Flash (copilot)" ? "mai-code-1.1-flash" : model,
+    model: CLI_MODEL_IDS.get(model) ?? model,
     "user-invocable": frontmatter["user-invocable"] ?? true,
     "disable-model-invocation": frontmatter["disable-model-invocation"] ?? frontmatter["user-invocable"] === false,
     tools,
@@ -137,6 +142,9 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
       : null,
     frontmatter.name !== "APEX" && tools.includes(inventory.interactiveTools.askUser)
       ? `Run user-facing questions as the foreground agent using \`${inventory.interactiveTools.askUser}\`, not as a delegated background task. For another interactive stage, ask the user to select its named agent and carry forward the scope note; do not delegate interactive work through \`${inventory.interactiveTools.delegate}\`. If the question tool is unavailable, report the limitation and stop without claiming answers were recorded.`
+      : null,
+    frontmatter.name !== "APEX" && tools.includes(inventory.interactiveTools.askUser)
+      ? `For a kernel question with \`multiSelect: true\`, use native multi-select only when the exposed question-tool schema supports it. Otherwise, show every exact kernel option in its original order and collect one free-text answer through \`${inventory.interactiveTools.askUser}\` using its supported free-text input. Ask for exact option values, one per line. Validate every supplied value against the kernel options; request correction for invalid, empty, or ambiguous input instead of dropping values, guessing aliases, selecting defaults, or applying recommendations. Then show the complete proposed selection as an array and use the native question tool to request explicit confirmation or correction. A correction requires a fresh confirmation of the complete set. Call \`apex/recordInput\` only after confirmation, preserving the request ID, expected head, owner epoch, array value shape, other submitted answers, and the user's stop boundary. Cancellation means no submission; stale-request rejection requires fresh kernel input and confirmation, not replay. Never pass unsupported \`multiSelect\` parameters or silently replace multiple selection with a single-choice answer. If free-text input or confirmation is unavailable, report the limitation and stop. This fallback changes only input collection, not permitted values or kernel validation.`
       : null,
   ].filter(Boolean);
   return serializeAgent(

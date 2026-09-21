@@ -114,7 +114,11 @@ function resourcesFromJson(json: string, track: IacTool): readonly Resource[] {
   if (root === undefined) throw new Error("POLICY_VALIDATION_INVALID_SOURCE");
   const resources: Resource[] = [];
   if (track === "bicep") {
-    const visit = (value: unknown, inheritedUnsupported = false): void => {
+    const visit = (
+      value: unknown,
+      inheritedUnsupported = false,
+      parentSymbols: readonly string[] | null = [],
+    ): void => {
       const entries = Array.isArray(value)
         ? value.map((entry) => [undefined, entry] as const)
         : object(value) !== undefined
@@ -130,13 +134,22 @@ function resourcesFromJson(json: string, track: IacTool): readonly Resource[] {
           (Object.hasOwn(resource, "condition") && resource.condition !== true) ||
           resource.existing === true;
         const physicalId = text(own(resource, "id"));
+        const symbols = parentSymbols !== null && symbol !== undefined ? [...parentSymbols, symbol] : null;
         resources.push({
           value: resource,
           unsupported,
           ...(physicalId === undefined ? {} : { physicalId }),
-          ...(symbol === undefined ? {} : { codeSymbol: symbol }),
+          ...(symbols === null ? {} : { codeSymbol: symbols.join("::") }),
         });
-        if (Object.hasOwn(resource, "resources")) visit(resource.resources, unsupported);
+        if (Object.hasOwn(resource, "resources")) visit(resource.resources, unsupported, symbols);
+        if (text(resource.type)?.toLowerCase() === "microsoft.resources/deployments") {
+          const properties = object(resource.properties);
+          if (properties !== undefined && Object.hasOwn(properties, "template")) {
+            const template = object(properties.template);
+            if (template === undefined) throw new Error("POLICY_VALIDATION_INVALID_SOURCE");
+            visit(template.resources, unsupported || Object.hasOwn(properties, "templateLink"), symbols);
+          }
+        }
       }
     };
     visit(root.resources);

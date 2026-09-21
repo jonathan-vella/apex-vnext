@@ -1,6 +1,6 @@
 # APEX vNext Checkpoint
 
-- **Updated:** 2026-09-16
+- **Updated:** 2026-09-21
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Integration branch:** `main`
 - **Product status:** Pre-release
@@ -10,7 +10,8 @@
 
 The approved direction is a COE workload factory with independent archetype reuse and conversational changes.
 Both ALZ-backed workloads and standalone single-subscription labs/demos are day-one requirements. Windows users run
-through WSL2 without a devcontainer. [PRD.md](PRD.md) is the canonical scope and quality reference.
+through WSL2 for VS Code Local and standalone CLI. Neither requires a devcontainer. Desktop-app work is parked.
+[PRD.md](PRD.md) is the canonical scope and quality reference.
 
 The standalone vNext repository owns a deterministic TypeScript runtime, versioned contracts, bounded capabilities,
 renderers, CLI/MCP lifecycle, managed VS Code and Copilot CLI projections, and deterministic qualification.
@@ -18,6 +19,84 @@ renderers, CLI/MCP lifecycle, managed VS Code and Copilot CLI projections, and d
 Repository modernization has retired original automation, prompts, compatibility utilities, duplicate workflows and npm
 scripts, stale root configuration, and unneeded development-container tooling. The active documentation has been rebuilt
 around vNext source authorities and Diátaxis navigation.
+
+## Active Completion Focus
+
+The maintainer parked all standalone desktop-app work on 2026-09-21. The active release targets only VS Code Local
+and standalone Copilot CLI on WSL2. Preserve desktop probes, Windows fixes and upstream findings without additional
+app tests, adapter implementation, native Windows CI or host setup. The
+[desktop backlog](ROADMAP.md#deferred-standalone-copilot-desktop-app) owns reactivation; built-in helpers remain deferred.
+
+PR #345 merged as `afca69ee4318052550d4993145e896329827a5fd`; its post-merge CI and release qualification passed.
+Candidate `67fefa2` has bounded user-confirmed VS Code/CLI intake and restart observations, not full workflow parity.
+The development desktop probes are separate evidence and must not be used to qualify these clients.
+
+The 2026-09-21 standalone CLI `1.0.86` recheck executed a tool-free worker through direct `--agent` selection despite
+`user-invocable: false`; see [ADR-0006](adrs/03-des-adr-0006-omit-cli-autonomous-workers.md).
+The maintainer-approved ADR revision removes visibility as a security blocker. Runtime authority tests and an isolated
+CLI-to-MCP probe reject invalid/stale work and accept a valid task without approving gates. Qualify actual CodeGen,
+Reviewer and Validator profiles next, preserving models, tool grants and kernel safeguards. Shipped worker membership
+remains unchanged pending that evidence; same-client review is not authenticated independent identity.
+The model identifier issue is resolved: CLI adapter `1.3.0` maps the same configured GPT models to documented CLI IDs.
+The actual Reviewer accepted a bound Requirements finding; corrected CodeGen guidance produced one accepted tree on
+each track. Task-only IaC `validateTask` requests now execute native checks and return runtime-owned evidence with
+explicit unexecuted-validator blockers. Fresh CLI Validator probes on both tracks report those blockers and stop without
+completion or Gate 4 changes. Required executable security-baseline/logical-parity evidence remains an implementation
+gap; command receipts must not be used to claim those checks passed. See the
+[worker matrix](CLIENT-QUALIFICATION.md#cli-worker-qualification).
+Complete the remaining product and paired-client matrix. Do not restart completed cleanup
+or add optional agent helpers, telemetry or orchestration infrastructure to accelerate delivery.
+
+Pending branch changes must be separated by relevance before integration: retain and qualify shared CLI guidance only
+where needed for the active clients; park desktop-only runtime changes and evidence without deleting or shipping them
+as an implied support promise. Do not reset the dirty branch or overwrite prior test workspaces.
+
+### Governance Native Validation Checkpoint
+
+The current working-tree slice passes the accepted nonempty policy map and generated managed-resource execution
+bindings into native source validation on both IaC tracks, reusing preview's binding construction. Bicep now evaluates
+mapped properties from the existing build command's output and includes source-bound policy evidence in its native
+validation receipt. Validation acceptance and preview require complete, passing evidence for the accepted mappings.
+The business policy validator is recorded as native only when that evaluation ran. Empty maps and Terraform's
+command-only validation do not claim policy execution.
+
+Regressions cover Deny, Modify and DeployIfNotExists, receipt tampering, stale inputs, input mutation during commands,
+missing bindings and rejected values. Rejection preserves the journal and closed Gate 4. Installed-Bicep tests verify
+matching and mismatched properties using symbolic-name compiler output. Unresolved expressions and unsupported
+resource bindings fail closed; this does not establish full AVM coverage or deployed-resource compliance.
+
+The Bicep evidence slice passed `qualify:vnext`. Terraform already evaluates saved-plan properties during native
+preview before Gate 4; its source-validation commands alone do not resolve planned values. A subsequent provider fix
+bounds and snapshots policy inputs before preview awaits, preventing caller mutation from changing expected values,
+removing mappings or replacing resource bindings during commands. All 285 provider tests and both focused Terraform
+saved-plan service tests passed after that fix. No authenticated planning was run or added to source validation.
+
+Both tracks now have nonempty management-group-baseline import through reconciliation, review, planning, code
+acceptance, restart and simulated deployment coverage. Tests retain Deny, Modify and DeployIfNotExists identities,
+reject missing/substituted/exempt mappings without changing the journal or opening Gate 2, and exclude unrelated
+subscription data from the selected snapshot and metadata sentinels from persisted runtime files.
+
+The same imported-baseline fixture now also uses production native providers with mocked external commands and
+file-backed runtime stores. Bicep rejects mismatched properties during source validation; both tracks reject mismatched
+preview properties without journal changes or opening Gate 4. After service restart, passing previews persist evidence
+bound to the accepted source, policy identities and exact mocked compiler/plan output. Terraform source validation
+remains command-only. These cases stop before native apply; simulated deployment and mocked output are not live
+compliance evidence.
+
+Bicep policy lookup now traverses embedded deployment templates using qualified `module::child` symbols, preserving
+parent conditions and loop restrictions. Installed-Bicep tests cover matching and mismatched local-module properties.
+Imported-policy workflows cover Bicep AVM-style bindings with explicit physical ownership and Terraform exact
+child-resource addresses. Both preview providers snapshot bounded policy inputs before awaited commands. Unresolved
+ARM expressions, missing symbols, ambiguous resources and unbound module containers remain fail-closed, not compliant.
+
+The combined governance changes passed `npm run qualify:vnext` on 2026-09-21 with exit code 0, including package tests,
+runtime validators, packaging and clean installation. Focused checks also passed all 336 provider/evaluator tests and
+13 imported-policy/ownership workflow tests. This is working-tree qualification, not a published release or client/cloud
+acceptance result.
+
+The remaining acceptance boundary is exact-candidate client and separately authorized cloud evidence, including actual
+AVM versions and parameterized workloads. Keep Terraform's earlier command-only evidence distinct from saved-plan
+policy evidence. Issue #344 remains open pending that acceptance; desktop work remains parked.
 
 ## Open Release Work
 
@@ -33,14 +112,15 @@ around vNext source authorities and Diátaxis navigation.
   bounded context/reviewer packs, stage criteria/dispositions and routing/tool scope have implementation and focused
   tests. Exact-client checks remain pending. Scoped prompt inspection found no further safe deletion.
 - Complete issue #344's nonempty-policy enforcement through planning and native code validation. Path-only import,
-  standalone collection and evidenced-empty import-to-simulated-deployment tests exist for both tracks. Native apply
+  standalone collection and empty/nonempty import-to-simulated-deployment tests exist for both tracks. Native apply
   previews check concrete policy values against compiled Bicep/saved Terraform plans with source-bound receipts;
-  native top-level ownership checks reject foreign mutations; AVM child-resource identity and earlier code-validation
-  integration remain open.
+  native top-level ownership checks reject foreign mutations. Combined imported-baseline/native-provider tests reach
+  preview with mocked commands, including qualified Bicep module children and resolved Terraform child resources.
+  Actual AVM-version/workload acceptance remains unverified; Terraform source validation is still command-only.
 - Implement and qualify COE import, provenance, relevant change questions, manual-edit conflicts and selective
   regeneration using existing contracts and parameters.
 - Complete design/ADR and operational/as-built output against the PRD quality checklist.
-- Close both-client lifecycle gaps on WSL2 in both profiles; generated projections do not prove complete outcomes.
+- Close VS Code and standalone CLI lifecycle gaps on WSL2 in both profiles; projections do not prove outcomes.
 - Evaluate Agent Plugins and APEX MCP redistribution after features work; npm remains the current implementation.
 - Complete exact-candidate live qualification for supported client interactions.
 - Complete separately authorized Bicep and Terraform cloud qualification.
