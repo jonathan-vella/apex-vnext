@@ -750,6 +750,46 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
           inputHash: request.inputHash,
           policyHash: request.policyHash,
           outcome: "pass" as const,
+          ...(track !== "terraform"
+            ? {}
+            : {
+                policyValidation: validatePolicyProperties({
+                  track,
+                  sourceHash: request.sourceHash,
+                  policyMapHash: request.policyHash,
+                  policyMap: {
+                    schemaVersion: "1.0.0",
+                    projectId: request.projectId,
+                    runId: request.runId,
+                    governanceHash: request.policyHash,
+                    mappings: [
+                      {
+                        policyAssignmentId: "unrequested",
+                        effect: "deny",
+                        logicalResourceId: "api",
+                        propertyPath: "enabled",
+                        expectedValue: true,
+                        disposition: "planned",
+                      },
+                    ],
+                  },
+                  logicalResourceManifest: { api: { terraformAddress: "azapi_resource.api" } },
+                  json: JSON.stringify({
+                    planned_values: {
+                      root_module: {
+                        resources: [{ address: "azapi_resource.api", mode: "managed", values: { enabled: true } }],
+                      },
+                    },
+                    resource_changes: [
+                      {
+                        address: "azapi_resource.api",
+                        mode: "managed",
+                        change: { actions: ["create"], after: { enabled: true }, after_unknown: {} },
+                      },
+                    ],
+                  }),
+                }),
+              }),
           commands: NATIVE_VALIDATION_COMMANDS[track].map((command) => ({
             validatorId: command.validatorId,
             commandHash: calculateNativeValidationCommandHash(command),
@@ -895,6 +935,22 @@ test("Bicep validation acceptance requires complete bound policy evidence before
       if (mode === "wrong-manifest") policy.logicalResourceManifestHash = "f".repeat(64);
       if (mode === "partial") policy.results.pop();
       if (mode === "wrong-mapping") policy.results[0]!.mappingHash = "f".repeat(64);
+      if (
+        [
+          "policyAssignmentId",
+          "policyDefinitionId",
+          "policyDefinitionReferenceId",
+          "logicalResourceId",
+          "propertyPath",
+        ].includes(mode)
+      )
+        Object.assign(policy.results[0]!, { [mode]: "different" });
+      if (mode === "effect") policy.results[0]!.effect = "modify";
+      if (mode === "disposition") policy.results[0]!.disposition = "satisfied";
+      if (mode === "expected-value") {
+        policy.results[0]!.expectedValueDigest = sha256Json(false);
+        policy.results[0]!.observedValueDigest = sha256Json(false);
+      }
       const { receiptHash: policyHash, ...policyBody } = policy;
       assert.ok(policyHash);
       const body = {
@@ -942,7 +998,22 @@ test("Bicep validation acceptance requires complete bound policy evidence before
   const validationTask = await task(service, "validation-bicep");
   const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
   const head = await journal.head();
-  for (mode of ["missing", "wrong-map", "wrong-manifest", "partial", "wrong-mapping"]) {
+  for (mode of [
+    "missing",
+    "wrong-map",
+    "wrong-manifest",
+    "partial",
+    "wrong-mapping",
+    "policyAssignmentId",
+    "policyDefinitionId",
+    "policyDefinitionReferenceId",
+    "logicalResourceId",
+    "propertyPath",
+    "effect",
+    "disposition",
+    "expected-value",
+  ]) {
+    await assert.rejects(service.validateTask(validationTask), /Native validation receipt is invalid or incomplete/);
     await assert.rejects(
       service.completeTaskOutputs(validationTask, [
         { kind: "validation-evidence", value: validationEvidence(runId, "bicep") },
@@ -1888,6 +1959,7 @@ test("native apply requires complete source-bound policy receipts before Gate 4"
   const base = bicepPreviewProvider(now);
   let receipt: PolicyValidationV1 | undefined;
   let includeReceipt = false;
+  let substituteResult = true;
   const provider: IacProvider = {
     ...base,
     async previewApply(request) {
@@ -1906,7 +1978,15 @@ test("native apply requires complete source-bound policy receipts before Gate 4"
       });
       return base.previewApply(request);
     },
-    policyValidation: () => (includeReceipt ? receipt : undefined),
+    policyValidation: () => {
+      if (!includeReceipt || receipt === undefined) return undefined;
+      if (!substituteResult) return receipt;
+      const changed = structuredClone(receipt);
+      changed.results[0]!.logicalResourceId = "foreign";
+      const { receiptHash, ...body } = changed;
+      assert.ok(receiptHash);
+      return { ...body, receiptHash: calculatePolicyValidationHash(body) };
+    },
   };
   const service = new ApexService(root, { clock: () => now, providers: { bicep: provider } });
   const { runId } = await service.init({
@@ -1931,6 +2011,11 @@ test("native apply requires complete source-bound policy receipts before Gate 4"
   await assert.rejects(service.preview({ operation: "apply", provider: "bicep" }), /source-bound policy validation/);
   assert.equal((await service.status()).run.gates[3]!.state, "closed");
   includeReceipt = true;
+  const head = (await service.status()).head;
+  await assert.rejects(service.preview({ operation: "apply", provider: "bicep" }), /source-bound policy validation/);
+  assert.equal((await service.status()).head, head);
+  assert.equal((await service.status()).run.gates[3]!.state, "closed");
+  substituteResult = false;
   await service.preview({ operation: "apply", provider: "bicep" });
   const events = await new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal")).replay();
   const created = events.findLast(({ type }) => type === "preview.created");
@@ -2056,7 +2141,7 @@ test("native Terraform apply requires complete source-bound policy receipts befo
   const requests: PreviewRequest[] = [];
   let receipt: PolicyValidationV1 | undefined;
   let attestation: ExecutionPlanAttestationV1 | undefined;
-  let receiptMode: "missing" | "rehashed" | "valid" = "missing";
+  let receiptMode: "missing" | "rehashed" | "substituted" | "valid" = "missing";
   const provider: typeof base = {
     ...base,
     async previewApply(request) {
@@ -2077,6 +2162,14 @@ test("native Terraform apply requires complete source-bound policy receipts befo
         }),
       });
       assert.equal(receipt.outcome, "pass");
+      if (receiptMode === "substituted") {
+        const changed = structuredClone(receipt);
+        changed.results[0]!.expectedValueDigest = sha256Json(false);
+        changed.results[0]!.observedValueDigest = sha256Json(false);
+        const { receiptHash, ...body } = changed;
+        assert.ok(receiptHash);
+        receipt = { ...body, receiptHash: calculatePolicyValidationHash(body) };
+      }
       const original = await base.previewApply(request);
       const originalAttestation = base.attestation(original.previewHash);
       assert.ok(originalAttestation);
@@ -2147,10 +2240,17 @@ test("native Terraform apply requires complete source-bound policy receipts befo
   await assert.rejects(service.preview({ operation: "apply", provider: "terraform" }), /terraform:saved-plan-binding/);
   assert.equal((await service.status()).run.gates[3]!.state, "closed");
   assert.equal(await journal.head(), head);
+  receiptMode = "substituted";
+  await assert.rejects(
+    service.preview({ operation: "apply", provider: "terraform" }),
+    /source-bound policy validation/,
+  );
+  assert.equal(await journal.head(), head);
+  assert.equal((await service.status()).run.gates[3]!.state, "closed");
   receiptMode = "valid";
   const preview = await service.preview({ operation: "apply", provider: "terraform" });
   assert.equal((await service.status()).run.gates[3]!.state, "open");
-  assert.equal(requests.length, 3);
+  assert.equal(requests.length, 4);
   const events = await journal.replay();
   const created = events.findLast(({ type }) => type === "preview.created");
   assert.ok(created);

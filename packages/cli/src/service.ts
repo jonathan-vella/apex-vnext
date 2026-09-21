@@ -47,6 +47,7 @@ import {
   type GovernanceConstraintsV1,
   type GovernanceObservationReceiptV1,
   type PolicyPropertyMapV1,
+  type PolicyValidationV1,
   type EvidenceManifestV1,
   type IacBindingV1,
   type NativeValidationReceiptV1,
@@ -2647,7 +2648,8 @@ export class ApexService {
       await this.assertCurrentWriterAuthority(current, transfers);
       const receiptHash = await this.objects.putJson(receipt);
       const executed = new Set<string>(receipt.commands.map(({ validatorId }) => validatorId));
-      if (receipt.policyValidation !== undefined) executed.add("business:policy-property-map");
+      if (run.iacTool === "bicep" && policyValidation !== undefined && receipt.policyValidation !== undefined)
+        executed.add("business:policy-property-map");
       const executedValidatorIds = required.filter((id) => executed.has(id));
       const blockedValidatorIds = required.filter((id) => !executed.has(id));
       const evidence: EvidenceManifestV1 = {
@@ -4058,11 +4060,7 @@ export class ApexService {
           policyReceipt.projectId !== run.projectId ||
           policyReceipt.runId !== run.runId ||
           policyReceipt.outcome !== "pass" ||
-          policyReceipt.results.length !== policyValidation.policyMap.mappings.length ||
-          policyReceipt.results.some(
-            (result, index) =>
-              result.mappingHash !== calculatePolicyValidationDigest(policyValidation.policyMap.mappings[index]),
-          ))
+          !this.policyResultsMatchMappings(policyReceipt, policyValidation.policyMap))
       )
         throw new ApexError(
           "APEX_VALIDATION",
@@ -6586,9 +6584,29 @@ export class ApexService {
       policy.projectId === receipt.projectId &&
       policy.runId === receipt.runId &&
       policy.results.length === input.policyMap.mappings.length &&
-      policy.results.every(
-        (result, index) => result.mappingHash === calculatePolicyValidationDigest(input.policyMap.mappings[index]),
-      )
+      this.policyResultsMatchMappings(policy, input.policyMap)
+    );
+  }
+
+  private policyResultsMatchMappings(receipt: PolicyValidationV1, policyMap: PolicyPropertyMapV1): boolean {
+    return (
+      receipt.results.length === policyMap.mappings.length &&
+      receipt.results.every((result, index) => {
+        const mapping = policyMap.mappings[index]!;
+        return (
+          result.mappingIndex === index &&
+          result.mappingHash === calculatePolicyValidationDigest(mapping) &&
+          result.policyAssignmentId === mapping.policyAssignmentId &&
+          result.policyDefinitionId === mapping.policyDefinitionId &&
+          result.policyDefinitionReferenceId === mapping.policyDefinitionReferenceId &&
+          result.effect === mapping.effect &&
+          result.disposition === mapping.disposition &&
+          result.logicalResourceId === mapping.logicalResourceId &&
+          result.propertyPath === mapping.propertyPath &&
+          Object.hasOwn(mapping, "expectedValue") &&
+          result.expectedValueDigest === calculatePolicyValidationDigest(mapping.expectedValue)
+        );
+      })
     );
   }
 
