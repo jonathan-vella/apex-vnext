@@ -1,4 +1,5 @@
 export * from "./artifacts.js";
+export * from "./archetype-source.js";
 export * from "./common.js";
 export * from "./deployment.js";
 export * from "./evidence.js";
@@ -12,6 +13,7 @@ export * from "./runtime.js";
 export * from "./targets.js";
 
 import { IacBindingV1Schema, ImplementationIntentV1Schema, RequirementsV1Schema } from "./artifacts.js";
+import { ArchetypeSourceProposalV1Schema } from "./archetype-source.js";
 import {
   ApprovalEvidenceV1Schema,
   DeploymentPreviewV1Schema,
@@ -69,6 +71,7 @@ import {
 } from "./targets.js";
 
 export const contractSchemas = [
+  ArchetypeSourceProposalV1Schema,
   RuntimeBundleLockV1Schema,
   ProjectConfigV1Schema,
   RunConfigV1Schema,
@@ -136,6 +139,7 @@ const metadata = (maxBytes: number, sensitivity: ContractSensitivity = "internal
 });
 
 export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
+  "https://schemas.apexops.dev/archetype-source-proposal-v1.json": metadata(524_288, "confidential"),
   "https://schemas.apexops.dev/runtime-bundle-lock-v1.json": metadata(32_768),
   "https://schemas.apexops.dev/project-config-v1.json": metadata(16_384),
   "https://schemas.apexops.dev/run-config-v1.json": metadata(65_536, "confidential"),

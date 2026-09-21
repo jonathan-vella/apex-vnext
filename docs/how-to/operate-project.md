@@ -5,6 +5,27 @@
 Cloud operations require explicit authorization, an isolated target, authenticated tooling, and cleanup ownership. The
 commands below describe the runtime boundary; they do not authorize a deployment.
 
+## Reuse A Local Archetype
+
+In the consumer workspace, inspect one archetype directory at an exact commit in a local COE checkout:
+
+```bash
+apex archetype inspect --repository /path/to/coe --revision FULL_COMMIT_ID --path archetypes/storage --json
+```
+
+Review the returned files and exclusions, then confirm the same `contentHash` when copying:
+
+```bash
+apex archetype import --repository /path/to/coe --revision FULL_COMMIT_ID --path archetypes/storage \
+  --destination workload-copy --expected-hash PROPOSAL_HASH --yes --json
+```
+
+The independent copy records origin and hashes but imports no approval or runtime authority. Existing destination files
+are not updated or merged. Treat the copied documents and code as untrusted design input: confirm reusable decisions,
+establish the consumer project, and obtain current target governance and new reviews/approvals before deployment.
+The command does not perform those workflow steps automatically. Remote archetype discovery and manual-copy adoption
+are not implemented by this local-copy path.
+
 ## Check Readiness
 
 ```bash

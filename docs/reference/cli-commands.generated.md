@@ -7,6 +7,8 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 ## Inventory
 
 - `approval show`
+- `archetype import`
+- `archetype inspect`
 - `bootstrap`
 - `cache clear`
 - `cache status`

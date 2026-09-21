@@ -109,6 +109,18 @@ The remaining acceptance boundary is exact-candidate client and separately autho
 AVM versions and parameterized workloads. Keep Terraform's earlier command-only evidence distinct from saved-plan
 policy evidence. Issue #344 remains open pending that acceptance; desktop work remains parked.
 
+### Local Archetype Reuse Checkpoint
+
+The working-tree `archetype inspect` and confirmation-gated `archetype import` commands read a selected local Git
+subtree at an exact commit and create a new independent directory with typed provenance. Tests cover uncommitted source
+edits, known credentials, source authority, unsafe paths, symlinks, executable files, byte limits, case collisions,
+proposal tampering, concurrent imports and destination conflicts. The operation does not execute source instructions,
+alter current runs or approve gates. It is not remote discovery, manual-copy adoption or selective regeneration.
+
+Canonical Planner-to-CodeGen and Planner-to-Validator CLI probes now have both-track routing evidence. Generation
+completed once per run; Validator correctly remained blocked on unexecuted business checks. Shipped worker membership
+and permissions remain unchanged.
+
 ## Open Release Work
 
 - Complete the [MCP contract follow-up](ROADMAP.md#mcp-contract-follow-up). The 2026-09-18 review reproduced invalid

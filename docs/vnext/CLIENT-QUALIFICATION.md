@@ -130,8 +130,14 @@ template alias mismatch; using `policy-property-map` instead of the workflow nod
 
 These are bounded synthetic routing results, not full client or review-quality acceptance. Rejected submissions remain
 recorded, and some non-Architecture reviews supplied optional pillar receipts. No authenticated independent reviewer
-identity is claimed. Successful native Validator completion remains blocked; CodeGen/Validator parent edges and the
-full workload lifecycle remain unqualified, so shipped CLI workers are still absent.
+identity is claimed. Successful native Validator completion and the full workload lifecycle remain unqualified, so
+shipped CLI workers are still absent.
+
+Subsequent isolated Planner-to-CodeGen and Planner-to-Validator probes succeeded as routing checks on both tracks.
+CodeGen accepted exactly one source tree/handoff per track; a fresh parent session delegated validation to the named
+Validator, which reported exact runtime blockers without completing. Audit checks verified source hashes, native mock
+command receipts, unchanged canaries, no new approvals/deployments and restart state. Evidence is retained under
+`dist/cli-worker-routing-11`. This covers delegated blocked handling, not successful native validation.
 
 Local evidence is retained under `dist/cli-worker-qualification-04` through `dist/cli-worker-qualification-07`,
 `dist/cli-parent-qualification-08`, the `dist/cli-review-qualification-09-*` fixtures, and

@@ -90,6 +90,7 @@ import {
   generateTerraformTree,
   importGovernanceBaseline,
   inspectGovernanceBaseline,
+  inspectArchetypeSource,
   GovernanceBaselineError,
   nativePolicyValidationBinding,
   type GovernanceBaselineSelection,
@@ -142,7 +143,7 @@ import {
 import { constants } from "node:fs";
 import { access, cp, lstat, mkdir, open, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
-import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { resolveBundledAssets, type BundledClientProjection } from "./assets.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
 import { ApexError, EXIT_CODES } from "./errors.js";
@@ -1157,6 +1158,90 @@ export class ApexService {
         ).sort(),
         payload: event.payload as JsonValue,
       }));
+  }
+
+  async inspectArchetype(repositoryPath: string, revision: string, selectedPath: string) {
+    try {
+      const { proposal } = await inspectArchetypeSource({
+        repositoryPath: resolve(this.root, repositoryPath),
+        revision,
+        selectedPath,
+      });
+      return proposal;
+    } catch {
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Archetype inspection failed: use an exact local Git commit and a bounded reusable directory without secrets or unsafe files",
+        EXIT_CODES.validation,
+      );
+    }
+  }
+
+  async importArchetype(request: {
+    repositoryPath: string;
+    revision: string;
+    selectedPath: string;
+    destination: string;
+    expectedHash: string;
+    confirm: boolean;
+  }): Promise<{ destination: string; contentHash: string; files: number; requiresConsumerReview: true }> {
+    if (request.confirm !== true)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Archetype import requires explicit confirmation",
+        EXIT_CODES.authorization,
+      );
+    if (!/^[a-z][a-z0-9-]{0,62}$/.test(request.destination) || !/^[a-f0-9]{64}$/.test(request.expectedHash))
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Archetype destination or proposal hash is invalid",
+        EXIT_CODES.validation,
+      );
+    const target = resolve(this.root, request.destination);
+    await this.assertSafeDestination(this.root, target);
+    if (await this.exists(target))
+      throw new ApexError("APEX_CONFLICT", "Archetype destination already exists", EXIT_CODES.conflict);
+    const { proposal, contents } = await inspectArchetypeSource({
+      repositoryPath: resolve(this.root, request.repositoryPath),
+      revision: request.revision,
+      selectedPath: request.selectedPath,
+    });
+    if (proposal.contentHash !== request.expectedHash)
+      throw new ApexError("APEX_STALE", "Archetype proposal does not match the confirmed selection", EXIT_CODES.stale);
+    const lockPath = join(this.root, ".apex-archetype-import.lock");
+    const lock = await open(lockPath, "wx", 0o600).catch(() => {
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "An archetype import lock exists; inspect the interrupted import before retrying",
+        EXIT_CODES.conflict,
+      );
+    });
+    try {
+      await this.assertSafeDestination(this.root, target);
+      await mkdir(target, { mode: 0o700 }).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "EEXIST")
+          throw new ApexError("APEX_CONFLICT", "Archetype destination already exists", EXIT_CODES.conflict);
+        throw error;
+      });
+      for (const file of proposal.files) {
+        const bytes = Buffer.from(contents.get(file.path)!, "utf8");
+        if (bytes.length !== file.bytes || sha256Bytes(bytes) !== file.hash)
+          throw new ApexError("APEX_STALE", "Archetype content changed before import", EXIT_CODES.stale);
+        const path = join(target, file.path);
+        await mkdir(dirname(path), { recursive: true });
+        await atomicWriteBytes(path, bytes, { refuseOverwrite: true });
+      }
+      await atomicWriteJson(join(target, ".apex-origin.json"), proposal, { refuseOverwrite: true });
+      return {
+        destination: request.destination,
+        contentHash: proposal.contentHash,
+        files: proposal.files.length,
+        requiresConsumerReview: true,
+      };
+    } finally {
+      await lock.close();
+      await rm(lockPath);
+    }
   }
 
   async status(): Promise<{

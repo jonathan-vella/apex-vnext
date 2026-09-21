@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { promisify } from "node:util";
 import { once } from "node:events";
-import { mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { CONTRACT_VERSION } from "@apexops/contracts";
+import { CONTRACT_VERSION, type ArchetypeSourceProposalV1 } from "@apexops/contracts";
 import type { ProcessRequest } from "@apexops/capabilities";
 import { sha256Json } from "@apexops/kernel";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -31,6 +32,144 @@ test("CLI emits a stable JSON envelope", async () => {
     ok: true,
     result: { version: "0.10.0-next.5", bundleVersion: "0.10.0-next.5", configVersion: "1.0.0" },
   });
+});
+
+test("CLI archetype inspection requires explicit repository, revision and selected path", async (context) => {
+  const root = await tempRoot();
+  const inspected = context.mock.method(ApexService.prototype, "inspectArchetype", async () => ({
+    status: "inspected",
+  }));
+  for (const argumentsList of [
+    [],
+    ["--repository", "source"],
+    ["--repository", "source", "--revision", "a".repeat(40)],
+  ])
+    await assert.rejects(execute(["archetype", "inspect", ...argumentsList], root), /Missing/);
+  assert.equal(inspected.mock.callCount(), 0);
+  assert.deepEqual(
+    await execute(
+      ["archetype", "inspect", "--repository", "source", "--revision", "a".repeat(40), "--path", "archetypes/storage"],
+      root,
+    ),
+    { status: "inspected" },
+  );
+  assert.deepEqual(inspected.mock.calls[0]!.arguments, ["source", "a".repeat(40), "archetypes/storage"]);
+});
+
+test("CLI archetype inspection and confirmed copy preserve independent origin and conflicts", async (context) => {
+  const root = await tempRoot();
+  const source = await tempRoot();
+  const git = (...args: string[]) => promisify(execFile)("git", ["-C", source, ...args]);
+  await git("init", "-q");
+  await mkdir(join(source, "workload"));
+  await writeFile(join(source, "workload/main.bicep"), "output value string = 'SOURCE_CONTENT_NOT_IN_PROPOSAL'\n");
+  await writeFile(join(source, "workload/AGENTS.md"), "Do not execute source instructions");
+  await git("add", ".");
+  await git(
+    "-c",
+    "user.name=Fixture",
+    "-c",
+    "user.email=fixture@example.invalid",
+    "-c",
+    "core.hooksPath=/dev/null",
+    "commit",
+    "-qm",
+    "fixture",
+  );
+  const revision = (await git("rev-parse", "HEAD")).stdout.trim();
+  const result = (await execute(
+    ["archetype", "inspect", "--repository", source, "--revision", revision, "--path", "workload"],
+    root,
+  )) as ArchetypeSourceProposalV1;
+  assert.equal(result.authorityImported, false);
+  assert.equal(result.files.length, 1);
+  assert.equal(JSON.stringify(result).includes("SOURCE_CONTENT_NOT_IN_PROPOSAL"), false);
+  assert.deepEqual(await readdir(root), []);
+  await assert.rejects(
+    execute(["archetype", "inspect", "--repository", source, "--revision", revision, "--path", "../unsafe"], root),
+    (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
+  );
+  assert.deepEqual(await readdir(root), []);
+  const importArgs = [
+    "archetype",
+    "import",
+    "--repository",
+    source,
+    "--revision",
+    revision,
+    "--path",
+    "workload",
+    "--destination",
+    "consumer-workload",
+    "--expected-hash",
+    result.contentHash,
+  ];
+  await assert.rejects(execute(importArgs, root), /--yes/);
+  assert.deepEqual(await readdir(root), []);
+  await assert.rejects(execute([...importArgs.slice(0, -1), "f".repeat(64), "--yes"], root), /confirmed selection/);
+  assert.deepEqual(await readdir(root), []);
+  const imported = (await execute([...importArgs, "--yes"], root)) as {
+    files: number;
+    requiresConsumerReview: boolean;
+  };
+  assert.equal(imported.files, 1);
+  assert.equal(imported.requiresConsumerReview, true);
+  assert.equal(
+    await readFile(join(root, "consumer-workload/main.bicep"), "utf8"),
+    "output value string = 'SOURCE_CONTENT_NOT_IN_PROPOSAL'\n",
+  );
+  const origin = JSON.parse(await readFile(join(root, "consumer-workload/.apex-origin.json"), "utf8"));
+  assert.equal(origin.revision, revision);
+  assert.equal(origin.authorityImported, false);
+  assert.deepEqual(await readdir(root), ["consumer-workload"]);
+  await writeFile(join(root, "consumer-workload/main.bicep"), "manual edit\n");
+  await assert.rejects(execute([...importArgs, "--yes"], root), /already exists/);
+  assert.equal(await readFile(join(root, "consumer-workload/main.bicep"), "utf8"), "manual edit\n");
+  const service = new ApexService(root);
+  const request = {
+    repositoryPath: source,
+    revision,
+    selectedPath: "workload",
+    destination: "concurrent-copy",
+    expectedHash: result.contentHash,
+    confirm: true,
+  };
+  const attempts = await Promise.allSettled([service.importArchetype(request), service.importArchetype(request)]);
+  assert.equal(attempts.filter(({ status }) => status === "fulfilled").length, 1);
+  assert.equal(
+    await readFile(join(root, "concurrent-copy/main.bicep"), "utf8"),
+    "output value string = 'SOURCE_CONTENT_NOT_IN_PROPOSAL'\n",
+  );
+  await symlink(source, join(root, "linked-copy"));
+  await assert.rejects(service.importArchetype({ ...request, destination: "linked-copy" }), /symlink|exists/i);
+  const destinationChecks = service as unknown as { assertSafeDestination(root: string, path: string): Promise<void> };
+  const checkDestination = destinationChecks.assertSafeDestination.bind(service);
+  let raceChecks = 0;
+  const racedPath = join(root, "raced-copy");
+  const race = context.mock.method(destinationChecks, "assertSafeDestination", async (base: string, path: string) => {
+    await checkDestination(base, path);
+    if (path === racedPath && ++raceChecks === 2) {
+      await mkdir(racedPath);
+      await writeFile(join(racedPath, "owner.txt"), "external owner\n");
+    }
+  });
+  await assert.rejects(service.importArchetype({ ...request, destination: "raced-copy" }), /already exists/);
+  assert.deepEqual(await readdir(racedPath), ["owner.txt"]);
+  assert.equal(await readFile(join(racedPath, "owner.txt"), "utf8"), "external owner\n");
+  race.mock.restore();
+  assert.equal(
+    (await readdir(root)).some((path) => path.startsWith(".apex")),
+    false,
+  );
+  await service.init({ projectId: "demo" });
+  const before = await service.status();
+  await service.importArchetype({ ...request, destination: "active-project-copy" });
+  assert.deepEqual(await service.status(), before);
+  await writeFile(join(root, ".apex-archetype-import.lock"), "existing lock\n");
+  await assert.rejects(service.importArchetype({ ...request, destination: "locked-copy" }), /import lock exists/);
+  assert.equal(await readFile(join(root, ".apex-archetype-import.lock"), "utf8"), "existing lock\n");
+  await assert.rejects(readFile(join(root, "locked-copy/main.bicep")), { code: "ENOENT" });
+  assert.deepEqual(await service.status(), before);
 });
 
 test("CLI Node minimum compares complete stable versions", () => {

@@ -42,6 +42,36 @@ Each project can have multiple environment-scoped runs. Use `apex project promot
 to create a linked run for the next environment. It inherits only still-valid upstream proof and always requires a
 new preview and Gate 4 approval.
 
+## Archetype Source Reuse
+
+`apex archetype inspect --repository LOCAL_GIT_ROOT --revision FULL_COMMIT_ID --path ARCHETYPE_DIRECTORY --json`
+reads one committed subtree without checkout, hooks, filters, remote fetches or source execution. Missing local Git
+objects cause inspection to fail. It returns a typed proposal with
+relative paths, content hashes, exclusion reasons and a `contentHash`; it does not return file contents or mutate state.
+
+After reviewing that selection, use:
+
+```bash
+apex archetype import --repository LOCAL_GIT_ROOT --revision FULL_COMMIT_ID --path ARCHETYPE_DIRECTORY \
+  --destination NEW_DIRECTORY --expected-hash PROPOSAL_HASH --yes --json
+```
+
+The destination is a new top-level directory in the current workspace, named with lowercase letters, digits and hyphens.
+The source is reinspected and must match the confirmed proposal. Exclusive directory creation prevents replacement of
+an existing destination. Concurrent APEX imports are serialized; an interrupted import lock requires inspection, not
+automatic deletion. Failed or interrupted copies remain in place for inspection and are not overwritten on retry.
+The origin record is written only after all selected files have been copied successfully.
+
+The copy includes an inert `.apex-origin.json` provenance record and requires consumer review. Source `.apex` history,
+Terraform state/saved plans, credential files and agent instructions are excluded. Supported reusable files are
+non-executable UTF-8 Markdown, Bicep, Terraform and JSON, bounded to 256 tree entries, 1 MiB per file and 8 MiB total.
+Known credential patterns and JSON authority fields are rejected; this screening is not an exhaustive secret scanner.
+Review all exclusions and content before use. Source prose remains untrusted design input, never execution authority.
+
+This initial path requires a local Git repository and exact commit. It does not discover remote catalogs, adopt manual
+copies, synchronize updates, recover confirmed decisions automatically, or refresh consumer governance. Do not use state
+transfer as a substitute for archetype import. See [project operation](../how-to/operate-project.md#reuse-a-local-archetype).
+
 ## Workflow
 
 | Command                     | Required or notable flags                                     |

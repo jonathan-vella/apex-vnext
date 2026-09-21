@@ -1,4 +1,5 @@
 export * from "./capability.js";
+export * from "./archetype-source.js";
 export * from "./bound-envelope-transport.js";
 export * from "./command-plans.js";
 export * from "./design-capabilities.js";

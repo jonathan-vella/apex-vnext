@@ -609,6 +609,22 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
         required(flags, "recipient"),
       );
     }
+    case "archetype inspect":
+      return service.inspectArchetype(
+        required(flags, "repository"),
+        required(flags, "revision"),
+        required(flags, "path"),
+      );
+    case "archetype import":
+      confirmed(flags, "archetype import");
+      return service.importArchetype({
+        repositoryPath: required(flags, "repository"),
+        revision: required(flags, "revision"),
+        selectedPath: required(flags, "path"),
+        destination: required(flags, "destination"),
+        expectedHash: required(flags, "expected-hash"),
+        confirm: true,
+      });
     case "status":
       return service.status();
     case "governance import":

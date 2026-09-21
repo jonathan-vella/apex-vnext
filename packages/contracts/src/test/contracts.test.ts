@@ -34,6 +34,7 @@ import {
   calculateNativeValidationCommandHash,
   calculateNativeValidationReceiptHash,
   calculatePolicyValidationDigest,
+  hasValidArchetypeSourceProposal,
   hasValidNativeValidationReceipt,
   LiveQualificationV1Schema,
   LIVE_QUALIFICATION_SCENARIO_IDS,
@@ -284,6 +285,37 @@ describe("Wave 1 contracts", () => {
       }
     });
   }
+
+  it("binds archetype origin proposals without accepting imported authority", () => {
+    const body = {
+      schemaVersion: "1.0.0",
+      repositoryPath: "/source/coe",
+      revision: "a".repeat(40),
+      selectedPath: "archetypes/storage",
+      authorityImported: false,
+      requiresConsumerReview: true,
+      files: [{ path: "main.bicep", hash, bytes: 10 }],
+      excluded: [],
+    };
+    const proposal = { ...body, contentHash: calculatePolicyValidationDigest(body) };
+    assert.equal(hasValidArchetypeSourceProposal(proposal), true);
+    for (const changed of [
+      { ...body, authorityImported: true },
+      { ...body, requiresConsumerReview: false },
+      { ...body, revision: "HEAD" },
+      { ...body, selectedPath: "../outside" },
+      { ...body, files: [{ path: "/absolute", hash, bytes: 10 }] },
+      { ...body, files: [{ path: "nested/../outside", hash, bytes: 10 }] },
+      { ...body, files: [{ path: "main.bicep", hash, bytes: 1_048_577 }] },
+      { ...body, excluded: [{ path: "MAIN.bicep", reason: "source-authority" }] },
+      { ...body, approval: true },
+    ])
+      assert.equal(
+        hasValidArchetypeSourceProposal({ ...changed, contentHash: calculatePolicyValidationDigest(changed) }),
+        false,
+      );
+    assert.equal(hasValidArchetypeSourceProposal({ ...proposal, revision: "b".repeat(40) }), false);
+  });
 
   it("uses one explicit persisted contract version", () => {
     const lock: RuntimeBundleLockV1 = {
