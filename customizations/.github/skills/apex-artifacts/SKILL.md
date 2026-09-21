@@ -42,16 +42,20 @@ Read [presentation conventions](references/presentation-conventions.md) before p
 - Cost estimate - presents priced and unpriced tables, pricing evidence, monthly breakdown, and uncertainty ranges.
 
 The registry also exposes direct, non-template renderers for run status, deployment preview, approval evidence, and
-resource inventory. Architecture and cost packages also include deterministic Python, SVG, and PNG diagram views.
+resource inventory, and deployment summaries. Deployment summaries bind the completed operation, inventory and approval;
+they distinguish simulated from native-adapter evidence without independently asserting live execution or operational
+readiness. Architecture and cost packages also include deterministic Python, SVG, and PNG diagram views.
 All are read-only views of accepted typed sources.
 
 ## Reference-Only Outlines
 
 - [Architecture assessment](templates/architecture-assessment.md) and [cost estimate](templates/cost-estimate.md) remain
     reference-only outlines; their accepted sources use direct deterministic renderers. [Governance constraints](templates/governance-constraints.md),
-    [implementation plan](templates/implementation-plan.md), [deployment summary](templates/deployment-summary.md),
+    [implementation plan](templates/implementation-plan.md),
     [operations runbook](templates/operations-runbook.md), and [resource inventory](templates/resource-inventory.md) are
     reference-only until the registry has a matching source producer and renderer.
+- [Deployment summary](templates/deployment-summary.md) remains an advisory outline; the direct renderer derives its
+    supported sections from completed operation evidence instead of claiming every outline slot is available.
 - [Additional document outlines](references/reference-only-outlines.md) preserve useful source-document semantics.
 
 Reference-only outlines never authorize rendering, file creation, cloud queries, repository reads, or state changes.

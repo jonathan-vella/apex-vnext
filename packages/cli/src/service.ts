@@ -136,6 +136,7 @@ import {
   renderCostBreakdownDiagram,
   renderCostUncertaintyDiagram,
   renderDeploymentPreview,
+  renderDeploymentSummary,
   renderRequirementsDocument,
   renderResourceInventory,
   renderRunStatus,
@@ -5449,10 +5450,67 @@ export class ApexService {
     return { deleted: true };
   }
 
-  async render(kind: "status" | "requirements" | "preview" | "approval" | "inventory"): Promise<string> {
+  async render(
+    kind: "status" | "requirements" | "preview" | "approval" | "inventory" | "deployment-summary",
+  ): Promise<string> {
     const run = await this.currentRun();
     if (kind === "status") return renderRunStatus(run);
     const events = await this.journal(run).replay();
+    if (kind === "deployment-summary") {
+      const event = events.findLast(({ type }) => type === "deployment.completed");
+      if (event === undefined)
+        throw new ApexError("APEX_NOT_FOUND", "No completed deployment exists for this run", EXIT_CODES.notFound);
+      const payload = event.payload as {
+        operationHash?: string;
+        inventoryHash?: string;
+        approvalHash?: string;
+        previewHash?: string;
+        provider?: string;
+        evidenceMode?: string;
+      };
+      if (
+        ![payload.operationHash, payload.inventoryHash, payload.approvalHash, payload.previewHash].every(
+          (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value),
+        ) ||
+        !["fake", "bicep", "terraform"].includes(payload.provider ?? "") ||
+        !["native", "simulated"].includes(payload.evidenceMode ?? "")
+      )
+        throw new ApexError("APEX_VALIDATION", "Deployment summary evidence is incomplete", EXIT_CODES.validation);
+      const operation = await this.objects.getJson<OperationRecordV1>(payload.operationHash!);
+      const inventory = await this.objects.getJson<ResourceInventoryV1>(payload.inventoryHash!);
+      const approval = await this.objects.getJson<ApprovalEvidenceV1>(payload.approvalHash!);
+      this.assertValid("operation", operation);
+      this.assertValid("inventory", inventory);
+      this.assertValid("approval", approval);
+      if (
+        [operation, inventory, approval].some(
+          (value) => value.projectId !== run.projectId || value.runId !== run.runId,
+        ) ||
+        sha256Json(operation) !== payload.operationHash ||
+        sha256Json(inventory) !== payload.inventoryHash ||
+        sha256Json(approval) !== payload.approvalHash ||
+        inventory.deploymentHash !== payload.operationHash ||
+        operation.approvalHash !== payload.approvalHash ||
+        operation.previewHash !== payload.previewHash ||
+        approval.previewHash !== payload.previewHash ||
+        approval.gate !== 4 ||
+        approval.decision !== "approved"
+      )
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Deployment summary evidence bindings do not match",
+          EXIT_CODES.validation,
+        );
+      return renderDeploymentSummary({
+        operation,
+        inventory,
+        approval,
+        operationHash: payload.operationHash!,
+        inventoryHash: payload.inventoryHash!,
+        provider: payload.provider as "fake" | "bicep" | "terraform",
+        evidenceMode: payload.evidenceMode as "native" | "simulated",
+      });
+    }
     if (kind === "requirements") {
       const hash = this.artifactHash(events, "requirements");
       if (hash === undefined)
@@ -5464,6 +5522,7 @@ export class ApexService {
       approval: ["gate.decided", "approvalHash", renderApprovalEvidence],
       inventory: ["deployment.completed", "inventoryHash", renderResourceInventory],
     } as const;
+    if (!Object.hasOwn(map, kind)) throw new ApexError("APEX_USAGE", "Unsupported document kind", EXIT_CODES.usage);
     const [eventType, field, renderer] = map[kind];
     const hash = this.latestPayloadHash(events, eventType, field);
     if (hash === undefined) throw new ApexError("APEX_NOT_FOUND", `No ${kind} artifact exists`, EXIT_CODES.notFound);

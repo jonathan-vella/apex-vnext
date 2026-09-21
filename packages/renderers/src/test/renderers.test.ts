@@ -3,6 +3,7 @@ import test from "node:test";
 import type {
   ApprovalEvidenceV1,
   DeploymentPreviewV1,
+  OperationRecordV1,
   RequirementsV1,
   ResourceInventoryV1,
   RunConfigV1,
@@ -12,6 +13,7 @@ import {
   REQUIREMENTS_TEMPLATE_SLOTS,
   renderApprovalEvidence,
   renderDeploymentPreview,
+  renderDeploymentSummary,
   renderRequirementsDocument,
   renderRequirements,
   renderResourceInventory,
@@ -26,13 +28,9 @@ test("document registry limits template bindings to supported sources", () => {
   assert.equal(DOCUMENT_REGISTRY.inventory?.sourceAvailability, "available");
   assert.equal(DOCUMENT_REGISTRY["architecture-assessment"]?.sourceAvailability, "available");
   assert.equal(DOCUMENT_REGISTRY["cost-estimate"]?.sourceAvailability, "available");
+  assert.equal(DOCUMENT_REGISTRY["deployment-summary"]?.renderer, "deployment-summary-v1");
   assert.equal(DOCUMENT_REGISTRY["resource-inventory-template"]?.templateAvailability, "reference-only");
-  for (const documentId of [
-    "governance-constraints",
-    "implementation-plan",
-    "deployment-summary",
-    "operations-runbook",
-  ]) {
+  for (const documentId of ["governance-constraints", "implementation-plan", "operations-runbook"]) {
     assert.equal(DOCUMENT_REGISTRY[documentId]?.sourceAvailability, "unavailable");
     assert.equal(DOCUMENT_REGISTRY[documentId]?.templateAvailability, "reference-only");
   }
@@ -186,6 +184,73 @@ test("approval evidence renders supplied timestamps and optional binding fields"
   assert.match(rendered, /\*\*Decision:\*\* APPROVED/);
   assert.match(rendered, /2026-07-01T11:00:00Z/);
   assert.match(rendered, /github-actions:owner\/repo:123:2:deploy/);
+});
+
+test("deployment summary distinguishes recorded evidence from live and operational claims", () => {
+  const operation: OperationRecordV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    runId: "run-1",
+    operationId: "op-1",
+    operation: "apply",
+    state: "succeeded",
+    previewHash: hash("a"),
+    approvalHash: hash("b"),
+    ownerEpoch: 1,
+    updatedAt: "2026-09-21T00:00:00Z",
+  };
+  const inventory: ResourceInventoryV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    runId: "run-1",
+    deploymentHash: hash("c"),
+    collectedAt: operation.updatedAt,
+    resources: [
+      {
+        logicalId: "storage|consumer",
+        resourceId: "/storage",
+        type: "Storage",
+        location: "swedencentral",
+        properties: { secret: "DO_NOT_RENDER" },
+      },
+    ],
+  };
+  const approval: ApprovalEvidenceV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    runId: "run-1",
+    gate: 4,
+    decision: "approved",
+    actor: "consumer",
+    mechanism: "tty",
+    dependencyHash: hash("a"),
+    previewHash: hash("a"),
+    writerEpoch: 1,
+    decidedAt: operation.updatedAt,
+  };
+  const input = {
+    operation,
+    inventory,
+    approval,
+    operationHash: hash("c"),
+    inventoryHash: hash("d"),
+    provider: "fake" as const,
+    evidenceMode: "simulated" as const,
+  };
+  const rendered = renderDeploymentSummary(input);
+  assert.equal(rendered, renderDeploymentSummary(input));
+  assert.match(rendered, /Simulated evidence only/);
+  assert.match(rendered, /storage\\\|consumer/);
+  assert.doesNotMatch(rendered, /DO_NOT_RENDER/);
+  assert.match(rendered, /restore tests.*not established/);
+  assert.match(
+    renderDeploymentSummary({ ...input, provider: "bicep", evidenceMode: "native" }),
+    /does not independently verify live cloud/,
+  );
+  assert.match(
+    renderDeploymentSummary({ ...input, inventory: { ...inventory, resources: [] } }),
+    /not proof of absence/,
+  );
 });
 
 test("resource inventory sorts resources and property keys", () => {

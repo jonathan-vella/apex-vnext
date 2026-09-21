@@ -1,6 +1,7 @@
 import type {
   ApprovalEvidenceV1,
   DeploymentPreviewV1,
+  OperationRecordV1,
   RequirementsV1,
   ResourceInventoryV1,
   RunConfigV1,
@@ -140,6 +141,72 @@ export function renderApprovalEvidence(approval: ApprovalEvidenceV1): string {
     ]),
   ];
   return summary.join("\n");
+}
+
+export function renderDeploymentSummary(input: {
+  operation: OperationRecordV1;
+  inventory: ResourceInventoryV1;
+  approval: ApprovalEvidenceV1;
+  operationHash: string;
+  inventoryHash: string;
+  provider: "fake" | "bicep" | "terraform";
+  evidenceMode: "simulated" | "native";
+}): string {
+  const { operation, inventory, approval } = input;
+  const simulated = input.evidenceMode === "simulated" || input.provider === "fake";
+  const rows = [...inventory.resources]
+    .sort((left, right) =>
+      compareText(`${left.logicalId}\u0000${left.resourceId}`, `${right.logicalId}\u0000${right.resourceId}`),
+    )
+    .map((resource) => [resource.logicalId, resource.resourceId, resource.type, resource.location]);
+  return [
+    "# Deployment Summary",
+    "",
+    simulated
+      ? "> Simulated evidence only. No cloud deployment is established by this record."
+      : "> Native-adapter evidence. This summary does not independently verify live cloud execution.",
+    "",
+    "## Recorded Operation",
+    "",
+    fieldList([
+      ["Project", operation.projectId],
+      ["Run", operation.runId],
+      ["Operation", operation.operation],
+      ["State", operation.state],
+      ["Provider", input.provider],
+      ["Provider operation", optional(operation.providerOperationId)],
+      ["Recorded", operation.updatedAt],
+      ["Error code", optional(operation.errorCode)],
+    ]),
+    "",
+    "## Resource Inventory",
+    "",
+    `Collected: ${escapeMarkdown(inventory.collectedAt)}`,
+    "",
+    rows.length === 0
+      ? "No resources are recorded in this inventory. This is not proof of absence outside the recorded scope."
+      : markdownTable(["Logical ID", "Resource ID", "Type", "Location"], rows),
+    "",
+    "## Authorization And Provenance",
+    "",
+    fieldList([
+      ["Operation hash", input.operationHash],
+      ["Inventory hash", input.inventoryHash],
+      ["Preview hash", operation.previewHash],
+      ["Approval hash", operation.approvalHash],
+      ["Approval actor", approval.actor],
+      ["Approval recorded", approval.decidedAt],
+      ["Writer epoch at execution", operation.ownerEpoch],
+    ]),
+    "",
+    "Historical authorization applies only to the recorded operation. It does not authorize another apply, rollback, or destroy.",
+    "",
+    "## Operational Evidence Gaps",
+    "",
+    "Health checks, application endpoints, diagnostic coverage, recovery procedures, restore tests, actual spend, and compliance certification are not established by these operation and inventory records.",
+    "",
+    "Review workload-specific operational evidence before handoff. Further changes require a current preview and new approval.",
+  ].join("\n");
 }
 
 export function renderResourceInventory(inventory: ResourceInventoryV1): string {

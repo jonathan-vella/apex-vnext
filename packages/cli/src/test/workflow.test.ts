@@ -265,6 +265,58 @@ test("requirements revision rejects stale heads and unresolved deployment execut
   assert.deepEqual(await service.status(), before);
 });
 
+test("deployment summary binds accepted operation evidence and never upgrades simulated execution", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo" });
+  await assert.rejects(service.render("deployment-summary"), /No completed deployment/);
+  await prepareValidatedRun(service, runId, "bicep");
+  const preview = await service.preview({ operation: "apply", provider: "fake" });
+  await service.decideGateNumber(4, "approved", "tester");
+  const deployed = await service.deploy(preview.previewHash);
+  const before = await service.status();
+  const summary = await service.render("deployment-summary");
+  assert.match(summary, /Simulated evidence only/);
+  assert.match(summary, new RegExp(preview.previewHash));
+  assert.deepEqual(await service.status(), before);
+  assert.equal(await new ApexService(root).render("deployment-summary"), summary);
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+  const completed = (await journal.replay()).findLast(({ type }) => type === "deployment.completed")!;
+  await journal.append({
+    eventId: "bad-summary-binding",
+    projectId: "demo",
+    runId,
+    ownerEpoch: before.run.ownerEpoch,
+    timestamp: new Date().toISOString(),
+    expectedHead: before.head,
+    type: "deployment.completed",
+    payload: { ...(completed.payload as Record<string, string>), previewHash: "f".repeat(64) },
+  });
+  await assert.rejects(service.render("deployment-summary"), /bindings do not match/);
+  const objects = new ObjectStore(root);
+  const payload = completed.payload as Record<string, string>;
+  const approval = await objects.getJson<Record<string, unknown>>(payload.approvalHash!);
+  for (const [field, value] of [
+    ["operationHash", { ...(deployed.operation as Record<string, unknown>), approvalHash: "e".repeat(64) }],
+    ["inventoryHash", { ...deployed.inventory, deploymentHash: "e".repeat(64) }],
+    ["inventoryHash", { ...deployed.inventory, projectId: "foreign" }],
+    ["approvalHash", { ...approval, decision: "rejected" }],
+  ] as const) {
+    const hash = await objects.putJson(value);
+    await journal.append({
+      eventId: hash,
+      projectId: "demo",
+      runId,
+      ownerEpoch: before.run.ownerEpoch,
+      timestamp: new Date().toISOString(),
+      expectedHead: await journal.head(),
+      type: "deployment.completed",
+      payload: { ...payload, [field]: hash },
+    });
+    await assert.rejects(service.render("deployment-summary"), /bindings do not match/);
+  }
+});
+
 test("status leaves pending run transaction recovery to an advancing operation", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);

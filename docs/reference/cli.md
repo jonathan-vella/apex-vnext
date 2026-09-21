@@ -130,9 +130,13 @@ remain intact. APEX does not automatically merge prose into requirements or sync
 | `apex reconcile`       | None                                                                                             |
 | `apex inventory`       | None                                                                                             |
 | `apex diagnose`        | None                                                                                             |
-| `apex render`          | `--kind` with status, requirements, preview, approval, or inventory                              |
+| `apex render`          | `--kind` with status, requirements, preview, approval, inventory, or deployment-summary          |
 
 Only a human-authorized operator should run gate or deployment mutations. A preview must match the selected IaC track.
+
+`apex render --kind deployment-summary` projects the latest completed operation with its exact inventory and approval
+bindings. It labels simulated and native-adapter evidence separately, omits arbitrary resource properties, and reports
+operational evidence gaps. It does not query Azure, establish live execution independently, or authorize another operation.
 
 ## Capabilities, Transfers, Evidence, And Quality
 
