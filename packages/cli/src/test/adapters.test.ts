@@ -525,6 +525,62 @@ test("bootstrap reuses an exact local runtime and rejects a conflicting version"
   );
 });
 
+test("bootstrap reruns reuse matching intact state without commands or new runs", async () => {
+  const root = await tempRoot();
+  await mkdir(join(root, ".git"));
+  const packageDirectory = join(root, "node_modules", "@apexops", "cli");
+  await mkdir(packageDirectory, { recursive: true });
+  await writeJson(join(packageDirectory, "package.json"), { version: APEX_VERSION });
+  const service = new ApexService(root, {
+    processRunner: {
+      run: async () => {
+        throw new Error("Rerun must not install");
+      },
+    },
+  });
+  const input = { projectId: "demo", clientId: "github-copilot-cli" as const, iacTool: "terraform" as const };
+  const initial = await service.bootstrap(input);
+  assert.equal(initial.resumed, false);
+  const before = await service.status();
+  const rerun = await service.bootstrap(input);
+  assert.deepEqual(rerun, { ...initial, resumed: true, runtimeInstalled: false });
+  assert.deepEqual(await service.status(), before);
+  assert.deepEqual(await readdir(join(root, ".apex", "projects", "demo", "runs")), [initial.runId]);
+  for (const changed of [
+    { projectId: "other" },
+    { environment: "prod" },
+    { clientId: "github-copilot-vscode" as const },
+    { iacTool: "bicep" as const },
+    { targetScope: "/foreign" },
+    { displayName: "Different" },
+  ]) {
+    await assert.rejects(service.bootstrap({ ...input, ...changed }), /resume is blocked/);
+    assert.deepEqual(await service.status(), before);
+  }
+  const managedPath = join(root, ".github", "agents", "apex.agent.md");
+  const managed = await readFile(managedPath, "utf8");
+  await writeFile(managedPath, managed + "\nManual edit\n");
+  await assert.rejects(service.bootstrap(input), /resume is blocked/);
+  assert.equal(await readFile(managedPath, "utf8"), managed + "\nManual edit\n");
+  await writeFile(managedPath, managed);
+  assert.equal((await new ApexService(root).bootstrap(input)).resumed, true);
+  assert.deepEqual(await service.status(), before);
+  const runtimePath = join(root, ".apex", "runtime", "workflow.v1.json");
+  const runtimeBytes = await readFile(runtimePath);
+  await writeFile(runtimePath, "{}\n");
+  await assert.rejects(service.bootstrap(input), /resume is blocked/);
+  assert.equal(await readFile(runtimePath, "utf8"), "{}\n");
+  await writeFile(runtimePath, runtimeBytes);
+  const selectionPath = join(root, ".apex", "config.json");
+  const selectionBytes = await readFile(selectionPath);
+  const outside = join(await tempRoot(), "selection.json");
+  await writeFile(outside, selectionBytes);
+  await rm(selectionPath);
+  await symlink(outside, selectionPath);
+  await assert.rejects(service.bootstrap(input), /resume is blocked/);
+  assert.deepEqual(await readFile(outside), selectionBytes);
+});
+
 test("bootstrap derives a project ID from the workspace folder", async () => {
   const root = await tempRoot();
   await mkdir(join(root, ".git"));

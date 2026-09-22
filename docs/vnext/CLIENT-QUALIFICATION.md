@@ -181,6 +181,16 @@ Local evidence is retained under `dist/cli-worker-qualification-04` through `dis
 `dist/cli-parent-qualification-08`, the `dist/cli-review-qualification-09-*` fixtures, and
 `dist/cli-governance-qualification-10`. Failed probes are not replaced by the later successful receipts.
 
+## Dual-Client Discovery Probe
+
+At source checkpoint `678270277cab50e805482b14bdacea5c55f038c5`, Copilot CLI `1.0.86` explicitly selected both a
+`target: github-copilot` profile and a `target: vscode` profile from one disposable workspace. Tool-free Terra sessions
+`b7011ecc-be2a-4f13-bbb6-f87fd7880084` and `02f60ff6-2a28-4deb-8859-1bab0cef845a` returned their respective profile markers
+with no tool requests or file changes. Evidence remains in `logs/dual-client-target-{cli,vscode}.jsonl` and
+`dist/dual-client-target-probe`. Thus `target` alone does not prevent explicit cross-client selection in this CLI build.
+This does not test automatic delegation, name collisions or VS Code filtering, and does not establish an authorization
+failure. Simultaneous client packaging must preserve exact models/tools without relying on this unproven isolation.
+
 ## Multiple-Selection Input
 
 Keep native multi-select in VS Code and wherever the exposed question-tool schema supports it. When a standalone CLI session

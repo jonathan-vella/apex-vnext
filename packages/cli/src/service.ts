@@ -31,6 +31,7 @@ import {
   ResourceInventoryV1Schema,
   ReviewFindingsV1Schema,
   RuntimeBundleLockV1Schema,
+  RunIdSchema,
   WorkloadDecisionManifestV1Schema,
   hasOnlyTypedSecretReferences,
   hasValidInputRequestQuestions,
@@ -859,13 +860,24 @@ export class ApexService {
             : "Workspace runtime version or package metadata conflicts with this installer; preserve it for review.",
     });
     const state = await inspect(join(this.root, ".apex"));
+    let resumable = false;
+    if (state?.isDirectory()) {
+      try {
+        await this.inspectBootstrapResume(config);
+        resumable = true;
+      } catch {
+        resumable = false;
+      }
+    }
     checks.push({
       id: "apex-state",
-      status: state === undefined ? "ready" : "blocked",
+      status: state === undefined || resumable ? "ready" : "blocked",
       reason:
         state === undefined
           ? "No existing APEX state would be replaced by initialization."
-          : "Existing APEX state requires resume or repair inspection; clean initialization is blocked.",
+          : resumable
+            ? "Matching selected run and managed runtime pass local integrity checks; initialization can be reused."
+            : "Existing APEX state is incomplete, modified or conflicts with requested settings; preserve it for review.",
     });
     const plan: BootstrapPlanV1 = {
       schemaVersion: CONTRACT_VERSION,
@@ -895,6 +907,54 @@ export class ApexService {
     return plan;
   }
 
+  private async inspectBootstrapResume(config: OnboardingConfigV1): Promise<Selection> {
+    for (const path of [
+      ".apex/config.json",
+      ".apex/customizations.selection.json",
+      ".apex/customizations.lock.json",
+      ".apex/apex.lock.json",
+    ])
+      await this.assertSafeDestination(this.root, join(this.root, path));
+    const selection = await this.selection();
+    if (selection?.projectId !== config.projectId || !Value.Check(RunIdSchema, selection.runId))
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "Bootstrap selection does not match the requested project",
+        EXIT_CODES.conflict,
+      );
+    await this.assertSafeDestination(this.root, this.projects.runDirectory(selection.projectId, selection.runId));
+    const run = await this.run(selection, { readOnly: true });
+    const project = await this.projects.getProject(selection.projectId);
+    const customization = await this.customizationSelection();
+    if (
+      config.projectId !== selection.projectId ||
+      (config.displayName !== undefined && config.displayName !== project.displayName) ||
+      (config.environment !== undefined && config.environment !== run.environment) ||
+      (config.targetScope !== undefined && config.targetScope !== run.targetScope) ||
+      (config.iacTool !== undefined && config.iacTool !== run.iacTool) ||
+      (config.client !== undefined && config.client !== customization.clientId) ||
+      customization.sourceMode !== "bundled-projection"
+    )
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "Bootstrap settings conflict with the selected initialized workspace",
+        EXIT_CODES.conflict,
+      );
+    const checks = [
+      ...(await this.managedFileChecks()),
+      ...(await this.runtimeLockChecks(run)),
+      await this.localGitBoundaryCheck(),
+    ];
+    if (checks.some(({ ok }) => !ok))
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "Bootstrap resume requires intact managed files and runtime locks",
+        EXIT_CODES.conflict,
+      );
+    await this.journal(run).replay();
+    return selection;
+  }
+
   async bootstrap(input: {
     projectId: ProjectId;
     displayName?: string;
@@ -903,12 +963,29 @@ export class ApexService {
     iacTool?: "bicep" | "terraform";
     clientId?: BundledClientProjection["id"];
     createRepository?: boolean;
-  }): Promise<{ projectId: ProjectId; runId: RunId; runtimeInstalled: boolean }> {
+  }): Promise<{ projectId: ProjectId; runId: RunId; runtimeInstalled: boolean; resumed: boolean }> {
+    if (await this.pathExistsLstat(join(this.root, ".apex"))) {
+      const { clientId, ...settings } = input;
+      const config = {
+        schemaVersion: CONTRACT_VERSION,
+        ...settings,
+        ...(clientId === undefined ? {} : { client: clientId }),
+      };
+      const plan = await this.planBootstrap(config);
+      if (plan.status !== "ready")
+        throw new ApexError(
+          "APEX_CONFLICT",
+          "Bootstrap resume is blocked; inspect bootstrap plan and preserve existing setup",
+          EXIT_CODES.conflict,
+        );
+      const selected = await this.inspectBootstrapResume(config);
+      return { ...selected, runtimeInstalled: false, resumed: true };
+    }
     await this.assertCleanInitialization();
     await this.ensureWorkspaceGitRepository(input.createRepository === true);
     const runtimeInstalled = await this.ensureWorkspaceRuntime();
     const initialized = await this.init(input);
-    return { ...initialized, runtimeInstalled };
+    return { ...initialized, runtimeInstalled, resumed: false };
   }
 
   async profileStatus(): Promise<{ installed: boolean; modified: boolean; version?: string }> {

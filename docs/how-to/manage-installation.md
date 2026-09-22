@@ -34,8 +34,9 @@ apex bootstrap plan --project payments --client github-copilot-vscode --create-r
 
 This bounded preflight checks the local Git boundary, workspace APEX package version and existing APEX state. It returns
 `ready`, `pending` or `blocked` for those checks, with the requested configuration and its hash. The hash is not an
-execution approval. Existing state is preserved and reported as requiring resume/repair inspection; this command does
-not yet implement automatic resume. Machine prerequisites, client health, remote COE, GitHub, OIDC and reviewed baseline
+execution approval. Matching initialized state can be reused when selected-project settings, managed files and runtime
+locks pass local checks. Partial or conflicting state remains blocked and preserved. Machine prerequisites, client
+health, remote COE, GitHub, OIDC and reviewed baseline
 checks are explicitly unassessed. A local `ready` result is not complete onboarding or deployment readiness.
 
 The agreed `apex-install` and `apex-bootstrap` guided first-run experiences, including both clients in one repository,
@@ -58,6 +59,12 @@ npx --yes @apexops/cli bootstrap --project payments --client github-copilot-cli 
 Omit `--create-repo` only when the workspace already has a `.git` boundary. When `--project` is omitted, APEX derives a
 valid project ID from the workspace folder. Use `--file onboarding.json --yes` to provide the same settings as a
 validated onboarding file.
+
+Repeating `bootstrap --yes` for matching, intact local setup returns the same project/run with `resumed: true`, without
+reinstalling packages, rewriting managed files or creating another run. Explicitly supplied settings must match the
+selected project and client; incompatible packages, manual managed-file edits or damaged state block the rerun.
+This only reuses completed local initialization. It does not yet resume interrupted COE, GitHub or OIDC provisioning,
+change the selected run, adopt conflicting files or repair partial state automatically.
 
 ## Install The VS Code Bootstrap Agent
 

@@ -608,6 +608,11 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     const cli = async (args) => JSON.parse((await runInTest(binary, [...args, "--json"], consumer)).stdout).result;
     if (consumer !== project) await cli(["init", "--project", "demo", "--client", clientId]);
     const before = await cli(["status"]);
+    const resumed = await cli(["bootstrap", "--project", "demo", "--client", clientId, "--yes"]);
+    assert.equal(resumed.resumed, true);
+    assert.equal(resumed.runId, before.run.runId);
+    assert.equal(resumed.runtimeInstalled, false);
+    assert.deepEqual(await cli(["status"]), before);
     const selection = ["--repository", coe, "--revision", revision, "--path", "archetypes/storage"];
     const catalog = await cli([
       "archetype",

@@ -136,7 +136,9 @@ and permissions remain unchanged.
 
 First-time onboarding now has an agreed [acceptance contract](PRD.md#req-onboarding-001-first-time-install-and-repository-bootstrap)
 and [delivery sequence](ROADMAP.md#first-time-setup-delivery). The initial `bootstrap plan` implementation is a read-only
-local preflight for the Git boundary, workspace runtime version and existing APEX state. It reports unassessed machine,
+local preflight for the Git boundary, workspace runtime version and existing APEX state. Matching intact local
+initialization can now be reused by bootstrap without commands, rewrites or duplicate runs; partial or conflicting state
+remains blocked. It reports unassessed machine,
 client, COE, GitHub, OIDC and baseline checks rather than claiming complete onboarding. The pre-Node installer, resumable
 multi-client configuration, remote multi-archetype bootstrap and approved governance provisioning remain open.
 
