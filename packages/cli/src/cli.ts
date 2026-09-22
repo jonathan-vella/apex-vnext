@@ -485,6 +485,8 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
       return interactiveBootstrap(root);
     case "bootstrap governance-plan":
       return service.planGovernanceSetup((await inputJson(flags)) as GovernanceSetupConfigV1);
+    case "bootstrap baseline-check":
+      return service.inspectGovernanceBaselineReadiness(required(flags, "path"));
     case "bootstrap coe-plan":
       return service.planArchetypeBatch((await inputJson(flags)) as ArchetypeBatchConfigV1);
     case "bootstrap coe-import":

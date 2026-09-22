@@ -3502,6 +3502,31 @@ function emptyGovernanceBaseline(subscriptionId: string, discoveredAt: string) {
   };
 }
 
+test("bootstrap baseline readiness is read-only before discovery and enforces target and expiry", async () => {
+  const root = await tempRoot();
+  let now = new Date("2026-09-19T00:00:00Z");
+  const subscriptionId = "11111111-1111-1111-1111-111111111111";
+  const service = new ApexService(root, { clock: () => now });
+  await service.init({ projectId: "demo", targetScope: `/subscriptions/${subscriptionId}/resourceGroups/rg-test` });
+  const path = join(root, "baseline.json");
+  const baseline = emptyGovernanceBaseline(subscriptionId, now.toISOString());
+  await writeJson(path, baseline);
+  const before = await service.status();
+  const result = await service.inspectGovernanceBaselineReadiness(path);
+  assert.equal(result.status, "ready");
+  assert.equal(result.imported, false);
+  assert.equal(result.deploymentAuthorized, false);
+  assert.equal(result.candidateHash, sha256Bytes(await readFile(path)));
+  assert.doesNotMatch(JSON.stringify(result), /UNSELECTED_BASELINE_MARKER/);
+  assert.deepEqual(await service.status(), before);
+  now = new Date("2026-10-19T00:00:00Z");
+  assert.equal((await service.inspectGovernanceBaselineReadiness(path)).status, "blocked");
+  assert.deepEqual(await service.status(), before);
+  await writeJson(path, emptyGovernanceBaseline("22222222-2222-2222-2222-222222222222", now.toISOString()));
+  await assert.rejects(service.inspectGovernanceBaselineReadiness(path));
+  assert.deepEqual(await service.status(), before);
+});
+
 async function materialGovernanceFixture(track: "bicep" | "terraform", native = false) {
   const root = await tempRoot();
   const now = new Date("2026-09-19T00:00:00Z");

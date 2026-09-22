@@ -127,6 +127,11 @@ conflict handling; do not assume installing/updating APEX overwrites consumer wo
 
 ### Select Or Renew
 
+Before the discovery stage, `apex bootstrap baseline-check --path baseline.json --json` checks a reviewed central
+baseline against the selected run's target and freshness rules. The wizard's central-baseline choice uses this same
+read-only check. A `ready` result includes the candidate hash and observation time but does not establish human review,
+import the baseline, change the journal or approve a gate. Acceptance remains at the normal discovery stage below.
+
 Before planning, import the reviewed JSON snapshot for the run's target through the governance-discovery task. Azure
 Policy remains authoritative; a snapshot is evidence, not permission to override a policy. The consumer owns the
 collection workflow and its GitHub configuration; do not commit Azure credentials.

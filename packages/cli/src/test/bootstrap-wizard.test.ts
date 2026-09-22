@@ -3,7 +3,7 @@ import test from "node:test";
 import { runBootstrapWizard } from "../bootstrap-wizard.js";
 import { ApexService } from "../service.js";
 import { tempRoot } from "./helpers.js";
-import { readdir } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { execute } from "../cli.js";
 import type { GovernanceSetupConfigV1 } from "@apexops/contracts";
@@ -24,6 +24,26 @@ test("bootstrap wizard cancellation and declined plans never initialize a worksp
     assert.ok(["cancelled", "pending"].includes(result.status));
     assert.deepEqual(await readdir(root), []);
   }
+});
+
+test("profile bootstrap guidance keeps guided setup confirmations and cloud boundaries explicit", async () => {
+  const root = await tempRoot();
+  const profileRoot = await tempRoot();
+  const service = new ApexService(root, { profileRoot });
+  await service.profileInstall();
+  const profile = await readFile(join(profileRoot, "apex-bootstrap.agent.md"), "utf8");
+  for (const phrase of [
+    "bootstrap wizard",
+    "Do not pass `--yes`",
+    "both",
+    "remote COE URL",
+    "bootstrap baseline-check",
+    "bootstrap governance-plan",
+    "Never request passwords",
+    "do not authorize identity creation",
+  ])
+    assert.ok(profile.includes(phrase), phrase);
+  assert.deepEqual(await readdir(root), []);
 });
 
 test(
@@ -75,7 +95,23 @@ test("bootstrap wizard uses the reviewed local plan and reports governance pendi
     resumed: false,
     runtimeInstalled: true,
   }));
-  const answers = ["invalid", "both", "no", "demo", "dev", "local", "terraform", "yes", "yes", "central"];
+  const baseline = context.mock.method(service, "inspectGovernanceBaselineReadiness", async () => ({
+    status: "ready",
+    imported: false,
+  }));
+  const answers = [
+    "invalid",
+    "both",
+    "no",
+    "demo",
+    "dev",
+    "local",
+    "terraform",
+    "yes",
+    "yes",
+    "central",
+    "baseline.json",
+  ];
   const shown: unknown[] = [];
   const result = await runBootstrapWizard(
     root,
@@ -103,9 +139,22 @@ test("bootstrap wizard uses the reviewed local plan and reports governance pendi
   assert.ok(shown.some((value) => typeof value === "object" && value !== null && "configHash" in value));
   assert.deepEqual(
     result.progress.map(({ step }) => step),
-    ["local-bootstrap", "governance"],
+    ["local-bootstrap", "central-baseline-check"],
   );
+  assert.deepEqual(baseline.mock.calls[0]!.arguments, ["baseline.json"]);
   assert.deepEqual(await readdir(root), []);
+});
+
+test("baseline-check CLI requires a path and forwards only that path", async (context) => {
+  const root = await tempRoot();
+  const inspect = context.mock.method(ApexService.prototype, "inspectGovernanceBaselineReadiness", async () => ({
+    status: "ready",
+    imported: false,
+  }));
+  await assert.rejects(execute(["bootstrap", "baseline-check"], root), /Missing --path/);
+  assert.equal(inspect.mock.callCount(), 0);
+  await execute(["bootstrap", "baseline-check", "--path", "baseline.json"], root);
+  assert.deepEqual(inspect.mock.calls[0]!.arguments, ["baseline.json"]);
 });
 
 test("bootstrap wizard stops on a blocked local plan without requesting mutation", async (context) => {

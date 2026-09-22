@@ -18,6 +18,7 @@ type SetupService = Pick<
   | "planBootstrap"
   | "bootstrap"
   | "planGovernanceSetup"
+  | "inspectGovernanceBaselineReadiness"
 >;
 
 export async function runBootstrapWizard(
@@ -167,6 +168,11 @@ export async function runBootstrapWizard(
         });
         interaction.show(setup);
         progress.push({ directory, step: "governance-plan", outcome: setup });
+      } else if (governance === "central") {
+        const path = await ask("Reviewed central baseline JSON path in this workspace: ");
+        const readiness = await service.inspectGovernanceBaselineReadiness(path);
+        interaction.show(readiness);
+        progress.push({ directory, step: "central-baseline-check", outcome: readiness });
       } else {
         progress.push({
           directory,
