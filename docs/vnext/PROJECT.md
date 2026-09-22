@@ -144,6 +144,11 @@ remote multi-archetype bootstrap and approved governance provisioning remain ope
 selects both client projections with one managed lifecycle and namespaced CLI profiles; complete paired-client discovery
 and workflow acceptance remain unqualified. Repeated updates and uninstall preserve user-merged managed content.
 
+Candidate packaging now emits a checksum/provenance-bound pre-Node Bash installer with canonical toolchain versions,
+confirmed user-local tool installation, separately approved system packages, archive checks and post-install version
+verification. Offline tests cover refusal and preservation paths. The clean-machine WSL run, host-extension setup,
+guided interaction and public installer distribution remain unqualified; no machine tools were installed for this work.
+
 The local implementation now includes bounded local catalog discovery, confirmed requirements adoption/revision,
 generated-file and prior-IaC conflict protection, structured Architecture decision records, evidence-bound deployment
 summaries and optional Diagnosis operational handoff. Diagnosis packages include a navigable inventory/policy/design-cost

@@ -468,10 +468,16 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     provenance.subject.map(({ name, digest }) => ({ name, sha256: digest.sha256 })),
     [
       ...release.packages.map(({ file, sha256 }) => ({ name: file, sha256 })),
+      { name: release.installer.file, sha256: release.installer.sha256 },
       { name: release.security.sbom.file, sha256: release.security.sbom.sha256 },
     ],
   );
   assert.equal(provenance.predicate.buildDefinition.resolvedDependencies[0].digest.gitCommit, release.sourceCommit);
+  const installer = await readFile(join(outputDirectory, release.installer.file));
+  assert.equal(createHash("sha256").update(installer).digest("hex"), release.installer.sha256);
+  assert.equal(installer.byteLength, release.installer.bytes);
+  assert.doesNotMatch(installer.toString("utf8"), /__APEX_/u);
+  assert.ok(installer.toString("utf8").includes(release.toolchain.node));
   assert.equal(provenance.predicate.buildDefinition.resolvedDependencies[0].uri, release.sourceRepository);
   assert.deepEqual(provenance.predicate.buildDefinition.internalParameters, release.toolchain);
 

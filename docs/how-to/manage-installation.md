@@ -2,6 +2,38 @@
 
 > [Current Version](../../VERSION.md) | Install, update, roll back, reinstall, or remove managed APEX vNext files.
 
+## Prepare A Consumer Machine
+
+Candidate packaging now generates a standalone `apex-install.sh` alongside the tarballs. Its digest is recorded in
+`release-manifest.json` and the provenance statement. Obtain that script and its expected digest from the approved
+release channel and verify it before execution. This source template is not directly executable as an installer:
+packaging substitutes the canonical Node, npm, Copilot CLI and minimum VS Code versions.
+
+From an existing Ubuntu WSL2 terminal, review the plan for an exact available APEX package version:
+
+```bash
+bash apex-install.sh --version RELEASE_VERSION --plan
+bash apex-install.sh --version RELEASE_VERSION --install --yes
+```
+
+The generated script runs without Node or an APEX source checkout. It checks Git, Node/npm, GitHub CLI, Copilot CLI,
+Azure CLI, Bicep, Terraform, PowerShell, azd, the VS Code host command and APEX. Compatible tools are preserved. It pins
+Node/npm/Copilot to the packaged toolchain minimums and retrieves other missing binary tools from official stable
+releases with SHA-256 verification and safe archive extraction. APEX comes from the configured npm registry at the exact
+requested version. A missing/unpublished package or unsupported Ubuntu package repository fails rather than completing.
+
+Ubuntu package and Azure CLI repository changes require the separate `--allow-system` flag and existing noninteractive
+sudo authorization. Run `sudo -v` yourself when instructed; never supply a password through an agent. Incompatible tools
+require `--replace-incompatible`, which permits user-local shadowing, not removal of existing installations. Unowned files
+in the install destinations block replacement. The installer does not edit shell profiles: add `~/.local/bin` to PATH in
+future terminals. Successful APEX installation also provides `apex-bootstrap`, a launcher for `apex bootstrap`.
+
+Windows/WSL installation, VS Code host installation, WSL/Copilot extension verification and account sign-in remain explicit
+host/user actions. No login, repo initialization, GitHub mutation, Azure identity/role change or deployment is executed
+by the installer. Concurrent installs are blocked by an install lock; inspect a stale lock after interruption before
+removing it. Completed compatible steps are retained for reruns. Current proof consists of offline safety tests and generated
+package/provenance checks, not a successful clean-machine installation or complete first-run acceptance.
+
 ## Install A Local Candidate
 
 This is a maintainer/local-candidate path, not the intended normal consumer prerequisite. Consumers use Windows via
