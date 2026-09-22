@@ -375,12 +375,16 @@ for (const track of ["bicep", "terraform"] as const) {
     const service = new ApexService(root);
     const { runId } = await service.init({ projectId: "demo", iacTool: track });
     await assert.rejects(service.render("deployment-guide"), /No current accepted plan/);
+    await assert.rejects(service.render("implementation-plan"), /No current accepted implementation intent/);
     await prepareValidatedRun(service, runId, track);
     const before = await service.status();
     const guide = await service.render("deployment-guide");
     assert.match(guide, /Accepted design only/);
     assert.match(guide, new RegExp(`--provider ${track}`));
     const directory = join(root, "agent-output", "demo", runId, "plan");
+    const implementation = await service.render("implementation-plan");
+    assert.equal(await readFile(join(directory, "implementation-plan.md"), "utf8"), implementation);
+    assert.equal(await new ApexService(root).render("implementation-plan"), implementation);
     assert.equal(await readFile(join(directory, "deployment-guide.md"), "utf8"), guide);
     assert.match(await readFile(join(directory, "README.md"), "utf8"), /deployment-guide.md/);
     assert.equal(await new ApexService(root).render("deployment-guide"), guide);
@@ -407,6 +411,7 @@ for (const track of ["bicep", "terraform"] as const) {
       confirm: true,
     });
     await assert.rejects(service.render("deployment-guide"), /No current accepted plan/);
+    await assert.rejects(service.render("implementation-plan"), /No current accepted implementation intent/);
     assert.equal(await readFile(join(directory, "deployment-guide.md"), "utf8"), guide);
   });
 }

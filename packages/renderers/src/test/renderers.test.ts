@@ -21,6 +21,7 @@ import {
   renderArchitectureDecisionRecords,
   renderDeploymentPreview,
   renderDeploymentGuide,
+  renderImplementationPlan,
   renderDeploymentSummary,
   renderRequirementsDocument,
   renderRequirements,
@@ -42,10 +43,37 @@ test("document registry limits template bindings to supported sources", () => {
   assert.equal(DOCUMENT_REGISTRY["deployment-guide"]?.renderer, "deployment-guide-v1");
   assert.equal(DOCUMENT_REGISTRY["operations-runbook"]?.renderer, "operations-runbook-v1");
   assert.equal(DOCUMENT_REGISTRY["resource-inventory-template"]?.templateAvailability, "reference-only");
-  for (const documentId of ["governance-constraints", "implementation-plan"]) {
+  assert.equal(DOCUMENT_REGISTRY["implementation-plan"]?.renderer, "implementation-plan-v1");
+  for (const documentId of ["governance-constraints"]) {
     assert.equal(DOCUMENT_REGISTRY[documentId]?.sourceAvailability, "unavailable");
     assert.equal(DOCUMENT_REGISTRY[documentId]?.templateAvailability, "reference-only");
   }
+});
+
+test("implementation plan deterministically presents accepted resources and source hashes", () => {
+  const intent: ImplementationIntentV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    runId: "run",
+    sourceHashes: { requirements: hash("a") },
+    resources: [
+      { id: "second", type: "service", purpose: "User | content", dependsOn: ["first"], controls: ["tls", "identity"] },
+      { id: "first", type: "service", purpose: "Shared service", dependsOn: [], controls: [] },
+    ],
+    outputs: ["second-output", "first-output"],
+  };
+  const rendered = renderImplementationPlan(intent, hash("b"));
+  assert.equal(
+    renderImplementationPlan(
+      { ...intent, resources: [...intent.resources].reverse(), outputs: [...intent.outputs].reverse() },
+      hash("b"),
+    ),
+    rendered,
+  );
+  assert.ok(rendered.indexOf("| first |") < rendered.indexOf("| second |"));
+  assert.ok(rendered.includes("User \\| content"));
+  assert.ok(rendered.includes(hash("a")) && rendered.includes(hash("b")));
+  assert.match(rendered, /not generated-source validation or deployment approval/);
 });
 
 for (const track of ["bicep", "terraform"] as const) {

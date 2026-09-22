@@ -49,6 +49,51 @@ export function renderRequirements(requirements: RequirementsV1): string {
   ].join("\n");
 }
 
+export function renderImplementationPlan(intent: ImplementationIntentV1, intentHash: string): string {
+  return [
+    "# Implementation Plan",
+    "",
+    "> Accepted implementation intent, not generated-source validation or deployment approval.",
+    "",
+    fieldList([
+      ["Project", intent.projectId],
+      ["Run", intent.runId],
+      ["Intent hash", intentHash],
+    ]),
+    "",
+    "## Logical Resources",
+    "",
+    markdownTable(
+      ["ID", "Type", "Purpose", "Depends On", "Controls"],
+      [...intent.resources]
+        .sort((left, right) => compareText(left.id, right.id))
+        .map((resource) => [
+          resource.id,
+          resource.type,
+          resource.purpose,
+          [...resource.dependsOn].sort(compareText).join(", ") || "None",
+          [...resource.controls].sort(compareText).join(", ") || "None declared",
+        ]),
+    ),
+    "",
+    "## Outputs",
+    "",
+    intent.outputs.length === 0
+      ? "No outputs declared."
+      : [...intent.outputs]
+          .sort(compareText)
+          .map((output) => `- ${escapeMarkdown(output)}`)
+          .join("\n"),
+    "",
+    "## Source Artifacts",
+    "",
+    markdownTable(
+      ["Artifact", "Accepted Hash"],
+      Object.entries(intent.sourceHashes).sort(([left], [right]) => compareText(left, right)),
+    ),
+  ].join("\n");
+}
+
 export function renderDeploymentGuide(input: {
   run: RunConfigV1;
   intent: ImplementationIntentV1;

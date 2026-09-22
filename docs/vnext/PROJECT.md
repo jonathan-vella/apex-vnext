@@ -146,6 +146,10 @@ ownership and outputs, and the existing preview/approval execution procedure. Ge
 current rendering refuses invalidated or mismatched sources. This is design guidance, not observed endpoints, verified
 access, deployment approval or workload-specific operational acceptance.
 
+The implementation-plan review file and direct CLI/MCP view now share one deterministic renderer over current accepted
+intent. Both retain source hashes, logical resources, dependencies, controls and intended outputs; invalidated intent
+is unavailable rather than presented as a current plan.
+
 Base-bound requirements amendments now merge bounded ID-addressed updates, additions, removals and explicitly changed
 fields before using the existing confirmed-revision path. They preserve untouched decisions and reject conflicting IDs,
 stale revisions and journal changes during preview. Full-document submission and normal Requirements review remain

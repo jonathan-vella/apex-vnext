@@ -42,6 +42,11 @@ Read [presentation conventions](references/presentation-conventions.md) before p
 - Cost estimate - presents priced and unpriced tables, pricing evidence, monthly breakdown, and uncertainty ranges.
 - Architecture decisions - presents accepted `decisionRecords` with alternatives, consequences, all five WAF impacts,
   requirement links and implementation notes. Missing records remain unavailable; do not infer them from summary prose.
+- Implementation plan - presents current accepted implementation intent, logical resources, dependencies, controls,
+    intended outputs and source hashes. Acceptance does not establish source validation or deployment approval.
+- Deployment guide - presents current accepted plan bindings, intended ownership, configuration names and secret
+    references, intended outputs and the kernel preview/approval procedure. It omits values and binding parameters;
+    never infer observed endpoints, verified access or execution from this design view.
 - Operations runbook - presents accepted Diagnosis `operationalHandoff`, with resource-bound health-check guidance and
     explicit untested procedures or justified non-applicability. References do not establish execution or successful recovery.
 
@@ -54,10 +59,11 @@ All are read-only views of accepted typed sources.
 ## Reference-Only Outlines
 
 - [Architecture assessment](templates/architecture-assessment.md) and [cost estimate](templates/cost-estimate.md) remain
-    reference-only outlines; their accepted sources use direct deterministic renderers. [Governance constraints](templates/governance-constraints.md),
-    [implementation plan](templates/implementation-plan.md),
+        reference-only outlines; their accepted sources use direct deterministic renderers. [Governance constraints](templates/governance-constraints.md)
     and [resource inventory](templates/resource-inventory.md) are
     reference-only until the registry has a matching source producer and renderer.
+- [Implementation plan](templates/implementation-plan.md) is an advisory outline; its direct renderer presents accepted
+    implementation intent without filling unsupported outline sections or claiming deployment readiness.
 - [Operations runbook](templates/operations-runbook.md) is an advisory outline; the direct renderer requires explicit
     accepted operational handoff data and does not infer missing ownership, procedures or test outcomes.
 - [Deployment summary](templates/deployment-summary.md) remains an advisory outline; the direct renderer derives its

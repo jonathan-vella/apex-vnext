@@ -94,9 +94,10 @@ export const DOCUMENT_REGISTRY: Readonly<Record<string, DocumentDefinition>> = {
     renderer: "unavailable",
   },
   "implementation-plan": {
-    sourceAvailability: "unavailable",
+    sourceArtifactKind: "implementation-intent",
+    sourceAvailability: "available",
     templateAvailability: "reference-only",
-    renderer: "unavailable",
+    renderer: "implementation-plan-v1",
   },
   "deployment-summary": {
     sourceArtifactKind: "operation-record",

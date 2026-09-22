@@ -144,6 +144,7 @@ import {
   renderDeploymentPreview,
   renderDeploymentSummary,
   renderDeploymentGuide,
+  renderImplementationPlan,
   renderRequirementsDocument,
   renderResourceInventory,
   renderRunStatus,
@@ -4015,13 +4016,6 @@ export class ApexService {
         `| ${headers.map(() => "---").join(" | ")} |`,
         ...rows.map((row) => `| ${row.join(" | ")} |`),
       ].join("\n");
-    const resourceRows = intent.resources.map((resource) => [
-      this.reviewMarkdownText(resource.id),
-      this.reviewMarkdownText(resource.type),
-      this.reviewMarkdownText(resource.purpose),
-      resource.dependsOn.map((dependency) => this.reviewMarkdownText(dependency)).join(", "),
-      resource.controls.map((control) => this.reviewMarkdownText(control)).join(", "),
-    ]);
     const bindingRows = Object.entries(binding.resourceBindings).map(([id, value]) => [
       this.reviewMarkdownText(id),
       this.reviewMarkdownText(value.implementation),
@@ -4052,14 +4046,7 @@ export class ApexService {
       ),
       this.writeGeneratedReview(
         join(directory, "implementation-plan.md"),
-        Buffer.from(
-          `# Implementation Plan\n\n## Logical Resources\n\n${table(["ID", "Type", "Purpose", "Depends On", "Controls"], resourceRows)}\n\n## Outputs\n\n${intent.outputs.map((output) => `- ${this.reviewMarkdownText(output)}`).join("\n")}\n\n## Source Artifacts\n\n${Object.entries(
-            intent.sourceHashes,
-          )
-            .map(([kind, hash]) => `- ${this.reviewMarkdownText(kind)}: ${hash}`)
-            .join("\n")}\n`,
-          "utf8",
-        ),
+        Buffer.from(renderImplementationPlan(intent, hashes["implementation-intent"]!), "utf8"),
       ),
       this.writeGeneratedReview(
         join(directory, "iac-binding.md"),
@@ -5729,12 +5716,27 @@ export class ApexService {
       | "inventory"
       | "deployment-summary"
       | "deployment-guide"
+      | "implementation-plan"
       | "operations-runbook"
       | "architecture-decisions",
   ): Promise<string> {
     const run = await this.currentRun();
     if (kind === "status") return renderRunStatus(run);
     const events = await this.journal(run).replay();
+    if (kind === "implementation-plan") {
+      const hash = this.artifactHash(events, "implementation-intent");
+      if (hash === undefined)
+        throw new ApexError("APEX_NOT_FOUND", "No current accepted implementation intent exists", EXIT_CODES.notFound);
+      const intent = await this.objects.getJson<ImplementationIntentV1>(hash);
+      this.assertValid("implementation-intent", intent);
+      if (intent.projectId !== run.projectId || intent.runId !== run.runId || sha256Json(intent) !== hash)
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Implementation plan source binding does not match",
+          EXIT_CODES.validation,
+        );
+      return renderImplementationPlan(intent, hash);
+    }
     if (kind === "deployment-guide") {
       const intentHash = this.artifactHash(events, "implementation-intent");
       const bindingHash = this.artifactHash(events, "iac-binding");

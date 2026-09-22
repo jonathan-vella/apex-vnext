@@ -155,22 +155,26 @@ Changed trees use a new isolated task directory. Resource-level incremental gene
 
 ## Projects And Operations
 
-| Command                | Required or notable flags                                                                                                                             |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apex project list`    | None                                                                                                                                                  |
-| `apex project use`     | `--project`; optional `--run`                                                                                                                         |
-| `apex project show`    | Optional `--project`                                                                                                                                  |
-| `apex project search`  | `--query`                                                                                                                                             |
-| `apex project history` | Optional `--limit`                                                                                                                                    |
-| `apex preview`         | `--operation` with apply/destroy; `--provider` with fake/Bicep/Terraform; optional `--recipient`                                                      |
-| `apex approval show`   | None                                                                                                                                                  |
-| `apex deploy`          | Optional `--preview`                                                                                                                                  |
-| `apex reconcile`       | None                                                                                                                                                  |
-| `apex inventory`       | None                                                                                                                                                  |
-| `apex diagnose`        | None                                                                                                                                                  |
-| `apex render`          | `--kind` with status, requirements, preview, approval, inventory, deployment-guide, deployment-summary, architecture-decisions, or operations-runbook |
+| Command                | Required or notable flags                                                                                                                                                  |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apex project list`    | None                                                                                                                                                                       |
+| `apex project use`     | `--project`; optional `--run`                                                                                                                                              |
+| `apex project show`    | Optional `--project`                                                                                                                                                       |
+| `apex project search`  | `--query`                                                                                                                                                                  |
+| `apex project history` | Optional `--limit`                                                                                                                                                         |
+| `apex preview`         | `--operation` with apply/destroy; `--provider` with fake/Bicep/Terraform; optional `--recipient`                                                                           |
+| `apex approval show`   | None                                                                                                                                                                       |
+| `apex deploy`          | Optional `--preview`                                                                                                                                                       |
+| `apex reconcile`       | None                                                                                                                                                                       |
+| `apex inventory`       | None                                                                                                                                                                       |
+| `apex diagnose`        | None                                                                                                                                                                       |
+| `apex render`          | `--kind` with status, requirements, preview, approval, inventory, implementation-plan, deployment-guide, deployment-summary, architecture-decisions, or operations-runbook |
 
 Only a human-authorized operator should run gate or deployment mutations. A preview must match the selected IaC track.
+
+`apex render --kind implementation-plan` projects current accepted implementation intent with logical resources,
+dependencies, controls, intended outputs and source hashes. It uses the same renderer as the generated plan-review file
+and refuses invalidated sources. This view does not establish validation, review completion or deployment approval.
 
 `apex render --kind deployment-guide` projects the current accepted plan, including target, resources, intended physical
 ownership, configuration names and secret references, intended outputs, and the preview/approval procedure. It binds
