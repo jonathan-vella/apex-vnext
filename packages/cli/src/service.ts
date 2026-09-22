@@ -2631,7 +2631,7 @@ export class ApexService {
       );
     const events = await this.journal(run).replay();
     assertTaskCurrent(task, events.at(-1)!.hash, run.ownerEpoch, this.clock);
-    await this.assertPreviousGeneratedSourceUnmodified(events);
+    const previousHandoff = await this.assertPreviousGeneratedSourceUnmodified(events);
     const inputs = await Promise.all(task.inputRefs.map((hash) => this.objects.getJson<unknown>(hash)));
     const intent = inputs.find((value): value is ImplementationIntentV1 => this.looksLikeIntent(value));
     const binding = inputs.find((value): value is IacBindingV1 => this.looksLikeBinding(value, run.iacTool));
@@ -2661,10 +2661,34 @@ export class ApexService {
             ...(options.lockFileContent === undefined ? {} : { lockFileContent: options.lockFileContent }),
           });
     const files: StagedFile[] = [];
-    for (const file of tree.files) files.push(await this.stageFile(taskId, file.path, file.content));
+    const sourceRoot =
+      previousHandoff?.treeHash === tree.treeHash
+        ? resolve(this.root, previousHandoff.rootPath)
+        : resolve(this.root, ".apex", "work", run.runId, taskId, "code");
+    if (previousHandoff?.treeHash === tree.treeHash) {
+      const taskRoot = resolve(this.root, ".apex", "work", run.runId, taskId, "code");
+      if (await this.exists(taskRoot))
+        throw new ApexError(
+          "APEX_CONFLICT",
+          "Current task already has staged files; resolve them before reusing unchanged source",
+          EXIT_CODES.conflict,
+        );
+      for (const file of tree.files) {
+        const bytes = Buffer.from(file.content, "utf8");
+        files.push({
+          taskId,
+          path: join(sourceRoot, file.path),
+          bytes: bytes.length,
+          hash: sha256Bytes(bytes),
+          idempotent: true,
+        });
+      }
+    } else {
+      for (const file of tree.files) files.push(await this.stageFile(taskId, file.path, file.content));
+    }
     try {
       await assertGeneratedSourceUnchanged({
-        rootPath: resolve(this.root, ".apex", "work", run.runId, taskId, "code"),
+        rootPath: sourceRoot,
         treeHash: tree.treeHash,
       });
     } catch {
@@ -2682,7 +2706,7 @@ export class ApexService {
       projectId: run.projectId,
       runId: run.runId,
       track: run.iacTool,
-      rootPath: relative(this.root, resolve(this.root, ".apex", "work", run.runId, taskId, "code")),
+      rootPath: relative(this.root, sourceRoot),
       treeHash: tree.treeHash,
       intentHash,
       bindingHash,
@@ -2698,7 +2722,7 @@ export class ApexService {
     return { files, outputHashes: completed.outputHashes, treeHash: tree.treeHash };
   }
 
-  private async assertPreviousGeneratedSourceUnmodified(events: EventV1[]): Promise<void> {
+  private async assertPreviousGeneratedSourceUnmodified(events: EventV1[]): Promise<IacHandoffV1 | undefined> {
     const previous = events.findLast(
       (event) =>
         event.type === "task.completed" &&
@@ -2720,6 +2744,7 @@ export class ApexService {
         EXIT_CODES.conflict,
       );
     }
+    return handoff;
   }
 
   async validateTask(

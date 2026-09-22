@@ -104,6 +104,11 @@ the prior generated content. Regeneration also verifies the previous accepted Ia
 replacement; changed, missing or unsafe source files block the operation. Existing task-specific source directories
 remain intact. APEX does not automatically merge prose into requirements or synchronize arbitrary code.
 
+When the regenerated tree is byte-identical to the verified prior tree, `task generate-iac` reuses that source without
+rewriting files or emitting new file-staging events. The new handoff still binds current accepted inputs and returns to
+validation; old reviews and approvals are not restored. Existing files staged in the new task block this reuse path.
+Changed trees use a new isolated task directory. Resource-level incremental generation remains outside this reuse case.
+
 ## Workflow
 
 | Command                     | Required or notable flags                                     |

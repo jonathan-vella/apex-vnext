@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, readdir, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -3119,8 +3119,20 @@ for (const track of ["bicep", "terraform"] as const) {
     assert.deepEqual(await service.status(), before);
     assert.equal(await readFile(main.path, "utf8"), `${original}\n// manual consumer edit\n`);
     await writeFile(main.path, original);
+    const staged = await service.stageFile(next.task.taskId, "notes.md", "New task notes\n");
+    await assert.rejects(service.generateIac(next.task.taskId), /already has staged files/);
+    assert.equal(await readFile(staged.path, "utf8"), "New task notes\n");
+    await rm(join(staged.path, ".."), { recursive: true });
+    const metadata = await stat(main.path, { bigint: true });
+    const stagedCount = (await journal.replay()).filter(({ type }) => type === "file.staged").length;
     const regenerated = await service.generateIac(next.task.taskId);
     assert.equal(regenerated.treeHash, generated.treeHash);
+    assert.ok(regenerated.files.every(({ idempotent }) => idempotent));
+    assert.equal(regenerated.files.find(({ path }) => path === main.path)?.path, main.path);
+    assert.equal((await stat(main.path, { bigint: true })).mtimeNs, metadata.mtimeNs);
+    assert.equal((await journal.replay()).filter(({ type }) => type === "file.staged").length, stagedCount);
+    assert.notEqual(regenerated.outputHashes["iac-handoff"], generated.outputHashes["iac-handoff"]);
+    assert.equal((await service.status()).task, `validation-${track}`);
     assert.equal(await readFile(main.path, "utf8"), original);
   });
 }
