@@ -132,3 +132,25 @@ export const GovernanceSetupPlanV1Schema = Type.Object(
   { $id: "https://schemas.apexops.dev/governance-setup-plan-v1.json", additionalProperties: false },
 );
 export type GovernanceSetupPlanV1 = Static<typeof GovernanceSetupPlanV1Schema>;
+
+export const GovernanceProvisionPlanV1Schema = Type.Object(
+  {
+    schemaVersion: ContractVersionSchema,
+    setup: GovernanceSetupPlanV1Schema,
+    contextHash: Sha256Schema,
+    evidenceHash: Sha256Schema,
+    planHash: Sha256Schema,
+    status: Type.Union([Type.Literal("ready"), Type.Literal("blocked")]),
+    applicationObjectId: Type.Optional(AzureId),
+    federationName: Type.String({ pattern: "^apex-governance-[a-f0-9]{24}$" }),
+    actions: Type.Array(Type.Union([Type.Literal("create-federation"), Type.Literal("assign-reader")]), {
+      maxItems: 2,
+      uniqueItems: true,
+    }),
+    blockers: Type.Array(Type.String({ minLength: 1, maxLength: 512 }), { maxItems: 16 }),
+    executionAuthorized: Type.Literal(false),
+    deploymentAuthorized: Type.Literal(false),
+  },
+  { $id: "https://schemas.apexops.dev/governance-provision-plan-v1.json", additionalProperties: false },
+);
+export type GovernanceProvisionPlanV1 = Static<typeof GovernanceProvisionPlanV1Schema>;

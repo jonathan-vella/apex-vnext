@@ -72,8 +72,10 @@ completed copies and initialized projects are retained. Declining a plan does no
 
 The wizard can collect consumer-governance identity inputs and display the evidence-bound OIDC plan, or record that a
 central reviewed baseline will be used. The central path checks a local reviewed-baseline file for target coverage,
-schema validity and freshness without changing workflow state. It does not create GitHub repositories, provision Azure identities/roles,
-dispatch collection, import central baselines automatically, or adopt source decisions without review. It reports these
+schema validity and freshness without changing workflow state. For a reused approved identity, the wizard can show a
+verified provisioning plan and separately ask to create only its missing exact federation and Reader assignment.
+It does not create GitHub repositories or new Azure identities, dispatch collection, import central baselines
+automatically, or adopt source decisions without review. It reports these
 as pending rather than claiming complete onboarding. Interactive login and client health verification remain separate.
 Automation must use the typed plan/import/bootstrap commands; the wizard rejects `--yes`, `--json` and non-TTY input.
 

@@ -18,6 +18,8 @@ type SetupService = Pick<
   | "planBootstrap"
   | "bootstrap"
   | "planGovernanceSetup"
+  | "planGovernanceProvision"
+  | "provisionGovernance"
   | "inspectGovernanceBaselineReadiness"
 >;
 
@@ -158,16 +160,32 @@ export async function runBootstrapWizard(
                 principalId: await ask("Approved service-principal object ID: "),
               }
             : { mode: "create", displayName: await ask("Proposed dedicated application display name: ") };
-        const setup = await service.planGovernanceSetup({
+        const governanceConfig: GovernanceSetupConfigV1 = {
           schemaVersion: "1.0.0",
           repository,
           tenantId,
           subscriptionId,
           identity,
           ...(managementGroupId ? { managementGroupId } : {}),
-        });
+        };
+        const setup = await service.planGovernanceSetup(governanceConfig);
         interaction.show(setup);
         progress.push({ directory, step: "governance-plan", outcome: setup });
+        if (identity.mode === "reuse" && setup.status !== "blocked") {
+          const provisioning = await service.planGovernanceProvision(governanceConfig);
+          interaction.show(provisioning);
+          progress.push({ directory, step: "governance-provision-plan", outcome: provisioning });
+          if (
+            provisioning.status === "ready" &&
+            (await confirm(
+              "Create only the listed Azure federation and Reader assignment for this existing identity? GitHub configuration and collection stay unchanged.",
+            ))
+          ) {
+            const outcome = await service.provisionGovernance(governanceConfig, provisioning.planHash, true);
+            interaction.show(outcome);
+            progress.push({ directory, step: "governance-provision", outcome });
+          }
+        }
       } else if (governance === "central") {
         const path = await ask("Reviewed central baseline JSON path in this workspace: ");
         const readiness = await service.inspectGovernanceBaselineReadiness(path);

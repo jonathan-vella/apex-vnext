@@ -52,6 +52,7 @@ import {
   OnboardingConfigV1Schema,
   GovernanceSetupConfigV1Schema,
   GovernanceSetupPlanV1Schema,
+  GovernanceProvisionPlanV1Schema,
 } from "./onboarding.js";
 import { NativeValidationReceiptV1Schema } from "./native-validation.js";
 import { GovernanceObservationReceiptV1Schema } from "./governance-observation.js";
@@ -86,6 +87,7 @@ import {
 } from "./targets.js";
 
 export const contractSchemas = [
+  GovernanceProvisionPlanV1Schema,
   ArchetypeBatchConfigV1Schema,
   ArchetypeBatchPlanV1Schema,
   GovernanceSetupConfigV1Schema,
@@ -161,6 +163,7 @@ const metadata = (maxBytes: number, sensitivity: ContractSensitivity = "internal
 });
 
 export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
+  "https://schemas.apexops.dev/governance-provision-plan-v1.json": metadata(65_536, "confidential"),
   "https://schemas.apexops.dev/archetype-batch-config-v1.json": metadata(16_384, "confidential"),
   "https://schemas.apexops.dev/archetype-batch-plan-v1.json": metadata(2_097_152, "confidential"),
   "https://schemas.apexops.dev/governance-setup-config-v1.json": metadata(16_384, "confidential"),

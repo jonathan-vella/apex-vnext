@@ -291,3 +291,54 @@ test("bootstrap wizard leaves consumer identity provisioning pending or blocked 
   await assert.rejects(execute(["bootstrap", "wizard"], root), /interactive terminal/);
   await assert.rejects(execute(["bootstrap"], root), /interactive terminal/);
 });
+
+test("wizard requires separate exact-plan confirmation for existing-identity provisioning", async (context) => {
+  for (const approval of ["yes", "no"]) {
+    const root = await tempRoot();
+    const service = new ApexService(root);
+    context.mock.method(service, "bootstrap", async () => ({ runtimeInstalled: false }));
+    context.mock.method(service, "planGovernanceSetup", async () => ({ status: "pending" }));
+    context.mock.method(service, "planGovernanceProvision", async () => ({
+      status: "ready",
+      planHash: "a".repeat(64),
+    }));
+    const provision = context.mock.method(service, "provisionGovernance", async () => ({
+      status: "configured",
+      collectionEnabled: false,
+    }));
+    const answers = [
+      "both",
+      "no",
+      "demo",
+      "",
+      "",
+      "bicep",
+      "yes",
+      "yes",
+      "consumer",
+      "example/repo",
+      "11111111-1111-1111-1111-111111111111",
+      "22222222-2222-2222-2222-222222222222",
+      "",
+      "reuse",
+      "33333333-3333-3333-3333-333333333333",
+      "44444444-4444-4444-4444-444444444444",
+      approval,
+    ];
+    const result = await runBootstrapWizard(
+      root,
+      {
+        ask: async () => {
+          assert.ok(answers.length);
+          return answers.shift()!;
+        },
+        show: () => {},
+      },
+      () => service,
+    );
+    assert.equal(result.status, "pending");
+    assert.equal(provision.mock.callCount(), approval === "yes" ? 1 : 0);
+    if (approval === "yes") assert.deepEqual(provision.mock.calls[0]!.arguments.slice(1), ["a".repeat(64), true]);
+    assert.deepEqual(await readdir(root), []);
+  }
+});

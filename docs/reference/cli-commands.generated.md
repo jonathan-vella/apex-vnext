@@ -15,6 +15,8 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 - `bootstrap coe-import`
 - `bootstrap coe-plan`
 - `bootstrap governance-plan`
+- `bootstrap governance-provision`
+- `bootstrap governance-provision-plan`
 - `bootstrap plan`
 - `bootstrap wizard`
 - `cache clear`

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { planGovernanceSetup } from "../governance-setup.js";
+import { planGovernanceSetup, planGovernanceProvision } from "../governance-setup.js";
 import type { GovernanceSetupConfigV1 } from "@apexops/contracts";
 
 const config: GovernanceSetupConfigV1 = {
@@ -58,4 +58,120 @@ test("governance setup accepts explicit name-based evidence but blocks guesses a
   );
   assert.equal(reused.variables.AZURE_CLIENT_ID, config.tenantId);
   assert.ok(reused.pendingActions.some((item) => item.includes("binding and existing grants")));
+});
+
+test("governance provisioning requires verified identity, protected environment and exact Reader semantics", () => {
+  const reused = {
+    ...config,
+    identity: { mode: "reuse" as const, clientId: config.tenantId, principalId: config.subscriptionId },
+  };
+  const setup = planGovernanceSetup(reused, repository, {
+    use_default: true,
+    use_immutable_subject: true,
+    sub_claim_prefix: "repo:Example@123/COE@456",
+  });
+  const evidence = {
+    account: { tenantId: config.tenantId, id: config.subscriptionId, state: "Enabled", environmentName: "AzureCloud" },
+    application: {
+      id: "33333333-3333-3333-3333-333333333333",
+      appId: reused.identity.clientId,
+      signInAudience: "AzureADMyOrg",
+    },
+    principal: {
+      id: reused.identity.principalId,
+      appId: reused.identity.clientId,
+      appOwnerOrganizationId: config.tenantId,
+      accountEnabled: true,
+      servicePrincipalType: "Application",
+    },
+    environment: {
+      name: "governance",
+      deployment_branch_policy: { protected_branches: true, custom_branch_policies: false },
+      protection_rules: [
+        { type: "required_reviewers", prevent_self_review: true, reviewers: [{ type: "Team", id: 1 }] },
+      ],
+    },
+    readerRole: {
+      name: setup.proposedRole.id,
+      roleName: "Reader",
+      roleType: "BuiltInRole",
+      permissions: [{ actions: ["*/read"], notActions: [], dataActions: [], notDataActions: [] }],
+    },
+    federations: [] as unknown[],
+    assignments: [] as unknown[],
+  };
+  const plan = planGovernanceProvision(setup, evidence);
+  assert.equal(plan.status, "ready");
+  assert.equal(plan.executionAuthorized, false);
+  assert.deepEqual(plan.actions, ["create-federation", "assign-reader"]);
+  const credential = {
+    name: plan.federationName,
+    issuer: setup.federation!.issuer,
+    subject: setup.federation!.subject,
+    audiences: [setup.federation!.audience],
+  };
+  const assignment = {
+    principalId: reused.identity.principalId,
+    scope: setup.proposedRole.scope,
+    roleDefinitionId: `/providers/Microsoft.Authorization/roleDefinitions/${setup.proposedRole.id}`,
+  };
+  const complete = planGovernanceProvision(setup, {
+    ...evidence,
+    federations: [credential],
+    assignments: [assignment],
+  });
+  assert.equal(complete.status, "ready");
+  assert.deepEqual(complete.actions, []);
+  assert.equal(complete.contextHash, plan.contextHash);
+  assert.notEqual(complete.planHash, plan.planHash);
+  for (const changed of [
+    { ...evidence, account: { ...evidence.account, tenantId: "foreign" } },
+    { ...evidence, account: { ...evidence.account, environmentName: "AzureChinaCloud" } },
+    { ...evidence, principal: { ...evidence.principal, appId: "foreign" } },
+    { ...evidence, environment: { ...evidence.environment, protection_rules: [] } },
+    { ...evidence, environment: { ...evidence.environment, deployment_branch_policy: null } },
+    {
+      ...evidence,
+      readerRole: {
+        ...evidence.readerRole,
+        permissions: [{ actions: ["*"], notActions: [], dataActions: [], notDataActions: [] }],
+      },
+    },
+    { ...evidence, federations: [{ ...credential, audiences: ["foreign"] }] },
+    { ...evidence, assignments: [{ ...assignment, condition: "restricted" }] },
+    {
+      ...evidence,
+      assignments: [
+        { ...assignment, scope: "/providers/Microsoft.Management/managementGroups/parent", condition: "restricted" },
+      ],
+    },
+    {
+      ...evidence,
+      assignments: [
+        {
+          ...assignment,
+          roleDefinitionId: "/providers/Microsoft.Authorization/roleDefinitions/8e3af657-a8ff-443c-a75c-2fe8c4bcb635",
+        },
+      ],
+    },
+    {
+      ...evidence,
+      assignments: [
+        assignment,
+        {
+          ...assignment,
+          scope: "/providers/Microsoft.Management/managementGroups/parent",
+          roleDefinitionId: "/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c",
+        },
+      ],
+    },
+    { ...evidence, assignments: [{ ...assignment, principalId: "foreign" }] },
+    { ...evidence, assignments: [{}] },
+    { ...evidence, federations: null },
+    { ...evidence, assignments: null },
+  ]) {
+    const blocked = planGovernanceProvision(setup, changed);
+    assert.equal(blocked.status, "blocked");
+    assert.deepEqual(blocked.actions, []);
+  }
 });

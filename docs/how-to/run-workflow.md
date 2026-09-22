@@ -102,8 +102,33 @@ incomplete evidence or mismatched prefixes block planning instead of assuming an
 The result lists proposed Reader scope, variables with collection disabled, and pending identity/access, environment,
 federation, workflow and review steps. `planHash` binds this view; it is not authorization. No files, identities, roles,
 variables or workflows are changed. Live tenant/principal binding, effective permissions, environment protection and
-OIDC login are not verified by this initial planner. Provisioning and dispatch remain administrator actions until the
-confirmed setup executor is qualified. A central reviewed baseline can use the existing import path without this setup.
+OIDC login are not verified by this initial planner. The stricter existing-identity provisioning path is described below;
+new identity creation and collection dispatch still require separate administrator actions. A central reviewed baseline
+can use the existing import path without this setup.
+
+For an existing approved application/service principal, preview the narrower provisioning step:
+
+```bash
+apex bootstrap governance-provision-plan --file governance-setup.json --json
+apex bootstrap governance-provision --file governance-setup.json --expected-hash PLAN_HASH --yes --json
+```
+
+This executor supports `identity.mode: reuse` only. It verifies the active public-cloud tenant/subscription, single-tenant
+application and enabled principal binding, live Reader definition, current federation/role inventory, and an existing
+`governance` GitHub environment requiring reviewers, preventing self-review and allowing protected branches only.
+Missing/inaccessible evidence, custom OIDC subjects, conflicting trust and constrained Reader assignments block writes.
+The RBAC inventory includes inherited assignments at the collection scope; observed roles other than unconditional
+Reader block federation rather than exposing existing write privileges. This is not a tenant-wide permissions audit:
+other scopes, group-derived grants and Microsoft Graph application permissions remain unverified. Use a dedicated,
+administrator-reviewed discovery identity; adding a Reader grant does not remove or limit other existing permissions.
+Identity creation and environment protection setup still require an administrator; the executor does not weaken them.
+
+After separate human confirmation of the exact plan, only missing exact federation and Reader assignment are created.
+Fresh prerequisites and read-back checks surround each action; unchanged reruns do not create duplicates. Local
+`.apex-governance-setup-*.json` receipts record verified or indeterminate actions. An uncertain outcome stops further work
+and requires remote inspection and a new plan; no automatic rollback or retry is attempted. Retain those receipts.
+GitHub variables, collection enablement/dispatch, baseline PR review/import and deployment authority remain unchanged.
+Current executor qualification uses simulated command responses; no live provisioning was performed for this feature.
 
 Installation includes the governance workflow, collector and schema in both supported client projections, copied from
 the packaged canonical sources. The workflow is disabled by default. A consumer administrator configures the following

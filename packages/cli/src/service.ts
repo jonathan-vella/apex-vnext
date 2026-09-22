@@ -81,6 +81,7 @@ import {
   type OnboardingConfigV1,
   type BootstrapPlanV1,
   type GovernanceSetupConfigV1,
+  type GovernanceProvisionPlanV1,
   type ProjectId,
   type ResourceInventoryV1,
   type ReviewFindingsV1,
@@ -111,6 +112,7 @@ import {
   inspectRemoteArchetype,
   listRemoteArchetypes,
   planGovernanceSetup as createGovernanceSetupPlan,
+  planGovernanceProvision as createGovernanceProvisionPlan,
   GovernanceBaselineError,
   nativePolicyValidationBinding,
   assertGeneratedSourceUnchanged,
@@ -858,6 +860,313 @@ export class ApexService {
     const repository = await read(`repos/${config.repository}`);
     const oidc = await read(`repos/${config.repository}/actions/oidc/customization/sub`);
     return createGovernanceSetupPlan(config, repository, oidc);
+  }
+
+  private async governanceSetupRead(executable: "az" | "gh", args: string[]): Promise<unknown> {
+    try {
+      const result = await this.processRunner.run({
+        executable,
+        args,
+        cwd: this.root,
+        env: { ...process.env, GH_PROMPT_DISABLED: "1", GH_PAGER: "cat", AZURE_CORE_ONLY_SHOW_ERRORS: "true" },
+        timeoutMs: 30_000,
+        maxOutputBytes: 262_144,
+      });
+      if (
+        result.exitCode !== 0 ||
+        result.signal !== null ||
+        result.timedOut ||
+        result.outputTruncated ||
+        Buffer.byteLength(result.stdout) > 262_144
+      )
+        return null;
+      return JSON.parse(result.stdout);
+    } catch {
+      return null;
+    }
+  }
+
+  async planGovernanceProvision(config: GovernanceSetupConfigV1): Promise<GovernanceProvisionPlanV1> {
+    config = structuredClone(config);
+    const setup = await this.planGovernanceSetup(config);
+    if (setup.status === "blocked" || config.identity.mode !== "reuse")
+      return createGovernanceProvisionPlan(setup, {
+        account: null,
+        application: null,
+        principal: null,
+        environment: null,
+        readerRole: null,
+        federations: null,
+        assignments: null,
+      });
+    const read = this.governanceSetupRead.bind(this);
+    const account = await read("az", [
+      "account",
+      "show",
+      "--query",
+      "{id:id,tenantId:tenantId,state:state,environmentName:environmentName}",
+      "-o",
+      "json",
+    ]);
+    const application = await read("az", [
+      "ad",
+      "app",
+      "show",
+      "--id",
+      config.identity.clientId,
+      "--query",
+      "{id:id,appId:appId,signInAudience:signInAudience}",
+      "-o",
+      "json",
+    ]);
+    const principal = await read("az", [
+      "ad",
+      "sp",
+      "show",
+      "--id",
+      config.identity.principalId,
+      "--query",
+      "{id:id,appId:appId,appOwnerOrganizationId:appOwnerOrganizationId,accountEnabled:accountEnabled,servicePrincipalType:servicePrincipalType}",
+      "-o",
+      "json",
+    ]);
+    const environment = await read("gh", [
+      "api",
+      "--hostname",
+      "github.com",
+      "--method",
+      "GET",
+      `repos/${config.repository}/environments/governance`,
+    ]);
+    const roles = await read("az", [
+      "role",
+      "definition",
+      "list",
+      "--name",
+      setup.proposedRole.id,
+      "--subscription",
+      config.subscriptionId,
+      "-o",
+      "json",
+    ]);
+    const readerRole = Array.isArray(roles) && roles.length === 1 ? roles[0] : null;
+    const federations = await read("az", [
+      "ad",
+      "app",
+      "federated-credential",
+      "list",
+      "--id",
+      config.identity.clientId,
+      "--query",
+      "[].{name:name,issuer:issuer,subject:subject,audiences:audiences}",
+      "-o",
+      "json",
+    ]);
+    const assignments = await read("az", [
+      "role",
+      "assignment",
+      "list",
+      "--assignee-object-id",
+      config.identity.principalId,
+      "--include-inherited",
+      "--scope",
+      setup.proposedRole.scope,
+      "--subscription",
+      config.subscriptionId,
+      "--all",
+      "--fill-principal-name",
+      "false",
+      "--fill-role-definition-name",
+      "false",
+      "--query",
+      "[].{principalId:principalId,scope:scope,roleDefinitionId:roleDefinitionId,condition:condition}",
+      "-o",
+      "json",
+    ]);
+    return createGovernanceProvisionPlan(setup, {
+      account,
+      application,
+      principal,
+      environment,
+      readerRole,
+      federations,
+      assignments,
+    });
+  }
+
+  async provisionGovernance(config: GovernanceSetupConfigV1, expectedHash: string, confirm: boolean) {
+    if (confirm !== true)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Governance provisioning requires explicit confirmation",
+        EXIT_CODES.authorization,
+      );
+    config = structuredClone(config);
+    const initial = await this.planGovernanceProvision(config);
+    if (initial.planHash !== expectedHash)
+      throw new ApexError("APEX_STALE", "Governance provisioning plan changed; review a fresh plan", EXIT_CODES.stale);
+    if (
+      initial.status !== "ready" ||
+      config.identity.mode !== "reuse" ||
+      !initial.setup.federation ||
+      !initial.applicationObjectId
+    )
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Governance provisioning prerequisites are blocked",
+        EXIT_CODES.authorization,
+      );
+    const lockPath = join(this.root, ".apex-governance-setup.lock");
+    await this.assertSafeDestination(this.root, lockPath);
+    const lock = await open(lockPath, "wx", 0o600).catch(() => {
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "A governance setup lock exists; inspect interrupted work before retrying",
+        EXIT_CODES.conflict,
+      );
+    });
+    const receiptPath = join(this.root, `.apex-governance-setup-${this.idSource()}.json`);
+    const payloadPath = `${receiptPath}.federation.json`;
+    const actions: Array<{ action: string; status: "started" | "verified" | "indeterminate" }> = [];
+    const receipt = () => ({
+      schemaVersion: CONTRACT_VERSION,
+      planHash: initial.planHash,
+      repository: config.repository,
+      clientId: config.identity.mode === "reuse" ? config.identity.clientId : "",
+      actions,
+      deploymentAuthorized: false,
+      collectionEnabled: false,
+    });
+    let payloadCreated = false;
+    try {
+      await this.assertSafeDestination(this.root, receiptPath);
+      await atomicWriteJson(receiptPath, receipt(), { refuseOverwrite: true });
+      for (const action of initial.actions) {
+        const current = await this.planGovernanceProvision(config);
+        if (
+          current.status !== "ready" ||
+          current.contextHash !== initial.contextHash ||
+          current.actions.some((item) => !initial.actions.includes(item)) ||
+          actions.some(
+            (item) =>
+              item.status === "verified" &&
+              current.actions.includes(item.action as GovernanceProvisionPlanV1["actions"][number]),
+          )
+        )
+          throw new ApexError(
+            "APEX_STALE",
+            "Governance prerequisites changed during provisioning; review a new plan",
+            EXIT_CODES.stale,
+          );
+        if (!current.actions.includes(action)) continue;
+        const entry = { action, status: "started" as "started" | "verified" | "indeterminate" };
+        actions.push(entry);
+        await atomicWriteJson(receiptPath, receipt());
+        let args: string[];
+        if (action === "create-federation") {
+          await this.assertSafeDestination(this.root, payloadPath);
+          await atomicWriteJson(
+            payloadPath,
+            {
+              name: initial.federationName,
+              issuer: initial.setup.federation.issuer,
+              subject: initial.setup.federation.subject,
+              audiences: [initial.setup.federation.audience],
+            },
+            { refuseOverwrite: true },
+          );
+          payloadCreated = true;
+          args = [
+            "ad",
+            "app",
+            "federated-credential",
+            "create",
+            "--id",
+            initial.applicationObjectId,
+            "--parameters",
+            payloadPath,
+            "--output",
+            "none",
+          ];
+        } else {
+          const digest = sha256Json({
+            principal: config.identity.principalId,
+            role: initial.setup.proposedRole.id,
+            scope: initial.setup.proposedRole.scope,
+          });
+          const name = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-5${digest.slice(13, 16)}-8${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
+          args = [
+            "role",
+            "assignment",
+            "create",
+            "--name",
+            name,
+            "--assignee-object-id",
+            config.identity.principalId,
+            "--assignee-principal-type",
+            "ServicePrincipal",
+            "--role",
+            initial.setup.proposedRole.id,
+            "--scope",
+            initial.setup.proposedRole.scope,
+            "--subscription",
+            config.subscriptionId,
+            "--output",
+            "none",
+          ];
+        }
+        try {
+          const result = await this.processRunner.run({
+            executable: "az",
+            args,
+            cwd: this.root,
+            timeoutMs: 60_000,
+            maxOutputBytes: 65_536,
+          });
+          if (result.exitCode !== 0 || result.signal !== null || result.timedOut || result.outputTruncated)
+            throw new Error("Mutation outcome unknown");
+          const verified = await this.planGovernanceProvision(config);
+          if (
+            verified.status !== "ready" ||
+            verified.contextHash !== initial.contextHash ||
+            verified.actions.includes(action)
+          )
+            throw new Error("Mutation not observed");
+          entry.status = "verified";
+          await atomicWriteJson(receiptPath, receipt());
+        } catch {
+          entry.status = "indeterminate";
+          await atomicWriteJson(receiptPath, receipt());
+          return {
+            status: "blocked",
+            ...receipt(),
+            receiptPath: relative(this.root, receiptPath),
+            nextAction:
+              "Inspect remote state and obtain a fresh provisioning plan before retrying; no rollback or further action was attempted.",
+          };
+        }
+      }
+      const final = await this.planGovernanceProvision(config);
+      if (final.status !== "ready" || final.contextHash !== initial.contextHash || final.actions.length !== 0)
+        return {
+          status: "blocked",
+          ...receipt(),
+          receiptPath: relative(this.root, receiptPath),
+          nextAction:
+            "Final remote verification changed; preserve the receipt and obtain a fresh plan before retrying.",
+        };
+      return {
+        status: "configured",
+        ...receipt(),
+        receiptPath: relative(this.root, receiptPath),
+        nextAction:
+          "Identity trust and Reader access are configured. GitHub variables, workflow verification, collection dispatch and reviewed-baseline acceptance remain pending.",
+      };
+    } finally {
+      if (payloadCreated) await rm(payloadPath, { force: true });
+      await lock.close();
+      await rm(lockPath);
+    }
   }
 
   async planBootstrap(config: OnboardingConfigV1): Promise<BootstrapPlanV1> {

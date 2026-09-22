@@ -134,6 +134,13 @@ and permissions remain unchanged.
 
 ## Open Release Work
 
+Existing approved identities now have a bounded governance provisioning preview and separately confirmed executor.
+It verifies public-cloud tenant/principal bindings, protected GitHub environment settings, observed OIDC subjects and
+the live Reader definition before creating only missing exact federation or Reader assignments. Each action is reread
+and verified, with local partial-outcome receipts and no automatic retry on uncertainty. Offline tests cover conflicts,
+stale plans, permission failures and changed protections. No live provisioning has been performed. New identity creation,
+GitHub environment/variable setup, collection dispatch and first baseline PR completion remain open.
+
 Terminal bootstrap now guides client selection, optional remote COE catalog selection, confirmed independent copies,
 per-workload local setup and consumer-governance plan inputs. It delegates mutations to existing service operations,
 retains partial progress and cancellation, and reports outstanding governance/client/GitHub work as pending or blocked.
