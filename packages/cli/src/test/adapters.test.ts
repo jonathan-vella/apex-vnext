@@ -639,6 +639,41 @@ test("governance setup CLI reads only bounded GitHub evidence and never mutates 
   assert.equal(calls.length, 2);
 });
 
+test("workspace installation leaves first project creation to APEX", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const installed = await service.initializeWorkspace({ clientId: "both" });
+  assert.deepEqual(installed, { workspaceReady: true, projectCreated: false });
+  assert.deepEqual(await service.listProjects(), []);
+  await assert.rejects(readFile(join(root, ".apex/config.json")), { code: "ENOENT" });
+  const emptyStatus = await execute(["status"], root);
+  assert.equal((emptyStatus as { status: string }).status, "needs_project");
+  const server = createMcpServer(service);
+  const client = new Client({ name: "empty-workspace", version: "1.0.0" });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+  try {
+    const response = await client.callTool({ name: "status", arguments: {} });
+    assert.equal(response.isError, undefined);
+    assert.deepEqual(response.structuredContent, emptyStatus);
+    const projects = await client.callTool({ name: "projectList", arguments: {} });
+    assert.equal(projects.isError, undefined);
+  } finally {
+    await client.close();
+    await server.close();
+  }
+  await readFile(join(root, ".vscode/mcp.json"));
+  await readFile(join(root, ".github/mcp.json"));
+  assert.equal((await service.doctor()).healthy, true);
+  assert.match((await service.doctor()).nextAction, /first project/);
+  await service.update();
+  assert.deepEqual(await service.listProjects(), []);
+  const created = await new ApexService(root).createProject({ projectId: "chosen-later", iacTool: "terraform" });
+  assert.equal(created.projectId, "chosen-later");
+  assert.equal((await service.status()).run.iacTool, "terraform");
+});
+
 test("bootstrap plan is read-only and reports missing, conflicting and existing setup", async () => {
   const root = await tempRoot();
   const service = new ApexService(root, {
@@ -811,7 +846,7 @@ test("bootstrap reruns reuse matching intact state without commands or new runs"
   assert.equal(initial.resumed, false);
   const before = await service.status();
   const rerun = await service.bootstrap(input);
-  assert.deepEqual(rerun, { ...initial, resumed: true, runtimeInstalled: false });
+  assert.deepEqual(rerun, { ...initial, resumed: true, projectCreated: false, runtimeInstalled: false });
   assert.deepEqual(await service.status(), before);
   assert.deepEqual(await readdir(join(root, ".apex", "projects", "demo", "runs")), [initial.runId]);
   for (const changed of [
@@ -881,15 +916,18 @@ test("combined client initialization uses one managed lifecycle and preserves pr
   assert.equal((await service.status()).run.runId, before.run.runId);
 });
 
-test("bootstrap derives a project ID from the workspace folder", async () => {
+test("bootstrap never derives a project ID from the workspace folder", async () => {
   const root = await tempRoot();
   await mkdir(join(root, ".git"));
   const result = (await execute(["bootstrap", "--yes"], root, {
     processRunner: {
       run: async () => ({ exitCode: 0, signal: null, stdout: "", stderr: "", timedOut: false, outputTruncated: false }),
     },
-  })) as { projectId: string };
-  assert.match(result.projectId, /^apex-cli-[a-z0-9-]+$/u);
+  })) as { projectId?: string; projectCreated: boolean; workspaceReady: boolean };
+  assert.equal(result.projectId, undefined);
+  assert.equal(result.projectCreated, false);
+  assert.equal(result.workspaceReady, true);
+  assert.deepEqual(await new ApexService(root).listProjects(), []);
 });
 
 test("CLI manages only its own VS Code profile bootstrap agent", async () => {

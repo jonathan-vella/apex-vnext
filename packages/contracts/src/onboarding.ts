@@ -17,7 +17,7 @@ export const BootstrapClientSchema = Type.Union([
 export const OnboardingConfigV1Schema = Type.Object(
   {
     schemaVersion: ContractVersionSchema,
-    projectId: ProjectIdSchema,
+    projectId: Type.Optional(ProjectIdSchema),
     displayName: Type.Optional(NonEmptyStringSchema),
     client: Type.Optional(BootstrapClientSchema),
     environment: Type.Optional(EnvironmentSchema),

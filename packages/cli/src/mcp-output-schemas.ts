@@ -166,7 +166,17 @@ const evidenceProperties = {
 };
 
 export const MCP_OUTPUT_SCHEMAS = {
-  status: contract(status),
+  status: contract(
+    Type.Union([
+      status,
+      object({
+        status: Type.Literal("needs_project"),
+        workspaceReady: Type.Literal(true),
+        projects: Type.Array(Type.String(), { maxItems: 0 }),
+        nextAction: NonEmptyStringSchema,
+      }),
+    ]),
+  ),
   capabilityList: contract(object({ packs: Type.Array(capability) })),
   capabilityStatus: contract(capability),
   nextTask: contract(

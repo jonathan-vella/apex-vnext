@@ -66,13 +66,14 @@ route.
 
 Run `apex bootstrap` (or `apex-bootstrap` after machine installation) in an interactive terminal to start guided setup.
 `apex bootstrap wizard` selects the same flow explicitly. Choose either or both clients, optionally supply a remote
-COE URL and exact commit, select one or more listed workload numbers, and review each copy and local initialization
-plan before confirming it. Each selected workload uses a separate destination and project setup. Enter `cancel` to stop;
-completed copies and initialized projects are retained. Declining a plan does not execute it.
+COE URL and exact commit, select one or more listed workload numbers, and review each copy and workspace installation
+plan before confirming it. Bootstrap does not ask for or invent a project ID, environment, workload target or IaC track.
+Each selected copy uses a separate workspace; the APEX agent gathers details and creates the first project later.
+Enter `cancel` to stop; completed copies and configured workspaces are retained. Declining a plan does not execute it.
 
 The wizard can collect consumer-governance identity inputs and display the evidence-bound OIDC plan, or record that a
-central reviewed baseline will be used. The central path checks a local reviewed-baseline file for target coverage,
-schema validity and freshness without changing workflow state. For a reused approved identity, the wizard can show a
+central reviewed baseline will be used. Target-bound baseline checks are deferred until a project and target exist;
+bootstrap must not invent them to validate a baseline. For a reused approved identity, the wizard can show a
 verified provisioning plan and separately ask to create only its missing exact federation and Reader assignment.
 It does not create GitHub repositories or new Azure identities, dispatch collection, import central baselines
 automatically, or adopt source decisions without review. It reports these
@@ -82,7 +83,7 @@ Automation must use the typed plan/import/bootstrap commands; the wizard rejects
 Inspect local initialization prerequisites without changing files or running commands:
 
 ```bash
-apex bootstrap plan --project payments --client github-copilot-vscode --create-repo --json
+apex bootstrap plan --client both --create-repo --json
 ```
 
 This bounded preflight checks the local Git boundary, workspace APEX package version and existing APEX state. It returns
@@ -102,18 +103,20 @@ For a published package, use either a global CLI or a one-shot command. These ro
 
 ```bash
 npm install -g @apexops/cli
-apex bootstrap --project payments --client github-copilot-vscode --create-repo --yes
+apex bootstrap --client github-copilot-vscode --create-repo --yes
 ```
 
 ```bash
-npx --yes @apexops/cli bootstrap --project payments --client github-copilot-cli --create-repo --yes
+npx --yes @apexops/cli bootstrap --client github-copilot-cli --create-repo --yes
 ```
 
-Omit `--create-repo` only when the workspace already has a `.git` boundary. When `--project` is omitted, APEX derives a
-valid project ID from the workspace folder. Use `--file onboarding.json --yes` to provide the same settings as a
-validated onboarding file.
+Omit `--create-repo` only when the workspace already has a `.git` boundary. Omitting `--project` leaves the workspace
+without a project, selected run or workload defaults. `apex status` reports `needs_project`; `doctor` checks workspace
+integrity without requiring Azure authentication, a backend or an IaC choice. Open the workspace APEX agent to gather
+project details and invoke `projectCreate`. Explicit `apex init` or `project create` remains available for automation
+that already knows those details. Use `--file onboarding.json --yes` for validated noninteractive workspace settings.
 
-Repeating `bootstrap --yes` for matching, intact local setup returns the same project/run with `resumed: true`, without
+Repeating `bootstrap --yes` for matching, intact workspace setup returns `resumed: true`, without
 reinstalling packages, rewriting managed files or creating another run. Explicitly supplied settings must match the
 selected project and client; incompatible packages, manual managed-file edits or damaged state block the rerun.
 This only reuses completed local initialization. It does not yet resume interrupted COE, GitHub or OIDC provisioning,

@@ -134,6 +134,11 @@ and permissions remain unchanged.
 
 ## Open Release Work
 
+Bootstrap now separates repository readiness from project creation: the wizard has no project ID, environment, workload
+target or IaC questions. Managed clients/runtime can be installed and verified with zero projects; CLI/MCP status returns
+`needs_project` and the coordinator gathers the first project's details afterward. Target-bound central-baseline checks
+are deferred rather than manufacturing a project to run them. Explicit project creation remains a separate operation.
+
 Existing approved identities now have a bounded governance provisioning preview and separately confirmed executor.
 It verifies public-cloud tenant/principal bindings, protected GitHub environment settings, observed OIDC subjects and
 the live Reader definition before creating only missing exact federation or Reader assignments. Each action is reread

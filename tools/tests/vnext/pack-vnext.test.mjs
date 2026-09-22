@@ -612,7 +612,17 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     }
     const binary = join(consumer, "node_modules", ".bin", process.platform === "win32" ? "apex.cmd" : "apex");
     const cli = async (args) => JSON.parse((await runInTest(binary, [...args, "--json"], consumer)).stdout).result;
-    if (consumer !== project) await cli(["init", "--project", "demo", "--client", clientId]);
+    if (consumer !== project) {
+      const workspace = await cli(["bootstrap", "--client", clientId, "--yes"]);
+      assert.equal(workspace.projectCreated, false);
+      assert.equal(workspace.projectId, undefined);
+      assert.equal((await cli(["status"])).status, "needs_project");
+      assert.equal((await cli(["doctor"])).healthy, true);
+      const repeated = await cli(["bootstrap", "--client", clientId, "--yes"]);
+      assert.equal(repeated.resumed, true);
+      assert.equal(repeated.projectCreated, false);
+      await cli(["project", "create", "--project", "demo"]);
+    }
     if (clientId === "both") {
       assert.match(await readFile(join(consumer, ".github/agents/apex-cli.agent.md"), "utf8"), /name: APEX CLI\n/u);
       assert.match(await readFile(join(consumer, ".github/agents/apex.agent.md"), "utf8"), /name: APEX\n/u);

@@ -103,21 +103,9 @@ export async function runBootstrapWizard(
     }
     for (const directory of directories) {
       interaction.show({ workspace: directory });
-      const projectId = await ask("Project ID (lowercase letters, numbers and hyphens): ");
-      const environment = (await ask("Environment [dev]: ")) || "dev";
-      const targetScope = (await ask("Azure target scope, or local for offline setup [local]: ")) || "local";
-      const iacTool = (await choose(
-        "IaC track [bicep/terraform, default bicep]: ",
-        ["bicep", "terraform"],
-        "bicep",
-      )) as "bicep" | "terraform";
       const createRepository = await confirm("Initialize a local Git repository if none exists here?");
       const config: OnboardingConfigV1 = {
         schemaVersion: "1.0.0",
-        projectId,
-        environment,
-        targetScope,
-        iacTool,
         ...(client === undefined ? {} : { client }),
         createRepository,
       };
@@ -130,13 +118,13 @@ export async function runBootstrapWizard(
           progress,
           nextAction: "Resolve the local bootstrap blockers; existing files were preserved.",
         };
-      if (!(await confirm("Install the exact workspace runtime and initialize or resume this project?")))
-        return { status: "pending", progress, nextAction: "Local project setup was not confirmed." };
+      if (
+        !(await confirm(
+          "Install the exact workspace runtime and configure or resume APEX here without creating a project?",
+        ))
+      )
+        return { status: "pending", progress, nextAction: "Workspace setup was not confirmed." };
       const initialized = await service.bootstrap({
-        projectId,
-        environment,
-        targetScope,
-        iacTool,
         createRepository,
         ...(client === undefined ? {} : { clientId: client }),
       });
@@ -187,10 +175,16 @@ export async function runBootstrapWizard(
           }
         }
       } else if (governance === "central") {
-        const path = await ask("Reviewed central baseline JSON path in this workspace: ");
-        const readiness = await service.inspectGovernanceBaselineReadiness(path);
-        interaction.show(readiness);
-        progress.push({ directory, step: "central-baseline-check", outcome: readiness });
+        progress.push({
+          directory,
+          step: "central-baseline-check",
+          outcome: {
+            status: "pending",
+            imported: false,
+            nextAction:
+              "APEX will check the reviewed central baseline once the first project and its target are known.",
+          },
+        });
       } else {
         progress.push({
           directory,
@@ -214,7 +208,7 @@ export async function runBootstrapWizard(
       status: blocked ? "blocked" : "pending",
       progress,
       nextAction:
-        "Local setup is complete. Review adopted workload decisions and complete client health, GitHub and governance prerequisites. No deployment is authorized.",
+        "Workspace setup is complete; no project was created. Open APEX (APEX CLI in the combined CLI installation) to gather details and create the first project. Complete pending governance and client checks. No deployment is authorized.",
     };
   } catch (error) {
     return {

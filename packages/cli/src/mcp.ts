@@ -335,7 +335,7 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
     ]);
   };
   server.registerTool("status", { description: "Read selected APEX run status" }, async () =>
-    result(await service.status()),
+    result(await service.workspaceStatus()),
   );
   server.registerTool("capabilityList", { description: "Read capability pack availability" }, async () =>
     result({ packs: await service.capabilityList() }),

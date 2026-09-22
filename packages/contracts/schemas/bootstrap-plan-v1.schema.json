@@ -113,8 +113,7 @@
         }
       },
       "required": [
-        "schemaVersion",
-        "projectId"
+        "schemaVersion"
       ],
       "type": "object"
     },

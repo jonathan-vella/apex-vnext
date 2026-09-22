@@ -83,6 +83,11 @@ independent workloads in separate folders with separate project state. Do not co
 Show differences and obtain confirmation before adopting organization defaults or reusable decisions. Existing choices,
 manual files and unrelated content remain protected; Azure Policy and mandatory security constraints stay authoritative.
 
+Bootstrap configures the repository, runtime, clients and governance prerequisites without requiring or inventing a
+project ID, project environment, workload target or IaC choice. A configured workspace with zero projects is a valid
+ready-to-start state. Only after setup does the APEX coordinator gather workload details and create the first project
+through the kernel-owned project operation. Empty-workspace status and health checks must not require a selected run.
+
 After confirming repository identity and workload choices, configure APEX and the selected clients. When no usable
 GitHub remote exists, offer repository creation and a reviewed push, showing owner, visibility and exact changes.
 Default new repositories to private. Never force-push or include unrelated changes implicitly.

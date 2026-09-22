@@ -20,7 +20,7 @@ import {
   renderQualityScorecardEvaluation,
   type ScorecardMeasurement,
 } from "@apexops/renderers";
-import { basename, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { ApexError, EXIT_CODES, normalizeError } from "./errors.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
 import { resolveBundledAssets } from "./assets.js";
@@ -98,22 +98,13 @@ async function inputJson(flags: Flags): Promise<unknown> {
   return JSON.parse(await readFile(required(flags, "file"), "utf8")) as unknown;
 }
 
-function defaultProjectId(root: string): string {
-  let value = basename(resolve(root))
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-");
-  while (value.startsWith("-")) value = value.slice(1);
-  while (value.endsWith("-")) value = value.slice(0, -1);
-  return value.length === 0 ? "apex-project" : value;
-}
-
-async function onboardingConfig(flags: Flags, root: string): Promise<OnboardingConfigV1> {
+async function onboardingConfig(flags: Flags, _root: string): Promise<OnboardingConfigV1> {
   const config =
     typeof flags.file === "string"
       ? await inputJson(flags)
       : {
           schemaVersion: CONTRACT_VERSION,
-          projectId: typeof flags.project === "string" ? flags.project : defaultProjectId(root),
+          ...(typeof flags.project === "string" ? { projectId: flags.project } : {}),
           ...(typeof flags.name === "string" ? { displayName: flags.name } : {}),
           ...(typeof flags.client === "string" ? { client: flags.client } : {}),
           ...(typeof flags.environment === "string" ? { environment: flags.environment } : {}),
@@ -510,7 +501,7 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
       confirmed(flags, "bootstrap");
       const config = await onboardingConfig(flags, root);
       return service.bootstrap({
-        projectId: config.projectId,
+        ...(config.projectId === undefined ? {} : { projectId: config.projectId }),
         ...(config.displayName === undefined ? {} : { displayName: config.displayName }),
         ...(config.environment === undefined ? {} : { environment: config.environment }),
         ...(config.targetScope === undefined ? {} : { targetScope: config.targetScope }),
@@ -674,7 +665,7 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
         confirm: true,
       });
     case "status":
-      return service.status();
+      return service.workspaceStatus();
     case "requirements preview-change":
       return service.previewRequirementsChange((await inputJson(flags)) as RequirementsV1, required(flags, "reason"));
     case "requirements preview-amendment":
@@ -904,6 +895,8 @@ async function main(): Promise<void> {
 export function formatHumanResult(args: string[], result: unknown): string {
   const command = args.find((argument) => !argument.startsWith("--"));
   if (command === "status" && result !== null && typeof result === "object") {
+    if ("status" in result && result.status === "needs_project")
+      return "Workspace configured. No projects yet. Open APEX to gather details and create the first project.";
     const status = result as {
       run?: { projectId?: string; environment?: string };
       task?: string | null;

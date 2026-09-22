@@ -3,15 +3,16 @@ import test from "node:test";
 import { runBootstrapWizard } from "../bootstrap-wizard.js";
 import { ApexService } from "../service.js";
 import { tempRoot } from "./helpers.js";
-import { readFile, readdir } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { execute } from "../cli.js";
 import type { GovernanceSetupConfigV1 } from "@apexops/contracts";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { APEX_VERSION } from "../version.js";
 
 test("bootstrap wizard cancellation and declined plans never initialize a workspace", async () => {
-  for (const answers of [["cancel"], ["both", "no", "demo", "", "", "bicep", "yes", "no"]]) {
+  for (const answers of [["cancel"], ["both", "no", "yes", "no"]]) {
     const root = await tempRoot();
     const queue = [...answers];
     const result = await runBootstrapWizard(root, {
@@ -37,7 +38,8 @@ test("profile bootstrap guidance keeps guided setup confirmations and cloud boun
     "Do not pass `--yes`",
     "both",
     "remote COE URL",
-    "bootstrap baseline-check",
+    "Defer target-bound central baseline checks",
+    "creates a project with an agreed target",
     "bootstrap governance-plan",
     "Never request passwords",
     "do not authorize identity creation",
@@ -99,19 +101,7 @@ test("bootstrap wizard uses the reviewed local plan and reports governance pendi
     status: "ready",
     imported: false,
   }));
-  const answers = [
-    "invalid",
-    "both",
-    "no",
-    "demo",
-    "dev",
-    "local",
-    "terraform",
-    "yes",
-    "yes",
-    "central",
-    "baseline.json",
-  ];
+  const answers = ["invalid", "both", "no", "yes", "yes", "central"];
   const shown: unknown[] = [];
   const result = await runBootstrapWizard(
     root,
@@ -129,10 +119,6 @@ test("bootstrap wizard uses the reviewed local plan and reports governance pendi
   assert.equal(result.status, "pending");
   assert.equal(setup.mock.callCount(), 1);
   assert.deepEqual(setup.mock.calls[0]!.arguments[0], {
-    projectId: "demo",
-    environment: "dev",
-    targetScope: "local",
-    iacTool: "terraform",
     createRepository: true,
     clientId: "both",
   });
@@ -141,7 +127,7 @@ test("bootstrap wizard uses the reviewed local plan and reports governance pendi
     result.progress.map(({ step }) => step),
     ["local-bootstrap", "central-baseline-check"],
   );
-  assert.deepEqual(baseline.mock.calls[0]!.arguments, ["baseline.json"]);
+  assert.equal(baseline.mock.callCount(), 0);
   assert.deepEqual(await readdir(root), []);
 });
 
@@ -163,7 +149,7 @@ test("bootstrap wizard stops on a blocked local plan without requesting mutation
   const setup = context.mock.method(service, "bootstrap", async () => {
     throw new Error("Must not run");
   });
-  const answers = ["both", "no", "demo", "dev", "local", "bicep", "no"];
+  const answers = ["both", "no", "no"];
   const result = await runBootstrapWizard(
     root,
     {
@@ -207,17 +193,9 @@ test("bootstrap wizard selects multiple independent workloads and confirms each 
     "api-copy",
     "storage-copy",
     "yes",
-    "api",
-    "dev",
-    "local",
-    "bicep",
     "yes",
     "yes",
     "later",
-    "storage",
-    "test",
-    "local",
-    "terraform",
     "yes",
     "yes",
     "later",
@@ -255,10 +233,6 @@ test("bootstrap wizard leaves consumer identity provisioning pending or blocked 
   const answers = [
     "both",
     "no",
-    "demo",
-    "",
-    "",
-    "bicep",
     "yes",
     "yes",
     "consumer",
@@ -309,10 +283,6 @@ test("wizard requires separate exact-plan confirmation for existing-identity pro
     const answers = [
       "both",
       "no",
-      "demo",
-      "",
-      "",
-      "bicep",
       "yes",
       "yes",
       "consumer",
@@ -340,5 +310,30 @@ test("wizard requires separate exact-plan confirmation for existing-identity pro
     assert.equal(provision.mock.callCount(), approval === "yes" ? 1 : 0);
     if (approval === "yes") assert.deepEqual(provision.mock.calls[0]!.arguments.slice(1), ["a".repeat(64), true]);
     assert.deepEqual(await readdir(root), []);
+  }
+});
+
+test("wizard configures a real empty workspace without asking or inventing project details", async () => {
+  const root = await tempRoot();
+  await mkdir(join(root, ".git"));
+  await mkdir(join(root, "node_modules/@apexops/cli"), { recursive: true });
+  await writeFile(join(root, "node_modules/@apexops/cli/package.json"), JSON.stringify({ version: APEX_VERSION }));
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const answers = ["both", "no", "no", "yes", "later"];
+    const questions: string[] = [];
+    const result = await runBootstrapWizard(root, {
+      ask: async (question) => {
+        questions.push(question);
+        assert.ok(answers.length, question);
+        return answers.shift()!;
+      },
+      show: () => {},
+    });
+    assert.equal(result.status, "pending");
+    assert.equal(answers.length, 0);
+    assert.doesNotMatch(questions.join("\n"), /Project ID|Environment \[|target scope|IaC track/i);
+    assert.deepEqual(await new ApexService(root).listProjects(), []);
+    await assert.rejects(readFile(join(root, ".apex/config.json")), { code: "ENOENT" });
+    assert.equal((await new ApexService(root).doctor()).healthy, true);
   }
 });

@@ -154,7 +154,8 @@ conflict handling; do not assume installing/updating APEX overwrites consumer wo
 
 Before the discovery stage, `apex bootstrap baseline-check --path baseline.json --json` checks a reviewed central
 baseline against the selected run's target and freshness rules. The wizard's central-baseline choice uses this same
-read-only check. A `ready` result includes the candidate hash and observation time but does not establish human review,
+read-only check after a project and target have been created. Workspace-only bootstrap defers this target-bound check.
+A `ready` result includes the candidate hash and observation time but does not establish human review,
 import the baseline, change the journal or approve a gate. Acceptance remains at the normal discovery stage below.
 
 Before planning, import the reviewed JSON snapshot for the run's target through the governance-discovery task. Azure
