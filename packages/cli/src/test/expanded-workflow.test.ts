@@ -30,7 +30,6 @@ import {
   validateStorageSecurityBindings,
   validateBicepResourceParity,
   validateBicepStorageDiagnostics,
-  generateBicepTree,
   ProcessRunner,
 } from "@apexops/capabilities";
 import type { IacProvider, PreviewRequest } from "@apexops/capabilities";
@@ -1193,25 +1192,8 @@ for (const secure of [true, false]) {
       }
       binding.intentHash = sha256Json(intent);
     });
-    const tree = generateBicepTree(
-      generated.plan[0]!.value as ImplementationIntentV1,
-      generated.plan[1]!.value as IacBindingV1,
-    );
-    const files = [
-      ...tree.files,
-      {
-        path: "bicepconfig.json",
-        content: JSON.stringify({ experimentalFeaturesEnabled: { symbolicNameCodegen: true } }),
-      },
-    ].sort((left, right) => left.path.localeCompare(right.path));
-    for (const file of files) await service.stageFile(generated.taskId, file.path, file.content);
-    const bundle = codegenBundle(runId, "bicep", generated.plan);
-    bundle[0]!.value = tree.logicalManifest as (typeof bundle)[0]["value"];
-    const handoff = bundle[1]!.value as IacHandoffV1;
-    handoff.rootPath = `.apex/work/${runId}/${generated.taskId}/code`;
-    handoff.treeHash = sha256Json(files);
-    handoff.logicalResourceManifestHash = sha256Json(tree.logicalManifest);
-    await service.completeTaskOutputs(generated.taskId, bundle);
+    const output = await service.generateIac(generated.taskId);
+    assert.ok(output.files.some(({ path }) => path.endsWith("bicepconfig.json")));
     const validationId = await task(service, "validation-bicep");
     const before = await service.status();
     const validated = await service.validateTask(validationId);
@@ -3378,6 +3360,12 @@ test("restricted staging and generateIac produce a real accepted tree", async ()
   assert.deepEqual((await service.status()).run, before);
   assert.equal(await readFile(first.path, "utf8"), "bounded\n");
   await assert.rejects(readFile(join(first.path, "..", "..", "escape.tf")), { code: "ENOENT" });
+  const config = await service.stageFile(taskId, "bicepconfig.json", "{}\n");
+  const configHead = await journal.head();
+  await assert.rejects(service.generateIac(taskId), /Refusing to overwrite staged file/);
+  assert.equal(await journal.head(), configHead);
+  assert.equal(await readFile(config.path, "utf8"), "{}\n");
+  await rm(config.path);
   await assert.rejects(service.generateIac(taskId), /differs from the expected tree/);
   assert.equal((await service.status()).task, "codegen-bicep");
   assert.equal(await readFile(first.path, "utf8"), "bounded\n");

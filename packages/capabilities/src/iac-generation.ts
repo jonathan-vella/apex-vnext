@@ -401,7 +401,16 @@ export function generateBicepTree(
     ["targetScope = 'resourceGroup'", descriptions, blocks.join("\n\n")]
       .filter((part) => part.length > 0)
       .join("\n\n") + "\n";
-  return virtualTree([{ path: "main.bicep", content }], manifest(intent, binding, contexts, "main.bicep", existing));
+  return virtualTree(
+    [
+      { path: "main.bicep", content },
+      {
+        path: "bicepconfig.json",
+        content: `${JSON.stringify({ experimentalFeaturesEnabled: { symbolicNameCodegen: true } }, null, 2)}\n`,
+      },
+    ],
+    manifest(intent, binding, contexts, "main.bicep", existing),
+  );
 }
 
 function exactProviderConstraint(value: string | undefined, fallback: string, label: string): string {

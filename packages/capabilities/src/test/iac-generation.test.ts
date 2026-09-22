@@ -142,7 +142,7 @@ test("diagnostic scope references emit only accepted native Bicep resource symbo
     parameters: { name: "logs", location: "swedencentral", parentId: "/", properties: {} },
   };
   const tree = generateBicepTree(source, selected);
-  assert.match(tree.files[0]!.content, /scope: storage/);
+  assert.match(tree.files.find(({ path }) => path === "main.bicep")!.content, /scope: storage/);
   assert.equal(
     tree.logicalManifest.resources.find(({ logicalId }) => logicalId === "diagnostic")!.generatedDependencies[0],
     "storage",
@@ -176,9 +176,15 @@ test("native generators are byte deterministic and enforce secure storage defaul
   const first = generateBicepTree(sourceIntent, bicepBinding);
   const second = generateBicepTree(sourceIntent, bicepBinding);
   assert.deepEqual(first, second);
-  assert.equal(first.files[0]?.path, "main.bicep");
-  assert.match(first.files[0]!.content, /minimumTlsVersion: 'TLS1_2'/);
-  assert.match(first.files[0]!.content, /allowSharedKeyAccess: false/);
+  assert.deepEqual(
+    first.files.map(({ path }) => path),
+    ["bicepconfig.json", "main.bicep"],
+  );
+  assert.deepEqual(JSON.parse(first.files.find(({ path }) => path === "bicepconfig.json")!.content), {
+    experimentalFeaturesEnabled: { symbolicNameCodegen: true },
+  });
+  assert.match(first.files.find(({ path }) => path === "main.bicep")!.content, /minimumTlsVersion: 'TLS1_2'/);
+  assert.match(first.files.find(({ path }) => path === "main.bicep")!.content, /allowSharedKeyAccess: false/);
   assert.equal(first.treeHash, sha256(first.files));
   assertExecutionAddresses(first, bicepBinding);
 
@@ -259,8 +265,11 @@ test("AVM generators preserve exact pins, harden storage, and only include suppl
   });
   const bicep = generateBicepTree(sourceIntent, bicepBinding);
   assertExecutionAddresses(bicep, bicepBinding);
-  assert.match(bicep.files[0]!.content, /br\/public:avm\/res\/storage\/storage-account:0\.31\.0/);
-  assert.match(bicep.files[0]!.content, /allowBlobPublicAccess: false/);
+  assert.match(
+    bicep.files.find(({ path }) => path === "main.bicep")!.content,
+    /br\/public:avm\/res\/storage\/storage-account:0\.31\.0/,
+  );
+  assert.match(bicep.files.find(({ path }) => path === "main.bicep")!.content, /allowBlobPublicAccess: false/);
 
   const lock = "provider lock bytes\n";
   const terraformBinding = binding(
@@ -396,7 +405,7 @@ test("generators render dependencies and native existing-resource semantics", ()
     { ...binding("terraform", "native:x@y", "2023-05-01", {}), resourceBindings },
     { existingResources: ["storage"] },
   );
-  assert.match(bicep.files[0]!.content, /resource storage .* existing/);
+  assert.match(bicep.files.find(({ path }) => path === "main.bicep")!.content, /resource storage .* existing/);
   assertExecutionAddresses(bicep, { ...binding("bicep", "native:x@y", "2023-05-01", {}), resourceBindings });
   assertExecutionAddresses(terraform, { ...binding("terraform", "native:x@y", "2023-05-01", {}), resourceBindings });
   assert.match(terraform.files.find(({ path }) => path === "main.tf")!.content, /data "azapi_resource" "storage"/);
@@ -514,9 +523,11 @@ test("native generated trees compile with installed Bicep and Terraform tools", 
     maxOutputBytes: 2_000_000,
   });
   assert.equal(compiledChild.exitCode, 0, compiledChild.stderr);
-  const childTemplate = JSON.parse(compiledChild.stdout) as { resources: Array<{ type: string; name: string }> };
-  assert.equal(childTemplate.resources[0]!.type, childType);
-  assert.equal(childTemplate.resources[0]!.name, "stexample/default");
+  const childTemplate = JSON.parse(compiledChild.stdout) as {
+    resources: Record<string, { type: string; name: string }>;
+  };
+  assert.equal(childTemplate.resources.storage!.type, childType);
+  assert.equal(childTemplate.resources.storage!.name, "stexample/default");
   const scopedIntent = intent([
     { id: "storage", type: childType, purpose: "Blob configuration", dependsOn: [], controls: [] },
     {
@@ -552,10 +563,6 @@ test("native generated trees compile with installed Bicep and Terraform tools", 
   const scopedRoot = join(root, "bicep-scoped");
   const scopedTree = generateBicepTree(scopedIntent, scopedBinding);
   await writeVirtualTree(scopedRoot, scopedTree);
-  await writeFile(
-    join(scopedRoot, "bicepconfig.json"),
-    JSON.stringify({ experimentalFeaturesEnabled: { symbolicNameCodegen: true } }),
-  );
   const compiledScoped = await runner.run({
     executable: "bicep",
     args: ["build", "main.bicep", "--stdout"],
@@ -614,7 +621,10 @@ test("writer creates files atomically and refuses overwrite, traversal, and syml
       binding("bicep", "native:Microsoft.Storage/storageAccounts@2023-05-01", "2023-05-01", nativeParameters),
     );
     await writeVirtualTree(root, tree);
-    assert.equal(await readFile(join(root, "main.bicep"), "utf8"), tree.files[0]!.content);
+    assert.equal(
+      await readFile(join(root, "main.bicep"), "utf8"),
+      tree.files.find(({ path }) => path === "main.bicep")!.content,
+    );
     await assert.rejects(writeVirtualTree(root, tree), /Refusing to overwrite/);
     await writeVirtualTree(root, tree, { overwrite: true });
 

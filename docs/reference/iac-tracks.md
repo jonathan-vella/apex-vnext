@@ -10,6 +10,11 @@ preview, approval evidence, an operation record, and inventory.
 
 A track cannot reuse the other track's preview or approval.
 
+Generated Bicep trees include `bicepconfig.json` with symbolic-name code generation enabled. This file participates in
+the source tree hash, so compiled resource identity does not depend on an ambient workspace setting. A conflicting
+staged configuration blocks generation rather than being overwritten. Native validation copies and verifies the same
+configuration with the accepted source.
+
 Native implementation descriptors accept nested ARM types such as
 `native:Microsoft.Storage/storageAccounts/blobServices@2023-05-01`. Bicep bindings must supply the explicit full child
 name; Terraform bindings supply the child name and parent ID. Generation does not infer symbolic parent/scope references.
