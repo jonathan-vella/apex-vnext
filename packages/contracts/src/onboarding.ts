@@ -65,3 +65,70 @@ export const BootstrapPlanV1Schema = Type.Object(
 );
 
 export type BootstrapPlanV1 = Static<typeof BootstrapPlanV1Schema>;
+
+const AzureId = Type.String({
+  pattern: "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$(?![\\s\\S])",
+});
+export const GovernanceSetupConfigV1Schema = Type.Object(
+  {
+    schemaVersion: ContractVersionSchema,
+    repository: Type.String({ pattern: "^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$(?![\\s\\S])" }),
+    tenantId: AzureId,
+    subscriptionId: AzureId,
+    managementGroupId: Type.Optional(
+      Type.String({ pattern: "^[A-Za-z0-9](?:[A-Za-z0-9_().-]{0,88}[A-Za-z0-9_()-])?$(?![\\s\\S])" }),
+    ),
+    identity: Type.Union([
+      Type.Object(
+        { mode: Type.Literal("reuse"), clientId: AzureId, principalId: AzureId },
+        { additionalProperties: false },
+      ),
+      Type.Object(
+        {
+          mode: Type.Literal("create"),
+          displayName: Type.String({ pattern: "^[A-Za-z][A-Za-z0-9_.-]{0,79}$(?![\\s\\S])" }),
+        },
+        { additionalProperties: false },
+      ),
+    ]),
+  },
+  { $id: "https://schemas.apexops.dev/governance-setup-config-v1.json", additionalProperties: false },
+);
+export type GovernanceSetupConfigV1 = Static<typeof GovernanceSetupConfigV1Schema>;
+
+export const GovernanceSetupPlanV1Schema = Type.Object(
+  {
+    schemaVersion: ContractVersionSchema,
+    config: GovernanceSetupConfigV1Schema,
+    evidenceHash: Sha256Schema,
+    status: Type.Union([Type.Literal("pending"), Type.Literal("blocked")]),
+    federation: Type.Optional(
+      Type.Object(
+        {
+          issuer: Type.Literal("https://token.actions.githubusercontent.com"),
+          audience: Type.Literal("api://AzureADTokenExchange"),
+          subject: Type.String({ minLength: 1, maxLength: 512 }),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    environment: Type.Literal("governance"),
+    proposedRole: Type.Object(
+      {
+        id: Type.Literal("acdd72a7-3385-48ef-bd42-f606fba81ae7"),
+        name: Type.Literal("Reader"),
+        scope: Type.String({ minLength: 1, maxLength: 256 }),
+      },
+      { additionalProperties: false },
+    ),
+    variables: Type.Record(Type.String({ pattern: "^[A-Z_]+$" }), Type.String({ maxLength: 256 })),
+    blockers: Type.Array(Type.String({ minLength: 1, maxLength: 512 }), { maxItems: 16 }),
+    pendingActions: Type.Array(Type.String({ minLength: 1, maxLength: 256 }), { maxItems: 16 }),
+    filesModified: Type.Literal(false),
+    executionAuthorized: Type.Literal(false),
+    deploymentAuthorized: Type.Literal(false),
+    planHash: Sha256Schema,
+  },
+  { $id: "https://schemas.apexops.dev/governance-setup-plan-v1.json", additionalProperties: false },
+);
+export type GovernanceSetupPlanV1 = Static<typeof GovernanceSetupPlanV1Schema>;

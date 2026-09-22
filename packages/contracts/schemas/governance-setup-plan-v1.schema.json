@@ -1,0 +1,217 @@
+{
+  "$id": "https://schemas.apexops.dev/governance-setup-plan-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "blockers": {
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 16,
+      "type": "array"
+    },
+    "config": {
+      "$id": "https://schemas.apexops.dev/governance-setup-config-v1.json",
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "clientId": {
+                  "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$(?![\\s\\S])",
+                  "type": "string"
+                },
+                "mode": {
+                  "const": "reuse",
+                  "type": "string"
+                },
+                "principalId": {
+                  "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$(?![\\s\\S])",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "mode",
+                "clientId",
+                "principalId"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "displayName": {
+                  "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,79}$(?![\\s\\S])",
+                  "type": "string"
+                },
+                "mode": {
+                  "const": "create",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "mode",
+                "displayName"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "managementGroupId": {
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_().-]{0,88}[A-Za-z0-9_()-])?$(?![\\s\\S])",
+          "type": "string"
+        },
+        "repository": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$(?![\\s\\S])",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "1.0.0",
+          "type": "string"
+        },
+        "subscriptionId": {
+          "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$(?![\\s\\S])",
+          "type": "string"
+        },
+        "tenantId": {
+          "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$(?![\\s\\S])",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "repository",
+        "tenantId",
+        "subscriptionId",
+        "identity"
+      ],
+      "type": "object"
+    },
+    "deploymentAuthorized": {
+      "const": false,
+      "type": "boolean"
+    },
+    "environment": {
+      "const": "governance",
+      "type": "string"
+    },
+    "evidenceHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "executionAuthorized": {
+      "const": false,
+      "type": "boolean"
+    },
+    "federation": {
+      "additionalProperties": false,
+      "properties": {
+        "audience": {
+          "const": "api://AzureADTokenExchange",
+          "type": "string"
+        },
+        "issuer": {
+          "const": "https://token.actions.githubusercontent.com",
+          "type": "string"
+        },
+        "subject": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "issuer",
+        "audience",
+        "subject"
+      ],
+      "type": "object"
+    },
+    "filesModified": {
+      "const": false,
+      "type": "boolean"
+    },
+    "pendingActions": {
+      "items": {
+        "maxLength": 256,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 16,
+      "type": "array"
+    },
+    "planHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "proposedRole": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "const": "acdd72a7-3385-48ef-bd42-f606fba81ae7",
+          "type": "string"
+        },
+        "name": {
+          "const": "Reader",
+          "type": "string"
+        },
+        "scope": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "scope"
+      ],
+      "type": "object"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "status": {
+      "anyOf": [
+        {
+          "const": "pending",
+          "type": "string"
+        },
+        {
+          "const": "blocked",
+          "type": "string"
+        }
+      ]
+    },
+    "variables": {
+      "patternProperties": {
+        "^[A-Z_]+$": {
+          "maxLength": 256,
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "config",
+    "evidenceHash",
+    "status",
+    "environment",
+    "proposedRole",
+    "variables",
+    "blockers",
+    "pendingActions",
+    "filesModified",
+    "executionAuthorized",
+    "deploymentAuthorized",
+    "planHash"
+  ],
+  "type": "object"
+}

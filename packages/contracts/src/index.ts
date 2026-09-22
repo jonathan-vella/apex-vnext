@@ -43,7 +43,12 @@ import {
   ImprovementProposalV1Schema,
   ImprovementRecurrenceV1Schema,
 } from "./improvement.js";
-import { BootstrapPlanV1Schema, OnboardingConfigV1Schema } from "./onboarding.js";
+import {
+  BootstrapPlanV1Schema,
+  OnboardingConfigV1Schema,
+  GovernanceSetupConfigV1Schema,
+  GovernanceSetupPlanV1Schema,
+} from "./onboarding.js";
 import { NativeValidationReceiptV1Schema } from "./native-validation.js";
 import { GovernanceObservationReceiptV1Schema } from "./governance-observation.js";
 import { PricingEvidenceV1Schema, PricingRequestV1Schema } from "./pricing.js";
@@ -77,6 +82,8 @@ import {
 } from "./targets.js";
 
 export const contractSchemas = [
+  GovernanceSetupConfigV1Schema,
+  GovernanceSetupPlanV1Schema,
   BootstrapPlanV1Schema,
   ArchetypeSourceProposalV1Schema,
   RuntimeBundleLockV1Schema,
@@ -148,6 +155,8 @@ const metadata = (maxBytes: number, sensitivity: ContractSensitivity = "internal
 });
 
 export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
+  "https://schemas.apexops.dev/governance-setup-config-v1.json": metadata(16_384, "confidential"),
+  "https://schemas.apexops.dev/governance-setup-plan-v1.json": metadata(32_768, "confidential"),
   "https://schemas.apexops.dev/bootstrap-plan-v1.json": metadata(65_536, "confidential"),
   "https://schemas.apexops.dev/archetype-source-proposal-v1.json": metadata(524_288, "confidential"),
   "https://schemas.apexops.dev/runtime-bundle-lock-v1.json": metadata(32_768),

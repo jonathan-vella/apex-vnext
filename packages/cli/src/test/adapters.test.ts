@@ -451,6 +451,93 @@ test("CLI governance revision requires explicit confirmation and reason before s
   assert.deepEqual(revision.mock.calls[0]?.arguments, ["baseline.json", { confirm: true, reason: "Policy changed" }]);
 });
 
+test("governance setup CLI reads only bounded GitHub evidence and never mutates setup", async () => {
+  const root = await tempRoot();
+  const config = {
+    schemaVersion: "1.0.0",
+    repository: "Example/COE",
+    tenantId: "11111111-1111-1111-1111-111111111111",
+    subscriptionId: "22222222-2222-2222-2222-222222222222",
+    identity: { mode: "create", displayName: "coe-reader" },
+  };
+  const file = join(root, "governance.json");
+  await writeJson(file, config);
+  const calls: ProcessRequest[] = [];
+  const options = {
+    processRunner: {
+      run: async (request: ProcessRequest) => {
+        calls.push(request);
+        assert.equal(request.executable, "gh");
+        assert.deepEqual(request.args.slice(0, 5), ["api", "--hostname", "github.com", "--method", "GET"]);
+        assert.equal(request.timeoutMs, 15_000);
+        assert.equal(request.maxOutputBytes, 65_536);
+        const value =
+          request.args[5] === "repos/Example/COE"
+            ? { id: 456, full_name: "Example/COE", name: "COE", owner: { id: 123, login: "Example" } }
+            : { use_default: true, use_immutable_subject: true, sub_claim_prefix: "repo:Example@123/COE@456" };
+        return {
+          exitCode: 0,
+          signal: null,
+          timedOut: false,
+          outputTruncated: false,
+          stdout: JSON.stringify(value),
+          stderr: "",
+        };
+      },
+    },
+  };
+  const plan = (await execute(["bootstrap", "governance-plan", "--file", file], root, options)) as {
+    status: string;
+    executionAuthorized: boolean;
+    federation: { subject: string };
+  };
+  assert.equal(plan.status, "pending");
+  assert.equal(plan.executionAuthorized, false);
+  assert.equal(plan.federation.subject, "repo:Example@123/COE@456:environment:governance");
+  assert.equal(calls.length, 2);
+  assert.deepEqual(
+    calls.map(({ args }) => args[5]),
+    ["repos/Example/COE", "repos/Example/COE/actions/oidc/customization/sub"],
+  );
+  assert.deepEqual(await readdir(root), ["governance.json"]);
+  const blocked = await execute(["bootstrap", "governance-plan", "--file", file], root, {
+    processRunner: {
+      run: async () => {
+        throw new Error("secret raw auth failure");
+      },
+    },
+  });
+  assert.equal((blocked as { status: string }).status, "blocked");
+  assert.doesNotMatch(JSON.stringify(blocked), /secret raw auth/);
+  for (const failure of [
+    { exitCode: 1 },
+    { timedOut: true },
+    { outputTruncated: true },
+    { signal: "SIGTERM" as const },
+    { stdout: "invalid JSON" },
+  ]) {
+    const result = await execute(["bootstrap", "governance-plan", "--file", file], root, {
+      processRunner: {
+        run: async () => ({
+          exitCode: 0,
+          signal: null,
+          timedOut: false,
+          outputTruncated: false,
+          stdout: "{}",
+          stderr: "private diagnostic",
+          ...failure,
+        }),
+      },
+    });
+    assert.equal((result as { status: string }).status, "blocked");
+    assert.doesNotMatch(JSON.stringify(result), /private diagnostic/);
+  }
+  assert.deepEqual(await readdir(root), ["governance.json"]);
+  await writeJson(file, { ...config, repository: "Example/COE?unsafe" });
+  await assert.rejects(execute(["bootstrap", "governance-plan", "--file", file], root, options), /malformed/);
+  assert.equal(calls.length, 2);
+});
+
 test("bootstrap plan is read-only and reports missing, conflicting and existing setup", async () => {
   const root = await tempRoot();
   const service = new ApexService(root, {

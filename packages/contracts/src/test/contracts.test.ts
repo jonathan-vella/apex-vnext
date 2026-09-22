@@ -40,6 +40,8 @@ import {
   LIVE_QUALIFICATION_SCENARIO_IDS,
   OnboardingConfigV1Schema,
   BootstrapPlanV1Schema,
+  GovernanceSetupConfigV1Schema,
+  GovernanceSetupPlanV1Schema,
   PolicyPropertyMapV1Schema,
   PricingEvidenceV1Schema,
   PricingRequestV1Schema,
@@ -769,6 +771,31 @@ describe("Wave 1 contracts", () => {
       { ...plan, token: "secret" },
     ])
       assert.equal(Value.Check(BootstrapPlanV1Schema, changed), false);
+  });
+
+  it("governance setup inputs reject secrets, malformed scopes and incomplete reused identities", () => {
+    const config = {
+      schemaVersion: "1.0.0",
+      repository: "Example/COE",
+      tenantId: "a".repeat(8) + "-1111-1111-1111-111111111111",
+      subscriptionId: "22222222-2222-2222-2222-222222222222",
+      identity: { mode: "create", displayName: "coe-reader" },
+    };
+    assert.equal(Value.Check(GovernanceSetupConfigV1Schema, config), true);
+    assert.equal(Value.Check(GovernanceSetupConfigV1Schema, { ...config, managementGroupId: "a" }), true);
+    for (const invalid of [
+      { ...config, clientSecret: "forbidden" },
+      { ...config, managementGroupId: "../root" },
+      { ...config, repository: "Example/COE\n" },
+      { ...config, tenantId: config.tenantId + "\n" },
+      { ...config, managementGroupId: "platform\n" },
+      { ...config, identity: { mode: "reuse", clientId: config.tenantId } },
+      { ...config, repository: "Example/COE:environment:production" },
+      { ...config, identity: { mode: "create", displayName: "coe", role: "Owner" } },
+    ])
+      assert.equal(Value.Check(GovernanceSetupConfigV1Schema, invalid), false);
+    for (const field of ["filesModified", "executionAuthorized", "deploymentAuthorized"])
+      assert.equal(Value.Check(GovernanceSetupPlanV1Schema.properties[field as "executionAuthorized"], true), false);
   });
 
   it("validates strict onboarding configuration with optional defaults", () => {

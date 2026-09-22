@@ -77,6 +77,34 @@ single decision panel; permitted risk acceptance is time-bound, while revision c
 
 ### Consumer Collection Setup
 
+Preview setup with `apex bootstrap governance-plan --file governance-setup.json --json`. The input uses the
+`governance-setup-config-v1` contract:
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "repository": "OWNER/REPOSITORY",
+  "tenantId": "11111111-1111-1111-1111-111111111111",
+  "subscriptionId": "22222222-2222-2222-2222-222222222222",
+  "identity": { "mode": "create", "displayName": "workload-policy-discovery" }
+}
+```
+
+Replace example IDs with the target tenant and login/collection subscription. For an approved existing identity, use
+`identity: { "mode": "reuse", "clientId": "...", "principalId": "..." }`. For management-group collection, also supply
+`managementGroupId`; the subscription remains the login subscription. No credentials belong in this input.
+
+The planner makes two bounded GitHub GETs for repository identity and OIDC subject settings. It binds the observed
+subject prefix, including immutable owner/repository IDs when present, to the `governance` environment. Custom templates,
+incomplete evidence or mismatched prefixes block planning instead of assuming an older name-only subject. See the
+[GitHub OIDC subject reference](https://docs.github.com/en/actions/reference/security/oidc#immutable-subject-claims).
+
+The result lists proposed Reader scope, variables with collection disabled, and pending identity/access, environment,
+federation, workflow and review steps. `planHash` binds this view; it is not authorization. No files, identities, roles,
+variables or workflows are changed. Live tenant/principal binding, effective permissions, environment protection and
+OIDC login are not verified by this initial planner. Provisioning and dispatch remain administrator actions until the
+confirmed setup executor is qualified. A central reviewed baseline can use the existing import path without this setup.
+
 Installation includes the governance workflow, collector and schema in both supported client projections, copied from
 the packaged canonical sources. The workflow is disabled by default. A consumer administrator configures the following
 in the consumer GitHub repository; installing APEX does not provision identities, grant permissions or enable collection.

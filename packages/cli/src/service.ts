@@ -22,6 +22,7 @@ import {
   OperationRecordV1Schema,
   OnboardingConfigV1Schema,
   BootstrapPlanV1Schema,
+  GovernanceSetupConfigV1Schema,
   PolicyPropertyMapV1Schema,
   QualityMeasurementsV1Schema,
   QualityReportV1Schema,
@@ -74,6 +75,7 @@ import {
   type OperationRecordV1,
   type OnboardingConfigV1,
   type BootstrapPlanV1,
+  type GovernanceSetupConfigV1,
   type ProjectId,
   type ResourceInventoryV1,
   type ReviewFindingsV1,
@@ -103,6 +105,7 @@ import {
   listArchetypeSources,
   inspectRemoteArchetype,
   listRemoteArchetypes,
+  planGovernanceSetup as createGovernanceSetupPlan,
   GovernanceBaselineError,
   nativePolicyValidationBinding,
   assertGeneratedSourceUnchanged,
@@ -809,6 +812,42 @@ export class ApexService {
       await rm(join(this.root, ".apex"), { recursive: true, force: true });
       throw error;
     }
+  }
+
+  async planGovernanceSetup(config: GovernanceSetupConfigV1) {
+    config = structuredClone(config);
+    if (!Value.Check(GovernanceSetupConfigV1Schema, config) || Buffer.byteLength(JSON.stringify(config)) > 16_384)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Governance setup configuration is malformed or oversized",
+        EXIT_CODES.validation,
+      );
+    const read = async (endpoint: string): Promise<unknown> => {
+      try {
+        const result = await this.processRunner.run({
+          executable: "gh",
+          args: ["api", "--hostname", "github.com", "--method", "GET", endpoint],
+          cwd: this.root,
+          env: { ...process.env, GH_PROMPT_DISABLED: "1", GH_PAGER: "cat" },
+          timeoutMs: 15_000,
+          maxOutputBytes: 65_536,
+        });
+        if (
+          result.exitCode !== 0 ||
+          result.signal !== null ||
+          result.timedOut ||
+          result.outputTruncated ||
+          Buffer.byteLength(result.stdout) > 65_536
+        )
+          return null;
+        return JSON.parse(result.stdout);
+      } catch {
+        return null;
+      }
+    };
+    const repository = await read(`repos/${config.repository}`);
+    const oidc = await read(`repos/${config.repository}/actions/oidc/customization/sub`);
+    return createGovernanceSetupPlan(config, repository, oidc);
   }
 
   async planBootstrap(config: OnboardingConfigV1): Promise<BootstrapPlanV1> {

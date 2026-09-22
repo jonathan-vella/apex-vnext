@@ -10,6 +10,7 @@ import {
   type QualityScorecardV1,
   type RequirementsV1,
   type RequirementsAmendmentV1,
+  type GovernanceSetupConfigV1,
 } from "@apexops/contracts";
 import { Value } from "@sinclair/typebox/value";
 import { EventJournal, ValidatorRegistry, WriterTransferStore, atomicWriteJson, sha256Json } from "@apexops/kernel";
@@ -472,6 +473,8 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
       });
     case "bootstrap plan":
       return service.planBootstrap(await onboardingConfig(flags, root));
+    case "bootstrap governance-plan":
+      return service.planGovernanceSetup((await inputJson(flags)) as GovernanceSetupConfigV1);
     case "bootstrap": {
       confirmed(flags, "bootstrap");
       const config = await onboardingConfig(flags, root);

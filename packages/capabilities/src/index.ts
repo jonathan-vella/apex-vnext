@@ -5,6 +5,7 @@ export * from "./command-plans.js";
 export * from "./design-capabilities.js";
 export * from "./encrypted-envelope-transport.js";
 export * from "./governance-baseline.js";
+export * from "./governance-setup.js";
 export * from "./iac.js";
 export * from "./iac-generation.js";
 export * from "./iac-normalizers.js";

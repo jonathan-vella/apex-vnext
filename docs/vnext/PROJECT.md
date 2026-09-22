@@ -134,6 +134,16 @@ and permissions remain unchanged.
 
 ## Open Release Work
 
+Governance onboarding now has a read-only `bootstrap governance-plan` command and typed configuration/plan contracts.
+It derives federation subjects from observed GitHub repository/OIDC settings, blocks unsupported subject templates,
+and proposes scoped Reader access with collection disabled. Identity, access, environment protection, provisioning,
+workflow dispatch and first-review-PR completion remain pending; no setup or deployment authority follows from a plan.
+
+A read-only planner probe against this repository observed the immutable subject prefix and derived the expected
+`governance` environment subject. Evidence digest `f5792037872f94ea53aea93ad965c46595d59bccfaf63b1038b6aee1fe691e73`
+bound the repository and OIDC responses. The result remained pending, with collection disabled and no file or remote
+configuration changes. Live Reader role metadata confirmed control-plane reads with no data actions; no role was assigned.
+
 Remote GitHub COE list/inspect/import now reads exact commits through bounded API calls without checkout, preserving
 the existing exclusions, content checks, explicit import confirmation and independent-copy semantics. Proposals bind
 the remote URL and blob-verified content. Private authentication is external to APEX; branch selection, guided
