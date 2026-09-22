@@ -19,6 +19,11 @@
     "maxBytes": 1048576,
     "sensitivity": "internal"
   },
+  "https://schemas.apexops.dev/bootstrap-plan-v1.json": {
+    "compatibility": "strict-v1",
+    "maxBytes": 65536,
+    "sensitivity": "confidential"
+  },
   "https://schemas.apexops.dev/capability-pack-manifest-v1.json": {
     "compatibility": "strict-v1",
     "maxBytes": 262144,

@@ -26,6 +26,22 @@ route.
 
 ## Bootstrap A Workspace
 
+Inspect local initialization prerequisites without changing files or running commands:
+
+```bash
+apex bootstrap plan --project payments --client github-copilot-vscode --create-repo --json
+```
+
+This bounded preflight checks the local Git boundary, workspace APEX package version and existing APEX state. It returns
+`ready`, `pending` or `blocked` for those checks, with the requested configuration and its hash. The hash is not an
+execution approval. Existing state is preserved and reported as requiring resume/repair inspection; this command does
+not yet implement automatic resume. Machine prerequisites, client health, remote COE, GitHub, OIDC and reviewed baseline
+checks are explicitly unassessed. A local `ready` result is not complete onboarding or deployment readiness.
+
+The agreed `apex-install` and `apex-bootstrap` guided first-run experiences, including both clients in one repository,
+remote multi-archetype selection and confirmed OIDC setup, remain under implementation. Their acceptance contract is
+[first-time onboarding](../vnext/PRD.md#req-onboarding-001-first-time-install-and-repository-bootstrap).
+
 For a published package, use either a global CLI or a one-shot command. These routes are unavailable until
 `@apexops/cli` is published to your approved npm registry. Both routes install the exact APEX CLI as a workspace
 `devDependency`, update the npm lockfile, and create one selected client projection.

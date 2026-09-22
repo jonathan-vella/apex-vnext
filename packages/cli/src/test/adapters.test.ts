@@ -15,7 +15,7 @@ import { createMcpServer } from "../mcp.js";
 import { execute, formatHumanResult } from "../cli.js";
 import { ApexService } from "../service.js";
 import { ApexError, EXIT_CODES } from "../errors.js";
-import { meetsMinimumVersion, MINIMUM_NODE_VERSION } from "../version.js";
+import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "../version.js";
 import { nextTaskAfterInput, requirements, tempRoot, writeJson } from "./helpers.js";
 
 test("CLI emits a stable JSON envelope", async () => {
@@ -369,6 +369,56 @@ test("CLI governance revision requires explicit confirmation and reason before s
     expected,
   );
   assert.deepEqual(revision.mock.calls[0]?.arguments, ["baseline.json", { confirm: true, reason: "Policy changed" }]);
+});
+
+test("bootstrap plan is read-only and reports missing, conflicting and existing setup", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root, {
+    processRunner: {
+      run: async () => {
+        throw new Error("Preflight must not execute commands");
+      },
+    },
+  });
+  const config = { schemaVersion: CONTRACT_VERSION, projectId: "demo", createRepository: true };
+  const before = await readdir(root);
+  const initial = await service.planBootstrap(config);
+  assert.equal(initial.status, "pending");
+  assert.equal(initial.filesModified, false);
+  assert.equal(initial.executionAuthorized, false);
+  assert.equal(initial.configHash, sha256Json(config));
+  assert.ok(initial.unassessed.includes("governance-oidc"));
+  assert.deepEqual(await readdir(root), before);
+  assert.deepEqual(await service.planBootstrap(config), initial);
+  assert.equal((await service.planBootstrap({ ...config, createRepository: false })).status, "blocked");
+  await mkdir(join(root, ".git"));
+  const packageDirectory = join(root, "node_modules", "@apexops", "cli");
+  await mkdir(packageDirectory, { recursive: true });
+  for (const content of ['{"version":"0.9.0"}', "{", "null", "[]"]) {
+    await writeFile(join(packageDirectory, "package.json"), content);
+    assert.equal((await service.planBootstrap(config)).status, "blocked");
+    assert.equal(await readFile(join(packageDirectory, "package.json"), "utf8"), content);
+  }
+  await writeJson(join(packageDirectory, "package.json"), { version: APEX_VERSION });
+  assert.equal((await service.planBootstrap(config)).status, "ready");
+  await mkdir(join(root, ".apex"));
+  await writeFile(join(root, ".apex", "canary"), "preserve");
+  assert.equal((await service.planBootstrap(config)).status, "blocked");
+  assert.equal(await readFile(join(root, ".apex", "canary"), "utf8"), "preserve");
+  const unsafe = await tempRoot();
+  await symlink(packageDirectory, join(unsafe, "node_modules"));
+  await assert.rejects(new ApexService(unsafe).planBootstrap(config), /symlink/);
+  const fresh = await tempRoot();
+  const result = (await execute(["bootstrap", "plan", "--project", "demo", "--create-repo"], fresh)) as typeof initial;
+  assert.equal(result.status, "pending");
+  assert.deepEqual(await readdir(fresh), []);
+  const configPath = join(fresh, "onboarding.json");
+  await writeJson(configPath, { ...config, client: "github-copilot-cli" });
+  await assert.rejects(
+    execute(["bootstrap", "plan", "--file", configPath, "--client", "github-copilot-vscode"], fresh),
+    /conflicts/,
+  );
+  assert.deepEqual(await readdir(fresh), ["onboarding.json"]);
 });
 
 test("CLI bootstrap validates onboarding files before initializing a selected client", async () => {

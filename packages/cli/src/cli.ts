@@ -117,6 +117,9 @@ async function onboardingConfig(flags: Flags, root: string): Promise<OnboardingC
   if (!Value.Check(OnboardingConfigV1Schema, config)) {
     throw new ApexError("APEX_VALIDATION", "Onboarding configuration is malformed", EXIT_CODES.validation);
   }
+  if (typeof flags.client === "string" && config.client !== undefined && flags.client !== config.client) {
+    throw new ApexError("APEX_USAGE", "--client conflicts with the onboarding configuration", EXIT_CODES.usage);
+  }
   return config;
 }
 
@@ -463,12 +466,11 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
           ? { customizationsSource: flags["customizations-source"] }
           : {}),
       });
+    case "bootstrap plan":
+      return service.planBootstrap(await onboardingConfig(flags, root));
     case "bootstrap": {
       confirmed(flags, "bootstrap");
       const config = await onboardingConfig(flags, root);
-      if (typeof flags.client === "string" && config.client !== undefined && flags.client !== config.client) {
-        throw new ApexError("APEX_USAGE", "--client conflicts with the onboarding configuration", EXIT_CODES.usage);
-      }
       return service.bootstrap({
         projectId: config.projectId,
         ...(config.displayName === undefined ? {} : { displayName: config.displayName }),

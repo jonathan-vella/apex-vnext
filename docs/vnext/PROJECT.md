@@ -134,6 +134,12 @@ and permissions remain unchanged.
 
 ## Open Release Work
 
+First-time onboarding now has an agreed [acceptance contract](PRD.md#req-onboarding-001-first-time-install-and-repository-bootstrap)
+and [delivery sequence](ROADMAP.md#first-time-setup-delivery). The initial `bootstrap plan` implementation is a read-only
+local preflight for the Git boundary, workspace runtime version and existing APEX state. It reports unassessed machine,
+client, COE, GitHub, OIDC and baseline checks rather than claiming complete onboarding. The pre-Node installer, resumable
+multi-client configuration, remote multi-archetype bootstrap and approved governance provisioning remain open.
+
 The local implementation now includes bounded local catalog discovery, confirmed requirements adoption/revision,
 generated-file and prior-IaC conflict protection, structured Architecture decision records, evidence-bound deployment
 summaries and optional Diagnosis operational handoff. Diagnosis packages include a navigable inventory/policy/design-cost

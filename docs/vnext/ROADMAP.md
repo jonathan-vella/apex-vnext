@@ -28,7 +28,8 @@ built-in helpers are deferred below; they are not prerequisites for finishing th
    evidence, nonempty imports, identity/isolation rejection and bounded module-child bindings. Confirm the same
    candidate in supported clients; actual AVM-version/workload and cloud evidence require separate qualification.
    Unresolved ARM expressions remain unsupported rather than being treated as compliant.
-3. Reconcile and finish existing COE/profile/change and artifact-output requirements; reuse implemented controls.
+3. Reconcile and finish COE/profile/change and artifact-output requirements; reuse implemented controls. Include the
+   first-time install/bootstrap acceptance agreed on 2026-09-22 under `REQ-ONBOARDING-001`.
 4. Qualify complete workflows and lifecycle in both clients on the same candidate, then finalize distribution and
    separately authorized cloud/release evidence. Preserve all review, freshness, ownership and human approval gates.
 
@@ -172,10 +173,12 @@ both-track policy/ownership qualification are still required; packaging tests do
 
 ## Phase 3: Profiles, Import And Change
 
-**Requirements:** `REQ-REUSE-001`, `REQ-CHANGE-001`, `REQ-REQUIREMENTS-001`, `REQ-STATE-001`, `REQ-CONTRACT-001`.
+**Requirements:** `REQ-REUSE-001`, `REQ-CHANGE-001`, `REQ-REQUIREMENTS-001`, `REQ-STATE-001`, `REQ-CONTRACT-001`,
+`REQ-ONBOARDING-001`.
 
 - Represent ALZ-backed and standalone lab/demo profiles using existing project contracts and resource ownership.
-- Let the user identify a COE, select one workload archetype and create an independent copy with source provenance.
+- Ask for a remote COE during bootstrap, select one or more workload archetypes and create independent copies in separate
+  folders with exact-commit provenance and separate project state. Do not compose workloads or import authority.
 - Support manually copied projects by bounded inspection and confirmation, not full-history import.
 - Reuse contracts and parameter files; clarify missing facts once. Exclude source secrets, state and approval authority.
 - Ask relevant change questions, show consequences, confirm conflicts and update affected outputs only.
@@ -211,6 +214,25 @@ both-track policy/ownership qualification are still required; packaging tests do
   a review command, broaden worker visibility or delegate generic tasks without proving the authority boundary.
 - Validate WSL2 setup/doctor, least-privilege prerequisites and the selected IaC tool without Docker or source checkout.
 - Use compact inputs, scoped skills and deterministic filtering throughout; no current token benchmark is required.
+
+### First-Time Setup Delivery
+
+Owner: CLI lifecycle and managed customization maintainers. Acceptance: `REQ-ONBOARDING-001`, agreed on 2026-09-22.
+These are planned additions, not capabilities established by existing bootstrap or clean-install tests.
+
+1. Record a bounded install/setup plan with readiness, conflicts and approval boundaries; reuse setup/doctor and the
+   canonical toolchain. Deliver `apex-install` from ready WSL2 Ubuntu without requiring Node/APEX first, covering both
+   clients and both IaC tracks. Verify installations and preserve compatible tools.
+2. Extend repository bootstrap to resumable new/existing/cloned-repo setup and either or both client projections.
+   Retain one managed ownership/update path, conflict preservation and explicit partial outcomes.
+3. Add remote-only COE selection during setup, independent multi-archetype copies and confirmed defaults/decision
+   adoption. Reuse bounded import validation and provenance; never execute imported instructions or copy approvals.
+4. Offer reviewed GitHub repository creation/push and policy-discovery OIDC setup with identity reuse or confirmed
+   dedicated creation. Keep Azure read roles separate from deployment authority; preserve administrator handoffs.
+5. Verify repository/client health and create the first collection review PR, or verify/import an existing central
+   reviewed baseline. Preserve human review and report governance pending where appropriate.
+6. Qualify reruns, interruption, missing permissions, conflicts, both clients together and secret-safe authentication.
+   Live identity, federation, role and repository changes require separate explicit authorization during qualification.
 
 ## Phase 6: Distribution Last
 

@@ -43,7 +43,7 @@ import {
   ImprovementProposalV1Schema,
   ImprovementRecurrenceV1Schema,
 } from "./improvement.js";
-import { OnboardingConfigV1Schema } from "./onboarding.js";
+import { BootstrapPlanV1Schema, OnboardingConfigV1Schema } from "./onboarding.js";
 import { NativeValidationReceiptV1Schema } from "./native-validation.js";
 import { GovernanceObservationReceiptV1Schema } from "./governance-observation.js";
 import { PricingEvidenceV1Schema, PricingRequestV1Schema } from "./pricing.js";
@@ -77,6 +77,7 @@ import {
 } from "./targets.js";
 
 export const contractSchemas = [
+  BootstrapPlanV1Schema,
   ArchetypeSourceProposalV1Schema,
   RuntimeBundleLockV1Schema,
   ProjectConfigV1Schema,
@@ -147,6 +148,7 @@ const metadata = (maxBytes: number, sensitivity: ContractSensitivity = "internal
 });
 
 export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
+  "https://schemas.apexops.dev/bootstrap-plan-v1.json": metadata(65_536, "confidential"),
   "https://schemas.apexops.dev/archetype-source-proposal-v1.json": metadata(524_288, "confidential"),
   "https://schemas.apexops.dev/runtime-bundle-lock-v1.json": metadata(32_768),
   "https://schemas.apexops.dev/project-config-v1.json": metadata(16_384),

@@ -20,6 +20,8 @@ import {
   ImplementationIntentV1Schema,
   LogicalResourceManifestV1Schema,
   OperationRecordV1Schema,
+  OnboardingConfigV1Schema,
+  BootstrapPlanV1Schema,
   PolicyPropertyMapV1Schema,
   QualityMeasurementsV1Schema,
   QualityReportV1Schema,
@@ -69,6 +71,8 @@ import {
   type ImplementationIntentV1,
   type Operation,
   type OperationRecordV1,
+  type OnboardingConfigV1,
+  type BootstrapPlanV1,
   type ProjectId,
   type ResourceInventoryV1,
   type ReviewFindingsV1,
@@ -802,6 +806,93 @@ export class ApexService {
       await rm(join(this.root, ".apex"), { recursive: true, force: true });
       throw error;
     }
+  }
+
+  async planBootstrap(config: OnboardingConfigV1): Promise<BootstrapPlanV1> {
+    config = structuredClone(config);
+    if (!Value.Check(OnboardingConfigV1Schema, config) || Buffer.byteLength(JSON.stringify(config)) > 16_384)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Onboarding configuration is malformed or oversized",
+        EXIT_CODES.validation,
+      );
+    const checks: BootstrapPlanV1["checks"] = [];
+    const inspect = async (path: string) => {
+      await this.assertSafeDestination(this.root, path);
+      return (await this.pathExistsLstat(path)) ? lstat(path) : undefined;
+    };
+    const repository = await inspect(join(this.root, ".git"));
+    checks.push({
+      id: "repository",
+      status:
+        repository === undefined
+          ? config.createRepository === true
+            ? "pending"
+            : "blocked"
+          : repository.isDirectory() || repository.isFile()
+            ? "ready"
+            : "blocked",
+      reason:
+        repository === undefined
+          ? "Git boundary is missing; repository creation requires confirmation."
+          : "Git boundary exists; remote identity and repository integrity are not assessed.",
+    });
+    const packagePath = join(this.root, "node_modules", "@apexops", "cli", "package.json");
+    const runtime = await inspect(packagePath);
+    let exactRuntime = false;
+    if (runtime !== undefined && runtime.isFile() && runtime.size <= 65_536) {
+      try {
+        const descriptor = JSON.parse(await readFile(packagePath, "utf8")) as { version?: unknown } | null;
+        exactRuntime = descriptor !== null && descriptor.version === APEX_VERSION;
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+      }
+    }
+    checks.push({
+      id: "workspace-runtime",
+      status: runtime === undefined ? "pending" : exactRuntime ? "ready" : "blocked",
+      reason:
+        runtime === undefined
+          ? "Exact workspace APEX runtime must be installed after confirmation."
+          : exactRuntime
+            ? "Workspace package declares the exact runtime version; package integrity is not assessed."
+            : "Workspace runtime version or package metadata conflicts with this installer; preserve it for review.",
+    });
+    const state = await inspect(join(this.root, ".apex"));
+    checks.push({
+      id: "apex-state",
+      status: state === undefined ? "ready" : "blocked",
+      reason:
+        state === undefined
+          ? "No existing APEX state would be replaced by initialization."
+          : "Existing APEX state requires resume or repair inspection; clean initialization is blocked.",
+    });
+    const plan: BootstrapPlanV1 = {
+      schemaVersion: CONTRACT_VERSION,
+      config,
+      configHash: sha256Json(config),
+      runtimeVersion: APEX_VERSION,
+      scope: "local-bootstrap-preflight-v1",
+      status: checks.some(({ status }) => status === "blocked")
+        ? "blocked"
+        : checks.some(({ status }) => status === "pending")
+          ? "pending"
+          : "ready",
+      checks,
+      unassessed: [
+        "machine-prerequisites",
+        "client-health",
+        "remote-coe",
+        "github-repository",
+        "governance-oidc",
+        "reviewed-baseline",
+      ],
+      filesModified: false,
+      executionAuthorized: false,
+    };
+    if (!Value.Check(BootstrapPlanV1Schema, plan))
+      throw new ApexError("APEX_VALIDATION", "Bootstrap plan exceeds contract bounds", EXIT_CODES.validation);
+    return plan;
   }
 
   async bootstrap(input: {

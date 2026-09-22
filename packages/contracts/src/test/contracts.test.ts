@@ -39,6 +39,7 @@ import {
   LiveQualificationV1Schema,
   LIVE_QUALIFICATION_SCENARIO_IDS,
   OnboardingConfigV1Schema,
+  BootstrapPlanV1Schema,
   PolicyPropertyMapV1Schema,
   PricingEvidenceV1Schema,
   PricingRequestV1Schema,
@@ -732,6 +733,42 @@ describe("Wave 1 contracts", () => {
     ]) {
       assert.equal(Value.Check(IacBindingV1Schema, withResources(physicalResources)), false);
     }
+  });
+
+  it("bootstrap preflight cannot assert execution authority or hide unassessed operations", () => {
+    const plan = {
+      schemaVersion: "1.0.0",
+      config: { schemaVersion: "1.0.0", projectId: "demo" },
+      configHash: "a".repeat(64),
+      runtimeVersion: "0.10.0-next.5",
+      scope: "local-bootstrap-preflight-v1",
+      status: "pending",
+      checks: ["repository", "workspace-runtime", "apex-state"].map((id) => ({
+        id,
+        status: "pending",
+        reason: "Needs setup",
+      })),
+      unassessed: [
+        "machine-prerequisites",
+        "client-health",
+        "remote-coe",
+        "github-repository",
+        "governance-oidc",
+        "reviewed-baseline",
+      ],
+      filesModified: false,
+      executionAuthorized: false,
+    };
+    assert.equal(Value.Check(BootstrapPlanV1Schema, plan), true);
+    for (const changed of [
+      { ...plan, executionAuthorized: true },
+      { ...plan, filesModified: true },
+      { ...plan, unassessed: [] },
+      { ...plan, checks: [] },
+      { ...plan, configHash: "invalid" },
+      { ...plan, token: "secret" },
+    ])
+      assert.equal(Value.Check(BootstrapPlanV1Schema, changed), false);
   });
 
   it("validates strict onboarding configuration with optional defaults", () => {

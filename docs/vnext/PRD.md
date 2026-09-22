@@ -64,20 +64,59 @@ workspace binding, authentication, prerequisites, version pinning, updates, upgr
 discovery, and preservation of active runs. Avoid competing updaters or a hosted service unless separately approved.
 Final package and client qualification follows any distribution change.
 
+### REQ-ONBOARDING-001: First-Time Install And Repository Bootstrap
+
+Provide `apex-install` and `apex-bootstrap` terminal entry points with guided Copilot entry points using the same
+deterministic implementation. These are setup operations, not another infrastructure workflow or source of approval.
+
+`apex-install` starts from working WSL2 Ubuntu without assuming Node, npm or APEX exists. Detect missing or incompatible
+prerequisites for both supported clients and both IaC tracks, show one installation plan, and obtain confirmation before
+installing prerequisites and APEX. Preserve compatible installations; require separate confirmation for incompatible
+replacement or privileged actions. Authentication remains interactive with credentials outside model-visible inputs.
+Verify installed versions and report remaining host or account prerequisites. Native Windows/WSL installation remains
+outside this scope; guide users when the required host setup is absent. No source checkout or devcontainer is required.
+
+`apex-bootstrap` configures new, existing or cloned repositories and supports VS Code, standalone CLI, or both in the
+same repository. Inspect existing state before proposing changes. Ask whether to copy from a COE and request its remote
+repository URL during setup. Permit one or more selected archetypes from that remote, pinned to exact commits, as
+independent workloads in separate folders with separate project state. Do not compose their infrastructure automatically.
+Show differences and obtain confirmation before adopting organization defaults or reusable decisions. Existing choices,
+manual files and unrelated content remain protected; Azure Policy and mandatory security constraints stay authoritative.
+
+After confirming repository identity and workload choices, configure APEX and the selected clients. When no usable
+GitHub remote exists, offer repository creation and a reviewed push, showing owner, visibility and exact changes.
+Default new repositories to private. Never force-push or include unrelated changes implicitly.
+
+For consumer-owned policy discovery, preview the exact GitHub environment, variables, workflow, Azure identity,
+federation and read-only role assignments. Reuse an approved identity or offer creation of a dedicated one after explicit
+confirmation. Keep discovery permissions separate from deployment permissions and use no client secret. Missing rights
+produce actionable administrator steps, not privilege escalation or a false success. Enable and dispatch collection only
+after approval; successful setup includes repository/client health checks and the first policy-baseline review PR.
+That PR means governance review is pending, not deployment readiness. Baseline review, merge and acceptance remain human
+and kernel-controlled. Do not automatically merge the baseline or grant workflow gates.
+
+When an existing central collector is selected, verify and import its current reviewed baseline, including target
+coverage and freshness, instead of duplicating the collector or identity. Missing or stale evidence leaves governance
+pending. All setup paths report explicit ready, pending or blocked outcomes and resume completed steps without duplicate
+imports, repositories, identities or role assignments. Preserve partial progress and evidence; do not claim success while
+required actions remain pending. Implementing this feature does not itself authorize live Azure or GitHub mutations.
+
 ### REQ-HOST-001: WSL2 Without A Devcontainer
 
 The initial supported Windows experience uses WSL2 with Ubuntu, VS Code or Copilot CLI, and the required local toolchain.
 Users must not need Docker, a devcontainer, a source-repository clone, or repository development tools to use APEX.
-Document and check prerequisites through existing setup/doctor surfaces; require only tools needed for the selected
-track and requested stage. These existing VS Code and CLI host paths remain unchanged.
+Document and check operational prerequisites through existing setup/doctor surfaces; require only tools needed for the
+selected track and requested stage. The first-time installer provisions both client and IaC toolchains under
+`REQ-ONBOARDING-001`; operational readiness checks remain stage-scoped.
 
 Native Windows runtime qualification and standalone desktop-app hosting are deferred under `REQ-COPILOT-APP-001`.
 They are not current release prerequisites or supported-host promises.
 
 ### REQ-REUSE-001: COE Archetype Import
 
-A user identifies a COE repository, APEX inspects its available archetypes, and the user selects one whole workload to
-copy into a consumer repository. The copy is independent, with source repository, revision and selected paths recorded.
+A user identifies a remote COE repository during bootstrap, APEX inspects its available archetypes, and the user selects
+one or more whole workloads to copy into separate consumer folders. Each copy is independent, with source repository,
+exact commit and selected paths recorded; each workload has separate APEX project state.
 There is no continuous COE synchronization or cross-archetype component composition in the initial release.
 
 Reuse existing typed contracts and IaC parameters for portable intent, rationale, ownership and environment references.
