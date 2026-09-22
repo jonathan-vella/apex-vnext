@@ -13,8 +13,9 @@ A track cannot reuse the other track's preview or approval.
 Native implementation descriptors accept nested ARM types such as
 `native:Microsoft.Storage/storageAccounts/blobServices@2023-05-01`. Bicep bindings must supply the explicit full child
 name; Terraform bindings supply the child name and parent ID. Generation does not infer symbolic parent/scope references.
-This parser support does not extend native Bicep preview ownership: unresolved child-resource ownership still blocks
-preview rather than granting authority over a parent or its descendants.
+Native Bicep ownership resolves explicitly named child types only when type and name segment counts match and the
+parent scope is the selected resource group. IDs interleave type/name segments; declaring a child grants no authority
+over its parent, siblings or undeclared descendants. Expression-based names and unresolved ownership still block preview.
 
 ## Resource Ownership
 

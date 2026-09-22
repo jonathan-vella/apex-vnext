@@ -124,6 +124,50 @@ test("native Bicep resolves accepted literal names and exact RG ownership", () =
   }
 });
 
+test("native Bicep child ownership binds exact full names without granting parent or sibling access", () => {
+  const context = fixture();
+  const childType = "Microsoft.Storage/storageAccounts/blobServices/containers";
+  const childImplementation = `native:${childType}@2023-05-01`;
+  context.intent.resources[0]!.type = childType;
+  context.binding.intentHash = sha256Json(context.intent);
+  context.binding.resourceBindings.storage!.implementation = childImplementation;
+  context.binding.resourceBindings.storage!.parameters.name = "acceptedname/default/content";
+  context.manifest.resources[0]!.type = childType;
+  context.manifest.resources[0]!.implementationAddress = childImplementation;
+  const childId = `${managedId}/blobServices/default/containers/content`;
+  const result = resolveNativeBicepResourceOwnership(context);
+  assert.deepEqual(result.issues, []);
+  assert.deepEqual(result.expectedResourceIds, [childId]);
+  assert.equal(
+    coverage(result.expectedResourceIds, [{ resourceId: childId, action: "update", material: true }]).valid,
+    true,
+  );
+  for (const resourceId of [
+    managedId,
+    `${managedId}/blobServices/default`,
+    `${childId}-other`,
+    `${childId}/other/nested`,
+  ])
+    assert.equal(coverage(result.expectedResourceIds, [{ resourceId, action: "delete", material: true }]).valid, false);
+  for (const name of [
+    "content",
+    "acceptedname/default",
+    "acceptedname/default/content/extra",
+    "acceptedname//content",
+    "acceptedname/../content",
+    "acceptedname/default/content\n",
+  ]) {
+    context.binding.resourceBindings.storage!.parameters.name = name;
+    assert.notEqual(resolveNativeBicepResourceOwnership(context).issues.length, 0, name);
+  }
+  context.binding.resourceBindings.storage!.parameters.name = "acceptedname/default/content";
+  context.manifest.resources[0]!.ownership = "existing";
+  context.manifest.resources[0]!.implementationKind = "existing";
+  const protectedChild = resolveNativeBicepResourceOwnership(context);
+  assert.deepEqual(protectedChild.expectedResourceIds, []);
+  assert.deepEqual(protectedChild.protectedResourceIds, [childId]);
+});
+
 test("existing Bicep resources are protected from update and delete", () => {
   const context = fixture();
   context.manifest.resources[0]!.ownership = "existing";

@@ -1892,6 +1892,48 @@ test("native Bicep deploy records stack ownership evidence in manifest order", a
   assert.equal((completed?.payload as { evidenceMode?: unknown }).evidenceMode, "native");
 });
 
+test("native Bicep child preview authorizes only the explicitly bound child ID", async () => {
+  const root = await tempRoot();
+  const now = new Date();
+  const targetScope = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test";
+  const childId = `${targetScope}/providers/Microsoft.Storage/storageAccounts/apidemo/blobServices/default`;
+  const base = bicepPreviewProvider(now);
+  let foreign = true;
+  const provider: IacProvider = {
+    ...base,
+    async previewApply(request) {
+      assert.deepEqual(
+        request.resources.map(({ resourceId }) => resourceId),
+        [childId],
+      );
+      const { previewHash, ...body } = await base.previewApply(request);
+      assert.ok(previewHash);
+      const preview = {
+        ...body,
+        changes: [{ resourceId: foreign ? `${childId}-sibling` : childId, action: "update" as const, material: true }],
+      };
+      return { ...preview, previewHash: sha256Json(preview) };
+    },
+  };
+  const service = new ApexService(root, { clock: () => now, providers: { bicep: provider } });
+  const { runId } = await service.init({ projectId: "demo", iacTool: "bicep", targetScope });
+  await reachValidation(service, runId, "bicep", (plan) => {
+    const intent = plan[0]!.value as ImplementationIntentV1;
+    intent.resources[0]!.type = "Microsoft.Storage/storageAccounts/blobServices";
+    const binding = plan[1]!.value as IacBindingV1;
+    binding.intentHash = sha256Json(intent);
+    binding.resourceBindings.api!.implementation = "native:Microsoft.Storage/storageAccounts/blobServices@2023-05-01";
+    binding.resourceBindings.api!.parameters.name = "apidemo/default";
+  });
+  const before = await service.status();
+  await assert.rejects(service.preview({ operation: "apply", provider: "bicep" }), /coverage/);
+  assert.deepEqual(await service.status(), before);
+  foreign = false;
+  const preview = await service.preview({ operation: "apply", provider: "bicep" });
+  assert.equal(preview.changes[0]!.resourceId, childId);
+  assert.equal((await service.status()).run.gates[3]!.state, "open");
+});
+
 for (const scenario of ["foreign ID", "existing update", "existing delete"] as const) {
   test(`native Bicep preview rejects ${scenario} outside accepted managed ownership`, async () => {
     const root = await tempRoot();

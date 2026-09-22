@@ -266,27 +266,33 @@ export function resolveNativeBicepResourceOwnership(context: {
       continue;
     }
     const descriptor =
-      /^native:(Microsoft\.[A-Za-z0-9.]+\/[A-Za-z0-9.]+)@([0-9]{4}-[0-9]{2}-[0-9]{2}(?:-preview)?)$/.exec(
+      /^native:(Microsoft\.[A-Za-z0-9.]+(?:\/[A-Za-z][A-Za-z0-9]*)+)@([0-9]{4}-[0-9]{2}-[0-9]{2}(?:-preview)?)$/.exec(
         resourceBinding.implementation,
       );
     const { name, parentId } = resourceBinding.parameters;
+    const typeSegments = descriptor?.[1]?.split("/") ?? [];
+    const nameSegments = typeof name === "string" ? name.split("/") : [];
     if (
       descriptor === null ||
       descriptor[1]!.toLowerCase() !== resource.type.toLowerCase() ||
       resourceBinding.version !== descriptor[2] ||
       typeof name !== "string" ||
-      !/^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\s\S])/.test(name) ||
+      nameSegments.length !== typeSegments.length - 1 ||
+      nameSegments.some((segment) => !/^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\s\S])/.test(segment)) ||
       typeof parentId !== "string" ||
       (parentId !== "/" && parentId.toLowerCase() !== targetScope.toLowerCase()) ||
       (entry.ownership === "managed" && entry.implementationKind !== "resource")
     ) {
       issues.push({
         path,
-        message: "Native Bicep ownership requires a matching top-level type, literal name, and target RG parent",
+        message: "Native Bicep ownership requires a matching type, exact literal name segments, and target RG parent",
       });
       continue;
     }
-    const resourceId = `${targetScope}/providers/${descriptor[1]}/${name}`;
+    const resourceId = `${targetScope}/providers/${typeSegments[0]}/${typeSegments
+      .slice(1)
+      .map((segment, index) => `${segment}/${nameSegments[index]}`)
+      .join("/")}`;
     const normalizedId = resourceId.toLowerCase();
     if (physicalIds.has(normalizedId)) {
       issues.push({ path, message: "Bicep bindings resolve to duplicate resource IDs" });
