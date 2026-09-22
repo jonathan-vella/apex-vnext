@@ -64,6 +64,18 @@ route.
 
 ## Bootstrap A Workspace
 
+Run `apex bootstrap` (or `apex-bootstrap` after machine installation) in an interactive terminal to start guided setup.
+`apex bootstrap wizard` selects the same flow explicitly. Choose either or both clients, optionally supply a remote
+COE URL and exact commit, select one or more listed workload numbers, and review each copy and local initialization
+plan before confirming it. Each selected workload uses a separate destination and project setup. Enter `cancel` to stop;
+completed copies and initialized projects are retained. Declining a plan does not execute it.
+
+The wizard can collect consumer-governance identity inputs and display the evidence-bound OIDC plan, or record that a
+central reviewed baseline will be used. It does not create GitHub repositories, provision Azure identities/roles,
+dispatch collection, import central baselines automatically, or adopt source decisions without review. It reports these
+as pending rather than claiming complete onboarding. Interactive login and client health verification remain separate.
+Automation must use the typed plan/import/bootstrap commands; the wizard rejects `--yes`, `--json` and non-TTY input.
+
 Inspect local initialization prerequisites without changing files or running commands:
 
 ```bash

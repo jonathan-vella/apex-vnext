@@ -1428,6 +1428,40 @@ export class ApexService {
         EXIT_CODES.conflict,
       );
     if (!(await lstat(target)).isDirectory()) throw conflict();
+    if (await this.pathExistsLstat(join(target, ".apex"))) {
+      const child = new ApexService(target);
+      await child.assertSafeDestination(target, join(target, ".apex/config.json"));
+      let projectId: string;
+      try {
+        projectId = (await child.selection()).projectId;
+        const readiness = await child.planBootstrap({ schemaVersion: CONTRACT_VERSION, projectId });
+        if (readiness.status !== "ready") throw conflict();
+      } catch {
+        throw conflict();
+      }
+      for (const file of proposal.files) {
+        const path = join(target, file.path);
+        await child.assertSafeDestination(target, path);
+        const info = await lstat(path);
+        if (
+          !info.isFile() ||
+          info.nlink !== 1 ||
+          info.size !== file.bytes ||
+          sha256Bytes(await readFile(path)) !== file.hash
+        )
+          throw conflict();
+      }
+      const origin = join(target, ".apex-origin.json");
+      await child.assertSafeDestination(target, origin);
+      const info = await lstat(origin);
+      if (!info.isFile() || info.nlink !== 1 || info.size > 262_144) throw conflict();
+      try {
+        if (sha256Json(JSON.parse(await readFile(origin, "utf8"))) !== sha256Json(proposal)) throw conflict();
+      } catch {
+        throw conflict();
+      }
+      return true;
+    }
     const expected = new Map(proposal.files.map((file) => [file.path, file]));
     expected.set(".apex-origin.json", { path: ".apex-origin.json", hash: "", bytes: 0 });
     const allowedDirectories = new Set(

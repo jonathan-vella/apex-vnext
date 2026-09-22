@@ -69,6 +69,11 @@ earlier completed copies intact. Re-plan and retry with the same hash only when 
 transactional rollback: a partially written blocked destination requires explicit inspection. Review each workload's
 decisions and initialize its independent APEX project afterward; no runtime state or approvals are copied.
 
+After a copied workload has been initialized, reruns first verify its selected APEX project, managed files, exact local
+runtime and Git boundary. Every originally imported file and its origin record must still match. Verified setup files
+and later unrelated user files are preserved, not re-imported or deleted. Damaged setup or changed imported source still
+blocks resumption. The strict exact-file-set rule above continues to apply to uninitialized copies.
+
 For either an imported workload or an existing manual copy, recover relevant decisions into a consumer-scoped
 `requirements-v1` JSON document. Confirm only facts that apply to this consumer; retain unresolved facts as unknowns.
 Use `requirements preview-adoption`, review its candidate and impact, then `requirements adopt --yes` with that proposal

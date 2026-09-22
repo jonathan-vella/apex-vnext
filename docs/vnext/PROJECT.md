@@ -134,6 +134,13 @@ and permissions remain unchanged.
 
 ## Open Release Work
 
+Terminal bootstrap now guides client selection, optional remote COE catalog selection, confirmed independent copies,
+per-workload local setup and consumer-governance plan inputs. It delegates mutations to existing service operations,
+retains partial progress and cancellation, and reports outstanding governance/client/GitHub work as pending or blocked.
+Batch resumption after local initialization verifies child bootstrap integrity and original source hashes while keeping
+setup files and later unrelated user content. A real Linux pseudo-terminal test confirms cancellation creates no files.
+The first-run flow still lacks automated GitHub creation, defaults/decision adoption and confirmed OIDC execution.
+
 Governance onboarding now has a read-only `bootstrap governance-plan` command and typed configuration/plan contracts.
 It derives federation subjects from observed GitHub repository/OIDC settings, blocks unsupported subject templates,
 and proposes scoped Reader access with collection disabled. Identity, access, environment protection, provisioning,

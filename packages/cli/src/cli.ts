@@ -30,6 +30,7 @@ import { exportProviderTransfer, importProviderTransfer } from "./provider-trans
 import { ApexService, type ServiceOptions, type TaskOutput } from "./service.js";
 import { exportStateTransfer, importStateTransfer } from "./state-transfer.js";
 import { APEX_VERSION } from "./version.js";
+import { interactiveBootstrap } from "./bootstrap-wizard.js";
 
 type FlagValue = string | string[] | boolean;
 type Flags = Record<string, FlagValue>;
@@ -474,6 +475,14 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
       });
     case "bootstrap plan":
       return service.planBootstrap(await onboardingConfig(flags, root));
+    case "bootstrap wizard":
+      if (flags.yes === true || flags.json === true)
+        throw new ApexError(
+          "APEX_USAGE",
+          "The wizard requires per-plan interactive confirmation; omit --yes and --json",
+          EXIT_CODES.usage,
+        );
+      return interactiveBootstrap(root);
     case "bootstrap governance-plan":
       return service.planGovernanceSetup((await inputJson(flags)) as GovernanceSetupConfigV1);
     case "bootstrap coe-plan":
@@ -486,6 +495,7 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
         true,
       );
     case "bootstrap": {
+      if (Object.keys(flags).length === 0) return interactiveBootstrap(root);
       confirmed(flags, "bootstrap");
       const config = await onboardingConfig(flags, root);
       return service.bootstrap({

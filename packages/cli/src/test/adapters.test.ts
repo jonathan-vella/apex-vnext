@@ -344,6 +344,24 @@ test("remote archetype CLI import rechecks exact content and records remote prov
     options,
   )) as { status: string };
   assert.equal(cliResult.status, "copied");
+  const initializedChild = new ApexService(join(root, "one"));
+  await mkdir(join(root, "one/.git"));
+  await initializedChild.init({ projectId: "child", clientId: "both" });
+  const packageDirectory = join(root, "one/node_modules/@apexops/cli");
+  await mkdir(packageDirectory, { recursive: true });
+  await writeJson(join(packageDirectory, "package.json"), { version: APEX_VERSION });
+  await writeFile(join(root, "one/user-notes.md"), "Preserve after setup\n");
+  const childStatus = await initializedChild.status();
+  assert.deepEqual(
+    (await service.planArchetypeBatch(config)).entries.map(({ state }) => state),
+    ["already-copied", "already-copied"],
+  );
+  await service.importArchetypeBatch(config, plan.planHash, true);
+  assert.deepEqual(await initializedChild.status(), childStatus);
+  assert.equal(await readFile(join(root, "one/user-notes.md"), "utf8"), "Preserve after setup\n");
+  await writeFile(join(root, "one/main.tf"), "Changed original source\n");
+  await assert.rejects(service.planArchetypeBatch(config), /modified or incomplete/);
+  await writeFile(join(root, "one/main.tf"), content);
   await assert.rejects(readFile(join(root, ".apex/config.json")), { code: "ENOENT" });
   responses[`${prefix}/blobs/${hash}`] = { ...(responses[`${prefix}/blobs/${hash}`] as object), content: "YmFk" };
   await assert.rejects(execute(["archetype", "inspect", ...selection], root, options), /inspection failed/);
