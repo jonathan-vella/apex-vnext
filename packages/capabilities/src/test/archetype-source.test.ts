@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -125,14 +125,26 @@ test("remote archetypes bind exact GitHub commits and verify blobs without check
     ),
     /collide/,
   );
-  const secret = Buffer.from('password = "do-not-import-this"\n');
-  const secretHash = createHash("sha1").update(`blob ${secret.length}\0`).update(secret).digest("hex");
+  const rejectedContent = Buffer.from('password = "do-not-import-this"\n');
+  const rejectedBlobId = execFileSync("git", ["hash-object", "--stdin"], {
+    input: rejectedContent,
+    encoding: "utf8",
+  }).trim();
   await assert.rejects(
     inspectRemoteArchetype(request, async (path) => {
       if (path === `${prefix}/trees/${selected}`)
-        return { sha: selected, truncated: false, tree: [{ ...file, sha: secretHash, size: secret.length }] };
-      if (path === `${prefix}/blobs/${secretHash}`)
-        return { sha: secretHash, size: secret.length, encoding: "base64", content: secret.toString("base64") };
+        return {
+          sha: selected,
+          truncated: false,
+          tree: [{ ...file, sha: rejectedBlobId, size: rejectedContent.length }],
+        };
+      if (path === `${prefix}/blobs/${rejectedBlobId}`)
+        return {
+          sha: rejectedBlobId,
+          size: rejectedContent.length,
+          encoding: "base64",
+          content: rejectedContent.toString("base64"),
+        };
       return read(path);
     }),
     /credential-like/,
