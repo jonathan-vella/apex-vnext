@@ -136,7 +136,7 @@ template alias mismatch; using `policy-property-map` instead of the workflow nod
 
 These are bounded synthetic routing results, not full client or review-quality acceptance. Rejected submissions remain
 recorded, and some non-Architecture reviews supplied optional pillar receipts. No authenticated independent reviewer
-identity is claimed. Successful native Validator completion and the full workload lifecycle remain unqualified, so
+identity is claimed. The full workload lifecycle and both-track native Validator acceptance remain unqualified, so
 shipped CLI workers are still absent.
 
 Subsequent isolated Planner-to-CodeGen and Planner-to-Validator probes succeeded as routing checks on both tracks.
@@ -154,6 +154,18 @@ output intentionally failed resource parity; this is not evidence that a real ma
 Independent audit verified receipts, the three fixed commands, unchanged validation head, closed Gate 4, preserved
 canaries and restart state. Fixtures had simulated prerequisite approvals only; no new approvals or deployments were
 issued. Parked Windows-only worktree edits remained outside this checkpoint. Shipped worker membership is unchanged.
+
+The subsequent `dist/cli-worker-routing-13` probe used source checkpoint
+`ca23ad5fdadb319d1946f47f0457187be2f310b1` and CLI `1.0.86`. Session
+`4479a245-2dba-4ad2-b8f4-e7a02131b854` routed canonical Planner `gpt-5.6-sol` to `APEX Validator` using its configured
+`gpt-5.6-terra`. The nine-resource Bicep storage fixture used ordinary `generateIac` and the installed Bicep compiler,
+not mocked command output. One validation request returned all six required validator IDs with no blockers; one
+completion reexecuted format/build/lint and accepted the source-bound native receipts. Independent audit verified exact
+command arguments, receipt and source hashes, unchanged canary, restart state, no new approvals/deployments and closed
+Gate 4. Prerequisite design/review approvals were synthetic fixture setup, not live workload acceptance. Parked Windows
+edits remained in the source worktree and were excluded from the published checkpoint. This proves the bounded
+`bicep-storage-only-baseline-v1` Validator path, not Terraform, mixed-service baseline coverage, a live Azure deployment,
+or a clean packaged-client lifecycle. Shipped worker membership remains unchanged.
 
 Local evidence is retained under `dist/cli-worker-qualification-04` through `dist/cli-worker-qualification-07`,
 `dist/cli-parent-qualification-08`, the `dist/cli-review-qualification-09-*` fixtures, and

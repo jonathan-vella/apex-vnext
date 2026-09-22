@@ -152,8 +152,12 @@ and compliance assertions are not authority for this candidate.
 
 Native source validation now records a separate, map-bound `no-actionable-mappings` applicability receipt for an accepted
 empty policy map on either track. This credits only that applicability check, not property evaluation or full compliance.
-Security-baseline and logical-resource-parity executors remain required and incomplete; successful production native
-Validator completion and shipped CLI worker enablement therefore remain blocked.
+Compiled Bicep parity now checks supported native resources and explicit diagnostic scopes against accepted bindings.
+A closed storage-only baseline can execute all required source validators using generated symbolic configuration.
+An actual Planner-to-Validator CLI probe accepted that bounded path with real compiler receipts and Gate 4 closed;
+see [client qualification](CLIENT-QUALIFICATION.md#current-worker-attempt). Terraform and mixed-service baseline/parity
+coverage, clean packaged-client acceptance and live operations remain incomplete. Shipped CLI workers remain disabled
+pending the required broader qualification.
 
 - Complete the [MCP contract follow-up](ROADMAP.md#mcp-contract-follow-up). The 2026-09-18 review reproduced invalid
   string/list results under SDK 1.29.0 and loss of stable error codes. All 34 tools now have output contracts, strict
