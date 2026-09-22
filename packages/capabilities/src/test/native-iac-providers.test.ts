@@ -21,6 +21,8 @@ import {
   type DeploymentPreviewV1,
   type PolicyValidationV1,
   type PolicyPropertyMapV1,
+  type IacBindingV1,
+  type LogicalResourceManifestV1,
 } from "@apexops/contracts";
 import {
   IacOutputParseError,
@@ -679,7 +681,10 @@ test("installed Bicep validates nested formatting and lint without changing acce
         const receipt = await provider.validateSource(input);
         if (checkPolicy) {
           assert.equal(receipt.policyValidation?.outcome, "pass");
-          assert.equal(receipt.resourceParity?.outcome, checkModule || checkDiagnostics ? "unsupported" : "pass");
+          assert.equal(
+            receipt.resourceParity?.outcome,
+            checkModule ? "unsupported" : checkDiagnostics ? "fail" : "pass",
+          );
           if (checkDiagnostics) {
             assert.equal(receipt.storageDiagnostics?.storage?.outcome, "pass");
             assert.equal(receipt.storageDiagnostics?.storage?.fullBaselineEvaluated, false);
@@ -744,6 +749,69 @@ test("installed Bicep validates nested formatting and lint without changing acce
       await assert.rejects(stat(calls[0]!.cwd!), { code: "ENOENT" });
     });
   }
+});
+
+test("native parity snapshots the accepted binding before compiler commands", async (context) => {
+  const fixture = await nativePolicyFixture(context, "bicep");
+  const implementation = "native:Microsoft.Storage/storageAccounts@2023-05-01";
+  const binding: IacBindingV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "project",
+    runId: "run",
+    track: "bicep",
+    intentHash: hashes.input,
+    resourceBindings: { storage: { implementation, version: "2023-05-01", parameters: { name: "approved" } } },
+  };
+  const manifest: LogicalResourceManifestV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "project",
+    runId: "run",
+    track: "bicep",
+    resources: [
+      {
+        logicalId: "storage",
+        type: "Microsoft.Storage/storageAccounts",
+        implementationAddress: implementation,
+        executionAddress: "storage",
+        implementationKind: "resource",
+        ownership: "managed",
+        dependsOn: [],
+        generatedDependencies: [],
+        sourcePath: "main.bicep",
+      },
+    ],
+  };
+  const expected = calculatePolicyValidationDigest(binding);
+  fixture.source.duringCommand = async () => {
+    binding.resourceBindings.storage!.parameters.name = "changed-after-await";
+  };
+  const receipt = await fixture.makeProvider().validateSource({
+    projectId: "project",
+    runId: "run",
+    sourceHash: hashes.iac,
+    generatedSource: fixture.generatedSource,
+    policyHash: hashes.policy,
+    inputHash: hashes.input,
+    resourceParityManifest: manifest,
+    resourceParityBinding: binding,
+  });
+  assert.equal(receipt.resourceParity?.bindingHash, expected);
+  assert.notEqual(receipt.resourceParity?.bindingHash, calculatePolicyValidationDigest(binding));
+  assert.equal(fixture.runner.requests.length, 3);
+  await assert.rejects(
+    fixture.makeProvider().validateSource({
+      projectId: "project",
+      runId: "run",
+      sourceHash: hashes.iac,
+      generatedSource: fixture.generatedSource,
+      policyHash: hashes.policy,
+      inputHash: hashes.input,
+      resourceParityManifest: manifest,
+      resourceParityBinding: { ...binding, intentHash: "f".repeat(64) },
+    }),
+    /inputs are invalid/,
+  );
+  assert.equal(fixture.runner.requests.length, 3);
 });
 
 test("native bicep validateSource requires the accepted main.bicep target", async (context) => {

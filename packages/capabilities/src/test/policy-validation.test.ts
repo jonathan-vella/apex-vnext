@@ -10,6 +10,7 @@ import {
   hasValidPolicyValidation,
   type PolicyPropertyMapV1,
   type LogicalResourceManifestV1,
+  type IacBindingV1,
 } from "@apexops/contracts";
 import {
   validatePolicyProperties,
@@ -206,6 +207,90 @@ describe("bounded policy property validation", () => {
       "invalid-source",
     );
     assert.equal(check({ resources }).manifestHash, calculatePolicyValidationDigest(manifest));
+  });
+
+  it("compiled diagnostic parity requires the exact accepted scope binding", () => {
+    const targetType = "Microsoft.Storage/storageAccounts/blobServices";
+    const diagnosticType = "Microsoft.Insights/diagnosticSettings";
+    const target = {
+      logicalId: "blob",
+      type: targetType,
+      implementationAddress: `native:${targetType}@2023-05-01`,
+      executionAddress: "blob",
+      implementationKind: "resource" as const,
+      ownership: "managed" as const,
+      dependsOn: [] as string[],
+      generatedDependencies: [] as string[],
+      sourcePath: "main.bicep",
+    };
+    const manifest: LogicalResourceManifestV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      track: "bicep",
+      resources: [
+        target,
+        {
+          ...target,
+          logicalId: "diag",
+          type: diagnosticType,
+          implementationAddress: `native:${diagnosticType}@2021-05-01-preview`,
+          executionAddress: "diag",
+          dependsOn: ["blob"],
+          generatedDependencies: ["blob"],
+        },
+      ],
+    };
+    const binding: IacBindingV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      track: "bicep",
+      intentHash: hash,
+      resourceBindings: {
+        blob: {
+          implementation: target.implementationAddress,
+          version: "2023-05-01",
+          parameters: { name: "account/default" },
+        },
+        diag: {
+          implementation: manifest.resources[1]!.implementationAddress,
+          version: "2021-05-01-preview",
+          scopeLogicalId: "blob",
+          parameters: { name: "logs" },
+        },
+      },
+    };
+    const scope = `[resourceId('${targetType}', split('account/default', '/')[0], split('account/default', '/')[1])]`;
+    const resources = {
+      blob: { type: targetType, name: "account/default" },
+      diag: { type: diagnosticType, name: "logs", scope, dependsOn: ["blob"] },
+    };
+    const check = (source: unknown, selected = binding) =>
+      validateBicepResourceParity({ sourceHash: hash, manifest, binding: selected, json: JSON.stringify(source) });
+    assert.equal(check({ resources }).outcome, "pass");
+    assert.equal(check({ resources }).bindingHash, calculatePolicyValidationDigest(binding));
+    assert.equal(
+      check({
+        resources: {
+          ...resources,
+          diag: { ...resources.diag, scope: scope.replaceAll("account/default", "foreign/default") },
+        },
+      }).outcome,
+      "fail",
+    );
+    assert.equal(
+      check({ resources: { ...resources, blob: { ...resources.blob, name: "foreign/default" } } }).outcome,
+      "unsupported",
+    );
+    assert.equal(check({ resources: { ...resources, diag: { ...resources.diag, dependsOn: [] } } }).outcome, "fail");
+    const missing = structuredClone(binding);
+    delete missing.resourceBindings.diag!.scopeLogicalId;
+    assert.equal(check({ resources }, missing).outcome, "unsupported");
+    assert.equal(
+      validateBicepResourceParity({ sourceHash: hash, manifest, json: JSON.stringify({ resources }) }).outcome,
+      "unsupported",
+    );
   });
 
   it("keeps batched storage observations resource-specific and bounded", () => {

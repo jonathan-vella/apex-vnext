@@ -742,7 +742,7 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
     let substituteStorage = false;
     let applicability: "valid" | "omit" | "wrong" = "valid";
     let unsolicitedPolicy = false;
-    let parity: "absent" | "valid" | "foreign" = "absent";
+    let parity: "absent" | "valid" | "foreign" | "foreign-binding" = "absent";
     let routing: "absent" | "valid" | "foreign" = "absent";
     const provider: IacProvider = {
       ...(track === "bicep" ? bicepPreviewProvider(new Date()) : terraformPreviewProvider(new Date())),
@@ -791,6 +791,7 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
                   ...validateBicepResourceParity({
                     sourceHash: request.sourceHash,
                     manifest: request.resourceParityManifest!,
+                    binding: request.resourceParityBinding!,
                     json: JSON.stringify({
                       resources: {
                         api: {
@@ -806,6 +807,7 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
                     }),
                   }),
                   ...(parity === "foreign" ? { manifestHash: "e".repeat(64) } : {}),
+                  ...(parity === "foreign-binding" ? { bindingHash: "d".repeat(64) } : {}),
                 },
               }),
           ...(applicability === "omit"
@@ -986,6 +988,14 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
         ),
       );
       parity = "foreign";
+      await assert.rejects(service.validateTask(validationTask), /invalid or incomplete/);
+      await assert.rejects(
+        service.completeTaskOutputs(validationTask, [{ kind: "validation-evidence", value: submitted }]),
+        /parity evidence.*manifest/,
+      );
+      assert.equal(await journal.head(), head);
+      parity = "absent";
+      parity = "foreign-binding";
       await assert.rejects(service.validateTask(validationTask), /invalid or incomplete/);
       await assert.rejects(
         service.completeTaskOutputs(validationTask, [{ kind: "validation-evidence", value: submitted }]),

@@ -2820,6 +2820,7 @@ export class ApexService {
           ? {
               storageSecurityBindings: this.storageSecurityBindings(manifest),
               resourceParityManifest: structuredClone(manifest),
+              resourceParityBinding: await this.objects.getJson<IacBindingV1>(handoff.bindingHash),
               storageDiagnosticsTargets: diagnosticsTargets,
             }
           : {}),
@@ -2827,7 +2828,7 @@ export class ApexService {
       if (
         !hasValidNativeValidationReceipt(receipt, binding) ||
         !this.hasRequiredNativePolicyEvidence(receipt, policyValidation) ||
-        !this.hasBoundResourceParity(receipt, manifest) ||
+        !this.hasBoundResourceParity(receipt, manifest, handoff.bindingHash) ||
         !this.hasBoundStorageDiagnostics(receipt, manifest) ||
         !this.hasBoundStorageRouting(receipt, diagnosticsTargets)
       )
@@ -4612,7 +4613,7 @@ export class ApexService {
               nativeReceipt,
               await this.storageDiagnosticsTargets(logicalManifest, handoff),
             ) ||
-            !this.hasBoundResourceParity(nativeReceipt, logicalManifest)
+            !this.hasBoundResourceParity(nativeReceipt, logicalManifest, handoff.bindingHash)
           )
             throw new ApexError(
               "APEX_VALIDATION",
@@ -7354,12 +7355,14 @@ export class ApexService {
   private hasBoundResourceParity(
     receipt: NativeValidationReceiptV1,
     manifest: LogicalResourceManifestV1 | undefined,
+    bindingHash: string,
   ): boolean {
     return (
       receipt.resourceParity === undefined ||
       (manifest !== undefined &&
         receipt.track === "bicep" &&
-        receipt.resourceParity.manifestHash === calculatePolicyValidationDigest(manifest))
+        receipt.resourceParity.manifestHash === calculatePolicyValidationDigest(manifest) &&
+        receipt.resourceParity.bindingHash === bindingHash)
     );
   }
 
@@ -7612,6 +7615,7 @@ export class ApexService {
                 resourceParityManifest: structuredClone(
                   artifacts["logical-resource-manifest"] as LogicalResourceManifestV1,
                 ),
+                resourceParityBinding: await this.objects.getJson<IacBindingV1>(handoff.bindingHash),
                 storageDiagnosticsTargets: diagnosticsTargets,
               }
             : {}),
@@ -7649,6 +7653,7 @@ export class ApexService {
           !this.hasBoundResourceParity(
             receipt,
             artifacts["logical-resource-manifest"] as LogicalResourceManifestV1 | undefined,
+            handoff.bindingHash,
           )
         )
           throw new ApexError(

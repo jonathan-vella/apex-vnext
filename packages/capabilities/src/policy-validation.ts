@@ -5,6 +5,7 @@ import {
   STORAGE_PROPERTY_HARDENING_CONTROLS,
   PolicyPropertyMapV1Schema,
   LogicalResourceManifestV1Schema,
+  IacBindingV1Schema,
   assertPolicyValidationJson,
   calculatePolicyValidationDigest,
   calculatePolicyValidationHash,
@@ -13,6 +14,7 @@ import {
   type PolicyValidationResultV1,
   type PolicyValidationV1,
   type LogicalResourceManifestV1,
+  type IacBindingV1,
   type NativeValidationReceiptV1,
 } from "@apexops/contracts";
 import { parseJsonProcessOutput } from "./iac-normalizers.js";
@@ -486,9 +488,20 @@ export function validateBicepStorageDiagnostics(request: {
 export function validateBicepResourceParity(request: {
   readonly sourceHash: string;
   readonly manifest: LogicalResourceManifestV1;
+  readonly binding?: IacBindingV1;
   readonly json: string;
 }) {
   assertPolicyValidationJson(request.manifest);
+  if (request.binding !== undefined) {
+    assertPolicyValidationJson(request.binding);
+    if (
+      !Value.Check(IacBindingV1Schema, request.binding) ||
+      request.binding.track !== "bicep" ||
+      request.binding.projectId !== request.manifest.projectId ||
+      request.binding.runId !== request.manifest.runId
+    )
+      throw new TypeError("RESOURCE_PARITY_INVALID_INPUT");
+  }
   if (
     !Value.Check(LogicalResourceManifestV1Schema, request.manifest) ||
     request.manifest.track !== "bicep" ||
@@ -511,6 +524,7 @@ export function validateBicepResourceParity(request: {
     coverage: "bicep-symbolic-resource-parity-v1" as const,
     sourceHash: request.sourceHash,
     manifestHash: calculatePolicyValidationDigest(request.manifest),
+    ...(request.binding === undefined ? {} : { bindingHash: calculatePolicyValidationDigest(request.binding) }),
     inputHash: createHash("sha256").update(request.json).digest("hex"),
     outcome,
     reason,
@@ -543,7 +557,6 @@ export function validateBicepResourceParity(request: {
         resource.codeSymbol === undefined ||
         resource.codeSymbol.includes("::") ||
         resource.resourceType?.toLowerCase() === "microsoft.resources/deployments" ||
-        Object.hasOwn(resource.value, "scope") ||
         Object.hasOwn(resource.value, "condition"),
     )
   )
@@ -558,6 +571,37 @@ export function validateBicepResourceParity(request: {
   for (const resource of expected) {
     const compiled = observed.find(({ codeSymbol }) => codeSymbol === resource.executionAddress)!;
     if (compiled.resourceType?.toLowerCase() !== resource.type.toLowerCase()) return result("fail", "type-mismatch");
+    const selected = request.binding?.resourceBindings[resource.logicalId];
+    const scopeId = selected?.scopeLogicalId;
+    if (Object.hasOwn(compiled.value, "scope") || scopeId !== undefined) {
+      const target = scopeId === undefined ? undefined : byId.get(scopeId);
+      const targetBinding = scopeId === undefined ? undefined : request.binding?.resourceBindings[scopeId];
+      const targetCompiled =
+        target === undefined ? undefined : observed.find(({ codeSymbol }) => codeSymbol === target.executionAddress);
+      const targetName = targetBinding?.parameters.name;
+      if (
+        resource.type.toLowerCase() !== "microsoft.insights/diagnosticsettings" ||
+        target === undefined ||
+        targetBinding === undefined ||
+        targetBinding.scopeLogicalId !== undefined ||
+        scopeId === resource.logicalId ||
+        !resource.dependsOn.includes(scopeId!) ||
+        typeof targetName !== "string" ||
+        !/^Microsoft\.[A-Za-z0-9.]+(?:\/[A-Za-z][A-Za-z0-9]*)+$/.test(target.type) ||
+        targetName.split("/").length !== target.type.split("/").length - 1 ||
+        targetName.split("/").some((name) => !/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(name)) ||
+        targetCompiled?.value.name !== targetName ||
+        compiled.value.name !== selected?.parameters.name ||
+        target.implementationAddress !== targetBinding.implementation ||
+        resource.implementationAddress !== selected?.implementation
+      )
+        return result("unsupported", "unsupported-resource");
+      const names = targetName.split("/");
+      const literalScope = `[resourceId('${target.type}', ${names.map((name) => `'${name}'`).join(", ")})]`;
+      const splitScope = `[resourceId('${target.type}', ${names.map((_, index) => `split('${targetName}', '/')[${index}]`).join(", ")})]`;
+      if (compiled.value.scope !== literalScope && compiled.value.scope !== splitScope)
+        return result("fail", "dependency-mismatch");
+    }
     const dependencies = compiled.value.dependsOn ?? [];
     if (
       !Array.isArray(dependencies) ||

@@ -161,9 +161,12 @@ digests and declare `fullBaselineEvaluated: false`; these checks do not credit t
 Native task completion requires executed evidence for every required validator, not merely caller-supplied entries.
 For Bicep manifests containing only managed native resources with unique top-level symbolic execution addresses,
 `resourceParity` compares captured compiler output with the accepted manifest: exact resource coverage, ARM types and
-dependency sets. Its receipt binds source, compiler output and manifest hashes; only `outcome: pass` credits the parity
-validator. Extra/missing resources, type changes and dependency mismatches fail. Modules, nested resources, existing
-declarations, loops, conditions, explicit scopes and expression-based dependencies remain unsupported. This does not
+dependency sets. Its receipt binds source, compiler output, manifest and accepted binding hashes; only `outcome: pass`
+credits the parity validator. An explicit diagnostic `scopeLogicalId` is supported only when the compiler's literal
+`resourceId` expression matches that accepted target's type and full name, and the dependency is present. The native
+adapter snapshots the binding before command execution. Extra/missing resources, type changes, scope substitutions and
+dependency mismatches fail. Modules, nested template objects, existing declarations, loops, conditions, other explicit
+scopes and expression-based dependencies remain unsupported. This does not
 evaluate security properties or establish Terraform parity; those checks remain independently required.
 
 Native preview also rejects a prior completion containing required simulated or missing evidence, before provider

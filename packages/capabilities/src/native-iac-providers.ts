@@ -13,6 +13,7 @@ import {
   hasValidNativeValidationReceipt,
   PolicyPropertyMapV1Schema,
   LogicalResourceManifestV1Schema,
+  IacBindingV1Schema,
 } from "@apexops/contracts";
 import type {
   ApprovalEvidenceV1,
@@ -324,8 +325,22 @@ abstract class NativeProviderBase {
     let policyInput: NativeValidationRequest["policyValidation"];
     let storageBindings: NativeValidationRequest["storageSecurityBindings"];
     let parityManifest: NativeValidationRequest["resourceParityManifest"];
+    let parityBinding: NativeValidationRequest["resourceParityBinding"];
     let diagnosticsTargets: NativeValidationRequest["storageDiagnosticsTargets"];
     try {
+      if (track === "bicep" && request.resourceParityBinding !== undefined) {
+        calculatePolicyValidationDigest(request.resourceParityBinding);
+        parityBinding = structuredClone(request.resourceParityBinding);
+        if (
+          !Value.Check(IacBindingV1Schema, parityBinding) ||
+          request.resourceParityManifest === undefined ||
+          parityBinding.track !== track ||
+          parityBinding.projectId !== request.projectId ||
+          parityBinding.runId !== request.runId ||
+          parityBinding.intentHash !== request.inputHash
+        )
+          throw new Error();
+      }
       if (track === "bicep" && request.storageDiagnosticsTargets !== undefined) {
         calculatePolicyValidationDigest(request.storageDiagnosticsTargets);
         diagnosticsTargets = structuredClone(request.storageDiagnosticsTargets);
@@ -464,6 +479,7 @@ abstract class NativeProviderBase {
         receipt.resourceParity = validateBicepResourceParity({
           sourceHash: receipt.sourceHash,
           manifest: parityManifest,
+          ...(parityBinding === undefined ? {} : { binding: parityBinding }),
           json: compiledTemplate ?? "",
         });
         const { receiptHash: previousHash, ...updated } = receipt;

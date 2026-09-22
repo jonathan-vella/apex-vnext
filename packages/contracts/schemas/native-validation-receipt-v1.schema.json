@@ -375,6 +375,10 @@
     "resourceParity": {
       "additionalProperties": false,
       "properties": {
+        "bindingHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
         "coverage": {
           "const": "bicep-symbolic-resource-parity-v1",
           "type": "string"

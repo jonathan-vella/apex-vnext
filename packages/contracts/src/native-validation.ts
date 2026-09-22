@@ -98,6 +98,7 @@ export const NativeValidationReceiptV1Schema = Type.Object(
           coverage: Type.Literal("bicep-symbolic-resource-parity-v1"),
           sourceHash: Sha256Schema,
           manifestHash: Sha256Schema,
+          bindingHash: Type.Optional(Sha256Schema),
           inputHash: Sha256Schema,
           outcome: Type.Union([Type.Literal("pass"), Type.Literal("fail"), Type.Literal("unsupported")]),
           reason: Type.Union([

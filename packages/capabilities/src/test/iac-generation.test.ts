@@ -12,6 +12,7 @@ import {
   ProcessRunner,
   sha256,
   validateGeneratedTree,
+  validateBicepResourceParity,
   writeVirtualTree,
   type GeneratedVirtualTree,
 } from "../index.js";
@@ -549,7 +550,12 @@ test("native generated trees compile with installed Bicep and Terraform tools", 
     },
   };
   const scopedRoot = join(root, "bicep-scoped");
-  await writeVirtualTree(scopedRoot, generateBicepTree(scopedIntent, scopedBinding));
+  const scopedTree = generateBicepTree(scopedIntent, scopedBinding);
+  await writeVirtualTree(scopedRoot, scopedTree);
+  await writeFile(
+    join(scopedRoot, "bicepconfig.json"),
+    JSON.stringify({ experimentalFeaturesEnabled: { symbolicNameCodegen: true } }),
+  );
   const compiledScoped = await runner.run({
     executable: "bicep",
     args: ["build", "main.bicep", "--stdout"],
@@ -559,14 +565,24 @@ test("native generated trees compile with installed Bicep and Terraform tools", 
   });
   assert.equal(compiledScoped.exitCode, 0, compiledScoped.stderr);
   const scopedTemplate = JSON.parse(compiledScoped.stdout) as {
-    resources: Array<{ type: string; scope?: string; location?: string }>;
+    resources: Record<string, { type: string; scope?: string; location?: string }>;
   };
-  const diagnostic = scopedTemplate.resources.find(({ type }) => type === "Microsoft.Insights/diagnosticSettings")!;
+  const diagnostic = Object.values(scopedTemplate.resources).find(
+    ({ type }) => type === "Microsoft.Insights/diagnosticSettings",
+  )!;
   assert.equal(
     diagnostic.scope,
     "[resourceId('Microsoft.Storage/storageAccounts/blobServices', split('stexample/default', '/')[0], split('stexample/default', '/')[1])]",
   );
   assert.equal(diagnostic.location, undefined);
+  const parity = validateBicepResourceParity({
+    sourceHash: HASH,
+    manifest: scopedTree.logicalManifest,
+    binding: scopedBinding,
+    json: compiledScoped.stdout,
+  });
+  assert.equal(parity.outcome, "pass");
+  assert.equal(parity.bindingHash, sha256(scopedBinding));
   for (const [executable, cwd] of [
     ["bicep", bicepRoot],
     ["terraform", terraformRoot],
