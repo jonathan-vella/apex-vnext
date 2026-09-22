@@ -10,6 +10,12 @@ preview, approval evidence, an operation record, and inventory.
 
 A track cannot reuse the other track's preview or approval.
 
+Native implementation descriptors accept nested ARM types such as
+`native:Microsoft.Storage/storageAccounts/blobServices@2023-05-01`. Bicep bindings must supply the explicit full child
+name; Terraform bindings supply the child name and parent ID. Generation does not infer symbolic parent/scope references.
+This parser support does not extend native Bicep preview ownership: unresolved child-resource ownership still blocks
+preview rather than granting authority over a parent or its descendants.
+
 ## Resource Ownership
 
 The logical-resource manifest distinguishes `existing` from `managed` ownership. Artifact staging and acceptance reject

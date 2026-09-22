@@ -85,6 +85,40 @@ function assertExecutionAddresses(tree: GeneratedVirtualTree, sourceBinding: Iac
   );
 }
 
+test("native generators accept nested resource types and reject malformed type paths", () => {
+  const resourceType = "Microsoft.Storage/storageAccounts/blobServices";
+  const source = intent([{ id: "storage", type: resourceType, purpose: "Blob service", dependsOn: [], controls: [] }]);
+  for (const track of ["bicep", "terraform"] as const) {
+    const generate = track === "bicep" ? generateBicepTree : generateTerraformTree;
+    const parameters = {
+      ...nativeParameters,
+      name: track === "bicep" ? "stexample/default" : "default",
+      parentId: "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/stexample",
+      properties: {},
+    };
+    const selected = binding(track, `native:${resourceType}@2023-05-01`, "2023-05-01", parameters);
+    const tree = generate(source, selected);
+    assert.ok(
+      tree.files
+        .find(({ path }) => path === `main.${track === "bicep" ? "bicep" : "tf"}`)!
+        .content.includes(`${resourceType}@2023-05-01`),
+    );
+    assert.equal(tree.logicalManifest.resources[0]!.type, resourceType);
+    assertExecutionAddresses(tree, selected);
+    for (const invalid of [
+      "Microsoft.Storage//blobServices",
+      "Microsoft.Storage/storageAccounts/",
+      "Microsoft.Storage/storageAccounts/../blobServices",
+      "Microsoft.Storage/storageAccounts/[child]",
+      "Microsoft.Storage/storageAccounts\\blobServices",
+    ])
+      assert.throws(
+        () => generate(source, binding(track, `native:${invalid}@2023-05-01`, "2023-05-01", parameters)),
+        /Unsupported binding/,
+      );
+  }
+});
+
 test("native generators are byte deterministic and enforce secure storage defaults", async () => {
   const sourceIntent = intent();
   const bicepBinding = binding(
@@ -420,6 +454,29 @@ test("native generated trees compile with installed Bicep and Terraform tools", 
   await writeVirtualTree(bicepRoot, bicep);
   await writeVirtualTree(terraformRoot, terraform);
   const runner = new ProcessRunner();
+  const childType = "Microsoft.Storage/storageAccounts/blobServices";
+  const childTree = generateBicepTree(
+    intent([{ id: "storage", type: childType, purpose: "Blob configuration", dependsOn: [], controls: [] }]),
+    binding("bicep", `native:${childType}@2023-05-01`, "2023-05-01", {
+      name: "stexample/default",
+      location: "swedencentral",
+      parentId: nativeParameters.parentId,
+      properties: {},
+    }),
+  );
+  const childRoot = join(root, "bicep-child");
+  await writeVirtualTree(childRoot, childTree);
+  const compiledChild = await runner.run({
+    executable: "bicep",
+    args: ["build", "main.bicep", "--stdout"],
+    cwd: childRoot,
+    timeoutMs: 180_000,
+    maxOutputBytes: 2_000_000,
+  });
+  assert.equal(compiledChild.exitCode, 0, compiledChild.stderr);
+  const childTemplate = JSON.parse(compiledChild.stdout) as { resources: Array<{ type: string; name: string }> };
+  assert.equal(childTemplate.resources[0]!.type, childType);
+  assert.equal(childTemplate.resources[0]!.name, "stexample/default");
   for (const [executable, cwd] of [
     ["bicep", bicepRoot],
     ["terraform", terraformRoot],
