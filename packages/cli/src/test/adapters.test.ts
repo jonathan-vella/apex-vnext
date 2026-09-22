@@ -186,6 +186,86 @@ test("CLI archetype inspection and confirmed copy preserve independent origin an
   assert.deepEqual(await service.status(), before);
 });
 
+test("remote archetype CLI import rechecks exact content and records remote provenance without runtime authority", async () => {
+  const root = await tempRoot();
+  const revision = "a".repeat(40),
+    tree = "b".repeat(40),
+    selected = "c".repeat(40);
+  const content = Buffer.from("terraform {}\n");
+  const hash = createHash("sha1").update(`blob ${content.length}\0`).update(content).digest("hex");
+  const prefix = "repos/example/coe/git";
+  const responses: Record<string, unknown> = {
+    [`${prefix}/commits/${revision}`]: { sha: revision, tree: { sha: tree } },
+    [`${prefix}/trees/${tree}`]: {
+      sha: tree,
+      truncated: false,
+      tree: [{ path: "workload", type: "tree", mode: "040000", sha: selected }],
+    },
+    [`${prefix}/trees/${selected}`]: {
+      sha: selected,
+      truncated: false,
+      tree: [{ path: "main.tf", type: "blob", mode: "100644", sha: hash, size: content.length }],
+    },
+    [`${prefix}/blobs/${hash}`]: {
+      sha: hash,
+      size: content.length,
+      encoding: "base64",
+      content: content.toString("base64"),
+    },
+  };
+  const calls: ProcessRequest[] = [];
+  const options = {
+    processRunner: {
+      run: async (request: ProcessRequest) => {
+        calls.push(request);
+        assert.equal(request.executable, "gh");
+        assert.deepEqual(request.args.slice(0, 5), ["api", "--hostname", "github.com", "--method", "GET"]);
+        assert.equal(request.maxOutputBytes, 2_097_152);
+        assert.ok(responses[request.args[5]!]);
+        return {
+          exitCode: 0,
+          signal: null,
+          stdout: JSON.stringify(responses[request.args[5]!]),
+          stderr: "",
+          timedOut: false,
+          outputTruncated: false,
+        };
+      },
+    },
+  };
+  const selection = [
+    "--repository",
+    "https://github.com/example/coe.git",
+    "--revision",
+    revision,
+    "--path",
+    "workload",
+  ];
+  const proposal = (await execute(["archetype", "inspect", ...selection], root, options)) as ArchetypeSourceProposalV1;
+  assert.equal(proposal.repositoryPath, "https://github.com/example/coe");
+  assert.deepEqual(await readdir(root), []);
+  const importing = [
+    "archetype",
+    "import",
+    ...selection,
+    "--destination",
+    "copy",
+    "--expected-hash",
+    proposal.contentHash,
+  ];
+  const count = calls.length;
+  await assert.rejects(execute(importing, root, options), /--yes/);
+  assert.equal(calls.length, count);
+  await execute([...importing, "--yes"], root, options);
+  assert.ok(calls.length > count);
+  assert.deepEqual(JSON.parse(await readFile(join(root, "copy/.apex-origin.json"), "utf8")), proposal);
+  assert.deepEqual(await readFile(join(root, "copy/main.tf")), content);
+  await assert.rejects(readFile(join(root, ".apex/config.json")), { code: "ENOENT" });
+  await assert.rejects(execute([...importing, "--yes"], root, options), /already exists/);
+  responses[`${prefix}/blobs/${hash}`] = { ...(responses[`${prefix}/blobs/${hash}`] as object), content: "YmFk" };
+  await assert.rejects(execute(["archetype", "inspect", ...selection], root, options), /inspection failed/);
+});
+
 test("CLI requirements change adapters require a file, reason, hash and explicit confirmation", async (context) => {
   const root = await tempRoot();
   const candidate = requirements();

@@ -101,6 +101,8 @@ import {
   inspectGovernanceBaseline,
   inspectArchetypeSource,
   listArchetypeSources,
+  inspectRemoteArchetype,
+  listRemoteArchetypes,
   GovernanceBaselineError,
   nativePolicyValidationBinding,
   assertGeneratedSourceUnchanged,
@@ -1343,16 +1345,12 @@ export class ApexService {
 
   async inspectArchetype(repositoryPath: string, revision: string, selectedPath: string) {
     try {
-      const { proposal } = await inspectArchetypeSource({
-        repositoryPath: resolve(this.root, repositoryPath),
-        revision,
-        selectedPath,
-      });
+      const { proposal } = await this.readArchetypeSelection(repositoryPath, revision, selectedPath);
       return proposal;
     } catch {
       throw new ApexError(
         "APEX_VALIDATION",
-        "Archetype inspection failed: use an exact local Git commit and a bounded reusable directory without secrets or unsafe files",
+        "Archetype inspection failed: use an exact commit in a local Git root or GitHub HTTPS repository and a bounded safe directory",
         EXIT_CODES.validation,
       );
     }
@@ -1360,11 +1358,16 @@ export class ApexService {
 
   async listArchetypes(repositoryPath: string, revision: string, catalogPath: string) {
     try {
+      if (repositoryPath.startsWith("https://"))
+        return await listRemoteArchetypes(
+          { repositoryPath, revision, catalogPath },
+          this.readArchetypeRemoteJson.bind(this),
+        );
       return await listArchetypeSources({ repositoryPath: resolve(this.root, repositoryPath), revision, catalogPath });
     } catch {
       throw new ApexError(
         "APEX_VALIDATION",
-        "Archetype discovery requires an exact local commit and a bounded safe catalog directory",
+        "Archetype discovery requires an exact commit, a local Git root or GitHub HTTPS repository, and a bounded safe catalog",
         EXIT_CODES.validation,
       );
     }
@@ -1394,11 +1397,11 @@ export class ApexService {
     await this.assertSafeDestination(this.root, target);
     if (await this.exists(target))
       throw new ApexError("APEX_CONFLICT", "Archetype destination already exists", EXIT_CODES.conflict);
-    const { proposal, contents } = await inspectArchetypeSource({
-      repositoryPath: resolve(this.root, request.repositoryPath),
-      revision: request.revision,
-      selectedPath: request.selectedPath,
-    });
+    const { proposal, contents } = await this.readArchetypeSelection(
+      request.repositoryPath,
+      request.revision,
+      request.selectedPath,
+    );
     if (proposal.contentHash !== request.expectedHash)
       throw new ApexError("APEX_STALE", "Archetype proposal does not match the confirmed selection", EXIT_CODES.stale);
     const lockPath = join(this.root, ".apex-archetype-import.lock");
@@ -1435,6 +1438,34 @@ export class ApexService {
       await lock.close();
       await rm(lockPath);
     }
+  }
+
+  private async readArchetypeRemoteJson(endpoint: string): Promise<unknown> {
+    try {
+      const result = await this.processRunner.run({
+        executable: "gh",
+        args: ["api", "--hostname", "github.com", "--method", "GET", endpoint],
+        cwd: this.root,
+        env: { ...process.env, GH_PROMPT_DISABLED: "1", GH_PAGER: "cat" },
+        timeoutMs: 15_000,
+        maxOutputBytes: 2_097_152,
+      });
+      if (result.exitCode !== 0 || result.signal !== null || result.timedOut || result.outputTruncated)
+        throw new Error("Incomplete remote response");
+      return JSON.parse(result.stdout);
+    } catch {
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Remote archetype read failed; verify GitHub access outside APEX",
+        EXIT_CODES.validation,
+      );
+    }
+  }
+
+  private async readArchetypeSelection(repositoryPath: string, revision: string, selectedPath: string) {
+    return repositoryPath.startsWith("https://")
+      ? inspectRemoteArchetype({ repositoryPath, revision, selectedPath }, this.readArchetypeRemoteJson.bind(this))
+      : inspectArchetypeSource({ repositoryPath: resolve(this.root, repositoryPath), revision, selectedPath });
   }
 
   async status(): Promise<{

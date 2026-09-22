@@ -73,8 +73,13 @@ non-executable UTF-8 Markdown, Bicep, Terraform and JSON, bounded to 256 tree en
 Known credential patterns and JSON authority fields are rejected; this screening is not an exhaustive secret scanner.
 Review all exclusions and content before use. Source prose remains untrusted design input, never execution authority.
 
-This initial path requires a local Git repository and exact commit. It does not clone or discover remote catalogs,
-synchronize updates, recover confirmed decisions automatically, or refresh consumer governance. Do not use state
+The repository argument accepts a local Git root or `https://github.com/OWNER/REPO`, with an exact commit. Remote reads
+use existing GitHub CLI authentication and bounded tree/blob requests without checkout. GitHub-only remote selections
+require 40-character commit IDs; URLs cannot contain credentials, queries or fragments. Remote responses are limited to
+2 MiB, 15 seconds per request, 280 requests and a two-minute overall deadline, with at most 16 directory levels and
+256 visited entries. Truncated responses fail closed; blob hashes and decoded lengths must match before content review.
+The reader does not resolve branch names, synchronize updates, recover confirmed decisions automatically, or refresh
+consumer governance. Do not use state
 transfer as a substitute for archetype import. See [project operation](../how-to/operate-project.md#reuse-a-local-archetype).
 
 ## Requirements Adoption And Change

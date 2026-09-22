@@ -134,6 +134,16 @@ and permissions remain unchanged.
 
 ## Open Release Work
 
+Remote GitHub COE list/inspect/import now reads exact commits through bounded API calls without checkout, preserving
+the existing exclusions, content checks, explicit import confirmation and independent-copy semantics. Proposals bind
+the remote URL and blob-verified content. Private authentication is external to APEX; branch selection, guided
+multi-archetype bootstrap, defaults adoption and automatic per-workload initialization remain open.
+
+A read-only GitHub API probe compared `docs/explanation` at source commit
+`709db7878e754a195f20ff02c2f5c50121ba62a5` against local Git inspection: all four file hashes and exclusions matched,
+with remote proposal hash `52eda3eab1b70064524fb437921b1ca702cde06fef4fbf6556c38e792a4b7995`. No files or runtime
+authority were imported. This checks real remote reads, not arbitrary-host support or complete COE onboarding.
+
 First-time onboarding now has an agreed [acceptance contract](PRD.md#req-onboarding-001-first-time-install-and-repository-bootstrap)
 and [delivery sequence](ROADMAP.md#first-time-setup-delivery). The initial `bootstrap plan` implementation is a read-only
 local preflight for the Git boundary, workspace runtime version and existing APEX state. Matching intact local

@@ -5,10 +5,146 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { inspectArchetypeSource, listArchetypeSources } from "../archetype-source.js";
+import {
+  inspectArchetypeSource,
+  listArchetypeSources,
+  inspectRemoteArchetype,
+  listRemoteArchetypes,
+} from "../archetype-source.js";
+import { createHash } from "node:crypto";
 import { hasValidArchetypeSourceProposal, calculatePolicyValidationDigest } from "@apexops/contracts";
 
 const execute = promisify(execFile);
+test("remote archetypes bind exact GitHub commits and verify blobs without checkout", async () => {
+  const revision = "a".repeat(40),
+    root = "b".repeat(40),
+    catalog = "c".repeat(40),
+    selected = "d".repeat(40);
+  const content = Buffer.from("targetScope = 'resourceGroup'\n");
+  const blob = createHash("sha1").update(`blob ${content.length}\0`).update(content).digest("hex");
+  const prefix = "repos/example/coe/git";
+  const data: Record<string, unknown> = {
+    [`${prefix}/commits/${revision}`]: { sha: revision, tree: { sha: root } },
+    [`${prefix}/trees/${root}`]: {
+      sha: root,
+      truncated: false,
+      tree: [{ path: "archetypes", mode: "040000", type: "tree", sha: catalog }],
+    },
+    [`${prefix}/trees/${catalog}`]: {
+      sha: catalog,
+      truncated: false,
+      tree: [{ path: "storage", mode: "040000", type: "tree", sha: selected }],
+    },
+    [`${prefix}/trees/${selected}`]: {
+      sha: selected,
+      truncated: false,
+      tree: [
+        { path: "main.bicep", mode: "100644", type: "blob", sha: blob, size: content.length },
+        { path: "AGENTS.md", mode: "100644", type: "blob", sha: "e".repeat(40), size: 10 },
+      ],
+    },
+    [`${prefix}/blobs/${blob}`]: {
+      sha: blob,
+      size: content.length,
+      encoding: "base64",
+      content: content.toString("base64"),
+    },
+  };
+  const calls: string[] = [];
+  const read = async (endpoint: string) => {
+    calls.push(endpoint);
+    assert.ok(data[endpoint]);
+    return structuredClone(data[endpoint]);
+  };
+  const request = {
+    repositoryPath: "https://github.com/example/coe.git",
+    revision,
+    selectedPath: "archetypes/storage",
+  };
+  const result = await inspectRemoteArchetype(request, read);
+  assert.equal(result.proposal.repositoryPath, "https://github.com/example/coe");
+  assert.equal(result.proposal.revision, revision);
+  assert.equal(hasValidArchetypeSourceProposal(result.proposal), true);
+  assert.deepEqual(
+    result.proposal.files.map(({ path }) => path),
+    ["main.bicep"],
+  );
+  assert.deepEqual(result.proposal.excluded, [{ path: "AGENTS.md", reason: "source-authority" }]);
+  assert.equal(result.contents.get("main.bicep"), content.toString());
+  assert.ok(!calls.some((path) => path.endsWith("e".repeat(40))));
+  const listed = await listRemoteArchetypes({ ...request, catalogPath: "archetypes" }, read);
+  assert.deepEqual(
+    listed.candidates.map(({ selectedPath }) => selectedPath),
+    ["archetypes/storage"],
+  );
+  for (const repositoryPath of [
+    "https://user:secret@github.com/example/coe",
+    "http://github.com/example/coe",
+    "https://evil.invalid/example/coe",
+    "file:///tmp/coe",
+    "https://github.com/example/coe?token=secret",
+  ])
+    await assert.rejects(
+      inspectRemoteArchetype({ ...request, repositoryPath }, async () => {
+        throw new Error("Must not fetch");
+      }),
+      /invalid/,
+    );
+  await assert.rejects(inspectRemoteArchetype({ ...request, revision: "main" }, read), /invalid/);
+  await assert.rejects(
+    inspectRemoteArchetype(request, async (path) =>
+      path === `${prefix}/trees/${selected}` ? { ...(data[path] as object), truncated: true } : read(path),
+    ),
+    /incomplete/,
+  );
+  await assert.rejects(
+    inspectRemoteArchetype(request, async (path) =>
+      path === `${prefix}/blobs/${blob}`
+        ? { ...(data[path] as object), content: Buffer.from("tampered").toString("base64") }
+        : read(path),
+    ),
+    /does not match/,
+  );
+  for (const entry of [
+    { path: "../escape", mode: "100644", type: "blob", sha: blob, size: content.length },
+    { path: "main.tf", mode: "120000", type: "blob", sha: blob, size: content.length },
+    { path: "main.tf", mode: "100644", type: "blob", sha: blob, size: 1_048_577 },
+    { path: "main.tf", mode: "160000", type: "commit", sha: blob },
+  ])
+    await assert.rejects(
+      inspectRemoteArchetype(request, async (path) =>
+        path === `${prefix}/trees/${selected}` ? { sha: selected, truncated: false, tree: [entry] } : read(path),
+      ),
+    );
+  const file = { path: "main.tf", mode: "100644", type: "blob", sha: blob, size: content.length };
+  await assert.rejects(
+    inspectRemoteArchetype(request, async (path) =>
+      path === `${prefix}/trees/${selected}`
+        ? { sha: selected, truncated: false, tree: [file, { ...file, path: "MAIN.tf" }] }
+        : read(path),
+    ),
+    /collide/,
+  );
+  const secret = Buffer.from('password = "do-not-import-this"\n');
+  const secretHash = createHash("sha1").update(`blob ${secret.length}\0`).update(secret).digest("hex");
+  await assert.rejects(
+    inspectRemoteArchetype(request, async (path) => {
+      if (path === `${prefix}/trees/${selected}`)
+        return { sha: selected, truncated: false, tree: [{ ...file, sha: secretHash, size: secret.length }] };
+      if (path === `${prefix}/blobs/${secretHash}`)
+        return { sha: secretHash, size: secret.length, encoding: "base64", content: secret.toString("base64") };
+      return read(path);
+    }),
+    /credential-like/,
+  );
+  const mutable = { ...request };
+  const bound = await inspectRemoteArchetype(mutable, async (path) => {
+    mutable.revision = "f".repeat(40);
+    return read(path);
+  });
+  assert.equal(bound.proposal.revision, revision);
+});
+
 test("archetype inspection pins committed content and excludes source authority", async (context) => {
   const root = await mkdtemp(join(tmpdir(), "apex-archetype-"));
   context.after(() => rm(root, { recursive: true, force: true }));
