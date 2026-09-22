@@ -14,6 +14,7 @@ import {
 import {
   validatePolicyProperties,
   validateBicepResourceParity,
+  validateBicepStorageDiagnostics,
   validateStorageSecurityProperties,
   validateStorageSecurityBindings,
   type PolicyValidationInput,
@@ -72,6 +73,71 @@ function input(track: "bicep" | "terraform"): PolicyValidationInput {
 }
 
 describe("bounded policy property validation", () => {
+  it("storage diagnostics require all service scopes and the exact accepted workspace", () => {
+    const workspaceResourceId =
+      "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.OperationalInsights/workspaces/log";
+    const resources: Record<string, Record<string, unknown>> = {
+      storage: { type: "Microsoft.Storage/storageAccounts", name: "apexfixture" },
+    };
+    for (const service of ["blobServices", "fileServices", "queueServices", "tableServices"]) {
+      const type = `Microsoft.Storage/storageAccounts/${service}`;
+      resources[service] = { type, name: "[format('{0}/{1}', 'apexfixture', 'default')]", dependsOn: ["storage"] };
+      resources[`${service}Diagnostic`] = {
+        type: "Microsoft.Insights/diagnosticSettings",
+        scope: `[resourceId('${type}', 'apexfixture', 'default')]`,
+        dependsOn: [service],
+        properties: {
+          workspaceId: workspaceResourceId,
+          logs: [{ categoryGroup: "allLogs", enabled: true }],
+          metrics: [{ category: "Transaction", enabled: true }],
+        },
+      };
+    }
+    const check = (source: unknown) =>
+      validateBicepStorageDiagnostics({
+        sourceHash: hash,
+        binding: { codeSymbol: "storage" },
+        workspaceResourceId,
+        json: JSON.stringify(source),
+      });
+    const receipt = check({ resources });
+    assert.equal(receipt.outcome, "pass");
+    assert.equal(receipt.fullBaselineEvaluated, false);
+    assert.doesNotMatch(JSON.stringify(receipt), /apexfixture|subscriptions/);
+    for (const mutation of [
+      "missing-service",
+      "missing-setting",
+      "wrong-scope",
+      "wrong-workspace",
+      "disabled-log",
+      "disabled-metric",
+      "condition",
+      "missing-dependency",
+    ]) {
+      const changed = structuredClone(resources);
+      const setting = changed.blobServicesDiagnostic!;
+      const properties = setting.properties as {
+        workspaceId: string;
+        logs: Array<{ enabled: boolean }>;
+        metrics: Array<{ enabled: boolean }>;
+      };
+      if (mutation === "missing-service") delete changed.blobServices;
+      if (mutation === "missing-setting") delete changed.blobServicesDiagnostic;
+      if (mutation === "wrong-scope") setting.scope = String(setting.scope).replace("apexfixture", "foreignaccount");
+      if (mutation === "wrong-workspace") properties.workspaceId += "foreign";
+      if (mutation === "disabled-log") properties.logs[0]!.enabled = false;
+      if (mutation === "disabled-metric") properties.metrics[0]!.enabled = false;
+      if (mutation === "condition") setting.condition = false;
+      if (mutation === "missing-dependency") setting.dependsOn = [];
+      assert.notEqual(check({ resources: changed }).outcome, "pass", mutation);
+    }
+    assert.equal(
+      check({ resources: { ...resources, storage: { ...resources.storage, name: "[parameters('name')]" } } }).outcome,
+      "unsupported",
+    );
+    assert.equal(check({}).reason, "invalid-source");
+  });
+
   it("compiled Bicep parity checks exact resource coverage, types and dependencies", () => {
     const resource = {
       logicalId: "storage",

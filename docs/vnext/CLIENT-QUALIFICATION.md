@@ -145,6 +145,16 @@ Validator, which reported exact runtime blockers without completing. Audit check
 command receipts, unchanged canaries, no new approvals/deployments and restart state. Evidence is retained under
 `dist/cli-worker-routing-11`. This covers delegated blocked handling, not successful native validation.
 
+The refreshed `dist/cli-worker-routing-12` probe used source checkpoint
+`9e86b311d86fdc2b1c8424b61224eba5b42e10e2`, CLI `1.0.86`, canonical Planner `gpt-5.6-sol` and delegated Validator
+`gpt-5.6-terra` selected from its agent definition. Bicep session `2371f739-b264-4f0f-8da5-8a0cb980b518` and Terraform
+session `c0fc6cbb-3a7b-46ac-ab20-f32677b0e9cf` each made one validation call and no completion call. Both reported the
+new map-bound empty-policy applicability check as executed and security/parity as blocked. Bicep's mocked empty compiler
+output intentionally failed resource parity; this is not evidence that a real matching compiler output fails.
+Independent audit verified receipts, the three fixed commands, unchanged validation head, closed Gate 4, preserved
+canaries and restart state. Fixtures had simulated prerequisite approvals only; no new approvals or deployments were
+issued. Parked Windows-only worktree edits remained outside this checkpoint. Shipped worker membership is unchanged.
+
 Local evidence is retained under `dist/cli-worker-qualification-04` through `dist/cli-worker-qualification-07`,
 `dist/cli-parent-qualification-08`, the `dist/cli-review-qualification-09-*` fixtures, and
 `dist/cli-governance-qualification-10`. Failed probes are not replaced by the later successful receipts.

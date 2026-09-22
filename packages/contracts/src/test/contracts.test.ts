@@ -190,6 +190,45 @@ describe("Wave 1 contracts", () => {
           false,
         );
       if (track === "bicep") {
+        const routing: Omit<NativeValidationReceiptV1, "receiptHash"> = {
+          ...body,
+          storageDiagnostics: {
+            storage: {
+              coverage: "bicep-storage-service-diagnostics-v1",
+              fullBaselineEvaluated: false,
+              sourceHash: body.sourceHash,
+              inputHash: otherHash,
+              bindingHash: hash,
+              outcome: "pass",
+              reason: "matched",
+            },
+          },
+        };
+        assert.equal(
+          hasValidNativeValidationReceipt(
+            { ...routing, receiptHash: calculateNativeValidationReceiptHash(routing) },
+            body,
+          ),
+          true,
+        );
+        for (const patch of [
+          { sourceHash: otherHash },
+          { fullBaselineEvaluated: true },
+          { outcome: "fail" },
+          { reason: "workspace-mismatch" },
+        ]) {
+          const altered = {
+            ...routing,
+            storageDiagnostics: { storage: { ...routing.storageDiagnostics!.storage!, ...patch } },
+          };
+          assert.equal(
+            hasValidNativeValidationReceipt(
+              { ...altered, receiptHash: calculatePolicyValidationDigest(altered) },
+              body,
+            ),
+            false,
+          );
+        }
         const parityBody: Omit<NativeValidationReceiptV1, "receiptHash"> = {
           ...body,
           resourceParity: {

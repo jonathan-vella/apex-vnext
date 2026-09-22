@@ -55,6 +55,7 @@ import {
   validatePolicyProperties,
   validateStorageSecurityBindings,
   validateBicepResourceParity,
+  validateBicepStorageDiagnostics,
 } from "./policy-validation.js";
 
 export interface NativeProviderRuntime {
@@ -323,7 +324,13 @@ abstract class NativeProviderBase {
     let policyInput: NativeValidationRequest["policyValidation"];
     let storageBindings: NativeValidationRequest["storageSecurityBindings"];
     let parityManifest: NativeValidationRequest["resourceParityManifest"];
+    let diagnosticsTargets: NativeValidationRequest["storageDiagnosticsTargets"];
     try {
+      if (track === "bicep" && request.storageDiagnosticsTargets !== undefined) {
+        calculatePolicyValidationDigest(request.storageDiagnosticsTargets);
+        diagnosticsTargets = structuredClone(request.storageDiagnosticsTargets);
+        if (Object.keys(diagnosticsTargets).length > 1000) throw new Error();
+      }
       if (track === "bicep" && request.resourceParityManifest !== undefined) {
         calculatePolicyValidationDigest(request.resourceParityManifest);
         parityManifest = structuredClone(request.resourceParityManifest);
@@ -459,6 +466,21 @@ abstract class NativeProviderBase {
           manifest: parityManifest,
           json: compiledTemplate ?? "",
         });
+        const { receiptHash: previousHash, ...updated } = receipt;
+        if (!previousHash) throw sourceBindingError();
+        receipt.receiptHash = calculateNativeValidationReceiptHash(updated);
+      }
+      if (diagnosticsTargets !== undefined) {
+        receipt.storageDiagnostics = Object.fromEntries(
+          Object.entries(diagnosticsTargets).map(([logicalId, target]) => [
+            logicalId,
+            validateBicepStorageDiagnostics({
+              ...target,
+              sourceHash: receipt.sourceHash,
+              json: compiledTemplate ?? "",
+            }),
+          ]),
+        );
         const { receiptHash: previousHash, ...updated } = receipt;
         if (!previousHash) throw sourceBindingError();
         receipt.receiptHash = calculateNativeValidationReceiptHash(updated);

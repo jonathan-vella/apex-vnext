@@ -13,6 +13,7 @@ import {
   type PolicyValidationResultV1,
   type PolicyValidationV1,
   type LogicalResourceManifestV1,
+  type NativeValidationReceiptV1,
 } from "@apexops/contracts";
 import { parseJsonProcessOutput } from "./iac-normalizers.js";
 
@@ -364,6 +365,121 @@ export function validateStorageSecurityBindings(request: {
       }),
     ),
   );
+}
+
+export function validateBicepStorageDiagnostics(request: {
+  readonly sourceHash: string;
+  readonly binding: PolicyResourceBinding;
+  readonly workspaceResourceId: string;
+  readonly json: string;
+}): NonNullable<NativeValidationReceiptV1["storageDiagnostics"]>[string] {
+  assertPolicyValidationJson(request.binding);
+  if (
+    !/^[a-f0-9]{64}$/.test(request.sourceHash) ||
+    !/^\/subscriptions\/[a-f0-9-]{36}\/resourceGroups\/[^/]+\/providers\/Microsoft\.OperationalInsights\/workspaces\/[^/]+$/i.test(
+      request.workspaceResourceId,
+    ) ||
+    typeof request.json !== "string" ||
+    Buffer.byteLength(request.json) > POLICY_VALIDATION_LIMITS.bytes
+  )
+    throw new TypeError("STORAGE_DIAGNOSTICS_INVALID_INPUT");
+  const bindingHash = calculatePolicyValidationDigest({
+    binding: request.binding,
+    workspaceResourceId: request.workspaceResourceId,
+  });
+  const inputHash = createHash("sha256").update(request.json).digest("hex");
+  const result = (
+    outcome: "pass" | "fail" | "unsupported",
+    reason: NonNullable<NativeValidationReceiptV1["storageDiagnostics"]>[string]["reason"],
+  ) => ({
+    coverage: "bicep-storage-service-diagnostics-v1" as const,
+    fullBaselineEvaluated: false as const,
+    sourceHash: request.sourceHash,
+    inputHash,
+    bindingHash,
+    outcome,
+    reason,
+  });
+  let resources: readonly Resource[];
+  try {
+    resources = resourcesFromJson(request.json, "bicep");
+  } catch {
+    return result("unsupported", "invalid-source");
+  }
+  const matches = resources.filter(({ codeSymbol }) => codeSymbol === request.binding.codeSymbol);
+  if (matches.length !== 1 || request.binding.codeSymbol === undefined || request.binding.physicalId !== undefined)
+    return result("unsupported", "ambiguous-or-unbound-account");
+  const account = matches[0]!;
+  if (
+    account.unsupported ||
+    account.codeSymbol!.includes("::") ||
+    account.resourceType?.toLowerCase() !== "microsoft.storage/storageaccounts" ||
+    typeof account.value.name !== "string" ||
+    !/^[a-z0-9]{3,24}$/.test(account.value.name) ||
+    Object.hasOwn(account.value, "scope") ||
+    Object.hasOwn(account.value, "condition")
+  )
+    return result("unsupported", "unsupported-account");
+  const services = ["blobServices", "fileServices", "queueServices", "tableServices"];
+  for (const service of services) {
+    const resourceType = `Microsoft.Storage/storageAccounts/${service}`;
+    const serviceResources = resources.filter(
+      (resource) =>
+        resource.resourceType?.toLowerCase() === resourceType.toLowerCase() &&
+        (resource.value.name === `${account.value.name}/default` ||
+          resource.value.name === `[format('{0}/{1}', '${account.value.name}', 'default')]`),
+    );
+    if (serviceResources.length !== 1) return result("fail", "missing-or-ambiguous-service");
+    const target = serviceResources[0]!;
+    if (
+      target.unsupported ||
+      target.codeSymbol === undefined ||
+      target.codeSymbol.includes("::") ||
+      Object.hasOwn(target.value, "scope") ||
+      Object.hasOwn(target.value, "condition") ||
+      !Array.isArray(target.value.dependsOn) ||
+      !target.value.dependsOn.includes(account.codeSymbol)
+    )
+      return result("unsupported", "unsupported-service");
+    const scope = `[resourceId('${resourceType}', '${account.value.name}', 'default')]`;
+    const settings = resources.filter(
+      (resource) =>
+        resource.resourceType?.toLowerCase() === "microsoft.insights/diagnosticsettings" &&
+        resource.value.scope === scope,
+    );
+    if (settings.length !== 1) return result("fail", "missing-or-ambiguous-diagnostics");
+    const setting = settings[0]!;
+    if (
+      setting.unsupported ||
+      setting.codeSymbol === undefined ||
+      setting.codeSymbol.includes("::") ||
+      Object.hasOwn(setting.value, "condition") ||
+      !Array.isArray(setting.value.dependsOn) ||
+      !setting.value.dependsOn.includes(target.codeSymbol)
+    )
+      return result("unsupported", "unsupported-diagnostics");
+    const properties = object(setting.value.properties);
+    if (
+      properties === undefined ||
+      typeof properties.workspaceId !== "string" ||
+      properties.workspaceId.toLowerCase() !== request.workspaceResourceId.toLowerCase()
+    )
+      return result("fail", "workspace-mismatch");
+    const logs = properties.logs;
+    const metrics = properties.metrics;
+    if (!Array.isArray(logs) || !Array.isArray(metrics)) return result("fail", "missing-categories");
+    const allLogs = logs.some((entry) => own(entry, "categoryGroup") === "allLogs" && own(entry, "enabled") === true);
+    const requiredLogs = ["StorageRead", "StorageWrite", "StorageDelete"];
+    if (
+      (!allLogs &&
+        !requiredLogs.every((category) =>
+          logs.some((entry) => own(entry, "category") === category && own(entry, "enabled") === true),
+        )) ||
+      !metrics.some((entry) => own(entry, "category") === "Transaction" && own(entry, "enabled") === true)
+    )
+      return result("fail", "disabled-or-missing-categories");
+  }
+  return result("pass", "matched");
 }
 
 export function validateBicepResourceParity(request: {

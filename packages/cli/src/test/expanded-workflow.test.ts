@@ -29,6 +29,7 @@ import {
   validatePolicyProperties,
   validateStorageSecurityBindings,
   validateBicepResourceParity,
+  validateBicepStorageDiagnostics,
 } from "@apexops/capabilities";
 import type { IacProvider, PreviewRequest } from "@apexops/capabilities";
 import { EventJournal, ObjectStore, RunRepository, ValidatorRegistry, sha256Bytes, sha256Json } from "@apexops/kernel";
@@ -742,6 +743,7 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
     let applicability: "valid" | "omit" | "wrong" = "valid";
     let unsolicitedPolicy = false;
     let parity: "absent" | "valid" | "foreign" = "absent";
+    let routing: "absent" | "valid" | "foreign" = "absent";
     const provider: IacProvider = {
       ...(track === "bicep" ? bicepPreviewProvider(new Date()) : terraformPreviewProvider(new Date())),
       async validateSource(request) {
@@ -756,6 +758,32 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
           inputHash: request.inputHash,
           policyHash: request.policyHash,
           outcome: "pass" as const,
+          ...(track !== "bicep" || routing === "absent"
+            ? {}
+            : {
+                storageDiagnostics: {
+                  api: {
+                    ...validateBicepStorageDiagnostics({
+                      ...request.storageDiagnosticsTargets!.api!,
+                      sourceHash: request.sourceHash,
+                      json: JSON.stringify({
+                        resources: {
+                          api: {
+                            type: "Microsoft.Storage/storageAccounts",
+                            properties: {
+                              minimumTlsVersion: "TLS1_2",
+                              supportsHttpsTrafficOnly: true,
+                              allowBlobPublicAccess: false,
+                              allowSharedKeyAccess: false,
+                            },
+                          },
+                        },
+                      }),
+                    }),
+                    ...(routing === "foreign" ? { bindingHash: "d".repeat(64) } : {}),
+                  },
+                },
+              }),
           ...(track !== "bicep" || parity === "absent"
             ? {}
             : {
@@ -878,7 +906,18 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
       service,
       runId,
       track,
-      track === "bicep" ? configureNativeBicepPlan : undefined,
+      track === "bicep"
+        ? (plan) => {
+            configureNativeBicepPlan(plan);
+            const binding = plan[1]!.value as IacBindingV1;
+            binding.resourceBindings.api!.parameters.diagnosticSettings = [
+              {
+                workspaceResourceId:
+                  "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.OperationalInsights/workspaces/log",
+              },
+            ];
+          }
+        : undefined,
     );
     const generatedHashes = await service.completeTaskOutputs(
       generated.taskId,
@@ -925,6 +964,18 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
     }
     const checked = await service.validateTask(validationTask);
     if (track === "bicep") {
+      routing = "valid";
+      const diagnosed = await service.validateTask(validationTask);
+      assert.equal(diagnosed.execution!.storageDiagnostics!.api!.fullBaselineEvaluated, false);
+      assert.ok(diagnosed.execution!.blockedValidatorIds.includes("business:security-baseline"));
+      routing = "foreign";
+      await assert.rejects(service.validateTask(validationTask), /invalid or incomplete/);
+      await assert.rejects(
+        service.completeTaskOutputs(validationTask, [{ kind: "validation-evidence", value: submitted }]),
+        /routing.*accepted targets/,
+      );
+      assert.equal(await journal.head(), head);
+      routing = "absent";
       parity = "valid";
       const matched = await service.validateTask(validationTask);
       assert.ok(matched.execution!.executedValidatorIds.includes("business:logical-resource-parity"));

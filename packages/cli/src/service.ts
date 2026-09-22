@@ -103,6 +103,7 @@ import {
   type PreviewRequest,
   type ProviderExecutionEvidence,
   type ProcessRunnerLike,
+  type NativeValidationRequest,
 } from "@apexops/capabilities";
 import {
   ContentCache,
@@ -2759,6 +2760,7 @@ export class ApexService {
       executedValidatorIds: string[];
       blockedValidatorIds: string[];
       storageSecurity?: NativeValidationReceiptV1["storageSecurity"];
+      storageDiagnostics?: NativeValidationReceiptV1["storageDiagnostics"];
     };
     outputs?: TaskOutput[];
   }> {
@@ -2809,6 +2811,7 @@ export class ApexService {
         inputHash: inputHash!,
       };
       const policyValidation = this.policyValidationInput(run.iacTool, policy, manifest, true);
+      const diagnosticsTargets = await this.storageDiagnosticsTargets(manifest, handoff);
       const receipt = await provider.validateSource({
         ...binding,
         generatedSource: { rootPath, treeHash: handoff.treeHash },
@@ -2817,6 +2820,7 @@ export class ApexService {
           ? {
               storageSecurityBindings: this.storageSecurityBindings(manifest),
               resourceParityManifest: structuredClone(manifest),
+              storageDiagnosticsTargets: diagnosticsTargets,
             }
           : {}),
       });
@@ -2824,7 +2828,8 @@ export class ApexService {
         !hasValidNativeValidationReceipt(receipt, binding) ||
         !this.hasRequiredNativePolicyEvidence(receipt, policyValidation) ||
         !this.hasBoundResourceParity(receipt, manifest) ||
-        !this.hasBoundStorageDiagnostics(receipt, manifest)
+        !this.hasBoundStorageDiagnostics(receipt, manifest) ||
+        !this.hasBoundStorageRouting(receipt, diagnosticsTargets)
       )
         throw new ApexError(
           "APEX_VALIDATION",
@@ -2868,6 +2873,7 @@ export class ApexService {
           executedValidatorIds,
           blockedValidatorIds,
           ...(receipt.storageSecurity === undefined ? {} : { storageSecurity: receipt.storageSecurity }),
+          ...(receipt.storageDiagnostics === undefined ? {} : { storageDiagnostics: receipt.storageDiagnostics }),
         },
         outputs: [{ kind: "validation-evidence", value: evidence }],
       };
@@ -4601,6 +4607,10 @@ export class ApexService {
                   : undefined),
             ) ||
             !this.hasBoundStorageDiagnostics(nativeReceipt, logicalManifest) ||
+            !this.hasBoundStorageRouting(
+              nativeReceipt,
+              await this.storageDiagnosticsTargets(logicalManifest, handoff),
+            ) ||
             !this.hasBoundResourceParity(nativeReceipt, logicalManifest)
           )
             throw new ApexError(
@@ -7352,6 +7362,74 @@ export class ApexService {
     );
   }
 
+  private async storageDiagnosticsTargets(
+    manifest: LogicalResourceManifestV1 | undefined,
+    handoff: IacHandoffV1,
+  ): Promise<NonNullable<NativeValidationRequest["storageDiagnosticsTargets"]>> {
+    if (manifest?.track !== "bicep") return {};
+    const binding = await this.objects.getJson<IacBindingV1>(handoff.bindingHash);
+    const nativeWorkspaces = manifest.resources
+      .filter(
+        ({ type, ownership }) =>
+          ownership === "managed" && type.toLowerCase() === "microsoft.insights/diagnosticsettings",
+      )
+      .map(
+        ({ logicalId }) =>
+          (binding.resourceBindings[logicalId]?.parameters.properties as { workspaceId?: unknown } | undefined)
+            ?.workspaceId,
+      );
+    const targets: Record<string, { binding: { codeSymbol: string }; workspaceResourceId: string }> = {};
+    for (const resource of manifest.resources) {
+      if (
+        resource.ownership !== "managed" ||
+        resource.executionAddress === undefined ||
+        resource.type.toLowerCase() !== "microsoft.storage/storageaccounts"
+      )
+        continue;
+      const settings = binding.resourceBindings[resource.logicalId]?.parameters.diagnosticSettings;
+      const workspaces =
+        Array.isArray(settings) && settings.length > 0
+          ? settings.map(
+              (setting: unknown) => (setting as { workspaceResourceId?: unknown } | null)?.workspaceResourceId,
+            )
+          : nativeWorkspaces;
+      if (
+        workspaces.length === 0 ||
+        workspaces.some(
+          (value) =>
+            typeof value !== "string" ||
+            !/^\/subscriptions\/[a-f0-9-]{36}\/resourceGroups\/[^/]+\/providers\/Microsoft\.OperationalInsights\/workspaces\/[^/]+$/i.test(
+              value,
+            ),
+        )
+      )
+        continue;
+      const ids = workspaces as string[];
+      if (new Set(ids.map((value) => value.toLowerCase())).size !== 1) continue;
+      targets[resource.logicalId] = {
+        binding: { codeSymbol: resource.executionAddress },
+        workspaceResourceId: ids[0]!,
+      };
+    }
+    return targets;
+  }
+
+  private hasBoundStorageRouting(
+    receipt: NativeValidationReceiptV1,
+    targets: NonNullable<NativeValidationRequest["storageDiagnosticsTargets"]>,
+  ): boolean {
+    if (receipt.storageDiagnostics === undefined) return true;
+    return (
+      receipt.track === "bicep" &&
+      Object.keys(receipt.storageDiagnostics).length === Object.keys(targets).length &&
+      Object.entries(receipt.storageDiagnostics).every(
+        ([logicalId, observation]) =>
+          Object.hasOwn(targets, logicalId) &&
+          observation.bindingHash === calculatePolicyValidationDigest(targets[logicalId]),
+      )
+    );
+  }
+
   private hasBoundStorageDiagnostics(
     receipt: NativeValidationReceiptV1,
     manifest: LogicalResourceManifestV1 | undefined,
@@ -7517,6 +7595,10 @@ export class ApexService {
           artifacts["logical-resource-manifest"] as LogicalResourceManifestV1 | undefined,
           true,
         );
+        const diagnosticsTargets = await this.storageDiagnosticsTargets(
+          artifacts["logical-resource-manifest"] as LogicalResourceManifestV1 | undefined,
+          handoff,
+        );
         const receipt = await provider.validateSource({
           ...binding,
           generatedSource: { rootPath, treeHash: handoff.treeHash },
@@ -7529,6 +7611,7 @@ export class ApexService {
                 resourceParityManifest: structuredClone(
                   artifacts["logical-resource-manifest"] as LogicalResourceManifestV1,
                 ),
+                storageDiagnosticsTargets: diagnosticsTargets,
               }
             : {}),
         });
@@ -7536,6 +7619,12 @@ export class ApexService {
           throw new ApexError(
             "APEX_VALIDATION",
             "Native validation receipt is invalid or stale",
+            EXIT_CODES.validation,
+          );
+        if (!this.hasBoundStorageRouting(receipt, diagnosticsTargets))
+          throw new ApexError(
+            "APEX_VALIDATION",
+            "Native diagnostic routing does not match accepted targets",
             EXIT_CODES.validation,
           );
         if (!this.hasRequiredNativePolicyEvidence(receipt, policyValidation))

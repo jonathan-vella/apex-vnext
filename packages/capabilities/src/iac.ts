@@ -83,6 +83,9 @@ export interface NativeValidationRequest {
   readonly policyValidation?: PreviewRequest["policyValidation"];
   readonly storageSecurityBindings?: Readonly<Record<string, PolicyResourceBinding>>;
   readonly resourceParityManifest?: LogicalResourceManifestV1;
+  readonly storageDiagnosticsTargets?: Readonly<
+    Record<string, { readonly binding: PolicyResourceBinding; readonly workspaceResourceId: string }>
+  >;
 }
 
 export interface CurrentDeploymentAuthority {

@@ -555,12 +555,16 @@ test("installed Bicep validates nested formatting and lint without changing acce
     "policy-mismatch",
     "module-pass",
     "module-mismatch",
+    "diagnostics-pass",
   ] as const) {
     await context.test(scenario, async (child) => {
       const root = await mkdtemp(join(tmpdir(), "apex-real-bicep-validation-"));
       child.after(() => rm(root, { recursive: true, force: true }));
       const checkModule = scenario.startsWith("module-");
-      const checkPolicy = scenario.startsWith("policy-") || checkModule;
+      const checkDiagnostics = scenario === "diagnostics-pass";
+      const checkPolicy = scenario.startsWith("policy-") || checkModule || checkDiagnostics;
+      const workspaceResourceId =
+        "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-fixture/providers/Microsoft.OperationalInsights/workspaces/log-fixture";
       const files = [
         {
           path: "main.bicep",
@@ -589,6 +593,12 @@ test("installed Bicep validates nested formatting and lint without changing acce
         const main = files.find(({ path }) => path === "main.bicep")!;
         files.find(({ path }) => path === "modules/nested.bicep")!.content = main.content;
         main.content = "module storageModule 'modules/nested.bicep' = {\n  name: 'storage-module'\n}\n";
+      }
+      if (checkDiagnostics) {
+        const main = files.find(({ path }) => path === "main.bicep")!;
+        for (const service of ["blobServices", "fileServices", "queueServices", "tableServices"]) {
+          main.content += `\nresource ${service} 'Microsoft.Storage/storageAccounts/${service}@2023-05-01' = {\n  parent: storage\n  name: 'default'\n}\n\nresource ${service}Diagnostic 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {\n  scope: ${service}\n  name: 'logs'\n  properties: {\n    workspaceId: '${workspaceResourceId}'\n    logs: [\n      {\n        categoryGroup: 'allLogs'\n        enabled: true\n      }\n    ]\n    metrics: [\n      {\n        category: 'Transaction'\n        enabled: true\n      }\n    ]\n  }\n}\n`;
+        }
       }
       await mkdir(join(root, "modules"));
       for (const file of files) await writeFile(join(root, file.path), file.content);
@@ -637,6 +647,9 @@ test("installed Bicep validates nested formatting and lint without changing acce
         inputHash: hashes.input,
         generatedSource: { rootPath: root, treeHash: sha256(files) },
         policyValidation,
+        ...(checkDiagnostics
+          ? { storageDiagnosticsTargets: { storage: { binding: { codeSymbol: "storage" }, workspaceResourceId } } }
+          : {}),
         ...(policyValidation === undefined
           ? {}
           : {
@@ -666,7 +679,12 @@ test("installed Bicep validates nested formatting and lint without changing acce
         const receipt = await provider.validateSource(input);
         if (checkPolicy) {
           assert.equal(receipt.policyValidation?.outcome, "pass");
-          assert.equal(receipt.resourceParity?.outcome, checkModule ? "unsupported" : "pass");
+          assert.equal(receipt.resourceParity?.outcome, checkModule || checkDiagnostics ? "unsupported" : "pass");
+          if (checkDiagnostics) {
+            assert.equal(receipt.storageDiagnostics?.storage?.outcome, "pass");
+            assert.equal(receipt.storageDiagnostics?.storage?.fullBaselineEvaluated, false);
+            assert.equal(receipt.storageDiagnostics?.storage?.inputHash, receipt.policyValidation?.inputHash);
+          }
           assert.equal(
             receipt.resourceParity?.manifestHash,
             calculatePolicyValidationDigest(input.resourceParityManifest!),

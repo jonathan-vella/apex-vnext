@@ -124,6 +124,38 @@ export const NativeValidationReceiptV1Schema = Type.Object(
     storageSecurity: Type.Optional(
       Type.Record(NonEmptyStringSchema, storageSecurityObservation, { maxProperties: 1000 }),
     ),
+    storageDiagnostics: Type.Optional(
+      Type.Record(
+        NonEmptyStringSchema,
+        Type.Object(
+          {
+            coverage: Type.Literal("bicep-storage-service-diagnostics-v1"),
+            fullBaselineEvaluated: Type.Literal(false),
+            sourceHash: Sha256Schema,
+            inputHash: Sha256Schema,
+            bindingHash: Sha256Schema,
+            outcome: Type.Union([Type.Literal("pass"), Type.Literal("fail"), Type.Literal("unsupported")]),
+            reason: Type.Union(
+              [
+                "matched",
+                "invalid-source",
+                "ambiguous-or-unbound-account",
+                "unsupported-account",
+                "missing-or-ambiguous-service",
+                "unsupported-service",
+                "missing-or-ambiguous-diagnostics",
+                "unsupported-diagnostics",
+                "workspace-mismatch",
+                "missing-categories",
+                "disabled-or-missing-categories",
+              ].map((reason) => Type.Literal(reason)),
+            ),
+          },
+          { additionalProperties: false },
+        ),
+        { maxProperties: 1000 },
+      ),
+    ),
     outcome: Type.Literal("pass"),
     commands: Type.Array(
       Type.Object(
@@ -186,6 +218,34 @@ export function hasValidNativeValidationReceipt(
     const storageInputHash =
       receipt.storageSecurity === undefined ? undefined : Object.values(receipt.storageSecurity)[0]?.inputHash;
     const parity = receipt.resourceParity;
+    if (receipt.storageDiagnostics !== undefined) {
+      const observations = Object.values(receipt.storageDiagnostics);
+      const inputHash = observations[0]?.inputHash;
+      if (
+        receipt.track !== "bicep" ||
+        observations.some(
+          (observation) =>
+            observation.sourceHash !== receipt.sourceHash ||
+            observation.inputHash !== inputHash ||
+            (storageInputHash !== undefined && observation.inputHash !== storageInputHash) ||
+            (parity !== undefined && observation.inputHash !== parity.inputHash) ||
+            (receipt.policyValidation !== undefined && observation.inputHash !== receipt.policyValidation.inputHash) ||
+            observation.outcome !==
+              (observation.reason === "matched"
+                ? "pass"
+                : [
+                      "invalid-source",
+                      "ambiguous-or-unbound-account",
+                      "unsupported-account",
+                      "unsupported-service",
+                      "unsupported-diagnostics",
+                    ].includes(observation.reason)
+                  ? "unsupported"
+                  : "fail"),
+        )
+      )
+        return false;
+    }
     if (
       parity !== undefined &&
       (receipt.track !== "bicep" ||

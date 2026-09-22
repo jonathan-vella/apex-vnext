@@ -136,6 +136,15 @@ AzureRM properties in supplied Terraform saved-plan JSON with known change evide
 does not generate a plan or attach these diagnostics. Passing limited storage properties never credits the full
 `business:security-baseline` validator or opens a gate.
 
+When accepted Bicep bindings identify one unambiguous literal Log Analytics workspace, `storageDiagnostics` reports
+bounded storage-service routing checks. Targets come from explicit storage `diagnosticSettings` workspace references or
+native diagnostic-resource bindings, not model assertions. The evaluator requires blob, file, queue and table service
+settings, exact literal account/service scope expressions emitted by the compiler, matching symbolic dependencies,
+enabled `allLogs` (or all three storage operation categories), and enabled `Transaction` metrics to that workspace.
+Missing scopes, categories or mismatched workspaces fail; modules and unresolved expressions remain unsupported.
+Ambiguous or absent workspace intent does not produce a diagnostic target. Receipts bind source, output and target
+digests and declare `fullBaselineEvaluated: false`; these checks do not credit the full security-baseline validator.
+
 Native task completion requires executed evidence for every required validator, not merely caller-supplied entries.
 For Bicep manifests containing only managed native resources with unique top-level symbolic execution addresses,
 `resourceParity` compares captured compiler output with the accepted manifest: exact resource coverage, ARM types and
