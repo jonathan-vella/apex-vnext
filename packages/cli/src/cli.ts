@@ -9,6 +9,7 @@ import {
   type QualityMeasurementsV1,
   type QualityScorecardV1,
   type RequirementsV1,
+  type RequirementsAmendmentV1,
 } from "@apexops/contracts";
 import { Value } from "@sinclair/typebox/value";
 import { EventJournal, ValidatorRegistry, WriterTransferStore, atomicWriteJson, sha256Json } from "@apexops/kernel";
@@ -636,6 +637,18 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
       return service.status();
     case "requirements preview-change":
       return service.previewRequirementsChange((await inputJson(flags)) as RequirementsV1, required(flags, "reason"));
+    case "requirements preview-amendment":
+      return service.previewRequirementsAmendment(
+        (await inputJson(flags)) as RequirementsAmendmentV1,
+        required(flags, "reason"),
+      );
+    case "requirements amend":
+      confirmed(flags, "requirements amend");
+      return service.amendRequirements((await inputJson(flags)) as RequirementsAmendmentV1, {
+        reason: required(flags, "reason"),
+        expectedHash: required(flags, "expected-hash"),
+        confirm: true,
+      });
     case "requirements preview-adoption":
       return service.previewRequirementsChange(
         (await inputJson(flags)) as RequirementsV1,

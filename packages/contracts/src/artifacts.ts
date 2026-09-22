@@ -44,6 +44,31 @@ const ChangeIdsSchema = Type.Array(Type.String({ minLength: 1, maxLength: 512 })
   uniqueItems: true,
 });
 
+export const RequirementsAmendmentV1Schema = Type.Object(
+  {
+    schemaVersion: ContractVersionSchema,
+    baseRequirementsHash: Sha256Schema,
+    updates: Type.Array(
+      Type.Object(
+        {
+          id: Type.String({ minLength: 1, maxLength: 512 }),
+          changes: Type.Partial(Type.Omit(RequirementV1Schema, ["id"]), { minProperties: 1 }),
+        },
+        { additionalProperties: false },
+      ),
+      { maxItems: 128 },
+    ),
+    additions: Type.Array(RequirementV1Schema, { maxItems: 128 }),
+    removals: Type.Array(Type.String({ minLength: 1, maxLength: 512 }), { maxItems: 128, uniqueItems: true }),
+    fields: Type.Partial(
+      Type.Omit(RequirementsV1Schema, ["schemaVersion", "projectId", "environment", "requirements"]),
+    ),
+  },
+  { $id: "https://schemas.apexops.dev/requirements-amendment-v1.json", additionalProperties: false },
+);
+
+export type RequirementsAmendmentV1 = Static<typeof RequirementsAmendmentV1Schema>;
+
 export const RequirementsChangeProposalV1Schema = Type.Object(
   {
     schemaVersion: ContractVersionSchema,

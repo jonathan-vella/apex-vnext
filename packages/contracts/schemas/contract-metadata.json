@@ -204,6 +204,11 @@
     "maxBytes": 262144,
     "sensitivity": "public"
   },
+  "https://schemas.apexops.dev/requirements-amendment-v1.json": {
+    "compatibility": "strict-v1",
+    "maxBytes": 262144,
+    "sensitivity": "confidential"
+  },
   "https://schemas.apexops.dev/requirements-change-proposal-v1.json": {
     "compatibility": "strict-v1",
     "maxBytes": 524288,

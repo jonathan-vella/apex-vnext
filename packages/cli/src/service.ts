@@ -24,6 +24,7 @@ import {
   QualityMeasurementsV1Schema,
   QualityReportV1Schema,
   RequirementsV1Schema,
+  RequirementsAmendmentV1Schema,
   RequirementsChangeProposalV1Schema,
   ResourceInventoryV1Schema,
   ReviewFindingsV1Schema,
@@ -74,6 +75,7 @@ import {
   type QualityScorecardV1,
   type QualityMeasurementsV1,
   type RequirementsV1,
+  type RequirementsAmendmentV1,
   type RunConfigV1,
   type RunId,
   type RuntimeBundleLockV1,
@@ -2904,6 +2906,69 @@ export class ApexService {
   ): Promise<{ outputHashes: Partial<Record<ArtifactKind, string>>; summary: string }> {
     await this.assertTaskType(taskId, "requirements");
     return this.completeTaskOutputs(taskId, [{ kind: "requirements", value: requirements }]);
+  }
+
+  private async prepareRequirementsAmendment(amendment: RequirementsAmendmentV1, reason: string) {
+    amendment = structuredClone(amendment);
+    if (
+      !Value.Check(RequirementsAmendmentV1Schema, amendment) ||
+      Buffer.byteLength(JSON.stringify(amendment), "utf8") > 262_144
+    )
+      throw new ApexError("APEX_VALIDATION", "Invalid or oversized requirements amendment", EXIT_CODES.validation);
+    const run = await this.run(await this.selection(), { readOnly: true });
+    const events = await this.journal(run).replay();
+    if (this.artifactHash(events, "requirements") !== amendment.baseRequirementsHash)
+      throw new ApexError("APEX_STALE", "Requirements amendment base is not current", EXIT_CODES.stale);
+    const base = await this.objects.getJson<RequirementsV1>(amendment.baseRequirementsHash);
+    const existingIds = new Set(base.requirements.map(({ id }) => id));
+    const changedIds = [
+      ...amendment.updates.map(({ id }) => id),
+      ...amendment.additions.map(({ id }) => id),
+      ...amendment.removals,
+    ];
+    if (
+      new Set(changedIds).size !== changedIds.length ||
+      amendment.updates.some(({ id }) => !existingIds.has(id)) ||
+      amendment.removals.some((id) => !existingIds.has(id)) ||
+      amendment.additions.some(({ id }) => existingIds.has(id))
+    )
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Requirements amendment has duplicate, conflicting or unknown IDs",
+        EXIT_CODES.validation,
+      );
+    const updates = new Map(amendment.updates.map(({ id, changes }) => [id, changes]));
+    const removals = new Set(amendment.removals);
+    const candidate = {
+      ...base,
+      ...amendment.fields,
+      requirements: [
+        ...base.requirements
+          .filter(({ id }) => !removals.has(id))
+          .map((item) => ({ ...item, ...updates.get(item.id) })),
+        ...amendment.additions,
+      ],
+    };
+    this.assertValid("requirements", candidate);
+    const proposal = await this.previewRequirementsChange(candidate, reason);
+    if (
+      proposal.sourceRequirementsHash !== amendment.baseRequirementsHash ||
+      proposal.expectedHead !== events.at(-1)?.hash
+    )
+      throw new ApexError("APEX_STALE", "Requirements amendment base changed during preview", EXIT_CODES.stale);
+    return { candidate, proposal };
+  }
+
+  async previewRequirementsAmendment(amendment: RequirementsAmendmentV1, reason: string) {
+    return (await this.prepareRequirementsAmendment(amendment, reason)).proposal;
+  }
+
+  async amendRequirements(
+    amendment: RequirementsAmendmentV1,
+    options: { reason: string; expectedHash: string; confirm: boolean },
+  ) {
+    const { candidate } = await this.prepareRequirementsAmendment(amendment, options.reason);
+    return this.reviseRequirements(candidate, options);
   }
 
   async previewRequirementsChange(candidate: RequirementsV1, reason: string, mode: "adopt" | "revise" = "revise") {

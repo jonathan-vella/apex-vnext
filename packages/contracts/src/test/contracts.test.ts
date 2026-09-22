@@ -46,6 +46,7 @@ import {
   QualityMeasurementsV1Schema,
   ArchitectureAvailabilityV1Schema,
   RequirementsV1Schema,
+  RequirementsAmendmentV1Schema,
   RequirementsChangeProposalV1Schema,
   ReviewFindingsV1Schema,
   RuntimeBundleLockV1Schema,
@@ -457,6 +458,30 @@ describe("Wave 1 contracts", () => {
         false,
       );
     assert.equal(hasValidArchetypeSourceProposal({ ...proposal, revision: "b".repeat(40) }), false);
+  });
+
+  it("bounds requirements amendments without allowing identity or requirement-ID replacement", () => {
+    const amendment = {
+      schemaVersion: "1.0.0",
+      baseRequirementsHash: "a".repeat(64),
+      updates: [{ id: "REQ-1", changes: { statement: "Updated objective" } }],
+      additions: [],
+      removals: [],
+      fields: { budgetAndOperations: "EUR 500" },
+    };
+    assert.equal(Value.Check(RequirementsAmendmentV1Schema, amendment), true);
+    for (const changed of [
+      { ...amendment, baseRequirementsHash: "invalid" },
+      { ...amendment, updates: Array.from({ length: 129 }, () => amendment.updates[0]) },
+      { ...amendment, updates: [{ id: "REQ-1", changes: {} }] },
+      { ...amendment, updates: [{ id: "REQ-1", changes: { id: "REQ-2" } }] },
+      ...["schemaVersion", "projectId", "environment", "requirements"].map((key) => ({
+        ...amendment,
+        fields: { [key]: "changed" },
+      })),
+      { ...amendment, approved: true },
+    ])
+      assert.equal(Value.Check(RequirementsAmendmentV1Schema, changed), false);
   });
 
   it("keeps requirements change proposals bounded and distinct from deployment authority", () => {

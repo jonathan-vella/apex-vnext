@@ -16,6 +16,7 @@ import {
   IacBindingV1Schema,
   ImplementationIntentV1Schema,
   RequirementsV1Schema,
+  RequirementsAmendmentV1Schema,
   RequirementsChangeProposalV1Schema,
 } from "./artifacts.js";
 import { ArchetypeSourceProposalV1Schema } from "./archetype-source.js";
@@ -85,6 +86,7 @@ export const contractSchemas = [
   InputSubmissionV1Schema,
   EventV1Schema,
   RequirementsV1Schema,
+  RequirementsAmendmentV1Schema,
   RequirementsChangeProposalV1Schema,
   ImplementationIntentV1Schema,
   IacBindingV1Schema,
@@ -154,6 +156,7 @@ export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
   "https://schemas.apexops.dev/input-submission-v1.json": metadata(65_536, "confidential"),
   "https://schemas.apexops.dev/event-v1.json": metadata(262_144, "confidential"),
   "https://schemas.apexops.dev/requirements-v1.json": metadata(524_288, "confidential"),
+  "https://schemas.apexops.dev/requirements-amendment-v1.json": metadata(262_144, "confidential"),
   "https://schemas.apexops.dev/requirements-change-proposal-v1.json": metadata(524_288, "confidential"),
   "https://schemas.apexops.dev/implementation-intent-v1.json": metadata(524_288),
   "https://schemas.apexops.dev/iac-binding-v1.json": metadata(524_288, "confidential"),

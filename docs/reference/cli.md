@@ -93,6 +93,34 @@ The preview reports changed and retained requirement IDs, affected workflow stag
 reassessment. It does not calculate revised costs or claim policy compliance. Confirmation binds the exact candidate,
 reason, run, journal head and writer epoch. In-flight or indeterminate deployments block revision.
 
+For a small change, submit a base-bound `requirements-amendment-v1` document instead of repeating unchanged fields:
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "baseRequirementsHash": "CURRENT_ACCEPTED_REQUIREMENTS_SHA256",
+  "updates": [{ "id": "REQ-1", "changes": { "statement": "Retain daily recovery points" } }],
+  "additions": [],
+  "removals": [],
+  "fields": { "budgetAndOperations": "Monthly limit is EUR 500" }
+}
+```
+
+Replace the base placeholder with the current accepted artifact hash, then preview and confirm:
+
+```bash
+apex requirements preview-amendment --file amendment.json --reason "Change recovery objective" --json
+apex requirements amend --file amendment.json --reason "Change recovery objective" \
+  --expected-hash PROPOSAL_HASH --yes --json
+```
+
+Amendments allow at most 128 entries in each of `updates`, `additions` and `removals`, within a 256 KiB input budget.
+Updates preserve IDs and unspecified properties; additions must use new IDs, and removals must name existing IDs.
+Duplicate or overlapping operations, identity-field changes and stale bases are rejected. Untouched requirements,
+unknowns, deferrals and source attribution are retained. Arrays in `fields` replace only the explicitly named array.
+The merged document uses the same validation, confirmation, review and invalidation path as full-document revision.
+No conversational interpretation or change is applied without confirmation. Full-document submission remains available.
+
 Confirmed decisions become the next Requirements task template without repeating the original intake. Task acceptance
 must match that candidate and still routes through Requirements review. Downstream reviews, governance, preview and
 approvals must be regenerated where the locked workflow invalidates them. Confirmation never authorizes deployment.

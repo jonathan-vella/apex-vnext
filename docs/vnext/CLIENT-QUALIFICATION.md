@@ -167,6 +167,16 @@ edits remained in the source worktree and were excluded from the published check
 `bicep-storage-only-baseline-v1` Validator path, not Terraform, mixed-service baseline coverage, a live Azure deployment,
 or a clean packaged-client lifecycle. Shipped worker membership remains unchanged.
 
+The follow-up `dist/cli-worker-routing-14/run-2` probe extended that path to actual delegated generation at source
+checkpoint `152531d54135457fbc18e40f026369904643726a`, CLI `1.0.86`. Session
+`7b4e74a8-f86d-4e58-9cbd-01a00ac07e56` routed Planner to CodeGen and then Validator; both children used
+`gpt-5.6-terra` from their agent definitions. CodeGen called ordinary `generateIac` once and returned without duplicate
+completion. Validator accepted all six native checks using the installed compiler. Independent audit verified exactly
+one completion per stage, six fixed compiler commands, source hashes, canary preservation, restart state and closed
+Gate 4, with no new approvals or deployments. The first setup attempt failed a canonical-tool assertion before runtime
+creation; corrected setup preserved CodeGen's declared delegation capability and used a fresh directory. The same
+storage-only, synthetic-prerequisite and unpackaged-client limitations apply; no worker membership changed.
+
 Local evidence is retained under `dist/cli-worker-qualification-04` through `dist/cli-worker-qualification-07`,
 `dist/cli-parent-qualification-08`, the `dist/cli-review-qualification-09-*` fixtures, and
 `dist/cli-governance-qualification-10`. Failed probes are not replaced by the later successful receipts.

@@ -61,7 +61,9 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 - `reconcile`
 - `render`
 - `requirements adopt`
+- `requirements amend`
 - `requirements preview-adoption`
+- `requirements preview-amendment`
 - `requirements preview-change`
 - `requirements revise`
 - `review resolve`

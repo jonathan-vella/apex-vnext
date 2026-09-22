@@ -3,7 +3,13 @@ import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { EventJournal, ObjectStore, sha256Json } from "@apexops/kernel";
-import type { EventV1, InputValueV1, RunConfigV1, PolicyPropertyMapV1 } from "@apexops/contracts";
+import type {
+  EventV1,
+  InputValueV1,
+  RunConfigV1,
+  PolicyPropertyMapV1,
+  RequirementsAmendmentV1,
+} from "@apexops/contracts";
 import { ApexError } from "../errors.js";
 import { ApexService } from "../service.js";
 import {
@@ -111,6 +117,104 @@ test("requirements change preview binds retained decisions and leaves workflow a
   );
   assert.deepEqual(await service.status(), before);
   assert.deepEqual(await snapshotFiles(root), files);
+});
+
+test("requirements amendments preserve untouched decisions and require current confirmed revision", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo" });
+  await prepareValidatedRun(service, runId, "bicep");
+  const base = requirements();
+  const amendment: RequirementsAmendmentV1 = {
+    schemaVersion: "1.0.0",
+    baseRequirementsHash: sha256Json(base),
+    updates: [{ id: base.requirements[0]!.id, changes: { statement: "Use the revised availability objective" } }],
+    additions: [
+      {
+        id: "REQ-DEFERRED",
+        statement: "Confirm recovery window",
+        status: "deferred",
+        priority: "should",
+        source: "consumer",
+      },
+    ],
+    removals: [],
+    fields: { budgetAndOperations: "Monthly limit is EUR 500" },
+  };
+  const candidate = {
+    ...base,
+    ...amendment.fields,
+    requirements: [
+      ...base.requirements.map((item, index) => (index === 0 ? { ...item, ...amendment.updates[0]!.changes } : item)),
+      ...amendment.additions,
+    ],
+  };
+  const before = await service.status();
+  const files = await snapshotFiles(root);
+  const proposal = await service.previewRequirementsAmendment(amendment, "Revise objective");
+  assert.deepEqual(proposal, await service.previewRequirementsChange(candidate, "Revise objective"));
+  const options = { reason: "Revise objective", expectedHash: proposal.proposalHash, confirm: true };
+  await assert.rejects(service.amendRequirements(amendment, { ...options, confirm: false }), /explicit confirmation/);
+  await assert.rejects(
+    service.previewRequirementsAmendment({ ...amendment, baseRequirementsHash: "f".repeat(64) }, "Stale"),
+    /not current/,
+  );
+  for (const invalid of [
+    { ...amendment, updates: [...amendment.updates, ...amendment.updates] },
+    { ...amendment, removals: [base.requirements[0]!.id] },
+    { ...amendment, updates: [{ id: "missing", changes: { statement: "Unknown ID" } }] },
+    { ...amendment, additions: [base.requirements[0]!] },
+    { ...amendment, fields: { environment: "prod" } },
+    { ...amendment, fields: { businessContext: "x".repeat(262_144) } },
+  ])
+    await assert.rejects(service.previewRequirementsAmendment(invalid as RequirementsAmendmentV1, "Invalid"));
+  await assert.rejects(
+    service.amendRequirements({ ...amendment, fields: { workload: "Different" } }, options),
+    /stale/,
+  );
+  assert.deepEqual(await service.status(), before);
+  assert.deepEqual(await snapshotFiles(root), files);
+  await service.amendRequirements(amendment, options);
+  const restarted = new ApexService(root);
+  await assert.rejects(restarted.previewRequirementsAmendment(amendment, "Replay"), /not current/);
+  const next = await restarted.nextTask();
+  assert.equal(next.status, "task");
+  if (next.status !== "task") throw new Error("Expected amended requirements task");
+  assert.deepEqual((await restarted.taskContext(next.task.taskId)).outputTemplates.requirements, candidate);
+  await restarted.completeRequirements(next.task.taskId, candidate);
+  assert.equal((await restarted.status()).task, "requirements-review");
+  assert.ok((await restarted.status()).run.gates.every(({ state }) => state !== "approved"));
+});
+
+test("requirements amendments reject a revision change during asynchronous preview", async (context) => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo", iacTool: "terraform" });
+  await prepareValidatedRun(service, runId, "terraform");
+  const amendment: RequirementsAmendmentV1 = {
+    schemaVersion: "1.0.0",
+    baseRequirementsHash: sha256Json(requirements()),
+    updates: [],
+    additions: [],
+    removals: [],
+    fields: { workload: "Amended workload" },
+  };
+  const original = service.previewRequirementsChange.bind(service);
+  const competing = { ...requirements(), workload: "Concurrent workload" };
+  const proposal = await original(competing, "Concurrent revision");
+  context.mock.method(service, "previewRequirementsChange", async (...args: Parameters<typeof original>) => {
+    context.mock.restoreAll();
+    await service.reviseRequirements(competing, {
+      reason: "Concurrent revision",
+      expectedHash: proposal.proposalHash,
+      confirm: true,
+    });
+    return original(...args);
+  });
+  await assert.rejects(service.previewRequirementsAmendment(amendment, "Amend workload"), /changed during preview/);
+  const next = await service.nextTask();
+  if (next.status !== "task") throw new Error("Expected concurrent revision task");
+  assert.deepEqual((await service.taskContext(next.task.taskId)).outputTemplates.requirements, competing);
 });
 
 test("confirmed requirements revision invalidates proof without approvals or file replacement", async () => {

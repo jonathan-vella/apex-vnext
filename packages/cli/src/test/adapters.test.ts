@@ -239,6 +239,47 @@ test("CLI requirements change adapters require a file, reason, hash and explicit
   ]);
 });
 
+test("CLI requirements amendment adapters preserve base-bound inputs and require confirmation", async (context) => {
+  const root = await tempRoot();
+  const amendment = {
+    schemaVersion: "1.0.0",
+    baseRequirementsHash: "a".repeat(64),
+    updates: [],
+    additions: [],
+    removals: [],
+    fields: { workload: "Revised workload" },
+  };
+  const file = join(root, "amendment.json");
+  await writeJson(file, amendment);
+  const preview = context.mock.method(ApexService.prototype, "previewRequirementsAmendment", async () => ({
+    proposalHash: "b".repeat(64),
+  }));
+  const amend = context.mock.method(ApexService.prototype, "amendRequirements", async () => ({
+    deploymentAuthorized: false,
+  }));
+  await assert.rejects(execute(["requirements", "preview-amendment", "--file", file], root), /Missing --reason/);
+  assert.equal(preview.mock.callCount(), 0);
+  await execute(["requirements", "preview-amendment", "--file", file, "--reason", "Revised workload"], root);
+  assert.deepEqual(preview.mock.calls[0]!.arguments, [amendment, "Revised workload"]);
+  const args = [
+    "requirements",
+    "amend",
+    "--file",
+    file,
+    "--reason",
+    "Revised workload",
+    "--expected-hash",
+    "b".repeat(64),
+  ];
+  await assert.rejects(execute(args, root), /--yes/);
+  assert.equal(amend.mock.callCount(), 0);
+  await execute([...args, "--yes"], root);
+  assert.deepEqual(amend.mock.calls[0]!.arguments, [
+    amendment,
+    { reason: "Revised workload", expectedHash: "b".repeat(64), confirm: true },
+  ]);
+});
+
 test("CLI Node minimum compares complete stable versions", () => {
   assert.equal(meetsMinimumVersion("26.8.9", MINIMUM_NODE_VERSION), false);
   assert.equal(meetsMinimumVersion("26.9.0", MINIMUM_NODE_VERSION), true);

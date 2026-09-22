@@ -141,6 +141,11 @@ index. These are implemented source paths with automated checks, not complete li
 validation, resource-level selective regeneration, actual as-built spend and independently observed operational tests
 remain incomplete. Procedures stay untested unless a separate evidence-producing workflow establishes otherwise.
 
+Base-bound requirements amendments now merge bounded ID-addressed updates, additions, removals and explicitly changed
+fields before using the existing confirmed-revision path. They preserve untouched decisions and reject conflicting IDs,
+stale revisions and journal changes during preview. Full-document submission and normal Requirements review remain
+available; this is not automatic conversational impact analysis or resource-level selective regeneration.
+
 The authorized output-quality reference was inspected at `jonathan-vella/aks-basic` commit
 `bb7ae9021a0fc59d10d129710a8a260b573d9dcc`, limited to the first sections of its edge-protection ADR, operations runbook
 and deployment guide under `agent-output/apex-aks`. No reference state, approval or artifact corpus was imported.
