@@ -92,6 +92,29 @@ export const NativeValidationReceiptV1Schema = Type.Object(
     policyHash: Sha256Schema,
     inputHash: Sha256Schema,
     policyValidation: Type.Optional(PolicyValidationV1Schema),
+    securityBaseline: Type.Optional(
+      Type.Object(
+        {
+          coverage: Type.Literal("bicep-storage-only-baseline-v1"),
+          sourceHash: Sha256Schema,
+          inputHash: Sha256Schema,
+          manifestHash: Sha256Schema,
+          bindingHash: Sha256Schema,
+          outcome: Type.Union([Type.Literal("pass"), Type.Literal("fail"), Type.Literal("unsupported")]),
+          reason: Type.Union(
+            [
+              "matched",
+              "resource-parity",
+              "unsupported-resource",
+              "credential-content",
+              "storage-controls",
+              "diagnostic-routing",
+            ].map((reason) => Type.Literal(reason)),
+          ),
+        },
+        { additionalProperties: false },
+      ),
+    ),
     resourceParity: Type.Optional(
       Type.Object(
         {
@@ -219,6 +242,23 @@ export function hasValidNativeValidationReceipt(
     const storageInputHash =
       receipt.storageSecurity === undefined ? undefined : Object.values(receipt.storageSecurity)[0]?.inputHash;
     const parity = receipt.resourceParity;
+    const baseline = receipt.securityBaseline;
+    if (
+      baseline !== undefined &&
+      (receipt.track !== "bicep" ||
+        parity === undefined ||
+        baseline.sourceHash !== receipt.sourceHash ||
+        baseline.inputHash !== parity.inputHash ||
+        baseline.manifestHash !== parity.manifestHash ||
+        baseline.bindingHash !== parity.bindingHash ||
+        (baseline.outcome === "pass" && (baseline.reason !== "matched" || parity.outcome !== "pass")) ||
+        (baseline.reason === "matched" && baseline.outcome !== "pass") ||
+        (baseline.reason === "resource-parity" && (parity.outcome === "pass" || baseline.outcome !== parity.outcome)) ||
+        (baseline.reason === "unsupported-resource" && baseline.outcome !== "unsupported") ||
+        (["credential-content", "storage-controls"].includes(baseline.reason) && baseline.outcome !== "fail") ||
+        (baseline.reason === "diagnostic-routing" && baseline.outcome === "pass"))
+    )
+      return false;
     if (receipt.storageDiagnostics !== undefined) {
       const observations = Object.values(receipt.storageDiagnostics);
       const inputHash = observations[0]?.inputHash;

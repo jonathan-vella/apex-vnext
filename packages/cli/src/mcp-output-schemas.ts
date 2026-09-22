@@ -250,6 +250,7 @@ export const MCP_OUTPUT_SCHEMAS = {
           blockedValidatorIds: strings,
           storageSecurity: NativeValidationReceiptV1Schema.properties.storageSecurity,
           storageDiagnostics: NativeValidationReceiptV1Schema.properties.storageDiagnostics,
+          securityBaseline: NativeValidationReceiptV1Schema.properties.securityBaseline,
         }),
         outputs: Type.Array(object({ kind: Type.Literal("validation-evidence"), value: EvidenceManifestV1Schema }), {
           minItems: 1,

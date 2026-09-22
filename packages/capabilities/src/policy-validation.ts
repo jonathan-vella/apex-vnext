@@ -6,6 +6,8 @@ import {
   PolicyPropertyMapV1Schema,
   LogicalResourceManifestV1Schema,
   IacBindingV1Schema,
+  SECRET_FIELD_PATTERN,
+  SECRET_VALUE_PATTERN,
   assertPolicyValidationJson,
   calculatePolicyValidationDigest,
   calculatePolicyValidationHash,
@@ -614,6 +616,187 @@ export function validateBicepResourceParity(request: {
       JSON.stringify([...dependencies].sort()) !== JSON.stringify(expectedDependencies)
     )
       return result("fail", "dependency-mismatch");
+  }
+  return result("pass", "matched");
+}
+
+export function validateBicepStorageBaseline(request: {
+  readonly sourceHash: string;
+  readonly manifest: LogicalResourceManifestV1;
+  readonly binding: IacBindingV1;
+  readonly json: string;
+}): NonNullable<NativeValidationReceiptV1["securityBaseline"]> {
+  const parity = validateBicepResourceParity(request);
+  const result = (
+    outcome: "pass" | "fail" | "unsupported",
+    reason:
+      | "matched"
+      | "resource-parity"
+      | "unsupported-resource"
+      | "credential-content"
+      | "storage-controls"
+      | "diagnostic-routing",
+  ) => ({
+    coverage: "bicep-storage-only-baseline-v1" as const,
+    sourceHash: request.sourceHash,
+    inputHash: parity.inputHash,
+    manifestHash: parity.manifestHash,
+    bindingHash: calculatePolicyValidationDigest(request.binding),
+    outcome,
+    reason,
+  });
+  if (parity.outcome !== "pass") return result(parity.outcome, "resource-parity");
+  const resources = resourcesFromJson(request.json, "bicep");
+  const accounts = resources.filter(
+    ({ resourceType }) => resourceType?.toLowerCase() === "microsoft.storage/storageaccounts",
+  );
+  const allowed = new Set([
+    "microsoft.storage/storageaccounts",
+    "microsoft.insights/diagnosticsettings",
+    ...["blobservices", "fileservices", "queueservices", "tableservices"].map(
+      (service) => `microsoft.storage/storageaccounts/${service}`,
+    ),
+  ]);
+  if (
+    accounts.length === 0 ||
+    new Set(accounts.map(({ value }) => value.name)).size !== accounts.length ||
+    resources.length !== accounts.length * 9 ||
+    resources.some(({ resourceType }) => !allowed.has(resourceType?.toLowerCase() ?? ""))
+  )
+    return result("unsupported", "unsupported-resource");
+  const parsed: unknown = JSON.parse(request.json);
+  const hasCredential = (value: unknown): boolean => {
+    if (typeof value === "string") return SECRET_VALUE_PATTERN.test(value);
+    if (Array.isArray(value)) return value.some(hasCredential);
+    return (
+      object(value) !== undefined &&
+      Object.entries(value as Record<string, unknown>).some(
+        ([key, child]) =>
+          (SECRET_FIELD_PATTERN.test(key) && typeof child === "string" && child.length > 0) || hasCredential(child),
+      )
+    );
+  };
+  if (hasCredential(parsed)) return result("fail", "credential-content");
+  const onlyKeys = (value: unknown, keys: readonly string[]): boolean =>
+    object(value) !== undefined && Object.keys(value as object).every((key) => keys.includes(key));
+  const template = object(parsed)!;
+  if (
+    !onlyKeys(template, [
+      "$schema",
+      "contentVersion",
+      "languageVersion",
+      "metadata",
+      "resources",
+      "parameters",
+      "variables",
+      "outputs",
+    ]) ||
+    ["parameters", "variables", "outputs"].some(
+      (key) =>
+        Object.hasOwn(template, key) &&
+        (!onlyKeys(template[key], []) || Object.keys(template[key] as object).length !== 0),
+    )
+  )
+    return result("unsupported", "unsupported-resource");
+  for (const resource of resources) {
+    if (
+      !onlyKeys(resource.value, [
+        "type",
+        "apiVersion",
+        "name",
+        "location",
+        "kind",
+        "sku",
+        "tags",
+        "identity",
+        "properties",
+        "dependsOn",
+        "scope",
+      ])
+    )
+      return result("unsupported", "unsupported-resource");
+    if (resource.resourceType?.toLowerCase() === "microsoft.insights/diagnosticsettings") {
+      if (!onlyKeys(resource.value.properties, ["workspaceId", "logs", "metrics", "logAnalyticsDestinationType"]))
+        return result("unsupported", "unsupported-resource");
+    } else if (
+      resource.resourceType?.toLowerCase() !== "microsoft.storage/storageaccounts" &&
+      resource.value.properties !== undefined &&
+      !onlyKeys(resource.value.properties, [])
+    )
+      return result("unsupported", "unsupported-resource");
+  }
+  for (const account of accounts) {
+    const properties = object(account.value.properties);
+    const network = object(properties?.networkAcls);
+    const encryption = object(properties?.encryption);
+    const encryptionServices = object(encryption?.services);
+    const identity = object(account.value.identity);
+    if (
+      !onlyKeys(properties, [
+        "minimumTlsVersion",
+        "supportsHttpsTrafficOnly",
+        "allowBlobPublicAccess",
+        "allowSharedKeyAccess",
+        "publicNetworkAccess",
+        "defaultToOAuthAuthentication",
+        "networkAcls",
+        "encryption",
+        "accessTier",
+      ]) ||
+      !onlyKeys(network, ["defaultAction", "bypass", "ipRules", "virtualNetworkRules"]) ||
+      !onlyKeys(identity, ["type"]) ||
+      !onlyKeys(encryption, ["keySource", "requireInfrastructureEncryption", "services"]) ||
+      !onlyKeys(encryptionServices, ["blob", "file"]) ||
+      !["blob", "file"].every((service) => onlyKeys(own(encryptionServices, service), ["enabled", "keyType"]))
+    )
+      return result("unsupported", "unsupported-resource");
+    if (
+      properties === undefined ||
+      !STORAGE_PROPERTY_HARDENING_CONTROLS.bicep.every(
+        ([path, expected]) => properties[path.slice("properties.".length)] === expected,
+      ) ||
+      properties.publicNetworkAccess !== "Disabled" ||
+      properties.defaultToOAuthAuthentication !== true ||
+      network?.defaultAction !== "Deny" ||
+      network.bypass !== "None" ||
+      !Array.isArray(network.ipRules) ||
+      network.ipRules.length !== 0 ||
+      !Array.isArray(network.virtualNetworkRules) ||
+      network.virtualNetworkRules.length !== 0 ||
+      encryption?.keySource !== "Microsoft.Storage" ||
+      encryption.requireInfrastructureEncryption !== true ||
+      !["blob", "file"].every((service) => own(own(encryptionServices, service), "enabled") === true) ||
+      identity?.type !== "SystemAssigned"
+    )
+      return result("fail", "storage-controls");
+    const manifestAccount = request.manifest.resources.find(
+      ({ executionAddress }) => executionAddress === account.codeSymbol,
+    )!;
+    const services = request.manifest.resources.filter(
+      (resource) =>
+        resource.type.toLowerCase().startsWith("microsoft.storage/storageaccounts/") &&
+        resource.dependsOn.includes(manifestAccount.logicalId),
+    );
+    const settings = request.manifest.resources.filter(({ logicalId }) =>
+      services.some((service) => request.binding.resourceBindings[logicalId]?.scopeLogicalId === service.logicalId),
+    );
+    const workspaceIds = settings.map(({ logicalId }) =>
+      own(request.binding.resourceBindings[logicalId]?.parameters.properties, "workspaceId"),
+    );
+    if (settings.length !== 4 || workspaceIds.some((id) => typeof id !== "string") || new Set(workspaceIds).size !== 1)
+      return result("unsupported", "diagnostic-routing");
+    let routing: ReturnType<typeof validateBicepStorageDiagnostics>;
+    try {
+      routing = validateBicepStorageDiagnostics({
+        sourceHash: request.sourceHash,
+        binding: { codeSymbol: account.codeSymbol! },
+        workspaceResourceId: workspaceIds[0] as string,
+        json: request.json,
+      });
+    } catch {
+      return result("unsupported", "diagnostic-routing");
+    }
+    if (routing.outcome !== "pass") return result(routing.outcome, "diagnostic-routing");
   }
   return result("pass", "matched");
 }

@@ -57,6 +57,7 @@ import {
   validateStorageSecurityBindings,
   validateBicepResourceParity,
   validateBicepStorageDiagnostics,
+  validateBicepStorageBaseline,
 } from "./policy-validation.js";
 
 export interface NativeProviderRuntime {
@@ -480,6 +481,17 @@ abstract class NativeProviderBase {
           sourceHash: receipt.sourceHash,
           manifest: parityManifest,
           ...(parityBinding === undefined ? {} : { binding: parityBinding }),
+          json: compiledTemplate ?? "",
+        });
+        const { receiptHash: previousHash, ...updated } = receipt;
+        if (!previousHash) throw sourceBindingError();
+        receipt.receiptHash = calculateNativeValidationReceiptHash(updated);
+      }
+      if (parityManifest !== undefined && parityBinding !== undefined) {
+        receipt.securityBaseline = validateBicepStorageBaseline({
+          sourceHash: receipt.sourceHash,
+          manifest: parityManifest,
+          binding: parityBinding,
           json: compiledTemplate ?? "",
         });
         const { receiptHash: previousHash, ...updated } = receipt;

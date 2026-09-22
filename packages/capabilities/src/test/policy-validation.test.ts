@@ -16,6 +16,7 @@ import {
   validatePolicyProperties,
   validateBicepResourceParity,
   validateBicepStorageDiagnostics,
+  validateBicepStorageBaseline,
   validateStorageSecurityProperties,
   validateStorageSecurityBindings,
   type PolicyValidationInput,
@@ -74,6 +75,150 @@ function input(track: "bicep" | "terraform"): PolicyValidationInput {
 }
 
 describe("bounded policy property validation", () => {
+  it("storage-only baseline requires complete resource coverage, controls and accepted diagnostic scopes", () => {
+    const workspaceId =
+      "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.OperationalInsights/workspaces/log";
+    const accountType = "Microsoft.Storage/storageAccounts";
+    const resources: Record<string, Record<string, unknown>> = {
+      storage: {
+        type: accountType,
+        name: "apexfixture",
+        identity: { type: "SystemAssigned" },
+        properties: {
+          minimumTlsVersion: "TLS1_2",
+          supportsHttpsTrafficOnly: true,
+          allowBlobPublicAccess: false,
+          allowSharedKeyAccess: false,
+          publicNetworkAccess: "Disabled",
+          defaultToOAuthAuthentication: true,
+          networkAcls: { defaultAction: "Deny", bypass: "None", ipRules: [], virtualNetworkRules: [] },
+          encryption: {
+            keySource: "Microsoft.Storage",
+            requireInfrastructureEncryption: true,
+            services: { blob: { enabled: true }, file: { enabled: true } },
+          },
+        },
+      },
+    };
+    const entry = (id: string, type: string, dependsOn: string[]) => ({
+      logicalId: id,
+      type,
+      implementationAddress: `native:${type}@2023-05-01`,
+      executionAddress: id,
+      implementationKind: "resource" as const,
+      ownership: "managed" as const,
+      dependsOn,
+      generatedDependencies: dependsOn,
+      sourcePath: "main.bicep",
+    });
+    const manifest: LogicalResourceManifestV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      track: "bicep",
+      resources: [entry("storage", accountType, [])],
+    };
+    const binding: IacBindingV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      track: "bicep",
+      intentHash: hash,
+      resourceBindings: {
+        storage: {
+          implementation: manifest.resources[0]!.implementationAddress,
+          version: "2023-05-01",
+          parameters: { name: "apexfixture" },
+        },
+      },
+    };
+    for (const service of ["blobServices", "fileServices", "queueServices", "tableServices"]) {
+      const type = `${accountType}/${service}`;
+      const diagnostic = `${service}Diagnostic`;
+      manifest.resources.push(
+        entry(service, type, ["storage"]),
+        entry(diagnostic, "Microsoft.Insights/diagnosticSettings", [service]),
+      );
+      binding.resourceBindings[service] = {
+        implementation: `native:${type}@2023-05-01`,
+        version: "2023-05-01",
+        parameters: { name: "apexfixture/default" },
+      };
+      binding.resourceBindings[diagnostic] = {
+        implementation: "native:Microsoft.Insights/diagnosticSettings@2023-05-01",
+        version: "2023-05-01",
+        scopeLogicalId: service,
+        parameters: { name: "logs", properties: { workspaceId } },
+      };
+      resources[service] = { type, name: "apexfixture/default", dependsOn: ["storage"] };
+      resources[diagnostic] = {
+        type: "Microsoft.Insights/diagnosticSettings",
+        name: "logs",
+        dependsOn: [service],
+        scope: `[resourceId('${type}', 'apexfixture', 'default')]`,
+        properties: {
+          workspaceId,
+          logs: [{ categoryGroup: "allLogs", enabled: true }],
+          metrics: [{ category: "Transaction", enabled: true }],
+        },
+      };
+    }
+    const check = (source: unknown) =>
+      validateBicepStorageBaseline({ sourceHash: hash, manifest, binding, json: JSON.stringify(source) });
+    assert.equal(check({ resources }).outcome, "pass");
+    for (const [key, value] of [
+      ["allowSharedKeyAccess", true],
+      ["publicNetworkAccess", "Enabled"],
+      ["defaultToOAuthAuthentication", false],
+      ["encryption", {}],
+      ["networkAcls", {}],
+    ] as const) {
+      const changed = structuredClone(resources);
+      (changed.storage!.properties as Record<string, unknown>)[key] = value;
+      assert.notEqual(check({ resources: changed }).outcome, "pass");
+    }
+    for (const key of Object.keys(resources.storage!.properties as object)) {
+      const changed = structuredClone(resources);
+      delete (changed.storage!.properties as Record<string, unknown>)[key];
+      assert.notEqual(check({ resources: changed }).outcome, "pass", key);
+    }
+    const noIdentity = structuredClone(resources);
+    delete noIdentity.storage!.identity;
+    assert.notEqual(check({ resources: noIdentity }).outcome, "pass");
+    for (const section of ["outputs", "variables", "parameters", "functions"]) {
+      assert.equal(check({ resources, [section]: { unchecked: "value" } }).outcome, "unsupported");
+    }
+    for (const property of ["isLocalUserEnabled", "isSftpEnabled", "unknownControl"]) {
+      const changed = structuredClone(resources);
+      (changed.storage!.properties as Record<string, unknown>)[property] = true;
+      assert.equal(check({ resources: changed }).outcome, "unsupported");
+    }
+    const unreviewedService = structuredClone(resources);
+    unreviewedService.blobServices!.properties = { cors: { corsRules: [{ allowedOrigins: ["*"] }] } };
+    assert.equal(check({ resources: unreviewedService }).outcome, "unsupported");
+    const unsupportedManifest = structuredClone(manifest);
+    unsupportedManifest.resources.push(entry("foreign", "Microsoft.KeyVault/vaults", []));
+    assert.equal(
+      validateBicepStorageBaseline({
+        sourceHash: hash,
+        manifest: unsupportedManifest,
+        binding,
+        json: JSON.stringify({ resources: { ...resources, foreign: { type: "Microsoft.KeyVault/vaults" } } }),
+      }).reason,
+      "unsupported-resource",
+    );
+    assert.equal(
+      check({ resources, outputs: { private: { type: "string", value: "AccountKey=must-not-leak" } } }).reason,
+      "credential-content",
+    );
+    const missing = structuredClone(resources);
+    delete missing.blobServicesDiagnostic;
+    assert.notEqual(check({ resources: missing }).outcome, "pass");
+    const changed = structuredClone(resources);
+    (changed.blobServicesDiagnostic!.properties as Record<string, unknown>).workspaceId = `${workspaceId}foreign`;
+    assert.equal(check({ resources: changed }).reason, "diagnostic-routing");
+  });
+
   it("storage diagnostics require all service scopes and the exact accepted workspace", () => {
     const workspaceResourceId =
       "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.OperationalInsights/workspaces/log";

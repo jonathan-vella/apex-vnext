@@ -30,6 +30,8 @@ import {
   validateStorageSecurityBindings,
   validateBicepResourceParity,
   validateBicepStorageDiagnostics,
+  generateBicepTree,
+  ProcessRunner,
 } from "@apexops/capabilities";
 import type { IacProvider, PreviewRequest } from "@apexops/capabilities";
 import { EventJournal, ObjectStore, RunRepository, ValidatorRegistry, sha256Bytes, sha256Json } from "@apexops/kernel";
@@ -1092,6 +1094,157 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
     assert.equal((await restarted.status()).run.gates[3]!.state, "open");
   }
 });
+
+for (const secure of [true, false]) {
+  test(`complete storage-only Bicep baseline executes real compiler checks without approving deployment (secure=${secure})`, async () => {
+    const root = await tempRoot();
+    const runner = new ProcessRunner();
+    const commands: string[] = [];
+    const { validationMode, ...nativeBase } = bicepPreviewProvider(new Date());
+    assert.equal(validationMode, "simulated");
+    const provider: IacProvider = {
+      ...nativeBase,
+      async validateSource(request) {
+        const native = new NativeBicepProvider({
+          runner: {
+            run: async (command) => {
+              commands.push(`${command.executable}:${command.args[0]}`);
+              assert.equal(command.executable, "bicep");
+              return runner.run(command);
+            },
+          },
+          currentAuthority: async () => {
+            throw new Error("No cloud authority in compiler fixture");
+          },
+          target: {
+            cwd: request.generatedSource.rootPath,
+            templateFile: "main.bicep",
+            resourceGroup: "rg-test",
+            deploymentName: "fixture",
+            stackName: "fixture",
+            denySettingsMode: "denyDelete",
+          },
+        });
+        return native.validateSource(request);
+      },
+    };
+    const service = new ApexService(root, { providers: { bicep: provider } });
+    const { runId } = await service.init({
+      projectId: "demo",
+      iacTool: "bicep",
+      targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
+    });
+    const workspaceId =
+      "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test/providers/Microsoft.OperationalInsights/workspaces/accepted-logs";
+    const generated = await reachCodegen(service, runId, "bicep", (plan) => {
+      configureNativeBicepPlan(plan);
+      const intent = plan[0]!.value as ImplementationIntentV1;
+      const binding = plan[1]!.value as IacBindingV1;
+      const account = binding.resourceBindings.api!;
+      account.parameters = {
+        ...account.parameters,
+        identity: { type: "SystemAssigned" },
+        properties: {
+          ...(account.parameters.properties as Record<string, unknown>),
+          publicNetworkAccess: "Disabled",
+          defaultToOAuthAuthentication: true,
+          networkAcls: { defaultAction: "Deny", bypass: "None", ipRules: [], virtualNetworkRules: [] },
+          encryption: {
+            keySource: "Microsoft.Storage",
+            requireInfrastructureEncryption: true,
+            services: { blob: { enabled: true }, file: { enabled: true } },
+          },
+        },
+      };
+      if (!secure) delete (account.parameters.properties as Record<string, unknown>).defaultToOAuthAuthentication;
+      for (const child of ["blobServices", "fileServices", "queueServices", "tableServices"]) {
+        const type = `Microsoft.Storage/storageAccounts/${child}`;
+        const diagnostic = `${child}Diagnostic`;
+        intent.resources.push(
+          { id: child, type, purpose: "Storage service", dependsOn: ["api"], controls: [] },
+          {
+            id: diagnostic,
+            type: "Microsoft.Insights/diagnosticSettings",
+            purpose: "Service monitoring",
+            dependsOn: [child],
+            controls: [],
+          },
+        );
+        binding.resourceBindings[child] = {
+          implementation: `native:${type}@2023-05-01`,
+          version: "2023-05-01",
+          parameters: { name: "apidemo/default", parentId: "/", location: "swedencentral", properties: {} },
+        };
+        binding.resourceBindings[diagnostic] = {
+          implementation: "native:Microsoft.Insights/diagnosticSettings@2021-05-01-preview",
+          version: "2021-05-01-preview",
+          scopeLogicalId: child,
+          parameters: {
+            name: "logs",
+            parentId: "/",
+            location: "swedencentral",
+            properties: {
+              workspaceId,
+              logs: [{ categoryGroup: "allLogs", enabled: true }],
+              metrics: [{ category: "Transaction", enabled: true }],
+            },
+          },
+        };
+      }
+      binding.intentHash = sha256Json(intent);
+    });
+    const tree = generateBicepTree(
+      generated.plan[0]!.value as ImplementationIntentV1,
+      generated.plan[1]!.value as IacBindingV1,
+    );
+    const files = [
+      ...tree.files,
+      {
+        path: "bicepconfig.json",
+        content: JSON.stringify({ experimentalFeaturesEnabled: { symbolicNameCodegen: true } }),
+      },
+    ].sort((left, right) => left.path.localeCompare(right.path));
+    for (const file of files) await service.stageFile(generated.taskId, file.path, file.content);
+    const bundle = codegenBundle(runId, "bicep", generated.plan);
+    bundle[0]!.value = tree.logicalManifest as (typeof bundle)[0]["value"];
+    const handoff = bundle[1]!.value as IacHandoffV1;
+    handoff.rootPath = `.apex/work/${runId}/${generated.taskId}/code`;
+    handoff.treeHash = sha256Json(files);
+    handoff.logicalResourceManifestHash = sha256Json(tree.logicalManifest);
+    await service.completeTaskOutputs(generated.taskId, bundle);
+    const validationId = await task(service, "validation-bicep");
+    const before = await service.status();
+    const validated = await service.validateTask(validationId);
+    if (!secure) {
+      assert.equal(validated.valid, false);
+      assert.deepEqual(validated.execution!.blockedValidatorIds, ["business:security-baseline"]);
+      assert.equal(validated.execution!.securityBaseline?.reason, "storage-controls");
+      assert.deepEqual(await service.status(), before);
+      await assert.rejects(
+        service.completeTaskOutputs(validationId, validated.outputs!),
+        /executed evidence for every required validator/,
+      );
+      assert.deepEqual(await service.status(), before);
+      assert.equal(before.run.gates[3]!.state, "closed");
+      return;
+    }
+    assert.equal(validated.valid, true);
+    assert.deepEqual(validated.execution!.blockedValidatorIds, []);
+    assert.equal(validated.execution!.securityBaseline?.coverage, "bicep-storage-only-baseline-v1");
+    assert.equal(validated.execution!.securityBaseline?.outcome, "pass");
+    assert.deepEqual(await service.status(), before);
+    await service.completeTaskOutputs(validationId, validated.outputs!);
+    assert.deepEqual(commands, [
+      "bicep:format",
+      "bicep:build",
+      "bicep:lint",
+      "bicep:format",
+      "bicep:build",
+      "bicep:lint",
+    ]);
+    assert.equal((await service.status()).run.gates[3]!.state, "closed");
+  });
+}
 
 test("Bicep validation acceptance requires complete bound policy evidence before advancing", async () => {
   const root = await tempRoot();

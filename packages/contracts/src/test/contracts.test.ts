@@ -262,6 +262,53 @@ describe("Wave 1 contracts", () => {
             false,
           );
         }
+        const baselineBody: Omit<NativeValidationReceiptV1, "receiptHash"> = {
+          ...parityBody,
+          resourceParity: { ...parityBody.resourceParity!, bindingHash: hash },
+          securityBaseline: {
+            coverage: "bicep-storage-only-baseline-v1",
+            sourceHash: body.sourceHash,
+            inputHash: otherHash,
+            manifestHash: hash,
+            bindingHash: hash,
+            outcome: "pass",
+            reason: "matched",
+          },
+        };
+        assert.equal(
+          hasValidNativeValidationReceipt(
+            { ...baselineBody, receiptHash: calculateNativeValidationReceiptHash(baselineBody) },
+            body,
+          ),
+          true,
+        );
+        for (const patch of [
+          { bindingHash: otherHash },
+          { manifestHash: otherHash },
+          { inputHash: hash },
+          { sourceHash: otherHash },
+          { reason: "storage-controls" },
+          { outcome: "unsupported" },
+          { coverage: "full" },
+        ]) {
+          const changed = { ...baselineBody, securityBaseline: { ...baselineBody.securityBaseline!, ...patch } };
+          assert.equal(
+            hasValidNativeValidationReceipt(
+              { ...changed, receiptHash: calculatePolicyValidationDigest(changed) },
+              body,
+            ),
+            false,
+          );
+        }
+        const withoutParity = { ...baselineBody };
+        delete withoutParity.resourceParity;
+        assert.equal(
+          hasValidNativeValidationReceipt(
+            { ...withoutParity, receiptHash: calculateNativeValidationReceiptHash(withoutParity) },
+            body,
+          ),
+          false,
+        );
         const controls = [
           ["properties.minimumTlsVersion", "TLS1_2"],
           ["properties.supportsHttpsTrafficOnly", true],

@@ -458,6 +458,85 @@
       "const": "1.0.0",
       "type": "string"
     },
+    "securityBaseline": {
+      "additionalProperties": false,
+      "properties": {
+        "bindingHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "coverage": {
+          "const": "bicep-storage-only-baseline-v1",
+          "type": "string"
+        },
+        "inputHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "manifestHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "const": "pass",
+              "type": "string"
+            },
+            {
+              "const": "fail",
+              "type": "string"
+            },
+            {
+              "const": "unsupported",
+              "type": "string"
+            }
+          ]
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "const": "matched",
+              "type": "string"
+            },
+            {
+              "const": "resource-parity",
+              "type": "string"
+            },
+            {
+              "const": "unsupported-resource",
+              "type": "string"
+            },
+            {
+              "const": "credential-content",
+              "type": "string"
+            },
+            {
+              "const": "storage-controls",
+              "type": "string"
+            },
+            {
+              "const": "diagnostic-routing",
+              "type": "string"
+            }
+          ]
+        },
+        "sourceHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "coverage",
+        "sourceHash",
+        "inputHash",
+        "manifestHash",
+        "bindingHash",
+        "outcome",
+        "reason"
+      ],
+      "type": "object"
+    },
     "sourceHash": {
       "pattern": "^[0-9a-f]{64}$",
       "type": "string"

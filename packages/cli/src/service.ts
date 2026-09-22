@@ -2761,6 +2761,7 @@ export class ApexService {
       blockedValidatorIds: string[];
       storageSecurity?: NativeValidationReceiptV1["storageSecurity"];
       storageDiagnostics?: NativeValidationReceiptV1["storageDiagnostics"];
+      securityBaseline?: NativeValidationReceiptV1["securityBaseline"];
     };
     outputs?: TaskOutput[];
   }> {
@@ -2850,6 +2851,7 @@ export class ApexService {
       )
         executed.add("business:policy-property-map");
       if (receipt.resourceParity?.outcome === "pass") executed.add("business:logical-resource-parity");
+      if (receipt.securityBaseline?.outcome === "pass") executed.add("business:security-baseline");
       const executedValidatorIds = required.filter((id) => executed.has(id));
       const blockedValidatorIds = required.filter((id) => !executed.has(id));
       const evidence: EvidenceManifestV1 = {
@@ -2875,6 +2877,7 @@ export class ApexService {
           blockedValidatorIds,
           ...(receipt.storageSecurity === undefined ? {} : { storageSecurity: receipt.storageSecurity }),
           ...(receipt.storageDiagnostics === undefined ? {} : { storageDiagnostics: receipt.storageDiagnostics }),
+          ...(receipt.securityBaseline === undefined ? {} : { securityBaseline: receipt.securityBaseline }),
         },
         outputs: [{ kind: "validation-evidence", value: evidence }],
       };
@@ -7670,6 +7673,7 @@ export class ApexService {
         )
           executed.add("business:policy-property-map");
         if (receipt.resourceParity?.outcome === "pass") executed.add("business:logical-resource-parity");
+        if (receipt.securityBaseline?.outcome === "pass") executed.add("business:security-baseline");
         if (provider.validationMode !== "simulated" && validatorIds.some((id) => !executed.has(id)))
           throw new ApexError(
             "APEX_VALIDATION",

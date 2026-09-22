@@ -169,11 +169,25 @@ dependency mismatches fail. Modules, nested template objects, existing declarati
 scopes and expression-based dependencies remain unsupported. This does not
 evaluate security properties or establish Terraform parity; those checks remain independently required.
 
+The `securityBaseline` receipt supports one bounded profile, `bicep-storage-only-baseline-v1`: every managed account
+must have exactly four storage services and their four scoped diagnostics, with no other resource types. It requires
+passing compiled parity, the four storage hardening properties, disabled public networking, OAuth by default, deny-only
+network ACLs without bypass or IP/VNet allow rules, system-assigned identity, Microsoft-managed encryption with
+infrastructure encryption, and blob/file encryption enabled. Diagnostic workspace references come from the accepted
+binding. Missing controls, credential-like content and diagnostic mismatches fail; unsupported resource sets or
+expressions cannot pass. The receipt binds source, compiler output, manifest and binding hashes. Only a passing result
+credits validation for the supported configuration. Nonempty template parameters, variables and outputs, unknown template
+sections, additional account controls, and nonempty storage-service configuration remain unsupported rather than ignored.
+The supported property allowlist is intentionally closed until additional settings receive executable checks. A pass
+credits the security validator. This deliberately strict profile does not implement arbitrary exceptions or mixed-service
+baselines, prove RBAC/data-plane access, or establish live diagnostic delivery.
+
 Native preview also rejects a prior completion containing required simulated or missing evidence, before provider
 commands run. Explicit simulated adapters remain available for offline tests and cannot establish production readiness.
-Because business security-baseline and general logical-parity coverage remain incomplete, the production native workflow
-currently stops at validation. Preview implementation tests use explicitly simulated business evidence where necessary;
-their success is not evidence that this production prerequisite has been satisfied.
+The complete storage-only profile can finish Bicep source validation without opening Gate 4. General Bicep workloads and
+Terraform still lack complete baseline/parity execution and remain blocked when required evidence is unavailable.
+Preview implementation tests use explicitly simulated business evidence where necessary; their success is not evidence
+that a production prerequisite has been satisfied.
 
 Deterministic and package qualification cover both tracks. Current-candidate live Azure qualification remains required
 before claiming production readiness or release acceptance.
