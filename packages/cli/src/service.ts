@@ -3956,6 +3956,7 @@ export class ApexService {
       this.reviewMarkdownText(value.implementation),
       this.reviewMarkdownText(value.version),
       this.reviewMarkdownText(JSON.stringify(value.parameters)),
+      this.reviewMarkdownText(value.scopeLogicalId ?? "Not declared"),
       this.reviewMarkdownText(
         value.physicalResources === undefined ? "Not declared" : JSON.stringify(value.physicalResources),
       ),
@@ -3988,7 +3989,7 @@ export class ApexService {
       this.writeGeneratedReview(
         join(directory, "iac-binding.md"),
         Buffer.from(
-          `# IaC Binding\n\n- Track: ${this.reviewMarkdownText(binding.track)}\n- Intent hash: ${binding.intentHash}\n\n${table(["Logical ID", "Implementation", "Version", "Parameters", "Physical Authorization Scope"], bindingRows)}\n\nPhysical scope declares intended managed and protected resources; it is not evidence of module expansion or resource existence.\n`,
+          `# IaC Binding\n\n- Track: ${this.reviewMarkdownText(binding.track)}\n- Intent hash: ${binding.intentHash}\n\n${table(["Logical ID", "Implementation", "Version", "Parameters", "Diagnostic Scope Logical ID", "Physical Authorization Scope"], bindingRows)}\n\nPhysical scope declares intended managed and protected resources; it is not evidence of module expansion or resource existence.\n`,
           "utf8",
         ),
       ),

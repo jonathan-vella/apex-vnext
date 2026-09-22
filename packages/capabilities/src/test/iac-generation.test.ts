@@ -119,6 +119,45 @@ test("native generators accept nested resource types and reject malformed type p
   }
 });
 
+test("diagnostic scope references emit only accepted native Bicep resource symbols", () => {
+  const source = intent();
+  source.resources.push({
+    id: "diagnostic",
+    type: "Microsoft.Insights/diagnosticSettings",
+    purpose: "Monitor",
+    dependsOn: ["storage"],
+    controls: [],
+  });
+  const selected = binding(
+    "bicep",
+    "native:Microsoft.Storage/storageAccounts@2023-05-01",
+    "2023-05-01",
+    nativeParameters,
+  );
+  selected.resourceBindings.diagnostic = {
+    implementation: "native:Microsoft.Insights/diagnosticSettings@2021-05-01-preview",
+    version: "2021-05-01-preview",
+    scopeLogicalId: "storage",
+    parameters: { name: "logs", location: "swedencentral", parentId: "/", properties: {} },
+  };
+  const tree = generateBicepTree(source, selected);
+  assert.match(tree.files[0]!.content, /scope: storage/);
+  assert.equal(
+    tree.logicalManifest.resources.find(({ logicalId }) => logicalId === "diagnostic")!.generatedDependencies[0],
+    "storage",
+  );
+  for (const scopeLogicalId of ["missing", "diagnostic"]) {
+    const changed = structuredClone(selected);
+    changed.resourceBindings.diagnostic!.scopeLogicalId = scopeLogicalId;
+    assert.throws(() => generateBicepTree(source, changed), /Diagnostic scope/);
+  }
+  assert.throws(() => generateBicepTree(source, selected, { existingResources: ["storage"] }), /existing resource/);
+  assert.throws(() => generateTerraformTree(source, { ...selected, track: "terraform" }), /Diagnostic scope/);
+  const changed = structuredClone(selected);
+  changed.resourceBindings.diagnostic!.parameters.scope = "foreign";
+  assert.throws(() => generateBicepTree(source, changed), /Diagnostic scope/);
+});
+
 test("native generators are byte deterministic and enforce secure storage defaults", async () => {
   const sourceIntent = intent();
   const bicepBinding = binding(
@@ -477,6 +516,57 @@ test("native generated trees compile with installed Bicep and Terraform tools", 
   const childTemplate = JSON.parse(compiledChild.stdout) as { resources: Array<{ type: string; name: string }> };
   assert.equal(childTemplate.resources[0]!.type, childType);
   assert.equal(childTemplate.resources[0]!.name, "stexample/default");
+  const scopedIntent = intent([
+    { id: "storage", type: childType, purpose: "Blob configuration", dependsOn: [], controls: [] },
+    {
+      id: "diagnostic",
+      type: "Microsoft.Insights/diagnosticSettings",
+      purpose: "Monitor",
+      dependsOn: ["storage"],
+      controls: [],
+    },
+  ]);
+  const scopedBinding = binding("bicep", `native:${childType}@2023-05-01`, "2023-05-01", {
+    name: "stexample/default",
+    location: "swedencentral",
+    parentId: nativeParameters.parentId,
+    properties: {},
+  });
+  scopedBinding.resourceBindings.diagnostic = {
+    implementation: "native:Microsoft.Insights/diagnosticSettings@2021-05-01-preview",
+    version: "2021-05-01-preview",
+    scopeLogicalId: "storage",
+    parameters: {
+      name: "logs",
+      location: "swedencentral",
+      parentId: "/",
+      properties: {
+        workspaceId:
+          "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.OperationalInsights/workspaces/log",
+        logs: [{ categoryGroup: "allLogs", enabled: true }],
+        metrics: [{ category: "Transaction", enabled: true }],
+      },
+    },
+  };
+  const scopedRoot = join(root, "bicep-scoped");
+  await writeVirtualTree(scopedRoot, generateBicepTree(scopedIntent, scopedBinding));
+  const compiledScoped = await runner.run({
+    executable: "bicep",
+    args: ["build", "main.bicep", "--stdout"],
+    cwd: scopedRoot,
+    timeoutMs: 180_000,
+    maxOutputBytes: 2_000_000,
+  });
+  assert.equal(compiledScoped.exitCode, 0, compiledScoped.stderr);
+  const scopedTemplate = JSON.parse(compiledScoped.stdout) as {
+    resources: Array<{ type: string; scope?: string; location?: string }>;
+  };
+  const diagnostic = scopedTemplate.resources.find(({ type }) => type === "Microsoft.Insights/diagnosticSettings")!;
+  assert.equal(
+    diagnostic.scope,
+    "[resourceId('Microsoft.Storage/storageAccounts/blobServices', split('stexample/default', '/')[0], split('stexample/default', '/')[1])]",
+  );
+  assert.equal(diagnostic.location, undefined);
   for (const [executable, cwd] of [
     ["bicep", bicepRoot],
     ["terraform", terraformRoot],

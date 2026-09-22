@@ -531,6 +531,33 @@ describe("Wave 1 contracts", () => {
       assert.equal(Value.Check(schema, changed), false);
   });
 
+  it("bounds native diagnostic scope references without arbitrary expressions", () => {
+    const source = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      track: "bicep",
+      intentHash: hash,
+      resourceBindings: {
+        diagnostic: {
+          implementation: "native:Microsoft.Insights/diagnosticSettings@2021-05-01-preview",
+          version: "2021-05-01-preview",
+          scopeLogicalId: "storage",
+          parameters: {},
+        },
+      },
+    };
+    assert.equal(Value.Check(IacBindingV1Schema, source), true);
+    for (const scopeLogicalId of ["../outside", "[resourceId('x')]", "foreign/id", "", "x".repeat(257)])
+      assert.equal(
+        Value.Check(IacBindingV1Schema, {
+          ...source,
+          resourceBindings: { diagnostic: { ...source.resourceBindings.diagnostic, scopeLogicalId } },
+        }),
+        false,
+      );
+  });
+
   it("uses one explicit persisted contract version", () => {
     const lock: RuntimeBundleLockV1 = {
       schemaVersion: CONTRACT_VERSION,

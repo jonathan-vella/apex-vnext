@@ -17,6 +17,12 @@ Native Bicep ownership resolves explicitly named child types only when type and 
 parent scope is the selected resource group. IDs interleave type/name segments; declaring a child grants no authority
 over its parent, siblings or undeclared descendants. Expression-based names and unresolved ownership still block preview.
 
+Native Bicep diagnostic-settings bindings can additionally declare `scopeLogicalId` for one managed native resource in
+the same accepted intent. The target must be a declared dependency; missing targets, modules, protected existing
+resources, self-reference, chained extension scopes and competing raw scope/parent parameters are rejected. The generator
+emits a symbolic `scope`, and ownership resolves only the diagnostic extension ID beneath that target. Terraform does
+not accept this Bicep-only field. Plan review displays the scope reference; it is not evidence that diagnostics ran.
+
 ## Resource Ownership
 
 The logical-resource manifest distinguishes `existing` from `managed` ownership. Artifact staging and acceptance reject

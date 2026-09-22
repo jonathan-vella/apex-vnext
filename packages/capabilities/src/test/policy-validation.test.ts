@@ -102,6 +102,15 @@ describe("bounded policy property validation", () => {
       });
     const receipt = check({ resources });
     assert.equal(receipt.outcome, "pass");
+    const fullNames = structuredClone(resources);
+    for (const service of ["blobServices", "fileServices", "queueServices", "tableServices"]) {
+      fullNames[service]!.name = "apexfixture/default";
+      fullNames[`${service}Diagnostic`]!.scope =
+        `[resourceId('Microsoft.Storage/storageAccounts/${service}', split('apexfixture/default', '/')[0], split('apexfixture/default', '/')[1])]`;
+    }
+    assert.equal(check({ resources: fullNames }).outcome, "pass");
+    fullNames.blobServicesDiagnostic!.scope = String(fullNames.blobServicesDiagnostic!.scope).replace("[1]", "[0]");
+    assert.notEqual(check({ resources: fullNames }).outcome, "pass");
     assert.equal(receipt.fullBaselineEvaluated, false);
     assert.doesNotMatch(JSON.stringify(receipt), /apexfixture|subscriptions/);
     for (const mutation of [

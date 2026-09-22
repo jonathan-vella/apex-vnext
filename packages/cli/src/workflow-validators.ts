@@ -233,12 +233,34 @@ export function resolveNativeBicepResourceOwnership(context: {
   }
   const manifestResources = new Map(manifest.resources.map((resource) => [resource.logicalId, resource]));
   const physicalIds = new Set<string>();
-  for (const resource of intent.resources) {
+  const orderedResources = [
+    ...intent.resources.filter(({ id }) => binding.resourceBindings[id]!.scopeLogicalId === undefined),
+    ...intent.resources.filter(({ id }) => binding.resourceBindings[id]!.scopeLogicalId !== undefined),
+  ];
+  for (const resource of orderedResources) {
     const resourceBinding = binding.resourceBindings[resource.id]!;
     const entry = manifestResources.get(resource.id)!;
     const path = `/binding/resourceBindings/${resource.id}`;
     if (entry.type !== resource.type || entry.implementationAddress !== resourceBinding.implementation) {
       issues.push({ path, message: "Manifest resource does not match the accepted binding and type" });
+      continue;
+    }
+    const scopeId = resourceBinding.scopeLogicalId;
+    if (
+      scopeId !== undefined &&
+      (resource.type.toLowerCase() !== "microsoft.insights/diagnosticsettings" ||
+        !resourceBinding.implementation.startsWith("native:Microsoft.Insights/diagnosticSettings@") ||
+        !resource.dependsOn.includes(scopeId) ||
+        scopeId === resource.id ||
+        binding.resourceBindings[scopeId]?.scopeLogicalId !== undefined ||
+        !binding.resourceBindings[scopeId]?.implementation.startsWith("native:") ||
+        manifestResources.get(scopeId)?.ownership !== "managed" ||
+        entry.ownership !== "managed" ||
+        !Object.hasOwn(resourceIdsByLogicalId, scopeId) ||
+        Object.hasOwn(resourceBinding.parameters, "scope") ||
+        Object.hasOwn(resourceBinding.parameters, "parent"))
+    ) {
+      issues.push({ path, message: "Diagnostic scope requires an exactly resolved managed native dependency" });
       continue;
     }
     if (resourceBinding.implementation.startsWith("avm:") || entry.implementationKind === "module") {
@@ -289,7 +311,7 @@ export function resolveNativeBicepResourceOwnership(context: {
       });
       continue;
     }
-    const resourceId = `${targetScope}/providers/${typeSegments[0]}/${typeSegments
+    const resourceId = `${scopeId === undefined ? targetScope : resourceIdsByLogicalId[scopeId]}/providers/${typeSegments[0]}/${typeSegments
       .slice(1)
       .map((segment, index) => `${segment}/${nameSegments[index]}`)
       .join("/")}`;
@@ -646,11 +668,15 @@ function bindingTrackMatch(value: unknown): ValidationIssue[] {
     bindingIds.every((id) => resourceIds.has(id))
       ? []
       : issue("/outputs/iac-binding", "IaC binding track, intent, or resource coverage is invalid");
-  if (Object.values(binding.resourceBindings).some(({ physicalResources }) => physicalResources !== undefined)) {
+  if (
+    Object.values(binding.resourceBindings).some(
+      ({ physicalResources, scopeLogicalId }) => physicalResources !== undefined || scopeLogicalId !== undefined,
+    )
+  ) {
     if (binding.track !== "bicep") {
       issues.push({
         path: "/outputs/iac-binding",
-        message: "Exact physical resource maps are supported only for Bicep AVM bindings",
+        message: "Exact physical resource maps and diagnostic scope references are supported only for Bicep bindings",
       });
     } else if (issues.length === 0) {
       issues.push(

@@ -442,10 +442,11 @@ export function validateBicepStorageDiagnostics(request: {
     )
       return result("unsupported", "unsupported-service");
     const scope = `[resourceId('${resourceType}', '${account.value.name}', 'default')]`;
+    const fullNameScope = `[resourceId('${resourceType}', split('${account.value.name}/default', '/')[0], split('${account.value.name}/default', '/')[1])]`;
     const settings = resources.filter(
       (resource) =>
         resource.resourceType?.toLowerCase() === "microsoft.insights/diagnosticsettings" &&
-        resource.value.scope === scope,
+        (resource.value.scope === scope || resource.value.scope === fullNameScope),
     );
     if (settings.length !== 1) return result("fail", "missing-or-ambiguous-diagnostics");
     const setting = settings[0]!;
