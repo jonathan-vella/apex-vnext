@@ -190,6 +190,39 @@ describe("Wave 1 contracts", () => {
           false,
         );
       if (track === "bicep") {
+        const parityBody: Omit<NativeValidationReceiptV1, "receiptHash"> = {
+          ...body,
+          resourceParity: {
+            coverage: "bicep-symbolic-resource-parity-v1",
+            sourceHash: body.sourceHash,
+            manifestHash: hash,
+            inputHash: otherHash,
+            outcome: "pass",
+            reason: "matched",
+          },
+        };
+        assert.equal(
+          hasValidNativeValidationReceipt(
+            { ...parityBody, receiptHash: calculateNativeValidationReceiptHash(parityBody) },
+            body,
+          ),
+          true,
+        );
+        for (const patch of [
+          { sourceHash: otherHash },
+          { outcome: "fail" },
+          { reason: "coverage-mismatch" },
+          { coverage: "full" },
+        ]) {
+          const altered = { ...parityBody, resourceParity: { ...parityBody.resourceParity!, ...patch } };
+          assert.equal(
+            hasValidNativeValidationReceipt(
+              { ...altered, receiptHash: calculatePolicyValidationDigest(altered) },
+              body,
+            ),
+            false,
+          );
+        }
         const controls = [
           ["properties.minimumTlsVersion", "TLS1_2"],
           ["properties.supportsHttpsTrafficOnly", true],

@@ -372,6 +372,80 @@
       "pattern": "^[0-9a-f]{64}$",
       "type": "string"
     },
+    "resourceParity": {
+      "additionalProperties": false,
+      "properties": {
+        "coverage": {
+          "const": "bicep-symbolic-resource-parity-v1",
+          "type": "string"
+        },
+        "inputHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "manifestHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "const": "pass",
+              "type": "string"
+            },
+            {
+              "const": "fail",
+              "type": "string"
+            },
+            {
+              "const": "unsupported",
+              "type": "string"
+            }
+          ]
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "const": "matched",
+              "type": "string"
+            },
+            {
+              "const": "coverage-mismatch",
+              "type": "string"
+            },
+            {
+              "const": "type-mismatch",
+              "type": "string"
+            },
+            {
+              "const": "dependency-mismatch",
+              "type": "string"
+            },
+            {
+              "const": "unsupported-resource",
+              "type": "string"
+            },
+            {
+              "const": "invalid-source",
+              "type": "string"
+            }
+          ]
+        },
+        "sourceHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "coverage",
+        "sourceHash",
+        "manifestHash",
+        "inputHash",
+        "outcome",
+        "reason"
+      ],
+      "type": "object"
+    },
     "runId": {
       "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
       "type": "string"

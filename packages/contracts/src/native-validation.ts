@@ -92,6 +92,26 @@ export const NativeValidationReceiptV1Schema = Type.Object(
     policyHash: Sha256Schema,
     inputHash: Sha256Schema,
     policyValidation: Type.Optional(PolicyValidationV1Schema),
+    resourceParity: Type.Optional(
+      Type.Object(
+        {
+          coverage: Type.Literal("bicep-symbolic-resource-parity-v1"),
+          sourceHash: Sha256Schema,
+          manifestHash: Sha256Schema,
+          inputHash: Sha256Schema,
+          outcome: Type.Union([Type.Literal("pass"), Type.Literal("fail"), Type.Literal("unsupported")]),
+          reason: Type.Union([
+            Type.Literal("matched"),
+            Type.Literal("coverage-mismatch"),
+            Type.Literal("type-mismatch"),
+            Type.Literal("dependency-mismatch"),
+            Type.Literal("unsupported-resource"),
+            Type.Literal("invalid-source"),
+          ]),
+        },
+        { additionalProperties: false },
+      ),
+    ),
     policyApplicability: Type.Optional(
       Type.Object(
         {
@@ -165,6 +185,21 @@ export function hasValidNativeValidationReceipt(
       return false;
     const storageInputHash =
       receipt.storageSecurity === undefined ? undefined : Object.values(receipt.storageSecurity)[0]?.inputHash;
+    const parity = receipt.resourceParity;
+    if (
+      parity !== undefined &&
+      (receipt.track !== "bicep" ||
+        parity.sourceHash !== receipt.sourceHash ||
+        (storageInputHash !== undefined && parity.inputHash !== storageInputHash) ||
+        (receipt.policyValidation !== undefined && parity.inputHash !== receipt.policyValidation.inputHash) ||
+        parity.outcome !==
+          (parity.reason === "matched"
+            ? "pass"
+            : ["unsupported-resource", "invalid-source"].includes(parity.reason)
+              ? "unsupported"
+              : "fail"))
+    )
+      return false;
     if (
       receipt.storageSecurity !== undefined &&
       (receipt.track !== "bicep" ||

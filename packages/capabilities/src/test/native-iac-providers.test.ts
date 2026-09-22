@@ -639,12 +639,39 @@ test("installed Bicep validates nested formatting and lint without changing acce
         policyValidation,
         ...(policyValidation === undefined
           ? {}
-          : { storageSecurityBindings: policyValidation.logicalResourceManifest }),
+          : {
+              storageSecurityBindings: policyValidation.logicalResourceManifest,
+              resourceParityManifest: {
+                schemaVersion: "1.0.0" as const,
+                projectId: "project",
+                runId: "run",
+                track: "bicep" as const,
+                resources: [
+                  {
+                    logicalId: "storage",
+                    type: "Microsoft.Storage/storageAccounts",
+                    implementationAddress: "native:Microsoft.Storage/storageAccounts@2023-05-01",
+                    executionAddress: checkModule ? "storageModule::storage" : "storage",
+                    implementationKind: "resource" as const,
+                    ownership: "managed" as const,
+                    dependsOn: [],
+                    generatedDependencies: [],
+                    sourcePath: "main.bicep",
+                  },
+                ],
+              },
+            }),
       };
       if (scenario === "pass" || scenario.endsWith("-pass")) {
         const receipt = await provider.validateSource(input);
         if (checkPolicy) {
           assert.equal(receipt.policyValidation?.outcome, "pass");
+          assert.equal(receipt.resourceParity?.outcome, checkModule ? "unsupported" : "pass");
+          assert.equal(
+            receipt.resourceParity?.manifestHash,
+            calculatePolicyValidationDigest(input.resourceParityManifest!),
+          );
+          assert.equal(receipt.resourceParity?.inputHash, receipt.policyValidation?.inputHash);
           assert.equal(receipt.policyValidation?.results.length, 3);
           assert.equal(receipt.storageSecurity?.storage?.outcome, "pass");
           assert.equal(receipt.storageSecurity?.storage?.fullBaselineEvaluated, false);

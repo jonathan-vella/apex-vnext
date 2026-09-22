@@ -9,9 +9,11 @@ import {
   calculatePolicyValidationHash,
   hasValidPolicyValidation,
   type PolicyPropertyMapV1,
+  type LogicalResourceManifestV1,
 } from "@apexops/contracts";
 import {
   validatePolicyProperties,
+  validateBicepResourceParity,
   validateStorageSecurityProperties,
   validateStorageSecurityBindings,
   type PolicyValidationInput,
@@ -70,6 +72,67 @@ function input(track: "bicep" | "terraform"): PolicyValidationInput {
 }
 
 describe("bounded policy property validation", () => {
+  it("compiled Bicep parity checks exact resource coverage, types and dependencies", () => {
+    const resource = {
+      logicalId: "storage",
+      type: "Microsoft.Storage/storageAccounts",
+      implementationAddress: "native",
+      executionAddress: "storage",
+      implementationKind: "resource" as const,
+      ownership: "managed" as const,
+      dependsOn: [] as string[],
+      generatedDependencies: [] as string[],
+      sourcePath: "main.bicep",
+    };
+    const manifest: LogicalResourceManifestV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      track: "bicep",
+      resources: [
+        resource,
+        {
+          ...resource,
+          logicalId: "second",
+          executionAddress: "second",
+          dependsOn: ["storage"],
+          generatedDependencies: ["storage"],
+        },
+      ],
+    };
+    const resources = { storage: { type: resource.type }, second: { type: resource.type, dependsOn: ["storage"] } };
+    const check = (source: unknown, expected = manifest) =>
+      validateBicepResourceParity({ sourceHash: hash, manifest: expected, json: JSON.stringify(source) });
+    assert.equal(check({ resources }).outcome, "pass");
+    assert.equal(check({ resources: { ...resources, extra: { type: resource.type } } }).reason, "coverage-mismatch");
+    assert.equal(check({ resources: { storage: resources.storage } }).reason, "coverage-mismatch");
+    assert.equal(
+      check({ resources: { ...resources, storage: { type: "Microsoft.KeyVault/vaults" } } }).reason,
+      "type-mismatch",
+    );
+    assert.equal(check({ resources: { ...resources, second: { type: resource.type } } }).reason, "dependency-mismatch");
+    assert.equal(
+      check({ resources: { ...resources, second: { type: resource.type, dependsOn: ["[resourceId('x','y')]"] } } })
+        .outcome,
+      "unsupported",
+    );
+    for (const patch of [{ condition: true }, { copy: {} }, { scope: "[resourceGroup().id]" }, { existing: true }])
+      assert.equal(
+        check({ resources: { ...resources, storage: { ...resources.storage, ...patch } } }).outcome,
+        "unsupported",
+      );
+    assert.equal(
+      check({ resources }, { ...manifest, resources: [{ ...resource, ownership: "existing" }] }).outcome,
+      "unsupported",
+    );
+    assert.equal(check({ resources: [] }).outcome, "fail");
+    assert.equal(
+      validateBicepResourceParity({ sourceHash: hash, manifest, json: "not JSON" }).reason,
+      "invalid-source",
+    );
+    assert.equal(check({ resources }).manifestHash, calculatePolicyValidationDigest(manifest));
+  });
+
   it("keeps batched storage observations resource-specific and bounded", () => {
     const secure = {
       type: "Microsoft.Storage/storageAccounts",

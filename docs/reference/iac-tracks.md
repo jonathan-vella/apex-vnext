@@ -137,9 +137,16 @@ does not generate a plan or attach these diagnostics. Passing limited storage pr
 `business:security-baseline` validator or opens a gate.
 
 Native task completion requires executed evidence for every required validator, not merely caller-supplied entries.
+For Bicep manifests containing only managed native resources with unique top-level symbolic execution addresses,
+`resourceParity` compares captured compiler output with the accepted manifest: exact resource coverage, ARM types and
+dependency sets. Its receipt binds source, compiler output and manifest hashes; only `outcome: pass` credits the parity
+validator. Extra/missing resources, type changes and dependency mismatches fail. Modules, nested resources, existing
+declarations, loops, conditions, explicit scopes and expression-based dependencies remain unsupported. This does not
+evaluate security properties or establish Terraform parity; those checks remain independently required.
+
 Native preview also rejects a prior completion containing required simulated or missing evidence, before provider
 commands run. Explicit simulated adapters remain available for offline tests and cannot establish production readiness.
-Because business security-baseline and full logical-parity executors remain incomplete, the production native workflow
+Because business security-baseline and general logical-parity coverage remain incomplete, the production native workflow
 currently stops at validation. Preview implementation tests use explicitly simulated business evidence where necessary;
 their success is not evidence that this production prerequisite has been satisfied.
 

@@ -12,6 +12,7 @@ import {
   calculatePolicyValidationDigest,
   hasValidNativeValidationReceipt,
   PolicyPropertyMapV1Schema,
+  LogicalResourceManifestV1Schema,
 } from "@apexops/contracts";
 import type {
   ApprovalEvidenceV1,
@@ -50,7 +51,11 @@ import {
 import type { ProcessRunnerLike } from "./process-runner.js";
 import { secretFreeProperties } from "./secret-redaction.js";
 import { LocalEncryptedPlanTransport, type LocalEncryptedPlan } from "./local-plan-transport.js";
-import { validatePolicyProperties, validateStorageSecurityBindings } from "./policy-validation.js";
+import {
+  validatePolicyProperties,
+  validateStorageSecurityBindings,
+  validateBicepResourceParity,
+} from "./policy-validation.js";
 
 export interface NativeProviderRuntime {
   readonly runner: ProcessRunnerLike;
@@ -317,7 +322,20 @@ abstract class NativeProviderBase {
     let receipt: NativeValidationReceiptV1;
     let policyInput: NativeValidationRequest["policyValidation"];
     let storageBindings: NativeValidationRequest["storageSecurityBindings"];
+    let parityManifest: NativeValidationRequest["resourceParityManifest"];
     try {
+      if (track === "bicep" && request.resourceParityManifest !== undefined) {
+        calculatePolicyValidationDigest(request.resourceParityManifest);
+        parityManifest = structuredClone(request.resourceParityManifest);
+        if (
+          !Value.Check(LogicalResourceManifestV1Schema, parityManifest) ||
+          parityManifest.track !== track ||
+          parityManifest.projectId !== request.projectId ||
+          parityManifest.runId !== request.runId ||
+          parityManifest.resources.length > 1000
+        )
+          throw new Error();
+      }
       if (track === "bicep" && request.storageSecurityBindings !== undefined) {
         calculatePolicyValidationDigest(request.storageSecurityBindings);
         storageBindings = structuredClone(request.storageSecurityBindings);
@@ -434,6 +452,16 @@ abstract class NativeProviderBase {
         } finally {
           await verify();
         }
+      }
+      if (parityManifest !== undefined) {
+        receipt.resourceParity = validateBicepResourceParity({
+          sourceHash: receipt.sourceHash,
+          manifest: parityManifest,
+          json: compiledTemplate ?? "",
+        });
+        const { receiptHash: previousHash, ...updated } = receipt;
+        if (!previousHash) throw sourceBindingError();
+        receipt.receiptHash = calculateNativeValidationReceiptHash(updated);
       }
       if (track === "bicep" && policyInput !== undefined && policyInput.policyMap.mappings.length > 0) {
         let policyValidation: PolicyValidationV1;

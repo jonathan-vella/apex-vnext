@@ -28,6 +28,7 @@ import {
   nativePolicyValidationBinding,
   validatePolicyProperties,
   validateStorageSecurityBindings,
+  validateBicepResourceParity,
 } from "@apexops/capabilities";
 import type { IacProvider, PreviewRequest } from "@apexops/capabilities";
 import { EventJournal, ObjectStore, RunRepository, ValidatorRegistry, sha256Bytes, sha256Json } from "@apexops/kernel";
@@ -740,6 +741,7 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
     let substituteStorage = false;
     let applicability: "valid" | "omit" | "wrong" = "valid";
     let unsolicitedPolicy = false;
+    let parity: "absent" | "valid" | "foreign" = "absent";
     const provider: IacProvider = {
       ...(track === "bicep" ? bicepPreviewProvider(new Date()) : terraformPreviewProvider(new Date())),
       async validateSource(request) {
@@ -754,6 +756,30 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
           inputHash: request.inputHash,
           policyHash: request.policyHash,
           outcome: "pass" as const,
+          ...(track !== "bicep" || parity === "absent"
+            ? {}
+            : {
+                resourceParity: {
+                  ...validateBicepResourceParity({
+                    sourceHash: request.sourceHash,
+                    manifest: request.resourceParityManifest!,
+                    json: JSON.stringify({
+                      resources: {
+                        api: {
+                          type: "Microsoft.Storage/storageAccounts",
+                          properties: {
+                            minimumTlsVersion: "TLS1_2",
+                            supportsHttpsTrafficOnly: true,
+                            allowBlobPublicAccess: false,
+                            allowSharedKeyAccess: false,
+                          },
+                        },
+                      },
+                    }),
+                  }),
+                  ...(parity === "foreign" ? { manifestHash: "e".repeat(64) } : {}),
+                },
+              }),
           ...(applicability === "omit"
             ? {}
             : {
@@ -898,6 +924,25 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
       substituteStorage = false;
     }
     const checked = await service.validateTask(validationTask);
+    if (track === "bicep") {
+      parity = "valid";
+      const matched = await service.validateTask(validationTask);
+      assert.ok(matched.execution!.executedValidatorIds.includes("business:logical-resource-parity"));
+      assert.deepEqual(matched.execution!.blockedValidatorIds, ["business:security-baseline"]);
+      assert.ok(
+        (matched.outputs![0]!.value as ReturnType<typeof validationEvidence>).entries.some(
+          ({ kind }) => kind === "business:logical-resource-parity",
+        ),
+      );
+      parity = "foreign";
+      await assert.rejects(service.validateTask(validationTask), /invalid or incomplete/);
+      await assert.rejects(
+        service.completeTaskOutputs(validationTask, [{ kind: "validation-evidence", value: submitted }]),
+        /parity evidence.*manifest/,
+      );
+      assert.equal(await journal.head(), head);
+      parity = "absent";
+    }
     assert.equal(checked.valid, false);
     assert.equal(checked.execution?.mode, "native");
     assert.deepEqual(

@@ -2776,11 +2776,17 @@ export class ApexService {
         ...binding,
         generatedSource: { rootPath, treeHash: handoff.treeHash },
         policyValidation: structuredClone(policyValidation),
-        ...(run.iacTool === "bicep" ? { storageSecurityBindings: this.storageSecurityBindings(manifest) } : {}),
+        ...(run.iacTool === "bicep"
+          ? {
+              storageSecurityBindings: this.storageSecurityBindings(manifest),
+              resourceParityManifest: structuredClone(manifest),
+            }
+          : {}),
       });
       if (
         !hasValidNativeValidationReceipt(receipt, binding) ||
         !this.hasRequiredNativePolicyEvidence(receipt, policyValidation) ||
+        !this.hasBoundResourceParity(receipt, manifest) ||
         !this.hasBoundStorageDiagnostics(receipt, manifest)
       )
         throw new ApexError(
@@ -2800,6 +2806,7 @@ export class ApexService {
         (run.iacTool === "bicep" && policyValidation !== undefined && receipt.policyValidation !== undefined)
       )
         executed.add("business:policy-property-map");
+      if (receipt.resourceParity?.outcome === "pass") executed.add("business:logical-resource-parity");
       const executedValidatorIds = required.filter((id) => executed.has(id));
       const blockedValidatorIds = required.filter((id) => !executed.has(id));
       const evidence: EvidenceManifestV1 = {
@@ -4556,7 +4563,8 @@ export class ApexService {
                   ? this.policyValidationInput(run.iacTool, policyMap, logicalManifest, true)
                   : undefined),
             ) ||
-            !this.hasBoundStorageDiagnostics(nativeReceipt, logicalManifest)
+            !this.hasBoundStorageDiagnostics(nativeReceipt, logicalManifest) ||
+            !this.hasBoundResourceParity(nativeReceipt, logicalManifest)
           )
             throw new ApexError(
               "APEX_VALIDATION",
@@ -7295,6 +7303,18 @@ export class ApexService {
     };
   }
 
+  private hasBoundResourceParity(
+    receipt: NativeValidationReceiptV1,
+    manifest: LogicalResourceManifestV1 | undefined,
+  ): boolean {
+    return (
+      receipt.resourceParity === undefined ||
+      (manifest !== undefined &&
+        receipt.track === "bicep" &&
+        receipt.resourceParity.manifestHash === calculatePolicyValidationDigest(manifest))
+    );
+  }
+
   private hasBoundStorageDiagnostics(
     receipt: NativeValidationReceiptV1,
     manifest: LogicalResourceManifestV1 | undefined,
@@ -7469,6 +7489,9 @@ export class ApexService {
                 storageSecurityBindings: this.storageSecurityBindings(
                   artifacts["logical-resource-manifest"] as LogicalResourceManifestV1 | undefined,
                 ),
+                resourceParityManifest: structuredClone(
+                  artifacts["logical-resource-manifest"] as LogicalResourceManifestV1,
+                ),
               }
             : {}),
         });
@@ -7495,6 +7518,17 @@ export class ApexService {
             "Native storage diagnostic does not match accepted binding",
             EXIT_CODES.validation,
           );
+        if (
+          !this.hasBoundResourceParity(
+            receipt,
+            artifacts["logical-resource-manifest"] as LogicalResourceManifestV1 | undefined,
+          )
+        )
+          throw new ApexError(
+            "APEX_VALIDATION",
+            "Native parity evidence does not match accepted manifest",
+            EXIT_CODES.validation,
+          );
         const receiptHash = await this.objects.putJson(receipt);
         const receiptBytes = Buffer.byteLength(JSON.stringify(receipt));
         const executed = new Set<string>(receipt.commands.map(({ validatorId }) => validatorId));
@@ -7503,6 +7537,7 @@ export class ApexService {
           (run.iacTool === "bicep" && receipt.policyValidation !== undefined)
         )
           executed.add("business:policy-property-map");
+        if (receipt.resourceParity?.outcome === "pass") executed.add("business:logical-resource-parity");
         if (provider.validationMode !== "simulated" && validatorIds.some((id) => !executed.has(id)))
           throw new ApexError(
             "APEX_VALIDATION",

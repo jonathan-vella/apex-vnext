@@ -4,6 +4,7 @@ import {
   POLICY_VALIDATION_LIMITS,
   STORAGE_PROPERTY_HARDENING_CONTROLS,
   PolicyPropertyMapV1Schema,
+  LogicalResourceManifestV1Schema,
   assertPolicyValidationJson,
   calculatePolicyValidationDigest,
   calculatePolicyValidationHash,
@@ -11,6 +12,7 @@ import {
   type PolicyPropertyMapV1,
   type PolicyValidationResultV1,
   type PolicyValidationV1,
+  type LogicalResourceManifestV1,
 } from "@apexops/contracts";
 import { parseJsonProcessOutput } from "./iac-normalizers.js";
 
@@ -362,6 +364,97 @@ export function validateStorageSecurityBindings(request: {
       }),
     ),
   );
+}
+
+export function validateBicepResourceParity(request: {
+  readonly sourceHash: string;
+  readonly manifest: LogicalResourceManifestV1;
+  readonly json: string;
+}) {
+  assertPolicyValidationJson(request.manifest);
+  if (
+    !Value.Check(LogicalResourceManifestV1Schema, request.manifest) ||
+    request.manifest.track !== "bicep" ||
+    request.manifest.resources.length > 1000 ||
+    !/^[a-f0-9]{64}$/.test(request.sourceHash) ||
+    typeof request.json !== "string" ||
+    Buffer.byteLength(request.json) > POLICY_VALIDATION_LIMITS.bytes
+  )
+    throw new TypeError("RESOURCE_PARITY_INVALID_INPUT");
+  const result = (
+    outcome: "pass" | "fail" | "unsupported",
+    reason:
+      | "matched"
+      | "coverage-mismatch"
+      | "type-mismatch"
+      | "dependency-mismatch"
+      | "unsupported-resource"
+      | "invalid-source",
+  ) => ({
+    coverage: "bicep-symbolic-resource-parity-v1" as const,
+    sourceHash: request.sourceHash,
+    manifestHash: calculatePolicyValidationDigest(request.manifest),
+    inputHash: createHash("sha256").update(request.json).digest("hex"),
+    outcome,
+    reason,
+  });
+  const expected = request.manifest.resources;
+  const byId = new Map(expected.map((resource) => [resource.logicalId, resource]));
+  if (
+    byId.size !== expected.length ||
+    new Set(expected.map(({ executionAddress }) => executionAddress)).size !== expected.length ||
+    expected.some(
+      (resource) =>
+        resource.ownership !== "managed" ||
+        resource.implementationKind !== "resource" ||
+        !/^[A-Za-z_][A-Za-z0-9_]*$/.test(resource.executionAddress ?? "") ||
+        resource.dependsOn.some((id) => !byId.has(id)) ||
+        JSON.stringify([...resource.dependsOn].sort()) !== JSON.stringify([...resource.generatedDependencies].sort()),
+    )
+  )
+    return result("unsupported", "unsupported-resource");
+  let observed: readonly Resource[];
+  try {
+    observed = resourcesFromJson(request.json, "bicep");
+  } catch {
+    return result("unsupported", "invalid-source");
+  }
+  if (
+    observed.some(
+      (resource) =>
+        resource.unsupported ||
+        resource.codeSymbol === undefined ||
+        resource.codeSymbol.includes("::") ||
+        resource.resourceType?.toLowerCase() === "microsoft.resources/deployments" ||
+        Object.hasOwn(resource.value, "scope") ||
+        Object.hasOwn(resource.value, "condition"),
+    )
+  )
+    return result("unsupported", "unsupported-resource");
+  if (
+    observed.length !== expected.length ||
+    expected.some(
+      (resource) => observed.filter(({ codeSymbol }) => codeSymbol === resource.executionAddress).length !== 1,
+    )
+  )
+    return result("fail", "coverage-mismatch");
+  for (const resource of expected) {
+    const compiled = observed.find(({ codeSymbol }) => codeSymbol === resource.executionAddress)!;
+    if (compiled.resourceType?.toLowerCase() !== resource.type.toLowerCase()) return result("fail", "type-mismatch");
+    const dependencies = compiled.value.dependsOn ?? [];
+    if (
+      !Array.isArray(dependencies) ||
+      dependencies.some((dependency) => typeof dependency !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(dependency))
+    )
+      return result("unsupported", "unsupported-resource");
+    const expectedDependencies = resource.dependsOn.map((id) => byId.get(id)!.executionAddress!).sort();
+    if (
+      new Set(dependencies).size !== dependencies.length ||
+      JSON.stringify([...dependencies].sort()) !== JSON.stringify(expectedDependencies)
+    )
+      return result("fail", "dependency-mismatch");
+  }
+  return result("pass", "matched");
 }
 
 export function validatePolicyProperties(request: PolicyValidationInput): PolicyValidationV1 {
