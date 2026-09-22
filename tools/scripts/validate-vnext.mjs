@@ -581,6 +581,7 @@ function validateCustomizations(model, findings) {
       { files: [".vscode/mcp.json"], generatedRoot: "client-projections/github-copilot-vscode" },
     ],
     ["github-copilot-cli", { files: [".github/mcp.json"], generatedRoot: "client-projections/github-copilot-cli" }],
+    ["both", { files: [".vscode/mcp.json", ".github/mcp.json"], generatedRoot: "client-projections/both" }],
   ]);
   const expectedAgentFiles = new Set(customization.agents.map(({ path: file }) => file));
   const expectedFiles = new Set([
@@ -619,7 +620,7 @@ function validateCustomizations(model, findings) {
   for (const projection of projections) {
     const expected = expectedProjectionFiles.get(projection.id);
     const files = array(projection.files);
-    projectedFiles.push(...files);
+    projectedFiles.push(...files.map((file) => `${projection.id}/${file}`));
     if (
       expected === undefined ||
       files.length !== new Set(files).size ||
@@ -643,7 +644,7 @@ function validateCustomizations(model, findings) {
     finding(
       findings,
       "customization.client-projection",
-      "Client projections must uniquely cover the supported VS Code and Copilot CLI files",
+      "Installation presets must exactly cover VS Code, Copilot CLI and their combined selection",
       "customizations/manifest.json",
     );
   const manifestRoles = array(customization.manifest.roles);

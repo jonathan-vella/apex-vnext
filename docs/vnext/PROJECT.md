@@ -37,7 +37,7 @@ The maintainer-approved ADR revision removes visibility as a security blocker. R
 CLI-to-MCP probe reject invalid/stale work and accept a valid task without approving gates. Qualify actual CodeGen,
 Reviewer and Validator profiles next, preserving models, tool grants and kernel safeguards. Shipped worker membership
 remains unchanged pending that evidence; same-client review is not authenticated independent identity.
-The model identifier issue is resolved: CLI adapter `1.4.0` maps the same configured GPT models to documented CLI IDs
+The model identifier issue is resolved: CLI adapter `1.5.0` maps the same configured GPT models to documented CLI IDs
 and keeps user discovery separate from model invocation. Isolated canonical parents delegated all four review stages
 on both tracks; stored reviews bound the correct subjects and introduced no gate approvals. Governance template identity
 now uses the accepted policy artifact rather than its workflow alias. These bounded probes do not qualify review quality,
@@ -140,7 +140,9 @@ local preflight for the Git boundary, workspace runtime version and existing APE
 initialization can now be reused by bootstrap without commands, rewrites or duplicate runs; partial or conflicting state
 remains blocked. It reports unassessed machine,
 client, COE, GitHub, OIDC and baseline checks rather than claiming complete onboarding. The pre-Node installer, resumable
-multi-client configuration, remote multi-archetype bootstrap and approved governance provisioning remain open.
+remote multi-archetype bootstrap and approved governance provisioning remain open. Combined local installation now
+selects both client projections with one managed lifecycle and namespaced CLI profiles; complete paired-client discovery
+and workflow acceptance remain unqualified. Repeated updates and uninstall preserve user-merged managed content.
 
 The local implementation now includes bounded local catalog discovery, confirmed requirements adoption/revision,
 generated-file and prior-IaC conflict protection, structured Architecture decision records, evidence-bound deployment

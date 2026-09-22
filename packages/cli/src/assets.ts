@@ -22,6 +22,7 @@ export interface BundledAssetSource {
   sourcePath?: string;
   sourceHash?: string;
   clientId?: string;
+  installationId?: "both";
   target?: string;
   adapterVersion?: string;
 }
@@ -34,7 +35,7 @@ export interface BundledAssetFile {
 }
 
 export interface BundledClientProjection {
-  id: "github-copilot-cli" | "github-copilot-vscode";
+  id: "github-copilot-cli" | "github-copilot-vscode" | "both";
   files: string[];
   digest: string;
 }
@@ -69,7 +70,7 @@ export interface BundledAssets {
 
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
-const PROJECTION_TARGETS: Readonly<Record<BundledClientProjection["id"], string>> = {
+const PROJECTION_TARGETS: Readonly<Record<string, string>> = {
   "github-copilot-cli": "github-copilot",
   "github-copilot-vscode": "vscode",
 };
@@ -370,10 +371,11 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
         throw new Error(`Invalid bundled asset source: ${file.path}`);
       }
       if (mapping.mode === "render-client-projections") {
-        const expectedPrefix = `${mapping.generatedRoot}/${file.source.clientId}/`;
+        const expectedPrefix = `${mapping.generatedRoot}/${file.source.installationId ?? file.source.clientId}/`;
         if (
           !["github-copilot-cli", "github-copilot-vscode"].includes(file.source.clientId ?? "") ||
-          file.source.adapterVersion !== "1.4.0" ||
+          (file.source.installationId !== undefined && file.source.installationId !== "both") ||
+          file.source.adapterVersion !== "1.5.0" ||
           !safeRelativePath(file.source.target ?? "") ||
           !file.path.startsWith(expectedPrefix) ||
           file.path !== `${expectedPrefix}${file.source.target}` ||
@@ -391,7 +393,7 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
   const projectionIds = new Set<string>();
   for (const projection of manifest.projections) {
     if (
-      !["github-copilot-cli", "github-copilot-vscode"].includes(projection.id) ||
+      !["github-copilot-cli", "github-copilot-vscode", "both"].includes(projection.id) ||
       projectionIds.has(projection.id) ||
       !Array.isArray(projection.files) ||
       projection.files.length !== new Set(projection.files).size ||
@@ -403,7 +405,7 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
     }
     projectionIds.add(projection.id);
   }
-  if (projectionIds.size !== 2) throw new Error("Bundled client projections are incomplete");
+  if (projectionIds.size !== 3) throw new Error("Bundled client projections are incomplete");
   const actualFiles = (await bundledPayloadFiles(root)).sort((left, right) =>
     left.path < right.path ? -1 : left.path > right.path ? 1 : 0,
   );
@@ -459,7 +461,13 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
     const canonical = sourceMetadata.get(`customizations/${file.source.sourcePath}`);
     if (
       (file.source.roleId !== undefined &&
-        (role === undefined || role.source !== file.source.sourcePath || !role.supportedTargets.includes(target))) ||
+        (role === undefined ||
+          role.source !== file.source.sourcePath ||
+          !role.supportedTargets.includes(target) ||
+          file.source.target !==
+            (file.source.installationId === "both" && file.source.clientId === "github-copilot-cli"
+              ? role.source.replace(/\/apex(?=[.-])/u, "/apex-cli")
+              : role.source))) ||
       canonical?.source.kind !== "repository-file" ||
       canonical.sha256 !== file.source.sourceHash ||
       (file.source.roleId === undefined && canonical.sha256 !== file.sha256)
@@ -475,7 +483,7 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
     )
     .map(({ path }) => path.slice("customizations/".length));
   for (const declaration of declarations) {
-    const target = projectionTarget(declaration.id);
+    const clients = declaration.id === "both" ? ["github-copilot-vscode", "github-copilot-cli"] : [declaration.id];
     const projection = manifest.projections.find(({ id }) => id === declaration.id);
     if (!Array.isArray(declaration.files) || declaration.files.length !== new Set(declaration.files).size) {
       throw new Error(`Bundled client projection disagrees with its declaration: ${declaration.id}`);
@@ -484,7 +492,15 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
       ...sharedFiles,
       ...sharedDirectoryFiles,
       ...declaration.files,
-      ...roles.filter(({ supportedTargets }) => supportedTargets.includes(target)).map(({ source }) => source),
+      ...clients.flatMap((client) =>
+        roles
+          .filter(({ supportedTargets }) => supportedTargets.includes(projectionTarget(client)))
+          .map(({ source }) =>
+            declaration.id === "both" && client === "github-copilot-cli"
+              ? source.replace(/\/apex(?=[.-])/u, "/apex-cli")
+              : source,
+          ),
+      ),
     ];
     const expected = [...new Set(expectedTargets)].map((path) => `${declaration.generatedRoot}/${path}`).sort();
     if (
@@ -510,6 +526,7 @@ export async function resolveBundledAssets(): Promise<BundledAssets> {
     clientProjections: {
       "github-copilot-cli": join(root, "client-projections", "github-copilot-cli"),
       "github-copilot-vscode": join(root, "client-projections", "github-copilot-vscode"),
+      both: join(root, "client-projections", "both"),
     },
     config: join(root, "config"),
     capabilityPacks: join(root, "capability-packs"),

@@ -32,9 +32,15 @@ qualification. Revised [ADR-0006](../vnext/adrs/03-des-adr-0006-omit-cli-autonom
 usability convention, not authorization. Kernel task, evidence, ownership and approval checks remain mandatory, and
 worker tool/model grants are unchanged. A directly selectable profile is not itself a security failure.
 
-CLI adapter `1.4.0` maps canonical `GPT-5.6 Terra` and `GPT-5.6 Sol` model labels to the documented CLI identifiers
+CLI adapter `1.5.0` maps canonical `GPT-5.6 Terra` and `GPT-5.6 Sol` model labels to the documented CLI identifiers
 `gpt-5.6-terra` and `gpt-5.6-sol`. VS Code labels and the selected model families are unchanged. This is identifier
 translation, not a model substitution or fallback.
+
+The `--client both` installation preset keeps those two client contracts in one managed lifecycle. CLI agent names use
+`APEX CLI` prefixes and `apex-cli-*` filenames; VS Code names remain unchanged. Both MCP configuration files are installed.
+This avoids relying on CLI `target` filtering or same-name added-root precedence, which did not isolate profiles in
+actual CLI probes. Combined installation/update/rollback checks and a bounded namespaced delegation probe do not replace
+full paired-client acceptance. Shipped CLI worker membership and all role grants remain unchanged.
 
 Hidden-user discovery does not implicitly disable model invocation. The adapter preserves explicit invocation-disable
 settings; isolated review-routing probes cover the canonical parent-to-Reviewer path on both tracks. This does not

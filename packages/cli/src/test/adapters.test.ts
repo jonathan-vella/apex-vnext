@@ -581,6 +581,38 @@ test("bootstrap reruns reuse matching intact state without commands or new runs"
   assert.deepEqual(await readFile(outside), selectionBytes);
 });
 
+test("combined client initialization uses one managed lifecycle and preserves profile conflicts", async () => {
+  const root = await tempRoot();
+  await execute(["init", "--project", "demo", "--client", "both"], root);
+  const service = new ApexService(root);
+  const before = await service.status();
+  const vscode = join(root, ".github/agents/apex.agent.md");
+  const cli = join(root, ".github/agents/apex-cli.agent.md");
+  assert.match(await readFile(vscode, "utf8"), /name: APEX\n/);
+  assert.match(await readFile(cli, "utf8"), /name: APEX CLI\n/);
+  await readFile(join(root, ".vscode/mcp.json"));
+  await readFile(join(root, ".github/mcp.json"));
+  const lock = JSON.parse(await readFile(join(root, ".apex/customizations.lock.json"), "utf8"));
+  assert.equal(lock.clientId, "both");
+  assert.equal(new Set(lock.files.map(({ path }: { path: string }) => path)).size, lock.files.length);
+  await service.update();
+  const restored = await service.rollbackCustomizations();
+  assert.deepEqual(restored.conflicts, []);
+  assert.equal((await new ApexService(root).status()).run.runId, before.run.runId);
+  const doctor = await service.doctor();
+  assert.ok(doctor.checks.filter(({ id }) => id.startsWith("managed:")).every(({ ok }) => ok));
+  const original = await readFile(cli, "utf8");
+  await writeFile(cli, original + "\nManual CLI edit\n");
+  await service.update();
+  assert.equal(await readFile(cli, "utf8"), original + "\nManual CLI edit\n");
+  await service.update();
+  assert.equal(await readFile(cli, "utf8"), original + "\nManual CLI edit\n");
+  await service.uninstallCustomizations();
+  assert.equal(await readFile(cli, "utf8"), original + "\nManual CLI edit\n");
+  await assert.rejects(readFile(vscode), { code: "ENOENT" });
+  assert.equal((await service.status()).run.runId, before.run.runId);
+});
+
 test("bootstrap derives a project ID from the workspace folder", async () => {
   const root = await tempRoot();
   await mkdir(join(root, ".git"));

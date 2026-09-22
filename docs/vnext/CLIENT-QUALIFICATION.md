@@ -191,6 +191,17 @@ with no tool requests or file changes. Evidence remains in `logs/dual-client-tar
 This does not test automatic delegation, name collisions or VS Code filtering, and does not establish an authorization
 failure. Simultaneous client packaging must preserve exact models/tools without relying on this unproven isolation.
 
+The added-root follow-up at source `aade16e0b319e9a0ff3d74768da5309086e4a070` also retained the workspace profile rather
+than overriding it. Baseline session `6224c6e3-c8bc-4c4b-a92f-865d2dd95f34` and added-root session
+`b3d30b0c-c1cb-4e2a-8d20-ea8e8db728d3` both returned the workspace marker, with no tool requests or file changes.
+Evidence remains under `dist/dual-client-added-root-probe`; this is a same-name precedence observation, not a trust boundary.
+
+A subsequent routing-only fixture used the working-tree name-mapping adapter based on that commit. CLI session
+`1cb50f1d-2f7b-41f8-bf24-e4fbe2afa036` delegated from `APEX CLI Planner` on Sol to `APEX CLI Validator` on its configured
+Terra model while a separate VS Code Validator profile was present. Only the namespaced marker was returned. The parent
+had delegation only and the child had no tools; no kernel workflow or cloud authority was available. Evidence remains in
+`dist/dual-client-namespaced-probe`. This supports distinct CLI names, not full combined-profile or VS Code acceptance.
+
 ## Multiple-Selection Input
 
 Keep native multi-select in VS Code and wherever the exposed question-tool schema supports it. When a standalone CLI session

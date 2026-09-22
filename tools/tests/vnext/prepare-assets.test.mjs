@@ -29,6 +29,48 @@ const assessmentSkills = [
   "apex-azure-validate",
 ];
 
+test("CLI projection namespaces agent references without changing models or grants", async () => {
+  const manifest = JSON.parse(await readFile(join(root, "customizations/manifest.json"), "utf8"));
+  const inventory = JSON.parse(await readFile(join(root, "tools/registry/copilot-cli-agent-tools.json"), "utf8"));
+  const agentNames = Object.fromEntries(
+    manifest.roles.map(({ agent }) => [agent, agent.replace(/^APEX/u, "APEX CLI")]),
+  );
+  for (const role of manifest.roles) {
+    const source = await readFile(join(root, "customizations", role.source), "utf8");
+    const options = {
+      delegates: roleDelegatesOnClient(role, "github-copilot-cli", manifest.roles, manifest.invocationEdges),
+    };
+    const original = renderClientAgentProjection(source, "github-copilot-cli", inventory, options);
+    const projected = renderClientAgentProjection(source, "github-copilot-cli", inventory, { ...options, agentNames });
+    const metadata = (text) => load(/^---\n([\s\S]*?)\n---/u.exec(text)[1]);
+    const before = metadata(original);
+    const after = metadata(projected);
+    assert.equal(after.name, agentNames[before.name]);
+    assert.deepEqual({ ...after, name: before.name }, before);
+    assert.ok(projected.includes("apex-shared-body"));
+    assert.doesNotMatch(projected, /APEX CLI CLI/u);
+    for (const target of ["Requirements", "Architect", "Planner", "Operator", "Reviewer", "Validator", "CodeGen"])
+      assert.ok(!projected.includes(`\`APEX ${target}\``));
+    assert.equal(
+      renderClientAgentProjection(source, "github-copilot-vscode", inventory, { agentNames }),
+      renderClientAgentProjection(source, "github-copilot-vscode", inventory),
+    );
+  }
+  const source = await readFile(join(root, "customizations/.github/agents/apex.agent.md"), "utf8");
+  const terms = renderClientAgentProjection(
+    `${source}\nThe APEX kernel owns state. Select \`APEX\` or \`APEX Planner\`.\n`,
+    "github-copilot-cli",
+    inventory,
+    { agentNames },
+  );
+  assert.match(terms, /The APEX kernel owns state\. Select `APEX CLI` or `APEX CLI Planner`\./u);
+  for (const mapping of [{}, { APEX: "unsafe\nname" }, { APEX: "APEX CLI", "APEX Planner": "APEX CLI" }])
+    assert.throws(
+      () => renderClientAgentProjection(source, "github-copilot-cli", inventory, { agentNames: mapping }),
+      /Invalid CLI agent name mapping/u,
+    );
+});
+
 test("governance collection files ship from canonical sources to both client projections", async () => {
   await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
   const assets = join(root, "packages/cli/assets");
@@ -65,6 +107,33 @@ test("governance collection files ship from canonical sources to both client pro
       }
     }
   }
+});
+
+test("combined installation preserves both MCP configurations and distinct client profiles", async () => {
+  await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
+  const assets = join(root, "packages/cli/assets");
+  const manifest = JSON.parse(await readFile(join(assets, "manifest.json"), "utf8"));
+  const customization = JSON.parse(await readFile(join(root, "customizations/manifest.json"), "utf8"));
+  const combined = manifest.projections.find(({ id }) => id === "both");
+  assert.ok(combined.files.includes("client-projections/both/.vscode/mcp.json"));
+  assert.ok(combined.files.includes("client-projections/both/.github/mcp.json"));
+  for (const client of ["github-copilot-vscode", "github-copilot-cli"])
+    for (const role of customization.roles) {
+      if (!roleSupportsClient(role, client)) continue;
+      const path = client === "github-copilot-cli" ? role.source.replace(/\/apex(?=[.-])/u, "/apex-cli") : role.source;
+      const target = `client-projections/both/${path}`;
+      assert.ok(combined.files.includes(target));
+      const metadata = (text) => load(/^---\n([\s\S]*?)\n---/u.exec(text)[1]);
+      const combinedAgent = metadata(await readFile(join(assets, target), "utf8"));
+      const singleAgent = metadata(await readFile(join(assets, "client-projections", client, role.source), "utf8"));
+      assert.equal(
+        combinedAgent.name,
+        client === "github-copilot-cli" ? role.agent.replace(/^APEX/u, "APEX CLI") : role.agent,
+      );
+      assert.deepEqual({ ...combinedAgent, name: singleAgent.name }, singleAgent);
+      assert.equal(manifest.files.find(({ path }) => path === target).source.clientId, client);
+      assert.equal(manifest.files.find(({ path }) => path === target).source.installationId, "both");
+    }
 });
 
 test("assessment skill mappings ship to managed client projections", async () => {

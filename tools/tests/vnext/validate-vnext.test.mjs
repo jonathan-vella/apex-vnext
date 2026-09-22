@@ -231,6 +231,11 @@ test("rejects client projection declaration and CLI allowlist drift", () => {
   });
   assert.ok(hasRule(projectionResult, "customization.client-projection"));
 
+  const combinedResult = mutate((model) => {
+    model.customization.manifest.clientProjections.find(({ id }) => id === "both").files = [".vscode/mcp.json"];
+  });
+  assert.ok(hasRule(combinedResult, "customization.client-projection"));
+
   const allowlistResult = mutate((model) => {
     model.customization.cliMcp.mcpServers.apex.tools.pop();
   });

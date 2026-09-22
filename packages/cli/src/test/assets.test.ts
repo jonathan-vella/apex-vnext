@@ -50,6 +50,11 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
           generatedRoot: "client-projections/github-copilot-cli",
           files: [".github/mcp.json"],
         },
+        {
+          id: "both",
+          generatedRoot: "client-projections/both",
+          files: [".vscode/mcp.json", ".github/mcp.json"],
+        },
       ],
       roles: [
         {
@@ -201,7 +206,7 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
           composition: "client-projections",
           clientId: client,
           target,
-          adapterVersion: "1.4.0",
+          adapterVersion: "1.5.0",
           sourcePath: target,
           sourceHash: sha256Bytes(content),
           ...(agent
@@ -217,8 +222,41 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
       });
     }
   }
+  for (const [target, content, clientId, sourcePath] of [
+    [".github/agents/apex.agent.md", agentBytes, "github-copilot-vscode", ".github/agents/apex.agent.md"],
+    [".github/agents/apex-cli.agent.md", agentBytes, "github-copilot-cli", ".github/agents/apex.agent.md"],
+    [".vscode/mcp.json", vscodeBytes, "github-copilot-vscode", ".vscode/mcp.json"],
+    [".github/mcp.json", cliBytes, "github-copilot-cli", ".github/mcp.json"],
+    ["README.md", sharedBytes, "github-copilot-vscode", "README.md"],
+  ]) {
+    const path = `client-projections/both/${target}`;
+    await mkdir(join(root, path!, ".."), { recursive: true });
+    await writeFile(join(root, path), content!);
+    const file: BundledAssetManifest["files"][number] = {
+      path,
+      source: {
+        kind: "generated",
+        composition: "client-projections",
+        clientId: clientId as string,
+        installationId: "both",
+        target: target as string,
+        adapterVersion: "1.5.0",
+        sourcePath: sourcePath as string,
+        sourceHash: sha256Bytes(content as Buffer),
+        ...(String(target).includes("agents/") ? { roleId: "coordinator" } : {}),
+      },
+      sha256: sha256Bytes(content as Buffer),
+      bytes: (content as Buffer).byteLength,
+    };
+    files.push(file as (typeof files)[number]);
+  }
   files.sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0));
   const projections = [
+    {
+      id: "both" as const,
+      files: files.filter(({ path }) => path.startsWith("client-projections/both/")).map(({ path }) => path),
+      digest: "",
+    },
     {
       id: "github-copilot-cli" as const,
       files: [
@@ -261,6 +299,14 @@ test("verifies a complete source-mapped bundle manifest", async (context) => {
   const { root, manifest } = await fixture();
   context.after(() => rm(root, { recursive: true, force: true }));
   await verifyBundledAssetManifest(root, manifest);
+});
+
+test("rejects combined profile client identity substitutions after rehashing", async () => {
+  const { root, manifest } = await fixture();
+  const agent = manifest.files.find(({ path }) => path === "client-projections/both/.github/agents/apex-cli.agent.md")!;
+  agent.source.clientId = "github-copilot-vscode";
+  manifest.lock.digest = bundleLockDigest(manifest);
+  await assert.rejects(verifyBundledAssetManifest(root, manifest), /source binding mismatch/);
 });
 
 test("rejects aggregate lock tampering and unlisted payload files", async (context) => {

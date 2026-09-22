@@ -171,6 +171,11 @@
       "id": "github-copilot-cli",
       "generatedRoot": "client-projections/github-copilot-cli",
       "files": [".github/mcp.json"]
+    },
+    {
+      "id": "both",
+      "generatedRoot": "client-projections/both",
+      "files": [".vscode/mcp.json", ".github/mcp.json"]
     }
   ],
   "roles": [

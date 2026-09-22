@@ -18,8 +18,14 @@ npm install --ignore-scripts --no-audit --no-fund \
 npx apex version --json
 ```
 
-Initialize exactly one client projection with `apex init --client github-copilot-vscode` or
-`--client github-copilot-cli`.
+Initialize VS Code with `apex init --client github-copilot-vscode`, standalone CLI with
+`--client github-copilot-cli`, or a combined managed installation with `--client both`.
+
+The combined preset installs both MCP configurations and keeps one update/rollback ownership record. VS Code profiles
+retain their APEX names; CLI profiles use `APEX CLI`, `APEX CLI Requirements` and corresponding role names, with
+`apex-cli-*.agent.md` filenames. Start the CLI coordinator with `copilot --agent apex-cli`. Each definition retains its
+client's exact model and tool contracts. Distinct names avoid relying on unsupported CLI `target` filtering or added-root
+precedence. Complete paired-client workflow qualification remains pending; CLI worker membership is unchanged.
 
 For an approved registry release, follow [Publish npm Packages](publish-npm.md) before using the published bootstrap
 route.
@@ -39,8 +45,8 @@ locks pass local checks. Partial or conflicting state remains blocked and preser
 health, remote COE, GitHub, OIDC and reviewed baseline
 checks are explicitly unassessed. A local `ready` result is not complete onboarding or deployment readiness.
 
-The agreed `apex-install` and `apex-bootstrap` guided first-run experiences, including both clients in one repository,
-remote multi-archetype selection and confirmed OIDC setup, remain under implementation. Their acceptance contract is
+The agreed `apex-install` and `apex-bootstrap` guided first-run experiences, remote multi-archetype selection and confirmed
+OIDC setup remain under implementation. Their acceptance contract is
 [first-time onboarding](../vnext/PRD.md#req-onboarding-001-first-time-install-and-repository-bootstrap).
 
 For a published package, use either a global CLI or a one-shot command. These routes are unavailable until

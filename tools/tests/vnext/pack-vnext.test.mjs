@@ -598,8 +598,8 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     coe,
   );
   const revision = (await runInTest("git", ["rev-parse", "HEAD"], coe)).stdout.trim();
-  for (const clientId of ["github-copilot-vscode", "github-copilot-cli"]) {
-    const consumer = clientId === "github-copilot-vscode" ? project : await createConsumer("cli-consumer");
+  for (const clientId of ["github-copilot-vscode", "github-copilot-cli", "both"]) {
+    const consumer = clientId === "github-copilot-vscode" ? project : await createConsumer(`${clientId}-consumer`);
     if (consumer !== project) {
       await installCandidate(consumer, true);
       await runInTest("git", ["init", "--initial-branch", "qualification"], consumer);
@@ -607,6 +607,12 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     const binary = join(consumer, "node_modules", ".bin", process.platform === "win32" ? "apex.cmd" : "apex");
     const cli = async (args) => JSON.parse((await runInTest(binary, [...args, "--json"], consumer)).stdout).result;
     if (consumer !== project) await cli(["init", "--project", "demo", "--client", clientId]);
+    if (clientId === "both") {
+      assert.match(await readFile(join(consumer, ".github/agents/apex-cli.agent.md"), "utf8"), /name: APEX CLI\n/u);
+      assert.match(await readFile(join(consumer, ".github/agents/apex.agent.md"), "utf8"), /name: APEX\n/u);
+      await readFile(join(consumer, ".vscode/mcp.json"));
+      await readFile(join(consumer, ".github/mcp.json"));
+    }
     const before = await cli(["status"]);
     const resumed = await cli(["bootstrap", "--project", "demo", "--client", clientId, "--yes"]);
     assert.equal(resumed.resumed, true);

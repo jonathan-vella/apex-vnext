@@ -67,10 +67,14 @@ function confirmed(flags: Flags, command: string): void {
   if (flags.yes !== true) throw new ApexError("APEX_USAGE", `${command} requires --yes`, EXIT_CODES.usage);
 }
 
-function clientId(flags: Flags): "github-copilot-cli" | "github-copilot-vscode" {
+function clientId(flags: Flags): "github-copilot-cli" | "github-copilot-vscode" | "both" {
   const value = flags.client ?? "github-copilot-vscode";
-  if (value !== "github-copilot-cli" && value !== "github-copilot-vscode") {
-    throw new ApexError("APEX_USAGE", "--client must be github-copilot-vscode or github-copilot-cli", EXIT_CODES.usage);
+  if (value !== "github-copilot-cli" && value !== "github-copilot-vscode" && value !== "both") {
+    throw new ApexError(
+      "APEX_USAGE",
+      "--client must be github-copilot-vscode, github-copilot-cli or both",
+      EXIT_CODES.usage,
+    );
   }
   return value;
 }

@@ -69,6 +69,10 @@
             {
               "const": "github-copilot-cli",
               "type": "string"
+            },
+            {
+              "const": "both",
+              "type": "string"
             }
           ]
         },

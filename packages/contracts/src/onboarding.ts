@@ -11,6 +11,7 @@ import {
 export const BootstrapClientSchema = Type.Union([
   Type.Literal("github-copilot-vscode"),
   Type.Literal("github-copilot-cli"),
+  Type.Literal("both"),
 ]);
 
 export const OnboardingConfigV1Schema = Type.Object(

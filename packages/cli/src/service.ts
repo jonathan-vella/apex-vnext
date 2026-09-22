@@ -1180,7 +1180,7 @@ export class ApexService {
       const destination = join(this.root, file.path);
       if (!(await this.pathExistsLstat(destination))) continue;
       await this.assertSafeDestination(this.root, destination);
-      if (sha256Bytes(await readFile(destination)) !== file.currentHash) {
+      if (sha256Bytes(await readFile(destination)) !== file.sourceHash) {
         conflicts.push(file.path);
         continue;
       }
@@ -8587,7 +8587,7 @@ export class ApexService {
       ) as CustomizationSelection;
       if (
         value.version !== 1 ||
-        !["github-copilot-cli", "github-copilot-vscode"].includes(value.clientId) ||
+        !["github-copilot-cli", "github-copilot-vscode", "both"].includes(value.clientId) ||
         !["bundled-projection", "custom-source"].includes(value.sourceMode) ||
         (value.sourceMode === "custom-source" && typeof value.customSource !== "string")
       ) {
@@ -9014,7 +9014,7 @@ export class ApexService {
               `Existing file conflicts with managed ${label}: ${path}`,
               EXIT_CODES.conflict,
             );
-          if (!repair && old !== undefined && currentHash !== old.currentHash && currentHash !== old.baseHash) {
+          if (!repair && old !== undefined && currentHash !== old.baseHash) {
             const base = await this.readManagedBase(old.baseRef);
             const merged = base === undefined ? undefined : this.mergeText(base, current, incoming);
             if (merged === undefined)
