@@ -143,6 +143,7 @@ import {
   renderCostUncertaintyDiagram,
   renderDeploymentPreview,
   renderDeploymentSummary,
+  renderDeploymentGuide,
   renderRequirementsDocument,
   renderResourceInventory,
   renderRunStatus,
@@ -3646,6 +3647,7 @@ export class ApexService {
       files = [
         "README.md",
         "implementation-plan.md",
+        "deployment-guide.md",
         "iac-binding.md",
         "environment-inputs.md",
         "challenger-findings.md",
@@ -4040,9 +4042,13 @@ export class ApexService {
       this.writeGeneratedReview(
         join(directory, "README.md"),
         Buffer.from(
-          `# Implementation Plan\n\nGenerated Gate 3 review package for run \`${this.reviewMarkdownText(run.runId)}\`. The APEX kernel state remains authoritative.\n\n- Intent hash: ${hashes["implementation-intent"]}\n- Binding hash: ${hashes["iac-binding"]}\n- Environment input hash: ${hashes["environment-inputs"]}\n- Review status: challenger findings pending\n`,
+          `# Implementation Plan\n\nGenerated Gate 3 review package for run \`${this.reviewMarkdownText(run.runId)}\`. The APEX kernel state remains authoritative.\n\n- Intent hash: ${hashes["implementation-intent"]}\n- Binding hash: ${hashes["iac-binding"]}\n- Environment input hash: ${hashes["environment-inputs"]}\n- Review status: challenger findings pending\n\n[Deployment guide](deployment-guide.md) describes the accepted plan and remaining execution prerequisites.\n`,
           "utf8",
         ),
+      ),
+      this.writeGeneratedReview(
+        join(directory, "deployment-guide.md"),
+        Buffer.from(this.renderAcceptedPlanGuide(run, intent, binding, inputs, hashes), "utf8"),
       ),
       this.writeGeneratedReview(
         join(directory, "implementation-plan.md"),
@@ -5676,6 +5682,44 @@ export class ApexService {
     return { deleted: true };
   }
 
+  private renderAcceptedPlanGuide(
+    run: RunConfigV1,
+    intent: ImplementationIntentV1,
+    binding: IacBindingV1,
+    inputs: EnvironmentInputsV1,
+    hashes: Partial<Record<ArtifactKind, string>>,
+  ): string {
+    this.assertValid("implementation-intent", intent);
+    this.assertValid("iac-binding", binding);
+    this.assertValid("environment-inputs", inputs);
+    if (
+      [intent, binding, inputs].some(
+        (artifact) => artifact.projectId !== run.projectId || artifact.runId !== run.runId,
+      ) ||
+      binding.track !== run.iacTool ||
+      inputs.environment !== run.environment ||
+      sha256Json(intent) !== hashes["implementation-intent"] ||
+      sha256Json(binding) !== hashes["iac-binding"] ||
+      sha256Json(inputs) !== hashes["environment-inputs"] ||
+      binding.intentHash !== hashes["implementation-intent"] ||
+      new Set(intent.resources.map(({ id }) => id)).size !== intent.resources.length ||
+      Object.keys(binding.resourceBindings).length !== intent.resources.length ||
+      intent.resources.some(({ id }) => !Object.hasOwn(binding.resourceBindings, id))
+    )
+      throw new ApexError("APEX_VALIDATION", "Deployment guide source bindings do not match", EXIT_CODES.validation);
+    return renderDeploymentGuide({
+      run,
+      intent,
+      binding,
+      inputs,
+      hashes: {
+        intent: hashes["implementation-intent"]!,
+        binding: hashes["iac-binding"]!,
+        inputs: hashes["environment-inputs"]!,
+      },
+    });
+  }
+
   async render(
     kind:
       | "status"
@@ -5684,12 +5728,27 @@ export class ApexService {
       | "approval"
       | "inventory"
       | "deployment-summary"
+      | "deployment-guide"
       | "operations-runbook"
       | "architecture-decisions",
   ): Promise<string> {
     const run = await this.currentRun();
     if (kind === "status") return renderRunStatus(run);
     const events = await this.journal(run).replay();
+    if (kind === "deployment-guide") {
+      const intentHash = this.artifactHash(events, "implementation-intent");
+      const bindingHash = this.artifactHash(events, "iac-binding");
+      const inputsHash = this.artifactHash(events, "environment-inputs");
+      if (intentHash === undefined || bindingHash === undefined || inputsHash === undefined)
+        throw new ApexError("APEX_NOT_FOUND", "No current accepted plan exists", EXIT_CODES.notFound);
+      return this.renderAcceptedPlanGuide(
+        run,
+        await this.objects.getJson<ImplementationIntentV1>(intentHash),
+        await this.objects.getJson<IacBindingV1>(bindingHash),
+        await this.objects.getJson<EnvironmentInputsV1>(inputsHash),
+        { "implementation-intent": intentHash, "iac-binding": bindingHash, "environment-inputs": inputsHash },
+      );
+    }
     if (kind === "deployment-summary") {
       return this.renderCompletedDeploymentSummary(run, events);
     }

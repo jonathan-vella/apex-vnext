@@ -141,6 +141,11 @@ index. These are implemented source paths with automated checks, not complete li
 validation, resource-level selective regeneration, actual as-built spend and independently observed operational tests
 remain incomplete. Procedures stay untested unless a separate evidence-producing workflow establishes otherwise.
 
+Accepted plans now produce a source-bound deployment guide with resource and configuration-reference tables, intended
+ownership and outputs, and the existing preview/approval execution procedure. Generated guides preserve manual edits;
+current rendering refuses invalidated or mismatched sources. This is design guidance, not observed endpoints, verified
+access, deployment approval or workload-specific operational acceptance.
+
 Base-bound requirements amendments now merge bounded ID-addressed updates, additions, removals and explicitly changed
 fields before using the existing confirmed-revision path. They preserve untouched decisions and reject conflicting IDs,
 stale revisions and journal changes during preview. Full-document submission and normal Requirements review remain
@@ -151,8 +156,8 @@ The authorized output-quality reference was inspected at `jonathan-vella/aks-bas
 and deployment guide under `agent-output/apex-aks`. No reference state, approval or artifact corpus was imported.
 The useful comparison points are workload-specific alternatives, environment differences, resource-specific health
 checks, ownership, deployment prerequisites and parameter guidance. Current typed ADR/runbook fields can carry much of
-that detail, but fixture rendering does not prove representative output quality. Workload-specific deployment-guide and
-troubleshooting coverage, diagram consistency and human operational acceptance remain open. Reference prices, settings
+that detail, but fixture rendering does not prove representative output quality. Workload-specific troubleshooting,
+deployment-guide acceptance, diagram consistency and human operational acceptance remain open. Reference prices, settings
 and compliance assertions are not authority for this candidate.
 
 Native source validation now records a separate, map-bound `no-actionable-mappings` applicability receipt for an accepted

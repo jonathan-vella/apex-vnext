@@ -104,6 +104,12 @@ export const DOCUMENT_REGISTRY: Readonly<Record<string, DocumentDefinition>> = {
     templateAvailability: "not-applicable",
     renderer: "deployment-summary-v1",
   },
+  "deployment-guide": {
+    sourceArtifactKind: "implementation-intent",
+    sourceAvailability: "available",
+    templateAvailability: "not-applicable",
+    renderer: "deployment-guide-v1",
+  },
   "operations-runbook": {
     sourceArtifactKind: "diagnosis",
     sourceAvailability: "available",

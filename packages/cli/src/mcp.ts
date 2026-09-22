@@ -693,7 +693,7 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
     "render",
     {
       description:
-        "Render the selected run's status, requirements, preview, approval, inventory, structured Architecture decisions, operational runbook, or evidence-bound deployment summary as a human-readable projection.",
+        "Render the selected run's status, requirements, preview, approval, inventory, structured Architecture decisions, plan-bound deployment guide, operational runbook, or evidence-bound deployment summary as a human-readable projection.",
       inputSchema: {
         kind: z.enum([
           "status",
@@ -702,6 +702,7 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
           "approval",
           "inventory",
           "deployment-summary",
+          "deployment-guide",
           "architecture-decisions",
           "operations-runbook",
         ]),

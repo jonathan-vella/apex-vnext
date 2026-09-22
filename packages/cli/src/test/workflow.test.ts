@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { EventJournal, ObjectStore, sha256Json } from "@apexops/kernel";
@@ -367,6 +367,70 @@ test("requirements revision rejects stale heads and unresolved deployment execut
     /in-flight or indeterminate/,
   );
   assert.deepEqual(await service.status(), before);
+});
+
+for (const track of ["bicep", "terraform"] as const) {
+  test(`deployment guide binds current accepted ${track} plan and refuses invalidated sources`, async (context) => {
+    const root = await tempRoot();
+    const service = new ApexService(root);
+    const { runId } = await service.init({ projectId: "demo", iacTool: track });
+    await assert.rejects(service.render("deployment-guide"), /No current accepted plan/);
+    await prepareValidatedRun(service, runId, track);
+    const before = await service.status();
+    const guide = await service.render("deployment-guide");
+    assert.match(guide, /Accepted design only/);
+    assert.match(guide, new RegExp(`--provider ${track}`));
+    const directory = join(root, "agent-output", "demo", runId, "plan");
+    assert.equal(await readFile(join(directory, "deployment-guide.md"), "utf8"), guide);
+    assert.match(await readFile(join(directory, "README.md"), "utf8"), /deployment-guide.md/);
+    assert.equal(await new ApexService(root).render("deployment-guide"), guide);
+    assert.deepEqual(await service.status(), before);
+    const originalRead = ObjectStore.prototype.getJson;
+    context.mock.method(
+      ObjectStore.prototype,
+      "getJson",
+      async function (this: ObjectStore, ...args: Parameters<typeof originalRead>) {
+        const value = await originalRead.apply(this, args);
+        return value !== null && typeof value === "object" && "resourceBindings" in value
+          ? { ...value, intentHash: "f".repeat(64) }
+          : value;
+      },
+    );
+    await assert.rejects(service.render("deployment-guide"), /source bindings do not match/);
+    context.mock.restoreAll();
+    assert.deepEqual(await service.status(), before);
+    const candidate = { ...requirements(), budgetAndOperations: "Revised budget" };
+    const proposal = await service.previewRequirementsChange(candidate, "Change budget");
+    await service.reviseRequirements(candidate, {
+      reason: "Change budget",
+      expectedHash: proposal.proposalHash,
+      confirm: true,
+    });
+    await assert.rejects(service.render("deployment-guide"), /No current accepted plan/);
+    assert.equal(await readFile(join(directory, "deployment-guide.md"), "utf8"), guide);
+  });
+}
+
+test("manual deployment guide blocks plan acceptance without replacing user content", async (context) => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo" });
+  const directory = join(root, "agent-output", "demo", runId, "plan");
+  const originalComplete = service.completeTaskOutputs.bind(service);
+  let planHead: string | null | undefined;
+  context.mock.method(service, "completeTaskOutputs", async (...args: Parameters<typeof originalComplete>) => {
+    if (args[1].some(({ kind }) => kind === "implementation-intent")) {
+      await mkdir(directory, { recursive: true });
+      await writeFile(join(directory, "deployment-guide.md"), "Manual deployment instructions\n");
+      planHead = (await service.status()).head;
+    }
+    return originalComplete(...args);
+  });
+  await assert.rejects(prepareValidatedRun(service, runId, "bicep"), /manual edits|generation baseline/);
+  assert.ok(planHead);
+  assert.equal((await service.status()).head, planHead);
+  assert.equal(await readFile(join(directory, "deployment-guide.md"), "utf8"), "Manual deployment instructions\n");
+  await assert.rejects(service.render("deployment-guide"), /No current accepted plan/);
 });
 
 test("deployment summary binds accepted operation evidence and never upgrades simulated execution", async () => {

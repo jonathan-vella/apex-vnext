@@ -3,6 +3,9 @@ import type {
   ArchitectureV1,
   DeploymentPreviewV1,
   DiagnosisV1,
+  EnvironmentInputsV1,
+  IacBindingV1,
+  ImplementationIntentV1,
   OperationRecordV1,
   PolicyPropertyMapV1,
   RequirementsV1,
@@ -43,6 +46,114 @@ export function renderRequirements(requirements: RequirementsV1): string {
     "## Unknowns",
     "",
     unknowns.length === 0 ? "None." : unknowns.map((item) => `- ${escapeMarkdown(item)}`).join("\n"),
+  ].join("\n");
+}
+
+export function renderDeploymentGuide(input: {
+  run: RunConfigV1;
+  intent: ImplementationIntentV1;
+  binding: IacBindingV1;
+  inputs: EnvironmentInputsV1;
+  hashes: { intent: string; binding: string; inputs: string };
+}): string {
+  const { run, intent, binding, inputs, hashes } = input;
+  const resources = [...intent.resources].sort((left, right) => compareText(left.id, right.id));
+  const configurations = Object.entries(inputs.inputs).sort(([left], [right]) => compareText(left, right));
+  return [
+    "# Deployment Guide",
+    "",
+    "> Accepted design only. This guide is not validation evidence, deployment approval or proof of resource existence.",
+    "",
+    "## Target And Sources",
+    "",
+    fieldList([
+      ["Project", run.projectId],
+      ["Run", run.runId],
+      ["Environment", run.environment],
+      ["Target scope", run.targetScope],
+      ["IaC track", binding.track],
+      ["Implementation intent hash", hashes.intent],
+      ["IaC binding hash", hashes.binding],
+      ["Environment inputs hash", hashes.inputs],
+    ]),
+    "",
+    "## Planned Resources",
+    "",
+    markdownTable(
+      ["Logical ID", "Type", "Purpose", "Implementation", "Version", "Dependencies", "Diagnostic Scope"],
+      resources.map((resource) => {
+        const bound = binding.resourceBindings[resource.id]!;
+        return [
+          resource.id,
+          resource.type,
+          resource.purpose,
+          bound.implementation,
+          bound.version,
+          [...resource.dependsOn].sort(compareText).join(", ") || "None",
+          bound.scopeLogicalId ?? "Not declared",
+        ];
+      }),
+    ),
+    "",
+    "## Ownership Boundaries",
+    "",
+    "Explicit physical scope below is intended authorization scope, not observed inventory. Undeclared physical IDs remain unresolved in this guide.",
+    "",
+    markdownTable(
+      ["Logical ID", "Resource ID", "Ownership", "Role"],
+      resources
+        .flatMap(({ id }) =>
+          (binding.resourceBindings[id]!.physicalResources ?? []).map((resource) => [
+            id,
+            resource.resourceId,
+            resource.ownership,
+            resource.role,
+          ]),
+        )
+        .sort((left, right) => compareText(stableJson(left), stableJson(right))),
+    ),
+    "",
+    "## Configuration And Access",
+    "",
+    "Use the accepted environment-input artifact for values. Values and binding parameters are deliberately omitted here; secret references must be resolved only by the authorized execution environment.",
+    "",
+    markdownTable(
+      ["Configuration Name", "Kind", "Secret Reference", "Version"],
+      configurations.map(([name, value]) => [
+        name,
+        value.kind,
+        value.kind === "value" ? "Not a secret reference" : `${value.provider}:${value.reference}`,
+        value.kind === "value" ? "Not applicable" : (value.version ?? "Not pinned"),
+      ]),
+    ),
+    "",
+    "Confirm the active writer, target identity, required Azure permissions, secret access and installed toolchain before any cloud operation. This plan does not establish access or grant roles.",
+    "",
+    "## Deployment Procedure",
+    "",
+    "1. Inspect `apex status --json` and `apex doctor --json`; resolve missing prerequisites and stale inputs.",
+    "2. Complete required reviews, Gates 1 through 3, source generation and all native source validators for this accepted plan.",
+    `3. With explicit cloud-operation authorization, request \`apex preview --operation apply --provider ${binding.track} --json\`. Terraform preview may perform authenticated planning.`,
+    "4. Review the exact preview, resource ownership, replacements, deletions, policy results and blockers. A human must approve Gate 4 for that exact fresh preview and recipient.",
+    "5. Execute only the approved preview through `apex deploy --preview PREVIEW_HASH --json`; never substitute an unbound provider command.",
+    "6. Inspect the recorded deployment summary and inventory, then perform separately authorized workload health checks. A command exit alone does not prove application readiness.",
+    "",
+    "## Outputs And Application Handoff",
+    "",
+    "These are intended output names, not observed values or endpoints. The application team supplies application code and verifies its configuration against accepted deployment evidence.",
+    "",
+    intent.outputs.length === 0
+      ? "No outputs declared."
+      : [...intent.outputs]
+          .sort(compareText)
+          .map((output) => `- ${escapeMarkdown(output)}`)
+          .join("\n"),
+    "",
+    "## Recovery And Remaining Evidence",
+    "",
+    "For interrupted or indeterminate execution, inspect status and use the authorized reconciliation path before retrying. Do not edit journals, reuse stale approvals or issue direct rollback commands.",
+    "",
+    "Workload-specific health checks, monitoring, escalation ownership, rollback and recovery procedures require accepted operational handoff data. This guide supplies no restore-test result, compliance certification, live endpoint, actual spend or successful deployment claim.",
   ].join("\n");
 }
 

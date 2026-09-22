@@ -155,22 +155,28 @@ Changed trees use a new isolated task directory. Resource-level incremental gene
 
 ## Projects And Operations
 
-| Command                | Required or notable flags                                                                                                           |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `apex project list`    | None                                                                                                                                |
-| `apex project use`     | `--project`; optional `--run`                                                                                                       |
-| `apex project show`    | Optional `--project`                                                                                                                |
-| `apex project search`  | `--query`                                                                                                                           |
-| `apex project history` | Optional `--limit`                                                                                                                  |
-| `apex preview`         | `--operation` with apply/destroy; `--provider` with fake/Bicep/Terraform; optional `--recipient`                                    |
-| `apex approval show`   | None                                                                                                                                |
-| `apex deploy`          | Optional `--preview`                                                                                                                |
-| `apex reconcile`       | None                                                                                                                                |
-| `apex inventory`       | None                                                                                                                                |
-| `apex diagnose`        | None                                                                                                                                |
-| `apex render`          | `--kind` with status, requirements, preview, approval, inventory, deployment-summary, architecture-decisions, or operations-runbook |
+| Command                | Required or notable flags                                                                                                                             |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apex project list`    | None                                                                                                                                                  |
+| `apex project use`     | `--project`; optional `--run`                                                                                                                         |
+| `apex project show`    | Optional `--project`                                                                                                                                  |
+| `apex project search`  | `--query`                                                                                                                                             |
+| `apex project history` | Optional `--limit`                                                                                                                                    |
+| `apex preview`         | `--operation` with apply/destroy; `--provider` with fake/Bicep/Terraform; optional `--recipient`                                                      |
+| `apex approval show`   | None                                                                                                                                                  |
+| `apex deploy`          | Optional `--preview`                                                                                                                                  |
+| `apex reconcile`       | None                                                                                                                                                  |
+| `apex inventory`       | None                                                                                                                                                  |
+| `apex diagnose`        | None                                                                                                                                                  |
+| `apex render`          | `--kind` with status, requirements, preview, approval, inventory, deployment-guide, deployment-summary, architecture-decisions, or operations-runbook |
 
 Only a human-authorized operator should run gate or deployment mutations. A preview must match the selected IaC track.
+
+`apex render --kind deployment-guide` projects the current accepted plan, including target, resources, intended physical
+ownership, configuration names and secret references, intended outputs, and the preview/approval procedure. It binds
+intent, binding and environment-input hashes; configuration values and binding parameters are omitted. The same guide
+is generated under the plan review directory with manual-edit protection. It does not establish access, validation,
+deployment approval, live endpoints or operational readiness. Invalidated plans cannot be rendered as current guides.
 
 `apex render --kind deployment-summary` projects the latest completed operation with its exact inventory and approval
 bindings. It labels simulated and native-adapter evidence separately, omits arbitrary resource properties, and reports

@@ -5,6 +5,9 @@ import type {
   ArchitectureV1,
   DeploymentPreviewV1,
   DiagnosisV1,
+  EnvironmentInputsV1,
+  IacBindingV1,
+  ImplementationIntentV1,
   PolicyPropertyMapV1,
   OperationRecordV1,
   RequirementsV1,
@@ -17,6 +20,7 @@ import {
   renderApprovalEvidence,
   renderArchitectureDecisionRecords,
   renderDeploymentPreview,
+  renderDeploymentGuide,
   renderDeploymentSummary,
   renderRequirementsDocument,
   renderRequirements,
@@ -35,6 +39,7 @@ test("document registry limits template bindings to supported sources", () => {
   assert.equal(DOCUMENT_REGISTRY["architecture-assessment"]?.sourceAvailability, "available");
   assert.equal(DOCUMENT_REGISTRY["cost-estimate"]?.sourceAvailability, "available");
   assert.equal(DOCUMENT_REGISTRY["deployment-summary"]?.renderer, "deployment-summary-v1");
+  assert.equal(DOCUMENT_REGISTRY["deployment-guide"]?.renderer, "deployment-guide-v1");
   assert.equal(DOCUMENT_REGISTRY["operations-runbook"]?.renderer, "operations-runbook-v1");
   assert.equal(DOCUMENT_REGISTRY["resource-inventory-template"]?.templateAvailability, "reference-only");
   for (const documentId of ["governance-constraints", "implementation-plan"]) {
@@ -42,6 +47,80 @@ test("document registry limits template bindings to supported sources", () => {
     assert.equal(DOCUMENT_REGISTRY[documentId]?.templateAvailability, "reference-only");
   }
 });
+
+for (const track of ["bicep", "terraform"] as const) {
+  test(`deployment guide renders accepted ${track} intent without disclosing configuration values`, () => {
+    const run = {
+      projectId: "demo",
+      runId: "run",
+      environment: "dev",
+      targetScope: "/subscriptions/demo/resourceGroups/demo",
+      iacTool: track,
+    } as RunConfigV1;
+    const intent: ImplementationIntentV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      sourceHashes: {},
+      resources: [{ id: "api", type: "Microsoft.Web/sites", purpose: "Serve requests", dependsOn: [], controls: [] }],
+      outputs: ["endpoint"],
+    };
+    const binding: IacBindingV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      track,
+      intentHash: hash("a"),
+      resourceBindings: {
+        api: {
+          implementation: "approved-module",
+          version: "1.0.0",
+          parameters: { password: "DO_NOT_RENDER_PARAMETER" },
+          physicalResources: [
+            {
+              resourceId: "/subscriptions/demo/resourceGroups/demo/providers/Microsoft.Web/sites/api",
+              type: "Microsoft.Web/sites",
+              ownership: "managed" as const,
+              role: "primary" as const,
+            },
+          ],
+        },
+      },
+    };
+    const inputs: EnvironmentInputsV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      environment: "dev" as const,
+      inputs: {
+        config: { kind: "value" as const, value: "DO_NOT_RENDER_VALUE" },
+        credential: {
+          kind: "secret-reference" as const,
+          provider: "azure-key-vault" as const,
+          reference: "vault/secret",
+          version: "v1",
+        },
+      },
+    };
+    const input = {
+      run,
+      intent,
+      binding,
+      inputs,
+      hashes: { intent: hash("a"), binding: hash("b"), inputs: hash("c") },
+    };
+    const guide = renderDeploymentGuide(input);
+    assert.equal(renderDeploymentGuide(input), guide);
+    assert.match(guide, /Accepted design only/);
+    assert.match(guide, new RegExp(`--provider ${track}`));
+    assert.match(guide, /azure-key-vault:vault\/secret/);
+    assert.match(guide, /intended output names, not observed values or endpoints/);
+    assert.match(guide, /human must approve Gate 4/);
+    assert.match(guide, /Microsoft.Web\/sites\/api/);
+    assert.doesNotMatch(guide, /DO_NOT_RENDER/);
+    for (const digest of Object.values(input.hashes)) assert.ok(guide.includes(digest));
+  });
+}
 
 test("requirements document rendering fills exact template slots with typed or unavailable values", () => {
   const input: RequirementsV1 = {
