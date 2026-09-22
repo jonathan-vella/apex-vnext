@@ -42,6 +42,33 @@ content are rejected. The proposal records the normalized remote URL, exact comm
 rechecks them before copying. Select further archetypes with separate inspections and destinations. These remain
 independent copies, not a combined workload or automatically initialized project state.
 
+For several archetypes, use one reviewed batch configuration with an exact remote commit:
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "repository": "https://github.com/ORG/COE",
+  "revision": "FULL_40_CHARACTER_COMMIT_ID",
+  "selections": [
+    { "selectedPath": "archetypes/storage", "destination": "storage-copy" },
+    { "selectedPath": "archetypes/api", "destination": "api-copy" }
+  ]
+}
+```
+
+```bash
+apex bootstrap coe-plan --file coe.json --json
+apex bootstrap coe-import --file coe.json --expected-hash PLAN_HASH --yes --json
+```
+
+The batch supports at most 16 unique selections in separate top-level folders, with 32 MiB total reusable content.
+Every selection is inspected before copying starts. Confirmation binds the configuration and all source proposals;
+existing destinations must match their recorded origin and exact file set to be reused. Manual edits, extra files,
+unsafe links and incomplete copies block rather than being overwritten. Later failures report a blocked entry and leave
+earlier completed copies intact. Re-plan and retry with the same hash only when the content is unchanged. This is not a
+transactional rollback: a partially written blocked destination requires explicit inspection. Review each workload's
+decisions and initialize its independent APEX project afterward; no runtime state or approvals are copied.
+
 For either an imported workload or an existing manual copy, recover relevant decisions into a consumer-scoped
 `requirements-v1` JSON document. Confirm only facts that apply to this consumer; retain unresolved facts as unknowns.
 Use `requirements preview-adoption`, review its candidate and impact, then `requirements adopt --yes` with that proposal

@@ -149,6 +149,11 @@ the existing exclusions, content checks, explicit import confirmation and indepe
 the remote URL and blob-verified content. Private authentication is external to APEX; branch selection, guided
 multi-archetype bootstrap, defaults adoption and automatic per-workload initialization remain open.
 
+The new `bootstrap coe-plan` and confirmed `coe-import` path groups up to 16 remote selections with a 32 MiB reusable
+content budget. Each destination remains independent. Exact origin/file checks permit unchanged-copy reruns; conflicting
+or partial destinations remain preserved and blocked. Later failures report partial progress without rolling back prior
+copies. Guided selection, defaults confirmation and separate workload initialization are not yet automated by this batch.
+
 A read-only GitHub API probe compared `docs/explanation` at source commit
 `709db7878e754a195f20ff02c2f5c50121ba62a5` against local Git inspection: all four file hashes and exclusions matched,
 with remote proposal hash `52eda3eab1b70064524fb437921b1ca702cde06fef4fbf6556c38e792a4b7995`. No files or runtime

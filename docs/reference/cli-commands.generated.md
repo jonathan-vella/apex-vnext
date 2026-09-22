@@ -11,6 +11,8 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 - `archetype inspect`
 - `archetype list`
 - `bootstrap`
+- `bootstrap coe-import`
+- `bootstrap coe-plan`
 - `bootstrap governance-plan`
 - `bootstrap plan`
 - `cache clear`

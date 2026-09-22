@@ -6,7 +6,7 @@ import { once } from "node:events";
 import { mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { CONTRACT_VERSION, type ArchetypeSourceProposalV1 } from "@apexops/contracts";
+import { CONTRACT_VERSION, type ArchetypeSourceProposalV1, type ArchetypeBatchPlanV1 } from "@apexops/contracts";
 import type { ProcessRequest } from "@apexops/capabilities";
 import { sha256Json } from "@apexops/kernel";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -186,7 +186,7 @@ test("CLI archetype inspection and confirmed copy preserve independent origin an
   assert.deepEqual(await service.status(), before);
 });
 
-test("remote archetype CLI import rechecks exact content and records remote provenance without runtime authority", async () => {
+test("remote archetype CLI import rechecks exact content and records remote provenance without runtime authority", async (context) => {
   const root = await tempRoot();
   const revision = "a".repeat(40),
     tree = "b".repeat(40),
@@ -199,7 +199,7 @@ test("remote archetype CLI import rechecks exact content and records remote prov
     [`${prefix}/trees/${tree}`]: {
       sha: tree,
       truncated: false,
-      tree: [{ path: "workload", type: "tree", mode: "040000", sha: selected }],
+      tree: ["workload", "second"].map((path) => ({ path, type: "tree", mode: "040000", sha: selected })),
     },
     [`${prefix}/trees/${selected}`]: {
       sha: selected,
@@ -262,6 +262,89 @@ test("remote archetype CLI import rechecks exact content and records remote prov
   assert.deepEqual(await readFile(join(root, "copy/main.tf")), content);
   await assert.rejects(readFile(join(root, ".apex/config.json")), { code: "ENOENT" });
   await assert.rejects(execute([...importing, "--yes"], root, options), /already exists/);
+  const config = {
+    schemaVersion: CONTRACT_VERSION,
+    repository: "https://github.com/example/coe",
+    revision,
+    selections: [
+      { selectedPath: "workload", destination: "one" },
+      { selectedPath: "second", destination: "two" },
+    ],
+  };
+  const file = join(root, "batch.json");
+  await writeJson(file, config);
+  const plan = (await execute(["bootstrap", "coe-plan", "--file", file], root, options)) as ArchetypeBatchPlanV1;
+  assert.deepEqual(
+    plan.entries.map(({ state }) => state),
+    ["pending", "pending"],
+  );
+  const service = new ApexService(root, options);
+  await assert.rejects(
+    execute(["bootstrap", "coe-import", "--file", file, "--expected-hash", plan.planHash], root, options),
+    /--yes/,
+  );
+  await assert.rejects(service.importArchetypeBatch(config, plan.planHash, false), /confirmation/);
+  await assert.rejects(service.importArchetypeBatch(config, "f".repeat(64), true), /confirmed plan/);
+  for (const selections of [
+    [...config.selections, config.selections[0]!],
+    [{ ...config.selections[0]!, destination: "../outside" }],
+  ])
+    await assert.rejects(service.planArchetypeBatch({ ...config, selections }), /unique selections/);
+  const original = service.importArchetype.bind(service);
+  const mock = context.mock.method(service, "importArchetype", async (...args: Parameters<typeof original>) => {
+    if (args[0].destination === "two") throw new Error("Simulated connection failure");
+    return original(...args);
+  });
+  const partial = await service.importArchetypeBatch(config, plan.planHash, true);
+  assert.equal(partial.status, "blocked");
+  assert.deepEqual(
+    partial.entries.map(({ status }) => status),
+    ["copied", "blocked"],
+  );
+  mock.mock.restore();
+  const resumedPlan = await service.planArchetypeBatch(config);
+  assert.equal(resumedPlan.planHash, plan.planHash);
+  assert.deepEqual(
+    resumedPlan.entries.map(({ state }) => state),
+    ["already-copied", "pending"],
+  );
+  const copied = await service.importArchetypeBatch(config, plan.planHash, true);
+  assert.deepEqual(
+    copied.entries.map(({ status }) => status),
+    ["already-copied", "copied"],
+  );
+  assert.deepEqual(
+    (await service.importArchetypeBatch(config, plan.planHash, true)).entries.map(({ status }) => status),
+    ["already-copied", "already-copied"],
+  );
+  assert.notEqual(
+    JSON.parse(await readFile(join(root, "one/.apex-origin.json"), "utf8")).selectedPath,
+    JSON.parse(await readFile(join(root, "two/.apex-origin.json"), "utf8")).selectedPath,
+  );
+  await writeFile(join(root, "one/main.tf"), "manual edit\n");
+  await assert.rejects(service.planArchetypeBatch(config), /modified or incomplete/);
+  assert.equal(await readFile(join(root, "one/main.tf"), "utf8"), "manual edit\n");
+  await writeFile(join(root, "one/main.tf"), content);
+  await writeFile(join(root, "one/extra.md"), "retain\n");
+  await assert.rejects(service.planArchetypeBatch(config), /modified or incomplete/);
+  assert.equal(await readFile(join(root, "one/extra.md"), "utf8"), "retain\n");
+  await rm(join(root, "one/extra.md"));
+  const origin = await readFile(join(root, "one/.apex-origin.json"));
+  await writeJson(join(root, "one/.apex-origin.json"), { ...JSON.parse(origin.toString()), revision: "f".repeat(40) });
+  await assert.rejects(service.planArchetypeBatch(config), /modified or incomplete/);
+  await writeFile(join(root, "one/.apex-origin.json"), origin);
+  await rm(join(root, "one/main.tf"));
+  await symlink(join(root, "two/main.tf"), join(root, "one/main.tf"));
+  await assert.rejects(service.planArchetypeBatch(config), /modified or incomplete/);
+  await rm(join(root, "one/main.tf"));
+  await writeFile(join(root, "one/main.tf"), content);
+  const cliResult = (await execute(
+    ["bootstrap", "coe-import", "--file", file, "--expected-hash", plan.planHash, "--yes"],
+    root,
+    options,
+  )) as { status: string };
+  assert.equal(cliResult.status, "copied");
+  await assert.rejects(readFile(join(root, ".apex/config.json")), { code: "ENOENT" });
   responses[`${prefix}/blobs/${hash}`] = { ...(responses[`${prefix}/blobs/${hash}`] as object), content: "YmFk" };
   await assert.rejects(execute(["archetype", "inspect", ...selection], root, options), /inspection failed/);
 });

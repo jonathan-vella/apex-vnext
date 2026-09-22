@@ -19,7 +19,11 @@ import {
   RequirementsAmendmentV1Schema,
   RequirementsChangeProposalV1Schema,
 } from "./artifacts.js";
-import { ArchetypeSourceProposalV1Schema } from "./archetype-source.js";
+import {
+  ArchetypeSourceProposalV1Schema,
+  ArchetypeBatchConfigV1Schema,
+  ArchetypeBatchPlanV1Schema,
+} from "./archetype-source.js";
 import {
   ApprovalEvidenceV1Schema,
   DeploymentPreviewV1Schema,
@@ -82,6 +86,8 @@ import {
 } from "./targets.js";
 
 export const contractSchemas = [
+  ArchetypeBatchConfigV1Schema,
+  ArchetypeBatchPlanV1Schema,
   GovernanceSetupConfigV1Schema,
   GovernanceSetupPlanV1Schema,
   BootstrapPlanV1Schema,
@@ -155,6 +161,8 @@ const metadata = (maxBytes: number, sensitivity: ContractSensitivity = "internal
 });
 
 export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
+  "https://schemas.apexops.dev/archetype-batch-config-v1.json": metadata(16_384, "confidential"),
+  "https://schemas.apexops.dev/archetype-batch-plan-v1.json": metadata(2_097_152, "confidential"),
   "https://schemas.apexops.dev/governance-setup-config-v1.json": metadata(16_384, "confidential"),
   "https://schemas.apexops.dev/governance-setup-plan-v1.json": metadata(32_768, "confidential"),
   "https://schemas.apexops.dev/bootstrap-plan-v1.json": metadata(65_536, "confidential"),

@@ -11,6 +11,7 @@ import {
   type RequirementsV1,
   type RequirementsAmendmentV1,
   type GovernanceSetupConfigV1,
+  type ArchetypeBatchConfigV1,
 } from "@apexops/contracts";
 import { Value } from "@sinclair/typebox/value";
 import { EventJournal, ValidatorRegistry, WriterTransferStore, atomicWriteJson, sha256Json } from "@apexops/kernel";
@@ -475,6 +476,15 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
       return service.planBootstrap(await onboardingConfig(flags, root));
     case "bootstrap governance-plan":
       return service.planGovernanceSetup((await inputJson(flags)) as GovernanceSetupConfigV1);
+    case "bootstrap coe-plan":
+      return service.planArchetypeBatch((await inputJson(flags)) as ArchetypeBatchConfigV1);
+    case "bootstrap coe-import":
+      confirmed(flags, "bootstrap coe-import");
+      return service.importArchetypeBatch(
+        (await inputJson(flags)) as ArchetypeBatchConfigV1,
+        required(flags, "expected-hash"),
+        true,
+      );
     case "bootstrap": {
       confirmed(flags, "bootstrap");
       const config = await onboardingConfig(flags, root);

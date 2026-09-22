@@ -1,5 +1,10 @@
 import {
   ApprovalEvidenceV1Schema,
+  ArchetypeBatchConfigV1Schema,
+  ArchetypeBatchPlanV1Schema,
+  type ArchetypeBatchConfigV1,
+  type ArchetypeBatchPlanV1,
+  type ArchetypeSourceProposalV1,
   ArchitectureAvailabilityV1Schema,
   ArchitectureV1Schema,
   CONTRACT_VERSION,
@@ -1410,6 +1415,160 @@ export class ApexService {
         EXIT_CODES.validation,
       );
     }
+  }
+
+  private async copiedArchetypeMatches(destination: string, proposal: ArchetypeSourceProposalV1): Promise<boolean> {
+    const target = join(this.root, destination);
+    await this.assertSafeDestination(this.root, target);
+    if (!(await this.pathExistsLstat(target))) return false;
+    const conflict = () =>
+      new ApexError(
+        "APEX_CONFLICT",
+        `Archetype destination ${destination} is modified or incomplete; preserve it for review`,
+        EXIT_CODES.conflict,
+      );
+    if (!(await lstat(target)).isDirectory()) throw conflict();
+    const expected = new Map(proposal.files.map((file) => [file.path, file]));
+    expected.set(".apex-origin.json", { path: ".apex-origin.json", hash: "", bytes: 0 });
+    const allowedDirectories = new Set(
+      proposal.files.flatMap(({ path }) => {
+        const segments = path.split("/");
+        return segments.slice(0, -1).map((_, index) => segments.slice(0, index + 1).join("/"));
+      }),
+    );
+    const seen = new Set<string>();
+    const inspect = async (directory: string): Promise<void> => {
+      for (const entry of await readdir(directory, { withFileTypes: true })) {
+        const absolute = join(directory, entry.name);
+        const path = relative(target, absolute).split(sep).join("/");
+        const info = await lstat(absolute);
+        if (info.isSymbolicLink()) throw conflict();
+        if (info.isDirectory()) {
+          if (!allowedDirectories.has(path)) throw conflict();
+          await inspect(absolute);
+        } else {
+          const file = expected.get(path);
+          if (
+            !file ||
+            !info.isFile() ||
+            info.nlink !== 1 ||
+            info.size > (path === ".apex-origin.json" ? 262_144 : file.bytes)
+          )
+            throw conflict();
+          const bytes = await readFile(absolute);
+          if (path === ".apex-origin.json") {
+            try {
+              if (sha256Json(JSON.parse(bytes.toString("utf8"))) !== sha256Json(proposal)) throw conflict();
+            } catch {
+              throw conflict();
+            }
+          } else if (bytes.length !== file.bytes || sha256Bytes(bytes) !== file.hash) throw conflict();
+          seen.add(path);
+        }
+      }
+    };
+    await inspect(target);
+    if (seen.size !== expected.size) throw conflict();
+    return true;
+  }
+
+  async planArchetypeBatch(config: ArchetypeBatchConfigV1): Promise<ArchetypeBatchPlanV1> {
+    config = structuredClone(config);
+    if (
+      !Value.Check(ArchetypeBatchConfigV1Schema, config) ||
+      Buffer.byteLength(JSON.stringify(config)) > 16_384 ||
+      new Set(config.selections.map(({ destination }) => destination)).size !== config.selections.length ||
+      new Set(config.selections.map(({ selectedPath }) => selectedPath.toLowerCase())).size !== config.selections.length
+    )
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Archetype batch requires unique selections and separate safe destinations",
+        EXIT_CODES.validation,
+      );
+    const entries: ArchetypeBatchPlanV1["entries"] = [];
+    let bytes = 0;
+    for (const selection of config.selections) {
+      const { proposal } = await this.readArchetypeSelection(
+        config.repository,
+        config.revision,
+        selection.selectedPath,
+      );
+      bytes += proposal.files.reduce((sum, file) => sum + file.bytes, 0);
+      if (bytes > 33_554_432)
+        throw new ApexError("APEX_VALIDATION", "Archetype batch exceeds 32 MiB", EXIT_CODES.validation);
+      entries.push({
+        destination: selection.destination,
+        proposal,
+        state: (await this.copiedArchetypeMatches(selection.destination, proposal)) ? "already-copied" : "pending",
+      });
+    }
+    const planHash = sha256Json({
+      config,
+      entries: entries.map(({ destination, proposal }) => ({ destination, proposal })),
+    });
+    const plan = {
+      schemaVersion: CONTRACT_VERSION,
+      config,
+      entries,
+      planHash,
+      authorityImported: false as const,
+      requiresConsumerReview: true as const,
+    };
+    if (!Value.Check(ArchetypeBatchPlanV1Schema, plan) || Buffer.byteLength(JSON.stringify(plan)) > 2_097_152)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Archetype batch plan is invalid or exceeds its byte budget",
+        EXIT_CODES.validation,
+      );
+    return plan;
+  }
+
+  async importArchetypeBatch(config: ArchetypeBatchConfigV1, expectedHash: string, confirm: boolean) {
+    if (confirm !== true)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Archetype batch requires explicit confirmation",
+        EXIT_CODES.authorization,
+      );
+    const plan = await this.planArchetypeBatch(config);
+    if (expectedHash !== plan.planHash)
+      throw new ApexError("APEX_STALE", "Archetype batch differs from the confirmed plan", EXIT_CODES.stale);
+    const entries: Array<{ destination: string; status: "copied" | "already-copied" | "blocked" | "pending" }> = [];
+    let blocked = false;
+    for (const entry of plan.entries) {
+      if (blocked) {
+        entries.push({ destination: entry.destination, status: "pending" });
+        continue;
+      }
+      try {
+        if (await this.copiedArchetypeMatches(entry.destination, entry.proposal))
+          entries.push({ destination: entry.destination, status: "already-copied" });
+        else {
+          await this.importArchetype({
+            repositoryPath: plan.config.repository,
+            revision: plan.config.revision,
+            selectedPath: entry.proposal.selectedPath,
+            destination: entry.destination,
+            expectedHash: entry.proposal.contentHash,
+            confirm: true,
+          });
+          entries.push({ destination: entry.destination, status: "copied" });
+        }
+      } catch {
+        blocked = true;
+        entries.push({ destination: entry.destination, status: "blocked" });
+      }
+    }
+    return {
+      status: blocked ? "blocked" : "copied",
+      planHash: plan.planHash,
+      entries,
+      nextAction: blocked
+        ? "Inspect the blocked destination and remote access; completed copies are preserved. Re-plan before retrying."
+        : "Review and adopt each workload's decisions, then initialize separate project state; no approvals were imported.",
+      authorityImported: false,
+      requiresConsumerReview: true,
+    };
   }
 
   async importArchetype(request: {

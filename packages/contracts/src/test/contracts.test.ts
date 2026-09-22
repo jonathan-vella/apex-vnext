@@ -42,6 +42,7 @@ import {
   BootstrapPlanV1Schema,
   GovernanceSetupConfigV1Schema,
   GovernanceSetupPlanV1Schema,
+  ArchetypeBatchConfigV1Schema,
   PolicyPropertyMapV1Schema,
   PricingEvidenceV1Schema,
   PricingRequestV1Schema,
@@ -796,6 +797,26 @@ describe("Wave 1 contracts", () => {
       assert.equal(Value.Check(GovernanceSetupConfigV1Schema, invalid), false);
     for (const field of ["filesModified", "executionAuthorized", "deploymentAuthorized"])
       assert.equal(Value.Check(GovernanceSetupPlanV1Schema.properties[field as "executionAuthorized"], true), false);
+  });
+
+  it("batch archetype configuration requires bounded independent remote selections", () => {
+    const config = {
+      schemaVersion: "1.0.0",
+      repository: "https://github.com/example/coe",
+      revision: "a".repeat(40),
+      selections: [{ selectedPath: "archetypes/storage", destination: "storage" }],
+    };
+    assert.equal(Value.Check(ArchetypeBatchConfigV1Schema, config), true);
+    for (const invalid of [
+      { ...config, repository: "/local/path" },
+      { ...config, revision: "main" },
+      { ...config, selections: [] },
+      { ...config, selections: Array.from({ length: 17 }, () => config.selections[0]) },
+      { ...config, selections: [{ selectedPath: "../escape", destination: "storage" }] },
+      { ...config, selections: [{ selectedPath: "archetypes/storage", destination: "nested/workload" }] },
+      { ...config, authorityImported: true },
+    ])
+      assert.equal(Value.Check(ArchetypeBatchConfigV1Schema, invalid), false);
   });
 
   it("validates strict onboarding configuration with optional defaults", () => {
