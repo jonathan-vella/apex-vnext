@@ -2662,6 +2662,18 @@ export class ApexService {
           });
     const files: StagedFile[] = [];
     for (const file of tree.files) files.push(await this.stageFile(taskId, file.path, file.content));
+    try {
+      await assertGeneratedSourceUnchanged({
+        rootPath: resolve(this.root, ".apex", "work", run.runId, taskId, "code"),
+        treeHash: tree.treeHash,
+      });
+    } catch {
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "Generated source differs from the expected tree; preserve and resolve staged-file conflicts before retrying",
+        EXIT_CODES.conflict,
+      );
+    }
     const intentHash = sha256Json(intent);
     const bindingHash = sha256Json(binding);
     const environmentInputsHash = sha256Json(environmentInputs);

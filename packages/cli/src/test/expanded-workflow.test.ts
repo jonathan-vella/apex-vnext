@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, readdir, rename, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -3061,6 +3061,16 @@ test("restricted staging and generateIac produce a real accepted tree", async ()
   assert.deepEqual((await service.status()).run, before);
   assert.equal(await readFile(first.path, "utf8"), "bounded\n");
   await assert.rejects(readFile(join(first.path, "..", "..", "escape.tf")), { code: "ENOENT" });
+  await assert.rejects(service.generateIac(taskId), /differs from the expected tree/);
+  assert.equal((await service.status()).task, "codegen-bicep");
+  assert.equal(await readFile(first.path, "utf8"), "bounded\n");
+  assert.equal(
+    (await journal.replay()).filter(
+      (event) => event.type === "task.completed" && (event.payload as { nodeId?: string }).nodeId === "codegen-bicep",
+    ).length,
+    0,
+  );
+  await rm(first.path);
   const generated = await service.generateIac(taskId, { requiredToolVersions: { bicep: "test" } });
   assert.match(generated.treeHash, /^[0-9a-f]{64}$/);
   assert.ok(generated.files.some(({ path }) => path.endsWith("main.bicep")));
