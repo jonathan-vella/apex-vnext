@@ -738,6 +738,8 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
     let now = new Date();
     let expireDuringValidation = false;
     let substituteStorage = false;
+    let applicability: "valid" | "omit" | "wrong" = "valid";
+    let unsolicitedPolicy = false;
     const provider: IacProvider = {
       ...(track === "bicep" ? bicepPreviewProvider(new Date()) : terraformPreviewProvider(new Date())),
       async validateSource(request) {
@@ -752,6 +754,14 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
           inputHash: request.inputHash,
           policyHash: request.policyHash,
           outcome: "pass" as const,
+          ...(applicability === "omit"
+            ? {}
+            : {
+                policyApplicability: {
+                  status: "no-actionable-mappings" as const,
+                  policyMapContentHash: applicability === "wrong" ? "e".repeat(64) : request.policyHash,
+                },
+              }),
           ...(track !== "bicep"
             ? {}
             : {
@@ -780,7 +790,7 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
                   ).map(([key, value]) => [key, { ...value, results: [...value.results] }]),
                 ),
               }),
-          ...(track !== "terraform"
+          ...(track !== "terraform" || !unsolicitedPolicy
             ? {}
             : {
                 policyValidation: validatePolicyProperties({
@@ -859,6 +869,18 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
     );
     assert.equal(await journal.head(), head);
     stale = false;
+    for (const mutation of ["omit", "wrong"] as const) {
+      applicability = mutation;
+      await assert.rejects(service.validateTask(validationTask), /invalid or incomplete/);
+      assert.equal(await journal.head(), head);
+    }
+    applicability = "valid";
+    if (track === "terraform") {
+      unsolicitedPolicy = true;
+      await assert.rejects(service.validateTask(validationTask), /invalid or incomplete/);
+      assert.equal(await journal.head(), head);
+      unsolicitedPolicy = false;
+    }
     const originalTime = now;
     expireDuringValidation = true;
     await assert.rejects(service.validateTask(validationTask), /expired/i);
@@ -880,16 +902,18 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
     assert.equal(checked.execution?.mode, "native");
     assert.deepEqual(
       [...checked.execution!.executedValidatorIds].sort(),
-      NATIVE_VALIDATION_COMMANDS[track].map(({ validatorId }) => validatorId).sort(),
+      [
+        ...NATIVE_VALIDATION_COMMANDS[track].map(({ validatorId }) => validatorId),
+        "business:policy-property-map",
+      ].sort(),
     );
     assert.deepEqual(checked.execution?.blockedValidatorIds, [
       "business:security-baseline",
-      "business:policy-property-map",
       "business:logical-resource-parity",
     ]);
     assert.equal(await journal.head(), head);
     const partial = checked.outputs![0]!.value as ReturnType<typeof validationEvidence>;
-    assert.equal(partial.entries.length, 3);
+    assert.equal(partial.entries.length, 4);
     for (const entry of partial.entries) {
       const stored = await new ObjectStore(root).getJson<{ sourceHash: string }>(entry.hash);
       assert.equal(stored.sourceHash, generatedHashes.outputHashes["iac-handoff"]);
@@ -940,8 +964,8 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
       const receipt = await objects.getJson<{ sourceHash: string }>(payload.validatorEvidenceRefs[validatorId]!);
       assert.equal(receipt.sourceHash, generatedHashes.outputHashes["iac-handoff"]);
     }
-    assert.equal(payload.validatorEvidenceModes["business:policy-property-map"], "simulated");
-    assert.equal(payload.validatorEvidenceRefs["business:policy-property-map"], undefined);
+    assert.equal(payload.validatorEvidenceModes["business:policy-property-map"], "native");
+    assert.match(payload.validatorEvidenceRefs["business:policy-property-map"]!, /^[a-f0-9]{64}$/);
     const evidence = await objects.getJson<ReturnType<typeof validationEvidence>>(
       accepted.outputHashes["validation-evidence"]!,
     );

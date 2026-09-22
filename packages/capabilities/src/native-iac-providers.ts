@@ -3,6 +3,7 @@ import { constants } from "node:fs";
 import { lstat, mkdir, mkdtemp, open, opendir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { Value } from "@sinclair/typebox/value";
 import {
   hasValidPolicyValidation,
   NATIVE_VALIDATION_COMMANDS,
@@ -10,6 +11,7 @@ import {
   calculateNativeValidationReceiptHash,
   calculatePolicyValidationDigest,
   hasValidNativeValidationReceipt,
+  PolicyPropertyMapV1Schema,
 } from "@apexops/contracts";
 import type {
   ApprovalEvidenceV1,
@@ -321,10 +323,11 @@ abstract class NativeProviderBase {
         storageBindings = structuredClone(request.storageSecurityBindings);
         if (Object.keys(storageBindings).length > 1000) throw new Error();
       }
-      if (track === "bicep" && request.policyValidation !== undefined) {
+      if (request.policyValidation !== undefined) {
         calculatePolicyValidationDigest(request.policyValidation);
         policyInput = structuredClone(request.policyValidation);
         if (
+          !Value.Check(PolicyPropertyMapV1Schema, policyInput.policyMap) ||
           calculatePolicyValidationDigest(policyInput.policyMap) !== request.policyHash ||
           policyInput.policyMap.projectId !== request.projectId ||
           policyInput.policyMap.runId !== request.runId
@@ -340,6 +343,14 @@ abstract class NativeProviderBase {
         treeHash: generatedSource.treeHash,
         policyHash: request.policyHash,
         inputHash: request.inputHash,
+        ...(policyInput?.policyMap.mappings.length === 0
+          ? {
+              policyApplicability: {
+                status: "no-actionable-mappings" as const,
+                policyMapContentHash: calculatePolicyValidationDigest(policyInput.policyMap),
+              },
+            }
+          : {}),
         outcome: "pass",
         commands: commands.map((command) => ({
           validatorId: command.validatorId,
@@ -424,7 +435,7 @@ abstract class NativeProviderBase {
           await verify();
         }
       }
-      if (policyInput !== undefined && policyInput.policyMap.mappings.length > 0) {
+      if (track === "bicep" && policyInput !== undefined && policyInput.policyMap.mappings.length > 0) {
         let policyValidation: PolicyValidationV1;
         try {
           policyValidation = validatePolicyProperties({

@@ -108,9 +108,16 @@ the captured build output and requires complete passing policy evidence within t
 policy validator as native only when that evaluation ran. Acceptance and subsequent preview check the accepted map,
 resource bindings and every mapping's evidence.
 
-Terraform source validation remains command-only: `terraform validate` does not resolve planned values. Native preview
-evaluates its saved plan and requires passing source-bound policy evidence before Gate 4. Both providers snapshot
-bounded policy inputs before awaited preview commands. `validateTask` with supplied artifacts stages/checks them. With
+For an accepted empty map, both source adapters record `policyApplicability` with
+`status: no-actionable-mappings` and the exact policy-map content hash. The runtime credits the mapping applicability
+check only with that bound receipt; omission, substitution and an applicability claim for a nonempty map are rejected.
+This is not property evaluation, absence of audit policies, or full compliance. Security-baseline and logical-parity
+validators remain independently required and blocked when their execution evidence is unavailable.
+
+Terraform source property validation remains command-only: `terraform validate` does not resolve planned values.
+Native preview evaluates its saved plan and requires passing source-bound policy evidence before Gate 4.
+Both providers snapshot bounded policy inputs before awaited preview commands.
+`validateTask` with supplied artifacts stages/checks them. With
 only a task ID for an IaC validation task, it executes native checks and returns runtime-owned evidence plus executed
 and blocked validator IDs, without completing the task. `valid: false` means required execution evidence is incomplete;
 the worker must report the blockers rather than fabricate missing entries. Acceptance reexecutes current native checks.

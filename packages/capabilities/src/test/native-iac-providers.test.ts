@@ -15,10 +15,12 @@ import {
   calculateNativeValidationReceiptHash,
   hasValidNativeValidationReceipt,
   calculatePolicyValidationHash,
+  calculatePolicyValidationDigest,
   hasValidPolicyValidation,
   type ApprovalEvidenceV1,
   type DeploymentPreviewV1,
   type PolicyValidationV1,
+  type PolicyPropertyMapV1,
 } from "@apexops/contracts";
 import {
   IacOutputParseError,
@@ -934,6 +936,55 @@ for (const track of ["bicep", "terraform"] as const) {
     assert.equal(JSON.stringify(receipt).includes("stdout"), false);
     assert.equal(JSON.stringify(receipt).includes("stderr"), false);
     assert.deepEqual(await provider.validateSource(input), receipt);
+  });
+
+  test(`native ${track} records empty policy applicability without planning or claiming property evaluation`, async (context) => {
+    const fixture = await nativePolicyFixture(context, track);
+    const policyMap: PolicyPropertyMapV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "project",
+      runId: "run",
+      governanceHash: hashes.policy,
+      mappings: [],
+    };
+    const input: NativeValidationRequest = {
+      projectId: "project",
+      runId: "run",
+      sourceHash: hashes.iac,
+      generatedSource: fixture.generatedSource,
+      policyHash: calculatePolicyValidationDigest(policyMap),
+      inputHash: hashes.input,
+      policyValidation: { policyMap, logicalResourceManifest: {} },
+    };
+    const receipt = await fixture.makeProvider().validateSource(input);
+    assert.deepEqual(receipt.policyApplicability, {
+      status: "no-actionable-mappings",
+      policyMapContentHash: input.policyHash,
+    });
+    assert.equal(receipt.policyValidation, undefined);
+    assert.equal(
+      hasValidNativeValidationReceipt(receipt, { ...input, track, treeHash: input.generatedSource.treeHash }),
+      true,
+    );
+    assert.deepEqual(
+      fixture.runner.requests.map(({ executable, args }) => ({ executable, args })),
+      NATIVE_VALIDATION_COMMANDS[track].map(({ executable, args }) => ({ executable, args: [...args] })),
+    );
+    await assert.rejects(
+      fixture.makeProvider().validateSource({ ...input, policyHash: "f".repeat(64) }),
+      /inputs are invalid/,
+    );
+    const malformed = { ...policyMap, mappings: "" };
+    const before = fixture.runner.requests.length;
+    await assert.rejects(
+      fixture.makeProvider().validateSource({
+        ...input,
+        policyHash: calculatePolicyValidationDigest(malformed),
+        policyValidation: { policyMap: malformed as unknown as PolicyPropertyMapV1, logicalResourceManifest: {} },
+      }),
+      /inputs are invalid/,
+    );
+    assert.equal(fixture.runner.requests.length, before);
   });
 
   test(`native ${track} validateSource rejects missing, stale, or misbound sources before commands`, async (context) => {

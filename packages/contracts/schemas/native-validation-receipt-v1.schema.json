@@ -77,6 +77,24 @@
       "const": "pass",
       "type": "string"
     },
+    "policyApplicability": {
+      "additionalProperties": false,
+      "properties": {
+        "policyMapContentHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "status": {
+          "const": "no-actionable-mappings",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "policyMapContentHash"
+      ],
+      "type": "object"
+    },
     "policyHash": {
       "pattern": "^[0-9a-f]{64}$",
       "type": "string"

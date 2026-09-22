@@ -167,6 +167,28 @@ describe("Wave 1 contracts", () => {
       const receipt = { ...body, receiptHash: calculateNativeValidationReceiptHash(body) };
       assert.equal(Value.Check(NativeValidationReceiptV1Schema, receipt), true);
       assert.equal(hasValidNativeValidationReceipt(receipt, body), true);
+      const applicable = {
+        ...body,
+        policyApplicability: { status: "no-actionable-mappings" as const, policyMapContentHash: body.policyHash },
+      };
+      assert.equal(
+        hasValidNativeValidationReceipt(
+          { ...applicable, receiptHash: calculateNativeValidationReceiptHash(applicable) },
+          body,
+        ),
+        true,
+      );
+      for (const mutation of [
+        { ...applicable, policyApplicability: { ...applicable.policyApplicability, policyMapContentHash: otherHash } },
+        { ...applicable, policyApplicability: { ...applicable.policyApplicability, status: "compliant" } },
+      ])
+        assert.equal(
+          hasValidNativeValidationReceipt(
+            { ...mutation, receiptHash: calculatePolicyValidationDigest(mutation) },
+            body,
+          ),
+          false,
+        );
       if (track === "bicep") {
         const controls = [
           ["properties.minimumTlsVersion", "TLS1_2"],

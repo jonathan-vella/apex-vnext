@@ -92,6 +92,15 @@ export const NativeValidationReceiptV1Schema = Type.Object(
     policyHash: Sha256Schema,
     inputHash: Sha256Schema,
     policyValidation: Type.Optional(PolicyValidationV1Schema),
+    policyApplicability: Type.Optional(
+      Type.Object(
+        {
+          status: Type.Literal("no-actionable-mappings"),
+          policyMapContentHash: Sha256Schema,
+        },
+        { additionalProperties: false },
+      ),
+    ),
     storageSecurity: Type.Optional(
       Type.Record(NonEmptyStringSchema, storageSecurityObservation, { maxProperties: 1000 }),
     ),
@@ -148,6 +157,12 @@ export function hasValidNativeValidationReceipt(
     const { receiptHash, ...receipt } = value;
     const keys = ["projectId", "runId", "track", "sourceHash", "treeHash", "policyHash", "inputHash"] as const;
     if (keys.some((key) => receipt[key] !== binding[key])) return false;
+    if (
+      receipt.policyApplicability !== undefined &&
+      (receipt.policyValidation !== undefined ||
+        receipt.policyApplicability.policyMapContentHash !== receipt.policyHash)
+    )
+      return false;
     const storageInputHash =
       receipt.storageSecurity === undefined ? undefined : Object.values(receipt.storageSecurity)[0]?.inputHash;
     if (

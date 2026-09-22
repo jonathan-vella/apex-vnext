@@ -2771,7 +2771,7 @@ export class ApexService {
         policyHash: policyHash!,
         inputHash: inputHash!,
       };
-      const policyValidation = this.policyValidationInput(run.iacTool, policy, manifest);
+      const policyValidation = this.policyValidationInput(run.iacTool, policy, manifest, true);
       const receipt = await provider.validateSource({
         ...binding,
         generatedSource: { rootPath, treeHash: handoff.treeHash },
@@ -2795,7 +2795,10 @@ export class ApexService {
       await this.assertCurrentWriterAuthority(current, transfers);
       const receiptHash = await this.objects.putJson(receipt);
       const executed = new Set<string>(receipt.commands.map(({ validatorId }) => validatorId));
-      if (run.iacTool === "bicep" && policyValidation !== undefined && receipt.policyValidation !== undefined)
+      if (
+        receipt.policyApplicability !== undefined ||
+        (run.iacTool === "bicep" && policyValidation !== undefined && receipt.policyValidation !== undefined)
+      )
         executed.add("business:policy-property-map");
       const executedValidatorIds = required.filter((id) => executed.has(id));
       const blockedValidatorIds = required.filter((id) => !executed.has(id));
@@ -4546,7 +4549,13 @@ export class ApexService {
           if (
             payload?.validatorEvidenceModes?.[validatorId] !== "native" ||
             !hasValidNativeValidationReceipt(nativeReceipt, binding) ||
-            !this.hasRequiredNativePolicyEvidence(nativeReceipt, policyValidation) ||
+            !this.hasRequiredNativePolicyEvidence(
+              nativeReceipt,
+              policyValidation ??
+                (policyMap?.mappings.length === 0
+                  ? this.policyValidationInput(run.iacTool, policyMap, logicalManifest, true)
+                  : undefined),
+            ) ||
             !this.hasBoundStorageDiagnostics(nativeReceipt, logicalManifest)
           )
             throw new ApexError(
@@ -7220,7 +7229,11 @@ export class ApexService {
     receipt: NativeValidationReceiptV1,
     input: PreviewRequest["policyValidation"],
   ): boolean {
-    if (receipt.track !== "bicep" || input === undefined || input.policyMap.mappings.length === 0) return true;
+    if (input === undefined) return receipt.policyApplicability === undefined;
+    if (input.policyMap.mappings.length === 0)
+      return receipt.policyApplicability?.policyMapContentHash === calculatePolicyValidationDigest(input.policyMap);
+    if (receipt.policyApplicability !== undefined) return false;
+    if (receipt.track !== "bicep") return true;
     const policy = receipt.policyValidation;
     return (
       policy !== undefined &&
@@ -7266,8 +7279,9 @@ export class ApexService {
     track: RunConfigV1["iacTool"],
     policyMap: PolicyPropertyMapV1 | undefined,
     manifest: LogicalResourceManifestV1 | undefined,
+    includeEmpty = false,
   ): PreviewRequest["policyValidation"] {
-    if (policyMap === undefined || policyMap.mappings.length === 0) return undefined;
+    if (policyMap === undefined || (!includeEmpty && policyMap.mappings.length === 0)) return undefined;
     return {
       policyMap,
       logicalResourceManifest: Object.fromEntries(
@@ -7444,6 +7458,7 @@ export class ApexService {
           run.iacTool,
           artifacts["policy-property-map"] as PolicyPropertyMapV1 | undefined,
           artifacts["logical-resource-manifest"] as LogicalResourceManifestV1 | undefined,
+          true,
         );
         const receipt = await provider.validateSource({
           ...binding,
@@ -7483,7 +7498,11 @@ export class ApexService {
         const receiptHash = await this.objects.putJson(receipt);
         const receiptBytes = Buffer.byteLength(JSON.stringify(receipt));
         const executed = new Set<string>(receipt.commands.map(({ validatorId }) => validatorId));
-        if (run.iacTool === "bicep" && policyValidation !== undefined) executed.add("business:policy-property-map");
+        if (
+          receipt.policyApplicability !== undefined ||
+          (run.iacTool === "bicep" && receipt.policyValidation !== undefined)
+        )
+          executed.add("business:policy-property-map");
         if (provider.validationMode !== "simulated" && validatorIds.some((id) => !executed.has(id)))
           throw new ApexError(
             "APEX_VALIDATION",
