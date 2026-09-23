@@ -172,7 +172,7 @@ Maintainer direction on 2026-09-23 supersedes DECISION-012. Managed agents, skil
 Copilot CLI agent format. Supported clients are standalone Copilot CLI and the VS Code Copilot harness, which runs
 CLI-format agents in the VS Code Agent Host. The VS Code Local projection, its renderer path, `.vscode/mcp.json` and the
 combined installation mode retire through DECISION-015 gates: consumer migration, replacement proof, archive provenance
-under `archive/vscode-projection/`, rollback and a negative reintroduction check. `apex init` and `apex update` reject
+under `.archive/vscode-projection/`, rollback and a negative reintroduction check. `apex init` and `apex update` reject
 the retired client with a stable error code and migration guidance. The archive is never a runtime dependency.
 
 An `apex-next` skill replaces handoff buttons. It reads kernel status and the next task, names the owning agent, and

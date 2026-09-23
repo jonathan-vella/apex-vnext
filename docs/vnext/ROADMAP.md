@@ -83,7 +83,7 @@ none of the slices below is implemented. The VS Code Local projection keeps ship
 6. **Numbered multi-choice.** Present options numbered in kernel order, resolve the user's numbers, let the kernel
    validate the values and keep explicit confirmation before `recordInput`.
 7. **Retire the VS Code projection.** Move rendered VS Code agents, `.vscode/mcp.json`, the renderer path and
-   VS Code-specific tests, including the VS Code installation lifecycle registry, to `archive/vscode-projection/`.
+   VS Code-specific tests, including the VS Code installation lifecycle registry, to `.archive/vscode-projection/`.
    Exclude the archive from packaging and validation. Add migration, rollback and negative reintroduction checks.
 8. **Documentation.** Update explanation, reference, how-to and tutorial pages as behavior ships, including `/review`
    and `/security-review` guidance for promoted output.
