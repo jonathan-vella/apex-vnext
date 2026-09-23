@@ -97,7 +97,7 @@
       ],
       "notes": "Lightweight, cost-optimized model for utility prompts and CLI-only workflows. Suitable for straightforward git operations, file staging, and deterministic CLI parsing. Not for complex orchestration or reasoning-heavy tasks."
     },
-    "GPT-5.6 Sol": {
+    "gpt-6-sol": {
       "vendor": "OpenAI",
       "tier": "frontier",
       "released": "2026-07",
@@ -105,7 +105,19 @@
       "use_for": [
         "repository-maintenance"
       ],
-      "notes": "Authorized 2026-07 for the pre-agent automation loop prompt. Shares the GPT-5.5 outcome-first prompting contract (Role / Goal / Success criteria / Constraints / Output / Stop rules, decision rules over absolutes, no Anthropic XML blocks), so `classifyModel()` assigns it the enforced `gpt-5.6` family and the `gpt55-*` rules in the vendor-prompting registry apply unchanged."
+      "notes": "Identifier updated by maintainer request on 2026-09-23. The repository retains its outcome-first prompting contract and enforces the existing gpt55-* rules for the gpt-6 family. Historical client probes do not qualify this identifier."
+    },
+    "gpt-6-luna": {
+      "vendor": "OpenAI",
+      "tier": "frontier",
+      "released": "unknown",
+      "deprecated": false,
+      "use_for": [
+        "code-generation",
+        "artifact-review",
+        "validation"
+      ],
+      "notes": "Selected by the maintainer on 2026-09-23 for CodeGen, Reviewer and Validator with reasoning-effort: max. CLI 1.0.87 delegated probes observed Luna/max with the explicit --reasoning-effort max launch option. Direct selection ignored the frontmatter effort and used medium. Release date and VS Code effort enforcement remain unverified; repository outcome-first rules remain enforced."
     },
     "GPT-5.6 Terra": {
       "vendor": "OpenAI",
@@ -182,16 +194,16 @@
     "generated_by": "tools/scripts/generate-model-catalog.mjs",
     "description": "Auto-generated inventory of agent → model assignments derived from frontmatter (canonical source). Do not edit by hand; run `npm run generate:model-catalog` and commit the result.",
     "agents": {
-      "apex-architect.agent.md": "GPT-5.6 Sol",
+      "apex-architect.agent.md": "gpt-6-sol",
       "apex-operator.agent.md": "GPT-5.6 Terra",
-      "apex-planner.agent.md": "GPT-5.6 Sol",
-      "apex-requirements.agent.md": "GPT-5.6 Sol",
+      "apex-planner.agent.md": "gpt-6-sol",
+      "apex-requirements.agent.md": "gpt-6-sol",
       "apex.agent.md": "MAI-Code-1.1-Flash"
     },
     "subagents": {
-      "apex-codegen.agent.md": "GPT-5.6 Terra",
-      "apex-reviewer.agent.md": "GPT-5.6 Terra",
-      "apex-validator.agent.md": "GPT-5.6 Terra"
+      "apex-codegen.agent.md": "gpt-6-luna",
+      "apex-reviewer.agent.md": "gpt-6-luna",
+      "apex-validator.agent.md": "gpt-6-luna"
     }
   }
 }

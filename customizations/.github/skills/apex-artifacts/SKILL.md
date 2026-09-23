@@ -40,18 +40,34 @@ Read [presentation conventions](references/presentation-conventions.md) before p
 - [Requirements document](templates/requirements.md) - present an accepted `requirements` artifact.
 - Architecture assessment - presents accepted components, decisions, risks, and all five qualitative WAF pillars.
 - Cost estimate - presents priced and unpriced tables, pricing evidence, monthly breakdown, and uncertainty ranges.
+- Architecture decisions - presents accepted `decisionRecords` with alternatives, consequences, all five WAF impacts,
+  requirement links and implementation notes. Missing records remain unavailable; do not infer them from summary prose.
+- Implementation plan - presents current accepted implementation intent, logical resources, dependencies, controls,
+    intended outputs and source hashes. Acceptance does not establish source validation or deployment approval.
+- Deployment guide - presents current accepted plan bindings, intended ownership, configuration names and secret
+    references, intended outputs and the kernel preview/approval procedure. It omits values and binding parameters;
+    never infer observed endpoints, verified access or execution from this design view.
+- Operations runbook - presents accepted Diagnosis `operationalHandoff`, with resource-bound health-check guidance and
+    explicit untested procedures or justified non-applicability. References do not establish execution or successful recovery.
 
 The registry also exposes direct, non-template renderers for run status, deployment preview, approval evidence, and
-resource inventory. Architecture and cost packages also include deterministic Python, SVG, and PNG diagram views.
+resource inventory, and deployment summaries. Deployment summaries bind the completed operation, inventory and approval;
+they distinguish simulated from native-adapter evidence without independently asserting live execution or operational
+readiness. Architecture and cost packages also include deterministic Python, SVG, and PNG diagram views.
 All are read-only views of accepted typed sources.
 
 ## Reference-Only Outlines
 
 - [Architecture assessment](templates/architecture-assessment.md) and [cost estimate](templates/cost-estimate.md) remain
-    reference-only outlines; their accepted sources use direct deterministic renderers. [Governance constraints](templates/governance-constraints.md),
-    [implementation plan](templates/implementation-plan.md), [deployment summary](templates/deployment-summary.md),
-    [operations runbook](templates/operations-runbook.md), and [resource inventory](templates/resource-inventory.md) are
+        reference-only outlines; their accepted sources use direct deterministic renderers. [Governance constraints](templates/governance-constraints.md)
+    and [resource inventory](templates/resource-inventory.md) are
     reference-only until the registry has a matching source producer and renderer.
+- [Implementation plan](templates/implementation-plan.md) is an advisory outline; its direct renderer presents accepted
+    implementation intent without filling unsupported outline sections or claiming deployment readiness.
+- [Operations runbook](templates/operations-runbook.md) is an advisory outline; the direct renderer requires explicit
+    accepted operational handoff data and does not infer missing ownership, procedures or test outcomes.
+- [Deployment summary](templates/deployment-summary.md) remains an advisory outline; the direct renderer derives its
+    supported sections from completed operation evidence instead of claiming every outline slot is available.
 - [Additional document outlines](references/reference-only-outlines.md) preserve useful source-document semantics.
 
 Reference-only outlines never authorize rendering, file creation, cloud queries, repository reads, or state changes.

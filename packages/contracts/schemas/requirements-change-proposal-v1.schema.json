@@ -1,0 +1,196 @@
+{
+  "$id": "https://schemas.apexops.dev/requirements-change-proposal-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "addedRequirementIds": {
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 4096,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "candidateHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "changedFields": {
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 4096,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "changedRequirementIds": {
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 4096,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "deploymentAuthorized": {
+      "const": false,
+      "type": "boolean"
+    },
+    "expectedHead": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "filesModified": {
+      "const": false,
+      "type": "boolean"
+    },
+    "invalidatedGates": {
+      "items": {
+        "maximum": 4,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "maxItems": 4,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "invalidatedNodes": {
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 4096,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "mode": {
+      "anyOf": [
+        {
+          "const": "adopt",
+          "type": "string"
+        },
+        {
+          "const": "revise",
+          "type": "string"
+        }
+      ]
+    },
+    "ownerEpoch": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "projectId": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "proposalHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "reason": {
+      "maxLength": 2048,
+      "minLength": 1,
+      "type": "string"
+    },
+    "removedRequirementIds": {
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 4096,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "requiresReassessment": {
+      "additionalItems": false,
+      "items": [
+        {
+          "const": "cost",
+          "type": "string"
+        },
+        {
+          "const": "policy",
+          "type": "string"
+        },
+        {
+          "const": "security",
+          "type": "string"
+        },
+        {
+          "const": "dependencies",
+          "type": "string"
+        },
+        {
+          "const": "code",
+          "type": "string"
+        },
+        {
+          "const": "documents",
+          "type": "string"
+        }
+      ],
+      "maxItems": 6,
+      "minItems": 6,
+      "type": "array"
+    },
+    "retainedRequirementIds": {
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 4096,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "runId": {
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "sourceRequirementsHash": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "runId",
+    "expectedHead",
+    "ownerEpoch",
+    "sourceRequirementsHash",
+    "mode",
+    "candidateHash",
+    "reason",
+    "addedRequirementIds",
+    "removedRequirementIds",
+    "changedRequirementIds",
+    "retainedRequirementIds",
+    "changedFields",
+    "invalidatedNodes",
+    "invalidatedGates",
+    "requiresReassessment",
+    "filesModified",
+    "deploymentAuthorized",
+    "proposalHash"
+  ],
+  "type": "object"
+}

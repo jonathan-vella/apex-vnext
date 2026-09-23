@@ -9,7 +9,7 @@ These records preserve accepted or proposed vNext architecture decisions. The co
 | [ADR-0003: Entra-only handoff](03-des-adr-0003-use-bounded-entra-only-handoff-session.md)       | Accepted |
 | [ADR-0004: Bounded improvement](03-des-adr-0004-use-bounded-observe-and-propose-improvement.md) | Accepted |
 | [ADR-0005: Client projections](03-des-adr-0005-use-selected-client-agent-projections.md)        | Proposed |
-| [ADR-0006: CLI worker boundary](03-des-adr-0006-omit-cli-autonomous-workers.md)                 | Proposed |
+| [ADR-0006: CLI worker kernel authority](03-des-adr-0006-omit-cli-autonomous-workers.md)         | Accepted |
 
 ADR-0001 is superseded and retained only in the
 retired qualification history. Current decisions are self-contained and do not require historical files.

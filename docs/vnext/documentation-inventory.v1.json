@@ -62,6 +62,18 @@
       "authorityBindings": ["projectControls", "qualification"]
     },
     {
+      "id": "copilot-desktop-parked-plan",
+      "currentPath": "docs/vnext/COPILOT-DESKTOP-PLAN.md",
+      "contentClass": "contributor-doc",
+      "audiences": ["repository-contributor", "maintainer"],
+      "lifecycle": "deferred",
+      "classification": "keep",
+      "targetFamily": "project-control",
+      "targetPaths": ["docs/vnext/COPILOT-DESKTOP-PLAN.md"],
+      "authorityBindings": ["projectControls"],
+      "owner": "client-experience-maintainers"
+    },
+    {
       "id": "terraform-reference",
       "currentPath": "docs/reference/iac-tracks.md",
       "contentClass": "user-doc",

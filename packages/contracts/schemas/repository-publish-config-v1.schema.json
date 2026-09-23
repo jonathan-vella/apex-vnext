@@ -1,0 +1,52 @@
+{
+  "$id": "https://schemas.apexops.dev/repository-publish-config-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "branch": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$(?![\\s\\S])",
+      "type": "string"
+    },
+    "name": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$(?![\\s\\S])",
+      "type": "string"
+    },
+    "owner": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,38}$(?![\\s\\S])",
+      "type": "string"
+    },
+    "remote": {
+      "const": "origin",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "visibility": {
+      "anyOf": [
+        {
+          "const": "private",
+          "type": "string"
+        },
+        {
+          "const": "internal",
+          "type": "string"
+        },
+        {
+          "const": "public",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "owner",
+    "name",
+    "visibility",
+    "branch",
+    "remote"
+  ],
+  "type": "object"
+}

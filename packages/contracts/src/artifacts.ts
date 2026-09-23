@@ -39,6 +39,71 @@ export const RequirementsV1Schema = Type.Object(
   { $id: "https://schemas.apexops.dev/requirements-v1.json", additionalProperties: false },
 );
 
+const ChangeIdsSchema = Type.Array(Type.String({ minLength: 1, maxLength: 512 }), {
+  maxItems: 4096,
+  uniqueItems: true,
+});
+
+export const RequirementsAmendmentV1Schema = Type.Object(
+  {
+    schemaVersion: ContractVersionSchema,
+    baseRequirementsHash: Sha256Schema,
+    updates: Type.Array(
+      Type.Object(
+        {
+          id: Type.String({ minLength: 1, maxLength: 512 }),
+          changes: Type.Partial(Type.Omit(RequirementV1Schema, ["id"]), { minProperties: 1 }),
+        },
+        { additionalProperties: false },
+      ),
+      { maxItems: 128 },
+    ),
+    additions: Type.Array(RequirementV1Schema, { maxItems: 128 }),
+    removals: Type.Array(Type.String({ minLength: 1, maxLength: 512 }), { maxItems: 128, uniqueItems: true }),
+    fields: Type.Partial(
+      Type.Omit(RequirementsV1Schema, ["schemaVersion", "projectId", "environment", "requirements"]),
+    ),
+  },
+  { $id: "https://schemas.apexops.dev/requirements-amendment-v1.json", additionalProperties: false },
+);
+
+export type RequirementsAmendmentV1 = Static<typeof RequirementsAmendmentV1Schema>;
+
+export const RequirementsChangeProposalV1Schema = Type.Object(
+  {
+    schemaVersion: ContractVersionSchema,
+    projectId: ProjectIdSchema,
+    runId: RunIdSchema,
+    expectedHead: Sha256Schema,
+    ownerEpoch: Type.Integer({ minimum: 0 }),
+    sourceRequirementsHash: Type.Union([Sha256Schema, Type.Null()]),
+    mode: Type.Union([Type.Literal("adopt"), Type.Literal("revise")]),
+    candidateHash: Sha256Schema,
+    reason: Type.String({ minLength: 1, maxLength: 2048 }),
+    addedRequirementIds: ChangeIdsSchema,
+    removedRequirementIds: ChangeIdsSchema,
+    changedRequirementIds: ChangeIdsSchema,
+    retainedRequirementIds: ChangeIdsSchema,
+    changedFields: ChangeIdsSchema,
+    invalidatedNodes: ChangeIdsSchema,
+    invalidatedGates: Type.Array(Type.Integer({ minimum: 1, maximum: 4 }), { maxItems: 4, uniqueItems: true }),
+    requiresReassessment: Type.Tuple([
+      Type.Literal("cost"),
+      Type.Literal("policy"),
+      Type.Literal("security"),
+      Type.Literal("dependencies"),
+      Type.Literal("code"),
+      Type.Literal("documents"),
+    ]),
+    filesModified: Type.Literal(false),
+    deploymentAuthorized: Type.Literal(false),
+    proposalHash: Sha256Schema,
+  },
+  { $id: "https://schemas.apexops.dev/requirements-change-proposal-v1.json", additionalProperties: false },
+);
+
+export type RequirementsChangeProposalV1 = Static<typeof RequirementsChangeProposalV1Schema>;
+
 export const LogicalResourceV1Schema = Type.Object(
   {
     id: NonEmptyStringSchema,
@@ -76,6 +141,7 @@ export const IacBindingV1Schema = Type.Object(
           implementation: NonEmptyStringSchema,
           version: NonEmptyStringSchema,
           parameters: Type.Record(NonEmptyStringSchema, Type.Unknown()),
+          scopeLogicalId: Type.Optional(Type.String({ pattern: "^[A-Za-z_][A-Za-z0-9_]*$", maxLength: 256 })),
           physicalResources: Type.Optional(
             Type.Array(
               Type.Object(

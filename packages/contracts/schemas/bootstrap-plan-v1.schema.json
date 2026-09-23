@@ -1,0 +1,206 @@
+{
+  "$id": "https://schemas.apexops.dev/bootstrap-plan-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "checks": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "const": "repository",
+                "type": "string"
+              },
+              {
+                "const": "workspace-runtime",
+                "type": "string"
+              },
+              {
+                "const": "apex-state",
+                "type": "string"
+              }
+            ]
+          },
+          "reason": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "const": "ready",
+                "type": "string"
+              },
+              {
+                "const": "pending",
+                "type": "string"
+              },
+              {
+                "const": "blocked",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "type": "array"
+    },
+    "config": {
+      "$id": "https://schemas.apexops.dev/onboarding-config-v1.json",
+      "additionalProperties": false,
+      "properties": {
+        "client": {
+          "anyOf": [
+            {
+              "const": "github-copilot-vscode",
+              "type": "string"
+            },
+            {
+              "const": "github-copilot-cli",
+              "type": "string"
+            },
+            {
+              "const": "both",
+              "type": "string"
+            }
+          ]
+        },
+        "createRepository": {
+          "type": "boolean"
+        },
+        "displayName": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "environment": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "iacTool": {
+          "anyOf": [
+            {
+              "const": "bicep",
+              "type": "string"
+            },
+            {
+              "const": "terraform",
+              "type": "string"
+            }
+          ]
+        },
+        "projectId": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "1.0.0",
+          "type": "string"
+        },
+        "targetScope": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion"
+      ],
+      "type": "object"
+    },
+    "configHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "executionAuthorized": {
+      "const": false,
+      "type": "boolean"
+    },
+    "filesModified": {
+      "const": false,
+      "type": "boolean"
+    },
+    "runtimeVersion": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "scope": {
+      "const": "local-bootstrap-preflight-v1",
+      "type": "string"
+    },
+    "status": {
+      "anyOf": [
+        {
+          "const": "ready",
+          "type": "string"
+        },
+        {
+          "const": "pending",
+          "type": "string"
+        },
+        {
+          "const": "blocked",
+          "type": "string"
+        }
+      ]
+    },
+    "unassessed": {
+      "additionalItems": false,
+      "items": [
+        {
+          "const": "machine-prerequisites",
+          "type": "string"
+        },
+        {
+          "const": "client-health",
+          "type": "string"
+        },
+        {
+          "const": "remote-coe",
+          "type": "string"
+        },
+        {
+          "const": "github-repository",
+          "type": "string"
+        },
+        {
+          "const": "governance-oidc",
+          "type": "string"
+        },
+        {
+          "const": "reviewed-baseline",
+          "type": "string"
+        }
+      ],
+      "maxItems": 6,
+      "minItems": 6,
+      "type": "array"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "config",
+    "configHash",
+    "runtimeVersion",
+    "scope",
+    "status",
+    "checks",
+    "unassessed",
+    "filesModified",
+    "executionAuthorized"
+  ],
+  "type": "object"
+}

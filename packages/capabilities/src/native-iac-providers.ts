@@ -3,12 +3,17 @@ import { constants } from "node:fs";
 import { lstat, mkdir, mkdtemp, open, opendir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { Value } from "@sinclair/typebox/value";
 import {
   hasValidPolicyValidation,
   NATIVE_VALIDATION_COMMANDS,
   calculateNativeValidationCommandHash,
   calculateNativeValidationReceiptHash,
+  calculatePolicyValidationDigest,
   hasValidNativeValidationReceipt,
+  PolicyPropertyMapV1Schema,
+  LogicalResourceManifestV1Schema,
+  IacBindingV1Schema,
 } from "@apexops/contracts";
 import type {
   ApprovalEvidenceV1,
@@ -47,7 +52,13 @@ import {
 import type { ProcessRunnerLike } from "./process-runner.js";
 import { secretFreeProperties } from "./secret-redaction.js";
 import { LocalEncryptedPlanTransport, type LocalEncryptedPlan } from "./local-plan-transport.js";
-import { validatePolicyProperties } from "./policy-validation.js";
+import {
+  validatePolicyProperties,
+  validateStorageSecurityBindings,
+  validateBicepResourceParity,
+  validateBicepStorageDiagnostics,
+  validateBicepStorageBaseline,
+} from "./policy-validation.js";
 
 export interface NativeProviderRuntime {
   readonly runner: ProcessRunnerLike;
@@ -241,6 +252,12 @@ async function readGeneratedSource(
   }
 }
 
+export async function assertGeneratedSourceUnchanged(
+  source: NonNullable<PreviewRequest["generatedSource"]>,
+): Promise<void> {
+  await readGeneratedSource(source);
+}
+
 async function bindGeneratedSource(
   request: Pick<PreviewRequest, "generatedSource">,
   cwd: string | undefined,
@@ -306,7 +323,58 @@ abstract class NativeProviderBase {
     const generatedSource = { ...request.generatedSource };
     const commands = NATIVE_VALIDATION_COMMANDS[track];
     let receipt: NativeValidationReceiptV1;
+    let policyInput: NativeValidationRequest["policyValidation"];
+    let storageBindings: NativeValidationRequest["storageSecurityBindings"];
+    let parityManifest: NativeValidationRequest["resourceParityManifest"];
+    let parityBinding: NativeValidationRequest["resourceParityBinding"];
+    let diagnosticsTargets: NativeValidationRequest["storageDiagnosticsTargets"];
     try {
+      if (track === "bicep" && request.resourceParityBinding !== undefined) {
+        calculatePolicyValidationDigest(request.resourceParityBinding);
+        parityBinding = structuredClone(request.resourceParityBinding);
+        if (
+          !Value.Check(IacBindingV1Schema, parityBinding) ||
+          request.resourceParityManifest === undefined ||
+          parityBinding.track !== track ||
+          parityBinding.projectId !== request.projectId ||
+          parityBinding.runId !== request.runId ||
+          parityBinding.intentHash !== request.inputHash
+        )
+          throw new Error();
+      }
+      if (track === "bicep" && request.storageDiagnosticsTargets !== undefined) {
+        calculatePolicyValidationDigest(request.storageDiagnosticsTargets);
+        diagnosticsTargets = structuredClone(request.storageDiagnosticsTargets);
+        if (Object.keys(diagnosticsTargets).length > 1000) throw new Error();
+      }
+      if (track === "bicep" && request.resourceParityManifest !== undefined) {
+        calculatePolicyValidationDigest(request.resourceParityManifest);
+        parityManifest = structuredClone(request.resourceParityManifest);
+        if (
+          !Value.Check(LogicalResourceManifestV1Schema, parityManifest) ||
+          parityManifest.track !== track ||
+          parityManifest.projectId !== request.projectId ||
+          parityManifest.runId !== request.runId ||
+          parityManifest.resources.length > 1000
+        )
+          throw new Error();
+      }
+      if (track === "bicep" && request.storageSecurityBindings !== undefined) {
+        calculatePolicyValidationDigest(request.storageSecurityBindings);
+        storageBindings = structuredClone(request.storageSecurityBindings);
+        if (Object.keys(storageBindings).length > 1000) throw new Error();
+      }
+      if (request.policyValidation !== undefined) {
+        calculatePolicyValidationDigest(request.policyValidation);
+        policyInput = structuredClone(request.policyValidation);
+        if (
+          !Value.Check(PolicyPropertyMapV1Schema, policyInput.policyMap) ||
+          calculatePolicyValidationDigest(policyInput.policyMap) !== request.policyHash ||
+          policyInput.policyMap.projectId !== request.projectId ||
+          policyInput.policyMap.runId !== request.runId
+        )
+          throw new Error();
+      }
       const body: Omit<NativeValidationReceiptV1, "receiptHash"> = {
         schemaVersion: "1.0.0",
         projectId: request.projectId,
@@ -316,6 +384,14 @@ abstract class NativeProviderBase {
         treeHash: generatedSource.treeHash,
         policyHash: request.policyHash,
         inputHash: request.inputHash,
+        ...(policyInput?.policyMap.mappings.length === 0
+          ? {
+              policyApplicability: {
+                status: "no-actionable-mappings" as const,
+                policyMapContentHash: calculatePolicyValidationDigest(policyInput.policyMap),
+              },
+            }
+          : {}),
         outcome: "pass",
         commands: commands.map((command) => ({
           validatorId: command.validatorId,
@@ -375,6 +451,7 @@ abstract class NativeProviderBase {
         }
         await readGeneratedSource(scratch, scratch, outputs);
       };
+      let compiledTemplate: string | undefined;
       for (const command of commands) {
         await verify();
         try {
@@ -392,11 +469,90 @@ abstract class NativeProviderBase {
             result.outputTruncated !== false
           )
             throw new Error();
+          if (command.validatorId === "bicep:build") compiledTemplate = result.stdout;
         } catch {
           throw new IacProviderError("NATIVE_VALIDATION_FAILED", "Native validation command failed");
         } finally {
           await verify();
         }
+      }
+      if (parityManifest !== undefined) {
+        receipt.resourceParity = validateBicepResourceParity({
+          sourceHash: receipt.sourceHash,
+          manifest: parityManifest,
+          ...(parityBinding === undefined ? {} : { binding: parityBinding }),
+          json: compiledTemplate ?? "",
+        });
+        const { receiptHash: previousHash, ...updated } = receipt;
+        if (!previousHash) throw sourceBindingError();
+        receipt.receiptHash = calculateNativeValidationReceiptHash(updated);
+      }
+      if (parityManifest !== undefined && parityBinding !== undefined) {
+        receipt.securityBaseline = validateBicepStorageBaseline({
+          sourceHash: receipt.sourceHash,
+          manifest: parityManifest,
+          binding: parityBinding,
+          json: compiledTemplate ?? "",
+        });
+        const { receiptHash: previousHash, ...updated } = receipt;
+        if (!previousHash) throw sourceBindingError();
+        receipt.receiptHash = calculateNativeValidationReceiptHash(updated);
+      }
+      if (diagnosticsTargets !== undefined) {
+        receipt.storageDiagnostics = Object.fromEntries(
+          Object.entries(diagnosticsTargets).map(([logicalId, target]) => [
+            logicalId,
+            validateBicepStorageDiagnostics({
+              ...target,
+              sourceHash: receipt.sourceHash,
+              json: compiledTemplate ?? "",
+            }),
+          ]),
+        );
+        const { receiptHash: previousHash, ...updated } = receipt;
+        if (!previousHash) throw sourceBindingError();
+        receipt.receiptHash = calculateNativeValidationReceiptHash(updated);
+      }
+      if (track === "bicep" && policyInput !== undefined && policyInput.policyMap.mappings.length > 0) {
+        let policyValidation: PolicyValidationV1;
+        try {
+          policyValidation = validatePolicyProperties({
+            ...policyInput,
+            track,
+            sourceHash: receipt.sourceHash,
+            policyMapHash: receipt.policyHash,
+            json: compiledTemplate ?? "",
+          });
+          if (policyValidation.outcome !== "pass") throw new Error();
+        } catch {
+          throw new IacProviderError("NATIVE_VALIDATION_FAILED", "Native policy property validation failed");
+        } finally {
+          await verify();
+        }
+        receipt.policyValidation = policyValidation;
+        const { receiptHash, ...updated } = receipt;
+        if (!receiptHash)
+          throw new IacProviderError("NATIVE_VALIDATION_FAILED", "Native validation receipt is missing");
+        receipt = { ...updated, receiptHash: calculateNativeValidationReceiptHash(updated) };
+      }
+      if (storageBindings !== undefined && Object.keys(storageBindings).length > 0) {
+        const observations = validateStorageSecurityBindings({
+          track,
+          bindings: storageBindings,
+          sourceHash: receipt.sourceHash,
+          json: compiledTemplate ?? "",
+        });
+        const storageSecurity = Object.fromEntries(
+          Object.entries(observations).map(([logicalId, observation]) => {
+            return [logicalId, { ...observation, results: [...observation.results] }];
+          }),
+        );
+        await verify();
+        const { receiptHash, ...body } = receipt;
+        if (!receiptHash)
+          throw new IacProviderError("NATIVE_VALIDATION_FAILED", "Native validation receipt is missing");
+        const updated = { ...body, storageSecurity };
+        receipt = { ...updated, receiptHash: calculateNativeValidationReceiptHash(updated) };
       }
       return receipt;
     } finally {
@@ -613,6 +769,14 @@ export class NativeBicepProvider extends NativeProviderBase implements IacProvid
   }
 
   async previewApply(request: PreviewRequest): Promise<DeploymentPreviewV1> {
+    if (request.policyValidation !== undefined) {
+      try {
+        calculatePolicyValidationDigest(request.policyValidation);
+        request = { ...request, policyValidation: structuredClone(request.policyValidation) };
+      } catch {
+        throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Bicep policy validation inputs are invalid");
+      }
+    }
     const source = await bindGeneratedSource(
       request,
       this.#target.cwd,
@@ -962,6 +1126,14 @@ export class NativeTerraformProvider extends NativeProviderBase implements IacPr
         "PREVIEW_HASH_MISMATCH",
         "Terraform local/reference plan transport requires injected key, artifact, and binding stores",
       );
+    }
+    if (operation === "apply" && request.policyValidation !== undefined) {
+      try {
+        calculatePolicyValidationDigest(request.policyValidation);
+        request = { ...request, policyValidation: structuredClone(request.policyValidation) };
+      } catch {
+        throw new IacProviderError("PREVIEW_HASH_MISMATCH", "Terraform policy validation inputs are invalid");
+      }
     }
     const source = await bindGeneratedSource(request, this.#target.cwd);
     const requestedPlanPath = this.#target.planPath(request, operation);

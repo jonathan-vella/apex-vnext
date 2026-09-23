@@ -11,7 +11,13 @@ const repositoryRoot = resolve(packageRoot, "../..");
 const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
-const CLIENT_ADAPTER_VERSION = "1.2.0";
+const CLIENT_ADAPTER_VERSION = "1.6.0";
+const CLI_MODEL_IDS = new Map([
+  ["MAI-Code-1.1-Flash (copilot)", "mai-code-1.1-flash"],
+  ["gpt-6-sol", "gpt-6-sol"],
+  ["gpt-6-luna", "gpt-6-luna"],
+  ["GPT-5.6 Terra", "gpt-5.6-terra"],
+]);
 export const GENERATED_SHARED_FILES = [
   ".github/workflows/governance-policy-baseline.yml",
   "tools/scripts/collect-governance-baseline.ps1",
@@ -121,9 +127,10 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
     name: frontmatter.name,
     description: frontmatter.description,
     target: "github-copilot",
-    model: model === "MAI-Code-1.1-Flash (copilot)" ? "mai-code-1.1-flash" : model,
+    model: CLI_MODEL_IDS.get(model) ?? model,
+    ...(frontmatter["reasoning-effort"] === undefined ? {} : { "reasoning-effort": frontmatter["reasoning-effort"] }),
     "user-invocable": frontmatter["user-invocable"] ?? true,
-    "disable-model-invocation": frontmatter["disable-model-invocation"] ?? frontmatter["user-invocable"] === false,
+    "disable-model-invocation": frontmatter["disable-model-invocation"] ?? false,
     tools,
   };
   const mechanics = [
@@ -138,11 +145,45 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
     frontmatter.name !== "APEX" && tools.includes(inventory.interactiveTools.askUser)
       ? `Run user-facing questions as the foreground agent using \`${inventory.interactiveTools.askUser}\`, not as a delegated background task. For another interactive stage, ask the user to select its named agent and carry forward the scope note; do not delegate interactive work through \`${inventory.interactiveTools.delegate}\`. If the question tool is unavailable, report the limitation and stop without claiming answers were recorded.`
       : null,
+    frontmatter.name !== "APEX" && tools.includes(inventory.interactiveTools.askUser)
+      ? `For a kernel question with \`multiSelect: true\`, use native multi-select only when the exposed question-tool schema supports it. Otherwise, show every exact kernel option in its original order and collect one free-text answer through \`${inventory.interactiveTools.askUser}\` using its supported free-text input. Ask for exact option values, one per line. Validate every supplied value against the kernel options; request correction for invalid, empty, or ambiguous input instead of dropping values, guessing aliases, selecting defaults, or applying recommendations. Then show the complete proposed selection as an array and use the native question tool to request explicit confirmation or correction. A correction requires a fresh confirmation of the complete set. Call \`apex/recordInput\` only after confirmation, preserving the request ID, expected head, owner epoch, array value shape, other submitted answers, and the user's stop boundary. Cancellation means no submission; stale-request rejection requires fresh kernel input and confirmation, not replay. Never pass unsupported \`multiSelect\` parameters or silently replace multiple selection with a single-choice answer. If free-text input or confirmation is unavailable, report the limitation and stop. This fallback changes only input collection, not permitted values or kernel validation.`
+      : null,
   ].filter(Boolean);
-  return serializeAgent(
+  const rendered = serializeAgent(
     cliFrontmatter,
     mechanics.length === 0 ? "" : `## Client Mechanics\n\n${mechanics.join(" ")}\n\n`,
     body,
+  );
+  if (options.agentNames === undefined) return rendered;
+  const entries = Object.entries(options.agentNames);
+  if (
+    entries.length === 0 ||
+    entries.some(
+      ([name, replacement]) =>
+        !/^APEX(?: [A-Za-z]+)*$/.test(name) ||
+        typeof replacement !== "string" ||
+        !/^APEX CLI(?: [A-Za-z]+)*$/.test(replacement),
+    ) ||
+    new Set(entries.map(([, replacement]) => replacement)).size !== entries.length ||
+    !Object.hasOwn(options.agentNames, frontmatter.name)
+  )
+    throw new Error("Invalid CLI agent name mapping");
+  const names = entries
+    .map(([name]) => name)
+    .filter((name) => name !== "APEX")
+    .sort((left, right) => right.length - left.length);
+  const pattern =
+    names.length === 0 ? undefined : new RegExp(`(?<![A-Za-z0-9_-])(?:${names.join("|")})(?![A-Za-z0-9_-])`, "gu");
+  const rewrite = (text) => {
+    const named = pattern === undefined ? text : text.replace(pattern, (name) => options.agentNames[name]);
+    return Object.hasOwn(options.agentNames, "APEX")
+      ? named.replaceAll("`APEX`", `\`${options.agentNames.APEX}\``)
+      : named;
+  };
+  return serializeAgent(
+    { ...cliFrontmatter, name: options.agentNames[frontmatter.name] },
+    mechanics.length === 0 ? "" : `## Client Mechanics\n\n${rewrite(mechanics.join(" "))}\n\n`,
+    rewrite(body),
   );
 }
 
@@ -393,10 +434,11 @@ async function prepareClientProjections(customizationManifest, pinnedCustomizati
   }
 
   for (const projection of clientProjections) {
+    const clients = projection.id === "both" ? ["github-copilot-vscode", "github-copilot-cli"] : [projection.id];
     const generatedRoot = join(assetsRoot, projection.generatedRoot);
     assertContained(assetsRoot, generatedRoot);
     const roleSources = new Set(
-      roles.filter((role) => roleSupportsClient(role, projection.id)).map(({ source }) => source),
+      roles.filter((role) => clients.some((client) => roleSupportsClient(role, client))).map(({ source }) => source),
     );
     const sources = [...new Set([...sharedFiles, ...sharedDirectoryFiles, ...projection.files])].filter(
       (path) => !roleSources.has(path),
@@ -415,7 +457,8 @@ async function prepareClientProjections(customizationManifest, pinnedCustomizati
         source: {
           kind: "generated",
           composition: "client-projections",
-          clientId: projection.id,
+          clientId: clients[0],
+          ...(projection.id === "both" ? { installationId: "both" } : {}),
           target: relativePath,
           adapterVersion: CLIENT_ADAPTER_VERSION,
           sourcePath: relativePath,
@@ -425,36 +468,46 @@ async function prepareClientProjections(customizationManifest, pinnedCustomizati
         bytes: bytes.byteLength,
       });
     }
-    for (const role of roles) {
-      if (!roleSupportsClient(role, projection.id)) continue;
-      const sourcePath = join(repositoryRoot, "customizations", role.source);
-      const source = (await readSourceFile(pinnedCustomizations.resolvedRoot, sourcePath)).toString("utf8");
-      const sourceHash = createHash("sha256").update(source).digest("hex");
-      const delegates = roleDelegatesOnClient(role, projection.id, roles, customizationManifest.invocationEdges);
-      const rendered = Buffer.from(
-        renderClientAgentProjection(source, projection.id, toolInventory, { delegates }),
-        "utf8",
-      );
-      const destination = join(generatedRoot, role.source);
-      assertContained(generatedRoot, destination);
-      await mkdir(dirname(destination), { recursive: true });
-      await writeFile(destination, rendered);
-      inventory.push({
-        path: portablePath(relative(assetsRoot, destination)),
-        source: {
-          kind: "generated",
-          composition: "client-projections",
-          roleId: role.id,
-          sourcePath: role.source,
-          sourceHash,
-          clientId: projection.id,
-          target: role.source,
-          adapterVersion: CLIENT_ADAPTER_VERSION,
-        },
-        sha256: createHash("sha256").update(rendered).digest("hex"),
-        bytes: rendered.byteLength,
-      });
-    }
+    for (const client of clients)
+      for (const role of roles) {
+        if (!roleSupportsClient(role, client)) continue;
+        const sourcePath = join(repositoryRoot, "customizations", role.source);
+        const source = (await readSourceFile(pinnedCustomizations.resolvedRoot, sourcePath)).toString("utf8");
+        const sourceHash = createHash("sha256").update(source).digest("hex");
+        const delegates = roleDelegatesOnClient(role, client, roles, customizationManifest.invocationEdges);
+        const namespaced = projection.id === "both" && client === "github-copilot-cli";
+        const agentNames = namespaced
+          ? Object.fromEntries(roles.map(({ agent }) => [agent, agent.replace(/^APEX/u, "APEX CLI")]))
+          : undefined;
+        const targetPath = namespaced ? role.source.replace(/\/apex(?=[.-])/u, "/apex-cli") : role.source;
+        const rendered = Buffer.from(
+          renderClientAgentProjection(source, client, toolInventory, {
+            delegates,
+            ...(agentNames === undefined ? {} : { agentNames }),
+          }),
+          "utf8",
+        );
+        const destination = join(generatedRoot, targetPath);
+        assertContained(generatedRoot, destination);
+        await mkdir(dirname(destination), { recursive: true });
+        await writeFile(destination, rendered);
+        inventory.push({
+          path: portablePath(relative(assetsRoot, destination)),
+          source: {
+            kind: "generated",
+            composition: "client-projections",
+            roleId: role.id,
+            sourcePath: role.source,
+            sourceHash,
+            clientId: client,
+            ...(projection.id === "both" ? { installationId: "both" } : {}),
+            target: targetPath,
+            adapterVersion: CLIENT_ADAPTER_VERSION,
+          },
+          sha256: createHash("sha256").update(rendered).digest("hex"),
+          bytes: rendered.byteLength,
+        });
+      }
   }
 }
 

@@ -2,7 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type {
   ApprovalEvidenceV1,
+  ArchitectureV1,
   DeploymentPreviewV1,
+  DiagnosisV1,
+  EnvironmentInputsV1,
+  IacBindingV1,
+  ImplementationIntentV1,
+  PolicyPropertyMapV1,
+  OperationRecordV1,
   RequirementsV1,
   ResourceInventoryV1,
   RunConfigV1,
@@ -11,11 +18,17 @@ import {
   DOCUMENT_REGISTRY,
   REQUIREMENTS_TEMPLATE_SLOTS,
   renderApprovalEvidence,
+  renderArchitectureDecisionRecords,
   renderDeploymentPreview,
+  renderDeploymentGuide,
+  renderImplementationPlan,
+  renderDeploymentSummary,
   renderRequirementsDocument,
   renderRequirements,
   renderResourceInventory,
   renderRunStatus,
+  renderOperationsRunbook,
+  renderPolicyMappingMatrix,
 } from "../index.js";
 
 const hash = (character: string): string => character.repeat(64);
@@ -26,17 +39,116 @@ test("document registry limits template bindings to supported sources", () => {
   assert.equal(DOCUMENT_REGISTRY.inventory?.sourceAvailability, "available");
   assert.equal(DOCUMENT_REGISTRY["architecture-assessment"]?.sourceAvailability, "available");
   assert.equal(DOCUMENT_REGISTRY["cost-estimate"]?.sourceAvailability, "available");
+  assert.equal(DOCUMENT_REGISTRY["deployment-summary"]?.renderer, "deployment-summary-v1");
+  assert.equal(DOCUMENT_REGISTRY["deployment-guide"]?.renderer, "deployment-guide-v1");
+  assert.equal(DOCUMENT_REGISTRY["operations-runbook"]?.renderer, "operations-runbook-v1");
   assert.equal(DOCUMENT_REGISTRY["resource-inventory-template"]?.templateAvailability, "reference-only");
-  for (const documentId of [
-    "governance-constraints",
-    "implementation-plan",
-    "deployment-summary",
-    "operations-runbook",
-  ]) {
+  assert.equal(DOCUMENT_REGISTRY["implementation-plan"]?.renderer, "implementation-plan-v1");
+  for (const documentId of ["governance-constraints"]) {
     assert.equal(DOCUMENT_REGISTRY[documentId]?.sourceAvailability, "unavailable");
     assert.equal(DOCUMENT_REGISTRY[documentId]?.templateAvailability, "reference-only");
   }
 });
+
+test("implementation plan deterministically presents accepted resources and source hashes", () => {
+  const intent: ImplementationIntentV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    runId: "run",
+    sourceHashes: { requirements: hash("a") },
+    resources: [
+      { id: "second", type: "service", purpose: "User | content", dependsOn: ["first"], controls: ["tls", "identity"] },
+      { id: "first", type: "service", purpose: "Shared service", dependsOn: [], controls: [] },
+    ],
+    outputs: ["second-output", "first-output"],
+  };
+  const rendered = renderImplementationPlan(intent, hash("b"));
+  assert.equal(
+    renderImplementationPlan(
+      { ...intent, resources: [...intent.resources].reverse(), outputs: [...intent.outputs].reverse() },
+      hash("b"),
+    ),
+    rendered,
+  );
+  assert.ok(rendered.indexOf("| first |") < rendered.indexOf("| second |"));
+  assert.ok(rendered.includes("User \\| content"));
+  assert.ok(rendered.includes(hash("a")) && rendered.includes(hash("b")));
+  assert.match(rendered, /not generated-source validation or deployment approval/);
+});
+
+for (const track of ["bicep", "terraform"] as const) {
+  test(`deployment guide renders accepted ${track} intent without disclosing configuration values`, () => {
+    const run = {
+      projectId: "demo",
+      runId: "run",
+      environment: "dev",
+      targetScope: "/subscriptions/demo/resourceGroups/demo",
+      iacTool: track,
+    } as RunConfigV1;
+    const intent: ImplementationIntentV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      sourceHashes: {},
+      resources: [{ id: "api", type: "Microsoft.Web/sites", purpose: "Serve requests", dependsOn: [], controls: [] }],
+      outputs: ["endpoint"],
+    };
+    const binding: IacBindingV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      track,
+      intentHash: hash("a"),
+      resourceBindings: {
+        api: {
+          implementation: "approved-module",
+          version: "1.0.0",
+          parameters: { password: "DO_NOT_RENDER_PARAMETER" },
+          physicalResources: [
+            {
+              resourceId: "/subscriptions/demo/resourceGroups/demo/providers/Microsoft.Web/sites/api",
+              type: "Microsoft.Web/sites",
+              ownership: "managed" as const,
+              role: "primary" as const,
+            },
+          ],
+        },
+      },
+    };
+    const inputs: EnvironmentInputsV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      environment: "dev" as const,
+      inputs: {
+        config: { kind: "value" as const, value: "DO_NOT_RENDER_VALUE" },
+        credential: {
+          kind: "secret-reference" as const,
+          provider: "azure-key-vault" as const,
+          reference: "vault/secret",
+          version: "v1",
+        },
+      },
+    };
+    const input = {
+      run,
+      intent,
+      binding,
+      inputs,
+      hashes: { intent: hash("a"), binding: hash("b"), inputs: hash("c") },
+    };
+    const guide = renderDeploymentGuide(input);
+    assert.equal(renderDeploymentGuide(input), guide);
+    assert.match(guide, /Accepted design only/);
+    assert.match(guide, new RegExp(`--provider ${track}`));
+    assert.match(guide, /azure-key-vault:vault\/secret/);
+    assert.match(guide, /intended output names, not observed values or endpoints/);
+    assert.match(guide, /human must approve Gate 4/);
+    assert.match(guide, /Microsoft.Web\/sites\/api/);
+    assert.doesNotMatch(guide, /DO_NOT_RENDER/);
+    for (const digest of Object.values(input.hashes)) assert.ok(guide.includes(digest));
+  });
+}
 
 test("requirements document rendering fills exact template slots with typed or unavailable values", () => {
   const input: RequirementsV1 = {
@@ -186,6 +298,197 @@ test("approval evidence renders supplied timestamps and optional binding fields"
   assert.match(rendered, /\*\*Decision:\*\* APPROVED/);
   assert.match(rendered, /2026-07-01T11:00:00Z/);
   assert.match(rendered, /github-actions:owner\/repo:123:2:deploy/);
+});
+
+test("ADR rendering preserves explicit alternatives and consequences without inventing approval", () => {
+  const architecture: ArchitectureV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    runId: "run",
+    title: "Design",
+    summary: "Design",
+    sourceHashes: {},
+    components: [],
+    decisions: [],
+    risks: [],
+    decisionRecords: [
+      {
+        id: "ADR-0001",
+        title: "Service|selection",
+        context: "Requirements",
+        decision: "Selected service",
+        requirementIds: ["REQ-1"],
+        alternatives: [
+          { option: "A", benefits: "Low cost", drawbacks: "Limited scale", rejectionReason: "Demand exceeds capacity" },
+          {
+            option: "B",
+            benefits: "Flexible",
+            drawbacks: "Higher operations effort",
+            rejectionReason: "Team capacity",
+          },
+        ],
+        positiveConsequences: ["Demand met"],
+        negativeConsequences: ["Higher cost"],
+        wafImpacts: {
+          security: "Identity",
+          reliability: "Recovery",
+          "performance-efficiency": "Scale",
+          "cost-optimization": "Cost",
+          "operational-excellence": "Staffing",
+        },
+        complianceConsiderations: "Target policy review required",
+        implementationNotes: "Plan the selected resource",
+      },
+    ],
+  };
+  const rendered = renderArchitectureDecisionRecords(architecture, hash("a"));
+  assert.equal(rendered, renderArchitectureDecisionRecords(architecture, hash("a")));
+  assert.match(rendered, /Demand exceeds capacity/);
+  assert.match(rendered, /Higher cost/);
+  assert.match(rendered, /Service\\\|selection/);
+  assert.match(rendered, /Gate approval and implemented state are separate evidence/);
+  const missingRecords = { ...architecture };
+  delete missingRecords.decisionRecords;
+  assert.throws(() => renderArchitectureDecisionRecords(missingRecords, hash("a")), /unavailable/);
+});
+
+test("policy mapping matrix preserves design dispositions without exposing expected values or certifying compliance", () => {
+  const policy: PolicyPropertyMapV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    runId: "run",
+    governanceHash: hash("a"),
+    mappings: [
+      {
+        policyAssignmentId: "assignment",
+        policyDefinitionId: "definition",
+        policyDefinitionReferenceId: "member",
+        effect: "deny",
+        logicalResourceId: "storage",
+        propertyPath: "properties.minimumTlsVersion",
+        expectedValue: "DO_NOT_RENDER",
+        disposition: "satisfied",
+      },
+    ],
+  };
+  const output = renderPolicyMappingMatrix(policy, hash("b"));
+  assert.match(output, /member/);
+  assert.match(output, /satisfied disposition alone is not execution evidence/);
+  assert.doesNotMatch(output, /DO_NOT_RENDER/);
+  assert.match(
+    renderPolicyMappingMatrix({ ...policy, mappings: [] }, hash("b")),
+    /does not establish absence of audit policies/,
+  );
+});
+
+test("operations runbook renders explicit ownership and untested recovery without claiming execution", () => {
+  const diagnosis: DiagnosisV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    runId: "run",
+    diagnosedAt: "2026-09-21T00:00:00Z",
+    status: "unknown",
+    observations: [],
+    causes: [],
+    operationalHandoff: {
+      owner: "Operations",
+      escalation: "On-call",
+      maintenanceWindow: "Sunday UTC",
+      accessPrerequisites: ["Read monitoring"],
+      configurationReferences: [{ name: "ENDPOINT", source: "Deployment output" }],
+      healthChecks: [{ resourceId: "/api", check: "Read /health", expectedOutcome: "HTTP 200", evidenceRefs: [] }],
+      monitoring: "Review alert workspace",
+      incidentResponse: {
+        applicability: "applicable",
+        owner: "On-call",
+        prerequisites: ["Incident declared"],
+        steps: ["Inspect service metrics"],
+        verification: "Record findings",
+        executionStatus: "untested",
+      },
+      rollback: {
+        applicability: "not-applicable",
+        rationale: "Replacement requires a new reviewed infrastructure change",
+      },
+      recovery: { applicability: "not-applicable", rationale: "State is owned by another service" },
+      limitations: ["No restore exercise evidence"],
+    },
+  };
+  const output = renderOperationsRunbook(diagnosis, hash("a"));
+  assert.equal(output, renderOperationsRunbook(diagnosis, hash("a")));
+  assert.match(output, /Execution status: untested/);
+  assert.match(output, /not establish that these checks ran or passed/);
+  assert.match(output, /State is owned by another service/);
+  const missing = { ...diagnosis };
+  delete missing.operationalHandoff;
+  assert.throws(() => renderOperationsRunbook(missing, hash("a")), /unavailable/);
+});
+
+test("deployment summary distinguishes recorded evidence from live and operational claims", () => {
+  const operation: OperationRecordV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    runId: "run-1",
+    operationId: "op-1",
+    operation: "apply",
+    state: "succeeded",
+    previewHash: hash("a"),
+    approvalHash: hash("b"),
+    ownerEpoch: 1,
+    updatedAt: "2026-09-21T00:00:00Z",
+  };
+  const inventory: ResourceInventoryV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    runId: "run-1",
+    deploymentHash: hash("c"),
+    collectedAt: operation.updatedAt,
+    resources: [
+      {
+        logicalId: "storage|consumer",
+        resourceId: "/storage",
+        type: "Storage",
+        location: "swedencentral",
+        properties: { secret: "DO_NOT_RENDER" },
+      },
+    ],
+  };
+  const approval: ApprovalEvidenceV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    runId: "run-1",
+    gate: 4,
+    decision: "approved",
+    actor: "consumer",
+    mechanism: "tty",
+    dependencyHash: hash("a"),
+    previewHash: hash("a"),
+    writerEpoch: 1,
+    decidedAt: operation.updatedAt,
+  };
+  const input = {
+    operation,
+    inventory,
+    approval,
+    operationHash: hash("c"),
+    inventoryHash: hash("d"),
+    provider: "fake" as const,
+    evidenceMode: "simulated" as const,
+  };
+  const rendered = renderDeploymentSummary(input);
+  assert.equal(rendered, renderDeploymentSummary(input));
+  assert.match(rendered, /Simulated evidence only/);
+  assert.match(rendered, /storage\\\|consumer/);
+  assert.doesNotMatch(rendered, /DO_NOT_RENDER/);
+  assert.match(rendered, /restore tests.*not established/);
+  assert.match(
+    renderDeploymentSummary({ ...input, provider: "bicep", evidenceMode: "native" }),
+    /does not independently verify live cloud/,
+  );
+  assert.match(
+    renderDeploymentSummary({ ...input, inventory: { ...inventory, resources: [] } }),
+    /not proof of absence/,
+  );
 });
 
 test("resource inventory sorts resources and property keys", () => {

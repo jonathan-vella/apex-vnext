@@ -26,8 +26,9 @@ roles. It also supports autonomous code generation, review, and validation worke
 
 ## GitHub Copilot CLI
 
-The Copilot CLI projection supports the coordinator and interactive specialists. Autonomous workers are omitted because
-the required hidden-but-delegable boundary is unavailable. The projection must not advertise or attempt those edges.
+The Copilot CLI projection supports the coordinator and interactive specialists. Autonomous workers remain omitted
+pending complete workflow qualification. Direct-selection visibility is not an authorization boundary; kernel task,
+evidence, ownership and approval checks remain authoritative. Candidate routing probes do not enable shipped edges.
 
 The target product nevertheless requires complete generation, review and validation outcomes in both clients. Any
 missing bounded CLI path is implementation work, not an acceptable omission of the workload lifecycle. See the

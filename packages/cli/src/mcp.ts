@@ -335,7 +335,7 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
     ]);
   };
   server.registerTool("status", { description: "Read selected APEX run status" }, async () =>
-    result(await service.status()),
+    result(await service.workspaceStatus()),
   );
   server.registerTool("capabilityList", { description: "Read capability pack availability" }, async () =>
     result({ packs: await service.capabilityList() }),
@@ -505,7 +505,7 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
     "generateIac",
     {
       description:
-        "Generate IaC for the active CodeGen task from accepted inputs and bindings; does not authorize deployment.",
+        "Generate IaC and complete the active CodeGen task from accepted inputs and bindings. Success already accepts the manifest and handoff; return the receipt without calling completeTask again. Does not authorize deployment.",
       inputSchema: {
         taskId: z.string(),
         existingResources: z.array(z.string()).optional(),
@@ -527,7 +527,8 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
   server.registerTool(
     "validateTask",
     {
-      description: "Validate the active task's staged outputs or supplied artifacts without completing the task.",
+      description:
+        "With only taskId for an IaC validation task, execute native checks and return runtime-owned outputs and execution metadata. valid:false and blockedValidatorIds mean required checks remain unexecuted; do not complete. Supplied artifacts are only checked/staged. Task completion and approval are separate.",
       inputSchema: stagingInput(true),
     },
     async ({ taskId, kind, value, summary, outputs }, extra) => {
@@ -692,8 +693,21 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
     "render",
     {
       description:
-        "Render the selected run's status, requirements, preview, approval, or inventory as a human-readable projection.",
-      inputSchema: { kind: z.enum(["status", "requirements", "preview", "approval", "inventory"]) },
+        "Render the selected run's status, requirements, preview, approval, inventory, structured Architecture decisions, implementation plan, plan-bound deployment guide, operational runbook, or evidence-bound deployment summary as a human-readable projection.",
+      inputSchema: {
+        kind: z.enum([
+          "status",
+          "requirements",
+          "preview",
+          "approval",
+          "inventory",
+          "deployment-summary",
+          "deployment-guide",
+          "implementation-plan",
+          "architecture-decisions",
+          "operations-runbook",
+        ]),
+      },
       outputSchema: z.object({ markdown: z.string() }).strict(),
     },
     async ({ kind }) => result({ markdown: await service.render(kind) }),

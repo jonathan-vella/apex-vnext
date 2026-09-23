@@ -6,15 +6,35 @@ Preserve working safety mechanisms; do not rebuild the runtime or create a gener
 
 ## Delivery Order
 
-| Phase | Outcome                                      | Primary acceptance                                                       |
-| ----- | -------------------------------------------- | ------------------------------------------------------------------------ |
-| 1     | Correct and compact task inputs and guidance | First optimization batch passes; controls stay aligned and enforced      |
-| 2     | Complete governance baseline import          | Subscription policy reaches review, Gate 2, planning and code validation |
-| 3     | Support both profiles and COE adaptation     | Independent import and conversational changes reuse accepted decisions   |
-| 4     | Complete design and operational output       | Useful, consistent documents and handoff match the quality reference     |
-| 5     | Close WSL2 and paired-client workflow gaps   | Both clients complete the lifecycle without a devcontainer               |
-| 6     | Finalize distribution and APEX MCP delivery  | Easy install/update/upgrade/rollback with compatible runtime versions    |
-| 7     | Qualify and release the final candidate      | Current evidence and explicit release authority                          |
+| Phase | Outcome                                      | Primary acceptance                                                             |
+| ----- | -------------------------------------------- | ------------------------------------------------------------------------------ |
+| 1     | Correct and compact task inputs and guidance | First optimization batch passes; controls stay aligned and enforced            |
+| 2     | Complete governance baseline import          | Subscription policy reaches review, Gate 2, planning and code validation       |
+| 3     | Support both profiles and COE adaptation     | Independent import and conversational changes reuse accepted decisions         |
+| 4     | Complete design and operational output       | Useful, consistent documents and handoff match the quality reference           |
+| 5     | Close WSL2 and paired-client workflow gaps   | VS Code Local and standalone CLI complete the lifecycle without a devcontainer |
+| 6     | Finalize distribution and APEX MCP delivery  | Easy install/update/upgrade/rollback with compatible runtime versions          |
+| 7     | Qualify and release the final candidate      | Current evidence and explicit release authority                                |
+
+## Current Completion Order
+
+As of 2026-09-21, focus only on VS Code Local and standalone Copilot CLI on WSL2. Desktop-app support and optional
+built-in helpers are deferred below; they are not prerequisites for finishing the active two-client release.
+
+1. Qualify actual standalone CLI CodeGen, Reviewer and Validator workflows under revised ADR-0006. Direct selection
+   is not a security blocker; task, evidence, ownership and approval checks are. Preserve existing worker permissions
+   and models, verify runtime outcomes, and keep shipped membership unchanged until qualification is reviewed.
+2. Finish acceptance for issue #344. Offline coverage now includes Bicep source-policy evidence, Terraform saved-plan
+   evidence, nonempty imports, identity/isolation rejection and bounded module-child bindings. Confirm the same
+   candidate in supported clients; actual AVM-version/workload and cloud evidence require separate qualification.
+   Unresolved ARM expressions remain unsupported rather than being treated as compliant.
+3. Reconcile and finish COE/profile/change and artifact-output requirements; reuse implemented controls. Include the
+   first-time install/bootstrap acceptance agreed on 2026-09-22 under `REQ-ONBOARDING-001`.
+4. Qualify complete workflows and lifecycle in both clients on the same candidate, then finalize distribution and
+   separately authorized cloud/release evidence. Preserve all review, freshness, ownership and human approval gates.
+
+Use narrow regression-first slices and integration checks at checkpoints. No new optimization campaign, broad rewrite
+or optional feature expansion is needed to follow this order.
 
 ## Development Diagnostics
 
@@ -97,32 +117,32 @@ exact supported-client evidence; no July 2026 protocol or client-parity claim fo
 R-IDs refer to the token, quality and latency brief reviewed on 2026-09-15. This register owns delivery disposition;
 the PRD owns acceptance. Applicable follow-ons belong in existing phases, not a second roadmap.
 
-| Recommendation             | Disposition and delivery                                                                       |
-| -------------------------- | ---------------------------------------------------------------------------------------------- |
-| R-01: ARM grants           | Adapt in first batch 3: scope per role, including legitimate Operator cost needs.              |
-| R-02: Tool metadata        | First batch 3: descriptions and client coverage checks before allowlist changes.               |
-| R-03: Prompt ownership     | Adapt in first batch 4: remove duplicates without losing worker safety rules.                  |
-| R-04: Skill index          | Adapt in first batch 4: compact references, no mandatory extra read per task.                  |
-| R-05: Bundle removal       | Phase 4: assess dormant/reference-only consumers; retire only with replacement proof.          |
-| R-06: Next-task outcomes   | First batch 3: document and test `needs_review` alongside other outcomes.                      |
-| R-07: Model tiers          | Deferred: require review-quality and delegation-boundary evidence before routing changes.      |
-| R-08: Intake prose         | No standalone work: already concise; preserve recommendation provenance in Phase 3.            |
-| R-09: Prompt ordering      | First batch 4 where useful: stable-first guidance, no cache-saving claim.                      |
-| R-10: Pricing reuse        | Phase 4: reuse exact matching evidence rows; batching requires provider support.               |
-| R-11: MCP duplication      | Deferred: prove compatibility in both clients before changing response representation.         |
-| R-12: Context budgets      | Adapt in first batch 2: locked limits, compact inline content and selective retrieval.         |
-| R-13: Input filtering      | First batch 1 then 2: accepted revisions and task dependencies, not kind filtering alone.      |
-| R-14: Requirements delta   | Phase 3: base-bound amendments, stable IDs, merged validation and full-submit fallback.        |
-| R-15: Network decision     | Phase 3: reuse confirmed intent when sufficient; retain necessary Architecture confirmation.   |
-| R-16: Replay reduction     | First batch 2: remove redundant request-local work; defer cross-call caching.                  |
-| R-17: Deferred rendering   | Deferred: require durable retry/recovery and package readiness before review or approval.      |
-| R-18: Journal snapshots    | Deferred: demonstrate need and preserve journal integrity, expiry and ownership checks.        |
-| R-19: New telemetry        | Not current scope under DECISION-025; preserve utilities and reconcile executable gates.       |
-| R-20: Reviewer packs       | First batch 2: bounded evidence and exact criteria for all four unchanged review passes.       |
-| R-21: Parallel reviews     | Deferred: scheduler and head/commit semantics need a separate correctness design.              |
-| R-22: CLI workers          | Reject terminal-wrapper shortcut; Phase 5 delivers a supported path retaining ADR-0006 bounds. |
-| R-23: Partial invalidation | Reject ID-only invalidation; Phase 3 reuses unchanged decisions with conservative proof.       |
-| R-24: Recommendations      | Phase 3: recommend permitted choices; never record or accept risk without confirmation.        |
+| Recommendation             | Disposition and delivery                                                                     |
+| -------------------------- | -------------------------------------------------------------------------------------------- |
+| R-01: ARM grants           | Adapt in first batch 3: scope per role, including legitimate Operator cost needs.            |
+| R-02: Tool metadata        | First batch 3: descriptions and client coverage checks before allowlist changes.             |
+| R-03: Prompt ownership     | Adapt in first batch 4: remove duplicates without losing worker safety rules.                |
+| R-04: Skill index          | Adapt in first batch 4: compact references, no mandatory extra read per task.                |
+| R-05: Bundle removal       | Phase 4: assess dormant/reference-only consumers; retire only with replacement proof.        |
+| R-06: Next-task outcomes   | First batch 3: document and test `needs_review` alongside other outcomes.                    |
+| R-07: Model tiers          | Deferred: require review-quality and delegation-boundary evidence before routing changes.    |
+| R-08: Intake prose         | No standalone work: already concise; preserve recommendation provenance in Phase 3.          |
+| R-09: Prompt ordering      | First batch 4 where useful: stable-first guidance, no cache-saving claim.                    |
+| R-10: Pricing reuse        | Phase 4: reuse exact matching evidence rows; batching requires provider support.             |
+| R-11: MCP duplication      | Deferred: prove compatibility in both clients before changing response representation.       |
+| R-12: Context budgets      | Adapt in first batch 2: locked limits, compact inline content and selective retrieval.       |
+| R-13: Input filtering      | First batch 1 then 2: accepted revisions and task dependencies, not kind filtering alone.    |
+| R-14: Requirements delta   | Phase 3: base-bound amendments, stable IDs, merged validation and full-submit fallback.      |
+| R-15: Network decision     | Phase 3: reuse confirmed intent when sufficient; retain necessary Architecture confirmation. |
+| R-16: Replay reduction     | First batch 2: remove redundant request-local work; defer cross-call caching.                |
+| R-17: Deferred rendering   | Deferred: require durable retry/recovery and package readiness before review or approval.    |
+| R-18: Journal snapshots    | Deferred: demonstrate need and preserve journal integrity, expiry and ownership checks.      |
+| R-19: New telemetry        | Not current scope under DECISION-025; preserve utilities and reconcile executable gates.     |
+| R-20: Reviewer packs       | First batch 2: bounded evidence and exact criteria for all four unchanged review passes.     |
+| R-21: Parallel reviews     | Deferred: scheduler and head/commit semantics need a separate correctness design.            |
+| R-22: CLI workers          | Qualify actual profiles under revised ADR-0006; retain kernel safeguards and scoped grants.  |
+| R-23: Partial invalidation | Reject ID-only invalidation; Phase 3 reuses unchanged decisions with conservative proof.     |
+| R-24: Recommendations      | Phase 3: recommend permitted choices; never record or accept risk without confirmation.      |
 
 Deferred mechanisms are not authorized implementation work. Reconsider only with a concrete functional need, named
 owner, compatibility and security design, focused tests and the required client evidence. Do not introduce model
@@ -153,10 +173,12 @@ both-track policy/ownership qualification are still required; packaging tests do
 
 ## Phase 3: Profiles, Import And Change
 
-**Requirements:** `REQ-REUSE-001`, `REQ-CHANGE-001`, `REQ-REQUIREMENTS-001`, `REQ-STATE-001`, `REQ-CONTRACT-001`.
+**Requirements:** `REQ-REUSE-001`, `REQ-CHANGE-001`, `REQ-REQUIREMENTS-001`, `REQ-STATE-001`, `REQ-CONTRACT-001`,
+`REQ-ONBOARDING-001`.
 
 - Represent ALZ-backed and standalone lab/demo profiles using existing project contracts and resource ownership.
-- Let the user identify a COE, select one workload archetype and create an independent copy with source provenance.
+- Ask for a remote COE during bootstrap, select one or more workload archetypes and create independent copies in separate
+  folders with exact-commit provenance and separate project state. Do not compose workloads or import authority.
 - Support manually copied projects by bounded inspection and confirmation, not full-history import.
 - Reuse contracts and parameter files; clarify missing facts once. Exclude source secrets, state and approval authority.
 - Ask relevant change questions, show consequences, confirm conflicts and update affected outputs only.
@@ -183,12 +205,34 @@ both-track policy/ownership qualification are still required; packaging tests do
 **Requirements:** `REQ-HOST-001`, `REQ-CUSTOMIZATION-001`, `REQ-GUIDANCE-001`, `REQ-WORKFLOW-001`.
 
 - Run basic client checks during earlier slices; use this phase to close end-to-end gaps, not first discover them.
+- Scope this phase to VS Code Local and standalone Copilot CLI. Do not add a desktop projection, native Windows lane
+  or desktop test prerequisite. Qualify standalone CLI worker behavior independently of the parked desktop probes.
 - Prove greenfield, COE import, changes, review, generation, validation and resume in both profiles.
-- Preserve the CLI hidden-worker boundary while providing every required outcome through supported mechanisms.
+- Preserve kernel authority and existing worker grants while qualifying required outcomes; profile visibility is not
+  an authentication or security gate.
 - Address R-22's outcome-parity goal without assuming a terminal invocation authenticates a worker's caller. Do not add
   a review command, broaden worker visibility or delegate generic tasks without proving the authority boundary.
 - Validate WSL2 setup/doctor, least-privilege prerequisites and the selected IaC tool without Docker or source checkout.
 - Use compact inputs, scoped skills and deterministic filtering throughout; no current token benchmark is required.
+
+### First-Time Setup Delivery
+
+Owner: CLI lifecycle and managed customization maintainers. Acceptance: `REQ-ONBOARDING-001`, agreed on 2026-09-22.
+These are planned additions, not capabilities established by existing bootstrap or clean-install tests.
+
+1. Record a bounded install/setup plan with readiness, conflicts and approval boundaries; reuse setup/doctor and the
+   canonical toolchain. Deliver `apex-install` from ready WSL2 Ubuntu without requiring Node/APEX first, covering both
+   clients and both IaC tracks. Verify installations and preserve compatible tools.
+2. Extend repository bootstrap to resumable new/existing/cloned-repo setup and either or both client projections.
+   Retain one managed ownership/update path, conflict preservation and explicit partial outcomes.
+3. Add remote-only COE selection during setup, independent multi-archetype copies and confirmed defaults/decision
+   adoption. Reuse bounded import validation and provenance; never execute imported instructions or copy approvals.
+4. Offer reviewed GitHub repository creation/push and policy-discovery OIDC setup with identity reuse or confirmed
+   dedicated creation. Keep Azure read roles separate from deployment authority; preserve administrator handoffs.
+5. Verify repository/client health and create the first collection review PR, or verify/import an existing central
+   reviewed baseline. Preserve human review and report governance pending where appropriate.
+6. Qualify reruns, interruption, missing permissions, conflicts, both clients together and secret-safe authentication.
+   Live identity, federation, role and repository changes require separate explicit authorization during qualification.
 
 ## Phase 6: Distribution Last
 
@@ -215,7 +259,47 @@ both-track policy/ownership qualification are still required; packaging tests do
 
 ## Later Work And Non-Goals
 
+### Deferred: Standalone Copilot Desktop App
+
+Owner: client experience maintainers. Parked by explicit maintainer direction on 2026-09-21, superseding the earlier
+mandatory-third-client scope. `REQ-COPILOT-APP-001` is retained but is not an active release acceptance requirement.
+Resume only after VS Code and standalone CLI required workflows are confirmed and the maintainer explicitly selects it.
+
+The [parked desktop implementation plan](COPILOT-DESKTOP-PLAN.md) retains the historical phases, proof requirements
+and implementation references. It is supporting design history, not a current release control or execution instruction.
+
+Preserve the native Windows fixtures, immutable probe receipts, input/confirmation observations and child-worktree
+binding results. The app's model selection was manual; the worker probe did not establish declared-parent enforcement.
+Track upstream [model selection #4097](https://github.com/github/app/issues/4097) and
+[parent-specific delegation #4098](https://github.com/github/app/issues/4098). An upstream reply does not authorize
+resuming work or prove that a fix is qualified.
+
+Park all remaining desktop adapter/identity contracts, Windows CI, worktree lifecycle, newline-checkout handling,
+worker authorization investigation and app-specific host/tool setup. Existing uncommitted Windows fixes are retained
+for later review, not evidence of shipped native Windows support. Do not mutate or delete existing test runs.
+On reactivation, rebind exact app/runtime versions and separately prove M1 native runtime, M2 adapter/interactions and
+M3 full applicable local workflows. Earlier smoke/intake checks do not establish any complete milestone.
+
+### Deferred: Built-In Copilot Agent Assistance
+
+Status: backlog only; no implementation authorized. Revisit only after APEX vNext's required VS Code and standalone
+Copilot CLI workflows are confirmed with current candidate-bound evidence, not intake/status checks alone, and the
+maintainer explicitly selects this work. This is not a prerequisite for current client qualification.
+
+Evaluate Explore for bounded discovery, Code-review and Security-review for advisory findings, and Rubber-duck for
+design critique. Consider user-invoked Research, development-only Task execution, and General-purpose delegation only
+where a specific need justifies them. Verify availability, instruction inheritance, tool permissions and behavior
+separately for each client; shared CLI foundations do not qualify desktop-app behavior.
+
+Keep results advisory and bounded. Built-ins must not replace APEX CodeGen, Reviewer or Validator contracts, create
+validation receipts, approve gates, or become workflow authority. Automatic inference is not required routing evidence.
+Do not add grants, hooks, plugins, agents or runtime changes under this backlog entry. Required safe APEX worker paths
+remain existing product work; optional built-in assistance must not expand that scope.
+
+### Other Deferred Work
+
 Application deployment pipelines and application-specific configuration are optional after the core product works.
-Token benchmarking is not current work. Continuous COE synchronization, multi-archetype composition, native Windows
-qualification, ALZ foundation deployment, application development and generic orchestration/synchronization frameworks
+Token benchmarking is not current work. Continuous COE synchronization, multi-archetype composition, native Windows and
+additional desktop
+hosts, ALZ foundation deployment, application development and generic orchestration/synchronization frameworks
 are not initial scope. Existing advanced capabilities need no expansion or deletion merely to simplify this plan.

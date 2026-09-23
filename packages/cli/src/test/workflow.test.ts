@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
-import { readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { EventJournal, ObjectStore, sha256Json } from "@apexops/kernel";
-import type { EventV1, InputValueV1, RunConfigV1, PolicyPropertyMapV1 } from "@apexops/contracts";
+import type {
+  EventV1,
+  InputValueV1,
+  RunConfigV1,
+  PolicyPropertyMapV1,
+  RequirementsAmendmentV1,
+} from "@apexops/contracts";
 import { ApexError } from "../errors.js";
 import { ApexService } from "../service.js";
 import {
@@ -68,6 +74,513 @@ test("status is read-only across repeated active-run reads and restart", async (
   assert.deepEqual(await new ApexService(root).status(), status);
   assert.deepEqual(await journal.replay(), events);
   assert.deepEqual(await snapshotFiles(root), files);
+});
+
+test("requirements change preview binds retained decisions and leaves workflow and files unchanged", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo" });
+  await prepareValidatedRun(service, runId, "bicep");
+  const before = await service.status();
+  const current = requirements();
+  const candidate = {
+    ...current,
+    budgetAndOperations: "Monthly limit is EUR 500",
+    requirements: [
+      ...current.requirements,
+      {
+        id: "REQ-ADDED",
+        statement: "Retain daily recovery points",
+        priority: "must" as const,
+        status: "confirmed" as const,
+        source: "consumer",
+      },
+    ],
+  };
+  const files = await snapshotFiles(root);
+  const proposal = await service.previewRequirementsChange(candidate, "Add recovery requirement");
+  assert.deepEqual(proposal.addedRequirementIds, ["REQ-ADDED"]);
+  assert.deepEqual(proposal.retainedRequirementIds, current.requirements.map(({ id }) => id).sort());
+  assert.deepEqual(proposal.changedFields, ["budgetAndOperations"]);
+  assert.equal(proposal.expectedHead, before.head);
+  assert.equal(proposal.candidateHash, sha256Json(candidate));
+  assert.deepEqual(proposal.invalidatedGates, [1, 2, 3, 4]);
+  assert.equal(proposal.deploymentAuthorized, false);
+  assert.deepEqual(
+    await new ApexService(root).previewRequirementsChange(candidate, "Add recovery requirement"),
+    proposal,
+  );
+  await assert.rejects(service.previewRequirementsChange(current, "No change"), /unchanged/);
+  await assert.rejects(
+    service.previewRequirementsChange({ ...candidate, projectId: "foreign" }, "Wrong project"),
+    /valid consumer/,
+  );
+  assert.deepEqual(await service.status(), before);
+  assert.deepEqual(await snapshotFiles(root), files);
+});
+
+test("requirements amendments preserve untouched decisions and require current confirmed revision", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo" });
+  await prepareValidatedRun(service, runId, "bicep");
+  const base = requirements();
+  const amendment: RequirementsAmendmentV1 = {
+    schemaVersion: "1.0.0",
+    baseRequirementsHash: sha256Json(base),
+    updates: [{ id: base.requirements[0]!.id, changes: { statement: "Use the revised availability objective" } }],
+    additions: [
+      {
+        id: "REQ-DEFERRED",
+        statement: "Confirm recovery window",
+        status: "deferred",
+        priority: "should",
+        source: "consumer",
+      },
+    ],
+    removals: [],
+    fields: { budgetAndOperations: "Monthly limit is EUR 500" },
+  };
+  const candidate = {
+    ...base,
+    ...amendment.fields,
+    requirements: [
+      ...base.requirements.map((item, index) => (index === 0 ? { ...item, ...amendment.updates[0]!.changes } : item)),
+      ...amendment.additions,
+    ],
+  };
+  const before = await service.status();
+  const files = await snapshotFiles(root);
+  const proposal = await service.previewRequirementsAmendment(amendment, "Revise objective");
+  assert.deepEqual(proposal, await service.previewRequirementsChange(candidate, "Revise objective"));
+  const options = { reason: "Revise objective", expectedHash: proposal.proposalHash, confirm: true };
+  await assert.rejects(service.amendRequirements(amendment, { ...options, confirm: false }), /explicit confirmation/);
+  await assert.rejects(
+    service.previewRequirementsAmendment({ ...amendment, baseRequirementsHash: "f".repeat(64) }, "Stale"),
+    /not current/,
+  );
+  for (const invalid of [
+    { ...amendment, updates: [...amendment.updates, ...amendment.updates] },
+    { ...amendment, removals: [base.requirements[0]!.id] },
+    { ...amendment, updates: [{ id: "missing", changes: { statement: "Unknown ID" } }] },
+    { ...amendment, additions: [base.requirements[0]!] },
+    { ...amendment, fields: { environment: "prod" } },
+    { ...amendment, fields: { businessContext: "x".repeat(262_144) } },
+  ])
+    await assert.rejects(service.previewRequirementsAmendment(invalid as RequirementsAmendmentV1, "Invalid"));
+  await assert.rejects(
+    service.amendRequirements({ ...amendment, fields: { workload: "Different" } }, options),
+    /stale/,
+  );
+  assert.deepEqual(await service.status(), before);
+  assert.deepEqual(await snapshotFiles(root), files);
+  await service.amendRequirements(amendment, options);
+  const restarted = new ApexService(root);
+  await assert.rejects(restarted.previewRequirementsAmendment(amendment, "Replay"), /not current/);
+  const next = await restarted.nextTask();
+  assert.equal(next.status, "task");
+  if (next.status !== "task") throw new Error("Expected amended requirements task");
+  assert.deepEqual((await restarted.taskContext(next.task.taskId)).outputTemplates.requirements, candidate);
+  await restarted.completeRequirements(next.task.taskId, candidate);
+  assert.equal((await restarted.status()).task, "requirements-review");
+  assert.ok((await restarted.status()).run.gates.every(({ state }) => state !== "approved"));
+});
+
+test("requirements amendments reject a revision change during asynchronous preview", async (context) => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo", iacTool: "terraform" });
+  await prepareValidatedRun(service, runId, "terraform");
+  const amendment: RequirementsAmendmentV1 = {
+    schemaVersion: "1.0.0",
+    baseRequirementsHash: sha256Json(requirements()),
+    updates: [],
+    additions: [],
+    removals: [],
+    fields: { workload: "Amended workload" },
+  };
+  const original = service.previewRequirementsChange.bind(service);
+  const competing = { ...requirements(), workload: "Concurrent workload" };
+  const proposal = await original(competing, "Concurrent revision");
+  context.mock.method(service, "previewRequirementsChange", async (...args: Parameters<typeof original>) => {
+    context.mock.restoreAll();
+    await service.reviseRequirements(competing, {
+      reason: "Concurrent revision",
+      expectedHash: proposal.proposalHash,
+      confirm: true,
+    });
+    return original(...args);
+  });
+  await assert.rejects(service.previewRequirementsAmendment(amendment, "Amend workload"), /changed during preview/);
+  const next = await service.nextTask();
+  if (next.status !== "task") throw new Error("Expected concurrent revision task");
+  assert.deepEqual((await service.taskContext(next.task.taskId)).outputTemplates.requirements, competing);
+});
+
+test("confirmed requirements revision invalidates proof without approvals or file replacement", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo" });
+  await prepareValidatedRun(service, runId, "bicep");
+  const before = await service.status();
+  const candidate = { ...requirements(), budgetAndOperations: "Monthly limit is EUR 500" };
+  const proposal = await service.previewRequirementsChange(candidate, "Change budget");
+  const options = { reason: "Change budget", expectedHash: proposal.proposalHash, confirm: true };
+  await assert.rejects(service.reviseRequirements(candidate, { ...options, confirm: false }), /explicit confirmation/);
+  await assert.rejects(
+    service.reviseRequirements({ ...candidate, budgetAndOperations: "Different" }, options),
+    /stale/,
+  );
+  assert.deepEqual(await service.status(), before);
+  await writeFile(join(root, "manual-design.md"), "Retain this manual edit\n");
+  const result = await service.reviseRequirements(candidate, options);
+  assert.equal(result.deploymentAuthorized, false);
+  const after = await service.status();
+  assert.equal(after.task, "requirements");
+  assert.equal(after.events, before.events + 1);
+  assert.ok(after.run.gates.every(({ state }) => state !== "approved" && state !== "inherited"));
+  assert.equal(await readFile(join(root, "manual-design.md"), "utf8"), "Retain this manual edit\n");
+  const restarted = new ApexService(root);
+  const task = await restarted.nextTask();
+  assert.equal(task.status, "task");
+  if (task.status !== "task") throw new Error("Expected revised requirements task");
+  assert.deepEqual((await restarted.taskContext(task.task.taskId)).outputTemplates.requirements, candidate);
+  await assert.rejects(restarted.completeRequirements(task.task.taskId, requirements()), /confirmed change candidate/);
+  const documentPath = join(root, "agent-output", "demo", runId, "01-requirements.md");
+  const originalDocument = await readFile(documentPath, "utf8");
+  await writeFile(documentPath, "Manual requirements edit\n");
+  const pending = await restarted.status();
+  await assert.rejects(restarted.completeRequirements(task.task.taskId, candidate), /manual edits/);
+  assert.deepEqual(await restarted.status(), pending);
+  assert.equal(await readFile(documentPath, "utf8"), "Manual requirements edit\n");
+  await writeFile(documentPath, originalDocument);
+  const unchangedPath = join(root, "agent-output", "demo", runId, "service-recommendations.md");
+  const unchangedBefore = await stat(unchangedPath, { bigint: true });
+  await restarted.completeRequirements(task.task.taskId, candidate);
+  assert.equal((await stat(unchangedPath, { bigint: true })).mtimeNs, unchangedBefore.mtimeNs);
+  assert.equal((await restarted.status()).task, "requirements-review");
+  assert.equal(await readFile(join(root, "manual-design.md"), "utf8"), "Retain this manual edit\n");
+});
+
+test("confirmed decision adoption reuses recovered requirements without importing approvals", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo" });
+  await writeFile(join(root, "manual-workload.md"), "Existing independently copied design\n");
+  const candidate = requirements();
+  const before = await service.status();
+  const proposal = await service.previewRequirementsChange(candidate, "Adopt recovered consumer decisions", "adopt");
+  assert.equal(proposal.sourceRequirementsHash, null);
+  assert.equal(proposal.mode, "adopt");
+  assert.deepEqual(proposal.retainedRequirementIds, []);
+  assert.deepEqual(await service.status(), before);
+  await service.reviseRequirements(candidate, {
+    reason: proposal.reason,
+    expectedHash: proposal.proposalHash,
+    confirm: true,
+    mode: "adopt",
+  });
+  const restarted = new ApexService(root);
+  const task = await restarted.nextTask();
+  assert.equal(task.status, "task");
+  if (task.status !== "task") throw new Error("Expected adopted requirements task without repeated intake");
+  assert.deepEqual((await restarted.taskContext(task.task.taskId)).outputTemplates.requirements, candidate);
+  await restarted.completeRequirements(task.task.taskId, candidate);
+  assert.equal((await restarted.status()).task, "requirements-review");
+  assert.ok((await restarted.status()).run.gates.every(({ state }) => state !== "approved" && state !== "inherited"));
+  await assert.rejects(restarted.previewRequirementsChange(candidate, "Duplicate adoption", "adopt"), /use revision/);
+  assert.equal(await readFile(join(root, "manual-workload.md"), "utf8"), "Existing independently copied design\n");
+});
+
+test("a later review invalidation does not resurrect an older confirmed requirements candidate", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo" });
+  const candidate = { ...requirements(), budgetAndOperations: "Adopted budget" };
+  const proposal = await service.previewRequirementsChange(candidate, "Adopt", "adopt");
+  await service.reviseRequirements(candidate, {
+    reason: "Adopt",
+    expectedHash: proposal.proposalHash,
+    confirm: true,
+    mode: "adopt",
+  });
+  const task = await service.nextTask();
+  if (task.status !== "task") throw new Error("Expected requirements task");
+  await service.completeRequirements(task.task.taskId, candidate);
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+  const before = await service.status();
+  await journal.append({
+    eventId: "review-revision",
+    projectId: "demo",
+    runId,
+    type: "workflow.invalidated",
+    timestamp: new Date().toISOString(),
+    ownerEpoch: before.run.ownerEpoch,
+    expectedHead: before.head,
+    payload: {
+      reason: "Reviewer requires correction",
+      nodeIds: ["requirements", "requirements-review"],
+      artifactKinds: ["requirements", "review-findings"],
+    },
+  });
+  const correction = await service.nextTask();
+  assert.equal(correction.status, "task");
+  if (correction.status !== "task") throw new Error("Expected correction without repeated intake");
+  assert.deepEqual((await service.taskContext(correction.task.taskId)).outputTemplates.requirements, candidate);
+  await service.completeRequirements(correction.task.taskId, {
+    ...candidate,
+    budgetAndOperations: "Reviewer-corrected budget",
+  });
+  assert.equal((await service.status()).task, "requirements-review");
+});
+
+test("requirements revision rejects stale heads and unresolved deployment execution", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo", iacTool: "terraform" });
+  await prepareValidatedRun(service, runId, "terraform");
+  const candidate = { ...requirements(), budgetAndOperations: "Monthly limit is EUR 500" };
+  const first = await service.previewRequirementsChange(candidate, "Change budget");
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+  await journal.append({
+    eventId: "in-flight",
+    projectId: "demo",
+    runId,
+    type: "deployment.started",
+    timestamp: new Date().toISOString(),
+    ownerEpoch: first.ownerEpoch,
+    expectedHead: first.expectedHead,
+    payload: { previewHash: "a".repeat(64) },
+  });
+  const before = await service.status();
+  await assert.rejects(
+    service.reviseRequirements(candidate, { reason: "Change budget", expectedHash: first.proposalHash, confirm: true }),
+    /stale/,
+  );
+  const current = await service.previewRequirementsChange(candidate, "Change budget");
+  await assert.rejects(
+    service.reviseRequirements(candidate, {
+      reason: "Change budget",
+      expectedHash: current.proposalHash,
+      confirm: true,
+    }),
+    /in-flight or indeterminate/,
+  );
+  assert.deepEqual(await service.status(), before);
+});
+
+for (const track of ["bicep", "terraform"] as const) {
+  test(`deployment guide binds current accepted ${track} plan and refuses invalidated sources`, async (context) => {
+    const root = await tempRoot();
+    const service = new ApexService(root);
+    const { runId } = await service.init({ projectId: "demo", iacTool: track });
+    await assert.rejects(service.render("deployment-guide"), /No current accepted plan/);
+    await assert.rejects(service.render("implementation-plan"), /No current accepted implementation intent/);
+    await prepareValidatedRun(service, runId, track);
+    const before = await service.status();
+    const guide = await service.render("deployment-guide");
+    assert.match(guide, /Accepted design only/);
+    assert.match(guide, new RegExp(`--provider ${track}`));
+    const directory = join(root, "agent-output", "demo", runId, "plan");
+    const implementation = await service.render("implementation-plan");
+    assert.equal(await readFile(join(directory, "implementation-plan.md"), "utf8"), implementation);
+    assert.equal(await new ApexService(root).render("implementation-plan"), implementation);
+    assert.equal(await readFile(join(directory, "deployment-guide.md"), "utf8"), guide);
+    assert.match(await readFile(join(directory, "README.md"), "utf8"), /deployment-guide.md/);
+    assert.equal(await new ApexService(root).render("deployment-guide"), guide);
+    assert.deepEqual(await service.status(), before);
+    const originalRead = ObjectStore.prototype.getJson;
+    context.mock.method(
+      ObjectStore.prototype,
+      "getJson",
+      async function (this: ObjectStore, ...args: Parameters<typeof originalRead>) {
+        const value = await originalRead.apply(this, args);
+        return value !== null && typeof value === "object" && "resourceBindings" in value
+          ? { ...value, intentHash: "f".repeat(64) }
+          : value;
+      },
+    );
+    await assert.rejects(service.render("deployment-guide"), /source bindings do not match/);
+    context.mock.restoreAll();
+    assert.deepEqual(await service.status(), before);
+    const candidate = { ...requirements(), budgetAndOperations: "Revised budget" };
+    const proposal = await service.previewRequirementsChange(candidate, "Change budget");
+    await service.reviseRequirements(candidate, {
+      reason: "Change budget",
+      expectedHash: proposal.proposalHash,
+      confirm: true,
+    });
+    await assert.rejects(service.render("deployment-guide"), /No current accepted plan/);
+    await assert.rejects(service.render("implementation-plan"), /No current accepted implementation intent/);
+    assert.equal(await readFile(join(directory, "deployment-guide.md"), "utf8"), guide);
+  });
+}
+
+test("manual deployment guide blocks plan acceptance without replacing user content", async (context) => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo" });
+  const directory = join(root, "agent-output", "demo", runId, "plan");
+  const originalComplete = service.completeTaskOutputs.bind(service);
+  let planHead: string | null | undefined;
+  context.mock.method(service, "completeTaskOutputs", async (...args: Parameters<typeof originalComplete>) => {
+    if (args[1].some(({ kind }) => kind === "implementation-intent")) {
+      await mkdir(directory, { recursive: true });
+      await writeFile(join(directory, "deployment-guide.md"), "Manual deployment instructions\n");
+      planHead = (await service.status()).head;
+    }
+    return originalComplete(...args);
+  });
+  await assert.rejects(prepareValidatedRun(service, runId, "bicep"), /manual edits|generation baseline/);
+  assert.ok(planHead);
+  assert.equal((await service.status()).head, planHead);
+  assert.equal(await readFile(join(directory, "deployment-guide.md"), "utf8"), "Manual deployment instructions\n");
+  await assert.rejects(service.render("deployment-guide"), /No current accepted plan/);
+});
+
+test("deployment summary binds accepted operation evidence and never upgrades simulated execution", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo" });
+  await assert.rejects(service.render("deployment-summary"), /No completed deployment/);
+  await prepareValidatedRun(service, runId, "bicep");
+  const preview = await service.preview({ operation: "apply", provider: "fake" });
+  await service.decideGateNumber(4, "approved", "tester");
+  const deployed = await service.deploy(preview.previewHash);
+  const before = await service.status();
+  const summary = await service.render("deployment-summary");
+  assert.match(summary, /Simulated evidence only/);
+  assert.match(summary, new RegExp(preview.previewHash));
+  assert.deepEqual(await service.status(), before);
+  assert.equal(await new ApexService(root).render("deployment-summary"), summary);
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
+  const completed = (await journal.replay()).findLast(({ type }) => type === "deployment.completed")!;
+  await journal.append({
+    eventId: "bad-summary-binding",
+    projectId: "demo",
+    runId,
+    ownerEpoch: before.run.ownerEpoch,
+    timestamp: new Date().toISOString(),
+    expectedHead: before.head,
+    type: "deployment.completed",
+    payload: { ...(completed.payload as Record<string, string>), previewHash: "f".repeat(64) },
+  });
+  await assert.rejects(service.render("deployment-summary"), /bindings do not match/);
+  const objects = new ObjectStore(root);
+  const payload = completed.payload as Record<string, string>;
+  const approval = await objects.getJson<Record<string, unknown>>(payload.approvalHash!);
+  for (const [field, value] of [
+    ["operationHash", { ...(deployed.operation as Record<string, unknown>), approvalHash: "e".repeat(64) }],
+    ["inventoryHash", { ...deployed.inventory, deploymentHash: "e".repeat(64) }],
+    ["inventoryHash", { ...deployed.inventory, projectId: "foreign" }],
+    ["approvalHash", { ...approval, decision: "rejected" }],
+  ] as const) {
+    const hash = await objects.putJson(value);
+    await journal.append({
+      eventId: hash,
+      projectId: "demo",
+      runId,
+      ownerEpoch: before.run.ownerEpoch,
+      timestamp: new Date().toISOString(),
+      expectedHead: await journal.head(),
+      type: "deployment.completed",
+      payload: { ...payload, [field]: hash },
+    });
+    await assert.rejects(service.render("deployment-summary"), /bindings do not match/);
+  }
+});
+
+test("operational handoff requires current inventory and pinned evidence before runbook materialization", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const { runId } = await service.init({ projectId: "demo" });
+  await prepareValidatedRun(service, runId, "bicep");
+  const preview = await service.preview({ operation: "apply", provider: "fake" });
+  await service.decideGateNumber(4, "approved", "tester");
+  const deployed = await service.deploy(preview.previewHash);
+  const next = await service.nextTask();
+  if (next.status !== "task" || next.task.taskType !== "diagnosis") throw new Error("Expected diagnosis task");
+  const handoff = {
+    owner: "Operations",
+    escalation: "On-call",
+    maintenanceWindow: "Sunday UTC",
+    accessPrerequisites: ["Monitoring access"],
+    configurationReferences: [],
+    healthChecks: [
+      {
+        resourceId: deployed.inventory.resources[0]!.resourceId,
+        check: "Inspect metrics",
+        expectedOutcome: "Within SLO",
+        evidenceRefs: [] as string[],
+      },
+    ],
+    monitoring: "Recorded resource metrics",
+    incidentResponse: { applicability: "not-applicable" as const, rationale: "Simulated fixture only" },
+    rollback: { applicability: "not-applicable" as const, rationale: "No live operation" },
+    recovery: { applicability: "not-applicable" as const, rationale: "No live data" },
+    limitations: ["Simulation, not production readiness"],
+  };
+  const diagnosis = {
+    schemaVersion: "1.0.0",
+    projectId: "demo",
+    runId,
+    diagnosedAt: new Date().toISOString(),
+    status: "unknown",
+    observations: ["Simulated inventory"],
+    causes: [],
+    operationalHandoff: handoff,
+  };
+  const before = await service.status();
+  await assert.rejects(
+    service.completeTaskOutputs(next.task.taskId, [
+      {
+        kind: "diagnosis",
+        value: {
+          ...diagnosis,
+          operationalHandoff: { ...handoff, healthChecks: [{ ...handoff.healthChecks[0], resourceId: "/foreign" }] },
+        },
+      },
+    ]),
+    /diagnosis:read-only/,
+  );
+  await assert.rejects(
+    service.completeTaskOutputs(next.task.taskId, [
+      {
+        kind: "diagnosis",
+        value: {
+          ...diagnosis,
+          operationalHandoff: {
+            ...handoff,
+            healthChecks: [{ ...handoff.healthChecks[0], evidenceRefs: ["f".repeat(64)] }],
+          },
+        },
+      },
+    ]),
+    /diagnosis:read-only/,
+  );
+  assert.deepEqual(await service.status(), before);
+  const accepted = await service.completeTaskOutputs(next.task.taskId, [{ kind: "diagnosis", value: diagnosis }]);
+  const runbook = await service.render("operations-runbook");
+  assert.match(runbook, new RegExp(accepted.outputHashes.diagnosis!));
+  assert.match(runbook, /Simulation, not production readiness/);
+  assert.equal(
+    await readFile(join(root, "agent-output", "demo", runId, "operations", "operations-runbook.md"), "utf8"),
+    runbook,
+  );
+  const directory = join(root, "agent-output", "demo", runId, "operations");
+  const index = await readFile(join(directory, "handoff-index.md"), "utf8");
+  for (const name of [
+    "deployment-summary.md",
+    "resource-inventory.md",
+    "policy-matrix.md",
+    "cost-reference.md",
+    "operations-runbook.md",
+  ]) {
+    assert.ok(index.includes(`](${name})`));
+    assert.ok((await readFile(join(directory, name))).length > 0);
+  }
+  assert.match(await readFile(join(directory, "deployment-summary.md"), "utf8"), /Simulated evidence only/);
+  assert.match(await readFile(join(directory, "cost-reference.md"), "utf8"), /not measured as-built spend/);
 });
 
 test("status leaves pending run transaction recovery to an advancing operation", async () => {
@@ -1519,7 +2032,7 @@ test("plan task context projects source hashes and valid output templates", asyn
     assert.equal(template.subjectHash, subjectHash);
     assert.equal(
       template.subjectKind,
-      taskType === "governance-review" ? "governance-reconciliation" : taskType.replace("-review", ""),
+      taskType === "governance-review" ? "policy-property-map" : taskType.replace("-review", ""),
     );
     if (taskType === "architecture-review") assert.equal(template.criteria?.length, 5);
     for (const reference of context.inputReferences) {
@@ -1572,7 +2085,43 @@ test("plan task context projects source hashes and valid output templates", asyn
   );
   await service.decideGateNumber(1, "approved", "tester");
   await acceptAvailabilityEvidence(service, initialized.runId);
-  const architectureValue = architecture(initialized.runId);
+  const architectureValue = {
+    ...architecture(initialized.runId),
+    decisionRecords: [
+      {
+        id: "ADR-0001",
+        title: "Service choice",
+        context: "Consumer workload requirements",
+        decision: "Use the accepted service",
+        requirementIds: [requirements().requirements[0]!.id],
+        alternatives: [
+          {
+            option: "Alternative A",
+            benefits: "Lower base cost",
+            drawbacks: "Insufficient capacity",
+            rejectionReason: "Fails workload demand",
+          },
+          {
+            option: "Alternative B",
+            benefits: "Flexible",
+            drawbacks: "Operations burden",
+            rejectionReason: "Team staffing limit",
+          },
+        ],
+        positiveConsequences: ["Meets workload demand"],
+        negativeConsequences: ["Higher base cost"],
+        wafImpacts: {
+          security: "Managed identity",
+          reliability: "Recovery planning",
+          "performance-efficiency": "Capacity alignment",
+          "cost-optimization": "Base cost trade-off",
+          "operational-excellence": "Team ownership",
+        },
+        complianceConsiderations: "Target policy remains mandatory",
+        implementationNotes: "Use accepted binding and parameter contract",
+      },
+    ],
+  };
   const costValue = costEstimate(initialized.runId);
   const architectureHashes = await complete("architecture", [
     { kind: "architecture", value: architectureValue },
@@ -1588,6 +2137,10 @@ test("plan task context projects source hashes and valid output templates", asyn
     },
   ]);
   const architectureReviewDirectory = join(root, "agent-output", "demo", initialized.runId, "architecture");
+  const decisions = await service.render("architecture-decisions");
+  assert.match(decisions, /ADR-0001/);
+  assert.match(decisions, new RegExp(architectureHashes.outputHashes.architecture!));
+  assert.equal(await readFile(join(architectureReviewDirectory, "architecture-decisions.md"), "utf8"), decisions);
   assert.match(await readFile(join(architectureReviewDirectory, "README.md"), "utf8"), /Architecture hash/u);
   assert.match(
     await readFile(join(architectureReviewDirectory, "architecture-assessment.md"), "utf8"),
@@ -1707,6 +2260,79 @@ test("plan task context projects source hashes and valid output templates", asyn
     offset = chunk.nextOffset;
   }
   assert.deepEqual(JSON.parse(chunks.join("")), plan[0]!.value);
+});
+
+test("direct worker calls preserve authority across missing, foreign, wrong, replayed and expired tasks", async () => {
+  let now = Date.parse("2026-09-21T00:00:00.000Z");
+  const root = await tempRoot();
+  const service = new ApexService(root, { clock: () => new Date(now) });
+  const { runId } = await service.init({ projectId: "demo" });
+  const runPath = join(root, ".apex", "projects", "demo", "runs", runId);
+  const journal = new EventJournal(join(runPath, "journal"));
+  const canary = join(root, "user-notes.md");
+  await writeFile(canary, "Preserve user content\n");
+  const unchangedAfterRejection = async (operation: () => Promise<unknown>, expected: RegExp) => {
+    const beforeEvents = await journal.replay();
+    const beforeRun = await readFile(join(runPath, "run.json"));
+    await assert.rejects(operation, expected);
+    assert.deepEqual(await journal.replay(), beforeEvents);
+    assert.deepEqual(await readFile(join(runPath, "run.json")), beforeRun);
+    assert.equal(await readFile(canary, "utf8"), "Preserve user content\n");
+  };
+  const missing = "00000000-0000-4000-8000-000000000000";
+  for (const operation of [
+    () => service.completeReview(missing, []),
+    () => service.generateIac(missing),
+    () => service.validateTask(missing),
+    () => service.stageFile(missing, "main.bicep", ""),
+  ])
+    await unchangedAfterRejection(operation, /task|ENOENT/i);
+  const issued = await nextTaskAfterInput(service);
+  if (issued.status !== "task") throw new Error("Expected requirements task");
+  for (const operation of [
+    () => service.completeReview(issued.task.taskId, []),
+    () => service.generateIac(issued.task.taskId),
+    () => service.stageFile(issued.task.taskId, "../user-notes.md", "overwrite"),
+    () => service.decideGateNumber(1, "approved", "direct-worker-probe"),
+  ])
+    await unchangedAfterRejection(operation, /task|gate|review|approval/i);
+  const other = new ApexService(await tempRoot());
+  await other.init({ projectId: "other" });
+  const foreign = await nextTaskAfterInput(other);
+  if (foreign.status !== "task") throw new Error("Expected foreign task");
+  await unchangedAfterRejection(() => service.completeReview(foreign.task.taskId, []), /task|ENOENT/i);
+  const accepted = await service.completeRequirements(issued.task.taskId, requirements());
+  assert.ok(accepted.outputHashes.requirements);
+  await unchangedAfterRejection(
+    () => service.completeRequirements(issued.task.taskId, requirements()),
+    /stale|head|completed/i,
+  );
+  const reviewTask = await service.nextTask();
+  if (reviewTask.status !== "task") throw new Error("Expected review task");
+  assert.equal(reviewTask.task.taskType, "requirements-review");
+  const reviewOutput = review(runId, "requirements", accepted.outputHashes.requirements!);
+  const wrongSubject = { ...reviewOutput, subjectHash: "f".repeat(64) };
+  await unchangedAfterRejection(
+    () => service.completeTaskOutputs(reviewTask.task.taskId, [{ kind: "review-findings", value: wrongSubject }]),
+    /bind|subject|hash/i,
+  );
+  now += 25 * 60 * 60 * 1_000;
+  await unchangedAfterRejection(() => service.completeReview(reviewTask.task.taskId, []), /expired/i);
+});
+
+test("same client can submit valid requirements and review without authenticating distinct agent identities", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  await service.init({ projectId: "demo" });
+  const issued = await nextTaskAfterInput(service);
+  if (issued.status !== "task") throw new Error("Expected requirements task");
+  const accepted = await service.completeRequirements(issued.task.taskId, requirements());
+  const reviewTask = await service.nextTask();
+  if (reviewTask.status !== "task") throw new Error("Expected review task");
+  const completed = await service.completeReview(reviewTask.task.taskId, []);
+  const stored = await new ObjectStore(root).getJson(completed.outputHashes["review-findings"]!);
+  assert.equal((stored as { subjectHash: string }).subjectHash, accepted.outputHashes.requirements);
+  assert.notEqual((await service.status()).run.gates[0]!.state, "approved");
 });
 
 test("review input reads reject expired tasks", async () => {
@@ -1978,10 +2604,17 @@ test("a task remains current across stage then complete", async () => {
 
 test("expired preview and wrong preview hash are rejected", async () => {
   let now = Date.parse("2026-01-01T00:00:00.000Z");
-  const service = new ApexService(await tempRoot(), { clock: () => new Date(now) });
+  const root = await tempRoot();
+  const service = new ApexService(root, { clock: () => new Date(now) });
   const initialized = await service.init({ projectId: "demo" });
   await prepareValidatedRun(service, initialized.runId, "bicep");
   const preview = await service.preview({ operation: "apply", provider: "fake", expiresInMs: 1 });
+  const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"));
+  const beforeApproval = await service.status();
+  const events = await journal.replay();
+  await assert.rejects(service.deploy(preview.previewHash), /approval|gate/i);
+  assert.deepEqual(await journal.replay(), events);
+  assert.deepEqual((await service.status()).run, beforeApproval.run);
   await service.decideGateNumber(4, "approved", "tester");
   await assert.rejects(
     service.deploy("f".repeat(64)),

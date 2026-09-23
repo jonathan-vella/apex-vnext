@@ -178,6 +178,7 @@ async function writeReleaseSecurityArtifacts(outputDirectory, releaseManifest) {
     _type: "https://in-toto.io/Statement/v1",
     subject: [
       ...releaseManifest.packages.map((entry) => ({ name: entry.file, digest: { sha256: entry.sha256 } })),
+      { name: releaseManifest.installer.file, digest: { sha256: releaseManifest.installer.sha256 } },
       { name: "sbom.cdx.json", digest: { sha256: sbomHash } },
     ],
     predicateType: "https://slsa.dev/provenance/v1",
@@ -248,6 +249,25 @@ async function packWorkspace(packageName, stagingDirectory) {
   return resolve(stagingDirectory, basename(filename));
 }
 
+export function renderConsumerInstaller(template, toolchain) {
+  const versions = {
+    NODE: toolchain.node,
+    NPM: toolchain.npm,
+    COPILOT: toolchain.copilotCli,
+    VSCODE: toolchain.minimumVscode,
+  };
+  let rendered = template;
+  for (const [name, version] of Object.entries(versions)) {
+    if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/u.test(version))
+      throw new Error(`Invalid installer toolchain version: ${name}`);
+    const marker = `__APEX_${name}_VERSION__`;
+    if (rendered.split(marker).length !== 2) throw new Error(`Installer marker must occur once: ${name}`);
+    rendered = rendered.replace(marker, version);
+  }
+  if (/__APEX_[A-Z_]+__/u.test(rendered)) throw new Error("Unresolved installer template marker");
+  return rendered;
+}
+
 export async function packVnext({ outputDirectory, includeTestkit = false }) {
   await run("npm", ["run", "build:vnext"]);
   await run("npm", ["run", "schemas:check", "--workspace", "@apexops/contracts"]);
@@ -280,6 +300,17 @@ export async function packVnext({ outputDirectory, includeTestkit = false }) {
       sourceRepository: await sourceRepository(),
       toolchain: await releaseToolchain(),
       packages,
+    };
+    const installer = renderConsumerInstaller(
+      await readFile(join(repositoryRoot, "tools/scripts/apex-install.sh"), "utf8"),
+      releaseManifest.toolchain,
+    );
+    const installerPath = join(outputDirectory, "apex-install.sh");
+    await writeFile(installerPath, installer, { mode: 0o755 });
+    releaseManifest.installer = {
+      file: "apex-install.sh",
+      sha256: await sha256(installerPath),
+      bytes: Buffer.byteLength(installer),
     };
     const security = await writeReleaseSecurityArtifacts(outputDirectory, releaseManifest);
     releaseManifest.security = security;

@@ -59,6 +59,12 @@ as a way around an intake-only or no-approval request. A status-only request cal
 
 ## Workflow
 
+Bootstrap installs workspace tooling and client configuration only; it does not create a project or choose workload
+defaults. When starting in a newly configured workspace, call `apex/projectList` before requesting run status or tasks.
+If the list is empty (or status returns `needs_project`), explain that setup is ready and use the project-creation flow
+below to gather the user's details and call `apex/projectCreate`. Never invent a placeholder project, environment or
+IaC selection merely to make status or routing succeed. A status-only request reports that no project exists and stops.
+
 1. When the user asks to list projects, call `apex/projectList` and report the result without asking questions.
 2. When the user asks to resume a project, call `apex/projectList` when no project is named, use the active client's
   question mechanism to select one, then call `apex/projectUse` and continue with `apex/status` and `apex/nextTask`.

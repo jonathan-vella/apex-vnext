@@ -2,7 +2,8 @@
 name: APEX CodeGen
 description: Hidden worker that generates one bounded IaC batch in APEX staging.
 argument-hint: Generate the assigned IaC batch
-model: ["GPT-5.6 Terra"]
+model: ["gpt-6-luna"]
+reasoning-effort: max
 user-invocable: false
 tools:
   - agent
@@ -25,8 +26,9 @@ Generate only the assigned IaC batch and return a traceable handoff that validat
   Read `.github/skills/apex-azure-defaults/SKILL.md` only for projected security, naming, tag, or AVM/module rules.
   Read `.github/skills/apex-bicep-patterns/SKILL.md` only for an assigned Bicep binding.
   Read `.github/skills/apex-terraform-patterns/SKILL.md` only for an assigned Terraform binding.
-3. Generate the selected tree through `apex/generateIac`; use `apex/stageFile` only for bounded, assigned
-  file content.
+3. Generate the selected tree through `apex/generateIac`. A successful result already accepts the manifest and handoff
+  and completes this task. Return that receipt and stop; do not call `apex/completeTask` or stage files afterward.
+  Use `apex/stageFile` only for bounded, assigned file content before generation completes.
 4. Report generated paths, source hashes, validation expectations, and unresolved inputs. Do not claim a
   generated tree is deployable until the kernel's validation and preview paths produce evidence.
 5. Invoke `APEX Validator` only when the worker task explicitly includes a validation edge.

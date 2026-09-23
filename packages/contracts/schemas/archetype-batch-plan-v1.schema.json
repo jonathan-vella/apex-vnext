@@ -1,0 +1,227 @@
+{
+  "$id": "https://schemas.apexops.dev/archetype-batch-plan-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "authorityImported": {
+      "const": false,
+      "type": "boolean"
+    },
+    "config": {
+      "$id": "https://schemas.apexops.dev/archetype-batch-config-v1.json",
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "pattern": "^https://github\\.com/[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$(?![\\s\\S])",
+          "type": "string"
+        },
+        "revision": {
+          "pattern": "^[a-f0-9]{40}$(?![\\s\\S])",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "1.0.0",
+          "type": "string"
+        },
+        "selections": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "destination": {
+                "pattern": "^[a-z][a-z0-9-]{0,62}$(?![\\s\\S])",
+                "type": "string"
+              },
+              "selectedPath": {
+                "maxLength": 512,
+                "minLength": 1,
+                "pattern": "^(?!/)(?!.*(?:^|/)[.]{1,2}(?:/|$))(?!.*[\\\\:\\x00-\\x1f\\x7f])[^/]+(?:/[^/]+)*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "selectedPath",
+              "destination"
+            ],
+            "type": "object"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "repository",
+        "revision",
+        "selections"
+      ],
+      "type": "object"
+    },
+    "entries": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "destination": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "proposal": {
+            "$id": "https://schemas.apexops.dev/archetype-source-proposal-v1.json",
+            "additionalProperties": false,
+            "properties": {
+              "authorityImported": {
+                "const": false,
+                "type": "boolean"
+              },
+              "contentHash": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "excluded": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "path": {
+                      "maxLength": 512,
+                      "minLength": 1,
+                      "pattern": "^(?!/)(?!.*(?:^|/)[.]{1,2}(?:/|$))(?!.*[\\\\:\\x00-\\x1f\\x7f])[^/]+(?:/[^/]+)*$",
+                      "type": "string"
+                    },
+                    "reason": {
+                      "anyOf": [
+                        {
+                          "const": "source-authority",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unsupported-material",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "reason"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 256,
+                "type": "array"
+              },
+              "files": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "bytes": {
+                      "maximum": 1048576,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "hash": {
+                      "pattern": "^[0-9a-f]{64}$",
+                      "type": "string"
+                    },
+                    "path": {
+                      "maxLength": 512,
+                      "minLength": 1,
+                      "pattern": "^(?!/)(?!.*(?:^|/)[.]{1,2}(?:/|$))(?!.*[\\\\:\\x00-\\x1f\\x7f])[^/]+(?:/[^/]+)*$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "hash",
+                    "bytes"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 256,
+                "minItems": 1,
+                "type": "array"
+              },
+              "repositoryPath": {
+                "maxLength": 4096,
+                "minLength": 1,
+                "type": "string"
+              },
+              "requiresConsumerReview": {
+                "const": true,
+                "type": "boolean"
+              },
+              "revision": {
+                "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$",
+                "type": "string"
+              },
+              "schemaVersion": {
+                "const": "1.0.0",
+                "type": "string"
+              },
+              "selectedPath": {
+                "maxLength": 512,
+                "minLength": 1,
+                "pattern": "^(?!/)(?!.*(?:^|/)[.]{1,2}(?:/|$))(?!.*[\\\\:\\x00-\\x1f\\x7f])[^/]+(?:/[^/]+)*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "schemaVersion",
+              "repositoryPath",
+              "revision",
+              "selectedPath",
+              "authorityImported",
+              "requiresConsumerReview",
+              "files",
+              "excluded",
+              "contentHash"
+            ],
+            "type": "object"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "const": "pending",
+                "type": "string"
+              },
+              {
+                "const": "already-copied",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "required": [
+          "destination",
+          "proposal",
+          "state"
+        ],
+        "type": "object"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "type": "array"
+    },
+    "planHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "requiresConsumerReview": {
+      "const": true,
+      "type": "boolean"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "config",
+    "entries",
+    "planHash",
+    "authorityImported",
+    "requiresConsumerReview"
+  ],
+  "type": "object"
+}

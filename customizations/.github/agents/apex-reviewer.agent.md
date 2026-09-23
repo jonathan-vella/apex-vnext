@@ -2,7 +2,8 @@
 name: APEX Reviewer
 description: Hidden autonomous worker that reviews one bounded artifact and returns typed findings or needs_input.
 argument-hint: Review the assigned artifact
-model: ["GPT-5.6 Terra"]
+model: ["gpt-6-luna"]
+reasoning-effort: max
 user-invocable: false
 tools:
   - apex/taskContext

@@ -7,7 +7,20 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 ## Inventory
 
 - `approval show`
+- `archetype import`
+- `archetype inspect`
+- `archetype list`
 - `bootstrap`
+- `bootstrap baseline-check`
+- `bootstrap coe-import`
+- `bootstrap coe-plan`
+- `bootstrap governance-plan`
+- `bootstrap governance-provision`
+- `bootstrap governance-provision-plan`
+- `bootstrap plan`
+- `bootstrap repository-plan`
+- `bootstrap repository-publish`
+- `bootstrap wizard`
 - `cache clear`
 - `cache status`
 - `capability install`
@@ -57,6 +70,12 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 - `quality status`
 - `reconcile`
 - `render`
+- `requirements adopt`
+- `requirements amend`
+- `requirements preview-adoption`
+- `requirements preview-amendment`
+- `requirements preview-change`
+- `requirements revise`
 - `review resolve`
 - `setup`
 - `state transfer-export`

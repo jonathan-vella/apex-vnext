@@ -124,6 +124,98 @@ test("native Bicep resolves accepted literal names and exact RG ownership", () =
   }
 });
 
+test("native Bicep child ownership binds exact full names without granting parent or sibling access", () => {
+  const context = fixture();
+  const childType = "Microsoft.Storage/storageAccounts/blobServices/containers";
+  const childImplementation = `native:${childType}@2023-05-01`;
+  context.intent.resources[0]!.type = childType;
+  context.binding.intentHash = sha256Json(context.intent);
+  context.binding.resourceBindings.storage!.implementation = childImplementation;
+  context.binding.resourceBindings.storage!.parameters.name = "acceptedname/default/content";
+  context.manifest.resources[0]!.type = childType;
+  context.manifest.resources[0]!.implementationAddress = childImplementation;
+  const childId = `${managedId}/blobServices/default/containers/content`;
+  const result = resolveNativeBicepResourceOwnership(context);
+  assert.deepEqual(result.issues, []);
+  assert.deepEqual(result.expectedResourceIds, [childId]);
+  assert.equal(
+    coverage(result.expectedResourceIds, [{ resourceId: childId, action: "update", material: true }]).valid,
+    true,
+  );
+  for (const resourceId of [
+    managedId,
+    `${managedId}/blobServices/default`,
+    `${childId}-other`,
+    `${childId}/other/nested`,
+  ])
+    assert.equal(coverage(result.expectedResourceIds, [{ resourceId, action: "delete", material: true }]).valid, false);
+  for (const name of [
+    "content",
+    "acceptedname/default",
+    "acceptedname/default/content/extra",
+    "acceptedname//content",
+    "acceptedname/../content",
+    "acceptedname/default/content\n",
+  ]) {
+    context.binding.resourceBindings.storage!.parameters.name = name;
+    assert.notEqual(resolveNativeBicepResourceOwnership(context).issues.length, 0, name);
+  }
+  context.binding.resourceBindings.storage!.parameters.name = "acceptedname/default/content";
+  context.manifest.resources[0]!.ownership = "existing";
+  context.manifest.resources[0]!.implementationKind = "existing";
+  const protectedChild = resolveNativeBicepResourceOwnership(context);
+  assert.deepEqual(protectedChild.expectedResourceIds, []);
+  assert.deepEqual(protectedChild.protectedResourceIds, [childId]);
+});
+
+test("diagnostic extension ownership resolves explicit native scopes without granting sibling extensions", () => {
+  const context = fixture();
+  const diagnostic = {
+    id: "diagnostic",
+    type: "Microsoft.Insights/diagnosticSettings",
+    purpose: "Monitor",
+    dependsOn: ["storage"],
+    controls: [],
+  };
+  context.intent.resources.unshift(diagnostic);
+  context.binding.intentHash = sha256Json(context.intent);
+  context.binding.resourceBindings.diagnostic = {
+    implementation: "native:Microsoft.Insights/diagnosticSettings@2021-05-01-preview",
+    version: "2021-05-01-preview",
+    scopeLogicalId: "storage",
+    parameters: { name: "logs", parentId: "/", location: "swedencentral", properties: {} },
+  };
+  context.manifest.resources.push({
+    ...context.manifest.resources[0]!,
+    logicalId: "diagnostic",
+    type: diagnostic.type,
+    implementationAddress: context.binding.resourceBindings.diagnostic.implementation,
+    dependsOn: ["storage"],
+    generatedDependencies: ["storage"],
+  });
+  const expected = `${managedId}/providers/Microsoft.Insights/diagnosticSettings/logs`;
+  const result = resolveNativeBicepResourceOwnership(context);
+  assert.deepEqual(result.issues, []);
+  assert.deepEqual(result.expectedResourceIds, [managedId, expected]);
+  assert.equal(planCoverage(context).valid, true);
+  assert.equal(
+    coverage(result.expectedResourceIds, [{ resourceId: `${expected}-other`, action: "update", material: true }]).valid,
+    false,
+  );
+  for (const scopeLogicalId of ["missing", "diagnostic"]) {
+    const changed = structuredClone(context);
+    changed.binding.resourceBindings.diagnostic!.scopeLogicalId = scopeLogicalId;
+    assert.ok(resolveNativeBicepResourceOwnership(changed).issues.length > 0);
+    assert.equal(planCoverage(changed).valid, false);
+  }
+  const protectedScope = structuredClone(context);
+  protectedScope.manifest.resources[0]!.ownership = "existing";
+  protectedScope.manifest.resources[0]!.implementationKind = "existing";
+  assert.ok(resolveNativeBicepResourceOwnership(protectedScope).issues.length > 0);
+  context.binding.track = "terraform";
+  assert.equal(planCoverage(context).valid, false);
+});
+
 test("existing Bicep resources are protected from update and delete", () => {
   const context = fixture();
   context.manifest.resources[0]!.ownership = "existing";

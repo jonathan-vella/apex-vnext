@@ -1,0 +1,51 @@
+{
+  "$id": "https://schemas.apexops.dev/archetype-batch-config-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "repository": {
+      "pattern": "^https://github\\.com/[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$(?![\\s\\S])",
+      "type": "string"
+    },
+    "revision": {
+      "pattern": "^[a-f0-9]{40}$(?![\\s\\S])",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "selections": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "destination": {
+            "pattern": "^[a-z][a-z0-9-]{0,62}$(?![\\s\\S])",
+            "type": "string"
+          },
+          "selectedPath": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*(?:^|/)[.]{1,2}(?:/|$))(?!.*[\\\\:\\x00-\\x1f\\x7f])[^/]+(?:/[^/]+)*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selectedPath",
+          "destination"
+        ],
+        "type": "object"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "type": "array"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "repository",
+    "revision",
+    "selections"
+  ],
+  "type": "object"
+}
