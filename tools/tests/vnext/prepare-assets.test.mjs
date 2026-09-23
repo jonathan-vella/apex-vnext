@@ -634,9 +634,13 @@ Gather requirements through the kernel.
   assert.match(cli, /target: github-copilot/u);
   assert.match(cli, /disable-model-invocation: false/u);
   assert.match(cli, /collect one free-text answer/u);
-  assert.match(cli, /request correction for invalid, empty, or ambiguous input/u);
+  assert.match(cli, /use `ask_user` checkboxes when it offers an array field/u);
+  assert.match(cli, /number every exact kernel option in its original order/u);
+  assert.match(cli, /request correction for out-of-range, duplicate, non-numeric, empty, or ambiguous entries/u);
+  assert.match(cli, /when every value matches, the checkbox answer needs no further confirmation/u);
+  assert.match(cli, /resolved selection as an array in kernel order/u);
   assert.match(cli, /A correction requires a fresh confirmation of the complete set/u);
-  assert.match(cli, /only after confirmation/u);
+  assert.match(cli, /only after the checkbox answer or confirmation/u);
   assert.match(cli, /Cancellation means no submission/u);
   assert.match(cli, /Never pass unsupported `multiSelect` parameters/u);
   assert.match(cli, /<!-- apex-shared-body -->\n+## Role\n\nGather requirements through the kernel\./u);

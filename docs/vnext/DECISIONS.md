@@ -195,4 +195,5 @@ retargeted to the VS Code Copilot harness; only Local-only tests are archived. F
 rule that a subagent may not use a costlier model tier than its parent, so the coordinator delegates CodeGen, Reviewer
 and Validator through `apex-next`. Under the maintainer's standing rule to take the recommended option while away,
 slice 6 ships only Explore: the other review helpers inherit the caller's APEX completion and disposition tools, and
-agent frontmatter cannot limit Validator's shell, so Validator gets none.
+agent frontmatter cannot limit Validator's shell, so Validator gets none. For slice 7, checkbox answers that map
+exactly to kernel options need no extra question; numbered or free-text answers still require explicit confirmation.

@@ -1484,6 +1484,18 @@ test("typed input recording rejects premature, stale, malformed, duplicate, and 
     }),
     (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
   );
+  for (const environments of [["dev", "dev"], [], ["dev", "qa"]]) {
+    await assert.rejects(
+      service.recordInput({
+        ...valid,
+        answers: valid.answers.map((answer) =>
+          answer.questionId === "target-environments" ? { ...answer, value: environments } : answer,
+        ),
+      }),
+      (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
+      `target environments ${JSON.stringify(environments)}`,
+    );
+  }
   const recorded = await service.recordInput(valid);
   assert.deepEqual(recorded, { recorded: true, requestId: pending.request.requestId });
   await assert.rejects(
