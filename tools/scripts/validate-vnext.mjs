@@ -17,7 +17,6 @@ import { GENERATED_SHARED_FILES } from "../../packages/cli/scripts/prepare-asset
 
 const REQUIRED_PACKAGES = ["contracts", "kernel", "capabilities", "renderers", "testkit", "cli"];
 const CORE_PACKAGES = new Set(["kernel", "capabilities", "renderers"]);
-const COST_TIERS = { fast: 0, standard: 1, premium: 2 };
 const CONFIG_SHAPES = {
   "workflow.v1.json": [
     "schemaVersion",
@@ -702,11 +701,11 @@ function validateCustomizations(model, findings) {
       );
     if (!role)
       finding(findings, "customization.role-reference", `${name} has no manifest role`, "customizations/manifest.json");
-    if (role && (!modelIds(frontmatter.model).includes(role.model) || !(role.costTier in COST_TIERS)))
+    if (role && !modelIds(frontmatter.model).includes(role.model))
       finding(
         findings,
         "customization.model-role",
-        `${name} frontmatter model or cost tier disagrees with its manifest role`,
+        `${name} frontmatter model disagrees with its manifest role`,
         agent.path,
       );
     const interactive = role?.interactionType === "interactive-handoff";
@@ -827,20 +826,11 @@ function validateCustomizations(model, findings) {
       );
       continue;
     }
-    const requiresHandoff =
-      child.interactionType === "interactive-handoff" || COST_TIERS[child.costTier] > COST_TIERS[parent.costTier];
-    if (requiresHandoff && edge.type !== "handoff")
+    if (child.interactionType === "interactive-handoff" && edge.type !== "handoff")
       finding(
         findings,
-        "customization.model-escalation",
+        "customization.interactive-edge",
         `${edge.from} -> ${edge.to} must be a handoff`,
-        "customizations/manifest.json",
-      );
-    if (edge.type === "subagent" && COST_TIERS[child.costTier] > COST_TIERS[parent.costTier])
-      finding(
-        findings,
-        "customization.model-escalation",
-        `Subagent ${edge.to} exceeds parent ${edge.from} cost tier`,
         "customizations/manifest.json",
       );
   }

@@ -249,9 +249,10 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(coordinatorAgent, /- apex\/projectCreate/u);
   assert.match(coordinatorAgent, /- apex\/gateDecide/u);
   assert.match(coordinatorAgent, /Use `ask_user` only for project lifecycle or routing choices, never intake/u);
-  assert.match(coordinatorAgent, /select `APEX Requirements` as the foreground agent/u);
-  assert.doesNotMatch(coordinatorAgent, /\n\s+- task\s*\n/u);
-  assert.match(coordinatorAgent, /request\.intake.*hand off to `APEX Requirements`/su);
+  assert.match(coordinatorAgent, /Route through the `apex-next` skill/u);
+  assert.match(coordinatorAgent, /\n\s+- task\s*\n/u);
+  assert.match(coordinatorAgent, /request\.intake`, the destination is exactly `APEX Requirements`/u);
+  assert.match(await readFile(join(root, ".github", "skills", "apex-next", "SKILL.md"), "utf8"), /^name: apex-next$/mu);
   assert.match(coordinatorAgent, /replace the active project.*apex\/projectCreate.*apex\/projectDelete/su);
   assert.match(coordinatorAgent, /If creation does not succeed, stop and report its result/u);
   assert.match(coordinatorAgent, /After a\s+successful creation, ask for explicit confirmation/u);
@@ -261,7 +262,10 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(coordinatorAgent, /--decision <approved\|rejected>/u);
   assert.match(coordinatorAgent, /--recipient <RECIPIENT_ID>/u);
   assert.match(coordinatorAgent, /call `apex\/gateDecide` with that gate, decision, and `confirm: true`/u);
-  assert.match(coordinatorAgent, /Never auto-invoke a specialist, author artifacts, approve a gate, or deploy/u);
+  assert.match(
+    coordinatorAgent,
+    /never auto-invoke an interactive specialist, author\s+artifacts, approve a gate, or deploy/u,
+  );
   assert.match(
     await readFile(join(root, ".github", "skills", "apex-azure-defaults", "SKILL.md"), "utf8"),
     /APEX Azure Defaults/u,

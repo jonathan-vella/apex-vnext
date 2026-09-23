@@ -149,6 +149,18 @@ results and the maintainer's decisions of the same day select these options:
 6. The failed harness probe blocks slice 11. The VS Code Copilot harness cannot qualify on WSL until picked agents
    apply, through an upstream fix or a verified workaround.
 
+### Slice 5 Probes
+
+On 2026-09-23 two more probes ran with Copilot CLI `1.0.88` in the disposable consumer workspace, using the slice 5
+projection and the real APEX MCP server. They are probe evidence, not CLIENT-021 qualification.
+
+- **`/agent` names.** `/agent apex-requirements` (the agent file name, which autocomplete offers) and
+  `/agent APEX Architect` (the display name) both selected the agent (session `912f2454`).
+- **`apex-next` from the coordinator.** In `-p` with only `apex(status)` and `apex(nextTask)` granted, `APEX` loaded
+  `apex-next` through `skill` and called each operation once. It named `apex-requirements` for the pending intake
+  request, printed both selection steps, said routing was pending and gave a fenced scope prompt with the exact request
+  ID (session `f99a791f`). Worker delegation from the coordinator was not exercised; slice 11 covers it.
+
 ## Execution Rules
 
 The clean-install package regression now exercises local archetype listing, exact-commit inspection, independent copy,

@@ -136,18 +136,20 @@ test("rejects a divergent CI validation entrypoint", () => {
   assert.ok(hasRule(result, "ci.validation-entrypoint"));
 });
 
-test("rejects a subagent model escalation", () => {
-  const result = mutate((model) => {
-    model.customization.manifest.roles.find(({ agent }) => agent === "APEX Reviewer").costTier = "premium";
-  });
-  assert.ok(hasRule(result, "customization.model-escalation"));
-});
-
-test("CLI distinguishes interactive handoffs from supported subagent edges", () => {
+test("rejects a subagent edge to an interactive role", () => {
   const result = mutate((model) => {
     model.customization.manifest.invocationEdges.find(
       ({ from, to }) => from === "APEX" && to === "APEX Requirements",
     ).type = "subagent";
+  });
+  assert.ok(hasRule(result, "customization.interactive-edge"));
+});
+
+test("CLI distinguishes interactive handoffs from supported subagent edges", () => {
+  const result = mutate((model) => {
+    model.customization.manifest.invocationEdges = model.customization.manifest.invocationEdges.filter(
+      ({ from, type }) => from !== "APEX" || type !== "subagent",
+    );
   });
   assert.ok(hasRule(result, "customization.cli-delegation"));
 });
