@@ -76,6 +76,72 @@ not evidence that the behavior exists.
 | `CLIENT-026` | `init` and `update` reject the retired VS Code client; archived files are never installed       | Required       | Not applicable          |
 | `CLIENT-027` | `.mcp.json` starts APEX MCP in interactive sessions and, when enabled, in `-p` sessions         | Required       | Required                |
 
+## CLI-Only Projection Probes
+
+Slice 1 of the [CLI-only projection plan](ROADMAP.md#cli-only-projection) ran local probes on 2026-09-23 at source
+checkpoint `dc289ab`. Standalone runs used Copilot CLI `1.0.88` (`linux-arm64`) with an isolated `COPILOT_HOME`,
+disposable Git fixtures under `dist/cli-probes`, explicit tool grants, synthetic agents and a fake `apex` MCP server
+that logs every call. The VS Code run used VS Code `1.139.0` (`2242ebbb`) over WSL with the Copilot harness, Agent Host
+protocol `0.9.0` and `@github/copilot-sdk` `1.0.15-unstable.35393089353.gfc44743`. These results characterize the
+clients; they are not APEX projection or scenario evidence.
+
+- **Model fields.** `.agent.md` frontmatter honors `model` (a string or an ordered list), `model-policy` and
+  `reasoning-effort`. The documented `models`, `modelPolicy` and `reasoningEffort` spellings were ignored; that child
+  ran on the session model at medium effort.
+- **Worker settings.** `model: [gpt-6-luna, gpt-5.6-luna]` with `model-policy: required` and `reasoning-effort: max`
+  ran through `task` on `gpt-6-luna` at max. A per-call `task` model was replaced by the required model with a notice.
+  Direct `--agent` selection also sent max. A user `subagents` override could not change a required model but did
+  lower its effort to low; under `preferred` it changed both. Ordered lists fall back only under `required`: otherwise
+  an unavailable first entry failed `task` dispatch, and direct selection fell back to the session default model.
+  Effort `max` on `gpt-5.4-mini` failed dispatch.
+- **Tool lists.** `task` subagents received no tools beyond those declared. A directly selected agent with `tools: []`
+  also received `skill` and `sql`.
+- **Workspace MCP.** A trusted folder loaded `.mcp.json` in interactive and `-p` sessions without
+  `GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP`. An untrusted folder loaded it in `-p` only with that variable set to
+  `true`. `${VAR}` expanded in `env`. Relative `args` resolve against the session directory, so the server failed when
+  a session started in a subdirectory.
+- **`ask_user`.** Interactive sessions use the structured form. An `array` field with `items.enum` rendered checkboxes
+  (Space toggles, Enter accepts, Ctrl+D declines, Esc cancels) plus an "Other" free-text entry, but the model received
+  flattened text (`User responded: red, blue`), not an array. `task` subagents never receive `ask_user`, even when
+  declared; the runtime sent the child an empty tool list.
+- **`/agent` context.** `/agent <name>` switched agent and model and kept the conversation; the new agent recalled a
+  code word from an earlier turn.
+- **Sidekick.** Project and user agents with a `sidekick:` block loaded only as ordinary selectable agents. They never
+  launched in `-p`, `-p --experimental` or interactive sessions. Selected directly, `send_inbox` returned "this session
+  is not a sidekick agent".
+- **Built-in helpers.** Helpers get only tools the calling agent holds; with a `task`-only caller, Explore had no file
+  reader. With read tools and shell on the caller, glob search skipped the gitignored `.apex/work/` staging path, but
+  explicit-path reads worked. Code-review and Security-review reviewed the staged file without a diff and cited correct
+  lines. Rubber-duck on `claude-haiku-4.5` cited wrong lines, and built-in Task ran `bicep build` under
+  `shell(bicep:*)`. Helpers inherit `task`; in the `task`-only run they spawned general-purpose agents until the depth
+  limit of 4, while the runtime blocked review-to-review delegation.
+- **VS Code Copilot harness.** The Agent Host discovered the workspace agents, flagged the `user-invocable: false`
+  worker as not user-invocable, and exposed `.mcp.json` tools from the second turn. The sidekick showed no activity.
+  Picking the agent did not apply it: each turn named it by a `vscode-remote://wsl%2Bubuntu/` URI, the host indexed
+  `file://` URIs, and the runtime deselected it before every turn. `/agent` is not a harness command; the default
+  agent ran the named agent through `task` instead. There the model list and efforts applied (`gpt-5.6-luna` high,
+  worker `gpt-6-luna` max) and `ask_user` was unavailable. The worker's empty tool list arrived as `null`, and its
+  prompt still carried `task` guidance.
+
+Standalone sessions `60de3415`, `973b27ef`, `531d4b2a`, `b7cd037a` and `e37cc4bc` cover model settings. `dc91aa77`,
+`e717ed91`, `3a1f34a5`, `a11b5bbf`, `366fe888` and `42e4f63e` cover workspace MCP; `bd350038`, `f14677a5`, `bfff54a8`
+and `976871e9` cover the sidekick. `b3808832` covers `ask_user` and `/agent`, `dc3278a2` covers subagent input, and
+`a2a3b50d` and `9502efed` cover helpers. The harness runtime session is `a3253c03-533b-4779-9544-7818e113abb6`. The
+results select these options:
+
+1. Slice 3 uses `model`, `model-policy` and `reasoning-effort`. Every listed model must support the declared effort.
+   User effort overrides remain a CLIENT-025 gap.
+2. Slice 4 renders `.mcp.json` with a server command that does not depend on the session directory.
+3. Slice 5 collects required input in the foreground before delegation; `/agent` with a prompt remains the fallback.
+   The sidekick needs a maintainer decision because this CLI build does not launch custom sidekicks.
+4. Slice 6 passes explicit staging paths, relies on the owning agent's read tools and verifies helper line references.
+   Task pre-checks add shell to the caller, and a `task` grant also exposes general-purpose delegation; both need a
+   maintainer decision.
+5. Slice 7 chooses between native checkboxes, whose answer returns as text, and numbered selection. Either way, the
+   kernel validates the values.
+6. Slice 11 cannot qualify the VS Code Copilot harness on WSL until picked agents apply, through an upstream fix or a
+   verified workaround.
+
 ## Execution Rules
 
 The clean-install package regression now exercises local archetype listing, exact-commit inspection, independent copy,

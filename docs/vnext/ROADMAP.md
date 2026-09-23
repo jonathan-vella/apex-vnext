@@ -60,8 +60,9 @@ Owner: managed customization, CLI lifecycle and client experience maintainers. D
 [DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection). Acceptance:
 [REQ-CUSTOMIZATION-001](PRD.md#req-customization-001-managed-copilot-experiences) and the planned
 [CLI-only scenarios](CLIENT-QUALIFICATION.md#planned-cli-only-scenarios). Branch: `feat/cli-agents`, draft PR #347.
-Tracking: [issue #348](https://github.com/jonathan-vella/apex-vnext/issues/348). Status: planned; no slice is
-implemented. The VS Code Local projection keeps shipping until slice 8 passes its gates.
+Tracking: [issue #348](https://github.com/jonathan-vella/apex-vnext/issues/348). Status: slice 1 probes are
+recorded in [CLIENT-QUALIFICATION](CLIENT-QUALIFICATION.md#cli-only-projection-probes); no other slice is implemented.
+The VS Code Local projection keeps shipping until slice 8 passes its gates.
 
 Managed agents target Copilot CLI only. Users may still run them in VS Code through its Copilot harness, which must
 pass the same qualification. Builder-only VS Code tooling for this repository stays.
@@ -71,7 +72,7 @@ pass the same qualification. Builder-only VS Code tooling for this repository st
 | 0   | Merge #346                    | PR #346                                                                                        | #346 is merged; #347 is rebased onto `main` and retargeted                                                                                                                                                                                              | #346 CI passes                                                         |
 | 1   | Local CLI probes              | Disposable workspaces under `dist/`                                                            | Dated results for model lists, effort field, `ask_user` multi-select and subagent use, `/agent` context, sidekick loading, `.mcp.json` in interactive and `-p` sessions, helper staging access and VS Code Copilot harness loading                      | Results recorded in CLIENT-QUALIFICATION                               |
 | 2   | Contracts                     | `packages/contracts`                                                                           | `github-copilot-cli` is the only installable projection; `github-copilot-vscode` means VS Code running CLI agents; the retired projection fails with a stable error code                                                                                | Contracts build and tests                                              |
-| 3   | CLI-format agents             | `customizations/.github/agents`, manifest, CLI tool inventory                                  | CLI frontmatter only; workers use `modelPolicy: required` and interactive agents `preferred`; no VS Code-only fields                                                                                                                                    | `validate:agents`, `validate:model-consistency`, customization tests   |
+| 3   | CLI-format agents             | `customizations/.github/agents`, manifest, CLI tool inventory                                  | CLI frontmatter only; workers use `model-policy: required` and interactive agents `preferred`; no VS Code-only fields                                                                                                                                   | `validate:agents`, `validate:model-consistency`, customization tests   |
 | 4   | Renderer and lifecycle        | `prepare-assets.mjs`, `assets.ts`, `service.ts`, `cli.ts`, `bootstrap-wizard.ts`               | One projection and `.mcp.json`; no combined mode or `apex-cli-*` names; `init` and `update` stop VS Code installs and say to run `apex init --client github-copilot-cli`                                                                                | CLI build; assets, adapters, customizations and bootstrap-wizard tests |
 | 5   | `apex-next` and sidekick      | New skill and sidekick agent, coordinator body                                                 | The coordinator routes through `apex-next`; delegation falls back to `/agent` and a prompt; the sidekick only reads status and next task                                                                                                                | Skill and agent validators, routing regression, CLI probe              |
 | 6   | Advisory built-in helpers     | Planner, Operator, Architect, Reviewer and Validator                                           | `task` is granted only where needed; Reviewer restates helper findings as typed input                                                                                                                                                                   | Grant tests, helper-only negative test, CLI probe per helper           |
@@ -85,8 +86,8 @@ pass the same qualification. Builder-only VS Code tooling for this repository st
 Each slice is one commit, or a small set, on `feat/cli-agents`. Slices 5 to 7 may run in any order after slice 4;
 slice 8 follows them.
 
-- **Slice 1:** check `model` lists against `models` and the `reasoningEffort` spelling; test `-p` with
-  `GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP`. Results select the options used by later slices.
+- **Slice 1:** done on 2026-09-23. The [probe results](CLIENT-QUALIFICATION.md#cli-only-projection-probes) select
+  the frontmatter and MCP options and name the decisions that slices 5 to 7 and 11 need.
 - **Slice 3:** remove `vscode/askQuestions`, handoffs, argument hints, agent allowlists and VS Code client mechanics.
   Workers use kernel task context, not repository instructions.
 - **Slice 5:** `apex-next` delegates the owning agent with the prepared prompt when the step can complete as a
@@ -100,7 +101,7 @@ slice 8 follows them.
 | `vscode/askQuestions` multi-select | `ask_user` numbered selection with kernel validation and confirmation |
 | per-parent `agents` allowlists     | kernel task ownership, `user-invocable: false`, scoped tools          |
 | `argument-hint`                    | agent `description`                                                   |
-| VS Code model fallback arrays      | CLI `models` and `modelPolicy`, confirmed by probe                    |
+| VS Code model fallback arrays      | CLI `model` list, `model-policy` and `reasoning-effort`               |
 | `.vscode/mcp.json`, `${input:...}` | `.mcp.json` with environment variables                                |
 | VS Code Local harness              | VS Code Copilot harness                                               |
 

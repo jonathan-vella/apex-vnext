@@ -314,7 +314,7 @@ kernel-owned `needs_input` contract and record typed answers without relying on 
   delegates the owner with the prepared prompt when the step can complete as a subagent, including any required input.
   Otherwise it prints the `/agent` selection and a ready-to-paste scope prompt. The coordinator routes through it.
 - A read-only context sidekick publishes the current project and next owner into the session inbox.
-- CodeGen, Reviewer and Validator run through `task` delegation with `modelPolicy: required`; interactive agents use
+- CodeGen, Reviewer and Validator run through `task` delegation with `model-policy: required`; interactive agents use
   `preferred`. Workers rely on kernel task context, not repository instructions. The coordinator may monitor and steer
   delegated workers through agent listing and messaging.
 - Built-in helpers are advisory and bounded: Explore for Planner and Operator brownfield discovery (never intake),
