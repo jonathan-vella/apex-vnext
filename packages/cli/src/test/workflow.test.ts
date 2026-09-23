@@ -1231,6 +1231,20 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
     const unpriced = structuredClone(partialCost);
     unpriced.lineItems[0]!.sku = "test - UNPRICED";
     unpriced.lineItems[0]!.source.uri = "urn:apex:arm-mcp:pricing-unavailable";
+    const untraced = structuredClone(manifest) as { skuDecisions: Array<{ requirementIds?: string[] }> };
+    delete untraced.skuDecisions[0]!.requirementIds;
+    await assert.rejects(
+      service.completeArchitecture(
+        issued.task.taskId,
+        architectureValue,
+        partialCost,
+        untraced as Parameters<typeof service.completeArchitecture>[3],
+      ),
+      (error: unknown) =>
+        error instanceof ApexError &&
+        error.code === "APEX_VALIDATION" &&
+        JSON.stringify(error.details).includes("requirementIds"),
+    );
     await assert.rejects(
       service.completeArchitecture(
         issued.task.taskId,

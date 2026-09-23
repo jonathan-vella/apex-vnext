@@ -100,6 +100,7 @@ import {
   type EventV1,
   type ExecutionPlanAttestationV1,
 } from "@apexops/contracts";
+import { Type } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import {
@@ -321,6 +322,16 @@ interface DoctorCheck {
   value: string;
   remedy?: string;
 }
+
+const DERIVED_DECISION_KEYS: ReadonlySet<string> = new Set([
+  "projectId",
+  "runId",
+  "environment",
+  "sourceRequirementsHash",
+  "architectureHash",
+  "costEstimateHash",
+  "requirementTraceability",
+]);
 
 const ARTIFACTS = {
   requirements: ["requirements", RequirementsV1Schema],
@@ -627,6 +638,10 @@ export class ApexService {
     this.validators.register("runtime-lock", RuntimeBundleLockV1Schema);
     this.validators.register("quality-measurements", QualityMeasurementsV1Schema);
     this.validators.register("architecture-availability", ArchitectureAvailabilityV1Schema);
+    this.validators.register(
+      "workload-decision-submission",
+      Type.Omit(WorkloadDecisionManifestV1Schema, [...DERIVED_DECISION_KEYS]),
+    );
     registerWorkflowValidators(this.validators);
     this.providers = {
       fake: new FakeIaCProvider({ track: "bicep", now: this.clock, nextId: this.idSource }),
@@ -4233,6 +4248,12 @@ export class ApexService {
       runId: run.runId,
       sourceHashes: { ...architecture.sourceHashes, requirements: requirementsHash },
     };
+    this.assertValid("architecture", boundArchitecture);
+    this.assertValid("cost-estimate", { ...costEstimate, projectId: run.projectId, runId: run.runId });
+    this.assertValid(
+      "workload-decision-submission",
+      Object.fromEntries(Object.entries(decisionManifest).filter(([key]) => !DERIVED_DECISION_KEYS.has(key))),
+    );
     const components = new Map(boundArchitecture.components.map((component) => [component.id, component]));
     for (const decision of decisionManifest.skuDecisions) {
       const component = components.get(decision.logicalId);

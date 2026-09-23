@@ -349,11 +349,21 @@ test("service validation reasons reach the agent while other errors stay generic
     status: async () => {
       throw new ApexError("APEX_VALIDATION", "REQ-002 needs a SKU decision", EXIT_CODES.validation);
     },
+    capabilityList: async () => {
+      throw new ApexError("APEX_VALIDATION", "architecture validation failed", EXIT_CODES.validation, [
+        { path: "/components/0/requirementIds", message: "Expected array" },
+      ]);
+    },
     listProjects: async () => {
       throw new ApexError("APEX_CONFLICT", "private detail", EXIT_CODES.conflict);
     },
   });
   assertError(await session.call("status"), "APEX_VALIDATION", "REQ-002 needs a SKU decision");
+  assertError(
+    await session.call("capabilityList"),
+    "APEX_VALIDATION",
+    "architecture validation failed: /components/0/requirementIds Expected array",
+  );
   assertError(
     await session.call("projectList"),
     "APEX_CONFLICT",
