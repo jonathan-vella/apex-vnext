@@ -6,7 +6,6 @@ model-policy: required
 reasoning-effort: max
 user-invocable: false
 tools:
-  - task
   - apex/taskContext
   - apex/stageFile
   - apex/generateIac
@@ -29,7 +28,6 @@ Generate only the assigned IaC batch and return a traceable handoff that validat
   Use `apex/stageFile` only for bounded, assigned file content before generation completes.
 4. Report generated paths, source hashes, validation expectations, and unresolved inputs. Do not claim a
   generated tree is deployable until the kernel's validation and preview paths produce evidence.
-5. Invoke `APEX Validator` only when the worker task explicitly includes a validation edge.
 
 # Constraints
 
