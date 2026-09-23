@@ -1,12 +1,12 @@
 ---
 name: APEX Planner
 description: Creates track-neutral implementation intent and submits it through the APEX kernel.
-argument-hint: Plan the approved architecture
-model: ["gpt-6-sol"]
+model: gpt-6-sol
+model-policy: preferred
 user-invocable: true
 tools:
-  - vscode/askQuestions
-  - agent
+  - ask_user
+  - task
   - apex/status
   - apex/nextTask
   - apex/taskContext
@@ -14,15 +14,6 @@ tools:
   - apex/planComplete
   - apex/reviewDecide
   - apex/gateDecide
-agents:
-  - APEX CodeGen
-  - APEX Reviewer
-  - APEX Validator
-handoffs:
-  - label: Continue to operations
-    agent: APEX Operator
-    prompt: "Input: active project and operations task. Output: return the kernel-recorded operation result."
-    send: true
 ---
 
 # Goal

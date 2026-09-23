@@ -117,7 +117,7 @@
         "artifact-review",
         "validation"
       ],
-      "notes": "Selected by the maintainer on 2026-09-23 for CodeGen, Reviewer and Validator with reasoning-effort: max. CLI 1.0.87 delegated probes observed Luna/max with the explicit --reasoning-effort max launch option. Direct selection ignored the frontmatter effort and used medium. Release date and VS Code effort enforcement remain unverified; repository outcome-first rules remain enforced."
+      "notes": "Selected by the maintainer on 2026-09-23 for CodeGen, Reviewer and Validator with model-policy: required and reasoning-effort: max. CLI 1.0.88 probes applied the frontmatter effort for delegated and directly selected agents; a user subagents override can still lower effort. VS Code effort enforcement remains unverified; repository outcome-first rules remain enforced."
     },
     "GPT-5.6 Terra": {
       "vendor": "OpenAI",
@@ -128,6 +128,16 @@
         "repository-maintenance"
       ],
       "notes": "Authorized 2026-07 for the pre-agent automation loop prompt. Shares the GPT-5.5 outcome-first prompting contract, so `classifyModel()` assigns it the enforced `gpt-5.6` family and the `gpt55-*` rules apply unchanged."
+    },
+    "gpt-5.6-terra": {
+      "vendor": "OpenAI",
+      "tier": "frontier",
+      "released": "2026-07",
+      "deprecated": false,
+      "use_for": [
+        "operations"
+      ],
+      "notes": "Copilot CLI identifier for GPT-5.6 Terra, used by the managed APEX Operator. Classified in the `gpt-5.6` family, so the `gpt55-*` rules apply."
     },
     "GPT-5.5": {
       "vendor": "OpenAI",
@@ -178,6 +188,16 @@
         "handoff-routing"
       ],
       "notes": "Microsoft's fast, cost-optimized coding model. Authorized for the APEX coordinator, which performs handoff-only routing with no creative generation. No MAI-specific automated prompting rules exist yet; the `mai-code` family is `reviewer-only` in vendor-prompting."
+    },
+    "mai-code-1.1-flash": {
+      "vendor": "Microsoft",
+      "tier": "standard",
+      "released": "2026-08",
+      "deprecated": false,
+      "use_for": [
+        "orchestration"
+      ],
+      "notes": "Copilot CLI identifier for MAI-Code-1.1-Flash, used by the managed APEX coordinator for routing without creative generation."
     }
   },
   "governance": {
@@ -195,10 +215,10 @@
     "description": "Auto-generated inventory of agent → model assignments derived from frontmatter (canonical source). Do not edit by hand; run `npm run generate:model-catalog` and commit the result.",
     "agents": {
       "apex-architect.agent.md": "gpt-6-sol",
-      "apex-operator.agent.md": "GPT-5.6 Terra",
+      "apex-operator.agent.md": "gpt-5.6-terra",
       "apex-planner.agent.md": "gpt-6-sol",
       "apex-requirements.agent.md": "gpt-6-sol",
-      "apex.agent.md": "MAI-Code-1.1-Flash"
+      "apex.agent.md": "mai-code-1.1-flash"
     },
     "subagents": {
       "apex-codegen.agent.md": "gpt-6-luna",

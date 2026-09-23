@@ -1,12 +1,12 @@
 ---
 name: APEX Architect
 description: Resolves architecture trade-offs and submits a typed result to the APEX kernel.
-argument-hint: Assess the approved requirements
-model: ["gpt-6-sol"]
+model: gpt-6-sol
+model-policy: preferred
 user-invocable: true
 tools:
-  - vscode/askQuestions
-  - agent
+  - ask_user
+  - task
   - apex/status
   - apex/nextTask
   - apex/recordInput
@@ -16,14 +16,6 @@ tools:
   - apex/reviewDecide
   - apex/gateDecide
   - azure-resource-manager-mcp/get_retail_prices
-agents:
-  - APEX Reviewer
-  - APEX Validator
-handoffs:
-  - label: Continue to planning
-    agent: APEX Planner
-    prompt: "Input: active project and planning task. Output: complete the typed plan through APEX MCP."
-    send: true
 ---
 
 # Goal

@@ -161,13 +161,28 @@ test("CLI preserves an explicit worker invocation-disable boundary", () => {
   assert.ok(hasRule(result, "customization.cli-authority"));
 });
 
-test("rejects askQuestions on an autonomous subagent", () => {
+test("rejects ask_user on an autonomous subagent", () => {
   const result = mutate((model) => {
     model.customization.agents
       .find(({ frontmatter }) => frontmatter.name === "APEX Reviewer")
-      .frontmatter.tools.push("vscode/askQuestions");
+      .frontmatter.tools.push("ask_user");
   });
   assert.ok(hasRule(result, "customization.subagent-questions"));
+});
+
+test("rejects retired VS Code agent fields and tools", () => {
+  for (const retire of [
+    (frontmatter) => frontmatter.tools.push("vscode/askQuestions"),
+    (frontmatter) => frontmatter.tools.push("agent"),
+    (frontmatter) => (frontmatter.handoffs = []),
+    (frontmatter) => (frontmatter.agents = []),
+    (frontmatter) => (frontmatter["argument-hint"] = "Describe the workload"),
+  ]) {
+    const result = mutate((model) => {
+      retire(model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX Planner").frontmatter);
+    });
+    assert.ok(hasRule(result, "customization.retired-field"));
+  }
 });
 
 test("rejects target declarations in shared managed agent sources", () => {

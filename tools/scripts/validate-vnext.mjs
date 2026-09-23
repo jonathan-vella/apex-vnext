@@ -79,6 +79,8 @@ const CONFIG_SHAPES = {
   ],
 };
 const FORBIDDEN_TOOL = /(^|\/)(shell|terminal|filesystem|fs|edit|write|git|azure|az|bicep|terraform)(\/|$)/i;
+const RETIRED_AGENT_FIELDS = ["argument-hint", "handoffs", "agents"];
+const RETIRED_AGENT_TOOLS = ["vscode/askQuestions", "agent"];
 const SECRET_KEY = /(secret|password|passwd|token|privateKey|clientSecret|connectionString)/i;
 const SOURCE_IMPORT = /(?:from\s+|import\s*\()["']([^"']+)["']/g;
 const ARM_MCP_ENDPOINT = "https://mcp.management.azure.com";
@@ -100,6 +102,7 @@ const ARM_MCP_READ_TOOLS = [
 
 const clone = (value) => structuredClone(value);
 const array = (value) => (Array.isArray(value) ? value : []);
+const modelIds = (value) => (typeof value === "string" ? [value] : array(value));
 const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const relative = (root, file) => path.relative(root, file).split(path.sep).join("/");
 const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));
@@ -686,7 +689,7 @@ function validateCustomizations(model, findings) {
       !frontmatter ||
       !name ||
       !frontmatter.description ||
-      !array(frontmatter.model).length ||
+      !modelIds(frontmatter.model).length ||
       typeof frontmatter["user-invocable"] !== "boolean"
     )
       finding(findings, "customization.frontmatter", `${agent.path} has incomplete frontmatter`, agent.path);
@@ -694,12 +697,12 @@ function validateCustomizations(model, findings) {
       finding(
         findings,
         "customization.source-target",
-        `${agent.path} must omit target because it is shared by both client projections`,
+        `${agent.path} must omit target; the CLI projection sets it`,
         agent.path,
       );
     if (!role)
       finding(findings, "customization.role-reference", `${name} has no manifest role`, "customizations/manifest.json");
-    if (role && (!array(frontmatter.model).includes(role.model) || !(role.costTier in COST_TIERS)))
+    if (role && (!modelIds(frontmatter.model).includes(role.model) || !(role.costTier in COST_TIERS)))
       finding(
         findings,
         "customization.model-role",
@@ -709,39 +712,25 @@ function validateCustomizations(model, findings) {
     const interactive = role?.interactionType === "interactive-handoff";
     if (interactive && frontmatter["user-invocable"] !== true)
       finding(findings, "customization.interactive", `${name} must be user-invocable`, agent.path);
-    if (
-      !interactive &&
-      (frontmatter["user-invocable"] !== false || array(frontmatter.tools).includes("vscode/askQuestions"))
-    )
+    if (!interactive && (frontmatter["user-invocable"] !== false || array(frontmatter.tools).includes("ask_user")))
       finding(
         findings,
         "customization.subagent-questions",
         `${name} is autonomous and cannot ask questions or be user-invocable`,
         agent.path,
       );
+    for (const field of RETIRED_AGENT_FIELDS)
+      if (frontmatter && field in frontmatter)
+        finding(findings, "customization.retired-field", `${name} uses retired VS Code field ${field}`, agent.path);
     for (const tool of array(frontmatter.tools)) {
-      if (tool === "agent" || tool === "vscode/askQuestions") continue;
-      if (FORBIDDEN_TOOL.test(tool))
+      if (tool === "task" || tool === "ask_user") continue;
+      if (RETIRED_AGENT_TOOLS.includes(tool))
+        finding(findings, "customization.retired-field", `${name} uses retired VS Code tool ${tool}`, agent.path);
+      else if (FORBIDDEN_TOOL.test(tool))
         finding(findings, "customization.forbidden-tool", `${name} references forbidden tool ${tool}`, agent.path);
       else if (!allowedMcp.has(tool))
         finding(findings, "customization.mcp-tool", `${name} references unknown MCP tool ${tool}`, agent.path);
     }
-    for (const handoff of array(frontmatter.handoffs)) {
-      if (
-        !agents.has(handoff.agent) ||
-        !/\bInput:/i.test(handoff.prompt ?? "") ||
-        !/\bOutput:/i.test(handoff.prompt ?? "")
-      )
-        finding(
-          findings,
-          "customization.handoff",
-          `${name} has an invalid handoff to ${handoff.agent ?? "<missing>"}`,
-          agent.path,
-        );
-    }
-    for (const child of array(frontmatter.agents))
-      if (!agents.has(child))
-        finding(findings, "customization.agent-reference", `${name} references unknown child ${child}`, agent.path);
   }
 
   const declaredEdges = array(customization.manifest.invocationEdges);
@@ -825,20 +814,6 @@ function validateCustomizations(model, findings) {
       "Manifest invocation edges must be unique",
       "customizations/manifest.json",
     );
-  }
-  const sourceEdgeKeys = customization.agents.flatMap(({ frontmatter }) => [
-    ...array(frontmatter?.handoffs).map(({ agent }) => `${frontmatter.name}\0${agent}\0handoff`),
-    ...array(frontmatter?.agents).map((agent) => `${frontmatter.name}\0${agent}\0subagent`),
-  ]);
-  for (const key of new Set([...declaredEdgeKeys, ...sourceEdgeKeys])) {
-    if (!declaredEdgeKeys.includes(key) || !sourceEdgeKeys.includes(key)) {
-      finding(
-        findings,
-        "customization.edge-source-drift",
-        `Manifest and source invocation edge disagree: ${key.replaceAll("\0", " -> ")}`,
-        "customizations/manifest.json",
-      );
-    }
   }
   for (const edge of declaredEdges) {
     const parent = roles.get(edge.from);

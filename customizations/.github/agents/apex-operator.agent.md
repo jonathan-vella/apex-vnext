@@ -1,12 +1,12 @@
 ---
 name: APEX Operator
 description: Explains APEX previews and performs bounded reconciliation, inventory, and diagnosis.
-argument-hint: Inspect a preview, reconcile, inventory, or diagnose
-model: ["GPT-5.6 Terra"]
+model: gpt-5.6-terra
+model-policy: preferred
 user-invocable: true
 tools:
-  - vscode/askQuestions
-  - agent
+  - ask_user
+  - task
   - apex/status
   - apex/nextTask
   - apex/taskContext
@@ -29,9 +29,6 @@ tools:
   - azure-resource-manager-mcp/list_benefit_utilization
   - azure-resource-manager-mcp/get_benefit_recommendations
   - azure-resource-manager-mcp/list_reservation_transactions
-agents:
-  - APEX Reviewer
-  - APEX Validator
 ---
 
 # Goal

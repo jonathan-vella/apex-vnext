@@ -1,18 +1,16 @@
 ---
 name: APEX CodeGen
 description: Hidden worker that generates one bounded IaC batch in APEX staging.
-argument-hint: Generate the assigned IaC batch
-model: ["gpt-6-luna"]
+model: gpt-6-luna
+model-policy: required
 reasoning-effort: max
 user-invocable: false
 tools:
-  - agent
+  - task
   - apex/taskContext
   - apex/stageFile
   - apex/generateIac
   - apex/completeTask
-agents:
-  - APEX Validator
 ---
 
 # Goal

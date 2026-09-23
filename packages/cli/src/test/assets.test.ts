@@ -126,7 +126,7 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
         composition: "client-projections",
         clientId: "github-copilot-cli",
         target,
-        adapterVersion: "1.6.0",
+        adapterVersion: "1.7.0",
         sourcePath: target,
         sourceHash: sha256Bytes(content),
         ...(agent ? { roleId: "coordinator" } : {}),
