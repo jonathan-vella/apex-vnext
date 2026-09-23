@@ -155,13 +155,15 @@ and the repository archives.
 - **Owner:** Managed customization and kernel maintainers
 - **Impact:** Explore, Rubber-duck, Code-review, Security-review, built-in Task or Research output could be treated as
   review completion, validation evidence or approval. Built-in models are set per user and add cost.
-- **Mitigation:** Keep helpers advisory. The owning APEX agent restates findings as typed kernel input with file and
-  line references. Helpers receive no completion or gate tools and see only the calling agent's read-only tools.
-  Validator's pre-check shell is limited to `bicep` and `terraform` or not granted. The kernel continues to reject
-  unexecuted or simulated evidence. Document per-user model overrides.
+- **Mitigation:** Keep helpers advisory. Managed agents use only Explore, which receives just `view`, `glob` and
+  `rg`. Rubber-duck, Code-review and Security-review inherit the caller's APEX completion and disposition tools, so
+  they stay out until the CLI scopes helper tools. Validator has no shell. The owning APEX agent restates findings as
+  typed kernel input with verified file and line references. The kernel continues to reject unexecuted or simulated
+  evidence. Document per-user model overrides.
 - **State:** Open; in progress on `feat/cli-projection`
 - **Closure proof:** Projection tests cover helper grants, negative tests show helper output alone cannot complete a
-  task or open a gate, and CLI probes cover each helper path.
+  task or open a gate, and CLI probes cover each granted helper path. Slice 6 covers Explore; the other helpers need
+  CLI tool scoping first.
 
 ## ASSUMPTION-001: Supported Clients Can Share Typed Outcomes
 

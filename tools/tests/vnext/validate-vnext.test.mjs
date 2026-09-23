@@ -163,6 +163,17 @@ test("CLI preserves an explicit worker invocation-disable boundary", () => {
   assert.ok(hasRule(result, "customization.cli-authority"));
 });
 
+test("keeps native read tools off hidden workers", () => {
+  const result = mutate((model) => {
+    model.customization.agents
+      .find(({ frontmatter }) => frontmatter.name === "APEX Reviewer")
+      .frontmatter.tools.push("view");
+  });
+  assert.ok(hasRule(result, "customization.worker-read-tool"));
+  const planner = mutate(() => {});
+  assert.ok(!hasRule(planner, "customization.worker-read-tool"));
+});
+
 test("rejects ask_user on an autonomous subagent", () => {
   const result = mutate((model) => {
     model.customization.agents

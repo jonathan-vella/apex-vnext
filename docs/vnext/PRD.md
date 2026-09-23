@@ -320,12 +320,12 @@ kernel-owned `needs_input` contract and record typed answers without relying on 
 - CodeGen, Reviewer and Validator run through `task` delegation with `model-policy: required`; interactive agents use
   `preferred`. Workers rely on kernel task context, not repository instructions. The coordinator may monitor and steer
   delegated workers through agent listing and messaging.
-- Built-in helpers are advisory and bounded: Explore for Planner and Operator brownfield discovery (never intake),
-  Rubber-duck for Architect and Planner critique, Code-review and Security-review under Reviewer, and user-invoked
-  Research. Helpers see only what the calling agent can read, so Planner, Operator, Architect and Reviewer get
-  read-only file tools and Reviewer gets `task`. Validator may run optional `bicep` and `terraform` pre-checks before
-  kernel validation only through a shell limited to those commands. The owning APEX agent restates any finding as
-  typed kernel input; helper output is never evidence, completion or approval.
+- Built-in helpers are advisory and bounded. Explore serves Planner and Operator brownfield discovery (never intake)
+  through their read-only file tools. Rubber-duck, Code-review and Security-review inherit the calling agent's full
+  tool set, so managed agents do not use them until the CLI can scope helper tools; users may run `/review`,
+  `/security-review` and `/research` themselves. Agent frontmatter cannot limit shell commands, so Validator has no
+  shell. The owning APEX agent restates any finding as typed kernel input; helper output is never evidence,
+  completion or approval.
 - Workspace MCP configuration uses `.mcp.json`. User documentation covers `/review` and `/security-review` for
   promoted output.
 
