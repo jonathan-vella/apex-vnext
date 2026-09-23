@@ -939,40 +939,6 @@ test("bootstrap never derives a project ID from the workspace folder", async () 
   assert.deepEqual(await new ApexService(root).listProjects(), []);
 });
 
-test("CLI manages only its own VS Code profile bootstrap agent", async () => {
-  const root = await tempRoot();
-  const profileRoot = join(await tempRoot(), "agents");
-  const profileAgent = join(profileRoot, "apex-bootstrap.agent.md");
-  await assert.rejects(execute(["profile", "install"], root, { profileRoot }), /requires --yes/u);
-  assert.deepEqual(await execute(["profile", "status"], root, { profileRoot }), { installed: false, modified: false });
-  assert.deepEqual(await execute(["profile", "install", "--yes"], root, { profileRoot }), {
-    installed: true,
-    version: "0.10.0-next.5",
-  });
-  assert.deepEqual(await execute(["profile", "status"], root, { profileRoot }), {
-    installed: true,
-    modified: false,
-    version: "0.10.0-next.5",
-  });
-  await assert.rejects(
-    execute(["profile", "install", "--client", "github-copilot-cli", "--yes"], root, { profileRoot }),
-    /supported only for github-copilot-vscode/u,
-  );
-  await writeFile(profileAgent, "local modification\n");
-  await assert.rejects(execute(["profile", "update", "--yes"], root, { profileRoot }), /was modified/u);
-  await assert.rejects(execute(["profile", "uninstall", "--yes"], root, { profileRoot }), /was modified/u);
-});
-
-test("CLI rejects a symlinked profile bootstrap agent", async () => {
-  const root = await tempRoot();
-  const profileRoot = join(await tempRoot(), "agents");
-  const outside = join(await tempRoot(), "outside.agent.md");
-  await writeFile(outside, "outside\n");
-  await mkdir(profileRoot, { recursive: true });
-  await symlink(outside, join(profileRoot, "apex-bootstrap.agent.md"));
-  await assert.rejects(execute(["profile", "install", "--yes"], root, { profileRoot }), /regular file/u);
-});
-
 test("MCP preserves valid result envelopes and sanitized execution errors", async () => {
   const service = new ApexService(await tempRoot());
   service.render = async () => "# Run status";

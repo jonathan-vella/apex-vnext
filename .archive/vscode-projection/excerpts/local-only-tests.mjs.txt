@@ -1,0 +1,114 @@
+// Archived from packages/cli/src/test/adapters.test.ts, tools/tests/retired-automation.test.mjs and tools/tests/vnext/validate-vnext.test.mjs at 9c3a459 (DECISION-029 slice 8). Provenance only; not compiled or run.
+
+test("CLI manages only its own VS Code profile bootstrap agent", async () => {
+  const root = await tempRoot();
+  const profileRoot = join(await tempRoot(), "agents");
+  const profileAgent = join(profileRoot, "apex-bootstrap.agent.md");
+  await assert.rejects(execute(["profile", "install"], root, { profileRoot }), /requires --yes/u);
+  assert.deepEqual(await execute(["profile", "status"], root, { profileRoot }), { installed: false, modified: false });
+  assert.deepEqual(await execute(["profile", "install", "--yes"], root, { profileRoot }), {
+    installed: true,
+    version: "0.10.0-next.5",
+  });
+  assert.deepEqual(await execute(["profile", "status"], root, { profileRoot }), {
+    installed: true,
+    modified: false,
+    version: "0.10.0-next.5",
+  });
+  await assert.rejects(
+    execute(["profile", "install", "--client", "github-copilot-cli", "--yes"], root, { profileRoot }),
+    /supported only for github-copilot-vscode/u,
+  );
+  await writeFile(profileAgent, "local modification\n");
+  await assert.rejects(execute(["profile", "update", "--yes"], root, { profileRoot }), /was modified/u);
+  await assert.rejects(execute(["profile", "uninstall", "--yes"], root, { profileRoot }), /was modified/u);
+});
+
+test("CLI rejects a symlinked profile bootstrap agent", async () => {
+  const root = await tempRoot();
+  const profileRoot = join(await tempRoot(), "agents");
+  const outside = join(await tempRoot(), "outside.agent.md");
+  await writeFile(outside, "outside\n");
+  await mkdir(profileRoot, { recursive: true });
+  await symlink(outside, join(profileRoot, "apex-bootstrap.agent.md"));
+  await assert.rejects(execute(["profile", "install", "--yes"], root, { profileRoot }), /regular file/u);
+});
+
+
+test("managed handoffs reject unknown targets, wildcard dispatch and unbounded loops", () => {
+  const agents = [{ name: "APEX", agents: ["Reviewer"], handoffs: [{ agent: "Reviewer" }] }, { name: "Reviewer" }];
+  assert.deepEqual(validateManagedHandoffs(agents), []);
+  assert.ok(validateManagedHandoffs([{ name: "APEX", agents: ["*"] }]).length > 0);
+  assert.ok(validateManagedHandoffs([{ name: "APEX", handoffs: [{ agent: "missing" }] }]).length > 0);
+  assert.ok(validateManagedHandoffs([{ name: "APEX", handoffs: [{}] }]).length > 0);
+  assert.ok(validateManagedHandoffs([{ name: "APEX", agents: "Reviewer" }]).length > 0);
+  const self = { agent: "APEX", prompt: "Input task. Output: result." };
+  assert.deepEqual(validateManagedHandoffs([{ name: "APEX", handoffs: [self] }]), []);
+  assert.ok(validateManagedHandoffs([{ name: "APEX", handoffs: Array(7).fill(self) }]).length > 0);
+  assert.ok(validateManagedHandoffs([{ name: "APEX", handoffs: [{ agent: "APEX" }] }]).length > 0);
+});
+
+
+test("rejects a PATH-dependent MCP launch", () => {
+  const result = mutate((model) => {
+    model.customization.vscodeMcp.servers.apex.command = "apex";
+    model.customization.vscodeMcp.servers.apex.args = ["mcp", "serve"];
+  });
+  assert.ok(hasRule(result, "mcp.launch"));
+});
+
+test("rejects ARM and Azure MCP launch drift", () => {
+  const endpointResult = mutate((model) => {
+    model.customization.vscodeMcp.servers["azure-resource-manager-mcp"].url = "https://example.invalid";
+  });
+  assert.ok(hasRule(endpointResult, "mcp.arm-launch"));
+
+  const toolsetResult = mutate((model) => {
+    model.customization.vscodeMcp.servers["azure-resource-manager-mcp"].headers["x-mcp-toolset"] = "Pricing";
+  });
+  assert.ok(hasRule(toolsetResult, "mcp.arm-launch"));
+
+  const allowlistResult = mutate((model) => {
+    model.customization.cliMcp.mcpServers["azure-resource-manager-mcp"].tools.push("create_budget");
+  });
+  assert.ok(hasRule(allowlistResult, "mcp.cli-arm-launch"));
+
+  const azureMcpResult = mutate((model) => {
+    model.customization.vscodeMcp.servers["azure-mcp-server"].args[0] =
+      "${workspaceFolder}/node_modules/@azure/mcp/index.js";
+  });
+  assert.ok(hasRule(azureMcpResult, "mcp.azure-launch"));
+
+  const azureMcpPackageResult = mutate((model) => {
+    model.packages.cli.manifest.dependencies["@azure/mcp"] = "3.0.0-beta.38";
+  });
+  assert.ok(hasRule(azureMcpPackageResult, "mcp.azure-package"));
+
+  const serverSetResult = mutate((model) => {
+    model.customization.vscodeMcp.servers.extra = { type: "stdio" };
+  });
+  assert.ok(hasRule(serverSetResult, "mcp.vscode-server-set"));
+});
+
+
+// From packages/cli/src/test/bootstrap-wizard.test.ts
+test("profile bootstrap guidance keeps guided setup confirmations and cloud boundaries explicit", async () => {
+  const root = await tempRoot();
+  const profileRoot = await tempRoot();
+  const service = new ApexService(root, { profileRoot });
+  await service.profileInstall();
+  const profile = await readFile(join(profileRoot, "apex-bootstrap.agent.md"), "utf8");
+  for (const phrase of [
+    "bootstrap wizard",
+    "Do not pass `--yes`",
+    "remote COE URL",
+    "Defer target-bound central baseline checks",
+    "creates a project with an agreed target",
+    "bootstrap governance-plan",
+    "Never request passwords",
+    "do not authorize identity creation",
+  ])
+    assert.ok(profile.includes(phrase), phrase);
+  assert.deepEqual(await readdir(root), []);
+});
+

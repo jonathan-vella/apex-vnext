@@ -221,43 +221,27 @@ test("rejects a missing MCP tool", () => {
 
 test("rejects a PATH-dependent MCP launch", () => {
   const result = mutate((model) => {
-    model.customization.vscodeMcp.servers.apex.command = "apex";
-    model.customization.vscodeMcp.servers.apex.args = ["mcp", "serve"];
+    model.customization.cliMcp.mcpServers.apex.command = "apex";
+    model.customization.cliMcp.mcpServers.apex.args = ["mcp", "serve"];
   });
-  assert.ok(hasRule(result, "mcp.launch"));
+  assert.ok(hasRule(result, "mcp.cli-launch"));
 });
 
-test("rejects ARM and Azure MCP launch drift", () => {
+test("rejects ARM MCP launch drift", () => {
   const endpointResult = mutate((model) => {
-    model.customization.vscodeMcp.servers["azure-resource-manager-mcp"].url = "https://example.invalid";
+    model.customization.cliMcp.mcpServers["azure-resource-manager-mcp"].url = "https://example.invalid";
   });
-  assert.ok(hasRule(endpointResult, "mcp.arm-launch"));
+  assert.ok(hasRule(endpointResult, "mcp.cli-arm-launch"));
 
   const toolsetResult = mutate((model) => {
-    model.customization.vscodeMcp.servers["azure-resource-manager-mcp"].headers["x-mcp-toolset"] = "Pricing";
+    model.customization.cliMcp.mcpServers["azure-resource-manager-mcp"].headers["x-mcp-toolset"] = "Pricing";
   });
-  assert.ok(hasRule(toolsetResult, "mcp.arm-launch"));
+  assert.ok(hasRule(toolsetResult, "mcp.cli-arm-launch"));
 
   const allowlistResult = mutate((model) => {
     model.customization.cliMcp.mcpServers["azure-resource-manager-mcp"].tools.push("create_budget");
   });
   assert.ok(hasRule(allowlistResult, "mcp.cli-arm-launch"));
-
-  const azureMcpResult = mutate((model) => {
-    model.customization.vscodeMcp.servers["azure-mcp-server"].args[0] =
-      "${workspaceFolder}/node_modules/@azure/mcp/index.js";
-  });
-  assert.ok(hasRule(azureMcpResult, "mcp.azure-launch"));
-
-  const azureMcpPackageResult = mutate((model) => {
-    model.packages.cli.manifest.dependencies["@azure/mcp"] = "3.0.0-beta.38";
-  });
-  assert.ok(hasRule(azureMcpPackageResult, "mcp.azure-package"));
-
-  const serverSetResult = mutate((model) => {
-    model.customization.vscodeMcp.servers.extra = { type: "stdio" };
-  });
-  assert.ok(hasRule(serverSetResult, "mcp.vscode-server-set"));
 });
 
 test("rejects client projection declaration and CLI allowlist drift", () => {

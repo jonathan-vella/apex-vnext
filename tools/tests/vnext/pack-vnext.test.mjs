@@ -496,7 +496,7 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
   const listing = (await runInTest("tar", ["-tzf", cliTarball])).stdout.split("\n").filter(Boolean);
   assert.ok(listing.includes("package/assets/customizations/.github/agents/apex.agent.md"));
   assert.ok(listing.includes("package/assets/config/workflow.v1.json"));
-  assert.ok(listing.includes("package/dist/azure-mcp.js"));
+  assert.ok(!listing.includes("package/dist/azure-mcp.js"));
   assert.ok(
     listing.every((path) => !path.includes("/dist/test/") && !path.endsWith(".map") && !path.endsWith(".tsbuildinfo")),
   );

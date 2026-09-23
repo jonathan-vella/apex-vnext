@@ -197,3 +197,5 @@ and Validator through `apex-next`. Under the maintainer's standing rule to take 
 slice 6 ships only Explore: the other review helpers inherit the caller's APEX completion and disposition tools, and
 agent frontmatter cannot limit Validator's shell, so Validator gets none. For slice 7, checkbox answers that map
 exactly to kernel options need no extra question; numbered or free-text answers still require explicit confirmation.
+Slice 8 archived VS Code Local under `.archive/vscode-projection/`. Only its MCP config launched the Azure MCP shim,
+and no managed agent used Azure MCP tools, so the shim and its `@azure/mcp` dependency retired with it.

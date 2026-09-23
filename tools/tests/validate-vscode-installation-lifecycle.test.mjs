@@ -23,7 +23,7 @@ test("VS Code lifecycle matrix rejects missing scenarios and unbound passed evid
   unbound.scenarios[0].liveStatus = "passed";
   assert.ok(
     validateVscodeInstallationLifecycle(unbound, schema).includes(
-      "VSCODE-LIFECYCLE-001: passed live status requires live evidence",
+      "VSCODE-LIFECYCLE-002: passed live status requires live evidence",
     ),
   );
 });

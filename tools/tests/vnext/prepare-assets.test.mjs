@@ -300,7 +300,7 @@ test("managed role projections retain required tools and exclude unrelated grant
         armTools.sort(),
         label,
       );
-      const interactive = client === "github-copilot-cli" ? ["ask_user", "task"] : ["vscode/askQuestions", "agent"];
+      const interactive = ["ask_user", "task"];
       if (client === "github-copilot-cli")
         assert.equal(
           metadata.tools.includes("task"),
@@ -535,7 +535,7 @@ test("asset generator rejects malformed and duplicate client projection declarat
         id: "coordinator",
         source: ".github/agents/apex.agent.md",
         agent: "APEX",
-        supportedTargets: ["vscode", "github-copilot"],
+        supportedTargets: ["github-copilot"],
       },
     ],
   };
@@ -569,6 +569,9 @@ test("asset generator rejects malformed and duplicate client projection declarat
     (manifest) => {
       manifest.roles[0].supportedTargets = ["unsupported"];
     },
+    (manifest) => {
+      manifest.roles[0].supportedTargets = ["vscode"];
+    },
   ]) {
     const invalid = structuredClone(valid);
     mutate(invalid);
@@ -598,15 +601,22 @@ test("asset generator accepts a role supported by only one client target", () =>
   };
   assert.deepEqual(validateClientProjectionDeclarations(manifest), manifest);
   assert.equal(roleSupportsClient(manifest.roles[0], "github-copilot-cli"), true);
-  assert.equal(roleSupportsClient(manifest.roles[0], "github-copilot-vscode"), false);
+  assert.throws(() => roleSupportsClient(manifest.roles[0], "github-copilot-vscode"), /Unsupported client projection/u);
 });
 
 test("delegation is enabled only when a destination is supported by the client", () => {
-  const parent = { agent: "APEX Planner", supportedTargets: ["vscode", "github-copilot"] };
-  const worker = { agent: "APEX CodeGen", supportedTargets: ["vscode"] };
+  const parent = { agent: "APEX Planner", supportedTargets: ["github-copilot"] };
+  const worker = { agent: "APEX CodeGen", supportedTargets: ["github-copilot"] };
   const edges = [{ from: parent.agent, to: worker.agent, type: "subagent" }];
-  assert.equal(roleDelegatesOnClient(parent, "github-copilot-vscode", [parent, worker], edges), true);
-  assert.equal(roleDelegatesOnClient(parent, "github-copilot-cli", [parent, worker], edges), false);
+  assert.equal(roleDelegatesOnClient(parent, "github-copilot-cli", [parent, worker], edges), true);
+  assert.equal(
+    roleDelegatesOnClient(parent, "github-copilot-cli", [parent, { ...worker, supportedTargets: [] }], edges),
+    false,
+  );
+  assert.throws(
+    () => roleDelegatesOnClient(parent, "github-copilot-vscode", [parent, worker], edges),
+    /Unsupported client projection/u,
+  );
 });
 
 test("asset generator renders the CLI Requirements projection and rejects retired VS Code fields", () => {
@@ -716,7 +726,7 @@ test("asset generator rejects unsafe projection roots before generation", () => 
         id: "coordinator",
         source: ".github/agents/apex.agent.md",
         agent: "APEX",
-        supportedTargets: ["vscode", "github-copilot"],
+        supportedTargets: ["github-copilot"],
       },
     ],
   };
@@ -743,8 +753,8 @@ test("APEX CLI projections carry each role's exact model and policy", async () =
 });
 
 test("CLI interactive handoffs do not grant background task delegation", () => {
-  const coordinator = { agent: "APEX", supportedTargets: ["vscode", "github-copilot"] };
-  const requirements = { agent: "APEX Requirements", supportedTargets: ["vscode", "github-copilot"] };
+  const coordinator = { agent: "APEX", supportedTargets: ["github-copilot"] };
+  const requirements = { agent: "APEX Requirements", supportedTargets: ["github-copilot"] };
   const delegates = roleDelegatesOnClient(
     coordinator,
     "github-copilot-cli",

@@ -19,10 +19,7 @@ export const GENERATED_SHARED_FILES = [
   "tools/scripts/collect-governance-baseline.ps1",
   "tools/schemas/governance-baseline.schema.json",
 ];
-const PROJECTION_TARGETS = new Map([
-  ["github-copilot-vscode", "vscode"],
-  ["github-copilot-cli", "github-copilot"],
-]);
+const PROJECTION_TARGETS = new Map([["github-copilot-cli", "github-copilot"]]);
 
 function bytewise(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -66,30 +63,6 @@ function serializeAgent(frontmatter, mechanics, body) {
 export function renderClientAgentProjection(source, clientId, toolInventory, options = {}) {
   const { frontmatter, body } = parseAgentSource(source);
   if ("target" in frontmatter) throw new Error("Shared agent source must not declare target");
-  if (clientId === "github-copilot-vscode") {
-    if (
-      Array.isArray(frontmatter.model) &&
-      frontmatter.model.length === 1 &&
-      frontmatter.model[0] === "MAI-Code-1.1-Flash (copilot)"
-    ) {
-      frontmatter.model = frontmatter.model[0];
-    }
-    const mechanics = [
-      frontmatter.name === "APEX"
-        ? "For requirements intake, present the declared Gather requirements handoff to `APEX Requirements` and stop for the user's interactive transition. State the user's scope and stop point beside the handoff; do not ask a role-selection question when the kernel has selected the owner. If unavailable, ask the user to select `APEX Requirements`. Use `vscode/askQuestions` only for project lifecycle or routing choices, never intake."
-        : Array.isArray(frontmatter.tools) && frontmatter.tools.includes("vscode/askQuestions")
-          ? "Use `vscode/askQuestions` for kernel-owned input requests."
-          : null,
-      Array.isArray(frontmatter.handoffs) && frontmatter.handoffs.length > 0
-        ? "Use the declared direct handoffs for interactive transitions."
-        : null,
-    ].filter(Boolean);
-    return serializeAgent(
-      { ...frontmatter, target: "vscode" },
-      mechanics.length === 0 ? "" : `## Client Mechanics\n\n${mechanics.join(" ")}\n\n`,
-      body,
-    );
-  }
   if (clientId !== "github-copilot-cli") throw new Error(`Unsupported client projection: ${clientId}`);
   const inventory = toolInventory ?? {
     interactiveTools: { askUser: "ask_user", delegate: "task" },

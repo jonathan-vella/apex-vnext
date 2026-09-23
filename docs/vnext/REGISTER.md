@@ -143,11 +143,12 @@ and the repository archives.
   agent allowlists and `.vscode/mcp.json` servers disappear, and the VS Code Agent Host does not forward servers that
   need interactive `${input:...}` values.
 - **Mitigation:** Apply [DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection) through DECISION-015
-  gates. Reject the retired client with a stable error code and migration hint. Replace handoffs with `apex-next`,
-  multi-select with native checkboxes or kernel-validated numbered selection, and allowlists with kernel task
-  ownership and scoped tools. Keep the archive out of packaging and add a negative reintroduction check.
+  gates. Retired client values fail normal validation; per maintainer direction there is no migration path. Replace
+  handoffs with `apex-next`, multi-select with native checkboxes or kernel-validated numbered selection, and allowlists
+  with kernel task ownership and scoped tools. The archive under `.archive/vscode-projection/` records rollback notes,
+  stays out of packaging, and `retired-paths.v1.json` keeps the former live paths absent.
 - **State:** Open; in progress on `feat/cli-projection`
-- **Closure proof:** Migration, rejection, rollback and reintroduction tests pass, archive provenance is recorded, and
+- **Closure proof:** Rejection and reintroduction tests pass, archive provenance and rollback notes are recorded, and
   standalone CLI and VS Code Copilot harness qualification passes on the same candidate.
 
 ## RISK-015: Built-In Helper Output Can Be Mistaken For Evidence

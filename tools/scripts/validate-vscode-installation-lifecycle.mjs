@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Validate the VS Code installation lifecycle qualification matrix. */
+/** Validate the VS Code Copilot harness installation lifecycle qualification matrix. */
 
 import { existsSync, readFileSync } from "node:fs";
 import process from "node:process";
@@ -8,7 +8,6 @@ import Ajv2020 from "ajv/dist/2020.js";
 const MATRIX_PATH = "tools/registry/vscode-installation-lifecycle.v1.json";
 const SCHEMA_PATH = "tools/registry/schemas/vscode-installation-lifecycle.schema.json";
 const REQUIRED_IDS = new Set([
-  "VSCODE-LIFECYCLE-001",
   "VSCODE-LIFECYCLE-002",
   "VSCODE-LIFECYCLE-003",
   "VSCODE-LIFECYCLE-004",
