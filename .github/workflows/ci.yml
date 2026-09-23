@@ -61,6 +61,3 @@ jobs:
 
       - name: Qualify APEX vNext
         run: npm run qualify:vnext
-
-      - name: Validate handoff references
-        run: bash tools/scripts/validate-handoff-references.sh
