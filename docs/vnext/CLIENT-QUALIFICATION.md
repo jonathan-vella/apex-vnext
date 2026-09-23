@@ -176,6 +176,21 @@ qualification.
   heading on line 6 (session `6be424d2`). `APEX Planner` refused an Explore request that named no workspace path
   (session `0c2c2afa`); for a named path it reported the right line and verified it with `view` (session `c52c4a75`).
 
+### Slice 7 Probes
+
+On 2026-09-23 two interactive `APEX Requirements` probes ran with Copilot CLI `1.0.88` against the real kernel. They
+are probe evidence, not CLIENT-023 qualification.
+
+- **Checkboxes.** The intake form offered `target-environments` as an array field with the four options in kernel
+  order and the recommendation as its default. The answer came back as text (`dev, test`); the agent recorded
+  `["dev", "test"]` and the kernel accepted it (session `fd948712`). A single-select answer left empty drew one
+  targeted follow-up question instead of a default.
+- **Cancellation.** Cancelling the form recorded nothing, and the agent reported the request as still pending
+  (session `af1f6ca7`).
+
+The numbered fallback did not run because the CLI offered checkboxes. Kernel and service tests cover duplicate, empty
+and unmatched values.
+
 ## Execution Rules
 
 The clean-install package regression now exercises local archetype listing, exact-commit inspection, independent copy,
@@ -358,7 +373,8 @@ field, then show the proposed array and obtain explicit confirmation through tha
 Under the [CLI-only projection plan](ROADMAP.md#cli-only-projection), use `ask_user` checkboxes where the tool offers an
 array field and map the returned text back to exact option values. Otherwise present the options numbered in kernel
 order, accept the user's numbers and resolve them to option values. The kernel validates the array either way.
-Out-of-range, duplicate, non-numeric or unmatched entries require correction. Confirmation is still required.
+Out-of-range, duplicate, non-numeric or unmatched entries require correction. Checkbox answers that map exactly need
+no extra question; resolved numbers or free text still require explicit confirmation.
 Preserve the kernel option order, allowed values, request identity, typed arrays and user stop boundary. Never invent a
 `multiSelect` parameter, silently reduce the question to one choice, infer aliases or record recommended defaults.
 Invalid, empty or ambiguous input requires correction; corrected selections require confirmation again. Cancellation

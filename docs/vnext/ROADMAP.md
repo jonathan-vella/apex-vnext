@@ -61,7 +61,7 @@ Owner: managed customization, CLI lifecycle and client experience maintainers. D
 [REQ-CUSTOMIZATION-001](PRD.md#req-customization-001-managed-copilot-experiences) and the planned
 [CLI-only scenarios](CLIENT-QUALIFICATION.md#planned-cli-only-scenarios). Branch: `feat/cli-projection`, draft PR #350;
 the plan and slice 1 merged in #347. Tracking: [issue #348](https://github.com/jonathan-vella/apex-vnext/issues/348).
-Status: slices 1 to 6 are done. `apex init` installs only the CLI projection, managed agent sources use CLI
+Status: slices 1 to 7 are done. `apex init` installs only the CLI projection, managed agent sources use CLI
 frontmatter, and the coordinator routes through `apex-next`; slice 8 archives the remaining VS Code Local files.
 
 Managed agents target Copilot CLI only. Users may still run them in VS Code through its Copilot harness, which must
