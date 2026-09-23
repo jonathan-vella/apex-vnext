@@ -233,7 +233,7 @@ export function loadRepositoryModel(root = process.cwd()) {
         frontmatter: parseFrontmatter(readFileSync(file, "utf8")),
       })),
       vscodeMcp: readJson(path.join(root, "customizations", ".vscode", "mcp.json")),
-      cliMcp: readJson(path.join(root, "customizations", ".github", "mcp.json")),
+      cliMcp: readJson(path.join(root, "customizations", ".mcp.json")),
     },
     contracts: {
       registry: parseContractRegistry(contractSource),
@@ -576,12 +576,7 @@ function validateCustomizations(model, findings) {
   const sharedDirectories = array(customization.manifest.sharedDirectories);
   const skillCoveredByDirectory = (file) => sharedDirectories.some((directory) => file.startsWith(`${directory}/`));
   const expectedProjectionFiles = new Map([
-    [
-      "github-copilot-vscode",
-      { files: [".vscode/mcp.json"], generatedRoot: "client-projections/github-copilot-vscode" },
-    ],
-    ["github-copilot-cli", { files: [".github/mcp.json"], generatedRoot: "client-projections/github-copilot-cli" }],
-    ["both", { files: [".vscode/mcp.json", ".github/mcp.json"], generatedRoot: "client-projections/both" }],
+    ["github-copilot-cli", { files: [".mcp.json"], generatedRoot: "client-projections/github-copilot-cli" }],
   ]);
   const expectedAgentFiles = new Set(customization.agents.map(({ path: file }) => file));
   const expectedFiles = new Set([
@@ -750,25 +745,6 @@ function validateCustomizations(model, findings) {
   }
 
   const declaredEdges = array(customization.manifest.invocationEdges);
-  const vscodeRoot = path.join(model.root, "packages", "cli", "assets", "client-projections", "github-copilot-vscode");
-  const vscodeAgents = walk(path.join(vscodeRoot, ".github", "agents"), (file) => file.endsWith(".agent.md"));
-  for (const file of vscodeAgents) {
-    const projectionPath = relative(vscodeRoot, file);
-    const repositoryPath = relative(model.root, file);
-    const { frontmatter, error } = parseProjectionFrontmatter(readFileSync(file, "utf8"));
-    if (error) {
-      finding(findings, "customization.vscode-agent-frontmatter", `${repositoryPath}: ${error}`, repositoryPath);
-      continue;
-    }
-    if (frontmatter?.target !== "vscode") {
-      finding(
-        findings,
-        "customization.vscode-agent-target",
-        `${projectionPath} must declare target: vscode`,
-        repositoryPath,
-      );
-    }
-  }
   const cliRoot = path.join(model.root, "packages", "cli", "assets", "client-projections", "github-copilot-cli");
   const cliAgents = walk(path.join(cliRoot, ".github", "agents"), (file) => file.endsWith(".agent.md"));
   for (const file of cliAgents) {
@@ -985,8 +961,8 @@ function validateMcp(model, findings) {
   if (
     !cliApex ||
     cliApex.type !== "local" ||
-    cliApex.command !== "node" ||
-    JSON.stringify(cliApex.args) !== JSON.stringify(["node_modules/@apexops/cli/dist/cli.js", "mcp", "serve"]) ||
+    cliApex.command !== "npx" ||
+    JSON.stringify(cliApex.args) !== JSON.stringify(["--no", "apex", "mcp", "serve"]) ||
     Object.keys(cliApex.env ?? {}).length > 0 ||
     JSON.stringify(cliApex.tools) !== JSON.stringify(model.mcpTools)
   )
@@ -994,7 +970,7 @@ function validateMcp(model, findings) {
       findings,
       "mcp.cli-launch",
       "Managed Copilot CLI MCP config must launch the workspace-local APEX CLI with the exact tool allowlist",
-      "customizations/.github/mcp.json",
+      "customizations/.mcp.json",
     );
   if (
     !cliArmMcp ||
@@ -1007,7 +983,7 @@ function validateMcp(model, findings) {
       findings,
       "mcp.cli-arm-launch",
       "Managed Copilot CLI config must connect directly to ARM MCP with the exact read-only tool allowlist",
-      "customizations/.github/mcp.json",
+      "customizations/.mcp.json",
     );
 }
 

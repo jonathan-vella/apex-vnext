@@ -151,8 +151,7 @@
     ".github/skills/apex-artifacts/templates/operations-runbook.md",
     ".github/skills/apex-artifacts/templates/resource-inventory.md",
     ".github/copilot-instructions.md",
-    ".github/mcp.json",
-    ".vscode/mcp.json"
+    ".mcp.json"
   ],
   "sharedFiles": [
     ".github/copilot-instructions.md",
@@ -163,19 +162,9 @@
   "sharedDirectories": [".github/instructions", ".github/skills"],
   "clientProjections": [
     {
-      "id": "github-copilot-vscode",
-      "generatedRoot": "client-projections/github-copilot-vscode",
-      "files": [".vscode/mcp.json"]
-    },
-    {
       "id": "github-copilot-cli",
       "generatedRoot": "client-projections/github-copilot-cli",
-      "files": [".github/mcp.json"]
-    },
-    {
-      "id": "both",
-      "generatedRoot": "client-projections/both",
-      "files": [".vscode/mcp.json", ".github/mcp.json"]
+      "files": [".mcp.json"]
     }
   ],
   "roles": [

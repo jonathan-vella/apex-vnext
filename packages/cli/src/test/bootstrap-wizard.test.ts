@@ -12,7 +12,7 @@ import { once } from "node:events";
 import { APEX_VERSION } from "../version.js";
 
 test("bootstrap wizard cancellation and declined plans never initialize a workspace", async () => {
-  for (const answers of [["cancel"], ["both", "no", "yes", "no"]]) {
+  for (const answers of [["cancel"], ["no", "yes", "no"]]) {
     const root = await tempRoot();
     const queue = [...answers];
     const result = await runBootstrapWizard(root, {
@@ -36,7 +36,6 @@ test("profile bootstrap guidance keeps guided setup confirmations and cloud boun
   for (const phrase of [
     "bootstrap wizard",
     "Do not pass `--yes`",
-    "both",
     "remote COE URL",
     "Defer target-bound central baseline checks",
     "creates a project with an agreed target",
@@ -72,7 +71,7 @@ test(
     let answered = false;
     child.stdout.setEncoding("utf8").on("data", (chunk: string) => {
       output += chunk;
-      if (!answered && output.includes("Client [both/")) {
+      if (!answered && output.includes("Copy one or more independent workloads")) {
         answered = true;
         child.stdin.write("cancel\n");
       }
@@ -101,7 +100,7 @@ test("bootstrap wizard uses the reviewed local plan and reports governance pendi
     status: "ready",
     imported: false,
   }));
-  const answers = ["invalid", "both", "no", "yes", "yes", "no", "central"];
+  const answers = ["invalid", "no", "yes", "yes", "no", "central"];
   const shown: unknown[] = [];
   const result = await runBootstrapWizard(
     root,
@@ -120,7 +119,7 @@ test("bootstrap wizard uses the reviewed local plan and reports governance pendi
   assert.equal(setup.mock.callCount(), 1);
   assert.deepEqual(setup.mock.calls[0]!.arguments[0], {
     createRepository: true,
-    clientId: "both",
+    clientId: "github-copilot-cli",
   });
   assert.ok(shown.some((value) => typeof value === "object" && value !== null && "configHash" in value));
   assert.deepEqual(
@@ -149,7 +148,7 @@ test("bootstrap wizard stops on a blocked local plan without requesting mutation
   const setup = context.mock.method(service, "bootstrap", async () => {
     throw new Error("Must not run");
   });
-  const answers = ["both", "no", "no"];
+  const answers = ["no", "no"];
   const result = await runBootstrapWizard(
     root,
     {
@@ -184,7 +183,6 @@ test("bootstrap wizard selects multiple independent workloads and confirms each 
     context.mock.method(service, "bootstrap", async () => ({ runtimeInstalled: true })),
   );
   const answers = [
-    "both",
     "yes",
     "https://github.com/example/coe",
     "a".repeat(40),
@@ -233,7 +231,6 @@ test("bootstrap wizard leaves consumer identity provisioning pending or blocked 
     executionAuthorized: false,
   }));
   const answers = [
-    "both",
     "no",
     "yes",
     "yes",
@@ -284,7 +281,6 @@ test("wizard requires separate exact-plan confirmation for existing-identity pro
       collectionEnabled: false,
     }));
     const answers = [
-      "both",
       "no",
       "yes",
       "yes",
@@ -323,7 +319,7 @@ test("wizard configures a real empty workspace without asking or inventing proje
   await mkdir(join(root, "node_modules/@apexops/cli"), { recursive: true });
   await writeFile(join(root, "node_modules/@apexops/cli/package.json"), JSON.stringify({ version: APEX_VERSION }));
   for (let attempt = 0; attempt < 2; attempt++) {
-    const answers = ["both", "no", "no", "yes", "no", "later"];
+    const answers = ["no", "no", "yes", "no", "later"];
     const questions: string[] = [];
     const result = await runBootstrapWizard(root, {
       ask: async (question) => {
@@ -355,7 +351,7 @@ test("wizard publishes a GitHub repository only after showing owner, visibility 
     };
     context.mock.method(service, "planRepositoryPublish", async () => plan);
     const publish = context.mock.method(service, "publishRepository", async () => ({ status: "published" }));
-    const answers = ["both", "no", "yes", "yes", "yes", "Example", "workload", "", "", approval, "later"];
+    const answers = ["no", "yes", "yes", "yes", "Example", "workload", "", "", approval, "later"];
     const shown: unknown[] = [];
     const result = await runBootstrapWizard(
       root,

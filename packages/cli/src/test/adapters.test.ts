@@ -346,7 +346,7 @@ test("remote archetype CLI import rechecks exact content and records remote prov
   assert.equal(cliResult.status, "copied");
   const initializedChild = new ApexService(join(root, "one"));
   await mkdir(join(root, "one/.git"));
-  await initializedChild.init({ projectId: "child", clientId: "both" });
+  await initializedChild.init({ projectId: "child", clientId: "github-copilot-cli" });
   const packageDirectory = join(root, "one/node_modules/@apexops/cli");
   await mkdir(packageDirectory, { recursive: true });
   await writeJson(join(packageDirectory, "package.json"), { version: APEX_VERSION });
@@ -642,7 +642,7 @@ test("governance setup CLI reads only bounded GitHub evidence and never mutates 
 test("workspace installation leaves first project creation to APEX", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const installed = await service.initializeWorkspace({ clientId: "both" });
+  const installed = await service.initializeWorkspace({ clientId: "github-copilot-cli" });
   assert.deepEqual(installed, { workspaceReady: true, projectCreated: false });
   assert.deepEqual(await service.listProjects(), []);
   await assert.rejects(readFile(join(root, ".apex/config.json")), { code: "ENOENT" });
@@ -663,8 +663,9 @@ test("workspace installation leaves first project creation to APEX", async () =>
     await client.close();
     await server.close();
   }
-  await readFile(join(root, ".vscode/mcp.json"));
-  await readFile(join(root, ".github/mcp.json"));
+  await readFile(join(root, ".mcp.json"));
+  for (const retired of [".vscode/mcp.json", ".github/mcp.json"])
+    await assert.rejects(readFile(join(root, retired)), { code: "ENOENT" });
   assert.equal((await service.doctor()).healthy, true);
   assert.match((await service.doctor()).nextAction, /first project/);
   await service.update();
@@ -852,7 +853,6 @@ test("bootstrap reruns reuse matching intact state without commands or new runs"
   for (const changed of [
     { projectId: "other" },
     { environment: "prod" },
-    { clientId: "github-copilot-vscode" as const },
     { iacTool: "bicep" as const },
     { targetScope: "/foreign" },
     { displayName: "Different" },
@@ -860,6 +860,8 @@ test("bootstrap reruns reuse matching intact state without commands or new runs"
     await assert.rejects(service.bootstrap({ ...input, ...changed }), /resume is blocked/);
     assert.deepEqual(await service.status(), before);
   }
+  await assert.rejects(service.bootstrap({ ...input, clientId: "github-copilot-vscode" as never }), /malformed/);
+  assert.deepEqual(await service.status(), before);
   const managedPath = join(root, ".github", "agents", "apex.agent.md");
   const managed = await readFile(managedPath, "utf8");
   await writeFile(managedPath, managed + "\nManual edit\n");
@@ -884,19 +886,25 @@ test("bootstrap reruns reuse matching intact state without commands or new runs"
   assert.deepEqual(await readFile(outside), selectionBytes);
 });
 
-test("combined client initialization uses one managed lifecycle and preserves profile conflicts", async () => {
+test("init rejects retired clients and the CLI projection keeps one managed lifecycle", async () => {
+  for (const client of ["github-copilot-vscode", "both"]) {
+    const rejected = await tempRoot();
+    await assert.rejects(
+      execute(["init", "--project", "demo", "--client", client], rejected),
+      /--client must be github-copilot-cli/u,
+    );
+    assert.deepEqual(await readdir(rejected), []);
+  }
   const root = await tempRoot();
-  await execute(["init", "--project", "demo", "--client", "both"], root);
+  await execute(["init", "--project", "demo"], root);
   const service = new ApexService(root);
   const before = await service.status();
-  const vscode = join(root, ".github/agents/apex.agent.md");
-  const cli = join(root, ".github/agents/apex-cli.agent.md");
-  assert.match(await readFile(vscode, "utf8"), /name: APEX\n/);
-  assert.match(await readFile(cli, "utf8"), /name: APEX CLI\n/);
-  await readFile(join(root, ".vscode/mcp.json"));
-  await readFile(join(root, ".github/mcp.json"));
+  const agent = join(root, ".github/agents/apex.agent.md");
+  assert.match(await readFile(agent, "utf8"), /name: APEX\n/);
+  await assert.rejects(readFile(join(root, ".github/agents/apex-cli.agent.md")), { code: "ENOENT" });
+  await readFile(join(root, ".mcp.json"));
   const lock = JSON.parse(await readFile(join(root, ".apex/customizations.lock.json"), "utf8"));
-  assert.equal(lock.clientId, "both");
+  assert.equal(lock.clientId, "github-copilot-cli");
   assert.equal(new Set(lock.files.map(({ path }: { path: string }) => path)).size, lock.files.length);
   await service.update();
   const restored = await service.rollbackCustomizations();
@@ -904,16 +912,17 @@ test("combined client initialization uses one managed lifecycle and preserves pr
   assert.equal((await new ApexService(root).status()).run.runId, before.run.runId);
   const doctor = await service.doctor();
   assert.ok(doctor.checks.filter(({ id }) => id.startsWith("managed:")).every(({ ok }) => ok));
-  const original = await readFile(cli, "utf8");
-  await writeFile(cli, original + "\nManual CLI edit\n");
+  const original = await readFile(agent, "utf8");
+  await writeFile(agent, original + "\nManual CLI edit\n");
   await service.update();
-  assert.equal(await readFile(cli, "utf8"), original + "\nManual CLI edit\n");
-  await service.update();
-  assert.equal(await readFile(cli, "utf8"), original + "\nManual CLI edit\n");
+  assert.equal(await readFile(agent, "utf8"), original + "\nManual CLI edit\n");
   await service.uninstallCustomizations();
-  assert.equal(await readFile(cli, "utf8"), original + "\nManual CLI edit\n");
-  await assert.rejects(readFile(vscode), { code: "ENOENT" });
+  assert.equal(await readFile(agent, "utf8"), original + "\nManual CLI edit\n");
   assert.equal((await service.status()).run.runId, before.run.runId);
+  const selectionPath = join(root, ".apex/customizations.selection.json");
+  const selection = JSON.parse(await readFile(selectionPath, "utf8"));
+  await writeFile(selectionPath, JSON.stringify({ ...selection, clientId: "github-copilot-vscode" }));
+  await assert.rejects(service.update(), /Customization selection is invalid/u);
 });
 
 test("bootstrap never derives a project ID from the workspace folder", async () => {

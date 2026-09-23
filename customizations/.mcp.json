@@ -2,8 +2,8 @@
   "mcpServers": {
     "apex": {
       "type": "local",
-      "command": "node",
-      "args": ["node_modules/@apexops/cli/dist/cli.js", "mcp", "serve"],
+      "command": "npx",
+      "args": ["--no", "apex", "mcp", "serve"],
       "env": {},
       "tools": [
         "status",

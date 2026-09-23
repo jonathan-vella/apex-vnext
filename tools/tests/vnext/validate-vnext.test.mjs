@@ -234,21 +234,30 @@ test("rejects ARM and Azure MCP launch drift", () => {
 
 test("rejects client projection declaration and CLI allowlist drift", () => {
   const projectionResult = mutate((model) => {
-    model.customization.manifest.clientProjections.find(({ id }) => id === "github-copilot-vscode").files = [
-      ".github/mcp.json",
-    ];
+    model.customization.manifest.clientProjections[0].files = [".github/mcp.json"];
   });
   assert.ok(hasRule(projectionResult, "customization.client-projection"));
 
-  const combinedResult = mutate((model) => {
-    model.customization.manifest.clientProjections.find(({ id }) => id === "both").files = [".vscode/mcp.json"];
-  });
-  assert.ok(hasRule(combinedResult, "customization.client-projection"));
+  for (const id of ["github-copilot-vscode", "both"]) {
+    const retiredResult = mutate((model) => {
+      model.customization.manifest.clientProjections.push({
+        id,
+        generatedRoot: `client-projections/${id}`,
+        files: [".vscode/mcp.json"],
+      });
+    });
+    assert.ok(hasRule(retiredResult, "customization.schema"));
+  }
 
   const allowlistResult = mutate((model) => {
     model.customization.cliMcp.mcpServers.apex.tools.pop();
   });
   assert.ok(hasRule(allowlistResult, "mcp.cli-launch"));
+
+  const launchResult = mutate((model) => {
+    model.customization.cliMcp.mcpServers.apex.args = ["node_modules/@apexops/cli/dist/cli.js", "mcp", "serve"];
+  });
+  assert.ok(hasRule(launchResult, "mcp.cli-launch"));
 });
 
 test("rejects an unsafe managed path", () => {
