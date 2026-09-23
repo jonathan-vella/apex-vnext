@@ -12,6 +12,7 @@ import { JSONRPCMessageSchema, SUPPORTED_PROTOCOL_VERSIONS } from "@modelcontext
 import { mcpWorkspaceRoot } from "../cli.js";
 import { MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
 import { createMcpServer } from "../mcp.js";
+import { ApexError, EXIT_CODES } from "../errors.js";
 import { ApexService } from "../service.js";
 import { tempRoot } from "./helpers.js";
 
@@ -342,6 +343,23 @@ test(
     assertSuccess("projectList", await session.call("projectList"));
   },
 );
+
+test("service validation reasons reach the agent while other errors stay generic", async (context) => {
+  const session = await connect(context, {
+    status: async () => {
+      throw new ApexError("APEX_VALIDATION", "REQ-002 needs a SKU decision", EXIT_CODES.validation);
+    },
+    listProjects: async () => {
+      throw new ApexError("APEX_CONFLICT", "private detail", EXIT_CODES.conflict);
+    },
+  });
+  assertError(await session.call("status"), "APEX_VALIDATION", "REQ-002 needs a SKU decision");
+  assertError(
+    await session.call("projectList"),
+    "APEX_CONFLICT",
+    "The operation conflicts with current state; refresh status before retrying.",
+  );
+});
 
 test("oversized malformed arguments hit the size guard before schema parsing", { timeout: 10_000 }, async (context) => {
   let calls = 0;
