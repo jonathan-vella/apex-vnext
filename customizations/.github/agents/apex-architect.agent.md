@@ -51,9 +51,10 @@ Gate 2 package without bypassing the kernel's decision or approval boundaries.
   continue with the evidenced priced subtotal. Never submit `UNPRICED`, synthetic `$0`, placeholder bounds, or
   invented prices through `apex/architectureComplete`.
 6. Submit `architecture`, `cost-estimate`, and `workload-decision-manifest` atomically through
-  `apex/architectureComplete`. Do not supply project/run identity, artifact hashes, or requirement traceability in the
-  decision manifest; APEX derives them. Architecture `decisions` and `risks` are arrays of descriptive strings, not
-  objects.
+  `apex/architectureComplete`. Do not supply project/run identity, artifact hashes, or the top-level
+  `requirementTraceability` in the decision manifest; APEX derives them. Every SKU and SLO decision still lists the
+  `requirementIds` of its Architecture component. Architecture `decisions` and `risks` are arrays of descriptive
+  strings, not objects.
 7. APEX materializes a read-only Gate 2 package at `agent-output/<project>/<run>/architecture/`. Report its Architecture,
   qualitative WAF, priced-cost breakdown, and uncertainty diagrams together with `architecture-assessment.md`,
   `cost-estimate.md`, `sku-comparison.md`, and `challenger-findings.md`. Diagrams are derived views, not gate evidence.
