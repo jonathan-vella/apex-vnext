@@ -2,6 +2,8 @@
 # Single required status check for all PRs to main
 # Consolidates: lint, agent-validation, policy-compliance-check
 # Runs markdown linting + all Node.js validators + handoff validation
+# Skips the "Qualify APEX vNext" step for PRs whose changes are entirely under docs/
+# (push and workflow_dispatch runs always run the full qualification)
 
 name: ci
 
@@ -27,7 +29,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          fetch-depth: 2
+
+      - name: Detect docs-only pull request
+        id: scope
+        if: github.event_name == 'pull_request'
+        run: |
+          changed_files="$(git diff --name-only HEAD^1 HEAD)"
+          if [ -n "$changed_files" ] && ! printf '%s\n' "$changed_files" | grep -qv '^docs/'; then
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Setup Node
         uses: ./.github/actions/setup-node-repo
@@ -60,6 +73,7 @@ jobs:
         run: npm run test:hooks
 
       - name: Qualify APEX vNext
+        if: steps.scope.outputs.docs_only != 'true'
         run: npm run qualify:vnext
 
       - name: Validate handoff references
