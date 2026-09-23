@@ -74,8 +74,9 @@ See [REQ-MCP-001](../vnext/PRD.md#req-mcp-001-predictable-tool-contracts) for ac
 
 Handler failures return `isError: true` with `{ "error": { "code": "APEX_STALE", "message": "..." } }` in both
 structured and text content. Messages are allowlisted recovery guidance, not raw exception messages. The exception is
-an `APEX_VALIDATION` failure raised by the kernel service: its authored reason, truncated to 1,000 characters, is
-returned so the agent can correct the typed input. Stacks, causes and exception details are omitted. Tool
+an `APEX_VALIDATION` failure raised by the kernel service: its authored reason, plus up to five schema issue paths,
+truncated to 1,000 characters, is returned so the agent can correct the typed input. Reasons that look like secrets
+stay generic. Stacks and causes are omitted. Tool
 argument-validation failures use the generic sanitized envelope; malformed JSON-RPC
 requests and unknown methods remain SDK concerns. Clients must inspect `isError`,
 refresh stale state and avoid blindly retrying mutations; an error does not imply that all side effects were rolled back.

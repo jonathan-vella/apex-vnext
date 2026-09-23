@@ -308,12 +308,15 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
             config.inputSchema === undefined ? [extra] : [input.data, extra],
           );
         } catch (error) {
-          if (
-            error instanceof ApexError &&
-            error.code === "APEX_VALIDATION" &&
-            !SECRET_VALUE_PATTERN.test(error.message)
-          )
-            serviceValidation = error.message;
+          if (error instanceof ApexError && error.code === "APEX_VALIDATION") {
+            const issues = Array.isArray(error.details)
+              ? (error.details as Array<{ path?: unknown; message?: unknown }>)
+                  .slice(0, 5)
+                  .map(({ path, message }) => `${String(path)} ${String(message)}`)
+              : [];
+            const reason = issues.length === 0 ? error.message : `${error.message}: ${issues.join("; ")}`;
+            if (!SECRET_VALUE_PATTERN.test(reason)) serviceValidation = reason;
+          }
           throw error;
         }
         assertBoundedInput(response.structuredContent);
