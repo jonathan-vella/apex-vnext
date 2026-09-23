@@ -261,7 +261,6 @@
     { "from": "APEX Planner", "to": "APEX Reviewer", "type": "subagent" },
     { "from": "APEX Planner", "to": "APEX Validator", "type": "subagent" },
     { "from": "APEX Operator", "to": "APEX Reviewer", "type": "subagent" },
-    { "from": "APEX Operator", "to": "APEX Validator", "type": "subagent" },
-    { "from": "APEX CodeGen", "to": "APEX Validator", "type": "subagent" }
+    { "from": "APEX Operator", "to": "APEX Validator", "type": "subagent" }
   ]
 }

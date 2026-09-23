@@ -639,7 +639,7 @@ function validateCustomizations(model, findings) {
     finding(
       findings,
       "customization.client-projection",
-      "Installation presets must exactly cover VS Code, Copilot CLI and their combined selection",
+      "Installation presets must cover exactly the github-copilot-cli projection",
       "customizations/manifest.json",
     );
   const manifestRoles = array(customization.manifest.roles);
