@@ -823,12 +823,13 @@ describe("Wave 1 contracts", () => {
     const config = {
       schemaVersion: CONTRACT_VERSION,
       projectId: "payments",
-      client: "github-copilot-vscode",
+      client: "github-copilot-cli",
       createRepository: true,
     };
 
     assert.equal(Value.Check(OnboardingConfigV1Schema, config), true);
-    assert.equal(Value.Check(OnboardingConfigV1Schema, { ...config, client: "unsupported" }), false);
+    for (const client of ["github-copilot-vscode", "both", "unsupported"])
+      assert.equal(Value.Check(OnboardingConfigV1Schema, { ...config, client }), false);
     assert.equal(Value.Check(OnboardingConfigV1Schema, { ...config, unexpected: true }), false);
   });
 
