@@ -57,8 +57,8 @@ secrets. See [ADR-0003](adrs/03-des-adr-0003-use-bounded-entra-only-handoff-sess
 
 ## DECISION-012: Support VS Code And GitHub Copilot CLI
 
-Both clients receive the coordinator and interactive specialists. Their shared interactions must produce equivalent
-typed outcomes; unsupported mechanics remain explicit.
+Superseded by DECISION-029. Both clients receive the coordinator and interactive specialists. Their shared interactions
+must produce equivalent typed outcomes; unsupported mechanics remain explicit.
 
 ## DECISION-013: Re-Baseline Every Release Candidate
 
@@ -165,3 +165,30 @@ rendering or structured-only MCP results. Those proposals require the evidence a
 adoption. Preserve DECISION-025, revised ADR-0006 kernel authority and scoped worker grants, journal integrity and human
 approval; changing documentation
 does not alter executable gates or close historical findings.
+
+## DECISION-029: Ship One Copilot CLI Projection
+
+Maintainer direction on 2026-09-23 supersedes DECISION-012. Managed agents, skills and MCP configuration use only the
+Copilot CLI agent format. Supported clients are standalone Copilot CLI and the VS Code Copilot harness, which runs
+CLI-format agents in the VS Code Agent Host. The VS Code Local projection, its renderer path, `.vscode/mcp.json` and the
+combined installation mode retire through DECISION-015 gates: consumer migration, replacement proof, archive provenance
+under `.archive/vscode-projection/`, rollback and a negative reintroduction check. `apex init` and `apex update` reject
+the retired client with a stable error code and migration guidance. The archive is never a runtime dependency.
+`github-copilot-cli` is the only installable projection; `github-copilot-vscode` remains the evidence identity for VS
+Code running CLI agents, so paired-client comparison continues. Builder-only VS Code tooling for this repository stays.
+
+An `apex-next` skill replaces handoff buttons. It reads kernel status and the next task, names the owning agent, and
+either delegates that agent with the prepared prompt or prints the client's selection step (`/agent` in standalone CLI,
+the Agent picker in the VS Code harness) and scope prompt. Built-in CLI agents are advisory helpers only: Explore,
+Rubber-duck, Code-review, Security-review, built-in Task and user-invoked Research never produce kernel evidence,
+complete tasks or approve gates. General-purpose delegation, `/fleet`, `/delegate` and plan mode stay out of managed
+workflows. Kernel authority, typed outcomes, the four review passes and human gates are unchanged.
+[REQ-CUSTOMIZATION-001](PRD.md#req-customization-001-managed-copilot-experiences) owns acceptance and the
+[CLI-only projection plan](ROADMAP.md#cli-only-projection) owns delivery.
+
+After the slice 1 probes on 2026-09-23, the maintainer settled slices 5 to 8. The read-only context sidekick is
+deferred until a Copilot CLI release launches custom sidekicks. Multi-choice input uses native `ask_user` checkboxes
+where offered and numbered selection otherwise. Planner, Operator, Architect and Reviewer get read-only file tools so
+built-in helpers can read, and Reviewer gets `task`. Validator may run `bicep` and `terraform` pre-checks only through
+a shell limited to those commands. The VS Code installation lifecycle tests and client-comparison tooling are
+retargeted to the VS Code Copilot harness; only Local-only tests are archived.

@@ -1,6 +1,6 @@
 # APEX vNext Checkpoint
 
-- **Updated:** 2026-09-21
+- **Updated:** 2026-09-23
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Integration branch:** `main`
 - **Product status:** Pre-release
@@ -10,11 +10,13 @@
 
 The approved direction is a COE workload factory with independent archetype reuse and conversational changes.
 Both ALZ-backed workloads and standalone single-subscription labs/demos are day-one requirements. Windows users run
-through WSL2 for VS Code Local and standalone CLI. Neither requires a devcontainer. Desktop-app work is parked.
+through WSL2. Neither client requires a devcontainer. Desktop-app work is parked.
 [PRD.md](PRD.md) is the canonical scope and quality reference.
 
 The standalone vNext repository owns a deterministic TypeScript runtime, versioned contracts, bounded capabilities,
 renderers, CLI/MCP lifecycle, managed VS Code and Copilot CLI projections, and deterministic qualification.
+[DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection) replaces both projections with one Copilot CLI
+projection. Until that plan ships, the VS Code Local and CLI projections described below remain the implemented state.
 
 Repository modernization has retired original automation, prompts, compatibility utilities, duplicate workflows and npm
 scripts, stale root configuration, and unneeded development-container tooling. The active documentation has been rebuilt
@@ -22,10 +24,16 @@ around vNext source authorities and Diátaxis navigation.
 
 ## Active Completion Focus
 
-The maintainer parked all standalone desktop-app work on 2026-09-21. The active release targets only VS Code Local
-and standalone Copilot CLI on WSL2. Preserve desktop probes, Windows fixes and upstream findings without additional
-app tests, adapter implementation, native Windows CI or host setup. The
-[desktop backlog](ROADMAP.md#deferred-standalone-copilot-desktop-app) owns reactivation; built-in helpers remain deferred.
+On 2026-09-23 the maintainer selected a single Copilot CLI projection. Supported clients become standalone Copilot CLI
+and the VS Code Copilot harness, which runs CLI-format agents. The VS Code Local projection retires through
+DECISION-015 gates with an archive under `.archive/vscode-projection/`. An `apex-next` skill replaces handoffs, advisory
+built-in helpers join the workflow, and the context sidekick is deferred. Work proceeds on `feat/cli-agents` per the
+[CLI-only projection plan](ROADMAP.md#cli-only-projection); slice 1 probes are recorded and no product slice is
+implemented yet.
+
+The maintainer parked all standalone desktop-app work on 2026-09-21. Preserve desktop probes, Windows fixes and
+upstream findings without additional app tests, adapter implementation, native Windows CI or host setup. The
+[desktop backlog](ROADMAP.md#deferred-standalone-copilot-desktop-app) owns reactivation.
 
 PR #345 merged as `afca69ee4318052550d4993145e896329827a5fd`; its post-merge CI and release qualification passed.
 Candidate `67fefa2` has bounded user-confirmed VS Code/CLI intake and restart observations, not full workflow parity.
@@ -262,7 +270,10 @@ pending the required broader qualification.
 - Implement and qualify COE import, provenance, relevant change questions, manual-edit conflicts and selective
   regeneration using existing contracts and parameters.
 - Complete design/ADR and operational/as-built output against the PRD quality checklist.
-- Close VS Code and standalone CLI lifecycle gaps on WSL2 in both profiles; projections do not prove outcomes.
+- Deliver the [CLI-only projection](ROADMAP.md#cli-only-projection): CLI-native agents, `apex-next`, advisory built-in
+  helpers, checkbox or numbered multi-choice, `.mcp.json` and gated VS Code projection retirement.
+- Close standalone CLI and VS Code Copilot harness lifecycle gaps on WSL2 in both profiles; projections do not prove
+  outcomes.
 - Evaluate Agent Plugins and APEX MCP redistribution after features work; npm remains the current implementation.
 - Complete exact-candidate live qualification for supported client interactions.
 - Complete separately authorized Bicep and Terraform cloud qualification.
