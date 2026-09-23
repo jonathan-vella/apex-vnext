@@ -24,14 +24,14 @@
     "sharedDirectories": { "$ref": "#/$defs/uniquePaths" },
     "clientProjections": {
       "type": "array",
-      "minItems": 3,
-      "maxItems": 3,
+      "minItems": 1,
+      "maxItems": 1,
       "items": {
         "type": "object",
         "required": ["id", "generatedRoot", "files"],
         "additionalProperties": false,
         "properties": {
-          "id": { "enum": ["github-copilot-vscode", "github-copilot-cli", "both"] },
+          "id": { "const": "github-copilot-cli" },
           "generatedRoot": { "type": "string", "pattern": "^client-projections/[a-z0-9-]+$" },
           "files": { "$ref": "#/$defs/uniquePaths" }
         }

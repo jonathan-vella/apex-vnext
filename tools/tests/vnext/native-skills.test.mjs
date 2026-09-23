@@ -40,11 +40,10 @@ test("native skills are internal, packaged, structured, and wired to their prima
   }
 });
 
-test("native skills are copied to the bundle and both client projections", async () => {
+test("native skills are copied to the bundle and the CLI projection", async () => {
   await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
   const assetRoots = [
     resolve(root, "packages", "cli", "assets", "customizations"),
-    resolve(root, "packages", "cli", "assets", "client-projections", "github-copilot-vscode"),
     resolve(root, "packages", "cli", "assets", "client-projections", "github-copilot-cli"),
   ];
 

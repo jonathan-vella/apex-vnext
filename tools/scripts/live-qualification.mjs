@@ -18,7 +18,11 @@ import {
   VNEXT_QUALIFICATION_REPOSITORY_IDENTITY,
 } from "./_lib/vnext-qualification.mjs";
 import { parseStrictJson } from "./_lib/strict-json.mjs";
-import { hasBoundClientQualification, hasValidInputRequestQuestions } from "../../packages/contracts/dist/index.js";
+import {
+  CLIENT_OUTCOME_CLIENT_IDS,
+  hasBoundClientQualification,
+  hasValidInputRequestQuestions,
+} from "../../packages/contracts/dist/index.js";
 import { ApexService } from "../../packages/cli/dist/index.js";
 import { EventJournal, ObjectStore, sha256Json } from "../../packages/kernel/dist/index.js";
 import { verifyClientOutcomeQualification } from "./compare-client-outcomes.mjs";
@@ -49,11 +53,11 @@ const COMMAND_OPTIONS = {
     "vscode-workspace",
   ]),
   cli: new Set(["binary", "output", "workspace"]),
-  input: new Set(["output", "workspace"]),
+  input: new Set(["client", "output", "workspace"]),
   lifecycle: new Set(["output", "root"]),
   prepare: new Set(["branch", "output", "package-lock", "release-manifest", "root", "runtime-bundle"]),
-  restart: new Set(["output", "workspace"]),
-  transfer: new Set(["output", "workspace"]),
+  restart: new Set(["client", "output", "workspace"]),
+  transfer: new Set(["client", "output", "workspace"]),
   runtime: new Set(["output", "project", "run"]),
   template: new Set([
     "actor",
@@ -165,15 +169,25 @@ async function installQualifiedRuntime(workspace, options, root = ROOT) {
   });
 }
 
+// Both evidence identities, standalone CLI and the VS Code Copilot harness, run the single Copilot CLI projection.
+const PROJECTION_CLIENT_ID = "github-copilot-cli";
+const PROJECTION_MCP_FILE = ".mcp.json";
+
+function evidenceClientId(options) {
+  const clientId = options.client ?? PROJECTION_CLIENT_ID;
+  if (!CLIENT_OUTCOME_CLIENT_IDS.includes(clientId)) throw new Error("Evidence client identity is invalid");
+  return clientId;
+}
+
 async function lifecycleClient(root, clientId, projectId, serviceFactory) {
   await mkdir(root, { recursive: false });
   const service = serviceFactory(root);
-  await service.init({ projectId, clientId });
+  await service.init({ projectId, clientId: PROJECTION_CLIENT_ID });
   const lockPath = join(root, ".apex", "customizations.lock.json");
   const lock = async () => {
     const bytes = await readBoundedRegularFile(lockPath, MAX_MANAGED_FILE_BYTES, "Lifecycle customization lock");
     const value = parseStrictJson(bytes.toString("utf8"));
-    if (value?.clientId !== clientId || !Array.isArray(value.files) || value.files.length === 0) {
+    if (value?.clientId !== PROJECTION_CLIENT_ID || !Array.isArray(value.files) || value.files.length === 0) {
       throw new Error("Lifecycle customization lock is invalid");
     }
     return { sha256: sha256(bytes), managedFiles: value.files.length };
@@ -192,7 +206,8 @@ async function lifecycleClient(root, clientId, projectId, serviceFactory) {
     throw new Error("Lifecycle uninstall did not remove managed state cleanly");
   }
   const reinstalledResult = await service.reinstallCustomizations();
-  if (reinstalledResult.clientId !== clientId) throw new Error("Lifecycle reinstall changed the selected client");
+  if (reinstalledResult.clientId !== PROJECTION_CLIENT_ID)
+    throw new Error("Lifecycle reinstall changed the selected client");
   const reinstalled = await lock();
   if (!(await readFile(sentinelPath)).equals(sentinel)) throw new Error("Lifecycle changed an unrelated file");
   return {
@@ -213,7 +228,7 @@ async function prepareClient(root, clientId, projectId, serviceFactory, installR
     timeout: 30_000,
     maxBuffer: MAX_CLI_OUTPUT_BYTES,
   });
-  const initialized = await serviceFactory(root).init({ projectId, clientId });
+  const initialized = await serviceFactory(root).init({ projectId, clientId: PROJECTION_CLIENT_ID });
   await installRuntime(root, options);
   const launcher = join(root, QUALIFICATION_RUNTIME_LAUNCHER_PATH);
   await mkdir(dirname(launcher), { recursive: true });
@@ -225,8 +240,12 @@ async function prepareClient(root, clientId, projectId, serviceFactory, installR
   ) {
     throw new Error("Prepared workspace identity is invalid");
   }
-  const requiredFile = clientId === "github-copilot-cli" ? ".github/mcp.json" : ".vscode/mcp.json";
-  const projection = await collectManagedProjection(root, clientId, requiredFile, "Prepared workspace");
+  const projection = await collectManagedProjection(
+    root,
+    PROJECTION_CLIENT_ID,
+    PROJECTION_MCP_FILE,
+    "Prepared workspace",
+  );
   if (projection.files.some(({ matches }) => !matches)) {
     throw new Error("Prepared workspace managed files do not match the customization lock");
   }
@@ -381,11 +400,10 @@ function assertWorkspacePreparation(preparation) {
 
 async function verifyPreparedWorkspace(root, expected) {
   await assertRuntimeDirectory(root, "Prepared cleanup workspace");
-  const requiredFile = expected.clientId === "github-copilot-cli" ? ".github/mcp.json" : ".vscode/mcp.json";
   const projection = await collectManagedProjection(
     root,
-    expected.clientId,
-    requiredFile,
+    PROJECTION_CLIENT_ID,
+    PROJECTION_MCP_FILE,
     "Prepared cleanup workspace",
   );
   const selection = parseStrictJson(
@@ -868,12 +886,14 @@ export async function collectGuidedCheckpoint(
     workspace: required(options, "vscode-workspace"),
     host: required(options, "vscode-host"),
   });
-  const cliInput = await collectInput({ workspace: required(options, "cli-workspace") });
-  const vscodeInput = await collectInput({ workspace: required(options, "vscode-workspace") });
-  const cliRestart = await collectRestart({ workspace: required(options, "cli-workspace") });
-  const vscodeRestart = await collectRestart({ workspace: required(options, "vscode-workspace") });
-  const cliTransfer = await collectTransfer({ workspace: required(options, "cli-workspace") });
-  const vscodeTransfer = await collectTransfer({ workspace: required(options, "vscode-workspace") });
+  const cliWorkspace = { workspace: required(options, "cli-workspace"), client: "github-copilot-cli" };
+  const vscodeWorkspace = { workspace: required(options, "vscode-workspace"), client: "github-copilot-vscode" };
+  const cliInput = await collectInput(cliWorkspace);
+  const vscodeInput = await collectInput(vscodeWorkspace);
+  const cliRestart = await collectRestart(cliWorkspace);
+  const vscodeRestart = await collectRestart(vscodeWorkspace);
+  const cliTransfer = await collectTransfer(cliWorkspace);
+  const vscodeTransfer = await collectTransfer(vscodeWorkspace);
   const lifecycle = await collectLifecycle({ root: required(options, "lifecycle-root") });
   assertCheckpointCandidate(candidate);
   assertCheckpointAdapter(runtime, "apex-runtime-journal-v1");
@@ -1196,7 +1216,12 @@ export async function collectCliSurfaceEvidence(
   if (Buffer.byteLength(versionOutput) > MAX_CLI_OUTPUT_BYTES)
     throw new Error("Copilot CLI version output is too large");
   const observedVersion = cliVersion(versionOutput);
-  const projection = await collectManagedProjection(workspace, "github-copilot-cli", ".github/mcp.json", "Copilot CLI");
+  const projection = await collectManagedProjection(
+    workspace,
+    PROJECTION_CLIENT_ID,
+    PROJECTION_MCP_FILE,
+    "Copilot CLI",
+  );
   const { files } = projection;
   const drift = files.some(({ matches }) => !matches);
   let mcp = { status: "not-run", servers: [], sourceDigest: null };
@@ -1333,7 +1358,7 @@ export async function collectVscodeSurfaceEvidence(
   const builtInExtension = listedExtensionVersion === null ? await builtinCopilotChat(host, observedVersion) : null;
   const observedExtensionVersion = listedExtensionVersion ?? builtInExtension?.version ?? null;
   const extensionInventorySha256 = builtInExtension?.digest ?? sha256(Buffer.from(extensionOutput));
-  const projection = await collectManagedProjection(workspace, "github-copilot-vscode", ".vscode/mcp.json", "VS Code");
+  const projection = await collectManagedProjection(workspace, PROJECTION_CLIENT_ID, PROJECTION_MCP_FILE, "VS Code");
   const drift = projection.files.some(({ matches }) => !matches);
   const disposition =
     observedExtensionVersion === null
@@ -1566,11 +1591,15 @@ export async function collectClientInputEvidence(
       )
     ).toString("utf8"),
   );
-  if (!["github-copilot-cli", "github-copilot-vscode"].includes(lock?.clientId)) {
+  if (lock?.clientId !== PROJECTION_CLIENT_ID) {
     throw new Error("Input workspace client selection is invalid");
   }
-  const requiredFile = lock.clientId === "github-copilot-cli" ? ".github/mcp.json" : ".vscode/mcp.json";
-  const projection = await collectManagedProjection(workspace, lock.clientId, requiredFile, "Input workspace");
+  const projection = await collectManagedProjection(
+    workspace,
+    PROJECTION_CLIENT_ID,
+    PROJECTION_MCP_FILE,
+    "Input workspace",
+  );
   if (projection.files.some(({ matches }) => !matches)) {
     throw new Error("Input workspace managed files do not match the customization lock");
   }
@@ -1637,7 +1666,7 @@ export async function collectClientInputEvidence(
   const evidence = {
     schemaVersion: "1.0.0",
     adapter: "apex-client-input-journal-v1",
-    client: { id: lock.clientId },
+    client: { id: evidenceClientId(options) },
     projectId,
     runId,
     source: {
@@ -1717,11 +1746,15 @@ export async function collectRestartEvidence(
       )
     ).toString("utf8"),
   );
-  if (!["github-copilot-cli", "github-copilot-vscode"].includes(lock?.clientId)) {
+  if (lock?.clientId !== PROJECTION_CLIENT_ID) {
     throw new Error("Restart workspace client selection is invalid");
   }
-  const requiredFile = lock.clientId === "github-copilot-cli" ? ".github/mcp.json" : ".vscode/mcp.json";
-  const projection = await collectManagedProjection(workspace, lock.clientId, requiredFile, "Restart workspace");
+  const projection = await collectManagedProjection(
+    workspace,
+    PROJECTION_CLIENT_ID,
+    PROJECTION_MCP_FILE,
+    "Restart workspace",
+  );
   if (projection.files.some(({ matches }) => !matches)) {
     throw new Error("Restart workspace managed files do not match the customization lock");
   }
@@ -1765,7 +1798,7 @@ export async function collectRestartEvidence(
   const evidence = {
     schemaVersion: "1.0.0",
     adapter: "apex-service-restart-v1",
-    client: { id: lock.clientId },
+    client: { id: evidenceClientId(options) },
     projectId: after.projectId,
     runId: after.runId,
     source: {
@@ -1908,11 +1941,15 @@ export async function collectTransferEvidence(
       )
     ).toString("utf8"),
   );
-  if (!["github-copilot-cli", "github-copilot-vscode"].includes(lock?.clientId)) {
+  if (lock?.clientId !== PROJECTION_CLIENT_ID) {
     throw new Error("Transfer workspace client selection is invalid");
   }
-  const requiredFile = lock.clientId === "github-copilot-cli" ? ".github/mcp.json" : ".vscode/mcp.json";
-  const projection = await collectManagedProjection(workspace, lock.clientId, requiredFile, "Transfer workspace");
+  const projection = await collectManagedProjection(
+    workspace,
+    PROJECTION_CLIENT_ID,
+    PROJECTION_MCP_FILE,
+    "Transfer workspace",
+  );
   if (projection.files.some(({ matches }) => !matches)) {
     throw new Error("Transfer workspace managed files do not match the customization lock");
   }
@@ -2022,7 +2059,7 @@ export async function collectTransferEvidence(
   const evidence = {
     schemaVersion: "1.0.0",
     adapter: "apex-writer-transfer-v1",
-    client: { id: lock.clientId },
+    client: { id: evidenceClientId(options) },
     projectId,
     runId,
     source: {

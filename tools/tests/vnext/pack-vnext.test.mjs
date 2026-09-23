@@ -15,7 +15,7 @@ const defaultRunTimeoutMs = 120_000;
 const defaultTerminationGraceMs = 1_000;
 const defaultMaxOutputBytes = 1_048_576;
 
-test("governance package payload installs and updates both clients without cloud activation", async (context) => {
+test("governance package payload installs and updates the CLI projection without cloud activation", async (context) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "apex-governance-pack-"));
   context.after(() => rm(temporaryRoot, { recursive: true, force: true }));
   const packed = parseNpmPackResult(
@@ -36,11 +36,7 @@ test("governance package payload installs and updates both clients without cloud
     "tools/scripts/collect-governance-baseline.ps1",
     "tools/schemas/governance-baseline.schema.json",
   ];
-  for (const prefix of [
-    "customizations",
-    "client-projections/github-copilot-cli",
-    "client-projections/github-copilot-vscode",
-  ]) {
+  for (const prefix of ["customizations", "client-projections/github-copilot-cli"]) {
     for (const path of paths) assert.ok(packed.files.some((file) => file.path === `assets/${prefix}/${path}`));
   }
   assert.ok(!packed.files.some(({ path }) => /governance-policy-(?:raw|baseline)\.json$/u.test(path)));
@@ -86,7 +82,7 @@ test("governance package payload installs and updates both clients without cloud
     changed.lock.digest = bundleLockDigest(changed);
     await assert.rejects(verifyBundledAssetManifest(assets.root, changed), /copy entr|source|mapping/u);
   }
-  for (const clientId of ["github-copilot-vscode", "github-copilot-cli"]) {
+  for (const clientId of ["github-copilot-cli"]) {
     const consumer = join(temporaryRoot, clientId);
     const service = new ApexService(consumer);
     await service.init({ projectId: "test", clientId });
@@ -555,8 +551,10 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     const contents = await readFile(join(project, ".github", "skills", reference), "utf8");
     assert.ok(contents.length > 0, `consumer package is missing ${reference}`);
   }
-  const mcpConfig = JSON.parse(await readFile(join(project, ".vscode", "mcp.json"), "utf8")).servers.apex;
-  const workspaceValue = (value) => value.replaceAll("${workspaceFolder}", project);
+  const mcpConfig = JSON.parse(await readFile(join(project, ".mcp.json"), "utf8")).mcpServers.apex;
+  assert.deepEqual([mcpConfig.command, ...mcpConfig.args], ["npx", "--no", "apex", "mcp", "serve"]);
+  const sessionDirectory = join(project, "infra");
+  await mkdir(sessionDirectory);
   const sdkRoot = join(project, "node_modules", "@modelcontextprotocol", "sdk", "dist", "esm", "client");
   const [{ Client }, { StdioClientTransport }] = await Promise.all([
     import(pathToFileURL(join(sdkRoot, "index.js")).href),
@@ -564,9 +562,9 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
   ]);
   const mcpClient = new Client({ name: "packed-consumer-test", version: "1.0.0" });
   const mcpTransport = new StdioClientTransport({
-    command: workspaceValue(mcpConfig.command),
-    args: mcpConfig.args.map(workspaceValue),
-    cwd: workspaceValue(mcpConfig.cwd),
+    command: mcpConfig.command,
+    args: mcpConfig.args,
+    cwd: sessionDirectory,
     stderr: "pipe",
   });
   try {
@@ -604,8 +602,9 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     coe,
   );
   const revision = (await runInTest("git", ["rev-parse", "HEAD"], coe)).stdout.trim();
-  for (const clientId of ["github-copilot-vscode", "github-copilot-cli", "both"]) {
-    const consumer = clientId === "github-copilot-vscode" ? project : await createConsumer(`${clientId}-consumer`);
+  const clientId = "github-copilot-cli";
+  for (const mode of ["init", "bootstrap"]) {
+    const consumer = mode === "init" ? project : await createConsumer(`${mode}-consumer`);
     if (consumer !== project) {
       await installCandidate(consumer, true);
       await runInTest("git", ["init", "--initial-branch", "qualification"], consumer);
@@ -623,12 +622,9 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
       assert.equal(repeated.projectCreated, false);
       await cli(["project", "create", "--project", "demo"]);
     }
-    if (clientId === "both") {
-      assert.match(await readFile(join(consumer, ".github/agents/apex-cli.agent.md"), "utf8"), /name: APEX CLI\n/u);
-      assert.match(await readFile(join(consumer, ".github/agents/apex.agent.md"), "utf8"), /name: APEX\n/u);
-      await readFile(join(consumer, ".vscode/mcp.json"));
-      await readFile(join(consumer, ".github/mcp.json"));
-    }
+    await readFile(join(consumer, ".mcp.json"));
+    for (const retired of [".vscode/mcp.json", ".github/mcp.json", ".github/agents/apex-cli.agent.md"])
+      await assert.rejects(readFile(join(consumer, retired)), { code: "ENOENT" });
     const before = await cli(["status"]);
     const resumed = await cli(["bootstrap", "--project", "demo", "--client", clientId, "--yes"]);
     assert.equal(resumed.resumed, true);
