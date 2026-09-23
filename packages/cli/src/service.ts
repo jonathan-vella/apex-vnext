@@ -180,7 +180,7 @@ import { userInfo } from "node:os";
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { resolveBundledAssets, type BundledClientProjection } from "./assets.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
-import { ApexError, EXIT_CODES } from "./errors.js";
+import { ApexError, EXIT_CODES, retiredProjectionError } from "./errors.js";
 import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "./version.js";
 import {
   registerWorkflowValidators,
@@ -750,6 +750,7 @@ export class ApexService {
     customizationsSource?: string;
     clientId?: BundledClientProjection["id"];
   }): Promise<{ workspaceReady: true; projectCreated: false }> {
+    if (await this.retiredProjectionInstalled()) throw retiredProjectionError();
     await this.assertCleanInitialization();
     await mkdir(join(this.root, ".apex"), { recursive: true });
     try {
@@ -1731,6 +1732,47 @@ export class ApexService {
     }
     await rm(lockPath, { force: true });
     return { removed, conflicts };
+  }
+
+  async retiredProjectionInstalled(): Promise<boolean> {
+    try {
+      const value = JSON.parse(await readFile(join(this.root, ".apex", "customizations.selection.json"), "utf8")) as {
+        clientId?: unknown;
+      };
+      return value.clientId === "github-copilot-vscode";
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw error;
+    }
+  }
+
+  /** Explicit replacement of a retired VS Code projection; project state is untouched. */
+  async replaceRetiredProjection(): Promise<{
+    removed: string[];
+    installed: string[];
+    clientId: BundledClientProjection["id"];
+  }> {
+    if (!(await this.retiredProjectionInstalled()))
+      throw new ApexError("APEX_CONFLICT", "Workspace is already initialized", EXIT_CODES.conflict);
+    const lockPath = join(this.root, ".apex", "customizations.lock.json");
+    const { removed, conflicts } = (await this.exists(lockPath))
+      ? await this.uninstallCustomizations()
+      : { removed: [], conflicts: [] };
+    if (conflicts.length > 0)
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "Edited VS Code projection files remain; move them, then run `apex init --client github-copilot-cli` again",
+        EXIT_CODES.conflict,
+        { removed, conflicts },
+      );
+    const selection: CustomizationSelection = {
+      version: 1,
+      clientId: "github-copilot-cli",
+      sourceMode: "bundled-projection",
+    };
+    await atomicWriteJson(join(this.root, ".apex", "customizations.selection.json"), selection);
+    const { installed, clientId } = await this.reinstallCustomizations();
+    return { removed, installed, clientId };
   }
 
   async reinstallCustomizations(
@@ -9408,6 +9450,7 @@ export class ApexService {
       const value = JSON.parse(
         await readFile(join(this.root, ".apex", "customizations.selection.json"), "utf8"),
       ) as CustomizationSelection;
+      if ((value.clientId as string) === "github-copilot-vscode") throw retiredProjectionError();
       if (
         value.version !== 1 ||
         value.clientId !== "github-copilot-cli" ||

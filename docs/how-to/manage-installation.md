@@ -142,6 +142,11 @@ remain pinned to their original generation and continue without deleting `.apex`
 Use `--customizations-source /absolute/path` only to test a deliberate local source bundle. Later updates of that
 selection require the same source.
 
+A workspace that still selects the retired VS Code projection fails `init` and `update` with `APEX_VALIDATION` and
+reason `CLIENT_PROJECTION_RETIRED`. Run `npx apex init --client github-copilot-cli --json` there to remove unchanged
+retired files and install the CLI projection; projects and runs are kept. Edited retired files stop the switch with
+`APEX_CONFLICT` and are listed; move them and run the command again.
+
 ## Roll Back Managed Files
 
 ```bash

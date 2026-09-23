@@ -448,6 +448,8 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
       };
     }
     case "init":
+      if (flags.client === "github-copilot-cli" && (await service.retiredProjectionInstalled()))
+        return service.replaceRetiredProjection();
       return service.init({
         projectId: required(flags, "project") as never,
         ...(typeof flags.name === "string" ? { displayName: flags.name } : {}),
