@@ -1,12 +1,12 @@
 # Supported Client Qualification
 
-This control defines release-blocking evidence for GitHub Copilot in VS Code Local and standalone Copilot CLI.
+This control defines release-blocking evidence for the VS Code Copilot harness and standalone Copilot CLI.
 Generated projection tests are necessary but do not replace live client interaction.
 
 [DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection) replaces VS Code Local with the VS Code
-Copilot harness running the single CLI projection. Until that change ships, the VS Code column below describes the
-current Local projection; afterwards it applies to the Copilot harness, and the
-[planned CLI-only scenarios](#planned-cli-only-scenarios) become blocking.
+Copilot harness running the single CLI projection. Since slice 4, only that projection installs, so the VS Code column
+below applies to the Copilot harness; its remaining Local mechanics are restated during the plan. The
+[planned CLI-only scenarios](#planned-cli-only-scenarios) become blocking when the plan completes.
 
 Both clients use Windows via WSL2/Ubuntu, without Docker or a devcontainer. Required outcomes follow the
 [PRD](PRD.md), including both environment profiles, COE reuse and conversational changes. Basic interaction checks
@@ -148,6 +148,100 @@ results and the maintainer's decisions of the same day select these options:
    selection otherwise. Either way, the kernel validates the values.
 6. The failed harness probe blocks slice 11. The VS Code Copilot harness cannot qualify on WSL until picked agents
    apply, through an upstream fix or a verified workaround.
+
+### Slice 5 Probes
+
+On 2026-09-23 two more probes ran with Copilot CLI `1.0.88` in the disposable consumer workspace, using the slice 5
+projection and the real APEX MCP server. They are probe evidence, not CLIENT-021 qualification.
+
+- **`/agent` names.** `/agent apex-requirements` (the agent file name, which autocomplete offers) and
+  `/agent APEX Architect` (the display name) both selected the agent (session `912f2454`).
+- **`apex-next` from the coordinator.** In `-p` with only `apex(status)` and `apex(nextTask)` granted, `APEX` loaded
+  `apex-next` through `skill` and called each operation once. It named `apex-requirements` for the pending intake
+  request, printed both selection steps, said routing was pending and gave a fenced scope prompt with the exact request
+  ID (session `f99a791f`). Worker delegation from the coordinator was not exercised; slice 11 covers it.
+
+### Slice 6 Probes
+
+On 2026-09-23 slice 6 probes ran with Copilot CLI `1.0.88` in the same workspace. They are probe evidence, not
+qualification.
+
+- **Frontmatter tools.** `view`, `glob` and `rg` were granted; `grep` and `shell(bicep:*)` were ignored, so frontmatter
+  cannot grant a limited shell. Declaring `task` also added `read_agent`, `list_agents` and `write_agent` (session
+  `787aebd7`).
+- **Helper reach.** Under a parent holding `task`, read tools and APEX tools, Explore received only `rg`, `glob` and
+  `view`. Code-review, Security-review and Rubber-duck received the parent's full set, including the APEX tools and
+  `task` (session `8e26f681`). The `task` schema offers no per-call tool limit (session `cd261e6e`).
+- **Explore in the projection.** Under `APEX Operator`, Explore listed only its three read tools and cited line 5 for a
+  heading on line 6 (session `6be424d2`). `APEX Planner` refused an Explore request that named no workspace path
+  (session `0c2c2afa`); for a named path it reported the right line and verified it with `view` (session `c52c4a75`).
+
+### Slice 7 Probes
+
+On 2026-09-23 two interactive `APEX Requirements` probes ran with Copilot CLI `1.0.88` against the real kernel. They
+are probe evidence, not CLIENT-023 qualification.
+
+- **Checkboxes.** The intake form offered `target-environments` as an array field with the four options in kernel
+  order and the recommendation as its default. The answer came back as text (`dev, test`); the agent recorded
+  `["dev", "test"]` and the kernel accepted it (session `fd948712`). A single-select answer left empty drew one
+  targeted follow-up question instead of a default.
+- **Cancellation.** Cancelling the form recorded nothing, and the agent reported the request as still pending
+  (session `af1f6ca7`).
+
+The numbered fallback did not run because the CLI offered checkboxes. Kernel and service tests cover duplicate, empty
+and unmatched values.
+
+### Slice 11 Standalone Attempt
+
+On 2026-09-23 the maintainer chose to qualify standalone Copilot CLI first and record the VS Code Copilot harness as
+blocked. Runs used Copilot CLI `1.0.88` (binary SHA-256 `487b36f3…f944550`), Node `v26.9.0`, packed candidates in
+clean Git consumers under an isolated `COPILOT_HOME`, target `local` (fake provider, no Azure deployment) and synthetic
+intake answers. Each fix below needed a new candidate, because a run stays pinned to its runtime generation. This is
+exploratory evidence, not CLIENT-001 to CLIENT-027 qualification. Maintainer hints were given in the `ce561ac` run, so
+a clean full run on the final candidate is still required.
+
+| Candidate | Scope                                                        | Sessions                                                   |
+| --------- | ------------------------------------------------------------ | ---------------------------------------------------------- |
+| `994895d` | Intake to Gate 1, restart, Architecture blocked              | `2d493452`, `23aedd61`, `5896a256`, `ce3c9a3d`, `7c6ef823` |
+| `ce561ac` | Intake to Gate 2 ready (CLI tarball `c110711a80dffe4b`)      | `3fc7d20e`                                                 |
+| `a8e65b9` | Lifecycle, retired client, `-p` MCP (CLI `e5a4d511d8d0f825`) | `7edbd926`, `d7a7efc5`                                     |
+
+| ID           | Standalone CLI result                                                                                           |
+| ------------ | --------------------------------------------------------------------------------------------------------------- |
+| `CLIENT-003` | Pass: one typed answer event per request; a missing single-select drew one targeted follow-up, not a default    |
+| `CLIENT-006` | Pass: `nextTask` returned `APEX_AUTHORIZATION` while Gate 1 was open                                            |
+| `CLIENT-007` | Pass: after `/exit` and a new session, the same journal head was reported                                       |
+| `CLIENT-009` | Pass: `update`, `rollback`, `uninstall`, `reinstall` and `status` succeeded with no tracked-file drift          |
+| `CLIENT-021` | Pass (fallback): `apex-next` named `apex-requirements` and printed `/agent` with a scope prompt                 |
+| `CLIENT-023` | Pass: checkboxes in kernel order; the UI answer `dev, prod, test` was stored as `["dev", "test", "prod"]`       |
+| `CLIENT-025` | Pass for Reviewer: `subagent.configured` shows `gpt-6-luna` at max with no launch flags; others not yet run     |
+| `CLIENT-026` | Pass: `init --client github-copilot-vscode` fails with `APEX_USAGE`; an adapters test covers the retired hint   |
+| `CLIENT-027` | Pass: `-p` with `GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP=true` called `apex/status`; without it no APEX tool   |
+| Others       | Not run: Gates 2 to 4, Planner, CodeGen, Validator, Operator deploy, CLIENT-008 and CLIENT-024 need a clean run |
+
+Gate 1 was approved by the maintainer; the agent relayed the chat approval to `gateDecide` with `confirm: true` and
+did not ask again. Gate 2 was left open for the maintainer. Findings and fixes:
+
+- **Retired installs.** An existing VS Code install failed `update` with a generic selection error. Fixed in
+  `994895d`: `init` and `update` return `details.reason: CLIENT_PROJECTION_RETIRED` with the switch command, and
+  `apex init --client github-copilot-cli` replaces unchanged retired files.
+- **Hidden validation reasons.** `architectureComplete` failed with the generic MCP message. Fixed in `ce561ac` and
+  `3a3db69`: kernel `APEX_VALIDATION` reasons and up to five schema paths reach the agent unless they look secret.
+- **Architecture crash.** A decision manifest without `requirementIds` threw a `TypeError` (`APEX_INTERNAL`). Fixed
+  in `68bd1a8`: the submission is schema-checked first. The Architect also read "do not supply requirement
+  traceability" as covering per-decision `requirementIds`; `527d67c` clarifies the agent, skill and tool text.
+- **Governance templates.** Governance tasks had no output templates, so the Operator guessed shapes and failed. Fixed
+  in `a8e65b9`: a `policy-property-map` template and, for `local` targets only, a no-policy `governance-constraints`
+  template. Subscription targets still import a reviewed baseline.
+- **ARM MCP on WSL.** The OAuth callback returned 404 and the device-code flow hung, so pricing never connected. The
+  workaround was an `az account get-access-token` bearer header passed with `--additional-mcp-config`; the token
+  expires after about an hour, after which pricing calls hang instead of failing. A user-level MCP file did not
+  override the repository server.
+- **Other observations.** The coordinator called built-in Explore, which had no file tools. `ask_user` rejected one
+  malformed multi-field schema and the agent corrected it. The Architect asked for SLO values rather than inventing
+  them.
+
+The VS Code Copilot harness stays blocked on WSL, as the [slice 1 probe](#cli-only-projection-probes) found.
 
 ## Execution Rules
 
@@ -331,7 +425,8 @@ field, then show the proposed array and obtain explicit confirmation through tha
 Under the [CLI-only projection plan](ROADMAP.md#cli-only-projection), use `ask_user` checkboxes where the tool offers an
 array field and map the returned text back to exact option values. Otherwise present the options numbered in kernel
 order, accept the user's numbers and resolve them to option values. The kernel validates the array either way.
-Out-of-range, duplicate, non-numeric or unmatched entries require correction. Confirmation is still required.
+Out-of-range, duplicate, non-numeric or unmatched entries require correction. Checkbox answers that map exactly need
+no extra question; resolved numbers or free text still require explicit confirmation.
 Preserve the kernel option order, allowed values, request identity, typed arrays and user stop boundary. Never invent a
 `multiSelect` parameter, silently reduce the question to one choice, infer aliases or record recommended defaults.
 Invalid, empty or ambiguous input requires correction; corrected selections require confirmation again. Cancellation
@@ -359,5 +454,6 @@ The aggregate cannot grant release authority; it becomes one input to the final 
 ## VS Code Installation Lifecycle
 
 The [VS Code installation lifecycle matrix](../../tools/registry/vscode-installation-lifecycle.v1.json) defines the
-bootstrap, reload, update, rollback, uninstall, and reinstall scenarios required for end-user lifecycle qualification.
-Its deterministic evidence is committed; live scenarios remain `not-run` until executed in a clean supported profile.
+bootstrap, reload, update, rollback, uninstall, and reinstall scenarios for the VS Code Copilot harness, which runs the
+CLI projection. Its deterministic evidence is committed; live scenarios remain `not-run` until executed in a clean
+supported profile. Slice 8 retired the profile bootstrap agent scenario with the VS Code Local projection.

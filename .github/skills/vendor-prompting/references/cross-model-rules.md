@@ -53,7 +53,7 @@ handoffs:
 
 **Rule** (`frontmatter-model-style-001`):
 
-- `.agent.md` files: array form — `model: ["Claude Opus 4.7"]`
+- `.agent.md` files: exact Copilot CLI model IDs — `model: claude-opus-4.7` or an ordered list of IDs
 - `.prompt.md` files: string form — `model: "Claude Opus 4.7"`
 - Bareword form for labels with parenthetical qualifiers (e.g.,
   `model: Claude Foo (suffix)`) is **forbidden** — YAML misparses parens.

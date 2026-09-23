@@ -1231,6 +1231,20 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
     const unpriced = structuredClone(partialCost);
     unpriced.lineItems[0]!.sku = "test - UNPRICED";
     unpriced.lineItems[0]!.source.uri = "urn:apex:arm-mcp:pricing-unavailable";
+    const untraced = structuredClone(manifest) as { skuDecisions: Array<{ requirementIds?: string[] }> };
+    delete untraced.skuDecisions[0]!.requirementIds;
+    await assert.rejects(
+      service.completeArchitecture(
+        issued.task.taskId,
+        architectureValue,
+        partialCost,
+        untraced as Parameters<typeof service.completeArchitecture>[3],
+      ),
+      (error: unknown) =>
+        error instanceof ApexError &&
+        error.code === "APEX_VALIDATION" &&
+        JSON.stringify(error.details).includes("requirementIds"),
+    );
     await assert.rejects(
       service.completeArchitecture(
         issued.task.taskId,
@@ -1484,6 +1498,18 @@ test("typed input recording rejects premature, stale, malformed, duplicate, and 
     }),
     (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
   );
+  for (const environments of [["dev", "dev"], [], ["dev", "qa"]]) {
+    await assert.rejects(
+      service.recordInput({
+        ...valid,
+        answers: valid.answers.map((answer) =>
+          answer.questionId === "target-environments" ? { ...answer, value: environments } : answer,
+        ),
+      }),
+      (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
+      `target environments ${JSON.stringify(environments)}`,
+    );
+  }
   const recorded = await service.recordInput(valid);
   assert.deepEqual(recorded, { recorded: true, requestId: pending.request.requestId });
   await assert.rejects(
@@ -2183,14 +2209,21 @@ test("plan task context projects source hashes and valid output templates", asyn
     await readFile(join(reviewsDirectory, "architecture-findings.md"), "utf8"),
     /Reviewed artifact kind: architecture/u,
   );
+  const template = async (kind: "governance-constraints" | "policy-property-map") => {
+    const issued = await nextTaskAfterInput(service);
+    if (issued.status !== "task") throw new Error("Expected a task");
+    return (await service.taskContext(issued.task.taskId)).outputTemplates[kind];
+  };
   const governanceHashes = await complete("governance-discovery", [
-    { kind: "governance-constraints", value: governance(initialized.runId) },
+    { kind: "governance-constraints", value: await template("governance-constraints") },
   ]);
+  const policyTemplate = await template("policy-property-map");
+  assert.deepEqual(
+    policyTemplate,
+    policyMap(initialized.runId, governanceHashes.outputHashes["governance-constraints"]!),
+  );
   const policyHashes = await complete("governance-reconciliation", [
-    {
-      kind: "policy-property-map",
-      value: policyMap(initialized.runId, governanceHashes.outputHashes["governance-constraints"]!),
-    },
+    { kind: "policy-property-map", value: policyTemplate },
   ]);
   await complete("governance-review", [
     {

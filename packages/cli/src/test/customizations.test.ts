@@ -73,13 +73,17 @@ test("init installs bundled customizations and runtime config by default", async
   await service.init({ projectId: "demo" });
   const coordinatorAgent = await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8");
   assert.match(coordinatorAgent, /name: APEX/u);
-  assert.match(coordinatorAgent, /target: vscode/u);
-  assert.match(await readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"), /target: vscode/u);
+  assert.match(coordinatorAgent, /target: github-copilot/u);
+  assert.match(
+    await readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"),
+    /target: github-copilot/u,
+  );
   const requirementsAgent = await readFile(join(root, ".github", "agents", "apex-requirements.agent.md"), "utf8");
   assert.match(requirementsAgent, /Immediately call `apex\/nextTask` after submitting requirements/u);
   assert.match(requirementsAgent, /invoke `APEX Reviewer` through the active client's delegation tool/u);
-  assert.match(requirementsAgent, /^tools:\n(?: {2}- .+\n)*? {2}- agent\n/mu);
-  assert.match(requirementsAgent, /^agents:\n {2}- APEX Reviewer\n/mu);
+  assert.match(requirementsAgent, /^tools:\n(?: {2}- .+\n)*? {2}- task\n/mu);
+  assert.doesNotMatch(requirementsAgent, /^agents:/mu);
+  await readFile(join(root, ".mcp.json"));
   assert.match(
     await readFile(join(root, ".github", "instructions", "apex-agent-authoring.instructions.md"), "utf8"),
     /APEX Agent Boundaries/u,
@@ -160,28 +164,18 @@ test("init installs bundled customizations and runtime config by default", async
     ),
     /Reference-Only Document Outlines/u,
   );
-  assert.deepEqual(JSON.parse(await readFile(join(root, ".vscode", "mcp.json"), "utf8")), {
-    servers: {
-      apex: {
-        type: "stdio",
-        command: "node",
-        args: ["${workspaceFolder}/node_modules/@apexops/cli/dist/cli.js", "mcp", "serve"],
-        cwd: "${workspaceFolder}",
-      },
-      "azure-resource-manager-mcp": {
-        type: "http",
-        url: "https://mcp.management.azure.com",
-        headers: { "x-mcp-toolset": "CostManagement,Pricing" },
-      },
-      "azure-mcp-server": {
-        type: "stdio",
-        command: "node",
-        args: ["${workspaceFolder}/node_modules/@apexops/cli/dist/azure-mcp.js"],
-        cwd: "${workspaceFolder}",
-      },
-    },
-  });
-  await assert.rejects(readFile(join(root, ".github", "mcp.json"), "utf8"), /ENOENT/u);
+  const mcp = JSON.parse(await readFile(join(root, ".mcp.json"), "utf8")) as {
+    mcpServers: Record<string, { type: string; command?: string; args?: string[]; url?: string; tools: string[] }>;
+  };
+  assert.deepEqual(Object.keys(mcp.mcpServers).sort(), ["apex", "azure-resource-manager-mcp"]);
+  assert.deepEqual(
+    { type: mcp.mcpServers.apex!.type, command: mcp.mcpServers.apex!.command, args: mcp.mcpServers.apex!.args },
+    { type: "local", command: "npx", args: ["--no", "apex", "mcp", "serve"] },
+  );
+  assert.ok(mcp.mcpServers.apex!.tools.includes("recordInput"));
+  assert.equal(mcp.mcpServers["azure-resource-manager-mcp"]!.url, "https://mcp.management.azure.com");
+  for (const retired of [join(".vscode", "mcp.json"), join(".github", "mcp.json")])
+    await assert.rejects(readFile(join(root, retired), "utf8"), /ENOENT/u);
   assert.equal(
     await readFile(join(root, ".apex", ".gitignore"), "utf8"),
     "/cache/\n/local/\n/work/\n/runtime/capability-packs/\n",
@@ -225,17 +219,18 @@ test("init installs bundled customizations and runtime config by default", async
     runtime: Array<{ sourceHash: string }>;
   };
   assert.ok([...lock.files, ...lock.runtime].every(({ sourceHash }) => /^[a-f0-9]{64}$/.test(sourceHash)));
-  assert.ok(lock.files.some(({ path }) => path === ".vscode/mcp.json"));
-  assert.ok(!lock.files.some(({ path }) => path === ".github/mcp.json"));
-  assert.equal(lock.clientId, "github-copilot-vscode");
+  assert.ok(lock.files.some(({ path }) => path === ".mcp.json"));
+  assert.ok(!lock.files.some(({ path }) => path === ".vscode/mcp.json" || path === ".github/mcp.json"));
+  assert.equal(lock.clientId, "github-copilot-cli");
 });
 
 test("init installs only the selected Copilot CLI projection and records it in the lock", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
   await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
-  await assert.rejects(readFile(join(root, ".vscode", "mcp.json"), "utf8"), /ENOENT/u);
-  assert.match(await readFile(join(root, ".github", "mcp.json"), "utf8"), /"recordInput"/u);
+  for (const retired of [join(".vscode", "mcp.json"), join(".github", "mcp.json")])
+    await assert.rejects(readFile(join(root, retired), "utf8"), /ENOENT/u);
+  assert.match(await readFile(join(root, ".mcp.json"), "utf8"), /"recordInput"/u);
   const requirementsAgent = await readFile(join(root, ".github", "agents", "apex-requirements.agent.md"), "utf8");
   assert.match(requirementsAgent, /target: github-copilot/u);
   assert.match(requirementsAgent, /model: gpt-6-sol/u);
@@ -254,9 +249,10 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(coordinatorAgent, /- apex\/projectCreate/u);
   assert.match(coordinatorAgent, /- apex\/gateDecide/u);
   assert.match(coordinatorAgent, /Use `ask_user` only for project lifecycle or routing choices, never intake/u);
-  assert.match(coordinatorAgent, /select `APEX Requirements` as the foreground agent/u);
-  assert.doesNotMatch(coordinatorAgent, /\n\s+- task\s*\n/u);
-  assert.match(coordinatorAgent, /request\.intake.*hand off to `APEX Requirements`/su);
+  assert.match(coordinatorAgent, /Route through the `apex-next` skill/u);
+  assert.match(coordinatorAgent, /\n\s+- task\s*\n/u);
+  assert.match(coordinatorAgent, /request\.intake`, the destination is exactly `APEX Requirements`/u);
+  assert.match(await readFile(join(root, ".github", "skills", "apex-next", "SKILL.md"), "utf8"), /^name: apex-next$/mu);
   assert.match(coordinatorAgent, /replace the active project.*apex\/projectCreate.*apex\/projectDelete/su);
   assert.match(coordinatorAgent, /If creation does not succeed, stop and report its result/u);
   assert.match(coordinatorAgent, /After a\s+successful creation, ask for explicit confirmation/u);
@@ -266,7 +262,10 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(coordinatorAgent, /--decision <approved\|rejected>/u);
   assert.match(coordinatorAgent, /--recipient <RECIPIENT_ID>/u);
   assert.match(coordinatorAgent, /call `apex\/gateDecide` with that gate, decision, and `confirm: true`/u);
-  assert.match(coordinatorAgent, /Never auto-invoke a specialist, author artifacts, approve a gate, or deploy/u);
+  assert.match(
+    coordinatorAgent,
+    /never auto-invoke an interactive specialist, author\s+artifacts, approve a gate, or deploy/u,
+  );
   assert.match(
     await readFile(join(root, ".github", "skills", "apex-azure-defaults", "SKILL.md"), "utf8"),
     /APEX Azure Defaults/u,
@@ -351,8 +350,8 @@ test("init installs only the selected Copilot CLI projection and records it in t
     files: Array<{ path: string }>;
   };
   assert.equal(lock.clientId, "github-copilot-cli");
-  assert.ok(lock.files.some(({ path }) => path === ".github/mcp.json"));
-  assert.ok(!lock.files.some(({ path }) => path === ".vscode/mcp.json"));
+  assert.ok(lock.files.some(({ path }) => path === ".mcp.json"));
+  assert.ok(!lock.files.some(({ path }) => path === ".vscode/mcp.json" || path === ".github/mcp.json"));
   assert.equal(
     lock.files.filter(({ path }) => /apex-(?:codegen|reviewer|validator)\.agent\.md$/u.test(path)).length,
     3,
@@ -370,10 +369,10 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.equal(rolledBackLock.clientId, "github-copilot-cli");
   assert.deepEqual((await service.uninstallCustomizations()).conflicts, []);
   assert.equal(await readFile(join(root, "unrelated.txt"), "utf8"), "preserve\n");
-  await assert.rejects(readFile(join(root, ".github", "mcp.json"), "utf8"), /ENOENT/u);
+  await assert.rejects(readFile(join(root, ".mcp.json"), "utf8"), /ENOENT/u);
   const reinstalled = await service.reinstallCustomizations();
   assert.equal(reinstalled.clientId, "github-copilot-cli");
-  assert.match(await readFile(join(root, ".github", "mcp.json"), "utf8"), /"recordInput"/u);
+  assert.match(await readFile(join(root, ".mcp.json"), "utf8"), /"recordInput"/u);
   assert.match(
     await readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"),
     /model: gpt-6-luna/u,
@@ -388,7 +387,7 @@ test("missing customization selection fails closed and custom sources require ex
   await assert.rejects(service.update(), /Customization selection is missing/);
   await assert.rejects(service.reinstallCustomizations(), /Customization selection is missing/);
   await assert.rejects(service.doctor(true, true), /Customization selection is missing/);
-  assert.ok(await stat(join(root, ".vscode", "mcp.json")));
+  assert.ok(await stat(join(root, ".mcp.json")));
 
   const customRoot = await tempRoot();
   const customSource = await tempRoot();

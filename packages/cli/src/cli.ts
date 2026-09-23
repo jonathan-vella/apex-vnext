@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { NativeBicepProvider, NativeTerraformProvider, ProcessRunner, type IacProvider } from "@apexops/capabilities";
 import {
   CONTRACT_VERSION,
@@ -21,7 +21,7 @@ import {
   renderQualityScorecardEvaluation,
   type ScorecardMeasurement,
 } from "@apexops/renderers";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { ApexError, EXIT_CODES, normalizeError } from "./errors.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
 import { resolveBundledAssets } from "./assets.js";
@@ -71,27 +71,10 @@ function confirmed(flags: Flags, command: string): void {
   if (flags.yes !== true) throw new ApexError("APEX_USAGE", `${command} requires --yes`, EXIT_CODES.usage);
 }
 
-function clientId(flags: Flags): "github-copilot-cli" | "github-copilot-vscode" | "both" {
-  const value = flags.client ?? "github-copilot-vscode";
-  if (value !== "github-copilot-cli" && value !== "github-copilot-vscode" && value !== "both") {
-    throw new ApexError(
-      "APEX_USAGE",
-      "--client must be github-copilot-vscode, github-copilot-cli or both",
-      EXIT_CODES.usage,
-    );
-  }
-  return value;
-}
-
-function profileClientId(flags: Flags): "github-copilot-vscode" {
-  const value = clientId(flags);
-  if (value !== "github-copilot-vscode") {
-    throw new ApexError(
-      "APEX_USAGE",
-      "Profile bootstrap is supported only for github-copilot-vscode",
-      EXIT_CODES.usage,
-    );
-  }
+function clientId(flags: Flags): "github-copilot-cli" {
+  const value = flags.client ?? "github-copilot-cli";
+  if (value !== "github-copilot-cli")
+    throw new ApexError("APEX_USAGE", "--client must be github-copilot-cli", EXIT_CODES.usage);
   return value;
 }
 
@@ -416,9 +399,20 @@ async function qualityStatus(root: string): Promise<QualityEvaluationArtifact> {
   }
 }
 
+// A session may start below the workspace root; stop at the repository boundary so an unrelated parent is never used.
+export async function mcpWorkspaceRoot(start: string): Promise<string> {
+  for (let directory = resolve(start); ; directory = dirname(directory)) {
+    const apex = await lstat(join(directory, ".apex")).catch(() => undefined);
+    if (apex?.isDirectory() === true) return directory;
+    const repository = await lstat(join(directory, ".git")).catch(() => undefined);
+    if (repository !== undefined || dirname(directory) === directory) return start;
+  }
+}
+
 export async function execute(argv: string[], root = process.cwd(), options: ServiceOptions = {}): Promise<unknown> {
   const { words, flags } = parse(argv);
   const command = words.join(" ");
+  if (command === "mcp serve") root = await mcpWorkspaceRoot(root);
   const runner = new ProcessRunner();
   const service = new ApexService(root, {
     ...options,
@@ -454,6 +448,8 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
       };
     }
     case "init":
+      if (flags.client === "github-copilot-cli" && (await service.retiredProjectionInstalled()))
+        return service.replaceRetiredProjection();
       return service.init({
         projectId: required(flags, "project") as never,
         ...(typeof flags.name === "string" ? { displayName: flags.name } : {}),
@@ -520,21 +516,6 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
         ...(config.createRepository === undefined ? {} : { createRepository: config.createRepository }),
       });
     }
-    case "profile status":
-      profileClientId(flags);
-      return service.profileStatus();
-    case "profile install":
-      confirmed(flags, "profile install");
-      profileClientId(flags);
-      return service.profileInstall();
-    case "profile update":
-      confirmed(flags, "profile update");
-      profileClientId(flags);
-      return service.profileUpdate();
-    case "profile uninstall":
-      confirmed(flags, "profile uninstall");
-      profileClientId(flags);
-      return service.profileUninstall();
     case "update":
       return service.update(
         typeof flags["customizations-source"] === "string" ? flags["customizations-source"] : undefined,

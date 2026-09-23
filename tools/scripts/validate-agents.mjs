@@ -22,7 +22,6 @@ import { getAgents, getPromptFiles } from "./_lib/workspace-index.mjs";
 import { getBody } from "./_lib/parse-frontmatter.mjs";
 import { Reporter } from "./_lib/reporter.mjs";
 import { MAX_BODY_LINES } from "./_lib/paths.mjs";
-import { validateManagedHandoffs } from "./_lib/managed-handoffs.mjs";
 
 let overallFailed = false;
 /** Aggregated structured findings across all parts (used by --format=json). */
@@ -54,7 +53,12 @@ function parseStructuredHandoffs(content) {
 
 const MAIN_AGENT_REQUIRED = ["name", "description", "user-invocable", "tools"];
 const SUBAGENT_REQUIRED = ["name", "description", "user-invocable", "tools"];
-const RECOMMENDED_FIELDS = ["agents", "model"];
+const RECOMMENDED_FIELDS = ["model"];
+const RETIRED_VSCODE_FIELDS = ["argument-hint", "handoffs", "agents"];
+const RETIRED_VSCODE_TOOLS = new Map([
+  ["vscode/askQuestions", "ask_user"],
+  ["agent", "task"],
+]);
 const BLOCK_SCALAR_PATTERN = /^description:\s*[>|][-\s]*$/m;
 // Description length cap: enforces concise routing-keyword-only descriptions.
 // See customizations/.github/instructions/apex-agent-authoring.instructions.md.
@@ -117,6 +121,20 @@ function runFrontmatterValidation() {
       }
     }
 
+    for (const field of RETIRED_VSCODE_FIELDS) {
+      if (field in frontmatter)
+        r.error(relativePath, `Retired VS Code field '${field}'; Copilot CLI agents do not use it`);
+    }
+    for (const tool of Array.isArray(frontmatter.tools) ? frontmatter.tools : []) {
+      if (RETIRED_VSCODE_TOOLS.has(tool)) {
+        r.error(relativePath, `Retired VS Code tool '${tool}'; use '${RETIRED_VSCODE_TOOLS.get(tool)}'`);
+      }
+    }
+    const expectedPolicy = isSubagent ? "required" : "preferred";
+    if (frontmatter["model-policy"] !== expectedPolicy) {
+      r.error(relativePath, `model-policy must be '${expectedPolicy}' (got: ${frontmatter["model-policy"]})`);
+    }
+
     if (isSubagent) {
       const ui = frontmatter["user-invocable"];
       if (ui !== "false" && ui !== "never" && ui !== false) {
@@ -132,15 +150,8 @@ function runFrontmatterValidation() {
 
     if (!isSubagent) {
       for (const field of RECOMMENDED_FIELDS) {
-        const explicitEmptyAgents = field === "agents" && /^agents:\s*\[\s*\]\s*$/m.test(content);
-        if (!(field in frontmatter) && !explicitEmptyAgents) {
-          r.warn(relativePath, `Missing recommended 1.109 field '${field}'`);
-        }
+        if (!(field in frontmatter)) r.warn(relativePath, `Missing recommended field '${field}'`);
       }
-    }
-
-    if ("agents" in frontmatter && !Array.isArray(frontmatter.agents)) {
-      r.error(relativePath, `'agents' parsed as ${typeof frontmatter.agents}, expected array`);
     }
 
     if (content.includes("handoffs:")) {
@@ -229,8 +240,10 @@ function runAgentChecks() {
 
   const agents = getAgents();
 
-  // Build the set of known subagent names from files under _subagents/.
-  // Used by the body-vs-frontmatter declaration check below.
+  // Known subagent names and manifest edges feed the body invocation check below.
+  const manifestEdges =
+    JSON.parse(fs.readFileSync(path.join(process.cwd(), "customizations", "manifest.json"), "utf8")).invocationEdges ??
+    [];
   const knownSubagents = new Set();
   for (const [, agent] of agents) {
     if (agent.isSubagent && agent.frontmatter?.name) {
@@ -270,12 +283,14 @@ function runAgentChecks() {
       console.log(`  Fix: Soften language or extract content to skill references.`);
     }
 
-    // Subagent invocation vs. `agents:` declaration consistency check.
-    // VS Code's subagent discovery uses the `agents:` frontmatter array;
-    // a body that invokes a subagent not declared there falls back to the
-    // generic runSubagent runner ("not registered in this VS Code agent list").
+    // A body that invokes a subagent needs a matching manifest subagent edge;
+    // the kernel and renderer derive delegation from those edges.
     if (!isSubagent) {
-      const declared = new Set(Array.isArray(agent.frontmatter?.agents) ? agent.frontmatter.agents : []);
+      const declared = new Set(
+        manifestEdges
+          .filter(({ from, type }) => from === agent.frontmatter?.name && type === "subagent")
+          .map(({ to }) => to),
+      );
       const missing = new Set();
       for (const subagentName of knownSubagents) {
         if (declared.has(subagentName)) continue;
@@ -293,9 +308,9 @@ function runAgentChecks() {
       for (const name of missing) {
         r.errorAnnotation(
           filePath,
-          `${file} invokes \`${name}\` in body but does not declare it in \`agents:\` frontmatter (VS Code subagent discovery will fail)`,
+          `${file} invokes \`${name}\` in body but customizations/manifest.json declares no subagent edge for it`,
         );
-        console.log(`  Fix: Add "${name}" to the \`agents:\` array in the frontmatter.`);
+        console.log(`  Fix: Add a subagent invocation edge for "${name}" to customizations/manifest.json.`);
       }
     }
 
@@ -355,9 +370,9 @@ function classifyModel(modelStr) {
   const s = Array.isArray(modelStr) ? modelStr[0] : modelStr;
   if (!s) return "unknown";
   const lower = s.toLowerCase();
-  if (lower.includes("claude opus")) return "claude-opus";
-  if (lower.includes("claude sonnet")) return "claude-sonnet";
-  if (lower.includes("claude haiku")) return "claude-haiku";
+  if (/claude[ -]opus/u.test(lower)) return "claude-opus";
+  if (/claude[ -]sonnet/u.test(lower)) return "claude-sonnet";
+  if (/claude[ -]haiku/u.test(lower)) return "claude-haiku";
   if (lower.includes("claude")) return "claude";
   if (/^gpt-6-(?:sol|luna)(?:\s|$)/u.test(lower)) return "gpt-6";
   if (lower.includes("gpt-5.6")) return "gpt-5.6";
@@ -874,11 +889,20 @@ function checkGpt55StopRulesNonEmpty(r, agent, file, family) {
 }
 
 /** Check 12: frontmatter-model-style-001 */
+const CLI_MODEL_ID = /^[a-z0-9][a-z0-9.-]*$/u;
+
 function checkFrontmatterModelStyle(r, item, file, family, fileType) {
   const m = item.frontmatter?.model;
   if (m === undefined || m === null) return;
-  if (fileType === "agent" && !Array.isArray(m)) {
-    emit(r, "frontmatter-model-style-001", family, file, `.agent.md model: must be array form, got ${typeof m}`);
+  const invalid = (Array.isArray(m) ? m : [m]).filter((id) => typeof id !== "string" || !CLI_MODEL_ID.test(id));
+  if (fileType === "agent" && invalid.length > 0) {
+    emit(
+      r,
+      "frontmatter-model-style-001",
+      family,
+      file,
+      `.agent.md model: must use Copilot CLI model IDs, got ${invalid.join(", ")}`,
+    );
   } else if (fileType === "prompt" && Array.isArray(m)) {
     emit(r, "frontmatter-model-style-001", family, file, `.prompt.md model: must be string form, got array`);
   }
@@ -1091,24 +1115,6 @@ function runVendorPrompting() {
 }
 
 // ============================================================================
-// Part 5: Workflow Handoff Validation (B0–B5, separate registry)
-// ============================================================================
-
-function runWorkflowHandoffs() {
-  const reporter = new Reporter("Workflow Handoff Rules");
-  reporter.header();
-  const agents = [...getAgents().values()].map((agent) => {
-    const match = agent.content.match(/^---\r?\n([\s\S]*?)\r?\n---/u);
-    if (!match) throw new Error(`Missing agent frontmatter: ${agent.path}`);
-    return yaml.load(match[1]);
-  });
-  for (const error of validateManagedHandoffs(agents)) reporter.error("managed-handoff", error);
-  reporter.summary();
-  if (reporter.errors > 0) overallFailed = true;
-  allFindings.push(...reporter.findings);
-}
-
-// ============================================================================
 // Self-check: cross-reference VENDOR_RULES vs rules.json
 // ============================================================================
 
@@ -1159,7 +1165,6 @@ const PARTS = {
   structural: runAgentChecks,
   "model-alignment": runModelAlignment,
   "vendor-prompting": runVendorPrompting,
-  "workflow-handoffs": runWorkflowHandoffs,
 };
 
 function parseArgs(argv) {

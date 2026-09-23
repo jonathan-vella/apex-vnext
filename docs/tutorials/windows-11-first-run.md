@@ -29,51 +29,23 @@ workloads; its folder name identifies the consumer, not a single workload:
 ```bash
 mkdir -p ~/src/contoso-platform
 cd ~/src/contoso-platform
-apex bootstrap --project payments --client github-copilot-vscode --create-repo --yes
+apex bootstrap --project payments --create-repo --yes
 ```
 
-## Choose A Client
+## Choose Where To Run APEX
 
-Select one client projection for this workspace. Both clients use the same kernel-owned `.apex` state.
+The workspace receives one Copilot CLI projection, and both hosts use the same kernel-owned `.apex` state.
 
-| Client      | Client value            | Use it when                                                        |
-| ----------- | ----------------------- | ------------------------------------------------------------------ |
-| VS Code     | `github-copilot-vscode` | You want the VS Code agent picker and VS Code-only worker support. |
-| Copilot CLI | `github-copilot-cli`    | You want terminal-based Copilot interaction.                       |
+| Host                    | How to start                                                       | Use it when                        |
+| ----------------------- | ------------------------------------------------------------------ | ---------------------------------- |
+| Copilot CLI             | Run `copilot --agent apex` in the workspace terminal               | You work in a terminal, and on WSL |
+| VS Code Copilot harness | Start a chat with the session target set to Copilot; pick **APEX** | You prefer VS Code, outside WSL    |
 
-## Initialize With VS Code
+Over WSL, VS Code `1.139.0` with Copilot Chat `0.67.0` does not apply a picked agent yet, so use Copilot CLI there.
 
-Open the workspace from WSL:
+## Initialize The Workspace
 
-```bash
-code .
-```
-
-In VS Code:
-
-1. Confirm the folder is trusted and that GitHub Copilot Chat is signed in.
-2. In the integrated WSL terminal, initialize the workspace:
-
-   ```bash
-   npx apex init \
-     --project payments \
-     --name "Payments platform" \
-     --environment dev \
-     --target "resource-group:payments-dev" \
-     --iac bicep \
-     --client github-copilot-vscode \
-     --json
-   ```
-
-3. Reload the VS Code window.
-4. Select the workspace **APEX** agent and continue with requirements.
-
-The initialized workspace contains the VS Code projection and MCP configuration. Do not install the profile bootstrap
-agent for a local candidate because its version-pinned `npx` command requires a published package.
-
-## Bootstrap With Copilot CLI
-
-From the workspace terminal, initialize the VS Code or Copilot CLI projection directly. This example selects Bicep:
+From the workspace terminal, initialize the projection directly. This example selects Bicep:
 
 ```bash
 npx apex init \
@@ -82,14 +54,14 @@ npx apex init \
   --environment dev \
   --target "resource-group:payments-dev" \
   --iac bicep \
-  --client github-copilot-cli \
   --json
 ```
 
-For Terraform, replace `--iac bicep` with `--iac terraform`.
+For Terraform, replace `--iac bicep` with `--iac terraform`. The initialized workspace contains the CLI projection and
+`.mcp.json`.
 
-Start Copilot CLI in the same directory, select the APEX agent, and continue the project. Copilot CLI does not include
-VS Code-only autonomous workers.
+Start Copilot CLI in the same directory with `copilot --agent apex` and continue the project. Ask APEX what is next at
+any point; it names the owning agent and prints `/agent <name>` with a scope prompt to paste after you switch.
 
 ## Verify The Workspace
 

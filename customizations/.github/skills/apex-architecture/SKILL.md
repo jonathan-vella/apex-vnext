@@ -35,7 +35,8 @@ Use this skill only for an active architecture task.
 6. Assume regional service/SKU availability and quota are sufficient. Do not request or validate deployment, restore,
    failover, regional, zonal, or quota evidence during Architecture.
 7. Submit `architecture`, `cost-estimate`, and `workload-decision-manifest` once through
-   `apex/architectureComplete`; APEX derives identity, hashes, requirement traceability, and cost/SKU bindings.
+   `apex/architectureComplete`; APEX derives identity, hashes, top-level `requirementTraceability`, and cost/SKU
+   bindings. Each SKU and SLO decision lists its component's `requirementIds`.
 8. Report the derived Architecture, qualitative WAF, cost-breakdown, and uncertainty diagrams materialized in the
    Gate 2 package. These diagrams do not replace typed artifacts, pricing tables, evidence, review, or approval.
 9. Treat regional/zonal support, subscription quota, deployment, restore, failover, and unresolved retail meters as

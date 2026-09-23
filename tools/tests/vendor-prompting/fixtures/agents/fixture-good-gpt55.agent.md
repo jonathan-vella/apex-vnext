@@ -1,7 +1,7 @@
 ---
 name: fixture-good-gpt55
 description: "Good GPT-5.5 agent fixture — should produce no vendor-prompting findings."
-model: ["GPT-5.5"]
+model: gpt-5.5
 user-invocable: true
 agents: []
 tools: [read]
