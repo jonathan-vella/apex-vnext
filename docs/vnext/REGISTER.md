@@ -148,7 +148,7 @@ and the repository archives.
   handoffs with `apex-next`, multi-select with native checkboxes or kernel-validated numbered selection, and allowlists
   with kernel task ownership and scoped tools. The archive under `.archive/vscode-projection/` records rollback notes,
   stays out of packaging, and `retired-paths.v1.json` keeps the former live paths absent.
-- **State:** Open; in progress on `feat/cli-projection`
+- **State:** Open; standalone CLI partially qualified in slice 11; VS Code harness blocked on WSL
 - **Closure proof:** Rejection and reintroduction tests pass, archive provenance and rollback notes are recorded, and
   standalone CLI and VS Code Copilot harness qualification passes on the same candidate.
 
@@ -162,7 +162,7 @@ and the repository archives.
   they stay out until the CLI scopes helper tools. Validator has no shell. The owning APEX agent restates findings as
   typed kernel input with verified file and line references. The kernel continues to reject unexecuted or simulated
   evidence. Document per-user model overrides.
-- **State:** Open; in progress on `feat/cli-projection`
+- **State:** Open; standalone CLI partially qualified in slice 11; VS Code harness blocked on WSL
 - **Closure proof:** Projection tests cover helper grants, negative tests show helper output alone cannot complete a
   task or open a gate, and CLI probes cover each granted helper path. Slice 6 covers Explore; the other helpers need
   CLI tool scoping first.

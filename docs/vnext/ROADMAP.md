@@ -59,13 +59,13 @@ See [current checkpoint](PROJECT.md#development-diagnostics-checkpoint) and
 Owner: managed customization, CLI lifecycle and client experience maintainers. Decision:
 [DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection). Acceptance:
 [REQ-CUSTOMIZATION-001](PRD.md#req-customization-001-managed-copilot-experiences) and the planned
-[CLI-only scenarios](CLIENT-QUALIFICATION.md#planned-cli-only-scenarios). Branch: `feat/cli-projection`, draft PR #350;
+[CLI-only scenarios](CLIENT-QUALIFICATION.md#planned-cli-only-scenarios). Branch: `feat/cli-projection`, PR #350;
 the plan and slice 1 merged in #347. Tracking: [issue #348](https://github.com/jonathan-vella/apex-vnext/issues/348).
 Status: slices 1 to 10 are done. `apex init` installs only the CLI projection, managed agent sources use CLI
 frontmatter, the coordinator routes through `apex-next`, and VS Code Local is archived under `.archive/vscode-projection/`.
 `npm run qualify:vnext` passed at `e645d92` on 2026-09-23. Slice 11 is partial: a standalone attempt reached Gate 2
 and fixed four defects ([results](CLIENT-QUALIFICATION.md#slice-11-standalone-attempt)). A clean full run needs the
-maintainer for gate approvals, and the VS Code harness stays blocked on WSL.
+maintainer for gate approvals, and the VS Code harness stays blocked on WSL. Slice 12 closed out on 2026-09-23.
 
 Managed agents target Copilot CLI only. Users may still run them in VS Code through its Copilot harness, which must
 pass the same qualification. Builder-only VS Code tooling for this repository stays.
