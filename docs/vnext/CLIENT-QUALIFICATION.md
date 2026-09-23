@@ -3,6 +3,11 @@
 This control defines release-blocking evidence for GitHub Copilot in VS Code Local and standalone Copilot CLI.
 Generated projection tests are necessary but do not replace live client interaction.
 
+[DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection) replaces VS Code Local with the VS Code
+Copilot harness running the single CLI projection. Until that change ships, the VS Code column below describes the
+current Local projection; afterwards it applies to the Copilot harness, and the
+[planned CLI-only scenarios](#planned-cli-only-scenarios) become blocking.
+
 Both clients use Windows via WSL2/Ubuntu, without Docker or a devcontainer. Required outcomes follow the
 [PRD](PRD.md), including both environment profiles, COE reuse and conversational changes. Basic interaction checks
 accompany feature delivery; final installation qualification follows the distribution decision. No token baseline is
@@ -33,9 +38,9 @@ active client. No third-client schema or acceptance expansion is required for th
 | `CLIENT-010` | Shared fake-provider workflow outcomes normalize equally.                | Required              | Required                            |
 | `CLIENT-011` | Bootstrap installs the exact local runtime and selected projection.      | Profile or CLI route  | CLI route                           |
 
-Unavailable client mechanics remain unavailable; they are not inferred as passing. Copilot CLI autonomous workers
-remain absent from the shipped projection pending qualification under revised ADR-0006. Direct-selection visibility
-is not a security pass/fail criterion; worker permissions remain unchanged.
+Unavailable client mechanics remain unavailable; they are not inferred as passing. Copilot CLI CodeGen, Reviewer and
+Validator ship since adapter `1.6.0` under revised ADR-0006; their current-candidate qualification is pending.
+Direct-selection visibility is not a security pass/fail criterion; worker permissions remain unchanged.
 
 That omission is a current qualification status, not permission to omit generation, review or validation. Demonstrate a
 supported bounded path for every required outcome. These additional acceptance scenarios are planned requirements,
@@ -55,6 +60,94 @@ not assertions that corresponding runtime or registry coverage already exists:
 
 Exercise both IaC tracks and both profiles with representative cases in the existing tests. Reuse fixtures and helpers;
 do not build a separate benchmark harness. Record explicit gaps until implemented.
+
+## Planned CLI-Only Scenarios
+
+These scenarios belong to the [CLI-only projection plan](ROADMAP.md#cli-only-projection). They are planned acceptance,
+not evidence that the behavior exists.
+
+| ID           | Required outcome                                                                                              | Standalone CLI | VS Code Copilot harness |
+| ------------ | ------------------------------------------------------------------------------------------------------------- | -------------- | ----------------------- |
+| `CLIENT-021` | `apex-next` names the kernel-selected owner, then delegates it or prints its client selection step and prompt | Required       | Required                |
+| `CLIENT-022` | Deferred with the context sidekick until a CLI release launches custom sidekicks                              | Deferred       | Deferred                |
+| `CLIENT-023` | Multi-choice uses checkboxes or numbered fallback in kernel order; invalid entries are corrected first        | Required       | Required                |
+| `CLIENT-024` | Built-in helper output alone cannot complete a task, create evidence or open a gate                           | Required       | Required                |
+| `CLIENT-025` | Workers run their required models and effort without launch flags or user overrides                           | Required       | Required                |
+| `CLIENT-026` | `init` and `update` reject the retired VS Code client; archived files are never installed                     | Required       | Not applicable          |
+| `CLIENT-027` | `.mcp.json` starts APEX MCP in interactive sessions and, when enabled, in `-p` sessions                       | Required       | Required                |
+
+The selection step is `/agent <name>` in standalone CLI and the Agent picker in the VS Code Copilot harness, where
+`/agent` is not a command. Harness scenarios that need a selected agent, including CLIENT-021, depend on picked agents
+applying; the [slice 1 probe](#cli-only-projection-probes) found that they do not over WSL.
+
+## CLI-Only Projection Probes
+
+Slice 1 of the [CLI-only projection plan](ROADMAP.md#cli-only-projection) ran local probes on 2026-09-23 at source
+checkpoint `dc289ab`. Standalone runs used Copilot CLI `1.0.88` (`linux-arm64`) with an isolated `COPILOT_HOME`,
+disposable Git fixtures under `dist/cli-probes`, explicit tool grants, synthetic agents and a fake `apex` MCP server
+that logs every call. The VS Code run used VS Code `1.139.0` (`2242ebbb`) over WSL with the built-in Copilot Chat
+extension `0.67.0`, the Copilot harness, Agent Host protocol `0.9.0` and `@github/copilot-sdk`
+`1.0.15-unstable.35393089353.gfc44743`. These results characterize the clients; they are not APEX projection or
+scenario evidence.
+
+- **Model fields.** `.agent.md` frontmatter honors `model` (a string or an ordered list), `model-policy` and
+  `reasoning-effort`. The documented `models`, `modelPolicy` and `reasoningEffort` spellings were ignored; that child
+  ran on the session model at medium effort.
+- **Worker settings.** `model: [gpt-6-luna, gpt-5.6-luna]` with `model-policy: required` and `reasoning-effort: max`
+  ran through `task` on `gpt-6-luna` at max. A per-call `task` model was replaced by the required model with a notice.
+  Direct `--agent` selection also sent max. A user `subagents` override could not change a required model but did
+  lower its effort to low; under `preferred` it changed both. Ordered lists fall back only under `required`: otherwise
+  an unavailable first entry failed `task` dispatch, and direct selection fell back to the session default model.
+  Effort `max` on `gpt-5.4-mini` failed dispatch.
+- **Tool lists.** `task` subagents received no tools beyond those declared. A directly selected agent with `tools: []`
+  also received `skill` and `sql`.
+- **Workspace MCP.** A trusted folder loaded `.mcp.json` in interactive and `-p` sessions without
+  `GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP`. An untrusted folder loaded it in `-p` only with that variable set to
+  `true`. `${VAR}` expanded in `env`. Relative `args` resolve against the session directory, so the server failed when
+  a session started in a subdirectory.
+- **`ask_user`.** Interactive sessions use the structured form. An `array` field with `items.enum` rendered checkboxes
+  (Space toggles, Enter accepts, Ctrl+D declines, Esc cancels) plus an "Other" free-text entry, but the model received
+  flattened text (`User responded: red, blue`), not an array. `task` subagents never receive `ask_user`, even when
+  declared; the runtime sent the child an empty tool list.
+- **`/agent` context.** `/agent <name>` switched agent and model and kept the conversation; the new agent recalled a
+  code word from an earlier turn.
+- **Sidekick.** Project and user agents with a `sidekick:` block loaded only as ordinary selectable agents. They never
+  launched in `-p`, `-p --experimental` or interactive sessions. Selected directly, `send_inbox` returned "this session
+  is not a sidekick agent".
+- **Built-in helpers.** Helpers get only tools the calling agent holds; with a `task`-only caller, Explore had no file
+  reader. With read tools and shell on the caller, glob search skipped the gitignored `.apex/work/` staging path, but
+  explicit-path reads worked. Code-review and Security-review reviewed the staged file without a diff and cited correct
+  lines. Rubber-duck on `claude-haiku-4.5` cited wrong lines, and built-in Task ran `bicep build` under
+  `shell(bicep:*)`. Helpers inherit `task`; in the `task`-only run they spawned general-purpose agents until the depth
+  limit of 4, while the runtime blocked review-to-review delegation.
+- **VS Code Copilot harness: failed.** The `harness-probe` test failed. The Agent Host listed the workspace agents and
+  flagged the `user-invocable: false` worker, but picking `harness-probe` did not apply it. Each turn named it by a
+  `vscode-remote://wsl%2Bubuntu/` URI, the host indexed `file://` URIs, and the runtime deselected it before every
+  turn, so the default agent answered. `/agent` is not a harness command either; the default agent ran `harness-probe`
+  through `task` instead. There its model list and efforts applied (`gpt-5.6-luna` high, worker `gpt-6-luna` max), but
+  `ask_user` was unavailable: the colors question never appeared, so harness multi-select is untested. `.mcp.json`
+  tools appeared from the second turn, the sidekick showed no activity, and the worker's empty tool list arrived as
+  `null` with `task` guidance.
+
+Standalone sessions `60de3415`, `973b27ef`, `531d4b2a`, `b7cd037a` and `e37cc4bc` cover model settings. `dc91aa77`,
+`e717ed91`, `3a1f34a5`, `a11b5bbf`, `366fe888` and `42e4f63e` cover workspace MCP; `bd350038`, `f14677a5`, `bfff54a8`
+and `976871e9` cover the sidekick. `b3808832` covers `ask_user` and `/agent`, `dc3278a2` covers subagent input, and
+`a2a3b50d` and `9502efed` cover helpers. The harness runtime session is `a3253c03-533b-4779-9544-7818e113abb6`. The
+results and the maintainer's decisions of the same day select these options:
+
+1. Slice 3 uses `model`, `model-policy` and `reasoning-effort`. Every listed model must support the declared effort.
+   User effort overrides remain a CLIENT-025 gap.
+2. Slice 4 renders `.mcp.json` with a server command that does not depend on the session directory.
+3. Slice 5 collects required input in the foreground before delegation; the client's selection step with a prompt
+   remains the fallback. The maintainer deferred the sidekick.
+4. Slice 6 passes explicit staging paths and verifies helper line references. The maintainer granted read-only file
+   tools to Planner, Operator, Architect and Reviewer and `task` to Reviewer. Validator gets a shell limited to `bicep`
+   and `terraform` only if the CLI enforces that limit. Agents with `task` can also reach general-purpose delegation,
+   which their instructions forbid.
+5. Slice 7 uses native checkboxes where offered, mapping their text answer back to exact option values, and numbered
+   selection otherwise. Either way, the kernel validates the values.
+6. The failed harness probe blocks slice 11. The VS Code Copilot harness cannot qualify on WSL until picked agents
+   apply, through an upstream fix or a verified workaround.
 
 ## Execution Rules
 
@@ -235,6 +328,10 @@ had delegation only and the child had no tools; no kernel workflow or cloud auth
 Keep native multi-select in VS Code and wherever the exposed question-tool schema supports it. When a standalone CLI session
 exposes only single-choice and free-text input, collect the exact option values through the native tool's free-text
 field, then show the proposed array and obtain explicit confirmation through that tool before `recordInput`.
+Under the [CLI-only projection plan](ROADMAP.md#cli-only-projection), use `ask_user` checkboxes where the tool offers an
+array field and map the returned text back to exact option values. Otherwise present the options numbered in kernel
+order, accept the user's numbers and resolve them to option values. The kernel validates the array either way.
+Out-of-range, duplicate, non-numeric or unmatched entries require correction. Confirmation is still required.
 Preserve the kernel option order, allowed values, request identity, typed arrays and user stop boundary. Never invent a
 `multiSelect` parameter, silently reduce the question to one choice, infer aliases or record recommended defaults.
 Invalid, empty or ambiguous input requires correction; corrected selections require confirmation again. Cancellation
