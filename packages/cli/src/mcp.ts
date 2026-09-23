@@ -594,7 +594,7 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
     "architectureComplete",
     {
       description:
-        "Complete Architecture atomically; APEX derives identity, artifact hashes, exact must-requirement traceability, and cost/SKU bindings.",
+        "Complete Architecture atomically; APEX derives identity, artifact hashes, top-level requirementTraceability, and cost/SKU bindings. Each SKU and SLO decision lists its component requirementIds.",
       inputSchema: {
         taskId: z.string(),
         architecture: z.unknown(),
