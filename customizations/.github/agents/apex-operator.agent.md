@@ -80,6 +80,9 @@ Never read or paste baseline bytes into chat, task context, or tool arguments. R
 If policy content changed, explain the invalidation scope and direct the user to the trusted CLI
 `apex governance revise --path <reviewed-path> --reason <reason> --yes --json`, followed by explicit import and renewed
 reviews/approvals. Never infer revision confirmation or substitute deployment `reconcile` for governance revision.
+A `local` target has no Azure Policy: submit the `governance-constraints` template from `apex/taskContext` unchanged
+through `apex/completeTask`. For governance reconciliation, start from the `policy-property-map` template and add one
+mapping per accepted governance finding; an empty finding set keeps `mappings` empty.
 If an indeterminate deployment has no recorded execution receipt, report that current reconciliation cannot establish
 its outcome and retain the blocker for operator/provider-supported resolution; do not repeat deployment or reconciliation.
 

@@ -2561,6 +2561,8 @@ export class ApexService {
       task.taskType === "requirements" ||
       task.taskType === "architecture" ||
       task.taskType === "plan" ||
+      task.taskType === "governance-discovery" ||
+      task.taskType === "governance-reconciliation" ||
       task.taskType.endsWith("-review")
     ) {
       for (const kind of task.allowedOutputKinds) {
@@ -7894,6 +7896,33 @@ export class ApexService {
             parameters: {},
           },
         },
+      };
+    }
+    if (kind === "governance-constraints" && run.targetScope === "local") {
+      const discoveredAt = this.clock();
+      return {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: run.projectId,
+        runId: run.runId,
+        targetScope: run.targetScope,
+        discoveredAt: discoveredAt.toISOString(),
+        expiresAt: new Date(discoveredAt.getTime() + 30 * 86_400_000).toISOString(),
+        summary: { assignmentCount: 0, denyCount: 0, modifyCount: 0, auditCount: 0, exemptionCount: 0 },
+        constraintsRef: {
+          mediaType: "application/json",
+          uri: "memory://local-no-policy",
+          digest: sha256Bytes(Buffer.from("[]")),
+          bytes: 2,
+        },
+      };
+    }
+    if (kind === "policy-property-map") {
+      return {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: run.projectId,
+        runId: run.runId,
+        governanceHash: this.acceptedArtifactHashes(events)["governance-constraints"] ?? "0".repeat(64),
+        mappings: [],
       };
     }
     if (kind === "environment-inputs") {

@@ -2209,14 +2209,21 @@ test("plan task context projects source hashes and valid output templates", asyn
     await readFile(join(reviewsDirectory, "architecture-findings.md"), "utf8"),
     /Reviewed artifact kind: architecture/u,
   );
+  const template = async (kind: "governance-constraints" | "policy-property-map") => {
+    const issued = await nextTaskAfterInput(service);
+    if (issued.status !== "task") throw new Error("Expected a task");
+    return (await service.taskContext(issued.task.taskId)).outputTemplates[kind];
+  };
   const governanceHashes = await complete("governance-discovery", [
-    { kind: "governance-constraints", value: governance(initialized.runId) },
+    { kind: "governance-constraints", value: await template("governance-constraints") },
   ]);
+  const policyTemplate = await template("policy-property-map");
+  assert.deepEqual(
+    policyTemplate,
+    policyMap(initialized.runId, governanceHashes.outputHashes["governance-constraints"]!),
+  );
   const policyHashes = await complete("governance-reconciliation", [
-    {
-      kind: "policy-property-map",
-      value: policyMap(initialized.runId, governanceHashes.outputHashes["governance-constraints"]!),
-    },
+    { kind: "policy-property-map", value: policyTemplate },
   ]);
   await complete("governance-review", [
     {
