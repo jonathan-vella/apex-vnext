@@ -38,6 +38,17 @@ test("classifyModel: GPT-5.5 → gpt-5.5 (current default)", () => {
   assert.equal(classifyModel(["GPT-5.5"]), "gpt-5.5");
 });
 
+test("classifyModel: GPT-6 identifiers retain outcome-first enforcement", () => {
+  for (const model of ["gpt-6-sol", "gpt-6-luna"]) {
+    assert.equal(classifyModel(model), "gpt-6");
+    assert.equal(classifyModel([model]), "gpt-6");
+    assert.equal(isGpt55(classifyModel(model)), true);
+    assert.equal(isGptFamily(classifyModel(model)), true);
+  }
+  assert.equal(classifyModel("gpt-6-unknown"), "unknown");
+  assert.equal(classifyModel("GPT-5.6 Terra"), "gpt-5.6");
+});
+
 test("classifyModel: GPT-5.4 → gpt-5.4", () => {
   assert.equal(classifyModel("GPT-5.4"), "gpt-5.4");
 });

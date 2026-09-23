@@ -19,8 +19,9 @@ Use this skill only inside the hidden CodeGen worker.
 2. Preserve exact module, provider, API, security, naming, ownership, and environment-input obligations.
 3. Keep secret values out of generated content; use only typed references supplied by the kernel. Use `apex/stageFile`
    only for additional assigned files before completion.
-4. Complete the issued task with the generated output. After completion, return the kernel receipt and perform no
-   follow-up staging, generation, validation, delegation, or repository work.
+4. A successful `apex/generateIac` result already completes the issued task and accepts its manifest and handoff.
+   Return that receipt and stop. Do not call `apex/completeTask` again or perform follow-up staging, generation,
+   validation, delegation, or repository work.
 5. Return `needs_input` when a required binding or value is absent.
 
 ## Boundaries

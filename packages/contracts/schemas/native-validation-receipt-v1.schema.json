@@ -77,9 +77,292 @@
       "const": "pass",
       "type": "string"
     },
+    "policyApplicability": {
+      "additionalProperties": false,
+      "properties": {
+        "policyMapContentHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "status": {
+          "const": "no-actionable-mappings",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "policyMapContentHash"
+      ],
+      "type": "object"
+    },
     "policyHash": {
       "pattern": "^[0-9a-f]{64}$",
       "type": "string"
+    },
+    "policyValidation": {
+      "$id": "https://schemas.apexops.dev/policy-validation-v1.json",
+      "additionalProperties": false,
+      "properties": {
+        "inputHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "logicalResourceManifestHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "const": "pass",
+              "type": "string"
+            },
+            {
+              "const": "fail",
+              "type": "string"
+            },
+            {
+              "const": "unsupported",
+              "type": "string"
+            }
+          ]
+        },
+        "policyMapContentHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "policyMapHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "projectId": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "receiptHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "results": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "disposition": {
+                "anyOf": [
+                  {
+                    "const": "satisfied",
+                    "type": "string"
+                  },
+                  {
+                    "const": "planned",
+                    "type": "string"
+                  },
+                  {
+                    "const": "exempt",
+                    "type": "string"
+                  },
+                  {
+                    "const": "blocked",
+                    "type": "string"
+                  }
+                ]
+              },
+              "effect": {
+                "anyOf": [
+                  {
+                    "const": "deny",
+                    "type": "string"
+                  },
+                  {
+                    "const": "modify",
+                    "type": "string"
+                  },
+                  {
+                    "const": "append",
+                    "type": "string"
+                  },
+                  {
+                    "const": "audit",
+                    "type": "string"
+                  },
+                  {
+                    "const": "deployIfNotExists",
+                    "type": "string"
+                  },
+                  {
+                    "const": "disabled",
+                    "type": "string"
+                  }
+                ]
+              },
+              "expectedValueDigest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "logicalResourceId": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "mappingHash": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "mappingIndex": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "observedValueDigest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "outcome": {
+                "anyOf": [
+                  {
+                    "const": "pass",
+                    "type": "string"
+                  },
+                  {
+                    "const": "fail",
+                    "type": "string"
+                  },
+                  {
+                    "const": "unsupported",
+                    "type": "string"
+                  }
+                ]
+              },
+              "policyAssignmentId": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "policyDefinitionId": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "policyDefinitionReferenceId": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "propertyPath": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "reason": {
+                "anyOf": [
+                  {
+                    "const": "matched",
+                    "type": "string"
+                  },
+                  {
+                    "const": "value-mismatch",
+                    "type": "string"
+                  },
+                  {
+                    "const": "missing-property",
+                    "type": "string"
+                  },
+                  {
+                    "const": "blocked",
+                    "type": "string"
+                  },
+                  {
+                    "const": "missing-expected-value",
+                    "type": "string"
+                  },
+                  {
+                    "const": "unverified-exemption",
+                    "type": "string"
+                  },
+                  {
+                    "const": "unsupported-effect",
+                    "type": "string"
+                  },
+                  {
+                    "const": "unsupported-path",
+                    "type": "string"
+                  },
+                  {
+                    "const": "unsupported-expression",
+                    "type": "string"
+                  },
+                  {
+                    "const": "resource-not-bound",
+                    "type": "string"
+                  },
+                  {
+                    "const": "resource-not-found",
+                    "type": "string"
+                  },
+                  {
+                    "const": "ambiguous-resource",
+                    "type": "string"
+                  },
+                  {
+                    "const": "unsupported-resource",
+                    "type": "string"
+                  },
+                  {
+                    "const": "invalid-source",
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "mappingIndex",
+              "mappingHash",
+              "policyAssignmentId",
+              "effect",
+              "disposition",
+              "logicalResourceId",
+              "propertyPath",
+              "outcome",
+              "reason"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "runId": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "1.0.0",
+          "type": "string"
+        },
+        "sourceHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "track": {
+          "anyOf": [
+            {
+              "const": "bicep",
+              "type": "string"
+            },
+            {
+              "const": "terraform",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "projectId",
+        "runId",
+        "track",
+        "sourceHash",
+        "policyMapHash",
+        "policyMapContentHash",
+        "logicalResourceManifestHash",
+        "inputHash",
+        "outcome",
+        "results",
+        "receiptHash"
+      ],
+      "type": "object"
     },
     "projectId": {
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
@@ -89,6 +372,84 @@
       "pattern": "^[0-9a-f]{64}$",
       "type": "string"
     },
+    "resourceParity": {
+      "additionalProperties": false,
+      "properties": {
+        "bindingHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "coverage": {
+          "const": "bicep-symbolic-resource-parity-v1",
+          "type": "string"
+        },
+        "inputHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "manifestHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "const": "pass",
+              "type": "string"
+            },
+            {
+              "const": "fail",
+              "type": "string"
+            },
+            {
+              "const": "unsupported",
+              "type": "string"
+            }
+          ]
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "const": "matched",
+              "type": "string"
+            },
+            {
+              "const": "coverage-mismatch",
+              "type": "string"
+            },
+            {
+              "const": "type-mismatch",
+              "type": "string"
+            },
+            {
+              "const": "dependency-mismatch",
+              "type": "string"
+            },
+            {
+              "const": "unsupported-resource",
+              "type": "string"
+            },
+            {
+              "const": "invalid-source",
+              "type": "string"
+            }
+          ]
+        },
+        "sourceHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "coverage",
+        "sourceHash",
+        "manifestHash",
+        "inputHash",
+        "outcome",
+        "reason"
+      ],
+      "type": "object"
+    },
     "runId": {
       "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$",
       "type": "string"
@@ -97,9 +458,355 @@
       "const": "1.0.0",
       "type": "string"
     },
+    "securityBaseline": {
+      "additionalProperties": false,
+      "properties": {
+        "bindingHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "coverage": {
+          "const": "bicep-storage-only-baseline-v1",
+          "type": "string"
+        },
+        "inputHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "manifestHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "const": "pass",
+              "type": "string"
+            },
+            {
+              "const": "fail",
+              "type": "string"
+            },
+            {
+              "const": "unsupported",
+              "type": "string"
+            }
+          ]
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "const": "matched",
+              "type": "string"
+            },
+            {
+              "const": "resource-parity",
+              "type": "string"
+            },
+            {
+              "const": "unsupported-resource",
+              "type": "string"
+            },
+            {
+              "const": "credential-content",
+              "type": "string"
+            },
+            {
+              "const": "storage-controls",
+              "type": "string"
+            },
+            {
+              "const": "diagnostic-routing",
+              "type": "string"
+            }
+          ]
+        },
+        "sourceHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "coverage",
+        "sourceHash",
+        "inputHash",
+        "manifestHash",
+        "bindingHash",
+        "outcome",
+        "reason"
+      ],
+      "type": "object"
+    },
     "sourceHash": {
       "pattern": "^[0-9a-f]{64}$",
       "type": "string"
+    },
+    "storageDiagnostics": {
+      "maxProperties": 1000,
+      "patternProperties": {
+        "^(.*)$": {
+          "additionalProperties": false,
+          "properties": {
+            "bindingHash": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "coverage": {
+              "const": "bicep-storage-service-diagnostics-v1",
+              "type": "string"
+            },
+            "fullBaselineEvaluated": {
+              "const": false,
+              "type": "boolean"
+            },
+            "inputHash": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "outcome": {
+              "anyOf": [
+                {
+                  "const": "pass",
+                  "type": "string"
+                },
+                {
+                  "const": "fail",
+                  "type": "string"
+                },
+                {
+                  "const": "unsupported",
+                  "type": "string"
+                }
+              ]
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "const": "matched",
+                  "type": "string"
+                },
+                {
+                  "const": "invalid-source",
+                  "type": "string"
+                },
+                {
+                  "const": "ambiguous-or-unbound-account",
+                  "type": "string"
+                },
+                {
+                  "const": "unsupported-account",
+                  "type": "string"
+                },
+                {
+                  "const": "missing-or-ambiguous-service",
+                  "type": "string"
+                },
+                {
+                  "const": "unsupported-service",
+                  "type": "string"
+                },
+                {
+                  "const": "missing-or-ambiguous-diagnostics",
+                  "type": "string"
+                },
+                {
+                  "const": "unsupported-diagnostics",
+                  "type": "string"
+                },
+                {
+                  "const": "workspace-mismatch",
+                  "type": "string"
+                },
+                {
+                  "const": "missing-categories",
+                  "type": "string"
+                },
+                {
+                  "const": "disabled-or-missing-categories",
+                  "type": "string"
+                }
+              ]
+            },
+            "sourceHash": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "coverage",
+            "fullBaselineEvaluated",
+            "sourceHash",
+            "inputHash",
+            "bindingHash",
+            "outcome",
+            "reason"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "storageSecurity": {
+      "maxProperties": 1000,
+      "patternProperties": {
+        "^(.*)$": {
+          "additionalProperties": false,
+          "properties": {
+            "bindingHash": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "coverage": {
+              "const": "storage-account-property-hardening-v1",
+              "type": "string"
+            },
+            "fullBaselineEvaluated": {
+              "const": false,
+              "type": "boolean"
+            },
+            "inputHash": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "outcome": {
+              "anyOf": [
+                {
+                  "const": "pass",
+                  "type": "string"
+                },
+                {
+                  "const": "fail",
+                  "type": "string"
+                },
+                {
+                  "const": "unsupported",
+                  "type": "string"
+                }
+              ]
+            },
+            "results": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "expectedValueDigest": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "observedValueDigest": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "outcome": {
+                    "anyOf": [
+                      {
+                        "const": "pass",
+                        "type": "string"
+                      },
+                      {
+                        "const": "fail",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unsupported",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "propertyPath": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "reason": {
+                    "anyOf": [
+                      {
+                        "const": "matched",
+                        "type": "string"
+                      },
+                      {
+                        "const": "value-mismatch",
+                        "type": "string"
+                      },
+                      {
+                        "const": "missing-property",
+                        "type": "string"
+                      },
+                      {
+                        "const": "blocked",
+                        "type": "string"
+                      },
+                      {
+                        "const": "missing-expected-value",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unverified-exemption",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unsupported-effect",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unsupported-path",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unsupported-expression",
+                        "type": "string"
+                      },
+                      {
+                        "const": "resource-not-bound",
+                        "type": "string"
+                      },
+                      {
+                        "const": "resource-not-found",
+                        "type": "string"
+                      },
+                      {
+                        "const": "ambiguous-resource",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unsupported-resource",
+                        "type": "string"
+                      },
+                      {
+                        "const": "invalid-source",
+                        "type": "string"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "propertyPath",
+                  "expectedValueDigest",
+                  "outcome",
+                  "reason"
+                ],
+                "type": "object"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            "sourceHash": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "coverage",
+            "fullBaselineEvaluated",
+            "sourceHash",
+            "inputHash",
+            "bindingHash",
+            "outcome",
+            "results"
+          ],
+          "type": "object"
+        }
+      },
+      "type": "object"
     },
     "track": {
       "anyOf": [

@@ -116,7 +116,8 @@ and the repository archives.
 - **Impact:** Tool removal, shared-only safety guidance, unsupported MCP representation or worker shortcuts can lose
   required outcomes. Smaller prompts or files alone do not demonstrate preserved reasoning or reduced model cost.
 - **Mitigation:** Follow the roadmap dispositions, retain all four review passes and domain-specific checklists, and
-  verify required-tool coverage in both projections. Preserve compatible responses and the CLI hidden-worker boundary.
+  verify required-tool coverage in both projections. Preserve compatible responses, kernel authority and scoped worker
+  grants; hidden-profile flags are not authentication.
 - **State:** Open
 - **Closure proof:** Changed guidance and projections pass consumer/contract tests; behavior changes have authorized
   exact-client evidence, and no unsupported token-saving, review-completion or parity claim is made.
@@ -134,6 +135,16 @@ and the repository archives.
   and both supported clients have evidence for the exact negotiated protocol and candidate.
 
 ## ASSUMPTION-001: Supported Clients Can Share Typed Outcomes
+
+### Active Scope And CLI Worker Evidence
+
+As of 2026-09-21, only VS Code Local and standalone Copilot CLI are active release clients. Desktop-app work is
+[deferred](ROADMAP.md#deferred-standalone-copilot-desktop-app); preserve its evidence without inferring CLI parity.
+Revised ADR-0006 removes direct-selection visibility as a security prerequisite. The `1.0.86` probe confirmed direct
+selection; subsequent runtime and CLI-to-MCP checks rejected invalid/stale tasks without state changes and accepted a
+valid review without gate approval. This does not authenticate independent reviewers or qualify all production workers.
+Owner: client experience and kernel maintainers. Closure requires actual generation/review/validation and parent-routing
+evidence with unchanged scoped permissions. Generic delegation and visibility-only probes are not closure.
 
 - **Owner:** Client experience
 - **Assumption:** VS Code and Copilot CLI can produce equivalent kernel outcomes for their shared supported interactions.

@@ -8,6 +8,11 @@ import {
   type OnboardingConfigV1,
   type QualityMeasurementsV1,
   type QualityScorecardV1,
+  type RequirementsV1,
+  type RequirementsAmendmentV1,
+  type GovernanceSetupConfigV1,
+  type RepositoryPublishConfigV1,
+  type ArchetypeBatchConfigV1,
 } from "@apexops/contracts";
 import { Value } from "@sinclair/typebox/value";
 import { EventJournal, ValidatorRegistry, WriterTransferStore, atomicWriteJson, sha256Json } from "@apexops/kernel";
@@ -16,7 +21,7 @@ import {
   renderQualityScorecardEvaluation,
   type ScorecardMeasurement,
 } from "@apexops/renderers";
-import { basename, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { ApexError, EXIT_CODES, normalizeError } from "./errors.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
 import { resolveBundledAssets } from "./assets.js";
@@ -26,6 +31,7 @@ import { exportProviderTransfer, importProviderTransfer } from "./provider-trans
 import { ApexService, type ServiceOptions, type TaskOutput } from "./service.js";
 import { exportStateTransfer, importStateTransfer } from "./state-transfer.js";
 import { APEX_VERSION } from "./version.js";
+import { interactiveBootstrap } from "./bootstrap-wizard.js";
 
 type FlagValue = string | string[] | boolean;
 type Flags = Record<string, FlagValue>;
@@ -65,10 +71,14 @@ function confirmed(flags: Flags, command: string): void {
   if (flags.yes !== true) throw new ApexError("APEX_USAGE", `${command} requires --yes`, EXIT_CODES.usage);
 }
 
-function clientId(flags: Flags): "github-copilot-cli" | "github-copilot-vscode" {
+function clientId(flags: Flags): "github-copilot-cli" | "github-copilot-vscode" | "both" {
   const value = flags.client ?? "github-copilot-vscode";
-  if (value !== "github-copilot-cli" && value !== "github-copilot-vscode") {
-    throw new ApexError("APEX_USAGE", "--client must be github-copilot-vscode or github-copilot-cli", EXIT_CODES.usage);
+  if (value !== "github-copilot-cli" && value !== "github-copilot-vscode" && value !== "both") {
+    throw new ApexError(
+      "APEX_USAGE",
+      "--client must be github-copilot-vscode, github-copilot-cli or both",
+      EXIT_CODES.usage,
+    );
   }
   return value;
 }
@@ -89,22 +99,13 @@ async function inputJson(flags: Flags): Promise<unknown> {
   return JSON.parse(await readFile(required(flags, "file"), "utf8")) as unknown;
 }
 
-function defaultProjectId(root: string): string {
-  let value = basename(resolve(root))
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-");
-  while (value.startsWith("-")) value = value.slice(1);
-  while (value.endsWith("-")) value = value.slice(0, -1);
-  return value.length === 0 ? "apex-project" : value;
-}
-
-async function onboardingConfig(flags: Flags, root: string): Promise<OnboardingConfigV1> {
+async function onboardingConfig(flags: Flags, _root: string): Promise<OnboardingConfigV1> {
   const config =
     typeof flags.file === "string"
       ? await inputJson(flags)
       : {
           schemaVersion: CONTRACT_VERSION,
-          projectId: typeof flags.project === "string" ? flags.project : defaultProjectId(root),
+          ...(typeof flags.project === "string" ? { projectId: flags.project } : {}),
           ...(typeof flags.name === "string" ? { displayName: flags.name } : {}),
           ...(typeof flags.client === "string" ? { client: flags.client } : {}),
           ...(typeof flags.environment === "string" ? { environment: flags.environment } : {}),
@@ -114,6 +115,9 @@ async function onboardingConfig(flags: Flags, root: string): Promise<OnboardingC
         };
   if (!Value.Check(OnboardingConfigV1Schema, config)) {
     throw new ApexError("APEX_VALIDATION", "Onboarding configuration is malformed", EXIT_CODES.validation);
+  }
+  if (typeof flags.client === "string" && config.client !== undefined && flags.client !== config.client) {
+    throw new ApexError("APEX_USAGE", "--client conflicts with the onboarding configuration", EXIT_CODES.usage);
   }
   return config;
 }
@@ -461,14 +465,53 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
           ? { customizationsSource: flags["customizations-source"] }
           : {}),
       });
+    case "bootstrap plan":
+      return service.planBootstrap(await onboardingConfig(flags, root));
+    case "bootstrap wizard":
+      if (flags.yes === true || flags.json === true)
+        throw new ApexError(
+          "APEX_USAGE",
+          "The wizard requires per-plan interactive confirmation; omit --yes and --json",
+          EXIT_CODES.usage,
+        );
+      return interactiveBootstrap(root);
+    case "bootstrap governance-plan":
+      return service.planGovernanceSetup((await inputJson(flags)) as GovernanceSetupConfigV1);
+    case "bootstrap governance-provision-plan":
+      return service.planGovernanceProvision((await inputJson(flags)) as GovernanceSetupConfigV1);
+    case "bootstrap governance-provision":
+      confirmed(flags, "bootstrap governance-provision");
+      return service.provisionGovernance(
+        (await inputJson(flags)) as GovernanceSetupConfigV1,
+        required(flags, "expected-hash"),
+        true,
+      );
+    case "bootstrap baseline-check":
+      return service.inspectGovernanceBaselineReadiness(required(flags, "path"));
+    case "bootstrap repository-plan":
+      return service.planRepositoryPublish((await inputJson(flags)) as RepositoryPublishConfigV1);
+    case "bootstrap repository-publish":
+      confirmed(flags, "bootstrap repository-publish");
+      return service.publishRepository(
+        (await inputJson(flags)) as RepositoryPublishConfigV1,
+        required(flags, "expected-hash"),
+        true,
+      );
+    case "bootstrap coe-plan":
+      return service.planArchetypeBatch((await inputJson(flags)) as ArchetypeBatchConfigV1);
+    case "bootstrap coe-import":
+      confirmed(flags, "bootstrap coe-import");
+      return service.importArchetypeBatch(
+        (await inputJson(flags)) as ArchetypeBatchConfigV1,
+        required(flags, "expected-hash"),
+        true,
+      );
     case "bootstrap": {
+      if (Object.keys(flags).length === 0) return interactiveBootstrap(root);
       confirmed(flags, "bootstrap");
       const config = await onboardingConfig(flags, root);
-      if (typeof flags.client === "string" && config.client !== undefined && flags.client !== config.client) {
-        throw new ApexError("APEX_USAGE", "--client conflicts with the onboarding configuration", EXIT_CODES.usage);
-      }
       return service.bootstrap({
-        projectId: config.projectId,
+        ...(config.projectId === undefined ? {} : { projectId: config.projectId }),
         ...(config.displayName === undefined ? {} : { displayName: config.displayName }),
         ...(config.environment === undefined ? {} : { environment: config.environment }),
         ...(config.targetScope === undefined ? {} : { targetScope: config.targetScope }),
@@ -609,8 +652,65 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
         required(flags, "recipient"),
       );
     }
+    case "archetype list":
+      return service.listArchetypes(
+        required(flags, "repository"),
+        required(flags, "revision"),
+        required(flags, "path"),
+      );
+    case "archetype inspect":
+      return service.inspectArchetype(
+        required(flags, "repository"),
+        required(flags, "revision"),
+        required(flags, "path"),
+      );
+    case "archetype import":
+      confirmed(flags, "archetype import");
+      return service.importArchetype({
+        repositoryPath: required(flags, "repository"),
+        revision: required(flags, "revision"),
+        selectedPath: required(flags, "path"),
+        destination: required(flags, "destination"),
+        expectedHash: required(flags, "expected-hash"),
+        confirm: true,
+      });
     case "status":
-      return service.status();
+      return service.workspaceStatus();
+    case "requirements preview-change":
+      return service.previewRequirementsChange((await inputJson(flags)) as RequirementsV1, required(flags, "reason"));
+    case "requirements preview-amendment":
+      return service.previewRequirementsAmendment(
+        (await inputJson(flags)) as RequirementsAmendmentV1,
+        required(flags, "reason"),
+      );
+    case "requirements amend":
+      confirmed(flags, "requirements amend");
+      return service.amendRequirements((await inputJson(flags)) as RequirementsAmendmentV1, {
+        reason: required(flags, "reason"),
+        expectedHash: required(flags, "expected-hash"),
+        confirm: true,
+      });
+    case "requirements preview-adoption":
+      return service.previewRequirementsChange(
+        (await inputJson(flags)) as RequirementsV1,
+        required(flags, "reason"),
+        "adopt",
+      );
+    case "requirements adopt":
+      confirmed(flags, "requirements adopt");
+      return service.reviseRequirements((await inputJson(flags)) as RequirementsV1, {
+        reason: required(flags, "reason"),
+        expectedHash: required(flags, "expected-hash"),
+        confirm: true,
+        mode: "adopt",
+      });
+    case "requirements revise":
+      confirmed(flags, "requirements revise");
+      return service.reviseRequirements((await inputJson(flags)) as RequirementsV1, {
+        reason: required(flags, "reason"),
+        expectedHash: required(flags, "expected-hash"),
+        confirm: true,
+      });
     case "governance import":
       return service.importGovernanceBaseline(required(flags, "path"));
     case "governance revise": {
@@ -805,6 +905,8 @@ async function main(): Promise<void> {
 export function formatHumanResult(args: string[], result: unknown): string {
   const command = args.find((argument) => !argument.startsWith("--"));
   if (command === "status" && result !== null && typeof result === "object") {
+    if ("status" in result && result.status === "needs_project")
+      return "Workspace configured. No projects yet. Open APEX to gather details and create the first project.";
     const status = result as {
       run?: { projectId?: string; environment?: string };
       task?: string | null;

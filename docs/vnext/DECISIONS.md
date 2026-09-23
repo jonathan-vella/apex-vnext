@@ -162,5 +162,6 @@ architecture-review, governance-review and plan-review, equivalent client outcom
 Reuse confirmed requirements, decisions and pricing evidence in the existing delivery phases. This does not authorize
 model downgrades, new telemetry, persistent snapshots, concurrent review commits, ID-only invalidation, asynchronous
 rendering or structured-only MCP results. Those proposals require the evidence and boundaries in the roadmap before
-adoption. Preserve DECISION-025, CLI worker restrictions, journal integrity and human approval; changing documentation
+adoption. Preserve DECISION-025, revised ADR-0006 kernel authority and scoped worker grants, journal integrity and human
+approval; changing documentation
 does not alter executable gates or close historical findings.

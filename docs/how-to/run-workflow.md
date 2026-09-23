@@ -77,6 +77,59 @@ single decision panel; permitted risk acceptance is time-bound, while revision c
 
 ### Consumer Collection Setup
 
+Preview setup with `apex bootstrap governance-plan --file governance-setup.json --json`. The input uses the
+`governance-setup-config-v1` contract:
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "repository": "OWNER/REPOSITORY",
+  "tenantId": "11111111-1111-1111-1111-111111111111",
+  "subscriptionId": "22222222-2222-2222-2222-222222222222",
+  "identity": { "mode": "create", "displayName": "workload-policy-discovery" }
+}
+```
+
+Replace example IDs with the target tenant and login/collection subscription. For an approved existing identity, use
+`identity: { "mode": "reuse", "clientId": "...", "principalId": "..." }`. For management-group collection, also supply
+`managementGroupId`; the subscription remains the login subscription. No credentials belong in this input.
+
+The planner makes two bounded GitHub GETs for repository identity and OIDC subject settings. It binds the observed
+subject prefix, including immutable owner/repository IDs when present, to the `governance` environment. Custom templates,
+incomplete evidence or mismatched prefixes block planning instead of assuming an older name-only subject. See the
+[GitHub OIDC subject reference](https://docs.github.com/en/actions/reference/security/oidc#immutable-subject-claims).
+
+The result lists proposed Reader scope, variables with collection disabled, and pending identity/access, environment,
+federation, workflow and review steps. `planHash` binds this view; it is not authorization. No files, identities, roles,
+variables or workflows are changed. Live tenant/principal binding, effective permissions, environment protection and
+OIDC login are not verified by this initial planner. The stricter existing-identity provisioning path is described below;
+new identity creation and collection dispatch still require separate administrator actions. A central reviewed baseline
+can use the existing import path without this setup.
+
+For an existing approved application/service principal, preview the narrower provisioning step:
+
+```bash
+apex bootstrap governance-provision-plan --file governance-setup.json --json
+apex bootstrap governance-provision --file governance-setup.json --expected-hash PLAN_HASH --yes --json
+```
+
+This executor supports `identity.mode: reuse` only. It verifies the active public-cloud tenant/subscription, single-tenant
+application and enabled principal binding, live Reader definition, current federation/role inventory, and an existing
+`governance` GitHub environment requiring reviewers, preventing self-review and allowing protected branches only.
+Missing/inaccessible evidence, custom OIDC subjects, conflicting trust and constrained Reader assignments block writes.
+The RBAC inventory includes inherited assignments at the collection scope; observed roles other than unconditional
+Reader block federation rather than exposing existing write privileges. This is not a tenant-wide permissions audit:
+other scopes, group-derived grants and Microsoft Graph application permissions remain unverified. Use a dedicated,
+administrator-reviewed discovery identity; adding a Reader grant does not remove or limit other existing permissions.
+Identity creation and environment protection setup still require an administrator; the executor does not weaken them.
+
+After separate human confirmation of the exact plan, only missing exact federation and Reader assignment are created.
+Fresh prerequisites and read-back checks surround each action; unchanged reruns do not create duplicates. Local
+`.apex-governance-setup-*.json` receipts record verified or indeterminate actions. An uncertain outcome stops further work
+and requires remote inspection and a new plan; no automatic rollback or retry is attempted. Retain those receipts.
+GitHub variables, collection enablement/dispatch, baseline PR review/import and deployment authority remain unchanged.
+Current executor qualification uses simulated command responses; no live provisioning was performed for this feature.
+
 Installation includes the governance workflow, collector and schema in both supported client projections, copied from
 the packaged canonical sources. The workflow is disabled by default. A consumer administrator configures the following
 in the consumer GitHub repository; installing APEX does not provision identities, grant permissions or enable collection.
@@ -98,6 +151,12 @@ update the consumer checkout before selecting the file. Repository updates prese
 conflict handling; do not assume installing/updating APEX overwrites consumer workflow customizations.
 
 ### Select Or Renew
+
+Before the discovery stage, `apex bootstrap baseline-check --path baseline.json --json` checks a reviewed central
+baseline against the selected run's target and freshness rules. The wizard's central-baseline choice uses this same
+read-only check after a project and target have been created. Workspace-only bootstrap defers this target-bound check.
+A `ready` result includes the candidate hash and observation time but does not establish human review,
+import the baseline, change the journal or approve a gate. Acceptance remains at the normal discovery stage below.
 
 Before planning, import the reviewed JSON snapshot for the run's target through the governance-discovery task. Azure
 Policy remains authoritative; a snapshot is evidence, not permission to override a policy. The consumer owns the

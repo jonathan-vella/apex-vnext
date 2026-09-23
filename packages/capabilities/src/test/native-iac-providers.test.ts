@@ -15,10 +15,14 @@ import {
   calculateNativeValidationReceiptHash,
   hasValidNativeValidationReceipt,
   calculatePolicyValidationHash,
+  calculatePolicyValidationDigest,
   hasValidPolicyValidation,
   type ApprovalEvidenceV1,
   type DeploymentPreviewV1,
   type PolicyValidationV1,
+  type PolicyPropertyMapV1,
+  type IacBindingV1,
+  type LogicalResourceManifestV1,
 } from "@apexops/contracts";
 import {
   IacOutputParseError,
@@ -304,6 +308,60 @@ function rehashPolicy(receipt: PolicyValidationV1): PolicyValidationV1 {
   return { ...body, receiptHash: calculatePolicyValidationHash(body) };
 }
 
+for (const track of ["bicep", "terraform"] as const) {
+  test(`native ${track} preview snapshots policy inputs before awaited commands`, async (context) => {
+    for (const phase of ["init", "show"] as const) {
+      for (const mutation of ["value", "mappings", "binding"] as const) {
+        await context.test(`${phase}: ${mutation}`, async (child) => {
+          const fixture = await nativePolicyFixture(child, track);
+          const input = fixture.policyRequest.policyValidation!;
+          const originalMapHash = sha256(input.policyMap);
+          const originalManifestHash = sha256(input.logicalResourceManifest);
+          fixture.source.value = "actual-private-mismatch";
+          const mutate = async () => {
+            if (mutation === "value") {
+              for (const mapping of input.policyMap.mappings) mapping.expectedValue = fixture.source.value;
+            } else if (mutation === "mappings") {
+              input.policyMap.mappings.length = 0;
+            } else {
+              delete input.logicalResourceManifest.storage;
+            }
+          };
+          if (track === "bicep")
+            fixture.source.duringCommand = async (command) => {
+              if (phase === "init" ? command.args.includes("what-if") : command.args[0] === "build") await mutate();
+            };
+          else if (phase === "init") fixture.source.duringInit = mutate;
+          else fixture.source.duringShow = mutate;
+          const provider = fixture.makeProvider();
+          const preview = await provider.previewApply(fixture.policyRequest);
+          const receipt = provider.policyValidation(preview.previewHash);
+          assert.ok(receipt);
+          assert.equal(receipt.policyMapContentHash, originalMapHash);
+          assert.equal(receipt.logicalResourceManifestHash, originalManifestHash);
+          assert.equal(receipt.outcome, "fail");
+          assert.equal(receipt.results.length, 3);
+          assert.ok(receipt.results.every(({ reason }) => reason === "value-mismatch"));
+          assert.equal(preview.blockers.length, 3);
+          await assert.rejects(provider.apply(preview, approval(preview), authority), { code: "PREVIEW_BLOCKED" });
+          assert.equal(fixture.executed(), false);
+        });
+      }
+    }
+  });
+
+  test(`native ${track} preview bounds policy inputs before commands`, async (context) => {
+    const fixture = await nativePolicyFixture(context, track);
+    fixture.policyRequest.policyValidation!.policyMap.mappings[0]!.expectedValue = Array(100_001).fill(null);
+    await assert.rejects(fixture.makeProvider().previewApply(fixture.policyRequest), {
+      code: "PREVIEW_HASH_MISMATCH",
+      message: `${track === "bicep" ? "Bicep" : "Terraform"} policy validation inputs are invalid`,
+    });
+    assert.equal(fixture.runner.requests.length, 0);
+    assert.equal(fixture.bindings.values.size, 0);
+  });
+}
+
 test("native terraform validateSource leaves accepted source pristine for fresh validation and preview", async (context) => {
   const fixture = await nativePolicyFixture(context, "terraform");
   const provider = fixture.makeProvider();
@@ -491,12 +549,31 @@ test("installed Bicep validates nested formatting and lint without changing acce
     }
     throw error;
   }
-  for (const scenario of ["pass", "format-drift", "lint-error"] as const) {
+  for (const scenario of [
+    "pass",
+    "format-drift",
+    "lint-error",
+    "policy-pass",
+    "policy-mismatch",
+    "module-pass",
+    "module-mismatch",
+    "diagnostics-pass",
+  ] as const) {
     await context.test(scenario, async (child) => {
       const root = await mkdtemp(join(tmpdir(), "apex-real-bicep-validation-"));
       child.after(() => rm(root, { recursive: true, force: true }));
+      const checkModule = scenario.startsWith("module-");
+      const checkDiagnostics = scenario === "diagnostics-pass";
+      const checkPolicy = scenario.startsWith("policy-") || checkModule || checkDiagnostics;
+      const workspaceResourceId =
+        "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-fixture/providers/Microsoft.OperationalInsights/workspaces/log-fixture";
       const files = [
-        { path: "main.bicep", content: "output result string = 'ok'\n" },
+        {
+          path: "main.bicep",
+          content: checkPolicy
+            ? "resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {\n  name: 'apexpolicytest'\n  location: 'swedencentral'\n  kind: 'StorageV2'\n  sku: {\n    name: 'Standard_LRS'\n  }\n  properties: {\n    supportsHttpsTrafficOnly: true\n    minimumTlsVersion: 'TLS1_2'\n    allowBlobPublicAccess: false\n    allowSharedKeyAccess: false\n  }\n}\n"
+            : "output result string = 'ok'\n",
+        },
         {
           path: "modules/nested.bicep",
           content:
@@ -508,9 +585,23 @@ test("installed Bicep validates nested formatting and lint without changing acce
         },
         {
           path: "bicepconfig.json",
-          content: JSON.stringify({ analyzers: { core: { rules: { "no-unused-params": { level: "error" } } } } }),
+          content: JSON.stringify({
+            experimentalFeaturesEnabled: { symbolicNameCodegen: true },
+            analyzers: { core: { rules: { "no-unused-params": { level: "error" } } } },
+          }),
         },
       ].sort((left, right) => left.path.localeCompare(right.path));
+      if (checkModule) {
+        const main = files.find(({ path }) => path === "main.bicep")!;
+        files.find(({ path }) => path === "modules/nested.bicep")!.content = main.content;
+        main.content = "module storageModule 'modules/nested.bicep' = {\n  name: 'storage-module'\n}\n";
+      }
+      if (checkDiagnostics) {
+        const main = files.find(({ path }) => path === "main.bicep")!;
+        for (const service of ["blobServices", "fileServices", "queueServices", "tableServices"]) {
+          main.content += `\nresource ${service} 'Microsoft.Storage/storageAccounts/${service}@2023-05-01' = {\n  parent: storage\n  name: 'default'\n}\n\nresource ${service}Diagnostic 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {\n  scope: ${service}\n  name: 'logs'\n  properties: {\n    workspaceId: '${workspaceResourceId}'\n    logs: [\n      {\n        categoryGroup: 'allLogs'\n        enabled: true\n      }\n    ]\n    metrics: [\n      {\n        category: 'Transaction'\n        enabled: true\n      }\n    ]\n  }\n}\n`;
+        }
+      }
       await mkdir(join(root, "modules"));
       for (const file of files) await writeFile(join(root, file.path), file.content);
       const calls: ProcessRequest[] = [];
@@ -531,16 +622,119 @@ test("installed Bicep validates nested formatting and lint without changing acce
           denySettingsMode: "denyDelete",
         },
       });
+      const policyValidation = checkPolicy
+        ? {
+            policyMap: {
+              schemaVersion: "1.0.0" as const,
+              projectId: "project",
+              runId: "run",
+              governanceHash: hashes.policy,
+              mappings: (["deny", "modify", "deployIfNotExists"] as const).map((effect) => ({
+                policyAssignmentId: "/assignments/baseline",
+                effect,
+                logicalResourceId: "storage",
+                propertyPath: "properties.supportsHttpsTrafficOnly",
+                expectedValue: !scenario.endsWith("mismatch"),
+                disposition: "planned" as const,
+              })),
+            },
+            logicalResourceManifest: { storage: { codeSymbol: checkModule ? "storageModule::storage" : "storage" } },
+          }
+        : undefined;
       const input = {
         projectId: "project",
         runId: "run",
         sourceHash: hashes.iac,
-        policyHash: hashes.policy,
+        policyHash: policyValidation === undefined ? hashes.policy : sha256(policyValidation.policyMap),
         inputHash: hashes.input,
         generatedSource: { rootPath: root, treeHash: sha256(files) },
+        policyValidation,
+        ...(checkDiagnostics
+          ? { storageDiagnosticsTargets: { storage: { binding: { codeSymbol: "storage" }, workspaceResourceId } } }
+          : {}),
+        ...(policyValidation === undefined
+          ? {}
+          : {
+              storageSecurityBindings: policyValidation.logicalResourceManifest,
+              resourceParityManifest: {
+                schemaVersion: "1.0.0" as const,
+                projectId: "project",
+                runId: "run",
+                track: "bicep" as const,
+                resources: [
+                  {
+                    logicalId: "storage",
+                    type: "Microsoft.Storage/storageAccounts",
+                    implementationAddress: "native:Microsoft.Storage/storageAccounts@2023-05-01",
+                    executionAddress: checkModule ? "storageModule::storage" : "storage",
+                    implementationKind: "resource" as const,
+                    ownership: "managed" as const,
+                    dependsOn: [],
+                    generatedDependencies: [],
+                    sourcePath: "main.bicep",
+                  },
+                ],
+              },
+            }),
       };
-      if (scenario === "pass") {
+      if (scenario === "pass" || scenario.endsWith("-pass")) {
         const receipt = await provider.validateSource(input);
+        if (checkPolicy) {
+          assert.equal(receipt.policyValidation?.outcome, "pass");
+          assert.equal(
+            receipt.resourceParity?.outcome,
+            checkModule ? "unsupported" : checkDiagnostics ? "fail" : "pass",
+          );
+          if (checkDiagnostics) {
+            assert.equal(receipt.storageDiagnostics?.storage?.outcome, "pass");
+            assert.equal(receipt.storageDiagnostics?.storage?.fullBaselineEvaluated, false);
+            assert.equal(receipt.storageDiagnostics?.storage?.inputHash, receipt.policyValidation?.inputHash);
+          }
+          assert.equal(
+            receipt.resourceParity?.manifestHash,
+            calculatePolicyValidationDigest(input.resourceParityManifest!),
+          );
+          assert.equal(receipt.resourceParity?.inputHash, receipt.policyValidation?.inputHash);
+          assert.equal(receipt.policyValidation?.results.length, 3);
+          assert.equal(receipt.storageSecurity?.storage?.outcome, "pass");
+          assert.equal(receipt.storageSecurity?.storage?.fullBaselineEvaluated, false);
+          assert.equal(receipt.storageSecurity?.storage?.sourceHash, input.sourceHash);
+          assert.equal(receipt.storageSecurity?.storage?.bindingHash, sha256(input.storageSecurityBindings!.storage));
+          assert.equal(
+            hasValidNativeValidationReceipt(receipt, {
+              ...input,
+              track: "bicep",
+              treeHash: input.generatedSource.treeHash,
+            }),
+            true,
+          );
+          for (const field of [
+            "sourceHash",
+            "inputHash",
+            "fullBaselineEvaluated",
+            "outcome",
+            "observedValueDigest",
+          ] as const) {
+            const altered = structuredClone(receipt);
+            const diagnostic = altered.storageSecurity!.storage!;
+            if (field === "sourceHash") diagnostic.sourceHash = "f".repeat(64);
+            else if (field === "inputHash") diagnostic.inputHash = "f".repeat(64);
+            else if (field === "fullBaselineEvaluated") Object.assign(diagnostic, { fullBaselineEvaluated: true });
+            else if (field === "outcome") diagnostic.outcome = "fail";
+            else diagnostic.results[0]!.observedValueDigest = "f".repeat(64);
+            const { receiptHash, ...body } = altered;
+            assert.ok(receiptHash);
+            altered.receiptHash = calculateNativeValidationReceiptHash(body);
+            assert.equal(
+              hasValidNativeValidationReceipt(altered, {
+                ...input,
+                track: "bicep",
+                treeHash: input.generatedSource.treeHash,
+              }),
+              false,
+            );
+          }
+        }
         assert.deepEqual(
           receipt.commands.map(({ validatorId }) => validatorId),
           ["bicep:format", "bicep:build", "bicep:lint"],
@@ -557,6 +751,69 @@ test("installed Bicep validates nested formatting and lint without changing acce
   }
 });
 
+test("native parity snapshots the accepted binding before compiler commands", async (context) => {
+  const fixture = await nativePolicyFixture(context, "bicep");
+  const implementation = "native:Microsoft.Storage/storageAccounts@2023-05-01";
+  const binding: IacBindingV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "project",
+    runId: "run",
+    track: "bicep",
+    intentHash: hashes.input,
+    resourceBindings: { storage: { implementation, version: "2023-05-01", parameters: { name: "approved" } } },
+  };
+  const manifest: LogicalResourceManifestV1 = {
+    schemaVersion: "1.0.0",
+    projectId: "project",
+    runId: "run",
+    track: "bicep",
+    resources: [
+      {
+        logicalId: "storage",
+        type: "Microsoft.Storage/storageAccounts",
+        implementationAddress: implementation,
+        executionAddress: "storage",
+        implementationKind: "resource",
+        ownership: "managed",
+        dependsOn: [],
+        generatedDependencies: [],
+        sourcePath: "main.bicep",
+      },
+    ],
+  };
+  const expected = calculatePolicyValidationDigest(binding);
+  fixture.source.duringCommand = async () => {
+    binding.resourceBindings.storage!.parameters.name = "changed-after-await";
+  };
+  const receipt = await fixture.makeProvider().validateSource({
+    projectId: "project",
+    runId: "run",
+    sourceHash: hashes.iac,
+    generatedSource: fixture.generatedSource,
+    policyHash: hashes.policy,
+    inputHash: hashes.input,
+    resourceParityManifest: manifest,
+    resourceParityBinding: binding,
+  });
+  assert.equal(receipt.resourceParity?.bindingHash, expected);
+  assert.notEqual(receipt.resourceParity?.bindingHash, calculatePolicyValidationDigest(binding));
+  assert.equal(fixture.runner.requests.length, 3);
+  await assert.rejects(
+    fixture.makeProvider().validateSource({
+      projectId: "project",
+      runId: "run",
+      sourceHash: hashes.iac,
+      generatedSource: fixture.generatedSource,
+      policyHash: hashes.policy,
+      inputHash: hashes.input,
+      resourceParityManifest: manifest,
+      resourceParityBinding: { ...binding, intentHash: "f".repeat(64) },
+    }),
+    /inputs are invalid/,
+  );
+  assert.equal(fixture.runner.requests.length, 3);
+});
+
 test("native bicep validateSource requires the accepted main.bicep target", async (context) => {
   const fixture = await nativePolicyFixture(context, "bicep");
   await assert.rejects(
@@ -571,6 +828,144 @@ test("native bicep validateSource requires the accepted main.bicep target", asyn
     { code: "PREVIEW_HASH_MISMATCH" },
   );
   assert.equal(fixture.runner.requests.length, 0);
+});
+
+test("native bicep validateSource evaluates mapped properties from its build output", async (context) => {
+  for (const scenario of ["pass", "mismatch", "expression", "invalid-output", "missing-binding"] as const) {
+    await context.test(scenario, async (context) => {
+      const fixture = await nativePolicyFixture(context, "bicep");
+      const policyValidation = structuredClone(fixture.policyRequest.policyValidation!);
+      if (scenario === "mismatch") fixture.source.value = "different";
+      if (scenario === "expression") fixture.source.value = "[parameters('security')]";
+      if (scenario === "invalid-output") fixture.source.invalid = true;
+      if (scenario === "missing-binding") delete policyValidation.logicalResourceManifest.storage;
+      const input: NativeValidationRequest = {
+        projectId: "project",
+        runId: "run",
+        sourceHash: hashes.iac,
+        generatedSource: fixture.generatedSource,
+        policyHash: sha256(policyValidation.policyMap),
+        inputHash: hashes.input,
+        policyValidation,
+      };
+      const provider = fixture.makeProvider();
+      if (scenario === "pass") {
+        const receipt = await provider.validateSource(input);
+        const policy = Reflect.get(receipt, "policyValidation") as PolicyValidationV1 | undefined;
+        assert.ok(policy, "Native Bicep validation must return executed policy evidence");
+        assert.equal(policy.outcome, "pass");
+        assert.equal(policy.results.length, 3);
+        assert.equal(policy.sourceHash, input.sourceHash);
+        assert.equal(policy.policyMapHash, input.policyHash);
+        assert.equal(policy.inputHash, createHash("sha256").update(fixture.json()).digest("hex"));
+        assert.equal(
+          hasValidNativeValidationReceipt(receipt, {
+            ...input,
+            track: "bicep",
+            treeHash: input.generatedSource.treeHash,
+          }),
+          true,
+        );
+        assert.equal(JSON.stringify(receipt).includes(fixture.source.value), false);
+        for (const key of [
+          "projectId",
+          "runId",
+          "track",
+          "sourceHash",
+          "policyMapHash",
+          "outcome",
+          "receiptHash",
+        ] as const) {
+          const changed = structuredClone(receipt);
+          const nested = Reflect.get(changed, "policyValidation") as PolicyValidationV1;
+          Reflect.set(
+            nested,
+            key,
+            key.endsWith("Hash")
+              ? "f".repeat(64)
+              : key === "track"
+                ? "terraform"
+                : key === "outcome"
+                  ? "unsupported"
+                  : "other",
+          );
+          if (key !== "receiptHash") {
+            const { receiptHash: oldPolicyHash, ...policyBody } = nested;
+            assert.ok(oldPolicyHash);
+            nested.receiptHash = calculatePolicyValidationHash(policyBody);
+          }
+          const { receiptHash: oldNativeHash, ...nativeBody } = changed;
+          assert.ok(oldNativeHash);
+          changed.receiptHash = calculateNativeValidationReceiptHash(nativeBody);
+          assert.equal(
+            hasValidNativeValidationReceipt(changed, {
+              ...input,
+              track: "bicep",
+              treeHash: input.generatedSource.treeHash,
+            }),
+            false,
+            key,
+          );
+        }
+      } else {
+        await assert.rejects(provider.validateSource(input), { code: "NATIVE_VALIDATION_FAILED" });
+      }
+      assert.equal(fixture.runner.requests.filter(({ args }) => args[0] === "build").length, 1);
+      assert.ok(fixture.runner.requests.every(({ executable }) => executable === "bicep"));
+      await assert.rejects(stat(fixture.runner.requests[0]!.cwd!), { code: "ENOENT" });
+      assert.equal(fixture.executed(), false);
+    });
+  }
+});
+
+test("native Bicep policy inputs are bound before commands and snapshotted during execution", async (context) => {
+  const fixture = await nativePolicyFixture(context, "bicep");
+  const policyValidation = structuredClone(fixture.policyRequest.policyValidation!);
+  const input: NativeValidationRequest = {
+    projectId: "project",
+    runId: "run",
+    sourceHash: hashes.iac,
+    generatedSource: fixture.generatedSource,
+    policyHash: sha256(policyValidation.policyMap),
+    inputHash: hashes.input,
+    policyValidation,
+  };
+  const provider = fixture.makeProvider();
+  for (const invalid of [
+    { ...input, policyHash: hashes.policy },
+    { ...input, runId: "other" },
+  ]) {
+    await assert.rejects(provider.validateSource(invalid), { code: "NATIVE_VALIDATION_INPUT_INVALID" });
+    assert.equal(fixture.runner.requests.length, 0);
+  }
+  fixture.source.duringCommand = async () => {
+    policyValidation.policyMap.mappings[0]!.expectedValue = "mutated-after-validation-started";
+  };
+  const receipt = await provider.validateSource(input);
+  assert.equal(receipt.policyValidation?.outcome, "pass");
+  assert.equal(receipt.policyValidation?.policyMapContentHash, input.policyHash);
+});
+
+test("native command-only validation does not claim unexecuted policy checks", async (context) => {
+  for (const track of ["bicep", "terraform"] as const) {
+    const fixture = await nativePolicyFixture(context, track);
+    const policyValidation = structuredClone(fixture.policyRequest.policyValidation!);
+    if (track === "bicep") policyValidation.policyMap.mappings = [];
+    const receipt = await fixture.makeProvider().validateSource({
+      projectId: "project",
+      runId: "run",
+      sourceHash: hashes.iac,
+      generatedSource: fixture.generatedSource,
+      policyHash: sha256(policyValidation.policyMap),
+      inputHash: hashes.input,
+      policyValidation,
+    });
+    assert.equal(receipt.policyValidation, undefined);
+    assert.deepEqual(
+      fixture.runner.requests.map(({ args }) => args[0]),
+      NATIVE_VALIDATION_COMMANDS[track].map(({ args }) => args[0]),
+    );
+  }
 });
 
 for (const track of ["bicep", "terraform"] as const) {
@@ -654,6 +1049,55 @@ for (const track of ["bicep", "terraform"] as const) {
     assert.equal(JSON.stringify(receipt).includes("stdout"), false);
     assert.equal(JSON.stringify(receipt).includes("stderr"), false);
     assert.deepEqual(await provider.validateSource(input), receipt);
+  });
+
+  test(`native ${track} records empty policy applicability without planning or claiming property evaluation`, async (context) => {
+    const fixture = await nativePolicyFixture(context, track);
+    const policyMap: PolicyPropertyMapV1 = {
+      schemaVersion: "1.0.0",
+      projectId: "project",
+      runId: "run",
+      governanceHash: hashes.policy,
+      mappings: [],
+    };
+    const input: NativeValidationRequest = {
+      projectId: "project",
+      runId: "run",
+      sourceHash: hashes.iac,
+      generatedSource: fixture.generatedSource,
+      policyHash: calculatePolicyValidationDigest(policyMap),
+      inputHash: hashes.input,
+      policyValidation: { policyMap, logicalResourceManifest: {} },
+    };
+    const receipt = await fixture.makeProvider().validateSource(input);
+    assert.deepEqual(receipt.policyApplicability, {
+      status: "no-actionable-mappings",
+      policyMapContentHash: input.policyHash,
+    });
+    assert.equal(receipt.policyValidation, undefined);
+    assert.equal(
+      hasValidNativeValidationReceipt(receipt, { ...input, track, treeHash: input.generatedSource.treeHash }),
+      true,
+    );
+    assert.deepEqual(
+      fixture.runner.requests.map(({ executable, args }) => ({ executable, args })),
+      NATIVE_VALIDATION_COMMANDS[track].map(({ executable, args }) => ({ executable, args: [...args] })),
+    );
+    await assert.rejects(
+      fixture.makeProvider().validateSource({ ...input, policyHash: "f".repeat(64) }),
+      /inputs are invalid/,
+    );
+    const malformed = { ...policyMap, mappings: "" };
+    const before = fixture.runner.requests.length;
+    await assert.rejects(
+      fixture.makeProvider().validateSource({
+        ...input,
+        policyHash: calculatePolicyValidationDigest(malformed),
+        policyValidation: { policyMap: malformed as unknown as PolicyPropertyMapV1, logicalResourceManifest: {} },
+      }),
+      /inputs are invalid/,
+    );
+    assert.equal(fixture.runner.requests.length, before);
   });
 
   test(`native ${track} validateSource rejects missing, stale, or misbound sources before commands`, async (context) => {

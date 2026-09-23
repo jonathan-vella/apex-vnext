@@ -233,12 +233,34 @@ export function resolveNativeBicepResourceOwnership(context: {
   }
   const manifestResources = new Map(manifest.resources.map((resource) => [resource.logicalId, resource]));
   const physicalIds = new Set<string>();
-  for (const resource of intent.resources) {
+  const orderedResources = [
+    ...intent.resources.filter(({ id }) => binding.resourceBindings[id]!.scopeLogicalId === undefined),
+    ...intent.resources.filter(({ id }) => binding.resourceBindings[id]!.scopeLogicalId !== undefined),
+  ];
+  for (const resource of orderedResources) {
     const resourceBinding = binding.resourceBindings[resource.id]!;
     const entry = manifestResources.get(resource.id)!;
     const path = `/binding/resourceBindings/${resource.id}`;
     if (entry.type !== resource.type || entry.implementationAddress !== resourceBinding.implementation) {
       issues.push({ path, message: "Manifest resource does not match the accepted binding and type" });
+      continue;
+    }
+    const scopeId = resourceBinding.scopeLogicalId;
+    if (
+      scopeId !== undefined &&
+      (resource.type.toLowerCase() !== "microsoft.insights/diagnosticsettings" ||
+        !resourceBinding.implementation.startsWith("native:Microsoft.Insights/diagnosticSettings@") ||
+        !resource.dependsOn.includes(scopeId) ||
+        scopeId === resource.id ||
+        binding.resourceBindings[scopeId]?.scopeLogicalId !== undefined ||
+        !binding.resourceBindings[scopeId]?.implementation.startsWith("native:") ||
+        manifestResources.get(scopeId)?.ownership !== "managed" ||
+        entry.ownership !== "managed" ||
+        !Object.hasOwn(resourceIdsByLogicalId, scopeId) ||
+        Object.hasOwn(resourceBinding.parameters, "scope") ||
+        Object.hasOwn(resourceBinding.parameters, "parent"))
+    ) {
+      issues.push({ path, message: "Diagnostic scope requires an exactly resolved managed native dependency" });
       continue;
     }
     if (resourceBinding.implementation.startsWith("avm:") || entry.implementationKind === "module") {
@@ -266,27 +288,33 @@ export function resolveNativeBicepResourceOwnership(context: {
       continue;
     }
     const descriptor =
-      /^native:(Microsoft\.[A-Za-z0-9.]+\/[A-Za-z0-9.]+)@([0-9]{4}-[0-9]{2}-[0-9]{2}(?:-preview)?)$/.exec(
+      /^native:(Microsoft\.[A-Za-z0-9.]+(?:\/[A-Za-z][A-Za-z0-9]*)+)@([0-9]{4}-[0-9]{2}-[0-9]{2}(?:-preview)?)$/.exec(
         resourceBinding.implementation,
       );
     const { name, parentId } = resourceBinding.parameters;
+    const typeSegments = descriptor?.[1]?.split("/") ?? [];
+    const nameSegments = typeof name === "string" ? name.split("/") : [];
     if (
       descriptor === null ||
       descriptor[1]!.toLowerCase() !== resource.type.toLowerCase() ||
       resourceBinding.version !== descriptor[2] ||
       typeof name !== "string" ||
-      !/^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\s\S])/.test(name) ||
+      nameSegments.length !== typeSegments.length - 1 ||
+      nameSegments.some((segment) => !/^[A-Za-z0-9][A-Za-z0-9_.-]*$(?![\s\S])/.test(segment)) ||
       typeof parentId !== "string" ||
       (parentId !== "/" && parentId.toLowerCase() !== targetScope.toLowerCase()) ||
       (entry.ownership === "managed" && entry.implementationKind !== "resource")
     ) {
       issues.push({
         path,
-        message: "Native Bicep ownership requires a matching top-level type, literal name, and target RG parent",
+        message: "Native Bicep ownership requires a matching type, exact literal name segments, and target RG parent",
       });
       continue;
     }
-    const resourceId = `${targetScope}/providers/${descriptor[1]}/${name}`;
+    const resourceId = `${scopeId === undefined ? targetScope : resourceIdsByLogicalId[scopeId]}/providers/${typeSegments[0]}/${typeSegments
+      .slice(1)
+      .map((segment, index) => `${segment}/${nameSegments[index]}`)
+      .join("/")}`;
     const normalizedId = resourceId.toLowerCase();
     if (physicalIds.has(normalizedId)) {
       issues.push({ path, message: "Bicep bindings resolve to duplicate resource IDs" });
@@ -376,6 +404,15 @@ function requirementsTraceability(value: unknown): ValidationIssue[] {
   const requirements = context.artifacts.requirements as RequirementsV1 | undefined;
   if (requirements === undefined) return issue("/artifacts/requirements", "Accepted requirements are required");
   const knownIds = new Set(requirements.requirements.map(({ id }) => id));
+  const records = architecture.decisionRecords ?? [];
+  if (
+    new Set(records.map(({ id }) => id)).size !== records.length ||
+    records.some(({ requirementIds }) => requirementIds.some((id) => !knownIds.has(id)))
+  )
+    return issue(
+      "/outputs/architecture/decisionRecords",
+      "Decision records require unique IDs and accepted requirement references",
+    );
   const referencedIds = architecture.components.flatMap(({ requirementIds }) => requirementIds);
   const unknown = [...new Set(referencedIds.filter((id) => !knownIds.has(id)))].sort();
   if (unknown.length > 0) {
@@ -631,11 +668,15 @@ function bindingTrackMatch(value: unknown): ValidationIssue[] {
     bindingIds.every((id) => resourceIds.has(id))
       ? []
       : issue("/outputs/iac-binding", "IaC binding track, intent, or resource coverage is invalid");
-  if (Object.values(binding.resourceBindings).some(({ physicalResources }) => physicalResources !== undefined)) {
+  if (
+    Object.values(binding.resourceBindings).some(
+      ({ physicalResources, scopeLogicalId }) => physicalResources !== undefined || scopeLogicalId !== undefined,
+    )
+  ) {
     if (binding.track !== "bicep") {
       issues.push({
         path: "/outputs/iac-binding",
-        message: "Exact physical resource maps are supported only for Bicep AVM bindings",
+        message: "Exact physical resource maps and diagnostic scope references are supported only for Bicep bindings",
       });
     } else if (issues.length === 0) {
       issues.push(
@@ -715,10 +756,22 @@ function bindingCoverage(expectedTrack: "bicep" | "terraform", value: unknown): 
   const expectedIds = intent.resources.map(({ id }) => id).sort();
   const bindingIds = Object.keys(binding.resourceBindings).sort();
   const manifestIds = manifest.resources.map(({ logicalId }) => logicalId).sort();
+  const intentById = new Map(intent.resources.map((resource) => [resource.id, resource]));
   return binding.track === expectedTrack &&
     manifest.track === expectedTrack &&
     JSON.stringify(bindingIds) === JSON.stringify(expectedIds) &&
-    JSON.stringify(manifestIds) === JSON.stringify(expectedIds)
+    JSON.stringify(manifestIds) === JSON.stringify(expectedIds) &&
+    manifest.resources.every((resource) => {
+      const approved = intentById.get(resource.logicalId);
+      const implementation = binding.resourceBindings[resource.logicalId];
+      return (
+        approved !== undefined &&
+        implementation !== undefined &&
+        resource.type === approved.type &&
+        resource.implementationAddress === implementation.implementation &&
+        JSON.stringify([...resource.dependsOn].sort()) === JSON.stringify([...approved.dependsOn].sort())
+      );
+    })
     ? []
     : issue("/outputs/logical-resource-manifest", `${expectedTrack} binding coverage is incomplete`);
 }
@@ -1237,7 +1290,13 @@ function diagnosisReadOnly(value: unknown): ValidationIssue[] {
       message: "Diagnosis is not a read-only observation of current inventory",
     });
   }
-  const unpinned = diagnosis.causes
+  const checks = diagnosis.operationalHandoff?.healthChecks ?? [];
+  if (checks.some(({ resourceId }) => !inventory.resources.some((resource) => resource.resourceId === resourceId)))
+    issues.push({
+      path: "/outputs/diagnosis/operationalHandoff/healthChecks",
+      message: "Health checks must reference recorded inventory resources",
+    });
+  const unpinned = [...diagnosis.causes, ...checks]
     .flatMap(({ evidenceRefs }) => evidenceRefs)
     .filter((reference) => !context.inputRefs.includes(reference))
     .sort();

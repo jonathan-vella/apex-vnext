@@ -1,11 +1,13 @@
 import {
   ApprovalEvidenceV1Schema,
+  EvidenceManifestV1Schema,
   ImprovementObservationV1Schema,
   ImprovementProposalV1Schema,
   InputRequestV1Schema,
   InputValueV1Schema,
   IsoDateTimeSchema,
   NonEmptyStringSchema,
+  NativeValidationReceiptV1Schema,
   ResourceInventoryV1Schema,
   RunConfigV1Schema,
   Sha256Schema,
@@ -164,7 +166,17 @@ const evidenceProperties = {
 };
 
 export const MCP_OUTPUT_SCHEMAS = {
-  status: contract(status),
+  status: contract(
+    Type.Union([
+      status,
+      object({
+        status: Type.Literal("needs_project"),
+        workspaceReady: Type.Literal(true),
+        projects: Type.Array(Type.String(), { maxItems: 0 }),
+        nextAction: NonEmptyStringSchema,
+      }),
+    ]),
+  ),
   capabilityList: contract(object({ packs: Type.Array(capability) })),
   capabilityStatus: contract(capability),
   nextTask: contract(
@@ -233,11 +245,29 @@ export const MCP_OUTPUT_SCHEMAS = {
     object({ files: Type.Array(stagedFile), outputHashes: artifactHashes, treeHash: Sha256Schema }),
   ),
   validateTask: contract(
-    object({
-      valid: Type.Literal(true),
-      taskId: NonEmptyStringSchema,
-      staged: Type.Optional(Type.Union([stagedArtifact, Type.Array(stagedArtifact)])),
-    }),
+    Type.Union([
+      object({
+        valid: Type.Literal(true),
+        taskId: NonEmptyStringSchema,
+        staged: Type.Optional(Type.Union([stagedArtifact, Type.Array(stagedArtifact)])),
+      }),
+      object({
+        valid: Type.Boolean(),
+        taskId: NonEmptyStringSchema,
+        execution: object({
+          mode: Type.Literal("native"),
+          executedValidatorIds: strings,
+          blockedValidatorIds: strings,
+          storageSecurity: NativeValidationReceiptV1Schema.properties.storageSecurity,
+          storageDiagnostics: NativeValidationReceiptV1Schema.properties.storageDiagnostics,
+          securityBaseline: NativeValidationReceiptV1Schema.properties.securityBaseline,
+        }),
+        outputs: Type.Array(object({ kind: Type.Literal("validation-evidence"), value: EvidenceManifestV1Schema }), {
+          minItems: 1,
+          maxItems: 1,
+        }),
+      }),
+    ]),
   ),
   completeTask: contract(completion),
   requirementsComplete: contract(completion),

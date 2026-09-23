@@ -48,6 +48,155 @@
       "minItems": 1,
       "type": "array"
     },
+    "decisionRecords": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "alternatives": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "benefits": {
+                  "maxLength": 2048,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "drawbacks": {
+                  "maxLength": 2048,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "option": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "rejectionReason": {
+                  "maxLength": 2048,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "option",
+                "benefits",
+                "drawbacks",
+                "rejectionReason"
+              ],
+              "type": "object"
+            },
+            "maxItems": 10,
+            "minItems": 2,
+            "type": "array"
+          },
+          "complianceConsiderations": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "context": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "decision": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^ADR-[0-9]{4}$",
+            "type": "string"
+          },
+          "implementationNotes": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "negativeConsequences": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 32,
+            "minItems": 1,
+            "type": "array"
+          },
+          "positiveConsequences": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 32,
+            "minItems": 1,
+            "type": "array"
+          },
+          "requirementIds": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "title": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "wafImpacts": {
+            "additionalProperties": false,
+            "properties": {
+              "cost-optimization": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "operational-excellence": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "performance-efficiency": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "reliability": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "security": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "security",
+              "reliability",
+              "performance-efficiency",
+              "cost-optimization",
+              "operational-excellence"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "context",
+          "decision",
+          "requirementIds",
+          "alternatives",
+          "positiveConsequences",
+          "negativeConsequences",
+          "wafImpacts",
+          "complianceConsiderations",
+          "implementationNotes"
+        ],
+        "type": "object"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "type": "array"
+    },
     "decisions": {
       "items": {
         "minLength": 1,

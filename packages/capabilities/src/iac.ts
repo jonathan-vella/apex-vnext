@@ -4,6 +4,8 @@ import type {
   DeploymentPreviewV1,
   IacTool,
   NativeValidationReceiptV1,
+  LogicalResourceManifestV1,
+  IacBindingV1,
   Operation,
   OperationRecordV1,
   PolicyPropertyMapV1,
@@ -79,6 +81,13 @@ export interface NativeValidationRequest {
   readonly generatedSource: NonNullable<PreviewRequest["generatedSource"]>;
   readonly policyHash: string;
   readonly inputHash: string;
+  readonly policyValidation?: PreviewRequest["policyValidation"];
+  readonly storageSecurityBindings?: Readonly<Record<string, PolicyResourceBinding>>;
+  readonly resourceParityManifest?: LogicalResourceManifestV1;
+  readonly resourceParityBinding?: IacBindingV1;
+  readonly storageDiagnosticsTargets?: Readonly<
+    Record<string, { readonly binding: PolicyResourceBinding; readonly workspaceResourceId: string }>
+  >;
 }
 
 export interface CurrentDeploymentAuthority {

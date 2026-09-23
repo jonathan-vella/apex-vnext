@@ -1,4 +1,5 @@
 export * from "./artifacts.js";
+export * from "./archetype-source.js";
 export * from "./common.js";
 export * from "./deployment.js";
 export * from "./evidence.js";
@@ -11,7 +12,18 @@ export * from "./policy-validation.js";
 export * from "./runtime.js";
 export * from "./targets.js";
 
-import { IacBindingV1Schema, ImplementationIntentV1Schema, RequirementsV1Schema } from "./artifacts.js";
+import {
+  IacBindingV1Schema,
+  ImplementationIntentV1Schema,
+  RequirementsV1Schema,
+  RequirementsAmendmentV1Schema,
+  RequirementsChangeProposalV1Schema,
+} from "./artifacts.js";
+import {
+  ArchetypeSourceProposalV1Schema,
+  ArchetypeBatchConfigV1Schema,
+  ArchetypeBatchPlanV1Schema,
+} from "./archetype-source.js";
 import {
   ApprovalEvidenceV1Schema,
   DeploymentPreviewV1Schema,
@@ -35,7 +47,15 @@ import {
   ImprovementProposalV1Schema,
   ImprovementRecurrenceV1Schema,
 } from "./improvement.js";
-import { OnboardingConfigV1Schema } from "./onboarding.js";
+import {
+  BootstrapPlanV1Schema,
+  OnboardingConfigV1Schema,
+  GovernanceSetupConfigV1Schema,
+  GovernanceSetupPlanV1Schema,
+  GovernanceProvisionPlanV1Schema,
+  RepositoryPublishConfigV1Schema,
+  RepositoryPublishPlanV1Schema,
+} from "./onboarding.js";
 import { NativeValidationReceiptV1Schema } from "./native-validation.js";
 import { GovernanceObservationReceiptV1Schema } from "./governance-observation.js";
 import { PricingEvidenceV1Schema, PricingRequestV1Schema } from "./pricing.js";
@@ -69,6 +89,15 @@ import {
 } from "./targets.js";
 
 export const contractSchemas = [
+  GovernanceProvisionPlanV1Schema,
+  RepositoryPublishConfigV1Schema,
+  RepositoryPublishPlanV1Schema,
+  ArchetypeBatchConfigV1Schema,
+  ArchetypeBatchPlanV1Schema,
+  GovernanceSetupConfigV1Schema,
+  GovernanceSetupPlanV1Schema,
+  BootstrapPlanV1Schema,
+  ArchetypeSourceProposalV1Schema,
   RuntimeBundleLockV1Schema,
   ProjectConfigV1Schema,
   RunConfigV1Schema,
@@ -77,6 +106,8 @@ export const contractSchemas = [
   InputSubmissionV1Schema,
   EventV1Schema,
   RequirementsV1Schema,
+  RequirementsAmendmentV1Schema,
+  RequirementsChangeProposalV1Schema,
   ImplementationIntentV1Schema,
   IacBindingV1Schema,
   ApprovalEvidenceV1Schema,
@@ -136,6 +167,15 @@ const metadata = (maxBytes: number, sensitivity: ContractSensitivity = "internal
 });
 
 export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
+  "https://schemas.apexops.dev/governance-provision-plan-v1.json": metadata(65_536, "confidential"),
+  "https://schemas.apexops.dev/repository-publish-config-v1.json": metadata(16_384, "confidential"),
+  "https://schemas.apexops.dev/repository-publish-plan-v1.json": metadata(262_144, "confidential"),
+  "https://schemas.apexops.dev/archetype-batch-config-v1.json": metadata(16_384, "confidential"),
+  "https://schemas.apexops.dev/archetype-batch-plan-v1.json": metadata(2_097_152, "confidential"),
+  "https://schemas.apexops.dev/governance-setup-config-v1.json": metadata(16_384, "confidential"),
+  "https://schemas.apexops.dev/governance-setup-plan-v1.json": metadata(32_768, "confidential"),
+  "https://schemas.apexops.dev/bootstrap-plan-v1.json": metadata(65_536, "confidential"),
+  "https://schemas.apexops.dev/archetype-source-proposal-v1.json": metadata(524_288, "confidential"),
   "https://schemas.apexops.dev/runtime-bundle-lock-v1.json": metadata(32_768),
   "https://schemas.apexops.dev/project-config-v1.json": metadata(16_384),
   "https://schemas.apexops.dev/run-config-v1.json": metadata(65_536, "confidential"),
@@ -144,6 +184,8 @@ export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
   "https://schemas.apexops.dev/input-submission-v1.json": metadata(65_536, "confidential"),
   "https://schemas.apexops.dev/event-v1.json": metadata(262_144, "confidential"),
   "https://schemas.apexops.dev/requirements-v1.json": metadata(524_288, "confidential"),
+  "https://schemas.apexops.dev/requirements-amendment-v1.json": metadata(262_144, "confidential"),
+  "https://schemas.apexops.dev/requirements-change-proposal-v1.json": metadata(524_288, "confidential"),
   "https://schemas.apexops.dev/implementation-intent-v1.json": metadata(524_288),
   "https://schemas.apexops.dev/iac-binding-v1.json": metadata(524_288, "confidential"),
   "https://schemas.apexops.dev/approval-evidence-v1.json": metadata(32_768, "confidential"),
@@ -174,7 +216,7 @@ export const contractMetadata: Readonly<Record<string, ContractMetadata>> = {
   "https://schemas.apexops.dev/governance-observation-receipt-v1.json": metadata(16_384, "confidential"),
   "https://schemas.apexops.dev/policy-property-map-v1.json": metadata(2_097_152, "confidential"),
   "https://schemas.apexops.dev/policy-validation-v1.json": metadata(4_194_304, "confidential"),
-  "https://schemas.apexops.dev/native-validation-receipt-v1.json": metadata(16_384, "confidential"),
+  "https://schemas.apexops.dev/native-validation-receipt-v1.json": metadata(8_404_992, "confidential"),
   "https://schemas.apexops.dev/environment-inputs-v1.json": metadata(524_288, "restricted"),
   "https://schemas.apexops.dev/logical-resource-manifest-v1.json": metadata(2_097_152),
   "https://schemas.apexops.dev/iac-handoff-v1.json": metadata(131_072, "confidential"),

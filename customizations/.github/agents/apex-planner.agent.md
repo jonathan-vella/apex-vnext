@@ -2,7 +2,7 @@
 name: APEX Planner
 description: Creates track-neutral implementation intent and submits it through the APEX kernel.
 argument-hint: Plan the approved architecture
-model: ["GPT-5.6 Sol"]
+model: ["gpt-6-sol"]
 user-invocable: true
 tools:
   - vscode/askQuestions

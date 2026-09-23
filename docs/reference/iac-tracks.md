@@ -10,6 +10,24 @@ preview, approval evidence, an operation record, and inventory.
 
 A track cannot reuse the other track's preview or approval.
 
+Generated Bicep trees include `bicepconfig.json` with symbolic-name code generation enabled. This file participates in
+the source tree hash, so compiled resource identity does not depend on an ambient workspace setting. A conflicting
+staged configuration blocks generation rather than being overwritten. Native validation copies and verifies the same
+configuration with the accepted source.
+
+Native implementation descriptors accept nested ARM types such as
+`native:Microsoft.Storage/storageAccounts/blobServices@2023-05-01`. Bicep bindings must supply the explicit full child
+name; Terraform bindings supply the child name and parent ID. Generation does not infer symbolic parent/scope references.
+Native Bicep ownership resolves explicitly named child types only when type and name segment counts match and the
+parent scope is the selected resource group. IDs interleave type/name segments; declaring a child grants no authority
+over its parent, siblings or undeclared descendants. Expression-based names and unresolved ownership still block preview.
+
+Native Bicep diagnostic-settings bindings can additionally declare `scopeLogicalId` for one managed native resource in
+the same accepted intent. The target must be a declared dependency; missing targets, modules, protected existing
+resources, self-reference, chained extension scopes and competing raw scope/parent parameters are rejected. The generator
+emits a symbolic `scope`, and ownership resolves only the diagnostic extension ID beneath that target. Terraform does
+not accept this Bicep-only field. Plan review displays the scope reference; it is not evidence that diagnostics ran.
+
 ## Resource Ownership
 
 The logical-resource manifest distinguishes `existing` from `managed` ownership. Artifact staging and acceptance reject
@@ -17,6 +35,10 @@ contradictory declarations with `APEX_VALIDATION`: existing resources use Bicep 
 `data` sources, while managed resources use `resource` or `module` implementations. Cross-track reference kinds are
 rejected. The owning predicate is
 [`hasValidLogicalResourceReferences`](../../packages/contracts/src/targets.ts).
+
+Code-generation acceptance also matches each manifest resource's ID, type, implementation descriptor and dependency
+set to the approved intent and binding. Rehashing an altered manifest does not authorize additional or substituted
+resources. These artifact-consistency checks do not prove compiled-resource parity.
 
 Preview requires a valid accepted manifest covering every intent resource. Only `managed` entries enter APEX's provider
 apply/destroy request resource lists and simulated changes/inventory. Existing references remain in the accepted intent
@@ -43,8 +65,27 @@ omitting the protected child from what-if does not authorize its implicit remova
 
 This declaration is not proof of resource existence, AVM expansion or policy compliance. Unknown child resources block
 preview instead of inheriting permission from their parent. Nonempty policy maps still require source-bound native
-property receipts; declaring physical IDs does not resolve module property expressions. Terraform module descendant
-ownership and full AVM policy evaluation remain unsupported. No live Azure qualification is implied by offline tests.
+property receipts; declaring physical IDs does not resolve module property expressions. Terraform module containers
+with unresolved descendants and full AVM expression evaluation remain unsupported. No live Azure qualification is
+implied by offline tests.
+
+### Policy Execution Addresses
+
+Managed manifest entries use `executionAddress` to bind policy observations to generated resources. Bicep uses the
+exact compiled symbolic key, or `module::child` for a resource inside an embedded deployment template. Deeper templates
+extend that path, for example `outer::inner::storage`. Symbol paths are case-sensitive; resource names and unqualified
+child basenames are not substitutes. Compilation must preserve symbolic names. This policy address does not replace
+the exact physical-resource ownership map required for Bicep modules.
+
+Terraform uses the full planned resource address, including module paths and instance keys, such as
+`module.storage.azurerm_storage_account.main["east"]`. A resolved child resource is a `resource` entry; a module
+container is not evidence of descendant ownership. The saved plan must contain matching known values and change
+evidence for that address.
+
+Missing or ambiguous bindings, unnamed nested resources, loops, unresolved conditions, linked templates and ARM
+property expressions fail closed. The evaluator does not interpret ARM parameters, variables or deployment functions.
+Local-module compiler tests and mocked native workflows establish these bounded mechanics, not compatibility with
+every AVM version or live resource compliance.
 
 ## Differences
 
@@ -79,10 +120,79 @@ historical label-only validation must be invalidated and rerun before using an o
 with historical Bicep build-only receipts must likewise rerun validation to produce format/build/lint evidence. Providers
 without source-validation support must explicitly declare simulated validation to remain usable as test adapters.
 
-Validation reports distinguish `native` and `simulated` entries. Only the commands listed above are proved by these
-receipts; security checks and policy evaluation are not proved by a command receipt. Policy-map hashes
-bind inputs, not compliance outcomes. Source-bound policy-property receipts remain required at native preview for
-nonempty maps. `validateTask` still stages and checks artifacts; command execution occurs at task completion.
+Validation reports distinguish `native` and `simulated` entries. Command results do not prove security checks or policy
+compliance merely by including a policy-map hash. For nonempty Bicep maps, the runtime also evaluates properties from
+the captured build output and requires complete passing policy evidence within the native receipt. It records the
+policy validator as native only when that evaluation ran. Acceptance and subsequent preview check the accepted map,
+resource bindings and every mapping's evidence.
+
+For an accepted empty map, both source adapters record `policyApplicability` with
+`status: no-actionable-mappings` and the exact policy-map content hash. The runtime credits the mapping applicability
+check only with that bound receipt; omission, substitution and an applicability claim for a nonempty map are rejected.
+This is not property evaluation, absence of audit policies, or full compliance. Security-baseline and logical-parity
+validators remain independently required and blocked when their execution evidence is unavailable.
+
+Terraform source property validation remains command-only: `terraform validate` does not resolve planned values.
+Native preview evaluates its saved plan and requires passing source-bound policy evidence before Gate 4.
+Both providers snapshot bounded policy inputs before awaited preview commands.
+`validateTask` with supplied artifacts stages/checks them. With
+only a task ID for an IaC validation task, it executes native checks and returns runtime-owned evidence plus executed
+and blocked validator IDs, without completing the task. `valid: false` means required execution evidence is incomplete;
+the worker must report the blockers rather than fabricate missing entries. Acceptance reexecutes current native checks.
+No authenticated planning is implicitly added to source validation.
+
+For managed storage accounts with accepted Bicep execution addresses, the receipt and task-only response include
+`storageSecurity` diagnostics from the captured compiler output. Coverage is explicitly
+`storage-account-property-hardening-v1`: minimum TLS, HTTPS-only, disabled public blob access and disabled shared-key
+access. Results bind source/output/binding hashes and retain value digests, not raw observed values. Root and qualified
+module-child symbols use the same exact-resource lookup; values on other resources cannot satisfy the check.
+
+Every diagnostic declares `fullBaselineEvaluated: false`. Diagnostics, production network policy, identity/authorization,
+other resource types and full resource parity are not covered by these four properties. Missing values fail; unresolved
+expressions, ambiguous bindings and unsupported types remain unsupported. The capability can inspect the corresponding
+AzureRM properties in supplied Terraform saved-plan JSON with known change evidence, but Terraform source validation
+does not generate a plan or attach these diagnostics. Passing limited storage properties never credits the full
+`business:security-baseline` validator or opens a gate.
+
+When accepted Bicep bindings identify one unambiguous literal Log Analytics workspace, `storageDiagnostics` reports
+bounded storage-service routing checks. Targets come from explicit storage `diagnosticSettings` workspace references or
+native diagnostic-resource bindings, not model assertions. The evaluator requires blob, file, queue and table service
+settings, exact literal account/service scope expressions emitted by the compiler, matching symbolic dependencies,
+enabled `allLogs` (or all three storage operation categories), and enabled `Transaction` metrics to that workspace.
+Missing scopes, categories or mismatched workspaces fail; modules and unresolved expressions remain unsupported.
+Ambiguous or absent workspace intent does not produce a diagnostic target. Receipts bind source, output and target
+digests and declare `fullBaselineEvaluated: false`; these checks do not credit the full security-baseline validator.
+
+Native task completion requires executed evidence for every required validator, not merely caller-supplied entries.
+For Bicep manifests containing only managed native resources with unique top-level symbolic execution addresses,
+`resourceParity` compares captured compiler output with the accepted manifest: exact resource coverage, ARM types and
+dependency sets. Its receipt binds source, compiler output, manifest and accepted binding hashes; only `outcome: pass`
+credits the parity validator. An explicit diagnostic `scopeLogicalId` is supported only when the compiler's literal
+`resourceId` expression matches that accepted target's type and full name, and the dependency is present. The native
+adapter snapshots the binding before command execution. Extra/missing resources, type changes, scope substitutions and
+dependency mismatches fail. Modules, nested template objects, existing declarations, loops, conditions, other explicit
+scopes and expression-based dependencies remain unsupported. This does not
+evaluate security properties or establish Terraform parity; those checks remain independently required.
+
+The `securityBaseline` receipt supports one bounded profile, `bicep-storage-only-baseline-v1`: every managed account
+must have exactly four storage services and their four scoped diagnostics, with no other resource types. It requires
+passing compiled parity, the four storage hardening properties, disabled public networking, OAuth by default, deny-only
+network ACLs without bypass or IP/VNet allow rules, system-assigned identity, Microsoft-managed encryption with
+infrastructure encryption, and blob/file encryption enabled. Diagnostic workspace references come from the accepted
+binding. Missing controls, credential-like content and diagnostic mismatches fail; unsupported resource sets or
+expressions cannot pass. The receipt binds source, compiler output, manifest and binding hashes. Only a passing result
+credits validation for the supported configuration. Nonempty template parameters, variables and outputs, unknown template
+sections, additional account controls, and nonempty storage-service configuration remain unsupported rather than ignored.
+The supported property allowlist is intentionally closed until additional settings receive executable checks. A pass
+credits the security validator. This deliberately strict profile does not implement arbitrary exceptions or mixed-service
+baselines, prove RBAC/data-plane access, or establish live diagnostic delivery.
+
+Native preview also rejects a prior completion containing required simulated or missing evidence, before provider
+commands run. Explicit simulated adapters remain available for offline tests and cannot establish production readiness.
+The complete storage-only profile can finish Bicep source validation without opening Gate 4. General Bicep workloads and
+Terraform still lack complete baseline/parity execution and remain blocked when required evidence is unavailable.
+Preview implementation tests use explicitly simulated business evidence where necessary; their success is not evidence
+that a production prerequisite has been satisfied.
 
 Deterministic and package qualification cover both tracks. Current-candidate live Azure qualification remains required
 before claiming production readiness or release acceptance.

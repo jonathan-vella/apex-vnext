@@ -33,12 +33,37 @@ test("init installs and update refreshes managed customizations", async () => {
   await writeFile(join(source, ".github", "managed.md"), "v1\n");
   const service = new ApexService(root);
   await service.init({ projectId: "demo", customizationsSource: source });
+  const assertPortableLock = async () => {
+    const lock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
+      files: Array<{ path: string; baseRef: string }>;
+      runtime: Array<{ path: string; baseRef: string }>;
+      previousLockRef?: string;
+    };
+    assert.ok(lock.files.some(({ path }) => path === ".github/managed.md"));
+    for (const file of [...lock.files, ...lock.runtime]) {
+      assert.equal(file.path.includes("\\"), false);
+      assert.equal(file.baseRef.includes("\\"), false);
+      assert.match(file.baseRef, /^\.apex\/customization-bases\//u);
+    }
+    if (lock.previousLockRef !== undefined) {
+      assert.match(lock.previousLockRef, /^\.apex\/customization-bases\/locks\/[a-f0-9]+\.json$/u);
+    }
+    const doctor = await service.doctor();
+    const managedChecks = doctor.checks.filter(({ id }) => id.startsWith("managed:") || id === "managed-files");
+    assert.ok(managedChecks.length > 0);
+    assert.ok(managedChecks.every(({ ok }) => ok));
+  };
+  await assertPortableLock();
   const runtimeLockHash = (await service.status()).run.runtimeLockHash;
   assert.equal(await readFile(join(root, ".github", "managed.md"), "utf8"), "v1\n");
   await writeFile(join(source, ".github", "managed.md"), "v2\n");
   await service.update(source);
+  await assertPortableLock();
   assert.equal(await readFile(join(root, ".github", "managed.md"), "utf8"), "v2\n");
   assert.equal((await service.status()).run.runtimeLockHash, runtimeLockHash);
+  assert.deepEqual((await service.rollbackCustomizations()).conflicts, []);
+  await assertPortableLock();
+  assert.equal(await readFile(join(root, ".github", "managed.md"), "utf8"), "v1\n");
   assert.equal((await service.nextTask()).status, "needs_input");
 });
 
@@ -52,7 +77,9 @@ test("init installs bundled customizations and runtime config by default", async
   assert.match(await readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"), /target: vscode/u);
   const requirementsAgent = await readFile(join(root, ".github", "agents", "apex-requirements.agent.md"), "utf8");
   assert.match(requirementsAgent, /Immediately call `apex\/nextTask` after submitting requirements/u);
-  assert.match(requirementsAgent, /invoke `APEX Reviewer` through the `agent` tool/u);
+  assert.match(requirementsAgent, /invoke `APEX Reviewer` through the active client's delegation tool/u);
+  assert.match(requirementsAgent, /^tools:\n(?: {2}- .+\n)*? {2}- agent\n/mu);
+  assert.match(requirementsAgent, /^agents:\n {2}- APEX Reviewer\n/mu);
   assert.match(
     await readFile(join(root, ".github", "instructions", "apex-agent-authoring.instructions.md"), "utf8"),
     /APEX Agent Boundaries/u,
@@ -211,9 +238,9 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(await readFile(join(root, ".github", "mcp.json"), "utf8"), /"recordInput"/u);
   const requirementsAgent = await readFile(join(root, ".github", "agents", "apex-requirements.agent.md"), "utf8");
   assert.match(requirementsAgent, /target: github-copilot/u);
-  assert.match(requirementsAgent, /model: GPT-5\.6 Sol/u);
+  assert.match(requirementsAgent, /model: gpt-6-sol/u);
   assert.match(requirementsAgent, /- ask_user/u);
-  assert.doesNotMatch(requirementsAgent, /\n\s+- task\s*\n/u);
+  assert.match(requirementsAgent, /\n\s+- task\s*\n/u);
   assert.match(requirementsAgent, /foreground agent using `ask_user`/u);
   assert.doesNotMatch(requirementsAgent, /vscode\/askQuestions|handoffs:|agents:/u);
   const plannerAgent = await readFile(join(root, ".github", "agents", "apex-planner.agent.md"), "utf8");
@@ -313,7 +340,11 @@ test("init installs only the selected Copilot CLI projection and records it in t
     /Reference-Only Document Outlines/u,
   );
   for (const worker of ["apex-codegen.agent.md", "apex-reviewer.agent.md", "apex-validator.agent.md"]) {
-    await assert.rejects(readFile(join(root, ".github", "agents", worker), "utf8"), /ENOENT/u);
+    const profile = await readFile(join(root, ".github", "agents", worker), "utf8");
+    assert.match(profile, /model: gpt-6-luna/u);
+    assert.match(profile, /reasoning-effort: max/u);
+    assert.match(profile, /user-invocable: false/u);
+    assert.doesNotMatch(profile, /- ask_user/u);
   }
   const lock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
     clientId?: string;
@@ -322,7 +353,10 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.equal(lock.clientId, "github-copilot-cli");
   assert.ok(lock.files.some(({ path }) => path === ".github/mcp.json"));
   assert.ok(!lock.files.some(({ path }) => path === ".vscode/mcp.json"));
-  assert.ok(!lock.files.some(({ path }) => /apex-(?:codegen|reviewer|validator)\.agent\.md$/u.test(path)));
+  assert.equal(
+    lock.files.filter(({ path }) => /apex-(?:codegen|reviewer|validator)\.agent\.md$/u.test(path)).length,
+    3,
+  );
   await writeFile(join(root, "unrelated.txt"), "preserve\n");
   await service.update();
   const updatedLock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
@@ -340,7 +374,10 @@ test("init installs only the selected Copilot CLI projection and records it in t
   const reinstalled = await service.reinstallCustomizations();
   assert.equal(reinstalled.clientId, "github-copilot-cli");
   assert.match(await readFile(join(root, ".github", "mcp.json"), "utf8"), /"recordInput"/u);
-  await assert.rejects(readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"), /ENOENT/u);
+  assert.match(
+    await readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"),
+    /model: gpt-6-luna/u,
+  );
 });
 
 test("missing customization selection fails closed and custom sources require explicit updates", async () => {

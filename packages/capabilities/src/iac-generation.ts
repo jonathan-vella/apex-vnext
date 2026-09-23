@@ -72,7 +72,8 @@ interface ResourceContext {
 
 const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const EXACT_VERSION = /^(?:=\s*)?[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$/;
-const NATIVE_IMPLEMENTATION = /^native:([A-Za-z0-9.]+\/[A-Za-z0-9.]+)@([0-9]{4}-[0-9]{2}-[0-9]{2}(?:-preview)?)$/;
+const NATIVE_IMPLEMENTATION =
+  /^native:([A-Za-z][A-Za-z0-9.]*\.[A-Za-z][A-Za-z0-9]*(?:\/[A-Za-z][A-Za-z0-9]*)+)@([0-9]{4}-[0-9]{2}-[0-9]{2}(?:-preview)?)$/;
 const AVM_IMPLEMENTATION = /^avm:([^@\s]+)@([^@\s]+)$/;
 
 function assertIdentifier(value: string, label: string): void {
@@ -131,6 +132,22 @@ function resourceContexts(intent: ImplementationIntentV1, binding: IacBindingV1)
           throw new TypeError(`Resource '${resource.id}' has unknown dependency '${dependency}'`);
       }
       const resourceBinding = binding.resourceBindings[resource.id]!;
+      if (resourceBinding.scopeLogicalId !== undefined) {
+        const target = binding.resourceBindings[resourceBinding.scopeLogicalId];
+        if (
+          binding.track !== "bicep" ||
+          resource.type.toLowerCase() !== "microsoft.insights/diagnosticsettings" ||
+          !resourceBinding.implementation.startsWith("native:Microsoft.Insights/diagnosticSettings@") ||
+          target === undefined ||
+          !target.implementation.startsWith("native:") ||
+          target.scopeLogicalId !== undefined ||
+          resourceBinding.scopeLogicalId === resource.id ||
+          !resource.dependsOn.includes(resourceBinding.scopeLogicalId) ||
+          Object.hasOwn(resourceBinding.parameters, "scope") ||
+          Object.hasOwn(resourceBinding.parameters, "parent")
+        )
+          throw new TypeError("Diagnostic scope requires an explicit native Bicep dependency without chained scopes");
+      }
       return {
         resource,
         binding: resourceBinding,
@@ -334,6 +351,9 @@ export function generateBicepTree(
   const blocks = contexts.map((context) => {
     if (context.parsed.kind === "native") {
       const parameters = requiredGenericParameters(context);
+      const scope = context.binding.scopeLogicalId;
+      if (scope !== undefined && (existing.has(context.resource.id) || existing.has(scope)))
+        throw new TypeError("Diagnostic scope cannot mutate an existing resource");
       const existingKeyword = existing.has(context.resource.id) ? " existing" : "";
       if (existingKeyword !== "") {
         return `resource ${context.declaration} '${context.parsed.source}@${context.parsed.version}' existing = {\n  name: ${bicepString(parameters.name)}\n}`;
@@ -349,7 +369,8 @@ export function generateBicepTree(
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([name, value]) => `  ${bicepObjectKey(name)}: ${renderBicepValue(value, 2)}`)
         .join("\n");
-      return `resource ${context.declaration} '${context.parsed.source}@${context.parsed.version}' = {\n  name: ${bicepString(parameters.name)}\n  location: ${bicepString(parameters.location)}${bodyFields.length === 0 ? "" : `\n${bodyFields}`}\n  properties: ${renderBicepValue(secureStorageProperties(context.resource.type, parameters.properties), 2)}${dependencies}\n}`;
+      const placement = scope === undefined ? `location: ${bicepString(parameters.location)}` : `scope: ${scope}`;
+      return `resource ${context.declaration} '${context.parsed.source}@${context.parsed.version}' = {\n  name: ${bicepString(parameters.name)}\n  ${placement}${bodyFields.length === 0 ? "" : `\n${bodyFields}`}\n  properties: ${renderBicepValue(secureStorageProperties(context.resource.type, parameters.properties), 2)}${dependencies}\n}`;
     }
     if (existing.has(context.resource.id)) {
       throw new TypeError(`Existing AVM resource '${context.resource.id}' is unsupported; use a native binding`);
@@ -380,7 +401,16 @@ export function generateBicepTree(
     ["targetScope = 'resourceGroup'", descriptions, blocks.join("\n\n")]
       .filter((part) => part.length > 0)
       .join("\n\n") + "\n";
-  return virtualTree([{ path: "main.bicep", content }], manifest(intent, binding, contexts, "main.bicep", existing));
+  return virtualTree(
+    [
+      { path: "main.bicep", content },
+      {
+        path: "bicepconfig.json",
+        content: `${JSON.stringify({ experimentalFeaturesEnabled: { symbolicNameCodegen: true } }, null, 2)}\n`,
+      },
+    ],
+    manifest(intent, binding, contexts, "main.bicep", existing),
+  );
 }
 
 function exactProviderConstraint(value: string | undefined, fallback: string, label: string): string {

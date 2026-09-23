@@ -83,7 +83,7 @@ const SECRET_KEY = /(secret|password|passwd|token|privateKey|clientSecret|connec
 const SOURCE_IMPORT = /(?:from\s+|import\s*\()["']([^"']+)["']/g;
 const ARM_MCP_ENDPOINT = "https://mcp.management.azure.com";
 const ARM_MCP_TOOLSET = "CostManagement,Pricing";
-const AZURE_MCP_PACKAGE_VERSION = "3.0.0-beta.45";
+const AZURE_MCP_PACKAGE_VERSION = "3.0.0-beta.46";
 const ARM_MCP_READ_TOOLS = [
   "get_retail_prices",
   "query_costs",
@@ -581,6 +581,7 @@ function validateCustomizations(model, findings) {
       { files: [".vscode/mcp.json"], generatedRoot: "client-projections/github-copilot-vscode" },
     ],
     ["github-copilot-cli", { files: [".github/mcp.json"], generatedRoot: "client-projections/github-copilot-cli" }],
+    ["both", { files: [".vscode/mcp.json", ".github/mcp.json"], generatedRoot: "client-projections/both" }],
   ]);
   const expectedAgentFiles = new Set(customization.agents.map(({ path: file }) => file));
   const expectedFiles = new Set([
@@ -619,7 +620,7 @@ function validateCustomizations(model, findings) {
   for (const projection of projections) {
     const expected = expectedProjectionFiles.get(projection.id);
     const files = array(projection.files);
-    projectedFiles.push(...files);
+    projectedFiles.push(...files.map((file) => `${projection.id}/${file}`));
     if (
       expected === undefined ||
       files.length !== new Set(files).size ||
@@ -643,7 +644,7 @@ function validateCustomizations(model, findings) {
     finding(
       findings,
       "customization.client-projection",
-      "Client projections must uniquely cover the supported VS Code and Copilot CLI files",
+      "Installation presets must exactly cover VS Code, Copilot CLI and their combined selection",
       "customizations/manifest.json",
     );
   const manifestRoles = array(customization.manifest.roles);
@@ -802,7 +803,7 @@ function validateCustomizations(model, findings) {
     }
     const interactive = role.interactionType === "interactive-handoff";
     const sourceAgent = customization.agents.find(({ path: sourcePath }) => sourcePath === projectionPath);
-    const expectedDisableModelInvocation = sourceAgent?.frontmatter?.["disable-model-invocation"] ?? !interactive;
+    const expectedDisableModelInvocation = sourceAgent?.frontmatter?.["disable-model-invocation"] ?? false;
     if (
       frontmatter["user-invocable"] !== interactive ||
       frontmatter["disable-model-invocation"] !== expectedDisableModelInvocation ||

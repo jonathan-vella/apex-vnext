@@ -156,6 +156,47 @@ export const ArchitectureV1Schema = Type.Object(
       { minItems: 1 },
     ),
     decisions: Type.Array(NonEmptyStringSchema),
+    decisionRecords: Type.Optional(
+      Type.Array(
+        Type.Object(
+          {
+            id: Type.String({ pattern: "^ADR-[0-9]{4}$" }),
+            title: Type.String({ minLength: 1, maxLength: 256 }),
+            context: Type.String({ minLength: 1, maxLength: 4096 }),
+            decision: Type.String({ minLength: 1, maxLength: 4096 }),
+            requirementIds: Type.Array(NonEmptyStringSchema, { minItems: 1, maxItems: 256, uniqueItems: true }),
+            alternatives: Type.Array(
+              Type.Object(
+                {
+                  option: Type.String({ minLength: 1, maxLength: 256 }),
+                  benefits: Type.String({ minLength: 1, maxLength: 2048 }),
+                  drawbacks: Type.String({ minLength: 1, maxLength: 2048 }),
+                  rejectionReason: Type.String({ minLength: 1, maxLength: 2048 }),
+                },
+                { additionalProperties: false },
+              ),
+              { minItems: 2, maxItems: 10 },
+            ),
+            positiveConsequences: Type.Array(NonEmptyStringSchema, { minItems: 1, maxItems: 32 }),
+            negativeConsequences: Type.Array(NonEmptyStringSchema, { minItems: 1, maxItems: 32 }),
+            wafImpacts: Type.Object(
+              {
+                security: NonEmptyStringSchema,
+                reliability: NonEmptyStringSchema,
+                "performance-efficiency": NonEmptyStringSchema,
+                "cost-optimization": NonEmptyStringSchema,
+                "operational-excellence": NonEmptyStringSchema,
+              },
+              { additionalProperties: false },
+            ),
+            complianceConsiderations: NonEmptyStringSchema,
+            implementationNotes: NonEmptyStringSchema,
+          },
+          { additionalProperties: false },
+        ),
+        { minItems: 1, maxItems: 64 },
+      ),
+    ),
     risks: Type.Array(NonEmptyStringSchema),
     wellArchitectedAssessment: Type.Optional(
       Type.Object(
@@ -544,6 +585,24 @@ export const TelemetryV1Schema = Type.Object(
   { $id: "https://schemas.apexops.dev/telemetry-v1.json", additionalProperties: false },
 );
 
+const OperationalProcedureSchema = Type.Union([
+  Type.Object(
+    {
+      applicability: Type.Literal("applicable"),
+      owner: NonEmptyStringSchema,
+      prerequisites: Type.Array(NonEmptyStringSchema, { minItems: 1, maxItems: 32 }),
+      steps: Type.Array(NonEmptyStringSchema, { minItems: 1, maxItems: 64 }),
+      verification: NonEmptyStringSchema,
+      executionStatus: Type.Literal("untested"),
+    },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    { applicability: Type.Literal("not-applicable"), rationale: NonEmptyStringSchema },
+    { additionalProperties: false },
+  ),
+]);
+
 export const DiagnosisV1Schema = Type.Object(
   {
     schemaVersion: ContractVersionSchema,
@@ -557,6 +616,38 @@ export const DiagnosisV1Schema = Type.Object(
       Type.Literal("unknown"),
     ]),
     observations: Type.Array(NonEmptyStringSchema),
+    operationalHandoff: Type.Optional(
+      Type.Object(
+        {
+          owner: NonEmptyStringSchema,
+          escalation: NonEmptyStringSchema,
+          maintenanceWindow: NonEmptyStringSchema,
+          accessPrerequisites: Type.Array(NonEmptyStringSchema, { minItems: 1, maxItems: 32 }),
+          configurationReferences: Type.Array(
+            Type.Object({ name: NonEmptyStringSchema, source: NonEmptyStringSchema }, { additionalProperties: false }),
+            { maxItems: 128 },
+          ),
+          healthChecks: Type.Array(
+            Type.Object(
+              {
+                resourceId: NonEmptyStringSchema,
+                check: NonEmptyStringSchema,
+                expectedOutcome: NonEmptyStringSchema,
+                evidenceRefs: Type.Array(Sha256Schema, { maxItems: 32, uniqueItems: true }),
+              },
+              { additionalProperties: false },
+            ),
+            { minItems: 1, maxItems: 256 },
+          ),
+          monitoring: NonEmptyStringSchema,
+          incidentResponse: OperationalProcedureSchema,
+          rollback: OperationalProcedureSchema,
+          recovery: OperationalProcedureSchema,
+          limitations: Type.Array(NonEmptyStringSchema, { minItems: 1, maxItems: 64 }),
+        },
+        { additionalProperties: false },
+      ),
+    ),
     causes: Type.Array(
       Type.Object(
         {

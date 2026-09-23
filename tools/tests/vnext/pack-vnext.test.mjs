@@ -468,10 +468,16 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     provenance.subject.map(({ name, digest }) => ({ name, sha256: digest.sha256 })),
     [
       ...release.packages.map(({ file, sha256 }) => ({ name: file, sha256 })),
+      { name: release.installer.file, sha256: release.installer.sha256 },
       { name: release.security.sbom.file, sha256: release.security.sbom.sha256 },
     ],
   );
   assert.equal(provenance.predicate.buildDefinition.resolvedDependencies[0].digest.gitCommit, release.sourceCommit);
+  const installer = await readFile(join(outputDirectory, release.installer.file));
+  assert.equal(createHash("sha256").update(installer).digest("hex"), release.installer.sha256);
+  assert.equal(installer.byteLength, release.installer.bytes);
+  assert.doesNotMatch(installer.toString("utf8"), /__APEX_/u);
+  assert.ok(installer.toString("utf8").includes(release.toolchain.node));
   assert.equal(provenance.predicate.buildDefinition.resolvedDependencies[0].uri, release.sourceRepository);
   assert.deepEqual(provenance.predicate.buildDefinition.internalParameters, release.toolchain);
 
@@ -567,11 +573,214 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     await mcpClient.connect(mcpTransport);
     const tools = await mcpClient.listTools();
     assert.ok(tools.tools.some(({ name }) => name === "status"));
+    assert.ok(
+      tools.tools.find(({ name }) => name === "render").inputSchema.properties.kind.enum.includes("deployment-guide"),
+    );
     const status = await mcpClient.callTool({ name: "status", arguments: {} });
     assert.equal(status.isError, undefined);
     assert.equal(status.structuredContent.run.projectId, "demo");
   } finally {
     await mcpClient.close();
+  }
+  const coe = join(temporaryRoot, "coe");
+  await mkdir(join(coe, "archetypes", "storage"), { recursive: true });
+  await writeFile(join(coe, "archetypes", "storage", "main.bicep"), "output name string = 'fixture'\n");
+  await writeFile(join(coe, "archetypes", "storage", "AGENTS.md"), "Untrusted source instructions\n");
+  await runInTest("git", ["init", "--initial-branch", "fixture"], coe);
+  await runInTest("git", ["add", "."], coe);
+  await runInTest(
+    "git",
+    [
+      "-c",
+      "user.name=Fixture",
+      "-c",
+      "user.email=fixture@example.invalid",
+      "-c",
+      "core.hooksPath=/dev/null",
+      "commit",
+      "-qm",
+      "fixture",
+    ],
+    coe,
+  );
+  const revision = (await runInTest("git", ["rev-parse", "HEAD"], coe)).stdout.trim();
+  for (const clientId of ["github-copilot-vscode", "github-copilot-cli", "both"]) {
+    const consumer = clientId === "github-copilot-vscode" ? project : await createConsumer(`${clientId}-consumer`);
+    if (consumer !== project) {
+      await installCandidate(consumer, true);
+      await runInTest("git", ["init", "--initial-branch", "qualification"], consumer);
+    }
+    const binary = join(consumer, "node_modules", ".bin", process.platform === "win32" ? "apex.cmd" : "apex");
+    const cli = async (args) => JSON.parse((await runInTest(binary, [...args, "--json"], consumer)).stdout).result;
+    if (consumer !== project) {
+      const workspace = await cli(["bootstrap", "--client", clientId, "--yes"]);
+      assert.equal(workspace.projectCreated, false);
+      assert.equal(workspace.projectId, undefined);
+      assert.equal((await cli(["status"])).status, "needs_project");
+      assert.equal((await cli(["doctor"])).healthy, true);
+      const repeated = await cli(["bootstrap", "--client", clientId, "--yes"]);
+      assert.equal(repeated.resumed, true);
+      assert.equal(repeated.projectCreated, false);
+      await cli(["project", "create", "--project", "demo"]);
+    }
+    if (clientId === "both") {
+      assert.match(await readFile(join(consumer, ".github/agents/apex-cli.agent.md"), "utf8"), /name: APEX CLI\n/u);
+      assert.match(await readFile(join(consumer, ".github/agents/apex.agent.md"), "utf8"), /name: APEX\n/u);
+      await readFile(join(consumer, ".vscode/mcp.json"));
+      await readFile(join(consumer, ".github/mcp.json"));
+    }
+    const before = await cli(["status"]);
+    const resumed = await cli(["bootstrap", "--project", "demo", "--client", clientId, "--yes"]);
+    assert.equal(resumed.resumed, true);
+    assert.equal(resumed.runId, before.run.runId);
+    assert.equal(resumed.runtimeInstalled, false);
+    assert.deepEqual(await cli(["status"]), before);
+    const selection = ["--repository", coe, "--revision", revision, "--path", "archetypes/storage"];
+    const catalog = await cli([
+      "archetype",
+      "list",
+      "--repository",
+      coe,
+      "--revision",
+      revision,
+      "--path",
+      "archetypes",
+    ]);
+    assert.deepEqual(
+      catalog.candidates.map(({ selectedPath }) => selectedPath),
+      ["archetypes/storage"],
+    );
+    const proposal = await cli(["archetype", "inspect", ...selection]);
+    const importing = [
+      "archetype",
+      "import",
+      ...selection,
+      "--destination",
+      "workload",
+      "--expected-hash",
+      proposal.contentHash,
+    ];
+    await assert.rejects(cli(importing));
+    await cli([...importing, "--yes"]);
+    assert.deepEqual(await cli(["status"]), before);
+    assert.equal(await readFile(join(consumer, "workload", "main.bicep"), "utf8"), "output name string = 'fixture'\n");
+    await assert.rejects(readFile(join(consumer, "workload", "AGENTS.md")), { code: "ENOENT" });
+    await writeFile(join(consumer, "workload", "main.bicep"), "manual consumer edit\n");
+    await assert.rejects(cli([...importing, "--yes"]));
+    assert.equal(await readFile(join(consumer, "workload", "main.bicep"), "utf8"), "manual consumer edit\n");
+    const candidate = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      workload: "Recovered storage workload",
+      environment: "dev",
+      requirements: [
+        {
+          id: "REQ-1",
+          statement: "Preserve consumer ownership",
+          priority: "must",
+          status: "confirmed",
+          source: "consumer confirmation",
+        },
+      ],
+      assumptions: [],
+      unknowns: ["Recovery window needs consumer confirmation"],
+    };
+    const candidatePath = join(consumer, "requirements.json");
+    await writeFile(candidatePath, JSON.stringify(candidate));
+    const adoption = await cli([
+      "requirements",
+      "preview-adoption",
+      "--file",
+      candidatePath,
+      "--reason",
+      "Recover decisions",
+    ]);
+    await assert.rejects(
+      cli([
+        "requirements",
+        "adopt",
+        "--file",
+        candidatePath,
+        "--reason",
+        "Recover decisions",
+        "--expected-hash",
+        "f".repeat(64),
+        "--yes",
+      ]),
+    );
+    await cli([
+      "requirements",
+      "adopt",
+      "--file",
+      candidatePath,
+      "--reason",
+      "Recover decisions",
+      "--expected-hash",
+      adoption.proposalHash,
+      "--yes",
+    ]);
+    const next = await cli(["task", "next"]);
+    assert.equal(next.status, "task");
+    assert.equal(next.task.taskType, "requirements");
+    const taskContext = await cli(["task", "context", "--task", next.task.taskId]);
+    assert.deepEqual(taskContext.outputTemplates.requirements, candidate);
+    const outputPath = join(consumer, "requirements-output.json");
+    await writeFile(outputPath, JSON.stringify({ kind: "requirements", value: candidate }));
+    const accepted = await cli(["task", "complete", "--task", next.task.taskId, "--file", outputPath]);
+    const after = await cli(["status"]);
+    assert.equal(after.task, "requirements-review");
+    assert.ok(after.run.gates.every(({ state }) => !["approved", "inherited"].includes(state)));
+    assert.deepEqual(await cli(["status"]), after);
+    await assert.rejects(cli(["render", "--kind", "deployment-guide"]), /No current accepted plan/);
+    const amendment = {
+      schemaVersion: "1.0.0",
+      baseRequirementsHash: accepted.outputHashes.requirements,
+      updates: [{ id: "REQ-1", changes: { statement: "Preserve ownership after adaptation" } }],
+      additions: [
+        {
+          id: "REQ-2",
+          statement: "Confirm the recovery window",
+          priority: "should",
+          status: "deferred",
+          source: "consumer",
+        },
+      ],
+      removals: [],
+      fields: { budgetAndOperations: "Monthly budget EUR 500" },
+    };
+    const amendmentPath = join(consumer, "amendment.json");
+    await writeFile(amendmentPath, JSON.stringify(amendment));
+    const amendmentArgs = ["--file", amendmentPath, "--reason", "Adapt recovered decisions"];
+    const change = await cli(["requirements", "preview-amendment", ...amendmentArgs]);
+    assert.deepEqual(change.changedRequirementIds, ["REQ-1"]);
+    assert.deepEqual(change.addedRequirementIds, ["REQ-2"]);
+    assert.equal(change.sourceRequirementsHash, amendment.baseRequirementsHash);
+    const confirmArgs = ["requirements", "amend", ...amendmentArgs, "--expected-hash", change.proposalHash];
+    await assert.rejects(cli(confirmArgs), /--yes/);
+    assert.deepEqual(await cli(["status"]), after);
+    await cli([...confirmArgs, "--yes"]);
+    await assert.rejects(cli(["requirements", "preview-amendment", ...amendmentArgs]), /not current/);
+    const amendedTask = await cli(["task", "next"]);
+    assert.equal(amendedTask.status, "task");
+    assert.equal(amendedTask.task.taskType, "requirements");
+    const amendedContext = await cli(["task", "context", "--task", amendedTask.task.taskId]);
+    const merged = {
+      ...candidate,
+      ...amendment.fields,
+      requirements: [{ ...candidate.requirements[0], ...amendment.updates[0].changes }, ...amendment.additions],
+    };
+    assert.deepEqual(amendedContext.outputTemplates.requirements, merged);
+    await writeFile(outputPath, JSON.stringify({ kind: "requirements", value: merged }));
+    await cli(["task", "complete", "--task", amendedTask.task.taskId, "--file", outputPath]);
+    const amendedStatus = await cli(["status"]);
+    assert.equal(amendedStatus.task, "requirements-review");
+    assert.ok(amendedStatus.run.gates.every(({ state }) => !["approved", "inherited"].includes(state)));
+    assert.deepEqual(await cli(["status"]), amendedStatus);
+    assert.equal(await readFile(join(consumer, "workload", "main.bicep"), "utf8"), "manual consumer edit\n");
+    assert.equal(
+      JSON.parse(await readFile(join(consumer, ".apex", "customizations.lock.json"), "utf8")).clientId,
+      clientId,
+    );
   }
   for (const path of [".apex/local/run/saved.tfplan", ".apex/work/run/task/output.json", ".apex/cache/content/item"]) {
     await mkdir(join(project, path, ".."), { recursive: true });

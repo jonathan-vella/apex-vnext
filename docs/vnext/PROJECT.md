@@ -1,6 +1,6 @@
 # APEX vNext Checkpoint
 
-- **Updated:** 2026-09-16
+- **Updated:** 2026-09-21
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Integration branch:** `main`
 - **Product status:** Pre-release
@@ -10,7 +10,8 @@
 
 The approved direction is a COE workload factory with independent archetype reuse and conversational changes.
 Both ALZ-backed workloads and standalone single-subscription labs/demos are day-one requirements. Windows users run
-through WSL2 without a devcontainer. [PRD.md](PRD.md) is the canonical scope and quality reference.
+through WSL2 for VS Code Local and standalone CLI. Neither requires a devcontainer. Desktop-app work is parked.
+[PRD.md](PRD.md) is the canonical scope and quality reference.
 
 The standalone vNext repository owns a deterministic TypeScript runtime, versioned contracts, bounded capabilities,
 renderers, CLI/MCP lifecycle, managed VS Code and Copilot CLI projections, and deterministic qualification.
@@ -19,7 +20,227 @@ Repository modernization has retired original automation, prompts, compatibility
 scripts, stale root configuration, and unneeded development-container tooling. The active documentation has been rebuilt
 around vNext source authorities and Diátaxis navigation.
 
+## Active Completion Focus
+
+The maintainer parked all standalone desktop-app work on 2026-09-21. The active release targets only VS Code Local
+and standalone Copilot CLI on WSL2. Preserve desktop probes, Windows fixes and upstream findings without additional
+app tests, adapter implementation, native Windows CI or host setup. The
+[desktop backlog](ROADMAP.md#deferred-standalone-copilot-desktop-app) owns reactivation; built-in helpers remain deferred.
+
+PR #345 merged as `afca69ee4318052550d4993145e896329827a5fd`; its post-merge CI and release qualification passed.
+Candidate `67fefa2` has bounded user-confirmed VS Code/CLI intake and restart observations, not full workflow parity.
+The development desktop probes are separate evidence and must not be used to qualify these clients.
+
+The 2026-09-21 standalone CLI `1.0.86` recheck executed a tool-free worker through direct `--agent` selection despite
+`user-invocable: false`; see [ADR-0006](adrs/03-des-adr-0006-omit-cli-autonomous-workers.md).
+The maintainer-approved ADR revision removes visibility as a security blocker. Runtime authority tests and an isolated
+CLI-to-MCP probe reject invalid/stale work and accept a valid task without approving gates. Qualify actual CodeGen,
+Reviewer and Validator profiles next, preserving models, tool grants and kernel safeguards. Shipped worker membership
+remains unchanged pending that evidence; same-client review is not authenticated independent identity.
+The model identifier issue is resolved: CLI adapter `1.5.0` maps the same configured GPT models to documented CLI IDs
+and keeps user discovery separate from model invocation. Isolated canonical parents delegated all four review stages
+on both tracks; stored reviews bound the correct subjects and introduced no gate approvals. Governance template identity
+now uses the accepted policy artifact rather than its workflow alias. These bounded probes do not qualify review quality,
+CodeGen/Validator parent edges or the full lifecycle, and shipped CLI worker membership remains unchanged.
+The actual Reviewer accepted a bound Requirements finding; corrected CodeGen guidance produced one accepted tree on
+each track. Task-only IaC `validateTask` requests now execute native checks and return runtime-owned evidence with
+explicit unexecuted-validator blockers. Fresh CLI Validator probes on both tracks report those blockers and stop without
+completion or Gate 4 changes. Required executable security-baseline/logical-parity evidence remains an implementation
+gap; command receipts must not be used to claim those checks passed. See the
+[worker matrix](CLIENT-QUALIFICATION.md#cli-worker-qualification).
+Native completion and preview now reject required unexecuted or simulated evidence instead of accepting supplied
+business-check hashes. Codegen acceptance also compares manifest resource types, descriptors and dependency sets with
+approved artifacts. This strengthens rejection behavior but does not implement the missing business executors.
+Storage-account property hardening now has a bounded concrete-value evaluator. Bicep source validation attaches its
+limited diagnostics for accepted storage bindings to the receipt and task-only response; four passing properties do
+not satisfy the full security baseline. Actual local-module compilation and both-track property/unknown-value tests
+cover this subset. Production validation remains blocked on the unimplemented required coverage.
+Complete the remaining product and paired-client matrix. Do not restart completed cleanup
+or add optional agent helpers, telemetry or orchestration infrastructure to accelerate delivery.
+
+Pending branch changes must be separated by relevance before integration: retain and qualify shared CLI guidance only
+where needed for the active clients; park desktop-only runtime changes and evidence without deleting or shipping them
+as an implied support promise. Do not reset the dirty branch or overwrite prior test workspaces.
+
+### Governance Native Validation Checkpoint
+
+The current working-tree slice passes the accepted nonempty policy map and generated managed-resource execution
+bindings into native source validation on both IaC tracks, reusing preview's binding construction. Bicep now evaluates
+mapped properties from the existing build command's output and includes source-bound policy evidence in its native
+validation receipt. Validation acceptance and preview require complete, passing evidence for the accepted mappings.
+The business policy validator is recorded as native only when that evaluation ran. Empty maps and Terraform's
+command-only validation do not claim policy execution.
+
+Regressions cover Deny, Modify and DeployIfNotExists, receipt tampering, stale inputs, input mutation during commands,
+missing bindings and rejected values. Rejection preserves the journal and closed Gate 4. Installed-Bicep tests verify
+matching and mismatched properties using symbolic-name compiler output. Unresolved expressions and unsupported
+resource bindings fail closed; this does not establish full AVM coverage or deployed-resource compliance.
+
+The Bicep evidence slice passed `qualify:vnext`. Terraform already evaluates saved-plan properties during native
+preview before Gate 4; its source-validation commands alone do not resolve planned values. A subsequent provider fix
+bounds and snapshots policy inputs before preview awaits, preventing caller mutation from changing expected values,
+removing mappings or replacing resource bindings during commands. All 285 provider tests and both focused Terraform
+saved-plan service tests passed after that fix. No authenticated planning was run or added to source validation.
+
+Both tracks now have nonempty management-group-baseline import through reconciliation, review, planning, code
+acceptance, restart and simulated deployment coverage. Tests retain Deny, Modify and DeployIfNotExists identities,
+reject missing/substituted/exempt mappings without changing the journal or opening Gate 2, and exclude unrelated
+subscription data from the selected snapshot and metadata sentinels from persisted runtime files.
+
+The same imported-baseline fixture now also uses production native providers with mocked external commands and
+file-backed runtime stores. Bicep rejects mismatched properties during source validation; both tracks reject mismatched
+preview properties without journal changes or opening Gate 4. After service restart, passing previews persist evidence
+bound to the accepted source, policy identities and exact mocked compiler/plan output. Terraform source validation
+remains command-only. These cases stop before native apply; simulated deployment and mocked output are not live
+compliance evidence.
+
+Bicep policy lookup now traverses embedded deployment templates using qualified `module::child` symbols, preserving
+parent conditions and loop restrictions. Installed-Bicep tests cover matching and mismatched local-module properties.
+Imported-policy workflows cover Bicep AVM-style bindings with explicit physical ownership and Terraform exact
+child-resource addresses. Both preview providers snapshot bounded policy inputs before awaited commands. Unresolved
+ARM expressions, missing symbols, ambiguous resources and unbound module containers remain fail-closed, not compliant.
+
+The combined governance changes passed `npm run qualify:vnext` on 2026-09-21 with exit code 0, including package tests,
+runtime validators, packaging and clean installation. Focused checks also passed all 336 provider/evaluator tests and
+13 imported-policy/ownership workflow tests. This is working-tree qualification, not a published release or client/cloud
+acceptance result.
+
+The remaining acceptance boundary is exact-candidate client and separately authorized cloud evidence, including actual
+AVM versions and parameterized workloads. Keep Terraform's earlier command-only evidence distinct from saved-plan
+policy evidence. Issue #344 remains open pending that acceptance; desktop work remains parked.
+
+### Local Archetype Reuse Checkpoint
+
+The working-tree `archetype inspect` and confirmation-gated `archetype import` commands read a selected local Git
+subtree at an exact commit and create a new independent directory with typed provenance. Tests cover uncommitted source
+edits, known credentials, source authority, unsafe paths, symlinks, executable files, byte limits, case collisions,
+proposal tampering, concurrent imports and destination conflicts. The operation does not execute source instructions,
+alter current runs or approve gates. It is not remote discovery or selective IaC regeneration.
+
+The next local slice adds explicit adoption and revision of consumer `requirements-v1` decisions. A typed impact
+proposal binds the candidate, reason, run, journal head and owner epoch; confirmation uses the existing atomic workflow
+invalidation path. Recovered decisions resume as the exact Requirements task template and still require review and
+approval. Tests cover restart, stale candidates/heads, unresolved deployment execution and preserved consumer files.
+Generated review documents and diagrams reject manual conflicts and skip byte-identical rewrites. Codegen verifies
+previous accepted source before generation, direct staging and acceptance; both-track tests preserve edited files and
+unchanged journal state on conflicts. Reviewer corrections reuse previously accepted decisions without repeating intake.
+Automatic document
+interpretation, remote catalog discovery, detailed cost/policy impact analysis and resource-level selective IaC
+regeneration remain open; these commands do not establish complete conversational adaptation acceptance.
+
+Canonical Planner-to-CodeGen and Planner-to-Validator CLI probes now have both-track routing evidence. Generation
+completed once per run; Validator correctly remained blocked on unexecuted business checks. Shipped worker membership
+and permissions remain unchanged.
+
 ## Open Release Work
+
+Bootstrap now separates repository readiness from project creation: the wizard has no project ID, environment, workload
+target or IaC questions. Managed clients/runtime can be installed and verified with zero projects; CLI/MCP status returns
+`needs_project` and the coordinator gathers the first project's details afterward. Target-bound central-baseline checks
+are deferred rather than manufacturing a project to run them. Explicit project creation remains a separate operation.
+
+Existing approved identities now have a bounded governance provisioning preview and separately confirmed executor.
+It verifies public-cloud tenant/principal bindings, protected GitHub environment settings, observed OIDC subjects and
+the live Reader definition before creating only missing exact federation or Reader assignments. Each action is reread
+and verified, with local partial-outcome receipts and no automatic retry on uncertainty. Offline tests cover conflicts,
+stale plans, permission failures and changed protections. No live provisioning has been performed. New identity creation,
+GitHub environment/variable setup, collection dispatch and first baseline PR completion remain open.
+
+Reviewed GitHub repository creation and push now has a typed plan and a separately confirmed executor. The plan binds
+the authenticated viewer, requested owner type, existing repository identity and visibility, the local branch, commit,
+tracked files and any uncommitted changes. It blocks foreign owners, visibility drift, conflicting remotes, unclean
+working trees and divergent remote history; `forcePush` is a contract constant of `false`, so no force push can be
+planned or executed. Execution creates the repository, adds `origin` and pushes only the reviewed branch, rereading
+the plan before and after each action and writing a local partial-outcome receipt without retry or rollback. Already
+published commits report `ready` with no actions, making reruns duplicate-safe. `bootstrap repository-plan` and the
+confirmed `bootstrap repository-publish` expose the same deterministic implementation the wizard uses. All coverage is
+offline with a simulated process runner; no live GitHub repository has been created or pushed by this work.
+
+Terminal bootstrap now guides client selection, optional remote COE catalog selection, confirmed independent copies,
+per-workload local setup and consumer-governance plan inputs. It delegates mutations to existing service operations,
+retains partial progress and cancellation, and reports outstanding governance/client/GitHub work as pending or blocked.
+Batch resumption after local initialization verifies child bootstrap integrity and original source hashes while keeping
+setup files and later unrelated user content. A real Linux pseudo-terminal test confirms cancellation creates no files.
+The first-run flow still lacks automated GitHub creation, defaults/decision adoption and confirmed OIDC execution.
+
+Governance onboarding now has a read-only `bootstrap governance-plan` command and typed configuration/plan contracts.
+It derives federation subjects from observed GitHub repository/OIDC settings, blocks unsupported subject templates,
+and proposes scoped Reader access with collection disabled. Identity, access, environment protection, provisioning,
+workflow dispatch and first-review-PR completion remain pending; no setup or deployment authority follows from a plan.
+
+A read-only planner probe against this repository observed the immutable subject prefix and derived the expected
+`governance` environment subject. Evidence digest `f5792037872f94ea53aea93ad965c46595d59bccfaf63b1038b6aee1fe691e73`
+bound the repository and OIDC responses. The result remained pending, with collection disabled and no file or remote
+configuration changes. Live Reader role metadata confirmed control-plane reads with no data actions; no role was assigned.
+
+Remote GitHub COE list/inspect/import now reads exact commits through bounded API calls without checkout, preserving
+the existing exclusions, content checks, explicit import confirmation and independent-copy semantics. Proposals bind
+the remote URL and blob-verified content. Private authentication is external to APEX; branch selection, guided
+multi-archetype bootstrap, defaults adoption and automatic per-workload initialization remain open.
+
+The new `bootstrap coe-plan` and confirmed `coe-import` path groups up to 16 remote selections with a 32 MiB reusable
+content budget. Each destination remains independent. Exact origin/file checks permit unchanged-copy reruns; conflicting
+or partial destinations remain preserved and blocked. Later failures report partial progress without rolling back prior
+copies. Guided selection, defaults confirmation and separate workload initialization are not yet automated by this batch.
+
+A read-only GitHub API probe compared `docs/explanation` at source commit
+`709db7878e754a195f20ff02c2f5c50121ba62a5` against local Git inspection: all four file hashes and exclusions matched,
+with remote proposal hash `52eda3eab1b70064524fb437921b1ca702cde06fef4fbf6556c38e792a4b7995`. No files or runtime
+authority were imported. This checks real remote reads, not arbitrary-host support or complete COE onboarding.
+
+First-time onboarding now has an agreed [acceptance contract](PRD.md#req-onboarding-001-first-time-install-and-repository-bootstrap)
+and [delivery sequence](ROADMAP.md#first-time-setup-delivery). The initial `bootstrap plan` implementation is a read-only
+local preflight for the Git boundary, workspace runtime version and existing APEX state. Matching intact local
+initialization can now be reused by bootstrap without commands, rewrites or duplicate runs; partial or conflicting state
+remains blocked. It reports unassessed machine,
+client, COE, GitHub, OIDC and baseline checks rather than claiming complete onboarding. The pre-Node installer, resumable
+remote multi-archetype bootstrap and approved governance provisioning remain open. Combined local installation now
+selects both client projections with one managed lifecycle and namespaced CLI profiles; complete paired-client discovery
+and workflow acceptance remain unqualified. Repeated updates and uninstall preserve user-merged managed content.
+
+Candidate packaging now emits a checksum/provenance-bound pre-Node Bash installer with canonical toolchain versions,
+confirmed user-local tool installation, separately approved system packages, archive checks and post-install version
+verification. Offline tests cover refusal and preservation paths. The clean-machine WSL run, host-extension setup,
+guided interaction and public installer distribution remain unqualified; no machine tools were installed for this work.
+
+The local implementation now includes bounded local catalog discovery, confirmed requirements adoption/revision,
+generated-file and prior-IaC conflict protection, structured Architecture decision records, evidence-bound deployment
+summaries and optional Diagnosis operational handoff. Diagnosis packages include a navigable inventory/policy/design-cost
+index. These are implemented source paths with automated checks, not complete live-client acceptance: native business
+validation, resource-level selective regeneration, actual as-built spend and independently observed operational tests
+remain incomplete. Procedures stay untested unless a separate evidence-producing workflow establishes otherwise.
+
+Accepted plans now produce a source-bound deployment guide with resource and configuration-reference tables, intended
+ownership and outputs, and the existing preview/approval execution procedure. Generated guides preserve manual edits;
+current rendering refuses invalidated or mismatched sources. This is design guidance, not observed endpoints, verified
+access, deployment approval or workload-specific operational acceptance.
+
+The implementation-plan review file and direct CLI/MCP view now share one deterministic renderer over current accepted
+intent. Both retain source hashes, logical resources, dependencies, controls and intended outputs; invalidated intent
+is unavailable rather than presented as a current plan.
+
+Base-bound requirements amendments now merge bounded ID-addressed updates, additions, removals and explicitly changed
+fields before using the existing confirmed-revision path. They preserve untouched decisions and reject conflicting IDs,
+stale revisions and journal changes during preview. Full-document submission and normal Requirements review remain
+available; this is not automatic conversational impact analysis or resource-level selective regeneration.
+
+The authorized output-quality reference was inspected at `jonathan-vella/aks-basic` commit
+`bb7ae9021a0fc59d10d129710a8a260b573d9dcc`, limited to the first sections of its edge-protection ADR, operations runbook
+and deployment guide under `agent-output/apex-aks`. No reference state, approval or artifact corpus was imported.
+The useful comparison points are workload-specific alternatives, environment differences, resource-specific health
+checks, ownership, deployment prerequisites and parameter guidance. Current typed ADR/runbook fields can carry much of
+that detail, but fixture rendering does not prove representative output quality. Workload-specific troubleshooting,
+deployment-guide acceptance, diagram consistency and human operational acceptance remain open. Reference prices, settings
+and compliance assertions are not authority for this candidate.
+
+Native source validation now records a separate, map-bound `no-actionable-mappings` applicability receipt for an accepted
+empty policy map on either track. This credits only that applicability check, not property evaluation or full compliance.
+Compiled Bicep parity now checks supported native resources and explicit diagnostic scopes against accepted bindings.
+A closed storage-only baseline can execute all required source validators using generated symbolic configuration.
+An actual Planner-to-Validator CLI probe accepted that bounded path with real compiler receipts and Gate 4 closed;
+see [client qualification](CLIENT-QUALIFICATION.md#current-worker-attempt). Terraform and mixed-service baseline/parity
+coverage, clean packaged-client acceptance and live operations remain incomplete. Shipped CLI workers remain disabled
+pending the required broader qualification.
 
 - Complete the [MCP contract follow-up](ROADMAP.md#mcp-contract-follow-up). The 2026-09-18 review reproduced invalid
   string/list results under SDK 1.29.0 and loss of stable error codes. All 34 tools now have output contracts, strict
@@ -33,14 +254,15 @@ around vNext source authorities and Diátaxis navigation.
   bounded context/reviewer packs, stage criteria/dispositions and routing/tool scope have implementation and focused
   tests. Exact-client checks remain pending. Scoped prompt inspection found no further safe deletion.
 - Complete issue #344's nonempty-policy enforcement through planning and native code validation. Path-only import,
-  standalone collection and evidenced-empty import-to-simulated-deployment tests exist for both tracks. Native apply
+  standalone collection and empty/nonempty import-to-simulated-deployment tests exist for both tracks. Native apply
   previews check concrete policy values against compiled Bicep/saved Terraform plans with source-bound receipts;
-  native top-level ownership checks reject foreign mutations; AVM child-resource identity and earlier code-validation
-  integration remain open.
+  native top-level ownership checks reject foreign mutations. Combined imported-baseline/native-provider tests reach
+  preview with mocked commands, including qualified Bicep module children and resolved Terraform child resources.
+  Actual AVM-version/workload acceptance remains unverified; Terraform source validation is still command-only.
 - Implement and qualify COE import, provenance, relevant change questions, manual-edit conflicts and selective
   regeneration using existing contracts and parameters.
 - Complete design/ADR and operational/as-built output against the PRD quality checklist.
-- Close both-client lifecycle gaps on WSL2 in both profiles; generated projections do not prove complete outcomes.
+- Close VS Code and standalone CLI lifecycle gaps on WSL2 in both profiles; projections do not prove outcomes.
 - Evaluate Agent Plugins and APEX MCP redistribution after features work; npm remains the current implementation.
 - Complete exact-candidate live qualification for supported client interactions.
 - Complete separately authorized Bicep and Terraform cloud qualification.

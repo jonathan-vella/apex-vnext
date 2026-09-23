@@ -33,10 +33,16 @@ import {
   NATIVE_VALIDATION_COMMANDS,
   calculateNativeValidationCommandHash,
   calculateNativeValidationReceiptHash,
+  calculatePolicyValidationDigest,
+  hasValidArchetypeSourceProposal,
   hasValidNativeValidationReceipt,
   LiveQualificationV1Schema,
   LIVE_QUALIFICATION_SCENARIO_IDS,
   OnboardingConfigV1Schema,
+  BootstrapPlanV1Schema,
+  GovernanceSetupConfigV1Schema,
+  GovernanceSetupPlanV1Schema,
+  ArchetypeBatchConfigV1Schema,
   PolicyPropertyMapV1Schema,
   PricingEvidenceV1Schema,
   PricingRequestV1Schema,
@@ -44,6 +50,8 @@ import {
   QualityMeasurementsV1Schema,
   ArchitectureAvailabilityV1Schema,
   RequirementsV1Schema,
+  RequirementsAmendmentV1Schema,
+  RequirementsChangeProposalV1Schema,
   ReviewFindingsV1Schema,
   RuntimeBundleLockV1Schema,
   ScenarioV1Schema,
@@ -164,8 +172,204 @@ describe("Wave 1 contracts", () => {
       const receipt = { ...body, receiptHash: calculateNativeValidationReceiptHash(body) };
       assert.equal(Value.Check(NativeValidationReceiptV1Schema, receipt), true);
       assert.equal(hasValidNativeValidationReceipt(receipt, body), true);
+      const applicable = {
+        ...body,
+        policyApplicability: { status: "no-actionable-mappings" as const, policyMapContentHash: body.policyHash },
+      };
+      assert.equal(
+        hasValidNativeValidationReceipt(
+          { ...applicable, receiptHash: calculateNativeValidationReceiptHash(applicable) },
+          body,
+        ),
+        true,
+      );
+      for (const mutation of [
+        { ...applicable, policyApplicability: { ...applicable.policyApplicability, policyMapContentHash: otherHash } },
+        { ...applicable, policyApplicability: { ...applicable.policyApplicability, status: "compliant" } },
+      ])
+        assert.equal(
+          hasValidNativeValidationReceipt(
+            { ...mutation, receiptHash: calculatePolicyValidationDigest(mutation) },
+            body,
+          ),
+          false,
+        );
+      if (track === "bicep") {
+        const routing: Omit<NativeValidationReceiptV1, "receiptHash"> = {
+          ...body,
+          storageDiagnostics: {
+            storage: {
+              coverage: "bicep-storage-service-diagnostics-v1",
+              fullBaselineEvaluated: false,
+              sourceHash: body.sourceHash,
+              inputHash: otherHash,
+              bindingHash: hash,
+              outcome: "pass",
+              reason: "matched",
+            },
+          },
+        };
+        assert.equal(
+          hasValidNativeValidationReceipt(
+            { ...routing, receiptHash: calculateNativeValidationReceiptHash(routing) },
+            body,
+          ),
+          true,
+        );
+        for (const patch of [
+          { sourceHash: otherHash },
+          { fullBaselineEvaluated: true },
+          { outcome: "fail" },
+          { reason: "workspace-mismatch" },
+        ]) {
+          const altered = {
+            ...routing,
+            storageDiagnostics: { storage: { ...routing.storageDiagnostics!.storage!, ...patch } },
+          };
+          assert.equal(
+            hasValidNativeValidationReceipt(
+              { ...altered, receiptHash: calculatePolicyValidationDigest(altered) },
+              body,
+            ),
+            false,
+          );
+        }
+        const parityBody: Omit<NativeValidationReceiptV1, "receiptHash"> = {
+          ...body,
+          resourceParity: {
+            coverage: "bicep-symbolic-resource-parity-v1",
+            sourceHash: body.sourceHash,
+            manifestHash: hash,
+            inputHash: otherHash,
+            outcome: "pass",
+            reason: "matched",
+          },
+        };
+        assert.equal(
+          hasValidNativeValidationReceipt(
+            { ...parityBody, receiptHash: calculateNativeValidationReceiptHash(parityBody) },
+            body,
+          ),
+          true,
+        );
+        for (const patch of [
+          { sourceHash: otherHash },
+          { outcome: "fail" },
+          { reason: "coverage-mismatch" },
+          { coverage: "full" },
+        ]) {
+          const altered = { ...parityBody, resourceParity: { ...parityBody.resourceParity!, ...patch } };
+          assert.equal(
+            hasValidNativeValidationReceipt(
+              { ...altered, receiptHash: calculatePolicyValidationDigest(altered) },
+              body,
+            ),
+            false,
+          );
+        }
+        const baselineBody: Omit<NativeValidationReceiptV1, "receiptHash"> = {
+          ...parityBody,
+          resourceParity: { ...parityBody.resourceParity!, bindingHash: hash },
+          securityBaseline: {
+            coverage: "bicep-storage-only-baseline-v1",
+            sourceHash: body.sourceHash,
+            inputHash: otherHash,
+            manifestHash: hash,
+            bindingHash: hash,
+            outcome: "pass",
+            reason: "matched",
+          },
+        };
+        assert.equal(
+          hasValidNativeValidationReceipt(
+            { ...baselineBody, receiptHash: calculateNativeValidationReceiptHash(baselineBody) },
+            body,
+          ),
+          true,
+        );
+        for (const patch of [
+          { bindingHash: otherHash },
+          { manifestHash: otherHash },
+          { inputHash: hash },
+          { sourceHash: otherHash },
+          { reason: "storage-controls" },
+          { outcome: "unsupported" },
+          { coverage: "full" },
+        ]) {
+          const changed = { ...baselineBody, securityBaseline: { ...baselineBody.securityBaseline!, ...patch } };
+          assert.equal(
+            hasValidNativeValidationReceipt(
+              { ...changed, receiptHash: calculatePolicyValidationDigest(changed) },
+              body,
+            ),
+            false,
+          );
+        }
+        const withoutParity = { ...baselineBody };
+        delete withoutParity.resourceParity;
+        assert.equal(
+          hasValidNativeValidationReceipt(
+            { ...withoutParity, receiptHash: calculateNativeValidationReceiptHash(withoutParity) },
+            body,
+          ),
+          false,
+        );
+        const controls = [
+          ["properties.minimumTlsVersion", "TLS1_2"],
+          ["properties.supportsHttpsTrafficOnly", true],
+          ["properties.allowBlobPublicAccess", false],
+          ["properties.allowSharedKeyAccess", false],
+        ] as const;
+        const diagnostics: NonNullable<NativeValidationReceiptV1["storageSecurity"]> = {
+          storage: {
+            coverage: "storage-account-property-hardening-v1",
+            fullBaselineEvaluated: false,
+            sourceHash: hash,
+            inputHash: otherHash,
+            bindingHash: hash,
+            outcome: "pass",
+            results: controls.map(([propertyPath, expected]) => ({
+              propertyPath,
+              expectedValueDigest: calculatePolicyValidationDigest(expected),
+              observedValueDigest: calculatePolicyValidationDigest(expected),
+              outcome: "pass",
+              reason: "matched",
+            })),
+          },
+        };
+        const check = (storageSecurity: typeof diagnostics) => {
+          const changed = { ...body, storageSecurity };
+          return hasValidNativeValidationReceipt(
+            { ...changed, receiptHash: calculateNativeValidationReceiptHash(changed) },
+            body,
+          );
+        };
+        assert.equal(check(diagnostics), true);
+        for (const mutation of [
+          "path",
+          "expected",
+          "duplicate",
+          "reason",
+          "mismatch-digests",
+          "missing-observed",
+          "mixed-inputs",
+        ] as const) {
+          const changed = structuredClone(diagnostics);
+          const result = changed.storage!.results[0]!;
+          if (mutation === "path") result.propertyPath = "unrelated";
+          else if (mutation === "expected") result.expectedValueDigest = result.observedValueDigest = hash;
+          else if (mutation === "duplicate") changed.storage!.results[1] = { ...result };
+          else if (mutation === "mixed-inputs") changed.other = { ...changed.storage!, inputHash: hash };
+          else {
+            changed.storage!.outcome = result.outcome = "fail";
+            result.reason = mutation === "reason" ? "unsupported-expression" : "value-mismatch";
+            if (mutation === "missing-observed") delete result.observedValueDigest;
+          }
+          assert.equal(check(changed), false, mutation);
+        }
+      }
       assert.equal(schemaById[NativeValidationReceiptV1Schema.$id!], NativeValidationReceiptV1Schema);
-      assert.equal(contractMetadata[NativeValidationReceiptV1Schema.$id!]?.maxBytes, 16_384);
+      assert.equal(contractMetadata[NativeValidationReceiptV1Schema.$id!]?.maxBytes, 8_404_992);
       assert.equal(
         calculateNativeValidationReceiptHash(Object.fromEntries(Object.entries(body).reverse()) as typeof body),
         receipt.receiptHash,
@@ -228,6 +432,207 @@ describe("Wave 1 contracts", () => {
       }
     });
   }
+
+  it("binds archetype origin proposals without accepting imported authority", () => {
+    const body = {
+      schemaVersion: "1.0.0",
+      repositoryPath: "/source/coe",
+      revision: "a".repeat(40),
+      selectedPath: "archetypes/storage",
+      authorityImported: false,
+      requiresConsumerReview: true,
+      files: [{ path: "main.bicep", hash, bytes: 10 }],
+      excluded: [],
+    };
+    const proposal = { ...body, contentHash: calculatePolicyValidationDigest(body) };
+    assert.equal(hasValidArchetypeSourceProposal(proposal), true);
+    for (const changed of [
+      { ...body, authorityImported: true },
+      { ...body, requiresConsumerReview: false },
+      { ...body, revision: "HEAD" },
+      { ...body, selectedPath: "../outside" },
+      { ...body, files: [{ path: "/absolute", hash, bytes: 10 }] },
+      { ...body, files: [{ path: "nested/../outside", hash, bytes: 10 }] },
+      { ...body, files: [{ path: "main.bicep", hash, bytes: 1_048_577 }] },
+      { ...body, excluded: [{ path: "MAIN.bicep", reason: "source-authority" }] },
+      { ...body, approval: true },
+    ])
+      assert.equal(
+        hasValidArchetypeSourceProposal({ ...changed, contentHash: calculatePolicyValidationDigest(changed) }),
+        false,
+      );
+    assert.equal(hasValidArchetypeSourceProposal({ ...proposal, revision: "b".repeat(40) }), false);
+  });
+
+  it("bounds requirements amendments without allowing identity or requirement-ID replacement", () => {
+    const amendment = {
+      schemaVersion: "1.0.0",
+      baseRequirementsHash: "a".repeat(64),
+      updates: [{ id: "REQ-1", changes: { statement: "Updated objective" } }],
+      additions: [],
+      removals: [],
+      fields: { budgetAndOperations: "EUR 500" },
+    };
+    assert.equal(Value.Check(RequirementsAmendmentV1Schema, amendment), true);
+    for (const changed of [
+      { ...amendment, baseRequirementsHash: "invalid" },
+      { ...amendment, updates: Array.from({ length: 129 }, () => amendment.updates[0]) },
+      { ...amendment, updates: [{ id: "REQ-1", changes: {} }] },
+      { ...amendment, updates: [{ id: "REQ-1", changes: { id: "REQ-2" } }] },
+      ...["schemaVersion", "projectId", "environment", "requirements"].map((key) => ({
+        ...amendment,
+        fields: { [key]: "changed" },
+      })),
+      { ...amendment, approved: true },
+    ])
+      assert.equal(Value.Check(RequirementsAmendmentV1Schema, changed), false);
+  });
+
+  it("keeps requirements change proposals bounded and distinct from deployment authority", () => {
+    const proposal = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run-1",
+      expectedHead: hash,
+      ownerEpoch: 0,
+      sourceRequirementsHash: hash,
+      candidateHash: hash,
+      reason: "Change budget",
+      mode: "revise",
+      addedRequirementIds: [],
+      removedRequirementIds: [],
+      changedRequirementIds: ["budget"],
+      retainedRequirementIds: ["availability"],
+      changedFields: [],
+      invalidatedNodes: ["requirements"],
+      invalidatedGates: [1, 2, 3, 4],
+      requiresReassessment: ["cost", "policy", "security", "dependencies", "code", "documents"],
+      filesModified: false,
+      deploymentAuthorized: false,
+      proposalHash: hash,
+    };
+    assert.equal(Value.Check(RequirementsChangeProposalV1Schema, proposal), true);
+    assert.equal(
+      Value.Check(RequirementsChangeProposalV1Schema, { ...proposal, mode: "adopt", sourceRequirementsHash: null }),
+      true,
+    );
+    for (const changed of [
+      { ...proposal, deploymentAuthorized: true },
+      { ...proposal, filesModified: true },
+      { ...proposal, ownerEpoch: -1 },
+      { ...proposal, expectedHead: "HEAD" },
+      { ...proposal, invalidatedGates: [5] },
+      { ...proposal, changedRequirementIds: ["same", "same"] },
+      { ...proposal, reason: "x".repeat(2049) },
+      { ...proposal, approval: true },
+    ])
+      assert.equal(Value.Check(RequirementsChangeProposalV1Schema, changed), false);
+  });
+
+  it("requires explicit alternatives and all WAF impacts for structured Architecture decisions", () => {
+    const record = {
+      id: "ADR-0001",
+      title: "Service selection",
+      context: "Workload constraints",
+      decision: "Selected service",
+      requirementIds: ["REQ-1"],
+      alternatives: [
+        { option: "Alternative A", benefits: "Simple", drawbacks: "Capacity", rejectionReason: "Cannot meet demand" },
+        {
+          option: "Alternative B",
+          benefits: "Flexible",
+          drawbacks: "Operations",
+          rejectionReason: "Requires unavailable staffing",
+        },
+      ],
+      positiveConsequences: ["Meets demand"],
+      negativeConsequences: ["Higher baseline cost"],
+      wafImpacts: {
+        security: "Identity controls",
+        reliability: "Recovery design",
+        "performance-efficiency": "Capacity",
+        "cost-optimization": "Cost trade-off",
+        "operational-excellence": "Staffing",
+      },
+      complianceConsiderations: "Review against target policy",
+      implementationNotes: "Bind selected service in plan",
+    };
+    const schema = ArchitectureV1Schema.properties.decisionRecords.items;
+    assert.equal(Value.Check(schema, record), true);
+    for (const changed of [
+      { ...record, alternatives: [] },
+      { ...record, negativeConsequences: [] },
+      { ...record, wafImpacts: { security: "Only one pillar" } },
+      { ...record, approval: true },
+      { ...record, id: "../escape" },
+    ])
+      assert.equal(Value.Check(schema, changed), false);
+  });
+
+  it("operational handoff describes procedures without asserting unobserved execution", () => {
+    const procedure = {
+      applicability: "applicable",
+      owner: "Operations",
+      prerequisites: ["Approved maintenance"],
+      steps: ["Follow resource-specific procedure"],
+      verification: "Verify expected health",
+      executionStatus: "untested",
+    };
+    const handoff = {
+      owner: "Operations",
+      escalation: "On-call escalation",
+      maintenanceWindow: "Sunday 02:00 UTC",
+      accessPrerequisites: ["Read-only monitoring role"],
+      configurationReferences: [{ name: "SERVICE_ENDPOINT", source: "Deployment output reference" }],
+      healthChecks: [
+        { resourceId: "/resource", check: "Inspect health endpoint", expectedOutcome: "Healthy", evidenceRefs: [] },
+      ],
+      monitoring: "Review target workspace alerts",
+      incidentResponse: procedure,
+      rollback: procedure,
+      recovery: {
+        applicability: "not-applicable",
+        rationale: "Stateless component; persistent data is externally owned",
+      },
+      limitations: ["Procedures have not been exercised"],
+    };
+    const schema = DiagnosisV1Schema.properties.operationalHandoff;
+    assert.equal(Value.Check(schema, handoff), true);
+    for (const changed of [
+      { ...handoff, recovery: { applicability: "not-applicable" } },
+      { ...handoff, rollback: { ...procedure, executionStatus: "tested" } },
+      { ...handoff, healthChecks: [] },
+      { ...handoff, approval: true },
+    ])
+      assert.equal(Value.Check(schema, changed), false);
+  });
+
+  it("bounds native diagnostic scope references without arbitrary expressions", () => {
+    const source = {
+      schemaVersion: "1.0.0",
+      projectId: "demo",
+      runId: "run",
+      track: "bicep",
+      intentHash: hash,
+      resourceBindings: {
+        diagnostic: {
+          implementation: "native:Microsoft.Insights/diagnosticSettings@2021-05-01-preview",
+          version: "2021-05-01-preview",
+          scopeLogicalId: "storage",
+          parameters: {},
+        },
+      },
+    };
+    assert.equal(Value.Check(IacBindingV1Schema, source), true);
+    for (const scopeLogicalId of ["../outside", "[resourceId('x')]", "foreign/id", "", "x".repeat(257)])
+      assert.equal(
+        Value.Check(IacBindingV1Schema, {
+          ...source,
+          resourceBindings: { diagnostic: { ...source.resourceBindings.diagnostic, scopeLogicalId } },
+        }),
+        false,
+      );
+  });
 
   it("uses one explicit persisted contract version", () => {
     const lock: RuntimeBundleLockV1 = {
@@ -331,6 +736,87 @@ describe("Wave 1 contracts", () => {
     ]) {
       assert.equal(Value.Check(IacBindingV1Schema, withResources(physicalResources)), false);
     }
+  });
+
+  it("bootstrap preflight cannot assert execution authority or hide unassessed operations", () => {
+    const plan = {
+      schemaVersion: "1.0.0",
+      config: { schemaVersion: "1.0.0", projectId: "demo" },
+      configHash: "a".repeat(64),
+      runtimeVersion: "0.10.0-next.5",
+      scope: "local-bootstrap-preflight-v1",
+      status: "pending",
+      checks: ["repository", "workspace-runtime", "apex-state"].map((id) => ({
+        id,
+        status: "pending",
+        reason: "Needs setup",
+      })),
+      unassessed: [
+        "machine-prerequisites",
+        "client-health",
+        "remote-coe",
+        "github-repository",
+        "governance-oidc",
+        "reviewed-baseline",
+      ],
+      filesModified: false,
+      executionAuthorized: false,
+    };
+    assert.equal(Value.Check(BootstrapPlanV1Schema, plan), true);
+    for (const changed of [
+      { ...plan, executionAuthorized: true },
+      { ...plan, filesModified: true },
+      { ...plan, unassessed: [] },
+      { ...plan, checks: [] },
+      { ...plan, configHash: "invalid" },
+      { ...plan, token: "secret" },
+    ])
+      assert.equal(Value.Check(BootstrapPlanV1Schema, changed), false);
+  });
+
+  it("governance setup inputs reject secrets, malformed scopes and incomplete reused identities", () => {
+    const config = {
+      schemaVersion: "1.0.0",
+      repository: "Example/COE",
+      tenantId: "a".repeat(8) + "-1111-1111-1111-111111111111",
+      subscriptionId: "22222222-2222-2222-2222-222222222222",
+      identity: { mode: "create", displayName: "coe-reader" },
+    };
+    assert.equal(Value.Check(GovernanceSetupConfigV1Schema, config), true);
+    assert.equal(Value.Check(GovernanceSetupConfigV1Schema, { ...config, managementGroupId: "a" }), true);
+    for (const invalid of [
+      { ...config, clientSecret: "forbidden" },
+      { ...config, managementGroupId: "../root" },
+      { ...config, repository: "Example/COE\n" },
+      { ...config, tenantId: config.tenantId + "\n" },
+      { ...config, managementGroupId: "platform\n" },
+      { ...config, identity: { mode: "reuse", clientId: config.tenantId } },
+      { ...config, repository: "Example/COE:environment:production" },
+      { ...config, identity: { mode: "create", displayName: "coe", role: "Owner" } },
+    ])
+      assert.equal(Value.Check(GovernanceSetupConfigV1Schema, invalid), false);
+    for (const field of ["filesModified", "executionAuthorized", "deploymentAuthorized"])
+      assert.equal(Value.Check(GovernanceSetupPlanV1Schema.properties[field as "executionAuthorized"], true), false);
+  });
+
+  it("batch archetype configuration requires bounded independent remote selections", () => {
+    const config = {
+      schemaVersion: "1.0.0",
+      repository: "https://github.com/example/coe",
+      revision: "a".repeat(40),
+      selections: [{ selectedPath: "archetypes/storage", destination: "storage" }],
+    };
+    assert.equal(Value.Check(ArchetypeBatchConfigV1Schema, config), true);
+    for (const invalid of [
+      { ...config, repository: "/local/path" },
+      { ...config, revision: "main" },
+      { ...config, selections: [] },
+      { ...config, selections: Array.from({ length: 17 }, () => config.selections[0]) },
+      { ...config, selections: [{ selectedPath: "../escape", destination: "storage" }] },
+      { ...config, selections: [{ selectedPath: "archetypes/storage", destination: "nested/workload" }] },
+      { ...config, authorityImported: true },
+    ])
+      assert.equal(Value.Check(ArchetypeBatchConfigV1Schema, invalid), false);
   });
 
   it("validates strict onboarding configuration with optional defaults", () => {

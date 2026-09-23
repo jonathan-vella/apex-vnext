@@ -1,6 +1,11 @@
 import { CapabilityPackLoader } from "@apexops/capabilities";
 import { ApexError, ApexService, type ServiceOptions, type TaskOutput } from "@apexops/cli";
-import { CONTRACT_VERSION, type QualityScorecardV1, type ResourceInventoryV1 } from "@apexops/contracts";
+import {
+  CONTRACT_VERSION,
+  type IacBindingV1,
+  type QualityScorecardV1,
+  type ResourceInventoryV1,
+} from "@apexops/contracts";
 import { ContentCache, EventJournal, ObjectStore, benchmarkKernel, contentCacheKey, sha256Json } from "@apexops/kernel";
 import { evaluateQualityScorecard, renderResourceInventory } from "@apexops/renderers";
 import { cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
@@ -727,7 +732,7 @@ function codegenBundle(context: TrackContext, plan: TaskOutput[]): TaskOutput[] 
       {
         logicalId: "api",
         type: "fake/service",
-        implementationAddress: "api",
+        implementationAddress: (plan[1]!.value as IacBindingV1).resourceBindings.api!.implementation,
         implementationKind: "resource",
         ownership: "managed",
         dependsOn: [],

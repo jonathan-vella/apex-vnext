@@ -451,7 +451,7 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
       {
         logicalId: "qualification-storage",
         type: "Microsoft.Storage/storageAccounts",
-        implementationAddress: track === "bicep" ? "module.storageAccount" : "module.storage_account",
+        implementationAddress: binding.resourceBindings["qualification-storage"].implementation,
         implementationKind: "module",
         ownership: "managed",
         dependsOn: [],

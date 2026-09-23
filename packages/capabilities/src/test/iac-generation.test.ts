@@ -12,6 +12,7 @@ import {
   ProcessRunner,
   sha256,
   validateGeneratedTree,
+  validateBicepResourceParity,
   writeVirtualTree,
   type GeneratedVirtualTree,
 } from "../index.js";
@@ -85,6 +86,79 @@ function assertExecutionAddresses(tree: GeneratedVirtualTree, sourceBinding: Iac
   );
 }
 
+test("native generators accept nested resource types and reject malformed type paths", () => {
+  const resourceType = "Microsoft.Storage/storageAccounts/blobServices";
+  const source = intent([{ id: "storage", type: resourceType, purpose: "Blob service", dependsOn: [], controls: [] }]);
+  for (const track of ["bicep", "terraform"] as const) {
+    const generate = track === "bicep" ? generateBicepTree : generateTerraformTree;
+    const parameters = {
+      ...nativeParameters,
+      name: track === "bicep" ? "stexample/default" : "default",
+      parentId: "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/stexample",
+      properties: {},
+    };
+    const selected = binding(track, `native:${resourceType}@2023-05-01`, "2023-05-01", parameters);
+    const tree = generate(source, selected);
+    assert.ok(
+      tree.files
+        .find(({ path }) => path === `main.${track === "bicep" ? "bicep" : "tf"}`)!
+        .content.includes(`${resourceType}@2023-05-01`),
+    );
+    assert.equal(tree.logicalManifest.resources[0]!.type, resourceType);
+    assertExecutionAddresses(tree, selected);
+    for (const invalid of [
+      "Microsoft.Storage//blobServices",
+      "Microsoft.Storage/storageAccounts/",
+      "Microsoft.Storage/storageAccounts/../blobServices",
+      "Microsoft.Storage/storageAccounts/[child]",
+      "Microsoft.Storage/storageAccounts\\blobServices",
+    ])
+      assert.throws(
+        () => generate(source, binding(track, `native:${invalid}@2023-05-01`, "2023-05-01", parameters)),
+        /Unsupported binding/,
+      );
+  }
+});
+
+test("diagnostic scope references emit only accepted native Bicep resource symbols", () => {
+  const source = intent();
+  source.resources.push({
+    id: "diagnostic",
+    type: "Microsoft.Insights/diagnosticSettings",
+    purpose: "Monitor",
+    dependsOn: ["storage"],
+    controls: [],
+  });
+  const selected = binding(
+    "bicep",
+    "native:Microsoft.Storage/storageAccounts@2023-05-01",
+    "2023-05-01",
+    nativeParameters,
+  );
+  selected.resourceBindings.diagnostic = {
+    implementation: "native:Microsoft.Insights/diagnosticSettings@2021-05-01-preview",
+    version: "2021-05-01-preview",
+    scopeLogicalId: "storage",
+    parameters: { name: "logs", location: "swedencentral", parentId: "/", properties: {} },
+  };
+  const tree = generateBicepTree(source, selected);
+  assert.match(tree.files.find(({ path }) => path === "main.bicep")!.content, /scope: storage/);
+  assert.equal(
+    tree.logicalManifest.resources.find(({ logicalId }) => logicalId === "diagnostic")!.generatedDependencies[0],
+    "storage",
+  );
+  for (const scopeLogicalId of ["missing", "diagnostic"]) {
+    const changed = structuredClone(selected);
+    changed.resourceBindings.diagnostic!.scopeLogicalId = scopeLogicalId;
+    assert.throws(() => generateBicepTree(source, changed), /Diagnostic scope/);
+  }
+  assert.throws(() => generateBicepTree(source, selected, { existingResources: ["storage"] }), /existing resource/);
+  assert.throws(() => generateTerraformTree(source, { ...selected, track: "terraform" }), /Diagnostic scope/);
+  const changed = structuredClone(selected);
+  changed.resourceBindings.diagnostic!.parameters.scope = "foreign";
+  assert.throws(() => generateBicepTree(source, changed), /Diagnostic scope/);
+});
+
 test("native generators are byte deterministic and enforce secure storage defaults", async () => {
   const sourceIntent = intent();
   const bicepBinding = binding(
@@ -102,9 +176,15 @@ test("native generators are byte deterministic and enforce secure storage defaul
   const first = generateBicepTree(sourceIntent, bicepBinding);
   const second = generateBicepTree(sourceIntent, bicepBinding);
   assert.deepEqual(first, second);
-  assert.equal(first.files[0]?.path, "main.bicep");
-  assert.match(first.files[0]!.content, /minimumTlsVersion: 'TLS1_2'/);
-  assert.match(first.files[0]!.content, /allowSharedKeyAccess: false/);
+  assert.deepEqual(
+    first.files.map(({ path }) => path),
+    ["bicepconfig.json", "main.bicep"],
+  );
+  assert.deepEqual(JSON.parse(first.files.find(({ path }) => path === "bicepconfig.json")!.content), {
+    experimentalFeaturesEnabled: { symbolicNameCodegen: true },
+  });
+  assert.match(first.files.find(({ path }) => path === "main.bicep")!.content, /minimumTlsVersion: 'TLS1_2'/);
+  assert.match(first.files.find(({ path }) => path === "main.bicep")!.content, /allowSharedKeyAccess: false/);
   assert.equal(first.treeHash, sha256(first.files));
   assertExecutionAddresses(first, bicepBinding);
 
@@ -185,8 +265,11 @@ test("AVM generators preserve exact pins, harden storage, and only include suppl
   });
   const bicep = generateBicepTree(sourceIntent, bicepBinding);
   assertExecutionAddresses(bicep, bicepBinding);
-  assert.match(bicep.files[0]!.content, /br\/public:avm\/res\/storage\/storage-account:0\.31\.0/);
-  assert.match(bicep.files[0]!.content, /allowBlobPublicAccess: false/);
+  assert.match(
+    bicep.files.find(({ path }) => path === "main.bicep")!.content,
+    /br\/public:avm\/res\/storage\/storage-account:0\.31\.0/,
+  );
+  assert.match(bicep.files.find(({ path }) => path === "main.bicep")!.content, /allowBlobPublicAccess: false/);
 
   const lock = "provider lock bytes\n";
   const terraformBinding = binding(
@@ -322,7 +405,7 @@ test("generators render dependencies and native existing-resource semantics", ()
     { ...binding("terraform", "native:x@y", "2023-05-01", {}), resourceBindings },
     { existingResources: ["storage"] },
   );
-  assert.match(bicep.files[0]!.content, /resource storage .* existing/);
+  assert.match(bicep.files.find(({ path }) => path === "main.bicep")!.content, /resource storage .* existing/);
   assertExecutionAddresses(bicep, { ...binding("bicep", "native:x@y", "2023-05-01", {}), resourceBindings });
   assertExecutionAddresses(terraform, { ...binding("terraform", "native:x@y", "2023-05-01", {}), resourceBindings });
   assert.match(terraform.files.find(({ path }) => path === "main.tf")!.content, /data "azapi_resource" "storage"/);
@@ -420,6 +503,93 @@ test("native generated trees compile with installed Bicep and Terraform tools", 
   await writeVirtualTree(bicepRoot, bicep);
   await writeVirtualTree(terraformRoot, terraform);
   const runner = new ProcessRunner();
+  const childType = "Microsoft.Storage/storageAccounts/blobServices";
+  const childTree = generateBicepTree(
+    intent([{ id: "storage", type: childType, purpose: "Blob configuration", dependsOn: [], controls: [] }]),
+    binding("bicep", `native:${childType}@2023-05-01`, "2023-05-01", {
+      name: "stexample/default",
+      location: "swedencentral",
+      parentId: nativeParameters.parentId,
+      properties: {},
+    }),
+  );
+  const childRoot = join(root, "bicep-child");
+  await writeVirtualTree(childRoot, childTree);
+  const compiledChild = await runner.run({
+    executable: "bicep",
+    args: ["build", "main.bicep", "--stdout"],
+    cwd: childRoot,
+    timeoutMs: 180_000,
+    maxOutputBytes: 2_000_000,
+  });
+  assert.equal(compiledChild.exitCode, 0, compiledChild.stderr);
+  const childTemplate = JSON.parse(compiledChild.stdout) as {
+    resources: Record<string, { type: string; name: string }>;
+  };
+  assert.equal(childTemplate.resources.storage!.type, childType);
+  assert.equal(childTemplate.resources.storage!.name, "stexample/default");
+  const scopedIntent = intent([
+    { id: "storage", type: childType, purpose: "Blob configuration", dependsOn: [], controls: [] },
+    {
+      id: "diagnostic",
+      type: "Microsoft.Insights/diagnosticSettings",
+      purpose: "Monitor",
+      dependsOn: ["storage"],
+      controls: [],
+    },
+  ]);
+  const scopedBinding = binding("bicep", `native:${childType}@2023-05-01`, "2023-05-01", {
+    name: "stexample/default",
+    location: "swedencentral",
+    parentId: nativeParameters.parentId,
+    properties: {},
+  });
+  scopedBinding.resourceBindings.diagnostic = {
+    implementation: "native:Microsoft.Insights/diagnosticSettings@2021-05-01-preview",
+    version: "2021-05-01-preview",
+    scopeLogicalId: "storage",
+    parameters: {
+      name: "logs",
+      location: "swedencentral",
+      parentId: "/",
+      properties: {
+        workspaceId:
+          "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.OperationalInsights/workspaces/log",
+        logs: [{ categoryGroup: "allLogs", enabled: true }],
+        metrics: [{ category: "Transaction", enabled: true }],
+      },
+    },
+  };
+  const scopedRoot = join(root, "bicep-scoped");
+  const scopedTree = generateBicepTree(scopedIntent, scopedBinding);
+  await writeVirtualTree(scopedRoot, scopedTree);
+  const compiledScoped = await runner.run({
+    executable: "bicep",
+    args: ["build", "main.bicep", "--stdout"],
+    cwd: scopedRoot,
+    timeoutMs: 180_000,
+    maxOutputBytes: 2_000_000,
+  });
+  assert.equal(compiledScoped.exitCode, 0, compiledScoped.stderr);
+  const scopedTemplate = JSON.parse(compiledScoped.stdout) as {
+    resources: Record<string, { type: string; scope?: string; location?: string }>;
+  };
+  const diagnostic = Object.values(scopedTemplate.resources).find(
+    ({ type }) => type === "Microsoft.Insights/diagnosticSettings",
+  )!;
+  assert.equal(
+    diagnostic.scope,
+    "[resourceId('Microsoft.Storage/storageAccounts/blobServices', split('stexample/default', '/')[0], split('stexample/default', '/')[1])]",
+  );
+  assert.equal(diagnostic.location, undefined);
+  const parity = validateBicepResourceParity({
+    sourceHash: HASH,
+    manifest: scopedTree.logicalManifest,
+    binding: scopedBinding,
+    json: compiledScoped.stdout,
+  });
+  assert.equal(parity.outcome, "pass");
+  assert.equal(parity.bindingHash, sha256(scopedBinding));
   for (const [executable, cwd] of [
     ["bicep", bicepRoot],
     ["terraform", terraformRoot],
@@ -451,7 +621,10 @@ test("writer creates files atomically and refuses overwrite, traversal, and syml
       binding("bicep", "native:Microsoft.Storage/storageAccounts@2023-05-01", "2023-05-01", nativeParameters),
     );
     await writeVirtualTree(root, tree);
-    assert.equal(await readFile(join(root, "main.bicep"), "utf8"), tree.files[0]!.content);
+    assert.equal(
+      await readFile(join(root, "main.bicep"), "utf8"),
+      tree.files.find(({ path }) => path === "main.bicep")!.content,
+    );
     await assert.rejects(writeVirtualTree(root, tree), /Refusing to overwrite/);
     await writeVirtualTree(root, tree, { overwrite: true });
 

@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { promisify } from "node:util";
 import { once } from "node:events";
-import { mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { CONTRACT_VERSION } from "@apexops/contracts";
+import { CONTRACT_VERSION, type ArchetypeSourceProposalV1, type ArchetypeBatchPlanV1 } from "@apexops/contracts";
 import type { ProcessRequest } from "@apexops/capabilities";
 import { sha256Json } from "@apexops/kernel";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -14,7 +15,7 @@ import { createMcpServer } from "../mcp.js";
 import { execute, formatHumanResult } from "../cli.js";
 import { ApexService } from "../service.js";
 import { ApexError, EXIT_CODES } from "../errors.js";
-import { meetsMinimumVersion, MINIMUM_NODE_VERSION } from "../version.js";
+import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "../version.js";
 import { nextTaskAfterInput, requirements, tempRoot, writeJson } from "./helpers.js";
 
 test("CLI emits a stable JSON envelope", async () => {
@@ -31,6 +32,433 @@ test("CLI emits a stable JSON envelope", async () => {
     ok: true,
     result: { version: "0.10.0-next.5", bundleVersion: "0.10.0-next.5", configVersion: "1.0.0" },
   });
+});
+
+test("CLI archetype inspection requires explicit repository, revision and selected path", async (context) => {
+  const root = await tempRoot();
+  const inspected = context.mock.method(ApexService.prototype, "inspectArchetype", async () => ({
+    status: "inspected",
+  }));
+  for (const argumentsList of [
+    [],
+    ["--repository", "source"],
+    ["--repository", "source", "--revision", "a".repeat(40)],
+  ])
+    await assert.rejects(execute(["archetype", "inspect", ...argumentsList], root), /Missing/);
+  assert.equal(inspected.mock.callCount(), 0);
+  assert.deepEqual(
+    await execute(
+      ["archetype", "inspect", "--repository", "source", "--revision", "a".repeat(40), "--path", "archetypes/storage"],
+      root,
+    ),
+    { status: "inspected" },
+  );
+  assert.deepEqual(inspected.mock.calls[0]!.arguments, ["source", "a".repeat(40), "archetypes/storage"]);
+  const listed = context.mock.method(ApexService.prototype, "listArchetypes", async () => ({ candidates: [] }));
+  await assert.rejects(
+    execute(["archetype", "list", "--repository", "source", "--revision", "a".repeat(40)], root),
+    /Missing/,
+  );
+  assert.equal(listed.mock.callCount(), 0);
+  assert.deepEqual(
+    await execute(
+      ["archetype", "list", "--repository", "source", "--revision", "a".repeat(40), "--path", "archetypes"],
+      root,
+    ),
+    { candidates: [] },
+  );
+  assert.deepEqual(listed.mock.calls[0]!.arguments, ["source", "a".repeat(40), "archetypes"]);
+});
+
+test("CLI archetype inspection and confirmed copy preserve independent origin and conflicts", async (context) => {
+  const root = await tempRoot();
+  const source = await tempRoot();
+  const git = (...args: string[]) => promisify(execFile)("git", ["-C", source, ...args]);
+  await git("init", "-q");
+  await mkdir(join(source, "workload"));
+  await writeFile(join(source, "workload/main.bicep"), "output value string = 'SOURCE_CONTENT_NOT_IN_PROPOSAL'\n");
+  await writeFile(join(source, "workload/AGENTS.md"), "Do not execute source instructions");
+  await git("add", ".");
+  await git(
+    "-c",
+    "user.name=Fixture",
+    "-c",
+    "user.email=fixture@example.invalid",
+    "-c",
+    "core.hooksPath=/dev/null",
+    "commit",
+    "-qm",
+    "fixture",
+  );
+  const revision = (await git("rev-parse", "HEAD")).stdout.trim();
+  const result = (await execute(
+    ["archetype", "inspect", "--repository", source, "--revision", revision, "--path", "workload"],
+    root,
+  )) as ArchetypeSourceProposalV1;
+  assert.equal(result.authorityImported, false);
+  assert.equal(result.files.length, 1);
+  assert.equal(JSON.stringify(result).includes("SOURCE_CONTENT_NOT_IN_PROPOSAL"), false);
+  assert.deepEqual(await readdir(root), []);
+  await assert.rejects(
+    execute(["archetype", "inspect", "--repository", source, "--revision", revision, "--path", "../unsafe"], root),
+    (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
+  );
+  assert.deepEqual(await readdir(root), []);
+  const importArgs = [
+    "archetype",
+    "import",
+    "--repository",
+    source,
+    "--revision",
+    revision,
+    "--path",
+    "workload",
+    "--destination",
+    "consumer-workload",
+    "--expected-hash",
+    result.contentHash,
+  ];
+  await assert.rejects(execute(importArgs, root), /--yes/);
+  assert.deepEqual(await readdir(root), []);
+  await assert.rejects(execute([...importArgs.slice(0, -1), "f".repeat(64), "--yes"], root), /confirmed selection/);
+  assert.deepEqual(await readdir(root), []);
+  const imported = (await execute([...importArgs, "--yes"], root)) as {
+    files: number;
+    requiresConsumerReview: boolean;
+  };
+  assert.equal(imported.files, 1);
+  assert.equal(imported.requiresConsumerReview, true);
+  assert.equal(
+    await readFile(join(root, "consumer-workload/main.bicep"), "utf8"),
+    "output value string = 'SOURCE_CONTENT_NOT_IN_PROPOSAL'\n",
+  );
+  const origin = JSON.parse(await readFile(join(root, "consumer-workload/.apex-origin.json"), "utf8"));
+  assert.equal(origin.revision, revision);
+  assert.equal(origin.authorityImported, false);
+  assert.deepEqual(await readdir(root), ["consumer-workload"]);
+  await writeFile(join(root, "consumer-workload/main.bicep"), "manual edit\n");
+  await assert.rejects(execute([...importArgs, "--yes"], root), /already exists/);
+  assert.equal(await readFile(join(root, "consumer-workload/main.bicep"), "utf8"), "manual edit\n");
+  const service = new ApexService(root);
+  const request = {
+    repositoryPath: source,
+    revision,
+    selectedPath: "workload",
+    destination: "concurrent-copy",
+    expectedHash: result.contentHash,
+    confirm: true,
+  };
+  const attempts = await Promise.allSettled([service.importArchetype(request), service.importArchetype(request)]);
+  assert.equal(attempts.filter(({ status }) => status === "fulfilled").length, 1);
+  assert.equal(
+    await readFile(join(root, "concurrent-copy/main.bicep"), "utf8"),
+    "output value string = 'SOURCE_CONTENT_NOT_IN_PROPOSAL'\n",
+  );
+  await symlink(source, join(root, "linked-copy"));
+  await assert.rejects(service.importArchetype({ ...request, destination: "linked-copy" }), /symlink|exists/i);
+  const destinationChecks = service as unknown as { assertSafeDestination(root: string, path: string): Promise<void> };
+  const checkDestination = destinationChecks.assertSafeDestination.bind(service);
+  let raceChecks = 0;
+  const racedPath = join(root, "raced-copy");
+  const race = context.mock.method(destinationChecks, "assertSafeDestination", async (base: string, path: string) => {
+    await checkDestination(base, path);
+    if (path === racedPath && ++raceChecks === 2) {
+      await mkdir(racedPath);
+      await writeFile(join(racedPath, "owner.txt"), "external owner\n");
+    }
+  });
+  await assert.rejects(service.importArchetype({ ...request, destination: "raced-copy" }), /already exists/);
+  assert.deepEqual(await readdir(racedPath), ["owner.txt"]);
+  assert.equal(await readFile(join(racedPath, "owner.txt"), "utf8"), "external owner\n");
+  race.mock.restore();
+  assert.equal(
+    (await readdir(root)).some((path) => path.startsWith(".apex")),
+    false,
+  );
+  await service.init({ projectId: "demo" });
+  const before = await service.status();
+  await service.importArchetype({ ...request, destination: "active-project-copy" });
+  assert.deepEqual(await service.status(), before);
+  await writeFile(join(root, ".apex-archetype-import.lock"), "existing lock\n");
+  await assert.rejects(service.importArchetype({ ...request, destination: "locked-copy" }), /import lock exists/);
+  assert.equal(await readFile(join(root, ".apex-archetype-import.lock"), "utf8"), "existing lock\n");
+  await assert.rejects(readFile(join(root, "locked-copy/main.bicep")), { code: "ENOENT" });
+  assert.deepEqual(await service.status(), before);
+});
+
+test("remote archetype CLI import rechecks exact content and records remote provenance without runtime authority", async (context) => {
+  const root = await tempRoot();
+  const revision = "a".repeat(40),
+    tree = "b".repeat(40),
+    selected = "c".repeat(40);
+  const content = Buffer.from("terraform {}\n");
+  const hash = createHash("sha1").update(`blob ${content.length}\0`).update(content).digest("hex");
+  const prefix = "repos/example/coe/git";
+  const responses: Record<string, unknown> = {
+    [`${prefix}/commits/${revision}`]: { sha: revision, tree: { sha: tree } },
+    [`${prefix}/trees/${tree}`]: {
+      sha: tree,
+      truncated: false,
+      tree: ["workload", "second"].map((path) => ({ path, type: "tree", mode: "040000", sha: selected })),
+    },
+    [`${prefix}/trees/${selected}`]: {
+      sha: selected,
+      truncated: false,
+      tree: [{ path: "main.tf", type: "blob", mode: "100644", sha: hash, size: content.length }],
+    },
+    [`${prefix}/blobs/${hash}`]: {
+      sha: hash,
+      size: content.length,
+      encoding: "base64",
+      content: content.toString("base64"),
+    },
+  };
+  const calls: ProcessRequest[] = [];
+  const options = {
+    processRunner: {
+      run: async (request: ProcessRequest) => {
+        calls.push(request);
+        assert.equal(request.executable, "gh");
+        assert.deepEqual(request.args.slice(0, 5), ["api", "--hostname", "github.com", "--method", "GET"]);
+        assert.equal(request.maxOutputBytes, 2_097_152);
+        assert.ok(responses[request.args[5]!]);
+        return {
+          exitCode: 0,
+          signal: null,
+          stdout: JSON.stringify(responses[request.args[5]!]),
+          stderr: "",
+          timedOut: false,
+          outputTruncated: false,
+        };
+      },
+    },
+  };
+  const selection = [
+    "--repository",
+    "https://github.com/example/coe.git",
+    "--revision",
+    revision,
+    "--path",
+    "workload",
+  ];
+  const proposal = (await execute(["archetype", "inspect", ...selection], root, options)) as ArchetypeSourceProposalV1;
+  assert.equal(proposal.repositoryPath, "https://github.com/example/coe");
+  assert.deepEqual(await readdir(root), []);
+  const importing = [
+    "archetype",
+    "import",
+    ...selection,
+    "--destination",
+    "copy",
+    "--expected-hash",
+    proposal.contentHash,
+  ];
+  const count = calls.length;
+  await assert.rejects(execute(importing, root, options), /--yes/);
+  assert.equal(calls.length, count);
+  await execute([...importing, "--yes"], root, options);
+  assert.ok(calls.length > count);
+  assert.deepEqual(JSON.parse(await readFile(join(root, "copy/.apex-origin.json"), "utf8")), proposal);
+  assert.deepEqual(await readFile(join(root, "copy/main.tf")), content);
+  await assert.rejects(readFile(join(root, ".apex/config.json")), { code: "ENOENT" });
+  await assert.rejects(execute([...importing, "--yes"], root, options), /already exists/);
+  const config = {
+    schemaVersion: CONTRACT_VERSION,
+    repository: "https://github.com/example/coe",
+    revision,
+    selections: [
+      { selectedPath: "workload", destination: "one" },
+      { selectedPath: "second", destination: "two" },
+    ],
+  };
+  const file = join(root, "batch.json");
+  await writeJson(file, config);
+  const plan = (await execute(["bootstrap", "coe-plan", "--file", file], root, options)) as ArchetypeBatchPlanV1;
+  assert.deepEqual(
+    plan.entries.map(({ state }) => state),
+    ["pending", "pending"],
+  );
+  const service = new ApexService(root, options);
+  await assert.rejects(
+    execute(["bootstrap", "coe-import", "--file", file, "--expected-hash", plan.planHash], root, options),
+    /--yes/,
+  );
+  await assert.rejects(service.importArchetypeBatch(config, plan.planHash, false), /confirmation/);
+  await assert.rejects(service.importArchetypeBatch(config, "f".repeat(64), true), /confirmed plan/);
+  for (const selections of [
+    [...config.selections, config.selections[0]!],
+    [{ ...config.selections[0]!, destination: "../outside" }],
+  ])
+    await assert.rejects(service.planArchetypeBatch({ ...config, selections }), /unique selections/);
+  const original = service.importArchetype.bind(service);
+  const mock = context.mock.method(service, "importArchetype", async (...args: Parameters<typeof original>) => {
+    if (args[0].destination === "two") throw new Error("Simulated connection failure");
+    return original(...args);
+  });
+  const partial = await service.importArchetypeBatch(config, plan.planHash, true);
+  assert.equal(partial.status, "blocked");
+  assert.deepEqual(
+    partial.entries.map(({ status }) => status),
+    ["copied", "blocked"],
+  );
+  mock.mock.restore();
+  const resumedPlan = await service.planArchetypeBatch(config);
+  assert.equal(resumedPlan.planHash, plan.planHash);
+  assert.deepEqual(
+    resumedPlan.entries.map(({ state }) => state),
+    ["already-copied", "pending"],
+  );
+  const copied = await service.importArchetypeBatch(config, plan.planHash, true);
+  assert.deepEqual(
+    copied.entries.map(({ status }) => status),
+    ["already-copied", "copied"],
+  );
+  assert.deepEqual(
+    (await service.importArchetypeBatch(config, plan.planHash, true)).entries.map(({ status }) => status),
+    ["already-copied", "already-copied"],
+  );
+  assert.notEqual(
+    JSON.parse(await readFile(join(root, "one/.apex-origin.json"), "utf8")).selectedPath,
+    JSON.parse(await readFile(join(root, "two/.apex-origin.json"), "utf8")).selectedPath,
+  );
+  await writeFile(join(root, "one/main.tf"), "manual edit\n");
+  await assert.rejects(service.planArchetypeBatch(config), /modified or incomplete/);
+  assert.equal(await readFile(join(root, "one/main.tf"), "utf8"), "manual edit\n");
+  await writeFile(join(root, "one/main.tf"), content);
+  await writeFile(join(root, "one/extra.md"), "retain\n");
+  await assert.rejects(service.planArchetypeBatch(config), /modified or incomplete/);
+  assert.equal(await readFile(join(root, "one/extra.md"), "utf8"), "retain\n");
+  await rm(join(root, "one/extra.md"));
+  const origin = await readFile(join(root, "one/.apex-origin.json"));
+  await writeJson(join(root, "one/.apex-origin.json"), { ...JSON.parse(origin.toString()), revision: "f".repeat(40) });
+  await assert.rejects(service.planArchetypeBatch(config), /modified or incomplete/);
+  await writeFile(join(root, "one/.apex-origin.json"), origin);
+  await rm(join(root, "one/main.tf"));
+  await symlink(join(root, "two/main.tf"), join(root, "one/main.tf"));
+  await assert.rejects(service.planArchetypeBatch(config), /modified or incomplete/);
+  await rm(join(root, "one/main.tf"));
+  await writeFile(join(root, "one/main.tf"), content);
+  const cliResult = (await execute(
+    ["bootstrap", "coe-import", "--file", file, "--expected-hash", plan.planHash, "--yes"],
+    root,
+    options,
+  )) as { status: string };
+  assert.equal(cliResult.status, "copied");
+  const initializedChild = new ApexService(join(root, "one"));
+  await mkdir(join(root, "one/.git"));
+  await initializedChild.init({ projectId: "child", clientId: "both" });
+  const packageDirectory = join(root, "one/node_modules/@apexops/cli");
+  await mkdir(packageDirectory, { recursive: true });
+  await writeJson(join(packageDirectory, "package.json"), { version: APEX_VERSION });
+  await writeFile(join(root, "one/user-notes.md"), "Preserve after setup\n");
+  const childStatus = await initializedChild.status();
+  assert.deepEqual(
+    (await service.planArchetypeBatch(config)).entries.map(({ state }) => state),
+    ["already-copied", "already-copied"],
+  );
+  await service.importArchetypeBatch(config, plan.planHash, true);
+  assert.deepEqual(await initializedChild.status(), childStatus);
+  assert.equal(await readFile(join(root, "one/user-notes.md"), "utf8"), "Preserve after setup\n");
+  await writeFile(join(root, "one/main.tf"), "Changed original source\n");
+  await assert.rejects(service.planArchetypeBatch(config), /modified or incomplete/);
+  await writeFile(join(root, "one/main.tf"), content);
+  await assert.rejects(readFile(join(root, ".apex/config.json")), { code: "ENOENT" });
+  responses[`${prefix}/blobs/${hash}`] = { ...(responses[`${prefix}/blobs/${hash}`] as object), content: "YmFk" };
+  await assert.rejects(execute(["archetype", "inspect", ...selection], root, options), /inspection failed/);
+});
+
+test("CLI requirements change adapters require a file, reason, hash and explicit confirmation", async (context) => {
+  const root = await tempRoot();
+  const candidate = requirements();
+  const file = join(root, "requirements.json");
+  await writeJson(file, candidate);
+  const preview = context.mock.method(ApexService.prototype, "previewRequirementsChange", async () => ({
+    proposalHash: "a".repeat(64),
+  }));
+  const revise = context.mock.method(ApexService.prototype, "reviseRequirements", async () => ({
+    deploymentAuthorized: false,
+  }));
+  await assert.rejects(execute(["requirements", "preview-change", "--file", file], root), /Missing --reason/);
+  assert.equal(preview.mock.callCount(), 0);
+  await execute(["requirements", "preview-change", "--file", file, "--reason", "Budget change"], root);
+  assert.deepEqual(preview.mock.calls[0]!.arguments, [candidate, "Budget change"]);
+  const args = [
+    "requirements",
+    "revise",
+    "--file",
+    file,
+    "--reason",
+    "Budget change",
+    "--expected-hash",
+    "a".repeat(64),
+  ];
+  await assert.rejects(execute(args, root), /--yes/);
+  assert.equal(revise.mock.callCount(), 0);
+  await execute([...args, "--yes"], root);
+  assert.deepEqual(revise.mock.calls[0]!.arguments, [
+    candidate,
+    { reason: "Budget change", expectedHash: "a".repeat(64), confirm: true },
+  ]);
+  await execute(["requirements", "preview-adoption", "--file", file, "--reason", "Recovered decisions"], root);
+  assert.deepEqual(preview.mock.calls[1]!.arguments, [candidate, "Recovered decisions", "adopt"]);
+  const adoptArgs = [
+    "requirements",
+    "adopt",
+    "--file",
+    file,
+    "--reason",
+    "Recovered decisions",
+    "--expected-hash",
+    "a".repeat(64),
+  ];
+  await assert.rejects(execute(adoptArgs, root), /--yes/);
+  assert.equal(revise.mock.callCount(), 1);
+  await execute([...adoptArgs, "--yes"], root);
+  assert.deepEqual(revise.mock.calls[1]!.arguments, [
+    candidate,
+    { reason: "Recovered decisions", expectedHash: "a".repeat(64), confirm: true, mode: "adopt" },
+  ]);
+});
+
+test("CLI requirements amendment adapters preserve base-bound inputs and require confirmation", async (context) => {
+  const root = await tempRoot();
+  const amendment = {
+    schemaVersion: "1.0.0",
+    baseRequirementsHash: "a".repeat(64),
+    updates: [],
+    additions: [],
+    removals: [],
+    fields: { workload: "Revised workload" },
+  };
+  const file = join(root, "amendment.json");
+  await writeJson(file, amendment);
+  const preview = context.mock.method(ApexService.prototype, "previewRequirementsAmendment", async () => ({
+    proposalHash: "b".repeat(64),
+  }));
+  const amend = context.mock.method(ApexService.prototype, "amendRequirements", async () => ({
+    deploymentAuthorized: false,
+  }));
+  await assert.rejects(execute(["requirements", "preview-amendment", "--file", file], root), /Missing --reason/);
+  assert.equal(preview.mock.callCount(), 0);
+  await execute(["requirements", "preview-amendment", "--file", file, "--reason", "Revised workload"], root);
+  assert.deepEqual(preview.mock.calls[0]!.arguments, [amendment, "Revised workload"]);
+  const args = [
+    "requirements",
+    "amend",
+    "--file",
+    file,
+    "--reason",
+    "Revised workload",
+    "--expected-hash",
+    "b".repeat(64),
+  ];
+  await assert.rejects(execute(args, root), /--yes/);
+  assert.equal(amend.mock.callCount(), 0);
+  await execute([...args, "--yes"], root);
+  assert.deepEqual(amend.mock.calls[0]!.arguments, [
+    amendment,
+    { reason: "Revised workload", expectedHash: "b".repeat(64), confirm: true },
+  ]);
 });
 
 test("CLI Node minimum compares complete stable versions", () => {
@@ -122,6 +550,178 @@ test("CLI governance revision requires explicit confirmation and reason before s
     expected,
   );
   assert.deepEqual(revision.mock.calls[0]?.arguments, ["baseline.json", { confirm: true, reason: "Policy changed" }]);
+});
+
+test("governance setup CLI reads only bounded GitHub evidence and never mutates setup", async () => {
+  const root = await tempRoot();
+  const config = {
+    schemaVersion: "1.0.0",
+    repository: "Example/COE",
+    tenantId: "11111111-1111-1111-1111-111111111111",
+    subscriptionId: "22222222-2222-2222-2222-222222222222",
+    identity: { mode: "create", displayName: "coe-reader" },
+  };
+  const file = join(root, "governance.json");
+  await writeJson(file, config);
+  const calls: ProcessRequest[] = [];
+  const options = {
+    processRunner: {
+      run: async (request: ProcessRequest) => {
+        calls.push(request);
+        assert.equal(request.executable, "gh");
+        assert.deepEqual(request.args.slice(0, 5), ["api", "--hostname", "github.com", "--method", "GET"]);
+        assert.equal(request.timeoutMs, 15_000);
+        assert.equal(request.maxOutputBytes, 65_536);
+        const value =
+          request.args[5] === "repos/Example/COE"
+            ? { id: 456, full_name: "Example/COE", name: "COE", owner: { id: 123, login: "Example" } }
+            : { use_default: true, use_immutable_subject: true, sub_claim_prefix: "repo:Example@123/COE@456" };
+        return {
+          exitCode: 0,
+          signal: null,
+          timedOut: false,
+          outputTruncated: false,
+          stdout: JSON.stringify(value),
+          stderr: "",
+        };
+      },
+    },
+  };
+  const plan = (await execute(["bootstrap", "governance-plan", "--file", file], root, options)) as {
+    status: string;
+    executionAuthorized: boolean;
+    federation: { subject: string };
+  };
+  assert.equal(plan.status, "pending");
+  assert.equal(plan.executionAuthorized, false);
+  assert.equal(plan.federation.subject, "repo:Example@123/COE@456:environment:governance");
+  assert.equal(calls.length, 2);
+  assert.deepEqual(
+    calls.map(({ args }) => args[5]),
+    ["repos/Example/COE", "repos/Example/COE/actions/oidc/customization/sub"],
+  );
+  assert.deepEqual(await readdir(root), ["governance.json"]);
+  const blocked = await execute(["bootstrap", "governance-plan", "--file", file], root, {
+    processRunner: {
+      run: async () => {
+        throw new Error("secret raw auth failure");
+      },
+    },
+  });
+  assert.equal((blocked as { status: string }).status, "blocked");
+  assert.doesNotMatch(JSON.stringify(blocked), /secret raw auth/);
+  for (const failure of [
+    { exitCode: 1 },
+    { timedOut: true },
+    { outputTruncated: true },
+    { signal: "SIGTERM" as const },
+    { stdout: "invalid JSON" },
+  ]) {
+    const result = await execute(["bootstrap", "governance-plan", "--file", file], root, {
+      processRunner: {
+        run: async () => ({
+          exitCode: 0,
+          signal: null,
+          timedOut: false,
+          outputTruncated: false,
+          stdout: "{}",
+          stderr: "private diagnostic",
+          ...failure,
+        }),
+      },
+    });
+    assert.equal((result as { status: string }).status, "blocked");
+    assert.doesNotMatch(JSON.stringify(result), /private diagnostic/);
+  }
+  assert.deepEqual(await readdir(root), ["governance.json"]);
+  await writeJson(file, { ...config, repository: "Example/COE?unsafe" });
+  await assert.rejects(execute(["bootstrap", "governance-plan", "--file", file], root, options), /malformed/);
+  assert.equal(calls.length, 2);
+});
+
+test("workspace installation leaves first project creation to APEX", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const installed = await service.initializeWorkspace({ clientId: "both" });
+  assert.deepEqual(installed, { workspaceReady: true, projectCreated: false });
+  assert.deepEqual(await service.listProjects(), []);
+  await assert.rejects(readFile(join(root, ".apex/config.json")), { code: "ENOENT" });
+  const emptyStatus = await execute(["status"], root);
+  assert.equal((emptyStatus as { status: string }).status, "needs_project");
+  const server = createMcpServer(service);
+  const client = new Client({ name: "empty-workspace", version: "1.0.0" });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+  try {
+    const response = await client.callTool({ name: "status", arguments: {} });
+    assert.equal(response.isError, undefined);
+    assert.deepEqual(response.structuredContent, emptyStatus);
+    const projects = await client.callTool({ name: "projectList", arguments: {} });
+    assert.equal(projects.isError, undefined);
+  } finally {
+    await client.close();
+    await server.close();
+  }
+  await readFile(join(root, ".vscode/mcp.json"));
+  await readFile(join(root, ".github/mcp.json"));
+  assert.equal((await service.doctor()).healthy, true);
+  assert.match((await service.doctor()).nextAction, /first project/);
+  await service.update();
+  assert.deepEqual(await service.listProjects(), []);
+  const created = await new ApexService(root).createProject({ projectId: "chosen-later", iacTool: "terraform" });
+  assert.equal(created.projectId, "chosen-later");
+  assert.equal((await service.status()).run.iacTool, "terraform");
+});
+
+test("bootstrap plan is read-only and reports missing, conflicting and existing setup", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root, {
+    processRunner: {
+      run: async () => {
+        throw new Error("Preflight must not execute commands");
+      },
+    },
+  });
+  const config = { schemaVersion: CONTRACT_VERSION, projectId: "demo", createRepository: true };
+  const before = await readdir(root);
+  const initial = await service.planBootstrap(config);
+  assert.equal(initial.status, "pending");
+  assert.equal(initial.filesModified, false);
+  assert.equal(initial.executionAuthorized, false);
+  assert.equal(initial.configHash, sha256Json(config));
+  assert.ok(initial.unassessed.includes("governance-oidc"));
+  assert.deepEqual(await readdir(root), before);
+  assert.deepEqual(await service.planBootstrap(config), initial);
+  assert.equal((await service.planBootstrap({ ...config, createRepository: false })).status, "blocked");
+  await mkdir(join(root, ".git"));
+  const packageDirectory = join(root, "node_modules", "@apexops", "cli");
+  await mkdir(packageDirectory, { recursive: true });
+  for (const content of ['{"version":"0.9.0"}', "{", "null", "[]"]) {
+    await writeFile(join(packageDirectory, "package.json"), content);
+    assert.equal((await service.planBootstrap(config)).status, "blocked");
+    assert.equal(await readFile(join(packageDirectory, "package.json"), "utf8"), content);
+  }
+  await writeJson(join(packageDirectory, "package.json"), { version: APEX_VERSION });
+  assert.equal((await service.planBootstrap(config)).status, "ready");
+  await mkdir(join(root, ".apex"));
+  await writeFile(join(root, ".apex", "canary"), "preserve");
+  assert.equal((await service.planBootstrap(config)).status, "blocked");
+  assert.equal(await readFile(join(root, ".apex", "canary"), "utf8"), "preserve");
+  const unsafe = await tempRoot();
+  await symlink(packageDirectory, join(unsafe, "node_modules"));
+  await assert.rejects(new ApexService(unsafe).planBootstrap(config), /symlink/);
+  const fresh = await tempRoot();
+  const result = (await execute(["bootstrap", "plan", "--project", "demo", "--create-repo"], fresh)) as typeof initial;
+  assert.equal(result.status, "pending");
+  assert.deepEqual(await readdir(fresh), []);
+  const configPath = join(fresh, "onboarding.json");
+  await writeJson(configPath, { ...config, client: "github-copilot-cli" });
+  await assert.rejects(
+    execute(["bootstrap", "plan", "--file", configPath, "--client", "github-copilot-vscode"], fresh),
+    /conflicts/,
+  );
+  assert.deepEqual(await readdir(fresh), ["onboarding.json"]);
 });
 
 test("CLI bootstrap validates onboarding files before initializing a selected client", async () => {
@@ -228,15 +828,106 @@ test("bootstrap reuses an exact local runtime and rejects a conflicting version"
   );
 });
 
-test("bootstrap derives a project ID from the workspace folder", async () => {
+test("bootstrap reruns reuse matching intact state without commands or new runs", async () => {
+  const root = await tempRoot();
+  await mkdir(join(root, ".git"));
+  const packageDirectory = join(root, "node_modules", "@apexops", "cli");
+  await mkdir(packageDirectory, { recursive: true });
+  await writeJson(join(packageDirectory, "package.json"), { version: APEX_VERSION });
+  const service = new ApexService(root, {
+    processRunner: {
+      run: async () => {
+        throw new Error("Rerun must not install");
+      },
+    },
+  });
+  const input = { projectId: "demo", clientId: "github-copilot-cli" as const, iacTool: "terraform" as const };
+  const initial = await service.bootstrap(input);
+  assert.equal(initial.resumed, false);
+  const before = await service.status();
+  const rerun = await service.bootstrap(input);
+  assert.deepEqual(rerun, { ...initial, resumed: true, projectCreated: false, runtimeInstalled: false });
+  assert.deepEqual(await service.status(), before);
+  assert.deepEqual(await readdir(join(root, ".apex", "projects", "demo", "runs")), [initial.runId]);
+  for (const changed of [
+    { projectId: "other" },
+    { environment: "prod" },
+    { clientId: "github-copilot-vscode" as const },
+    { iacTool: "bicep" as const },
+    { targetScope: "/foreign" },
+    { displayName: "Different" },
+  ]) {
+    await assert.rejects(service.bootstrap({ ...input, ...changed }), /resume is blocked/);
+    assert.deepEqual(await service.status(), before);
+  }
+  const managedPath = join(root, ".github", "agents", "apex.agent.md");
+  const managed = await readFile(managedPath, "utf8");
+  await writeFile(managedPath, managed + "\nManual edit\n");
+  await assert.rejects(service.bootstrap(input), /resume is blocked/);
+  assert.equal(await readFile(managedPath, "utf8"), managed + "\nManual edit\n");
+  await writeFile(managedPath, managed);
+  assert.equal((await new ApexService(root).bootstrap(input)).resumed, true);
+  assert.deepEqual(await service.status(), before);
+  const runtimePath = join(root, ".apex", "runtime", "workflow.v1.json");
+  const runtimeBytes = await readFile(runtimePath);
+  await writeFile(runtimePath, "{}\n");
+  await assert.rejects(service.bootstrap(input), /resume is blocked/);
+  assert.equal(await readFile(runtimePath, "utf8"), "{}\n");
+  await writeFile(runtimePath, runtimeBytes);
+  const selectionPath = join(root, ".apex", "config.json");
+  const selectionBytes = await readFile(selectionPath);
+  const outside = join(await tempRoot(), "selection.json");
+  await writeFile(outside, selectionBytes);
+  await rm(selectionPath);
+  await symlink(outside, selectionPath);
+  await assert.rejects(service.bootstrap(input), /resume is blocked/);
+  assert.deepEqual(await readFile(outside), selectionBytes);
+});
+
+test("combined client initialization uses one managed lifecycle and preserves profile conflicts", async () => {
+  const root = await tempRoot();
+  await execute(["init", "--project", "demo", "--client", "both"], root);
+  const service = new ApexService(root);
+  const before = await service.status();
+  const vscode = join(root, ".github/agents/apex.agent.md");
+  const cli = join(root, ".github/agents/apex-cli.agent.md");
+  assert.match(await readFile(vscode, "utf8"), /name: APEX\n/);
+  assert.match(await readFile(cli, "utf8"), /name: APEX CLI\n/);
+  await readFile(join(root, ".vscode/mcp.json"));
+  await readFile(join(root, ".github/mcp.json"));
+  const lock = JSON.parse(await readFile(join(root, ".apex/customizations.lock.json"), "utf8"));
+  assert.equal(lock.clientId, "both");
+  assert.equal(new Set(lock.files.map(({ path }: { path: string }) => path)).size, lock.files.length);
+  await service.update();
+  const restored = await service.rollbackCustomizations();
+  assert.deepEqual(restored.conflicts, []);
+  assert.equal((await new ApexService(root).status()).run.runId, before.run.runId);
+  const doctor = await service.doctor();
+  assert.ok(doctor.checks.filter(({ id }) => id.startsWith("managed:")).every(({ ok }) => ok));
+  const original = await readFile(cli, "utf8");
+  await writeFile(cli, original + "\nManual CLI edit\n");
+  await service.update();
+  assert.equal(await readFile(cli, "utf8"), original + "\nManual CLI edit\n");
+  await service.update();
+  assert.equal(await readFile(cli, "utf8"), original + "\nManual CLI edit\n");
+  await service.uninstallCustomizations();
+  assert.equal(await readFile(cli, "utf8"), original + "\nManual CLI edit\n");
+  await assert.rejects(readFile(vscode), { code: "ENOENT" });
+  assert.equal((await service.status()).run.runId, before.run.runId);
+});
+
+test("bootstrap never derives a project ID from the workspace folder", async () => {
   const root = await tempRoot();
   await mkdir(join(root, ".git"));
   const result = (await execute(["bootstrap", "--yes"], root, {
     processRunner: {
       run: async () => ({ exitCode: 0, signal: null, stdout: "", stderr: "", timedOut: false, outputTruncated: false }),
     },
-  })) as { projectId: string };
-  assert.match(result.projectId, /^apex-cli-[a-z0-9-]+$/u);
+  })) as { projectId?: string; projectCreated: boolean; workspaceReady: boolean };
+  assert.equal(result.projectId, undefined);
+  assert.equal(result.projectCreated, false);
+  assert.equal(result.workspaceReady, true);
+  assert.deepEqual(await new ApexService(root).listProjects(), []);
 });
 
 test("CLI manages only its own VS Code profile bootstrap agent", async () => {

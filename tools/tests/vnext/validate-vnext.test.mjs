@@ -152,6 +152,15 @@ test("CLI distinguishes interactive handoffs from supported subagent edges", () 
   assert.ok(hasRule(result, "customization.cli-delegation"));
 });
 
+test("CLI preserves an explicit worker invocation-disable boundary", () => {
+  const result = mutate((model) => {
+    model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX Reviewer").frontmatter[
+      "disable-model-invocation"
+    ] = true;
+  });
+  assert.ok(hasRule(result, "customization.cli-authority"));
+});
+
 test("rejects askQuestions on an autonomous subagent", () => {
   const result = mutate((model) => {
     model.customization.agents
@@ -230,6 +239,11 @@ test("rejects client projection declaration and CLI allowlist drift", () => {
     ];
   });
   assert.ok(hasRule(projectionResult, "customization.client-projection"));
+
+  const combinedResult = mutate((model) => {
+    model.customization.manifest.clientProjections.find(({ id }) => id === "both").files = [".vscode/mcp.json"];
+  });
+  assert.ok(hasRule(combinedResult, "customization.client-projection"));
 
   const allowlistResult = mutate((model) => {
     model.customization.cliMcp.mcpServers.apex.tools.pop();
