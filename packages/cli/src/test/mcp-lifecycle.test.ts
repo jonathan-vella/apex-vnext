@@ -351,6 +351,7 @@ test("service validation reasons reach the agent while other errors stay generic
     },
     capabilityList: async () => {
       throw new ApexError("APEX_VALIDATION", "architecture validation failed", EXIT_CODES.validation, [
+        { path: "/components/0/requirementIds", message: "Expected required property" },
         { path: "/components/0/requirementIds", message: "Expected array" },
       ]);
     },
@@ -362,7 +363,7 @@ test("service validation reasons reach the agent while other errors stay generic
   assertError(
     await session.call("capabilityList"),
     "APEX_VALIDATION",
-    "architecture validation failed: /components/0/requirementIds Expected array",
+    "architecture validation failed: /components/0/requirementIds Expected required property",
   );
   assertError(
     await session.call("projectList"),
