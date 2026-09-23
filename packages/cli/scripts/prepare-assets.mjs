@@ -11,13 +11,9 @@ const repositoryRoot = resolve(packageRoot, "../..");
 const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
-const CLIENT_ADAPTER_VERSION = "1.6.0";
-const CLI_MODEL_IDS = new Map([
-  ["MAI-Code-1.1-Flash (copilot)", "mai-code-1.1-flash"],
-  ["gpt-6-sol", "gpt-6-sol"],
-  ["gpt-6-luna", "gpt-6-luna"],
-  ["GPT-5.6 Terra", "gpt-5.6-terra"],
-]);
+const CLIENT_ADAPTER_VERSION = "1.7.0";
+const RETIRED_SOURCE_FIELDS = ["argument-hint", "handoffs", "agents"];
+const RETIRED_SOURCE_TOOLS = ["vscode/askQuestions", "agent"];
 export const GENERATED_SHARED_FILES = [
   ".github/workflows/governance-policy-baseline.yml",
   "tools/scripts/collect-governance-baseline.ps1",
@@ -100,16 +96,20 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
     workspaceServer: "apex",
     operationIds: ["status", "recordInput"],
   };
-  const model = Array.isArray(frontmatter.model) ? frontmatter.model[0] : frontmatter.model;
-  if (typeof model !== "string" || model.length === 0) throw new Error("CLI agent projection requires one model");
+  for (const field of RETIRED_SOURCE_FIELDS)
+    if (field in frontmatter) throw new Error(`CLI agent source must not declare ${field}`);
+  const models = Array.isArray(frontmatter.model) ? frontmatter.model : [frontmatter.model];
+  if (models.length === 0 || models.some((model) => typeof model !== "string" || model.length === 0))
+    throw new Error("CLI agent projection requires a model");
+  if (!["required", "preferred"].includes(frontmatter["model-policy"]))
+    throw new Error("CLI agent source requires model-policy: required or preferred");
   const sourceTools = Array.isArray(frontmatter.tools) ? frontmatter.tools : [];
   const tools = [
     ...new Set(
       sourceTools
-        .filter((tool) => tool !== "agent" || options.delegates !== false)
+        .filter((tool) => tool !== inventory.interactiveTools.delegate || options.delegates !== false)
         .map((tool) => {
-          if (tool === "vscode/askQuestions") return inventory.interactiveTools.askUser;
-          if (tool === "agent") return inventory.interactiveTools.delegate;
+          if (RETIRED_SOURCE_TOOLS.includes(tool)) throw new Error(`CLI agent source must not use ${tool}`);
           if (typeof tool === "string" && tool.startsWith("apex/")) {
             const operation = tool.slice("apex/".length);
             if (!inventory.operationIds.includes(operation))
@@ -127,7 +127,8 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
     name: frontmatter.name,
     description: frontmatter.description,
     target: "github-copilot",
-    model: CLI_MODEL_IDS.get(model) ?? model,
+    model: frontmatter.model,
+    "model-policy": frontmatter["model-policy"],
     ...(frontmatter["reasoning-effort"] === undefined ? {} : { "reasoning-effort": frontmatter["reasoning-effort"] }),
     "user-invocable": frontmatter["user-invocable"] ?? true,
     "disable-model-invocation": frontmatter["disable-model-invocation"] ?? false,

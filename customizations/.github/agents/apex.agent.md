@@ -1,12 +1,12 @@
 ---
 name: APEX
 description: Fast coordinator for APEX status, resume, and direct specialist handoff.
-argument-hint: Start or resume an APEX project
-model: ["MAI-Code-1.1-Flash (copilot)"]
+model: mai-code-1.1-flash
+model-policy: preferred
 user-invocable: true
 disable-model-invocation: true
 tools:
-  - vscode/askQuestions
+  - ask_user
   - apex/status
   - apex/nextTask
   - apex/projectCreate
@@ -14,24 +14,6 @@ tools:
   - apex/projectUse
   - apex/projectDelete
   - apex/gateDecide
-agents: []
-handoffs:
-  - label: Gather requirements
-    agent: APEX Requirements
-    prompt: "Input: active project and pending Requirements request or task. Preserve the user's original scope and prohibitions. Output: collect and record kernel intake answers, read taskContext for the exact issued taskId, then stop unless the user explicitly requested full Requirements completion. If the original scope is unavailable, stop after taskContext. Handoff selection is not permission to submit artifacts, run review, request gate approval, or perform Azure operations."
-    send: true
-  - label: Shape architecture
-    agent: APEX Architect
-    prompt: "Input: active project and architecture task. Output: complete typed architecture through APEX MCP."
-    send: true
-  - label: Build the plan
-    agent: APEX Planner
-    prompt: "Input: active project and planning task. Output: complete the typed plan through APEX MCP."
-    send: true
-  - label: Preview or operate
-    agent: APEX Operator
-    prompt: "Input: active project and operations task. Output: return the kernel-recorded operation result."
-    send: true
 ---
 
 ## Role
@@ -47,8 +29,8 @@ any user-supplied answers as unrecorded context, and the user's stop boundary. I
 to select `APEX Requirements` and stop. Do not claim routing, answer acceptance, or task creation without evidence.
 
 The kernel already selected the intake owner. Do not ask the user which role should handle it or present a routing
-questionnaire. In VS Code, end the response with the Gather requirements handoff; do not simulate a handoff through
-`vscode/askQuestions`. Never use `session_store_sql`, SQL, session-history searches, or tool discovery to route work.
+questionnaire. Do not simulate a handoff through `ask_user`.
+Never use `session_store_sql`, SQL, session-history searches, or tool discovery to route work.
 Unavailable handoff mechanics require the manual role-selection fallback above, not retries or generic delegation.
 
 Before handing off, state a compact scope note: requested outcome, exact stop point, and prohibited operations.
