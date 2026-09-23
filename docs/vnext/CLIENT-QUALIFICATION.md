@@ -38,9 +38,9 @@ active client. No third-client schema or acceptance expansion is required for th
 | `CLIENT-010` | Shared fake-provider workflow outcomes normalize equally.                | Required              | Required                            |
 | `CLIENT-011` | Bootstrap installs the exact local runtime and selected projection.      | Profile or CLI route  | CLI route                           |
 
-Unavailable client mechanics remain unavailable; they are not inferred as passing. Copilot CLI autonomous workers
-remain absent from the shipped projection pending qualification under revised ADR-0006. Direct-selection visibility
-is not a security pass/fail criterion; worker permissions remain unchanged.
+Unavailable client mechanics remain unavailable; they are not inferred as passing. Copilot CLI CodeGen, Reviewer and
+Validator ship since adapter `1.6.0` under revised ADR-0006; their current-candidate qualification is pending.
+Direct-selection visibility is not a security pass/fail criterion; worker permissions remain unchanged.
 
 That omission is a current qualification status, not permission to omit generation, review or validation. Demonstrate a
 supported bounded path for every required outcome. These additional acceptance scenarios are planned requirements,
@@ -85,9 +85,10 @@ applying; the [slice 1 probe](#cli-only-projection-probes) found that they do no
 Slice 1 of the [CLI-only projection plan](ROADMAP.md#cli-only-projection) ran local probes on 2026-09-23 at source
 checkpoint `dc289ab`. Standalone runs used Copilot CLI `1.0.88` (`linux-arm64`) with an isolated `COPILOT_HOME`,
 disposable Git fixtures under `dist/cli-probes`, explicit tool grants, synthetic agents and a fake `apex` MCP server
-that logs every call. The VS Code run used VS Code `1.139.0` (`2242ebbb`) over WSL with the Copilot harness, Agent Host
-protocol `0.9.0` and `@github/copilot-sdk` `1.0.15-unstable.35393089353.gfc44743`. These results characterize the
-clients; they are not APEX projection or scenario evidence.
+that logs every call. The VS Code run used VS Code `1.139.0` (`2242ebbb`) over WSL with the built-in Copilot Chat
+extension `0.67.0`, the Copilot harness, Agent Host protocol `0.9.0` and `@github/copilot-sdk`
+`1.0.15-unstable.35393089353.gfc44743`. These results characterize the clients; they are not APEX projection or
+scenario evidence.
 
 - **Model fields.** `.agent.md` frontmatter honors `model` (a string or an ordered list), `model-policy` and
   `reasoning-effort`. The documented `models`, `modelPolicy` and `reasoningEffort` spellings were ignored; that child

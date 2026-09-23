@@ -17,7 +17,10 @@ of current plugin compatibility. Preserve existing projections until a qualified
 
 [DECISION-029](../DECISIONS.md#decision-029-ship-one-copilot-cli-projection) selects that replacement: only the Copilot
 CLI projection ships, used by standalone CLI and the VS Code Copilot harness. The shared-source boundary, provenance
-and pinned CLI tool inventory in this record still apply; the VS Code projection retires once its gates pass.
+and pinned CLI tool inventory in this record still apply; the VS Code projection retires once its gates pass. Until
+slice 8 of the [CLI-only projection plan](../ROADMAP.md#cli-only-projection) passes, the Decision and Implementation
+Notes below describe the current two-projection implementation; afterwards only the CLI projection is generated and
+validated.
 
 ## 🔍 Context
 
