@@ -43,8 +43,6 @@ Install the complete package set from one qualified build. Do not mix tarballs f
 
 ## Initialize A Project
 
-For VS Code:
-
 ```bash
 npx apex init \
   --project demo \
@@ -52,12 +50,10 @@ npx apex init \
   --environment dev \
   --target local \
   --iac bicep \
-  --client github-copilot-vscode \
   --json
 ```
 
-For Copilot CLI, replace the client value with `github-copilot-cli`. To select Terraform, replace `--iac bicep` with
-`--iac terraform`.
+This installs the Copilot CLI projection. To select Terraform, replace `--iac bicep` with `--iac terraform`.
 
 ## Check Readiness
 
@@ -77,9 +73,9 @@ tutorial because it checks Azure CLI authentication.
 npx apex task next --json
 ```
 
-A new project normally needs requirements input. In a supported Copilot client, select the visible APEX coordinator and
-ask it to continue the project. The coordinator reads kernel state and hands interactive decisions to the appropriate
-specialist.
+A new project normally needs requirements input. Start Copilot CLI with `copilot --agent apex` and ask the coordinator
+to continue the project. It reads kernel state, names the specialist that owns the next step, and prints the
+`/agent <name>` command and a scope prompt to paste after you switch.
 
 Do not edit `.apex` directly or infer progress from chat history.
 

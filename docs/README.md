@@ -3,8 +3,9 @@
 > [Current Version](../VERSION.md) | Pre-release documentation for the governed APEX runtime and clients.
 
 APEX vNext targets COE workload reuse and conversational adaptation with rich design and operational output. Both
-ALZ-backed workloads and standalone labs/demos are initial scope, using VS Code or Copilot CLI on Windows via WSL2
-without a devcontainer. The kernel owns state, gates and evidence; clients guide people through it.
+ALZ-backed workloads and standalone labs/demos are initial scope, using Copilot CLI, standalone or through the VS Code
+Copilot harness, on Windows via WSL2 without a devcontainer. The kernel owns state, gates and evidence; clients guide
+people through it.
 
 The [PRD](vnext/PRD.md) defines the target contract. Guides describe implemented commands and mark planned extensions
 explicitly; the [checkpoint](vnext/PROJECT.md) identifies remaining work. Distribution and APEX MCP packaging are the
@@ -30,7 +31,7 @@ last feature-delivery phase, not prerequisites for completing governance and wor
 - [Complete the first local run](tutorials/first-run.md) introduces initialization, readiness, and deterministic local
   state without making cloud changes.
 - [WSL2 and VS Code consumer runbook](tutorials/wsl2-vscode-consumer-runbook.md) installs the published preview and
-  creates a VS Code workspace in Ubuntu on WSL2.
+  creates an APEX workspace for Copilot CLI in Ubuntu on WSL2.
 
 ## How-To Guides
 

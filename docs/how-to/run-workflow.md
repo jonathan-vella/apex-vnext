@@ -47,8 +47,10 @@ The promoted run remains in the same project and is selected automatically. It i
 evidence; it always needs its own code generation, validation, preview, and Gate 4 approval. Repeat for production
 with its production target. Return to a prior environment with `apex project use --project payments --run RUN_ID`.
 
-Use the visible APEX coordinator in VS Code or Copilot CLI as the normal interactive entry point. Direct CLI commands
-remain useful for inspection and bounded operations.
+Use the APEX coordinator in Copilot CLI (`copilot --agent apex`) as the normal interactive entry point; the VS Code
+Copilot harness runs the same agents. Ask it what is next: the `apex-next` skill names the owning agent and either
+delegates a hidden worker or prints `/agent <name>` with a scope prompt. Direct CLI commands remain useful for
+inspection and bounded operations.
 
 ## Handle Input Before Tasks
 

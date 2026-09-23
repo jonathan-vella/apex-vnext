@@ -6,7 +6,7 @@ This directory is the versioned source bundle installed into consumer repositori
 - `.github/agents/`
 - `.github/skills/`
 - `.github/copilot-instructions.md`
-- `.vscode/mcp.json`
+- `.mcp.json`
 
 `manifest.json` records the bundle version, managed files, agent roles, supported targets, invocation edges, interaction
 types, and recommended models. A client projection omits roles that do not declare its target; unsupported roles are
