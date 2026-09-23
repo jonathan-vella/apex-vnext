@@ -272,6 +272,8 @@ test("managed role projections retain required tools and exclude unrelated grant
     review: [],
     validation: [],
   };
+  const readTools = ["view", "glob", "rg"];
+  const explorers = ["planning", "operations"];
   assert.deepEqual(manifest.roles.map(({ id }) => id).sort(), Object.keys(requiredApex).sort());
   for (const client of ["github-copilot-cli"]) {
     for (const role of manifest.roles) {
@@ -305,7 +307,29 @@ test("managed role projections retain required tools and exclude unrelated grant
           roleDelegatesOnClient(role, client, manifest.roles, manifest.invocationEdges),
           `${label}: delegation must match supported worker edges`,
         );
-      const allowed = new Set([...apexTools, ...armTools, ...interactive]);
+      const nativeRead = explorers.includes(role.id) ? readTools : [];
+      assert.deepEqual(
+        metadata.tools.filter((tool) => readTools.includes(tool)),
+        nativeRead,
+        `${label}: read tools`,
+      );
+      const mechanics = content.split("<!-- apex-shared-body -->")[0];
+      if (explorers.includes(role.id)) {
+        assert.match(mechanics, /Explore is advisory and read-only/u, label);
+        assert.match(mechanics, /never for requirements intake/u, label);
+        assert.match(mechanics, /never treat its output as kernel evidence, task completion or approval/u, label);
+      } else {
+        assert.doesNotMatch(mechanics, /Explore is advisory/u, label);
+      }
+      if (metadata.tools.includes("task") && role.id !== "coordinator") {
+        assert.match(
+          mechanics,
+          /never for general-purpose, rubber-duck, code-review, security-review or research agents/u,
+          label,
+        );
+      }
+      assert.ok(!metadata.tools.some((tool) => /^(bash|shell)/u.test(tool)), `${label}: no shell`);
+      const allowed = new Set([...apexTools, ...armTools, ...interactive, ...nativeRead]);
       for (const tool of metadata.tools) assert.ok(allowed.has(tool), `${label}: unexpected tool ${tool}`);
       for (const tool of [...arm.managedPolicy.denyBeforeTransport, ...arm.managedPolicy.deferredTools]) {
         assert.ok(

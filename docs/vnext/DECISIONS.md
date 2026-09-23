@@ -193,4 +193,6 @@ built-in helpers can read, and Reviewer gets `task`. Validator may run `bicep` a
 a shell limited to those commands. The VS Code installation lifecycle tests and client-comparison tooling are
 retargeted to the VS Code Copilot harness; only Local-only tests are archived. For slice 5 the maintainer retired the
 rule that a subagent may not use a costlier model tier than its parent, so the coordinator delegates CodeGen, Reviewer
-and Validator through `apex-next`.
+and Validator through `apex-next`. Under the maintainer's standing rule to take the recommended option while away,
+slice 6 ships only Explore: the other review helpers inherit the caller's APEX completion and disposition tools, and
+agent frontmatter cannot limit Validator's shell, so Validator gets none.

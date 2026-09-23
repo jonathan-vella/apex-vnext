@@ -93,6 +93,7 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
   if (clientId !== "github-copilot-cli") throw new Error(`Unsupported client projection: ${clientId}`);
   const inventory = toolInventory ?? {
     interactiveTools: { askUser: "ask_user", delegate: "task" },
+    agentReadTools: ["view", "glob", "rg"],
     workspaceServer: "apex",
     operationIds: ["status", "recordInput"],
   };
@@ -134,6 +135,9 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
     "disable-model-invocation": frontmatter["disable-model-invocation"] ?? false,
     tools,
   };
+  const explores =
+    tools.includes(inventory.interactiveTools.delegate) &&
+    (inventory.agentReadTools ?? []).every((tool) => tools.includes(tool));
   const mechanics = [
     frontmatter.name === "APEX"
       ? `Route through the \`apex-next\` skill. Use \`${inventory.interactiveTools.delegate}\` only for the hidden workers it names, never for interactive intake, and do not substitute Explore. Use \`${inventory.interactiveTools.askUser}\` only for project lifecycle or routing choices, never intake.`
@@ -141,7 +145,10 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
         ? `Use \`${inventory.interactiveTools.askUser}\` for kernel-owned input requests.`
         : null,
     frontmatter.name !== "APEX" && tools.includes(inventory.interactiveTools.delegate)
-      ? `Use \`${inventory.interactiveTools.delegate}\` for declared worker delegation.`
+      ? `Use \`${inventory.interactiveTools.delegate}\` only for declared worker delegation${explores ? " and Explore" : ""}; never for general-purpose, rubber-duck, code-review, security-review or research agents.`
+      : null,
+    explores
+      ? "Explore is advisory and read-only. Use it only for questions about explicit workspace paths, never for requirements intake. Name exact paths because it skips gitignored paths such as `.apex/work/`, verify every line it cites, and never treat its output as kernel evidence, task completion or approval."
       : null,
     frontmatter.name !== "APEX" && tools.includes(inventory.interactiveTools.askUser)
       ? `Run user-facing questions as the foreground agent using \`${inventory.interactiveTools.askUser}\`, not as a delegated background task. For another interactive stage, use the \`apex-next\` skill to print its selection step and scope prompt; do not delegate interactive work through \`${inventory.interactiveTools.delegate}\`. If the question tool is unavailable, report the limitation and stop without claiming answers were recorded.`

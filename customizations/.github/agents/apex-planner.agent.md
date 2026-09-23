@@ -7,6 +7,9 @@ user-invocable: true
 tools:
   - ask_user
   - task
+  - view
+  - glob
+  - rg
   - apex/status
   - apex/nextTask
   - apex/taskContext

@@ -161,6 +161,21 @@ projection and the real APEX MCP server. They are probe evidence, not CLIENT-021
   request, printed both selection steps, said routing was pending and gave a fenced scope prompt with the exact request
   ID (session `f99a791f`). Worker delegation from the coordinator was not exercised; slice 11 covers it.
 
+### Slice 6 Probes
+
+On 2026-09-23 slice 6 probes ran with Copilot CLI `1.0.88` in the same workspace. They are probe evidence, not
+qualification.
+
+- **Frontmatter tools.** `view`, `glob` and `rg` were granted; `grep` and `shell(bicep:*)` were ignored, so frontmatter
+  cannot grant a limited shell. Declaring `task` also added `read_agent`, `list_agents` and `write_agent` (session
+  `787aebd7`).
+- **Helper reach.** Under a parent holding `task`, read tools and APEX tools, Explore received only `rg`, `glob` and
+  `view`. Code-review, Security-review and Rubber-duck received the parent's full set, including the APEX tools and
+  `task` (session `8e26f681`). The `task` schema offers no per-call tool limit (session `cd261e6e`).
+- **Explore in the projection.** Under `APEX Operator`, Explore listed only its three read tools and cited line 5 for a
+  heading on line 6 (session `6be424d2`). `APEX Planner` refused an Explore request that named no workspace path
+  (session `0c2c2afa`); for a named path it reported the right line and verified it with `view` (session `c52c4a75`).
+
 ## Execution Rules
 
 The clean-install package regression now exercises local archetype listing, exact-commit inspection, independent copy,

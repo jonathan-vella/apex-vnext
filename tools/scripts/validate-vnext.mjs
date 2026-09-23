@@ -681,6 +681,9 @@ function validateCustomizations(model, findings) {
         `${skill.path} needs name and description frontmatter`,
         skill.path,
       );
+  const agentReadTools = array(
+    readJson(path.join(model.root, "tools", "registry", "copilot-cli-agent-tools.json")).agentReadTools,
+  );
   for (const [name, agent] of agents) {
     const frontmatter = agent.frontmatter;
     const role = roles.get(name);
@@ -723,6 +726,16 @@ function validateCustomizations(model, findings) {
         finding(findings, "customization.retired-field", `${name} uses retired VS Code field ${field}`, agent.path);
     for (const tool of array(frontmatter.tools)) {
       if (tool === "task" || tool === "ask_user") continue;
+      if (agentReadTools.includes(tool)) {
+        if (!interactive)
+          finding(
+            findings,
+            "customization.worker-read-tool",
+            `${name} is a hidden worker and cannot hold native read tool ${tool}`,
+            agent.path,
+          );
+        continue;
+      }
       if (RETIRED_AGENT_TOOLS.includes(tool))
         finding(findings, "customization.retired-field", `${name} uses retired VS Code tool ${tool}`, agent.path);
       else if (FORBIDDEN_TOOL.test(tool))
