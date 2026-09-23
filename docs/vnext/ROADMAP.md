@@ -61,8 +61,8 @@ Owner: managed customization, CLI lifecycle and client experience maintainers. D
 [REQ-CUSTOMIZATION-001](PRD.md#req-customization-001-managed-copilot-experiences) and the planned
 [CLI-only scenarios](CLIENT-QUALIFICATION.md#planned-cli-only-scenarios). Branch: `feat/cli-projection`, draft PR #350;
 the plan and slice 1 merged in #347. Tracking: [issue #348](https://github.com/jonathan-vella/apex-vnext/issues/348).
-Status: slices 1 to 7 are done. `apex init` installs only the CLI projection, managed agent sources use CLI
-frontmatter, and the coordinator routes through `apex-next`; slice 8 archives the remaining VS Code Local files.
+Status: slices 1 to 8 are done. `apex init` installs only the CLI projection, managed agent sources use CLI
+frontmatter, the coordinator routes through `apex-next`, and VS Code Local is archived under `.archive/vscode-projection/`.
 
 Managed agents target Copilot CLI only. Users may still run them in VS Code through its Copilot harness, which must
 pass the same qualification. Builder-only VS Code tooling for this repository stays.
@@ -90,8 +90,8 @@ slice 8 follows them.
   [probe results](CLIENT-QUALIFICATION.md#cli-only-projection-probes) select the frontmatter and MCP options and name
   the decisions that slices 5 to 7 and 11 need.
 - **Slices 2 and 4:** done on 2026-09-23 in one push so CI stayed green. Workspace MCP moved to `.mcp.json` with a
-  directory-independent `npx --no apex mcp serve` launch. VS Code profile commands and the VS Code render branch stay
-  until slice 8.
+  directory-independent `npx --no apex mcp serve` launch. VS Code profile commands and the VS Code render branch stayed
+  until slice 8 archived them.
 - **Slice 3:** remove `vscode/askQuestions`, handoffs, argument hints, agent allowlists and VS Code client mechanics.
   Workers use kernel task context, not repository instructions.
 - **Slice 5:** `apex-next` delegates the owning agent with the prepared prompt when the step can complete as a

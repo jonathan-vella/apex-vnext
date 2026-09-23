@@ -1,0 +1,27 @@
+// Archived from packages/cli/scripts/prepare-assets.mjs at 9c3a459 (DECISION-029 slice 8). Provenance only; not compiled or run.
+
+// renderClientAgentProjection VS Code branch, with PROJECTION_TARGETS entry ["github-copilot-vscode", "vscode"].
+  if (clientId === "github-copilot-vscode") {
+    if (
+      Array.isArray(frontmatter.model) &&
+      frontmatter.model.length === 1 &&
+      frontmatter.model[0] === "MAI-Code-1.1-Flash (copilot)"
+    ) {
+      frontmatter.model = frontmatter.model[0];
+    }
+    const mechanics = [
+      frontmatter.name === "APEX"
+        ? "For requirements intake, present the declared Gather requirements handoff to `APEX Requirements` and stop for the user's interactive transition. State the user's scope and stop point beside the handoff; do not ask a role-selection question when the kernel has selected the owner. If unavailable, ask the user to select `APEX Requirements`. Use `vscode/askQuestions` only for project lifecycle or routing choices, never intake."
+        : Array.isArray(frontmatter.tools) && frontmatter.tools.includes("vscode/askQuestions")
+          ? "Use `vscode/askQuestions` for kernel-owned input requests."
+          : null,
+      Array.isArray(frontmatter.handoffs) && frontmatter.handoffs.length > 0
+        ? "Use the declared direct handoffs for interactive transitions."
+        : null,
+    ].filter(Boolean);
+    return serializeAgent(
+      { ...frontmatter, target: "vscode" },
+      mechanics.length === 0 ? "" : `## Client Mechanics\n\n${mechanics.join(" ")}\n\n`,
+      body,
+    );
+  }

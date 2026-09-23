@@ -78,18 +78,6 @@ function clientId(flags: Flags): "github-copilot-cli" {
   return value;
 }
 
-function profileClientId(flags: Flags): "github-copilot-vscode" {
-  const value = flags.client ?? "github-copilot-vscode";
-  if (value !== "github-copilot-vscode") {
-    throw new ApexError(
-      "APEX_USAGE",
-      "Profile bootstrap is supported only for github-copilot-vscode",
-      EXIT_CODES.usage,
-    );
-  }
-  return value;
-}
-
 async function inputJson(flags: Flags): Promise<unknown> {
   return JSON.parse(await readFile(required(flags, "file"), "utf8")) as unknown;
 }
@@ -526,21 +514,6 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
         ...(config.createRepository === undefined ? {} : { createRepository: config.createRepository }),
       });
     }
-    case "profile status":
-      profileClientId(flags);
-      return service.profileStatus();
-    case "profile install":
-      confirmed(flags, "profile install");
-      profileClientId(flags);
-      return service.profileInstall();
-    case "profile update":
-      confirmed(flags, "profile update");
-      profileClientId(flags);
-      return service.profileUpdate();
-    case "profile uninstall":
-      confirmed(flags, "profile uninstall");
-      profileClientId(flags);
-      return service.profileUninstall();
     case "update":
       return service.update(
         typeof flags["customizations-source"] === "string" ? flags["customizations-source"] : undefined,

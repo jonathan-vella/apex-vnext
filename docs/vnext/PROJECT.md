@@ -14,9 +14,9 @@ through WSL2. Neither client requires a devcontainer. Desktop-app work is parked
 [PRD.md](PRD.md) is the canonical scope and quality reference.
 
 The standalone vNext repository owns a deterministic TypeScript runtime, versioned contracts, bounded capabilities,
-renderers, CLI/MCP lifecycle, managed VS Code and Copilot CLI projections, and deterministic qualification.
-[DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection) replaces both projections with one Copilot CLI
-projection. Until that plan ships, the VS Code Local and CLI projections described below remain the implemented state.
+renderers, CLI/MCP lifecycle, one managed Copilot CLI projection, and deterministic qualification.
+[DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection) replaced the VS Code Local projection, now
+archived under `.archive/vscode-projection/`; the VS Code Copilot harness runs the CLI projection.
 
 Repository modernization has retired original automation, prompts, compatibility utilities, duplicate workflows and npm
 scripts, stale root configuration, and unneeded development-container tooling. The active documentation has been rebuilt
@@ -28,9 +28,9 @@ On 2026-09-23 the maintainer selected a single Copilot CLI projection. Supported
 and the VS Code Copilot harness, which runs CLI-format agents. The VS Code Local projection retires through
 DECISION-015 gates with an archive under `.archive/vscode-projection/`. An `apex-next` skill replaces handoffs, advisory
 built-in helpers join the workflow, and the context sidekick is deferred. Work proceeds on `feat/cli-projection`
-(draft PR #350) per the [CLI-only projection plan](ROADMAP.md#cli-only-projection); slices 1 to 7 are done, so
-`apex init` installs only the CLI projection, managed agent sources use CLI frontmatter, and the coordinator routes
-through `apex-next`.
+(draft PR #350) per the [CLI-only projection plan](ROADMAP.md#cli-only-projection); slices 1 to 8 are done, so
+`apex init` installs only the CLI projection, managed agent sources use CLI frontmatter, the coordinator routes
+through `apex-next`, and VS Code Local is archived.
 
 The maintainer parked all standalone desktop-app work on 2026-09-21. Preserve desktop probes, Windows fixes and
 upstream findings without additional app tests, adapter implementation, native Windows CI or host setup. The

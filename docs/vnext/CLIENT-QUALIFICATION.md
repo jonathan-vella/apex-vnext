@@ -402,5 +402,6 @@ The aggregate cannot grant release authority; it becomes one input to the final 
 ## VS Code Installation Lifecycle
 
 The [VS Code installation lifecycle matrix](../../tools/registry/vscode-installation-lifecycle.v1.json) defines the
-bootstrap, reload, update, rollback, uninstall, and reinstall scenarios required for end-user lifecycle qualification.
-Its deterministic evidence is committed; live scenarios remain `not-run` until executed in a clean supported profile.
+bootstrap, reload, update, rollback, uninstall, and reinstall scenarios for the VS Code Copilot harness, which runs the
+CLI projection. Its deterministic evidence is committed; live scenarios remain `not-run` until executed in a clean
+supported profile. Slice 8 retired the profile bootstrap agent scenario with the VS Code Local projection.

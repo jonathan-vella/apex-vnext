@@ -27,26 +27,6 @@ test("bootstrap wizard cancellation and declined plans never initialize a worksp
   }
 });
 
-test("profile bootstrap guidance keeps guided setup confirmations and cloud boundaries explicit", async () => {
-  const root = await tempRoot();
-  const profileRoot = await tempRoot();
-  const service = new ApexService(root, { profileRoot });
-  await service.profileInstall();
-  const profile = await readFile(join(profileRoot, "apex-bootstrap.agent.md"), "utf8");
-  for (const phrase of [
-    "bootstrap wizard",
-    "Do not pass `--yes`",
-    "remote COE URL",
-    "Defer target-bound central baseline checks",
-    "creates a project with an agreed target",
-    "bootstrap governance-plan",
-    "Never request passwords",
-    "do not authorize identity creation",
-  ])
-    assert.ok(profile.includes(phrase), phrase);
-  assert.deepEqual(await readdir(root), []);
-});
-
 test(
   "bare bootstrap presents a real terminal question and cancels without files",
   { skip: process.platform !== "linux", timeout: 15_000 },

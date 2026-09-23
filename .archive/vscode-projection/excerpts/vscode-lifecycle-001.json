@@ -1,0 +1,8 @@
+{
+  "id": "VSCODE-LIFECYCLE-001",
+  "purpose": "Install and protect the opt-in VS Code profile bootstrap agent.",
+  "deterministicEvidence": [
+    "packages/cli/src/test/adapters.test.ts"
+  ],
+  "liveStatus": "not-run"
+}

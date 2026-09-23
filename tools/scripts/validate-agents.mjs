@@ -22,7 +22,6 @@ import { getAgents, getPromptFiles } from "./_lib/workspace-index.mjs";
 import { getBody } from "./_lib/parse-frontmatter.mjs";
 import { Reporter } from "./_lib/reporter.mjs";
 import { MAX_BODY_LINES } from "./_lib/paths.mjs";
-import { validateManagedHandoffs } from "./_lib/managed-handoffs.mjs";
 
 let overallFailed = false;
 /** Aggregated structured findings across all parts (used by --format=json). */
@@ -1116,24 +1115,6 @@ function runVendorPrompting() {
 }
 
 // ============================================================================
-// Part 5: Workflow Handoff Validation (B0–B5, separate registry)
-// ============================================================================
-
-function runWorkflowHandoffs() {
-  const reporter = new Reporter("Workflow Handoff Rules");
-  reporter.header();
-  const agents = [...getAgents().values()].map((agent) => {
-    const match = agent.content.match(/^---\r?\n([\s\S]*?)\r?\n---/u);
-    if (!match) throw new Error(`Missing agent frontmatter: ${agent.path}`);
-    return yaml.load(match[1]);
-  });
-  for (const error of validateManagedHandoffs(agents)) reporter.error("managed-handoff", error);
-  reporter.summary();
-  if (reporter.errors > 0) overallFailed = true;
-  allFindings.push(...reporter.findings);
-}
-
-// ============================================================================
 // Self-check: cross-reference VENDOR_RULES vs rules.json
 // ============================================================================
 
@@ -1184,7 +1165,6 @@ const PARTS = {
   structural: runAgentChecks,
   "model-alignment": runModelAlignment,
   "vendor-prompting": runVendorPrompting,
-  "workflow-handoffs": runWorkflowHandoffs,
 };
 
 function parseArgs(argv) {
