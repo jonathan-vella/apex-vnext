@@ -375,7 +375,7 @@ export async function verifyBundledAssetManifest(root: string, manifest: Bundled
         if (
           !["github-copilot-cli", "github-copilot-vscode"].includes(file.source.clientId ?? "") ||
           (file.source.installationId !== undefined && file.source.installationId !== "both") ||
-          file.source.adapterVersion !== "1.5.0" ||
+          file.source.adapterVersion !== "1.6.0" ||
           !safeRelativePath(file.source.target ?? "") ||
           !file.path.startsWith(expectedPrefix) ||
           file.path !== `${expectedPrefix}${file.source.target}` ||

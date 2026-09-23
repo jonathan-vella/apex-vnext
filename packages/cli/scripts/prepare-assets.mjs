@@ -11,10 +11,11 @@ const repositoryRoot = resolve(packageRoot, "../..");
 const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
-const CLIENT_ADAPTER_VERSION = "1.5.0";
+const CLIENT_ADAPTER_VERSION = "1.6.0";
 const CLI_MODEL_IDS = new Map([
   ["MAI-Code-1.1-Flash (copilot)", "mai-code-1.1-flash"],
-  ["GPT-5.6 Sol", "gpt-5.6-sol"],
+  ["gpt-6-sol", "gpt-6-sol"],
+  ["gpt-6-luna", "gpt-6-luna"],
   ["GPT-5.6 Terra", "gpt-5.6-terra"],
 ]);
 export const GENERATED_SHARED_FILES = [
@@ -127,6 +128,7 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
     description: frontmatter.description,
     target: "github-copilot",
     model: CLI_MODEL_IDS.get(model) ?? model,
+    ...(frontmatter["reasoning-effort"] === undefined ? {} : { "reasoning-effort": frontmatter["reasoning-effort"] }),
     "user-invocable": frontmatter["user-invocable"] ?? true,
     "disable-model-invocation": frontmatter["disable-model-invocation"] ?? false,
     tools,

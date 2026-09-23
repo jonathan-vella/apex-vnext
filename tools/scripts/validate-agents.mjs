@@ -359,6 +359,7 @@ function classifyModel(modelStr) {
   if (lower.includes("claude sonnet")) return "claude-sonnet";
   if (lower.includes("claude haiku")) return "claude-haiku";
   if (lower.includes("claude")) return "claude";
+  if (/^gpt-6-(?:sol|luna)(?:\s|$)/u.test(lower)) return "gpt-6";
   if (lower.includes("gpt-5.6")) return "gpt-5.6";
   if (lower.includes("gpt-5.5")) return "gpt-5.5";
   if (lower.includes("gpt-5.4")) return "gpt-5.4";
@@ -373,7 +374,7 @@ function isClaude(family) {
 }
 
 function isGpt55(family) {
-  return family === "gpt-5.5" || family === "gpt-5.6";
+  return family === "gpt-5.5" || family === "gpt-5.6" || family === "gpt-6";
 }
 
 function isGptFamily(family) {
@@ -665,6 +666,7 @@ const FAMILY_STATUS = {
   "claude-haiku": "warn-only",
   claude: "warn-only",
   "gpt-5.6": "enforced",
+  "gpt-6": "enforced",
   "gpt-5.5": "enforced",
   "gpt-5.4": "deprecated",
   "gpt-codex": "reviewer-only",
@@ -753,7 +755,7 @@ function checkClaudeOneShotNoInvestigate(r, agent, file, family) {
 
 /** Check 6: gpt55-skeleton-001 */
 function checkGpt55Skeleton(r, agent, file, family) {
-  if (family !== "gpt-5.6" && family !== "gpt-5.5" && family !== "gpt-5.4") return;
+  if (!isGpt55(family) && family !== "gpt-5.4") return;
   const body = getBody(agent.content);
   const missing = GPT55_REQUIRED_SECTIONS.filter((h) => !new RegExp(`^${h}\\b`, "m").test(body));
   if (missing.length > 0) {
@@ -856,7 +858,7 @@ function checkClaudeNoPrefill(r, item, file, family) {
 
 /** Check 11: gpt55-stop-rules-non-empty-001 */
 function checkGpt55StopRulesNonEmpty(r, agent, file, family) {
-  if (family !== "gpt-5.6" && family !== "gpt-5.5") return;
+  if (!isGpt55(family)) return;
   const body = getBody(agent.content);
   // Match section body up to the next H1 heading or the end of the document.
   // (`$` with the `m` flag matches end-of-line; we need end-of-string here, hence the explicit alternative.)

@@ -20,31 +20,35 @@ They are not marked implemented by this support matrix. See the [checkpoint](../
 | GitHub Copilot CLI             | Coordinator and specialist projection implemented | Projection generation and lifecycle tests | Current candidate pending           | Conditional       |
 | GitHub Copilot desktop app     | Parked; historical feasibility probes only        | No current acceptance claim               | Incomplete historical probes        | Deferred          |
 | VS Code autonomous workers     | Implemented                                       | Projection and delegation tests           | Current candidate pending           | Conditional       |
-| Copilot CLI autonomous workers | Not yet shipped; permissions unchanged            | Runtime authority tests                   | Actual worker qualification pending | Unqualified       |
+| Copilot CLI autonomous workers | Enabled; permissions unchanged                    | Runtime authority and projection tests    | Bounded Luna workflow probes passed | Conditional       |
 | Bicep track                    | Implemented                                       | Deterministic provider and package tests  | Current cloud candidate pending     | Conditional       |
 | Terraform track                | Implemented                                       | Deterministic provider and package tests  | Current cloud candidate pending     | Conditional       |
 
 ## Client Differences
 
-The two implemented Copilot projections receive the coordinator and interactive specialist roles. VS Code also receives
-autonomous code generation, review, and validation workers. Copilot CLI workers remain unshipped pending actual workflow
-qualification. Revised [ADR-0006](../vnext/adrs/03-des-adr-0006-omit-cli-autonomous-workers.md) treats visibility as a
+Both Copilot projections receive the coordinator, interactive specialists, and autonomous CodeGen, Reviewer and
+Validator workers. CLI workers were enabled with maintainer authorization after bounded Luna workflow probes.
+Revised [ADR-0006](../vnext/adrs/03-des-adr-0006-omit-cli-autonomous-workers.md) treats visibility as a
 usability convention, not authorization. Kernel task, evidence, ownership and approval checks remain mandatory, and
-worker tool/model grants are unchanged. A directly selectable profile is not itself a security failure.
+worker tool grants are unchanged. A directly selectable profile is not itself a security failure.
 
-CLI adapter `1.5.0` maps canonical `GPT-5.6 Terra` and `GPT-5.6 Sol` model labels to the documented CLI identifiers
-`gpt-5.6-terra` and `gpt-5.6-sol`. VS Code labels and the selected model families are unchanged. This is identifier
-translation, not a model substitution or fallback.
+Requirements, Architect and Planner use the maintainer-selected `gpt-6-sol` identifier in both client projections.
+CodeGen, Reviewer and Validator use `gpt-6-luna` with `reasoning-effort: max` in both client renderings.
+Operator retains `GPT-5.6 Terra` in VS Code and `gpt-5.6-terra` in CLI.
+Start standalone CLI with `copilot --reasoning-effort max`: CLI `1.0.87` ignored the field on direct agent selection,
+but delegated worker traces confirmed Luna/max with this launch option. VS Code effort enforcement remains unverified.
+Historical Sol qualification records refer to the previous identifier; they do not qualify the new model selection.
 
 The `--client both` installation preset keeps those two client contracts in one managed lifecycle. CLI agent names use
 `APEX CLI` prefixes and `apex-cli-*` filenames; VS Code names remain unchanged. Both MCP configuration files are installed.
 This avoids relying on CLI `target` filtering or same-name added-root precedence, which did not isolate profiles in
 actual CLI probes. Combined installation/update/rollback checks and a bounded namespaced delegation probe do not replace
-full paired-client acceptance. Shipped CLI worker membership and all role grants remain unchanged.
+full paired-client acceptance. Worker inclusion does not expand tool grants or deployment authority.
 
 Hidden-user discovery does not implicitly disable model invocation. The adapter preserves explicit invocation-disable
 settings; isolated review-routing probes cover the canonical parent-to-Reviewer path on both tracks. This does not
-enable shipped workers, add tools, authenticate reviewers or establish successful native validation.
+authenticate reviewers or establish full native validation coverage. Bicep storage-only native validation passed;
+Terraform correctly blocks on missing security-baseline and logical-parity executors.
 
 In Copilot CLI, run interactive specialists as foreground custom agents. The coordinator names the required role
 and supplies a continuation note with the user's scope; the user selects that role before continuing. Interactive

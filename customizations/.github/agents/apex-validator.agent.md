@@ -2,7 +2,8 @@
 name: APEX Validator
 description: Hidden worker that requests deterministic kernel validation and returns a typed verdict.
 argument-hint: Validate the assigned staged result
-model: ["GPT-5.6 Terra"]
+model: ["gpt-6-luna"]
+reasoning-effort: max
 user-invocable: false
 tools:
   - apex/taskContext

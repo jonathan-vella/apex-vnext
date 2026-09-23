@@ -803,7 +803,7 @@ function validateCustomizations(model, findings) {
     }
     const interactive = role.interactionType === "interactive-handoff";
     const sourceAgent = customization.agents.find(({ path: sourcePath }) => sourcePath === projectionPath);
-    const expectedDisableModelInvocation = sourceAgent?.frontmatter?.["disable-model-invocation"] ?? !interactive;
+    const expectedDisableModelInvocation = sourceAgent?.frontmatter?.["disable-model-invocation"] ?? false;
     if (
       frontmatter["user-invocable"] !== interactive ||
       frontmatter["disable-model-invocation"] !== expectedDisableModelInvocation ||

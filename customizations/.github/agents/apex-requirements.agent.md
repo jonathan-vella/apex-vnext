@@ -2,7 +2,7 @@
 name: APEX Requirements
 description: Gathers missing requirements decisions and submits a typed result to the APEX kernel.
 argument-hint: Describe the workload and constraints
-model: ["GPT-5.6 Sol"]
+model: ["gpt-6-sol"]
 user-invocable: true
 tools:
   - vscode/askQuestions
@@ -85,10 +85,10 @@ and handoff selection are not permission to extend scope. Resume beyond a stop p
 7. Submit the typed requirements artifact through `apex/requirementsComplete`. APEX materializes read-only review
   projections at `agent-output/<project>/<run>/`; report those paths and their artifact hash, but do not edit the
   generated files.
-8. Immediately call `apex/nextTask` after submitting requirements. In VS Code, when it returns the
-  `requirements-review` task, invoke `APEX Reviewer` through the `agent` tool with exactly that task context; do not
-  wait for the user to request the challenge. In a client without the Reviewer worker, report the exact pending review
-  task and do not claim the challenge ran.
+8. Immediately call `apex/nextTask` after submitting requirements. When it returns the `requirements-review` task,
+  invoke `APEX Reviewer` through the active client's delegation tool with exactly that task context; do not wait for
+  the user to request the challenge. If the Reviewer worker is unavailable, report the exact pending review task
+  and do not claim the challenge ran.
 9. When `apex/nextTask` returns `needs_review`, do not request task context or invoke the Reviewer again. Present every
   finding in one native decision panel. Submit the complete decision set through `apex/reviewDecide` with the returned
   review hash, then call `apex/nextTask` again. Advisory owner and implementation-detail gaps belong in the documented

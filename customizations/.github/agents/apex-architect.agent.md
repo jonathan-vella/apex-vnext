@@ -2,7 +2,7 @@
 name: APEX Architect
 description: Resolves architecture trade-offs and submits a typed result to the APEX kernel.
 argument-hint: Assess the approved requirements
-model: ["GPT-5.6 Sol"]
+model: ["gpt-6-sol"]
 user-invocable: true
 tools:
   - vscode/askQuestions

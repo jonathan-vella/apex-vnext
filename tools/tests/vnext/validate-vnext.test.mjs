@@ -152,6 +152,15 @@ test("CLI distinguishes interactive handoffs from supported subagent edges", () 
   assert.ok(hasRule(result, "customization.cli-delegation"));
 });
 
+test("CLI preserves an explicit worker invocation-disable boundary", () => {
+  const result = mutate((model) => {
+    model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX Reviewer").frontmatter[
+      "disable-model-invocation"
+    ] = true;
+  });
+  assert.ok(hasRule(result, "customization.cli-authority"));
+});
+
 test("rejects askQuestions on an autonomous subagent", () => {
   const result = mutate((model) => {
     model.customization.agents

@@ -312,7 +312,7 @@ test("managed role projections retain required tools and exclude unrelated grant
     for (const role of manifest.roles) {
       const path = join(root, "packages/cli/assets/client-projections", client, role.source);
       if (["code-generation", "review", "validation"].includes(role.id)) {
-        assert.deepEqual(role.supportedTargets, ["vscode"], `${role.id} must remain VS Code-only`);
+        assert.deepEqual(role.supportedTargets, ["vscode", "github-copilot"], `${role.id} must ship to both clients`);
       }
       if (!roleSupportsClient(role, client)) {
         await assert.rejects(readFile(path), { code: "ENOENT" });
@@ -335,7 +335,11 @@ test("managed role projections retain required tools and exclude unrelated grant
       );
       const interactive = client === "github-copilot-cli" ? ["ask_user", "task"] : ["vscode/askQuestions", "agent"];
       if (client === "github-copilot-cli")
-        assert.ok(!metadata.tools.includes("task"), `${label}: no supported worker edge`);
+        assert.equal(
+          metadata.tools.includes("task"),
+          roleDelegatesOnClient(role, client, manifest.roles, manifest.invocationEdges),
+          `${label}: delegation must match supported worker edges`,
+        );
       const allowed = new Set([...apexTools, ...armTools, ...interactive]);
       for (const tool of metadata.tools) assert.ok(allowed.has(tool), `${label}: unexpected tool ${tool}`);
       for (const tool of [...arm.managedPolicy.denyBeforeTransport, ...arm.managedPolicy.deferredTools]) {
@@ -763,7 +767,8 @@ test("APEX projections use exact client-specific model identifiers for every rol
   const inventory = JSON.parse(await readFile(join(root, "tools/registry/copilot-cli-agent-tools.json"), "utf8"));
   const cliModels = new Map([
     ["MAI-Code-1.1-Flash (copilot)", "mai-code-1.1-flash"],
-    ["GPT-5.6 Sol", "gpt-5.6-sol"],
+    ["gpt-6-sol", "gpt-6-sol"],
+    ["gpt-6-luna", "gpt-6-luna"],
     ["GPT-5.6 Terra", "gpt-5.6-terra"],
   ]);
   for (const role of manifest.roles) {
@@ -774,6 +779,9 @@ test("APEX projections use exact client-specific model identifiers for every rol
       const frontmatter = load(/^---\n([\s\S]*?)\n---/u.exec(rendered)[1]);
       const projectedModel = Array.isArray(frontmatter.model) ? frontmatter.model[0] : frontmatter.model;
       assert.equal(projectedModel, client === "github-copilot-cli" ? cliModels.get(role.model) : role.model);
+      const lunaWorker = ["code-generation", "review", "validation"].includes(role.id);
+      assert.equal(frontmatter["reasoning-effort"], lunaWorker ? "max" : undefined);
+      if (lunaWorker) assert.equal(projectedModel, "gpt-6-luna");
     }
   }
 });

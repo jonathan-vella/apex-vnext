@@ -206,7 +206,7 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
           composition: "client-projections",
           clientId: client,
           target,
-          adapterVersion: "1.5.0",
+          adapterVersion: "1.6.0",
           sourcePath: target,
           sourceHash: sha256Bytes(content),
           ...(agent
@@ -240,7 +240,7 @@ async function fixture(): Promise<{ root: string; manifest: BundledAssetManifest
         clientId: clientId as string,
         installationId: "both",
         target: target as string,
-        adapterVersion: "1.5.0",
+        adapterVersion: "1.6.0",
         sourcePath: sourcePath as string,
         sourceHash: sha256Bytes(content as Buffer),
         ...(String(target).includes("agents/") ? { roleId: "coordinator" } : {}),
