@@ -174,6 +174,8 @@ CLI-format agents in the VS Code Agent Host. The VS Code Local projection, its r
 combined installation mode retire through DECISION-015 gates: consumer migration, replacement proof, archive provenance
 under `.archive/vscode-projection/`, rollback and a negative reintroduction check. `apex init` and `apex update` reject
 the retired client with a stable error code and migration guidance. The archive is never a runtime dependency.
+`github-copilot-cli` is the only installable projection; `github-copilot-vscode` remains the evidence identity for VS
+Code running CLI agents, so paired-client comparison continues. Builder-only VS Code tooling for this repository stays.
 
 An `apex-next` skill replaces handoff buttons. It reads kernel status and the next task, names the owning agent, and
 either delegates that agent with the prepared prompt or prints the `/agent` selection and scope prompt. A read-only

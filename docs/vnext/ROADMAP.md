@@ -59,36 +59,40 @@ See [current checkpoint](PROJECT.md#development-diagnostics-checkpoint) and
 Owner: managed customization, CLI lifecycle and client experience maintainers. Decision:
 [DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection). Acceptance:
 [REQ-CUSTOMIZATION-001](PRD.md#req-customization-001-managed-copilot-experiences) and the planned
-[CLI-only scenarios](CLIENT-QUALIFICATION.md#planned-cli-only-scenarios). Branch: `feat/cli-agents`. Status: planned;
-none of the slices below is implemented. The VS Code Local projection keeps shipping until slice 7 passes its gates.
+[CLI-only scenarios](CLIENT-QUALIFICATION.md#planned-cli-only-scenarios). Branch: `feat/cli-agents`, draft PR #347.
+Tracking: [issue #348](https://github.com/jonathan-vella/apex-vnext/issues/348). Status: planned; no slice is
+implemented. The VS Code Local projection keeps shipping until slice 8 passes its gates.
 
-1. **Resolve client facts with local probes.** Check model lists against `models`, the `reasoningEffort` spelling,
-   `ask_user` multi-select, `ask_user` inside a `task` subagent, `/agent` context retention, sidekick loading, and
-   `.mcp.json` startup, including `-p` with `GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP`. Also check built-in helper
-   access to staging paths and agent loading in the VS Code Copilot harness. Record dated observations; they select
-   the options used by later slices.
-2. **CLI-native agent sources.** Author agents in CLI format: `model` or `models`, `modelPolicy: required` for workers
-   and `preferred` for interactive agents, the verified effort field, `ask_user`, `task` and `apex/*` selectors.
-   Remove `vscode/askQuestions`, handoffs, argument hints, agent allowlists and VS Code client mechanics. Workers use
-   kernel task context, not repository instructions.
-3. **Simplify rendering and lifecycle.** Remove the VS Code renderer path, combined installation and `apex-cli-*`
-   names. Ship `.mcp.json` only. `init` and `update` reject the retired client with a stable error code and
-   migration hint.
-4. **Next-step routing.** Add the `apex-next` skill and route the coordinator through it. It delegates the owning agent
-   with the prepared prompt when the step can complete as a subagent; otherwise it prints `/agent` and the scope
-   prompt. Add the read-only context sidekick. Let the coordinator monitor and steer delegated workers.
-5. **Advisory built-in helpers.** Grant `task` only where needed: Explore for Planner and Operator, Rubber-duck for
-   Architect and Planner, Code-review and Security-review under Reviewer, optional built-in Task pre-checks before
-   `validateTask`, and user-invoked Research suggestions. Reviewer restates helper findings as typed input.
-6. **Numbered multi-choice.** Present options numbered in kernel order, resolve the user's numbers, let the kernel
-   validate the values and keep explicit confirmation before `recordInput`.
-7. **Retire the VS Code projection.** Move rendered VS Code agents, `.vscode/mcp.json`, the renderer path and
-   VS Code-specific tests, including the VS Code installation lifecycle registry, to `.archive/vscode-projection/`.
-   Exclude the archive from packaging and validation. Add migration, rollback and negative reintroduction checks.
-8. **Documentation.** Update explanation, reference, how-to and tutorial pages as behavior ships, including `/review`
-   and `/security-review` guidance for promoted output.
-9. **Qualify.** Run focused package tests per slice and one `npm run qualify:vnext` at integration. Then qualify
-   standalone CLI and the VS Code Copilot harness on the same candidate.
+Managed agents target Copilot CLI only. Users may still run them in VS Code through its Copilot harness, which must
+pass the same qualification. Builder-only VS Code tooling for this repository stays.
+
+| #   | Slice                         | Main scope                                                                                     | Done when                                                                                                                                                                                                                                               | Checks                                                                 |
+| --- | ----------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| 0   | Merge #346                    | PR #346                                                                                        | #346 is merged; #347 is rebased onto `main` and retargeted                                                                                                                                                                                              | #346 CI passes                                                         |
+| 1   | Local CLI probes              | Disposable workspaces under `dist/`                                                            | Dated results for model lists, effort field, `ask_user` multi-select and subagent use, `/agent` context, sidekick loading, `.mcp.json` in interactive and `-p` sessions, helper staging access and VS Code Copilot harness loading                      | Results recorded in CLIENT-QUALIFICATION                               |
+| 2   | Contracts                     | `packages/contracts`                                                                           | `github-copilot-cli` is the only installable projection; `github-copilot-vscode` means VS Code running CLI agents; the retired projection fails with a stable error code                                                                                | Contracts build and tests                                              |
+| 3   | CLI-format agents             | `customizations/.github/agents`, manifest, CLI tool inventory                                  | CLI frontmatter only; workers use `modelPolicy: required` and interactive agents `preferred`; no VS Code-only fields                                                                                                                                    | `validate:agents`, `validate:model-consistency`, customization tests   |
+| 4   | Renderer and lifecycle        | `prepare-assets.mjs`, `assets.ts`, `service.ts`, `cli.ts`, `bootstrap-wizard.ts`               | One projection and `.mcp.json`; no combined mode or `apex-cli-*` names; `init` and `update` stop VS Code installs and say to run `apex init --client github-copilot-cli`                                                                                | CLI build; assets, adapters, customizations and bootstrap-wizard tests |
+| 5   | `apex-next` and sidekick      | New skill and sidekick agent, coordinator body                                                 | The coordinator routes through `apex-next`; delegation falls back to `/agent` and a prompt; the sidekick only reads status and next task                                                                                                                | Skill and agent validators, routing regression, CLI probe              |
+| 6   | Advisory built-in helpers     | Planner, Operator, Architect, Reviewer and Validator                                           | `task` is granted only where needed; Reviewer restates helper findings as typed input                                                                                                                                                                   | Grant tests, helper-only negative test, CLI probe per helper           |
+| 7   | Numbered multi-choice         | Kernel input validation, interactive agent bodies                                              | Numbers map to kernel order; invalid, duplicate and out-of-range entries are rejected; confirmation stays                                                                                                                                               | Kernel and service tests, CLIENT-023 probe                             |
+| 8   | Retire the VS Code projection | `.archive/vscode-projection/`, `retired-paths.v1.json`, projection-only scripts and registries | VS Code agents, `.vscode/mcp.json`, the renderer path and Local-only tests are archived with rollback notes; retired paths are enforced; lifecycle and client-comparison tooling target the VS Code Copilot harness; builder-only VS Code tooling stays | `test:retired-automation`, pack test, `validate:all`                   |
+| 9   | Documentation                 | Explanation, reference, how-to, tutorials, `copilot-instructions.md`, generated references     | Docs describe shipped behavior only, including `/review` and `/security-review`                                                                                                                                                                         | `lint:md`, `validate:docs`, `validate:docs-reference`                  |
+| 10  | Integration                   | Whole repository                                                                               | `npm run qualify:vnext` passes once                                                                                                                                                                                                                     | Full suite                                                             |
+| 11  | Client qualification          | Candidate-bound evidence                                                                       | CLIENT-001 to CLIENT-027 pass in standalone CLI and the VS Code Copilot harness; RISK-014 and RISK-015 closure proof is met                                                                                                                             | CLIENT-QUALIFICATION evidence                                          |
+| 12  | Close out                     | PROJECT, REGISTER, ROADMAP                                                                     | #347 is ready for review                                                                                                                                                                                                                                | Maintainer review                                                      |
+
+Each slice is one commit, or a small set, on `feat/cli-agents`. Slices 5 to 7 may run in any order after slice 4;
+slice 8 follows them.
+
+- **Slice 1:** check `model` lists against `models` and the `reasoningEffort` spelling; test `-p` with
+  `GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP`. Results select the options used by later slices.
+- **Slice 3:** remove `vscode/askQuestions`, handoffs, argument hints, agent allowlists and VS Code client mechanics.
+  Workers use kernel task context, not repository instructions.
+- **Slice 5:** `apex-next` delegates the owning agent with the prepared prompt when the step can complete as a
+  subagent. The coordinator may also monitor and steer delegated workers.
+- **Slice 6:** Explore for Planner and Operator, Rubber-duck for Architect and Planner, Code-review and
+  Security-review under Reviewer, optional built-in Task pre-checks before `validateTask`, and user-invoked Research.
 
 | Retired mechanic                   | Replacement                                                           |
 | ---------------------------------- | --------------------------------------------------------------------- |
