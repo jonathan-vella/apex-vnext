@@ -12,26 +12,28 @@ Preserve working safety mechanisms; do not rebuild the runtime or create a gener
 | 2     | Complete governance baseline import          | Subscription policy reaches review, Gate 2, planning and code validation       |
 | 3     | Support both profiles and COE adaptation     | Independent import and conversational changes reuse accepted decisions         |
 | 4     | Complete design and operational output       | Useful, consistent documents and handoff match the quality reference           |
-| 5     | Close WSL2 and paired-client workflow gaps   | VS Code Local and standalone CLI complete the lifecycle without a devcontainer |
+| 5     | Close WSL2 and CLI-projection workflow gaps  | Standalone CLI and VS Code Copilot harness complete the lifecycle on WSL2      |
 | 6     | Finalize distribution and APEX MCP delivery  | Easy install/update/upgrade/rollback with compatible runtime versions          |
 | 7     | Qualify and release the final candidate      | Current evidence and explicit release authority                                |
 
 ## Current Completion Order
 
-As of 2026-09-21, focus only on VS Code Local and standalone Copilot CLI on WSL2. Desktop-app support and optional
-built-in helpers are deferred below; they are not prerequisites for finishing the active two-client release.
+As of 2026-09-23, focus on the single Copilot CLI projection selected by
+[DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection), used by standalone Copilot CLI and the VS Code
+Copilot harness on WSL2. Desktop-app support remains deferred below and is not a prerequisite for this release.
 
-1. Qualify actual standalone CLI CodeGen, Reviewer and Validator workflows under revised ADR-0006. Direct selection
-   is not a security blocker; task, evidence, ownership and approval checks are. Preserve existing worker permissions
-   and models, verify runtime outcomes, and keep shipped membership unchanged until qualification is reviewed.
+1. Deliver the [CLI-only projection](#cli-only-projection) on `feat/cli-agents`. CLI CodeGen, Reviewer and Validator
+   already ship under revised ADR-0006; keep their evidence as history and requalify them on the new candidate.
+   Task, evidence, ownership and approval checks stay authoritative; direct selection is not a security blocker.
 2. Finish acceptance for issue #344. Offline coverage now includes Bicep source-policy evidence, Terraform saved-plan
    evidence, nonempty imports, identity/isolation rejection and bounded module-child bindings. Confirm the same
    candidate in supported clients; actual AVM-version/workload and cloud evidence require separate qualification.
    Unresolved ARM expressions remain unsupported rather than being treated as compliant.
 3. Reconcile and finish COE/profile/change and artifact-output requirements; reuse implemented controls. Include the
    first-time install/bootstrap acceptance agreed on 2026-09-22 under `REQ-ONBOARDING-001`.
-4. Qualify complete workflows and lifecycle in both clients on the same candidate, then finalize distribution and
-   separately authorized cloud/release evidence. Preserve all review, freshness, ownership and human approval gates.
+4. Qualify complete workflows and lifecycle in standalone CLI and the VS Code Copilot harness on the same candidate,
+   then finalize distribution and separately authorized cloud/release evidence. Preserve all review, freshness,
+   ownership and human approval gates.
 
 Use narrow regression-first slices and integration checks at checkpoints. No new optimization campaign, broad rewrite
 or optional feature expansion is needed to follow this order.
@@ -51,6 +53,55 @@ optimization first batch or its deferred telemetry recommendation:
 
 See [current checkpoint](PROJECT.md#development-diagnostics-checkpoint) and
 [operator commands](../how-to/debug-local.md#command-driven-session-assessment).
+
+## CLI-Only Projection
+
+Owner: managed customization, CLI lifecycle and client experience maintainers. Decision:
+[DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection). Acceptance:
+[REQ-CUSTOMIZATION-001](PRD.md#req-customization-001-managed-copilot-experiences) and the planned
+[CLI-only scenarios](CLIENT-QUALIFICATION.md#planned-cli-only-scenarios). Branch: `feat/cli-agents`. Status: planned;
+none of the slices below is implemented. The VS Code Local projection keeps shipping until slice 7 passes its gates.
+
+1. **Resolve client facts with local probes.** Check model lists against `models`, the `reasoningEffort` spelling,
+   `ask_user` multi-select, `ask_user` inside a `task` subagent, `/agent` context retention, sidekick loading, and
+   `.mcp.json` startup, including `-p` with `GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP`. Also check built-in helper
+   access to staging paths and agent loading in the VS Code Copilot harness. Record dated observations; they select
+   the options used by later slices.
+2. **CLI-native agent sources.** Author agents in CLI format: `model` or `models`, `modelPolicy: required` for workers
+   and `preferred` for interactive agents, the verified effort field, `ask_user`, `task` and `apex/*` selectors.
+   Remove `vscode/askQuestions`, handoffs, argument hints, agent allowlists and VS Code client mechanics. Workers use
+   kernel task context, not repository instructions.
+3. **Simplify rendering and lifecycle.** Remove the VS Code renderer path, combined installation and `apex-cli-*`
+   names. Ship `.mcp.json` only. `init` and `update` reject the retired client with a stable error code and
+   migration hint.
+4. **Next-step routing.** Add the `apex-next` skill and route the coordinator through it. It delegates the owning agent
+   with the prepared prompt when the step can complete as a subagent; otherwise it prints `/agent` and the scope
+   prompt. Add the read-only context sidekick. Let the coordinator monitor and steer delegated workers.
+5. **Advisory built-in helpers.** Grant `task` only where needed: Explore for Planner and Operator, Rubber-duck for
+   Architect and Planner, Code-review and Security-review under Reviewer, optional built-in Task pre-checks before
+   `validateTask`, and user-invoked Research suggestions. Reviewer restates helper findings as typed input.
+6. **Numbered multi-choice.** Present options numbered in kernel order, resolve the user's numbers, let the kernel
+   validate the values and keep explicit confirmation before `recordInput`.
+7. **Retire the VS Code projection.** Move rendered VS Code agents, `.vscode/mcp.json`, the renderer path and
+   VS Code-specific tests, including the VS Code installation lifecycle registry, to `archive/vscode-projection/`.
+   Exclude the archive from packaging and validation. Add migration, rollback and negative reintroduction checks.
+8. **Documentation.** Update explanation, reference, how-to and tutorial pages as behavior ships, including `/review`
+   and `/security-review` guidance for promoted output.
+9. **Qualify.** Run focused package tests per slice and one `npm run qualify:vnext` at integration. Then qualify
+   standalone CLI and the VS Code Copilot harness on the same candidate.
+
+| Retired mechanic                   | Replacement                                                           |
+| ---------------------------------- | --------------------------------------------------------------------- |
+| handoff buttons and `send: true`   | `apex-next` delegation, or `/agent` plus printed scope prompt         |
+| `vscode/askQuestions` multi-select | `ask_user` numbered selection with kernel validation and confirmation |
+| per-parent `agents` allowlists     | kernel task ownership, `user-invocable: false`, scoped tools          |
+| `argument-hint`                    | agent `description`                                                   |
+| VS Code model fallback arrays      | CLI `models` and `modelPolicy`, confirmed by probe                    |
+| `.vscode/mcp.json`, `${input:...}` | `.mcp.json` with environment variables                                |
+| VS Code Local harness              | VS Code Copilot harness                                               |
+
+General-purpose delegation, `/fleet`, `/delegate`, `/pr automerge` and plan mode are out of scope; see
+[excluded CLI helpers](#excluded-cli-helpers).
 
 ## Phase 1: Align Without Rebuilding
 
@@ -140,7 +191,7 @@ the PRD owns acceptance. Applicable follow-ons belong in existing phases, not a 
 | R-19: New telemetry        | Not current scope under DECISION-025; preserve utilities and reconcile executable gates.     |
 | R-20: Reviewer packs       | First batch 2: bounded evidence and exact criteria for all four unchanged review passes.     |
 | R-21: Parallel reviews     | Deferred: scheduler and head/commit semantics need a separate correctness design.            |
-| R-22: CLI workers          | Qualify actual profiles under revised ADR-0006; retain kernel safeguards and scoped grants.  |
+| R-22: CLI workers          | Shipped in CLI; requalify in the CLI-only projection with required worker models.            |
 | R-23: Partial invalidation | Reject ID-only invalidation; Phase 3 reuses unchanged decisions with conservative proof.     |
 | R-24: Recommendations      | Phase 3: recommend permitted choices; never record or accept risk without confirmation.      |
 
@@ -205,8 +256,9 @@ both-track policy/ownership qualification are still required; packaging tests do
 **Requirements:** `REQ-HOST-001`, `REQ-CUSTOMIZATION-001`, `REQ-GUIDANCE-001`, `REQ-WORKFLOW-001`.
 
 - Run basic client checks during earlier slices; use this phase to close end-to-end gaps, not first discover them.
-- Scope this phase to VS Code Local and standalone Copilot CLI. Do not add a desktop projection, native Windows lane
-  or desktop test prerequisite. Qualify standalone CLI worker behavior independently of the parked desktop probes.
+- Scope this phase to standalone Copilot CLI and the VS Code Copilot harness, both using the single CLI projection.
+  Do not add a desktop projection, native Windows lane or desktop test prerequisite. Qualify standalone CLI worker
+  behavior independently of the parked desktop probes.
 - Prove greenfield, COE import, changes, review, generation, validation and resume in both profiles.
 - Preserve kernel authority and existing worker grants while qualifying required outcomes; profile visibility is not
   an authentication or security gate.
@@ -221,9 +273,9 @@ Owner: CLI lifecycle and managed customization maintainers. Acceptance: `REQ-ONB
 These are planned additions, not capabilities established by existing bootstrap or clean-install tests.
 
 1. Record a bounded install/setup plan with readiness, conflicts and approval boundaries; reuse setup/doctor and the
-   canonical toolchain. Deliver `apex-install` from ready WSL2 Ubuntu without requiring Node/APEX first, covering both
-   clients and both IaC tracks. Verify installations and preserve compatible tools.
-2. Extend repository bootstrap to resumable new/existing/cloned-repo setup and either or both client projections.
+   canonical toolchain. Deliver `apex-install` from ready WSL2 Ubuntu without requiring Node/APEX first, covering the
+   CLI projection, both supported clients and both IaC tracks. Verify installations and preserve compatible tools.
+2. Extend repository bootstrap to resumable new/existing/cloned-repo setup that installs the single CLI projection.
    Retain one managed ownership/update path, conflict preservation and explicit partial outcomes.
 3. Add remote-only COE selection during setup, independent multi-archetype copies and confirmed defaults/decision
    adoption. Reuse bounded import validation and provenance; never execute imported instructions or copy approvals.
@@ -231,7 +283,8 @@ These are planned additions, not capabilities established by existing bootstrap 
    dedicated creation. Keep Azure read roles separate from deployment authority; preserve administrator handoffs.
 5. Verify repository/client health and create the first collection review PR, or verify/import an existing central
    reviewed baseline. Preserve human review and report governance pending where appropriate.
-6. Qualify reruns, interruption, missing permissions, conflicts, both clients together and secret-safe authentication.
+6. Qualify reruns, interruption, missing permissions, conflicts, standalone CLI and the VS Code Copilot harness in one
+   workspace, and secret-safe authentication.
    Live identity, federation, role and repository changes require separate explicit authorization during qualification.
 
 ## Phase 6: Distribution Last
@@ -263,7 +316,8 @@ These are planned additions, not capabilities established by existing bootstrap 
 
 Owner: client experience maintainers. Parked by explicit maintainer direction on 2026-09-21, superseding the earlier
 mandatory-third-client scope. `REQ-COPILOT-APP-001` is retained but is not an active release acceptance requirement.
-Resume only after VS Code and standalone CLI required workflows are confirmed and the maintainer explicitly selects it.
+Resume only after standalone CLI and VS Code Copilot harness required workflows are confirmed and the maintainer
+explicitly selects it.
 
 The [parked desktop implementation plan](COPILOT-DESKTOP-PLAN.md) retains the historical phases, proof requirements
 and implementation references. It is supporting design history, not a current release control or execution instruction.
@@ -280,21 +334,16 @@ for later review, not evidence of shipped native Windows support. Do not mutate 
 On reactivation, rebind exact app/runtime versions and separately prove M1 native runtime, M2 adapter/interactions and
 M3 full applicable local workflows. Earlier smoke/intake checks do not establish any complete milestone.
 
-### Deferred: Built-In Copilot Agent Assistance
+### Excluded CLI Helpers
 
-Status: backlog only; no implementation authorized. Revisit only after APEX vNext's required VS Code and standalone
-Copilot CLI workflows are confirmed with current candidate-bound evidence, not intake/status checks alone, and the
-maintainer explicitly selects this work. This is not a prerequisite for current client qualification.
+On 2026-09-23 the maintainer moved advisory built-in helpers into the active [CLI-only projection](#cli-only-projection):
+Explore, Rubber-duck, Code-review, Security-review, built-in Task pre-checks and user-invoked Research. They remain
+advisory and never replace APEX CodeGen, Reviewer or Validator contracts, create validation receipts or approve gates.
 
-Evaluate Explore for bounded discovery, Code-review and Security-review for advisory findings, and Rubber-duck for
-design critique. Consider user-invoked Research, development-only Task execution, and General-purpose delegation only
-where a specific need justifies them. Verify availability, instruction inheritance, tool permissions and behavior
-separately for each client; shared CLI foundations do not qualify desktop-app behavior.
-
-Keep results advisory and bounded. Built-ins must not replace APEX CodeGen, Reviewer or Validator contracts, create
-validation receipts, approve gates, or become workflow authority. Automatic inference is not required routing evidence.
-Do not add grants, hooks, plugins, agents or runtime changes under this backlog entry. Required safe APEX worker paths
-remain existing product work; optional built-in assistance must not expand that scope.
+General-purpose delegation, `/fleet`, `/delegate`, `/pr automerge` and plan mode stay out of managed workflows.
+General-purpose delegation defeats bounded least-privilege roles, `/fleet` bypasses kernel batch control, `/delegate`
+and `/pr automerge` leave kernel gates, and plan mode duplicates Planner without adding authority. Revisit only with a
+named need, an authority design, focused tests and client evidence.
 
 ### Other Deferred Work
 

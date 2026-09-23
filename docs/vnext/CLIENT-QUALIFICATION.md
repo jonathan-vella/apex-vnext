@@ -3,6 +3,11 @@
 This control defines release-blocking evidence for GitHub Copilot in VS Code Local and standalone Copilot CLI.
 Generated projection tests are necessary but do not replace live client interaction.
 
+[DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection) replaces VS Code Local with the VS Code
+Copilot harness running the single CLI projection. Until that change ships, the VS Code column below describes the
+current Local projection; afterwards it applies to the Copilot harness, and the
+[planned CLI-only scenarios](#planned-cli-only-scenarios) become blocking.
+
 Both clients use Windows via WSL2/Ubuntu, without Docker or a devcontainer. Required outcomes follow the
 [PRD](PRD.md), including both environment profiles, COE reuse and conversational changes. Basic interaction checks
 accompany feature delivery; final installation qualification follows the distribution decision. No token baseline is
@@ -55,6 +60,21 @@ not assertions that corresponding runtime or registry coverage already exists:
 
 Exercise both IaC tracks and both profiles with representative cases in the existing tests. Reuse fixtures and helpers;
 do not build a separate benchmark harness. Record explicit gaps until implemented.
+
+## Planned CLI-Only Scenarios
+
+These scenarios belong to the [CLI-only projection plan](ROADMAP.md#cli-only-projection). They are planned acceptance,
+not evidence that the behavior exists.
+
+| ID           | Required outcome                                                                                | Standalone CLI | VS Code Copilot harness |
+| ------------ | ----------------------------------------------------------------------------------------------- | -------------- | ----------------------- |
+| `CLIENT-021` | `apex-next` names the kernel-selected owner, then delegates it or prints `/agent` and a prompt  | Required       | Required                |
+| `CLIENT-022` | The context sidekick loads, reads only status and next task, and changes no state               | Required       | Required                |
+| `CLIENT-023` | Numbered multi-choice resolves in kernel order; invalid numbers are corrected before recording  | Required       | Required                |
+| `CLIENT-024` | Built-in helper output alone cannot complete a task, create evidence or open a gate             | Required       | Required                |
+| `CLIENT-025` | Workers run their required models and effort without launch flags or user overrides             | Required       | Required                |
+| `CLIENT-026` | `init` and `update` reject the retired VS Code client; archived files are never installed       | Required       | Not applicable          |
+| `CLIENT-027` | `.mcp.json` starts APEX MCP in interactive sessions and, when enabled, in `-p` sessions         | Required       | Required                |
 
 ## Execution Rules
 
@@ -235,6 +255,9 @@ had delegation only and the child had no tools; no kernel workflow or cloud auth
 Keep native multi-select in VS Code and wherever the exposed question-tool schema supports it. When a standalone CLI session
 exposes only single-choice and free-text input, collect the exact option values through the native tool's free-text
 field, then show the proposed array and obtain explicit confirmation through that tool before `recordInput`.
+Under the [CLI-only projection plan](ROADMAP.md#cli-only-projection), this becomes numbered selection: present the
+options numbered in kernel order, accept the user's numbers, resolve them to option values and let the kernel validate
+the array. Out-of-range, duplicate or non-numeric entries require correction. Confirmation is still required.
 Preserve the kernel option order, allowed values, request identity, typed arrays and user stop boundary. Never invent a
 `multiSelect` parameter, silently reduce the question to one choice, infer aliases or record recommended defaults.
 Invalid, empty or ambiguous input requires correction; corrected selections require confirmation again. Cancellation
