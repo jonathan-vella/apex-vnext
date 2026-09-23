@@ -9,8 +9,9 @@ and the repository archives.
 - **Impact:** Managed agents, input handling, MCP discovery, or routing may differ from deterministic projections.
 - **Mitigation:** Bind observed client versions and hashes; run the complete client matrix on the exact candidate.
 - **State:** Open
-- **Closure proof:** Current standalone Copilot CLI and VS Code Copilot harness evidence satisfies
-  [CLIENT-QUALIFICATION.md](CLIENT-QUALIFICATION.md).
+- **Closure proof:** Exact-candidate standalone Copilot CLI and VS Code Copilot harness evidence satisfies
+  [CLIENT-QUALIFICATION.md](CLIENT-QUALIFICATION.md). The slice 1 probes only characterize the clients, and the harness
+  cannot qualify until picked agents apply.
 
 ## RISK-002: Live Cloud Behavior Can Differ From Deterministic Providers
 

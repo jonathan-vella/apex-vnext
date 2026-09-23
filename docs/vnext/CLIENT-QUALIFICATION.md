@@ -66,15 +66,19 @@ do not build a separate benchmark harness. Record explicit gaps until implemente
 These scenarios belong to the [CLI-only projection plan](ROADMAP.md#cli-only-projection). They are planned acceptance,
 not evidence that the behavior exists.
 
-| ID           | Required outcome                                                                               | Standalone CLI | VS Code Copilot harness |
-| ------------ | ---------------------------------------------------------------------------------------------- | -------------- | ----------------------- |
-| `CLIENT-021` | `apex-next` names the kernel-selected owner, then delegates it or prints `/agent` and a prompt | Required       | Required                |
-| `CLIENT-022` | The context sidekick loads, reads only status and next task, and changes no state              | Required       | Required                |
-| `CLIENT-023` | Numbered multi-choice resolves in kernel order; invalid numbers are corrected before recording | Required       | Required                |
-| `CLIENT-024` | Built-in helper output alone cannot complete a task, create evidence or open a gate            | Required       | Required                |
-| `CLIENT-025` | Workers run their required models and effort without launch flags or user overrides            | Required       | Required                |
-| `CLIENT-026` | `init` and `update` reject the retired VS Code client; archived files are never installed      | Required       | Not applicable          |
-| `CLIENT-027` | `.mcp.json` starts APEX MCP in interactive sessions and, when enabled, in `-p` sessions        | Required       | Required                |
+| ID           | Required outcome                                                                                              | Standalone CLI | VS Code Copilot harness |
+| ------------ | ------------------------------------------------------------------------------------------------------------- | -------------- | ----------------------- |
+| `CLIENT-021` | `apex-next` names the kernel-selected owner, then delegates it or prints its client selection step and prompt | Required       | Required                |
+| `CLIENT-022` | The context sidekick loads, reads only status and next task, and changes no state                             | Required       | Required                |
+| `CLIENT-023` | Numbered multi-choice resolves in kernel order; invalid numbers are corrected before recording                | Required       | Required                |
+| `CLIENT-024` | Built-in helper output alone cannot complete a task, create evidence or open a gate                           | Required       | Required                |
+| `CLIENT-025` | Workers run their required models and effort without launch flags or user overrides                           | Required       | Required                |
+| `CLIENT-026` | `init` and `update` reject the retired VS Code client; archived files are never installed                     | Required       | Not applicable          |
+| `CLIENT-027` | `.mcp.json` starts APEX MCP in interactive sessions and, when enabled, in `-p` sessions                       | Required       | Required                |
+
+The selection step is `/agent <name>` in standalone CLI and the Agent picker in the VS Code Copilot harness, where
+`/agent` is not a command. Harness scenarios that need a selected agent, including CLIENT-021, depend on picked agents
+applying; the [slice 1 probe](#cli-only-projection-probes) found that they do not over WSL.
 
 ## CLI-Only Projection Probes
 

@@ -312,7 +312,8 @@ kernel-owned `needs_input` contract and record typed answers without relying on 
   confirmation, correction and cancellation follow [CLIENT-QUALIFICATION](CLIENT-QUALIFICATION.md#multiple-selection-input).
 - An `apex-next` skill, invocable by users and agents, reads status and the next task and names the owning agent. It
   delegates the owner with the prepared prompt when the step can complete as a subagent, including any required input.
-  Otherwise it prints the `/agent` selection and a ready-to-paste scope prompt. The coordinator routes through it.
+  Otherwise it prints the client's selection step (`/agent <name>` in standalone CLI, the Agent picker in the VS Code
+  harness) and a ready-to-paste scope prompt. The coordinator routes through it.
 - A read-only context sidekick publishes the current project and next owner into the session inbox.
 - CodeGen, Reviewer and Validator run through `task` delegation with `model-policy: required`; interactive agents use
   `preferred`. Workers rely on kernel task context, not repository instructions. The coordinator may monitor and steer

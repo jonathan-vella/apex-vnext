@@ -178,10 +178,11 @@ the retired client with a stable error code and migration guidance. The archive 
 Code running CLI agents, so paired-client comparison continues. Builder-only VS Code tooling for this repository stays.
 
 An `apex-next` skill replaces handoff buttons. It reads kernel status and the next task, names the owning agent, and
-either delegates that agent with the prepared prompt or prints the `/agent` selection and scope prompt. A read-only
-context sidekick keeps the next step visible. Built-in CLI agents are advisory helpers only: Explore, Rubber-duck,
-Code-review, Security-review, built-in Task and user-invoked Research never produce kernel evidence, complete tasks or
-approve gates. General-purpose delegation, `/fleet`, `/delegate` and plan mode stay out of managed workflows. Kernel
-authority, typed outcomes, the four review passes and human gates are unchanged.
+either delegates that agent with the prepared prompt or prints the client's selection step (`/agent` in standalone CLI,
+the Agent picker in the VS Code harness) and scope prompt. A read-only context sidekick keeps the next step visible.
+Built-in CLI agents are advisory helpers only: Explore, Rubber-duck, Code-review, Security-review, built-in Task and
+user-invoked Research never produce kernel evidence, complete tasks or approve gates. General-purpose delegation,
+`/fleet`, `/delegate` and plan mode stay out of managed workflows. Kernel authority, typed outcomes, the four review
+passes and human gates are unchanged.
 [REQ-CUSTOMIZATION-001](PRD.md#req-customization-001-managed-copilot-experiences) owns acceptance and the
 [CLI-only projection plan](ROADMAP.md#cli-only-projection) owns delivery.
