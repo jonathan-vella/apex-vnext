@@ -206,18 +206,18 @@ a clean full run on the final candidate is still required.
 | `ce561ac` | Intake to Gate 2 ready (CLI tarball `c110711a80dffe4b`)      | `3fc7d20e`                                                 |
 | `a8e65b9` | Lifecycle, retired client, `-p` MCP (CLI `e5a4d511d8d0f825`) | `7edbd926`, `d7a7efc5`                                     |
 
-| ID           | Standalone CLI result                                                                                            |
-| ------------ | ---------------------------------------------------------------------------------------------------------------- |
-| `CLIENT-003` | Pass: one typed answer event per request; a missing single-select drew one targeted follow-up, not a default     |
-| `CLIENT-006` | Pass: `nextTask` returned `APEX_AUTHORIZATION` while Gate 1 was open                                             |
-| `CLIENT-007` | Pass: after `/exit` and a new session, the same journal head was reported                                        |
-| `CLIENT-009` | Pass: `update`, `rollback`, `uninstall`, `reinstall` and `status` succeeded with no tracked-file drift           |
-| `CLIENT-021` | Pass (fallback): `apex-next` named `apex-requirements` and printed `/agent` with a scope prompt                  |
-| `CLIENT-023` | Pass: checkboxes in kernel order; the UI answer `dev, prod, test` was stored as `["dev", "test", "prod"]`        |
-| `CLIENT-025` | Pass for Reviewer: `subagent.configured` shows `gpt-6-luna` at max with no launch flags; others not yet run      |
-| `CLIENT-026` | Pass: `init --client github-copilot-vscode` fails with `APEX_USAGE`; an adapters test covers the retired hint    |
-| `CLIENT-027` | Pass: `-p` with `GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP=true` called `apex/status`; without it no APEX tool    |
-| Others       | Not run: Gates 2 to 4, Planner, CodeGen, Validator, Operator deploy, CLIENT-008 and CLIENT-024 need a clean run  |
+| ID           | Standalone CLI result                                                                                           |
+| ------------ | --------------------------------------------------------------------------------------------------------------- |
+| `CLIENT-003` | Pass: one typed answer event per request; a missing single-select drew one targeted follow-up, not a default    |
+| `CLIENT-006` | Pass: `nextTask` returned `APEX_AUTHORIZATION` while Gate 1 was open                                            |
+| `CLIENT-007` | Pass: after `/exit` and a new session, the same journal head was reported                                       |
+| `CLIENT-009` | Pass: `update`, `rollback`, `uninstall`, `reinstall` and `status` succeeded with no tracked-file drift          |
+| `CLIENT-021` | Pass (fallback): `apex-next` named `apex-requirements` and printed `/agent` with a scope prompt                 |
+| `CLIENT-023` | Pass: checkboxes in kernel order; the UI answer `dev, prod, test` was stored as `["dev", "test", "prod"]`       |
+| `CLIENT-025` | Pass for Reviewer: `subagent.configured` shows `gpt-6-luna` at max with no launch flags; others not yet run     |
+| `CLIENT-026` | Pass: `init --client github-copilot-vscode` fails with `APEX_USAGE`; an adapters test covers the retired hint   |
+| `CLIENT-027` | Pass: `-p` with `GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP=true` called `apex/status`; without it no APEX tool   |
+| Others       | Not run: Gates 2 to 4, Planner, CodeGen, Validator, Operator deploy, CLIENT-008 and CLIENT-024 need a clean run |
 
 Gate 1 was approved by the maintainer; the agent relayed the chat approval to `gateDecide` with `confirm: true` and
 did not ask again. Gate 2 was left open for the maintainer. Findings and fixes:
