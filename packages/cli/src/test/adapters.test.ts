@@ -919,10 +919,42 @@ test("init rejects retired clients and the CLI projection keeps one managed life
   await service.uninstallCustomizations();
   assert.equal(await readFile(agent, "utf8"), original + "\nManual CLI edit\n");
   assert.equal((await service.status()).run.runId, before.run.runId);
+});
+
+test("a retired VS Code install stops until init explicitly selects the CLI projection", async () => {
+  const root = await tempRoot();
+  await execute(["init", "--project", "demo"], root);
+  const service = new ApexService(root);
+  const before = await service.status();
   const selectionPath = join(root, ".apex/customizations.selection.json");
   const selection = JSON.parse(await readFile(selectionPath, "utf8"));
   await writeFile(selectionPath, JSON.stringify({ ...selection, clientId: "github-copilot-vscode" }));
-  await assert.rejects(service.update(), /Customization selection is invalid/u);
+  const retired = {
+    details: { reason: "CLIENT_PROJECTION_RETIRED" },
+    message: /apex init --client github-copilot-cli/u,
+  };
+  await assert.rejects(service.update(), retired);
+  await assert.rejects(execute(["init", "--project", "demo"], root), retired);
+  const edited = join(root, ".github/agents/apex-planner.agent.md");
+  await writeFile(edited, "Manual edit\n");
+  await assert.rejects(execute(["init", "--client", "github-copilot-cli"], root), (error: ApexError) => {
+    const details = error.details as { removed: string[]; conflicts: string[] };
+    assert.equal(error.code, "APEX_CONFLICT");
+    assert.ok(details.removed.includes(".github/agents/apex.agent.md"));
+    assert.deepEqual(details.conflicts, [".github/agents/apex-planner.agent.md"]);
+    return true;
+  });
+  await assert.rejects(service.update(), retired);
+  await rm(edited);
+  const replaced = (await execute(["init", "--client", "github-copilot-cli"], root)) as { installed: string[] };
+  assert.ok(replaced.installed.includes(".github/agents/apex-planner.agent.md"));
+  assert.equal(JSON.parse(await readFile(selectionPath, "utf8")).clientId, "github-copilot-cli");
+  assert.equal((await service.status()).run.runId, before.run.runId);
+  await service.update();
+  await assert.rejects(
+    execute(["init", "--project", "demo", "--client", "github-copilot-cli"], root),
+    /already initialized/u,
+  );
 });
 
 test("bootstrap never derives a project ID from the workspace folder", async () => {
