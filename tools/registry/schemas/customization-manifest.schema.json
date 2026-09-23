@@ -24,14 +24,14 @@
     "sharedDirectories": { "$ref": "#/$defs/uniquePaths" },
     "clientProjections": {
       "type": "array",
-      "minItems": 3,
-      "maxItems": 3,
+      "minItems": 1,
+      "maxItems": 1,
       "items": {
         "type": "object",
         "required": ["id", "generatedRoot", "files"],
         "additionalProperties": false,
         "properties": {
-          "id": { "enum": ["github-copilot-vscode", "github-copilot-cli", "both"] },
+          "id": { "const": "github-copilot-cli" },
           "generatedRoot": { "type": "string", "pattern": "^client-projections/[a-z0-9-]+$" },
           "files": { "$ref": "#/$defs/uniquePaths" }
         }
@@ -43,7 +43,7 @@
       "uniqueItems": true,
       "items": {
         "type": "object",
-        "required": ["id", "source", "agent", "role", "supportedTargets", "interactionType", "model", "costTier"],
+        "required": ["id", "source", "agent", "role", "supportedTargets", "interactionType", "model"],
         "additionalProperties": false,
         "properties": {
           "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
@@ -53,13 +53,11 @@
           "supportedTargets": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 2,
-            "uniqueItems": true,
-            "items": { "enum": ["vscode", "github-copilot"] }
+            "maxItems": 1,
+            "items": { "const": "github-copilot" }
           },
           "interactionType": { "enum": ["interactive-handoff", "autonomous-subagent"] },
-          "model": { "type": "string", "minLength": 1 },
-          "costTier": { "enum": ["fast", "standard", "premium"] }
+          "model": { "type": "string", "minLength": 1 }
         }
       }
     },

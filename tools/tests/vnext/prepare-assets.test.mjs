@@ -29,46 +29,17 @@ const assessmentSkills = [
   "apex-azure-validate",
 ];
 
-test("CLI projection namespaces agent references without changing models or grants", async () => {
+test("CLI projection keeps canonical agent names", async () => {
   const manifest = JSON.parse(await readFile(join(root, "customizations/manifest.json"), "utf8"));
   const inventory = JSON.parse(await readFile(join(root, "tools/registry/copilot-cli-agent-tools.json"), "utf8"));
-  const agentNames = Object.fromEntries(
-    manifest.roles.map(({ agent }) => [agent, agent.replace(/^APEX/u, "APEX CLI")]),
-  );
   for (const role of manifest.roles) {
     const source = await readFile(join(root, "customizations", role.source), "utf8");
-    const options = {
+    const projected = renderClientAgentProjection(source, "github-copilot-cli", inventory, {
       delegates: roleDelegatesOnClient(role, "github-copilot-cli", manifest.roles, manifest.invocationEdges),
-    };
-    const original = renderClientAgentProjection(source, "github-copilot-cli", inventory, options);
-    const projected = renderClientAgentProjection(source, "github-copilot-cli", inventory, { ...options, agentNames });
-    const metadata = (text) => load(/^---\n([\s\S]*?)\n---/u.exec(text)[1]);
-    const before = metadata(original);
-    const after = metadata(projected);
-    assert.equal(after.name, agentNames[before.name]);
-    assert.deepEqual({ ...after, name: before.name }, before);
-    assert.ok(projected.includes("apex-shared-body"));
-    assert.doesNotMatch(projected, /APEX CLI CLI/u);
-    for (const target of ["Requirements", "Architect", "Planner", "Operator", "Reviewer", "Validator", "CodeGen"])
-      assert.ok(!projected.includes(`\`APEX ${target}\``));
-    assert.equal(
-      renderClientAgentProjection(source, "github-copilot-vscode", inventory, { agentNames }),
-      renderClientAgentProjection(source, "github-copilot-vscode", inventory),
-    );
+    });
+    assert.equal(load(/^---\n([\s\S]*?)\n---/u.exec(projected)[1]).name, role.agent);
+    assert.doesNotMatch(projected, /APEX CLI/u);
   }
-  const source = await readFile(join(root, "customizations/.github/agents/apex.agent.md"), "utf8");
-  const terms = renderClientAgentProjection(
-    `${source}\nThe APEX kernel owns state. Select \`APEX\` or \`APEX Planner\`.\n`,
-    "github-copilot-cli",
-    inventory,
-    { agentNames },
-  );
-  assert.match(terms, /The APEX kernel owns state\. Select `APEX CLI` or `APEX CLI Planner`\./u);
-  for (const mapping of [{}, { APEX: "unsafe\nname" }, { APEX: "APEX CLI", "APEX Planner": "APEX CLI" }])
-    assert.throws(
-      () => renderClientAgentProjection(source, "github-copilot-cli", inventory, { agentNames: mapping }),
-      /Invalid CLI agent name mapping/u,
-    );
 });
 
 test("governance collection files ship from canonical sources to both client projections", async () => {
@@ -109,31 +80,25 @@ test("governance collection files ship from canonical sources to both client pro
   }
 });
 
-test("combined installation preserves both MCP configurations and distinct client profiles", async () => {
+test("the bundle ships only the Copilot CLI projection with a workspace .mcp.json", async () => {
   await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
   const assets = join(root, "packages/cli/assets");
   const manifest = JSON.parse(await readFile(join(assets, "manifest.json"), "utf8"));
   const customization = JSON.parse(await readFile(join(root, "customizations/manifest.json"), "utf8"));
-  const combined = manifest.projections.find(({ id }) => id === "both");
-  assert.ok(combined.files.includes("client-projections/both/.vscode/mcp.json"));
-  assert.ok(combined.files.includes("client-projections/both/.github/mcp.json"));
-  for (const client of ["github-copilot-vscode", "github-copilot-cli"])
-    for (const role of customization.roles) {
-      if (!roleSupportsClient(role, client)) continue;
-      const path = client === "github-copilot-cli" ? role.source.replace(/\/apex(?=[.-])/u, "/apex-cli") : role.source;
-      const target = `client-projections/both/${path}`;
-      assert.ok(combined.files.includes(target));
-      const metadata = (text) => load(/^---\n([\s\S]*?)\n---/u.exec(text)[1]);
-      const combinedAgent = metadata(await readFile(join(assets, target), "utf8"));
-      const singleAgent = metadata(await readFile(join(assets, "client-projections", client, role.source), "utf8"));
-      assert.equal(
-        combinedAgent.name,
-        client === "github-copilot-cli" ? role.agent.replace(/^APEX/u, "APEX CLI") : role.agent,
-      );
-      assert.deepEqual({ ...combinedAgent, name: singleAgent.name }, singleAgent);
-      assert.equal(manifest.files.find(({ path }) => path === target).source.clientId, client);
-      assert.equal(manifest.files.find(({ path }) => path === target).source.installationId, "both");
-    }
+  assert.deepEqual(
+    manifest.projections.map(({ id }) => id),
+    ["github-copilot-cli"],
+  );
+  assert.deepEqual(await readdir(join(assets, "client-projections")), ["github-copilot-cli"]);
+  const [projection] = manifest.projections;
+  assert.ok(projection.files.includes("client-projections/github-copilot-cli/.mcp.json"));
+  assert.ok(!projection.files.some((path) => /\/(?:\.vscode|\.github)\/mcp\.json$|apex-cli/u.test(path)));
+  for (const role of customization.roles) {
+    if (!roleSupportsClient(role, "github-copilot-cli")) continue;
+    const entry = manifest.files.find(({ path }) => path === `client-projections/github-copilot-cli/${role.source}`);
+    assert.equal(entry.source.clientId, "github-copilot-cli");
+    assert.equal(entry.source.installationId, undefined);
+  }
 });
 
 test("assessment skill mappings ship to managed client projections", async () => {
@@ -307,12 +272,14 @@ test("managed role projections retain required tools and exclude unrelated grant
     review: [],
     validation: [],
   };
+  const readTools = ["view", "glob", "rg"];
+  const explorers = ["planning", "operations"];
   assert.deepEqual(manifest.roles.map(({ id }) => id).sort(), Object.keys(requiredApex).sort());
-  for (const client of ["github-copilot-vscode", "github-copilot-cli"]) {
+  for (const client of ["github-copilot-cli"]) {
     for (const role of manifest.roles) {
       const path = join(root, "packages/cli/assets/client-projections", client, role.source);
       if (["code-generation", "review", "validation"].includes(role.id)) {
-        assert.deepEqual(role.supportedTargets, ["vscode", "github-copilot"], `${role.id} must ship to both clients`);
+        assert.deepEqual(role.supportedTargets, ["github-copilot"], `${role.id} must ship to Copilot CLI`);
       }
       if (!roleSupportsClient(role, client)) {
         await assert.rejects(readFile(path), { code: "ENOENT" });
@@ -333,14 +300,36 @@ test("managed role projections retain required tools and exclude unrelated grant
         armTools.sort(),
         label,
       );
-      const interactive = client === "github-copilot-cli" ? ["ask_user", "task"] : ["vscode/askQuestions", "agent"];
+      const interactive = ["ask_user", "task"];
       if (client === "github-copilot-cli")
         assert.equal(
           metadata.tools.includes("task"),
           roleDelegatesOnClient(role, client, manifest.roles, manifest.invocationEdges),
           `${label}: delegation must match supported worker edges`,
         );
-      const allowed = new Set([...apexTools, ...armTools, ...interactive]);
+      const nativeRead = explorers.includes(role.id) ? readTools : [];
+      assert.deepEqual(
+        metadata.tools.filter((tool) => readTools.includes(tool)),
+        nativeRead,
+        `${label}: read tools`,
+      );
+      const mechanics = content.split("<!-- apex-shared-body -->")[0];
+      if (explorers.includes(role.id)) {
+        assert.match(mechanics, /Explore is advisory and read-only/u, label);
+        assert.match(mechanics, /never for requirements intake/u, label);
+        assert.match(mechanics, /never treat its output as kernel evidence, task completion or approval/u, label);
+      } else {
+        assert.doesNotMatch(mechanics, /Explore is advisory/u, label);
+      }
+      if (metadata.tools.includes("task") && role.id !== "coordinator") {
+        assert.match(
+          mechanics,
+          /never for general-purpose, rubber-duck, code-review, security-review or research agents/u,
+          label,
+        );
+      }
+      assert.ok(!metadata.tools.some((tool) => /^(bash|shell)/u.test(tool)), `${label}: no shell`);
+      const allowed = new Set([...apexTools, ...armTools, ...interactive, ...nativeRead]);
       for (const tool of metadata.tools) assert.ok(allowed.has(tool), `${label}: unexpected tool ${tool}`);
       for (const tool of [...arm.managedPolicy.denyBeforeTransport, ...arm.managedPolicy.deferredTools]) {
         assert.ok(
@@ -356,39 +345,25 @@ test("managed role projections retain required tools and exclude unrelated grant
   }
 });
 
-test("managed routing distinguishes input, review dispositions, and exact task context in both clients", async () => {
+test("managed routing distinguishes input, review dispositions, and exact task context", async () => {
   await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
   const agents = ["apex", "apex-requirements", "apex-architect", "apex-planner", "apex-operator"];
-  const skills = ["apex-workflow", "apex-requirements", "apex-operations"];
-  for (const client of ["github-copilot-vscode", "github-copilot-cli"]) {
+  const skills = ["apex-workflow", "apex-next", "apex-requirements", "apex-operations"];
+  for (const client of ["github-copilot-cli"]) {
     const projection = join(root, "packages/cli/assets/client-projections", client);
     const coordinator = await readFile(join(projection, ".github/agents/apex.agent.md"), "utf8");
     const mechanics = coordinator.split("<!-- apex-shared-body -->")[0];
     assert.match(mechanics, /never intake/);
     assert.match(coordinator, /exactly `APEX Requirements`, never Explore or a generic agent/);
-    assert.match(coordinator, /user's stop boundary/);
-    assert.match(coordinator, /If handoff is unavailable, ask the user/);
+    assert.match(coordinator, /exact stop point, and prohibited operations into the scope prompt/);
+    assert.match(coordinator, /Route every next step through the `apex-next` skill/);
     assert.match(coordinator, /Never use `session_store_sql`, SQL, session-history searches/);
     assert.match(coordinator, /Do not ask the user which role should handle it/);
     assert.match(coordinator, /status-only request calls `apex\/status` once and stops/);
     if (client === "github-copilot-cli") {
-      assert.match(mechanics, /select `APEX Requirements` as the foreground agent/);
+      assert.match(mechanics, /Route through the `apex-next` skill/);
       assert.doesNotMatch(mechanics, /for declared worker delegation/);
-      assert.match(mechanics, /Print the scope note verbatim for continuation/);
-      assert.match(mechanics, /Do not use `task` for interactive intake/);
-      assert.match(mechanics, /If the original scope is unavailable, limit continuation to intake through taskContext/);
-    } else {
-      assert.match(mechanics, /present the declared Gather requirements handoff/);
-      assert.match(mechanics, /stop for the user's interactive transition/);
-      assert.match(mechanics, /State the user's scope and stop point beside the handoff/);
-      const frontmatter = load(coordinator.split("---")[1]);
-      const handoff = frontmatter.handoffs.find(({ agent }) => agent === "APEX Requirements");
-      assert.match(handoff.prompt, /If the original scope is unavailable, stop after taskContext/);
-      assert.match(
-        handoff.prompt,
-        /Handoff selection is not permission to submit artifacts, run review, request gate approval/,
-      );
-      assert.doesNotMatch(handoff.prompt, /Output: complete typed requirements through APEX MCP/);
+      assert.match(mechanics, /Use `task` only for the hidden workers it names, never for interactive intake/);
     }
     const requirements = await readFile(join(projection, ".github/agents/apex-requirements.agent.md"), "utf8");
     const submission = requirements.indexOf(
@@ -417,11 +392,9 @@ test("managed routing distinguishes input, review dispositions, and exact task c
     assert.match(requirements, /Do not ask supplemental owner-assignment questions/);
     assert.match(requirements, /Recommendations are proposed, not confirmed requirements or compliance evidence/);
     assert.doesNotMatch(requirements, /Acknowledge and assign|ask only for the responsible role/);
-    if (client === "github-copilot-vscode") {
-      const reviewer = await readFile(join(projection, ".github/agents/apex-reviewer.agent.md"), "utf8");
-      assert.match(reviewer, /Do not create blocking findings or\s+owner-assignment requests solely/);
-      assert.match(reviewer, /violated\s+Azure Policy constraints/);
-    }
+    const reviewer = await readFile(join(projection, ".github/agents/apex-reviewer.agent.md"), "utf8");
+    assert.match(reviewer, /Do not create blocking findings or\s+owner-assignment requests solely/);
+    assert.match(reviewer, /violated\s+Azure Policy constraints/);
     for (const agent of agents) {
       const content = await readFile(join(projection, ".github/agents", `${agent}.agent.md`), "utf8");
       for (const state of ["status=needs_input", "status=needs_review", "status=task", "task.taskId"]) {
@@ -448,7 +421,16 @@ test("managed routing distinguishes input, review dispositions, and exact task c
       }
       if (skill === "apex-workflow") {
         assert.match(content, /status-only request, report that result and stop/);
-        assert.match(content, /do not ask the user to choose a role or search session history/);
+        assert.match(content, /route the next step with the `apex-next` skill/);
+      }
+      if (skill === "apex-next") {
+        assert.match(content, /Do not ask the user to choose a role or search session history/);
+        assert.match(content, /Delegate it with `task` and the scope prompt/);
+        assert.match(content, /Never delegate an interactive owner/);
+        assert.match(content, /Copilot CLI: `\/agent apex-requirements`/);
+        assert.match(content, /in the Agent picker/);
+        assert.match(content, /If the original scope is\s+unavailable, limit continuation to intake/);
+        assert.match(content, /Do not claim the switch, answer acceptance or task creation/);
       }
       for (const state of ["needs_input", "needs_review", "status=task", "task.taskId"]) {
         assert.ok(content.includes(state), `${client}/${skill}: missing ${state} routing`);
@@ -543,14 +525,9 @@ test("asset generator rejects malformed and duplicate client projection declarat
     sharedDirectories: [],
     clientProjections: [
       {
-        id: "github-copilot-vscode",
-        generatedRoot: "client-projections/github-copilot-vscode",
-        files: [".vscode/mcp.json"],
-      },
-      {
         id: "github-copilot-cli",
         generatedRoot: "client-projections/github-copilot-cli",
-        files: [".github/mcp.json"],
+        files: [".mcp.json"],
       },
     ],
     roles: [
@@ -558,7 +535,7 @@ test("asset generator rejects malformed and duplicate client projection declarat
         id: "coordinator",
         source: ".github/agents/apex.agent.md",
         agent: "APEX",
-        supportedTargets: ["vscode", "github-copilot"],
+        supportedTargets: ["github-copilot"],
       },
     ],
   };
@@ -568,13 +545,20 @@ test("asset generator rejects malformed and duplicate client projection declarat
       manifest.sharedFiles.push(manifest.sharedFiles[0]);
     },
     (manifest) => {
-      manifest.clientProjections[0].files = ".vscode/mcp.json";
+      manifest.clientProjections[0].files = ".mcp.json";
     },
     (manifest) => {
       manifest.clientProjections[0].files.push(manifest.clientProjections[0].files[0]);
     },
     (manifest) => {
-      manifest.clientProjections[1].id = manifest.clientProjections[0].id;
+      manifest.clientProjections[0].id = "github-copilot-vscode";
+    },
+    (manifest) => {
+      manifest.clientProjections.push({
+        id: "both",
+        generatedRoot: "client-projections/both",
+        files: [".vscode/mcp.json", ".mcp.json"],
+      });
     },
     (manifest) => {
       manifest.roles.push({ id: "other", source: ".github/agents/other.agent.md", agent: "APEX" });
@@ -584,6 +568,9 @@ test("asset generator rejects malformed and duplicate client projection declarat
     },
     (manifest) => {
       manifest.roles[0].supportedTargets = ["unsupported"];
+    },
+    (manifest) => {
+      manifest.roles[0].supportedTargets = ["vscode"];
     },
   ]) {
     const invalid = structuredClone(valid);
@@ -598,14 +585,9 @@ test("asset generator accepts a role supported by only one client target", () =>
     sharedDirectories: [],
     clientProjections: [
       {
-        id: "github-copilot-vscode",
-        generatedRoot: "client-projections/github-copilot-vscode",
-        files: [".vscode/mcp.json"],
-      },
-      {
         id: "github-copilot-cli",
         generatedRoot: "client-projections/github-copilot-cli",
-        files: [".github/mcp.json"],
+        files: [".mcp.json"],
       },
     ],
     roles: [
@@ -613,82 +595,80 @@ test("asset generator accepts a role supported by only one client target", () =>
         id: "validator",
         source: ".github/agents/apex-validator.agent.md",
         agent: "APEX Validator",
-        supportedTargets: ["vscode"],
+        supportedTargets: ["github-copilot"],
       },
     ],
   };
   assert.deepEqual(validateClientProjectionDeclarations(manifest), manifest);
-  assert.equal(roleSupportsClient(manifest.roles[0], "github-copilot-vscode"), true);
-  assert.equal(roleSupportsClient(manifest.roles[0], "github-copilot-cli"), false);
+  assert.equal(roleSupportsClient(manifest.roles[0], "github-copilot-cli"), true);
+  assert.throws(() => roleSupportsClient(manifest.roles[0], "github-copilot-vscode"), /Unsupported client projection/u);
 });
 
 test("delegation is enabled only when a destination is supported by the client", () => {
-  const parent = { agent: "APEX Planner", supportedTargets: ["vscode", "github-copilot"] };
-  const worker = { agent: "APEX CodeGen", supportedTargets: ["vscode"] };
+  const parent = { agent: "APEX Planner", supportedTargets: ["github-copilot"] };
+  const worker = { agent: "APEX CodeGen", supportedTargets: ["github-copilot"] };
   const edges = [{ from: parent.agent, to: worker.agent, type: "subagent" }];
-  assert.equal(roleDelegatesOnClient(parent, "github-copilot-vscode", [parent, worker], edges), true);
-  assert.equal(roleDelegatesOnClient(parent, "github-copilot-cli", [parent, worker], edges), false);
+  assert.equal(roleDelegatesOnClient(parent, "github-copilot-cli", [parent, worker], edges), true);
+  assert.equal(
+    roleDelegatesOnClient(parent, "github-copilot-cli", [parent, { ...worker, supportedTargets: [] }], edges),
+    false,
+  );
+  assert.throws(
+    () => roleDelegatesOnClient(parent, "github-copilot-vscode", [parent, worker], edges),
+    /Unsupported client projection/u,
+  );
 });
 
-test("asset generator renders client-valid Requirements projections from one shared body", () => {
+test("asset generator renders the CLI Requirements projection and rejects retired VS Code fields", () => {
   const source = `---
 name: APEX Requirements
 description: Gather requirements.
-argument-hint: Describe the workload
-model: ["Claude Sonnet 5"]
+model: gpt-6-sol
+model-policy: preferred
 user-invocable: true
 tools:
-  - vscode/askQuestions
-  - agent
+  - ask_user
+  - task
   - apex/status
   - apex/recordInput
-agents:
-  - APEX Reviewer
-handoffs:
-  - label: Continue
-    agent: APEX Architect
-    prompt: "Input: requirements. Output: architecture."
-    send: true
 ---
 
 ## Role
 
 Gather requirements through the kernel.
 `;
-  const vscode = renderClientAgentProjection(source, "github-copilot-vscode");
   const cli = renderClientAgentProjection(source, "github-copilot-cli");
-  assert.match(vscode, /vscode\/askQuestions/u);
-  assert.match(vscode, /target: vscode/u);
-  assert.match(vscode, /handoffs:/u);
-  assert.match(vscode, /agents:/u);
-  assert.match(vscode, /model:\n\s+- Claude Sonnet 5/u);
   assert.match(cli, /\n\s+- ask_user/u);
   assert.match(cli, /\n\s+- task/u);
-  assert.match(cli, /model: Claude Sonnet 5/u);
+  assert.match(cli, /model: gpt-6-sol\nmodel-policy: preferred/u);
   assert.match(cli, /target: github-copilot/u);
   assert.match(cli, /disable-model-invocation: false/u);
   assert.match(cli, /collect one free-text answer/u);
-  assert.match(cli, /request correction for invalid, empty, or ambiguous input/u);
+  assert.match(cli, /use `ask_user` checkboxes when it offers an array field/u);
+  assert.match(cli, /number every exact kernel option in its original order/u);
+  assert.match(cli, /request correction for out-of-range, duplicate, non-numeric, empty, or ambiguous entries/u);
+  assert.match(cli, /when every value matches, the checkbox answer needs no further confirmation/u);
+  assert.match(cli, /resolved selection as an array in kernel order/u);
   assert.match(cli, /A correction requires a fresh confirmation of the complete set/u);
-  assert.match(cli, /only after confirmation/u);
+  assert.match(cli, /only after the checkbox answer or confirmation/u);
   assert.match(cli, /Cancellation means no submission/u);
   assert.match(cli, /Never pass unsupported `multiSelect` parameters/u);
-  assert.doesNotMatch(vscode, /collect one free-text answer/u);
-  assert.doesNotMatch(cli, /vscode\/askQuestions|handoffs:|agents:|argument-hint:/u);
-  const marker = "<!-- apex-shared-body -->";
-  assert.equal(vscode.slice(vscode.indexOf(marker)), cli.slice(cli.indexOf(marker)));
-  assert.notEqual(vscode, cli);
-  assert.throws(
-    () => renderClientAgentProjection(source.replace("name:", "target: vscode\nname:"), "github-copilot-vscode"),
-    /must not declare target/u,
-  );
+  assert.match(cli, /<!-- apex-shared-body -->\n+## Role\n\nGather requirements through the kernel\./u);
+  const render = (text) => () => renderClientAgentProjection(text, "github-copilot-cli");
+  for (const field of ["argument-hint: Describe the workload", "agents: [APEX Reviewer]", "handoffs: []"])
+    assert.throws(render(source.replace("user-invocable:", `${field}\nuser-invocable:`)), /must not declare/u);
+  for (const tool of ["vscode/askQuestions", "agent"])
+    assert.throws(render(source.replace("  - ask_user", `  - ${tool}`)), /must not use/u);
+  assert.throws(render(source.replace("model-policy: preferred\n", "")), /model-policy/u);
+  assert.throws(render(source.replace("name:", "target: github-copilot\nname:")), /must not declare target/u);
 });
 
 test("CLI projection keeps hidden workers noninteractive and rejects unpinned APEX operations", () => {
   const hidden = `---
 name: APEX Validator
 description: Validate one result.
-model: ["Claude Sonnet 5"]
+model: gpt-6-luna
+model-policy: required
 user-invocable: false
 disable-model-invocation: true
 tools:
@@ -736,14 +716,9 @@ test("asset generator rejects unsafe projection roots before generation", () => 
     sharedFiles: [".github/copilot-instructions.md"],
     clientProjections: [
       {
-        id: "github-copilot-vscode",
-        generatedRoot: "client-projections/github-copilot-vscode",
-        files: [".vscode/mcp.json"],
-      },
-      {
         id: "github-copilot-cli",
         generatedRoot: "client-projections/github-copilot-cli",
-        files: [".github/mcp.json"],
+        files: [".mcp.json"],
       },
     ],
     roles: [
@@ -751,7 +726,7 @@ test("asset generator rejects unsafe projection roots before generation", () => 
         id: "coordinator",
         source: ".github/agents/apex.agent.md",
         agent: "APEX",
-        supportedTargets: ["vscode", "github-copilot"],
+        supportedTargets: ["github-copilot"],
       },
     ],
   };
@@ -762,33 +737,24 @@ test("asset generator rejects unsafe projection roots before generation", () => 
   }
 });
 
-test("APEX projections use exact client-specific model identifiers for every role", async () => {
+test("APEX CLI projections carry each role's exact model and policy", async () => {
   const manifest = JSON.parse(await readFile(join(root, "customizations/manifest.json"), "utf8"));
   const inventory = JSON.parse(await readFile(join(root, "tools/registry/copilot-cli-agent-tools.json"), "utf8"));
-  const cliModels = new Map([
-    ["MAI-Code-1.1-Flash (copilot)", "mai-code-1.1-flash"],
-    ["gpt-6-sol", "gpt-6-sol"],
-    ["gpt-6-luna", "gpt-6-luna"],
-    ["GPT-5.6 Terra", "gpt-5.6-terra"],
-  ]);
   for (const role of manifest.roles) {
     const source = await readFile(join(root, "customizations", role.source), "utf8");
-    assert.ok(cliModels.has(role.model), `Missing expected CLI identifier for ${role.agent}`);
-    for (const client of ["github-copilot-vscode", "github-copilot-cli"]) {
-      const rendered = renderClientAgentProjection(source, client, inventory, { delegates: false });
-      const frontmatter = load(/^---\n([\s\S]*?)\n---/u.exec(rendered)[1]);
-      const projectedModel = Array.isArray(frontmatter.model) ? frontmatter.model[0] : frontmatter.model;
-      assert.equal(projectedModel, client === "github-copilot-cli" ? cliModels.get(role.model) : role.model);
-      const lunaWorker = ["code-generation", "review", "validation"].includes(role.id);
-      assert.equal(frontmatter["reasoning-effort"], lunaWorker ? "max" : undefined);
-      if (lunaWorker) assert.equal(projectedModel, "gpt-6-luna");
-    }
+    const rendered = renderClientAgentProjection(source, "github-copilot-cli", inventory, { delegates: false });
+    const frontmatter = load(/^---\n([\s\S]*?)\n---/u.exec(rendered)[1]);
+    const worker = ["code-generation", "review", "validation"].includes(role.id);
+    assert.equal(frontmatter.model, role.model, `${role.agent} model`);
+    assert.equal(frontmatter["model-policy"], worker ? "required" : "preferred", `${role.agent} model policy`);
+    assert.equal(frontmatter["reasoning-effort"], worker ? "max" : undefined, `${role.agent} reasoning effort`);
+    if (worker) assert.equal(frontmatter.model, "gpt-6-luna");
   }
 });
 
 test("CLI interactive handoffs do not grant background task delegation", () => {
-  const coordinator = { agent: "APEX", supportedTargets: ["vscode", "github-copilot"] };
-  const requirements = { agent: "APEX Requirements", supportedTargets: ["vscode", "github-copilot"] };
+  const coordinator = { agent: "APEX", supportedTargets: ["github-copilot"] };
+  const requirements = { agent: "APEX Requirements", supportedTargets: ["github-copilot"] };
   const delegates = roleDelegatesOnClient(
     coordinator,
     "github-copilot-cli",
@@ -799,10 +765,11 @@ test("CLI interactive handoffs do not grant background task delegation", () => {
   const source = `---
 name: APEX
 description: Coordinate workflow.
-model: MAI-Code-1.1-Flash (copilot)
+model: mai-code-1.1-flash
+model-policy: preferred
 user-invocable: true
 tools:
-  - vscode/askQuestions
+  - ask_user
   - apex/status
 ---
 
@@ -822,13 +789,13 @@ Coordinate.
   );
   assert.doesNotMatch(rendered, /\n\s+- task/u);
   assert.doesNotMatch(rendered, /collect one free-text answer/u);
-  assert.match(rendered, /foreground agent/);
+  assert.match(rendered, /Route through the `apex-next` skill/);
 });
 
-test("asset lifecycle carries restored managed skills to both clients", async () => {
+test("asset lifecycle carries restored managed skills to the CLI projection", async () => {
   await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
   const restoredSkills = ["apex-azure-adr", "apex-azure-defaults", "apex-azure-rbac", "apex-microsoft-docs"];
-  const clients = ["github-copilot-cli", "github-copilot-vscode"];
+  const clients = ["github-copilot-cli"];
 
   for (const skill of restoredSkills) {
     const source = await readFile(join("customizations", ".github", "skills", skill, "SKILL.md"));
@@ -841,12 +808,12 @@ test("asset lifecycle carries restored managed skills to both clients", async ()
   }
 });
 
-test("asset preparation includes operational skill references for both clients", async () => {
+test("asset preparation includes operational skill references in the CLI projection", async () => {
   const relativePaths = [
     ".github/skills/apex-azure-governance/references/operational-checklist.md",
     ".github/skills/apex-azure-deploy/references/operational-checklist.md",
   ];
-  for (const client of ["github-copilot-vscode", "github-copilot-cli"]) {
+  for (const client of ["github-copilot-cli"]) {
     for (const relativePath of relativePaths) {
       const content = await readFile(
         join(process.cwd(), "packages", "cli", "assets", "client-projections", client, relativePath),

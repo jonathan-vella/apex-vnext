@@ -259,16 +259,6 @@
       }
     },
     {
-      "id": "lint-workflow-handoffs",
-      "script": "lint:workflow-handoffs",
-      "profile": "node-lint",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
       "id": "test-python",
       "script": "test:python",
       "profile": "external-test",

@@ -4,7 +4,6 @@ import test from "node:test";
 import { load } from "js-yaml";
 import { validateVscodeConfiguration } from "../scripts/validate-vscode-config.mjs";
 import { parseFrontmatter } from "../scripts/_lib/parse-frontmatter.mjs";
-import { validateManagedHandoffs } from "../scripts/_lib/managed-handoffs.mjs";
 import { validateReviewDependencies } from "../scripts/validate-challenger-presence.mjs";
 
 test("retired paths remain absent without requiring historical evidence", () => {
@@ -33,19 +32,6 @@ test("all four review requirements survive workflow cleanup", () => {
       node.sourceDependencies = node.sourceDependencies.filter((dependency) => dependency !== review);
     assert.ok(validateReviewDependencies(changed).some((error) => error.includes(review)));
   }
-});
-
-test("managed handoffs reject unknown targets, wildcard dispatch and unbounded loops", () => {
-  const agents = [{ name: "APEX", agents: ["Reviewer"], handoffs: [{ agent: "Reviewer" }] }, { name: "Reviewer" }];
-  assert.deepEqual(validateManagedHandoffs(agents), []);
-  assert.ok(validateManagedHandoffs([{ name: "APEX", agents: ["*"] }]).length > 0);
-  assert.ok(validateManagedHandoffs([{ name: "APEX", handoffs: [{ agent: "missing" }] }]).length > 0);
-  assert.ok(validateManagedHandoffs([{ name: "APEX", handoffs: [{}] }]).length > 0);
-  assert.ok(validateManagedHandoffs([{ name: "APEX", agents: "Reviewer" }]).length > 0);
-  const self = { agent: "APEX", prompt: "Input task. Output: result." };
-  assert.deepEqual(validateManagedHandoffs([{ name: "APEX", handoffs: [self] }]), []);
-  assert.ok(validateManagedHandoffs([{ name: "APEX", handoffs: Array(7).fill(self) }]).length > 0);
-  assert.ok(validateManagedHandoffs([{ name: "APEX", handoffs: [{ agent: "APEX" }] }]).length > 0);
 });
 
 test("retired automation commands remain unavailable", () => {
@@ -96,6 +82,8 @@ test("retired automation commands remain unavailable", () => {
     "test:modernization-ownership",
     "assess:agents",
     "challenger-telemetry",
+    "lint:workflow-handoffs",
+    "validate:azure-mcp-latest",
   ])
     assert.equal(scripts[command], undefined, `${command} must stay retired`);
   const cli = readFileSync("packages/cli/src/cli.ts", "utf8");

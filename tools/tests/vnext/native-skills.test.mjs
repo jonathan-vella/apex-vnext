@@ -40,15 +40,29 @@ test("native skills are internal, packaged, structured, and wired to their prima
   }
 });
 
-test("native skills are copied to the bundle and both client projections", async () => {
+test("apex-next is a packaged, user-invocable routing skill used by the coordinator", async () => {
+  const manifest = JSON.parse(await readFile(resolve(root, "customizations", "manifest.json"), "utf8"));
+  const [source, coordinator] = await Promise.all([
+    readFile(skillPath("apex-next"), "utf8"),
+    readFile(agentPath("apex.agent.md"), "utf8"),
+  ]);
+  assert.match(source, /^name: apex-next$/mu);
+  assert.doesNotMatch(source, /^user-invocable: false$|^disable-model-invocation: true$/mu);
+  for (const heading of ["## Prerequisites", "## Workflow", "## Boundaries", "## Output"]) {
+    assert.match(source, new RegExp(`^${heading}$`, "mu"));
+  }
+  assert.ok(manifest.managedFiles.includes(".github/skills/apex-next/SKILL.md"), "apex-next must be packaged");
+  assert.match(coordinator, /\.github\/skills\/apex-next\/SKILL\.md/u);
+});
+
+test("native skills are copied to the bundle and the CLI projection", async () => {
   await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
   const assetRoots = [
     resolve(root, "packages", "cli", "assets", "customizations"),
-    resolve(root, "packages", "cli", "assets", "client-projections", "github-copilot-vscode"),
     resolve(root, "packages", "cli", "assets", "client-projections", "github-copilot-cli"),
   ];
 
-  for (const [skill] of skills) {
+  for (const skill of [...skills.map(([name]) => name), "apex-next"]) {
     const source = await readFile(skillPath(skill), "utf8");
     for (const assetRoot of assetRoots) {
       assert.equal(await readFile(assetSkillPath(assetRoot, skill), "utf8"), source);

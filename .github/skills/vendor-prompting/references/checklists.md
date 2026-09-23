@@ -17,9 +17,9 @@ Two parallel checklists: agent (`*.agent.md`) and prompt
 
 ### Cross-vendor (apply to every agent)
 
-- [ ] **R-X-3** Frontmatter `model:` is array form, not bareword.
+- [ ] **R-X-3** Frontmatter `model:` uses exact Copilot CLI model IDs, not display names.
       _(rule `frontmatter-model-style-001`)_
-      Hint: `head -10 <file>` and confirm `model: [...]`.
+      Hint: `head -10 <file>` and confirm `model: gpt-6-sol` (or an ordered list of IDs).
 - [ ] **R-X-2** No `handoffs[].model` overrides match the target
       agent's own model. _(rule `legacy-002`)_
       Hint: `--only=vendor-prompting` flags `legacy-002`.

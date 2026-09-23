@@ -8,11 +8,7 @@ import {
   Sha256Schema,
 } from "./common.js";
 
-export const BootstrapClientSchema = Type.Union([
-  Type.Literal("github-copilot-vscode"),
-  Type.Literal("github-copilot-cli"),
-  Type.Literal("both"),
-]);
+export const BootstrapClientSchema = Type.Literal("github-copilot-cli");
 
 export const OnboardingConfigV1Schema = Type.Object(
   {

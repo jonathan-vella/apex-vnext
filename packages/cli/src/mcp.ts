@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ApexService, SUPPORTED_ARTIFACT_KINDS } from "./service.js";
 import { APEX_VERSION } from "./version.js";
 import { ApexError, EXIT_CODES, normalizeError, type ApexErrorCode } from "./errors.js";
+import { SECRET_VALUE_PATTERN } from "@apexops/contracts";
 import { MCP_OUTPUT_SCHEMAS } from "./mcp-output-schemas.js";
 import { ListToolsRequestSchema, type Tool } from "@modelcontextprotocol/sdk/types.js";
 
@@ -286,6 +287,7 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
         if (extra.signal?.aborted) throw new ApexError("APEX_CONFLICT", "Cancelled", EXIT_CODES.conflict);
       };
       let releaseSlot: (() => void) | undefined;
+      let serviceValidation: string | undefined;
       try {
         checkCancelled();
         if (Date.now() - rateWindowStart >= 60_000) {
@@ -298,17 +300,35 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
         if (!input.success) throw new ApexError("APEX_VALIDATION", "Invalid tool arguments", EXIT_CODES.validation);
         releaseSlot = await acquire(extra.signal);
         checkCancelled();
-        const response = await Reflect.apply(
-          callback,
-          undefined,
-          config.inputSchema === undefined ? [extra] : [input.data, extra],
-        );
+        let response: Awaited<ReturnType<typeof callback>>;
+        try {
+          response = await Reflect.apply(
+            callback,
+            undefined,
+            config.inputSchema === undefined ? [extra] : [input.data, extra],
+          );
+        } catch (error) {
+          if (error instanceof ApexError && error.code === "APEX_VALIDATION") {
+            const issues: string[] = [];
+            for (const { path, message } of Array.isArray(error.details)
+              ? (error.details as Array<{ path?: unknown; message?: unknown }>)
+              : []) {
+              if (issues.length < 5 && !issues.some((issue) => issue.startsWith(`${String(path)} `)))
+                issues.push(`${String(path)} ${String(message)}`);
+            }
+            const reason = issues.length === 0 ? error.message : `${error.message}: ${issues.join("; ")}`;
+            if (!SECRET_VALUE_PATTERN.test(reason)) serviceValidation = reason;
+          }
+          throw error;
+        }
         assertBoundedInput(response.structuredContent);
         if (!outputSchema.safeParse(response.structuredContent).success) throw new Error("Invalid MCP result contract");
         return response;
       } catch (error) {
         const { code } = normalizeError(error);
-        return { ...result({ error: { code, message: errorMessages[code] } }), isError: true };
+        // Kernel validation reasons let agents correct typed input; guard, internal and secret-like messages stay generic.
+        const message = serviceValidation === undefined ? errorMessages[code] : serviceValidation.slice(0, 1_000);
+        return { ...result({ error: { code, message } }), isError: true };
       } finally {
         releaseSlot?.();
       }
@@ -576,7 +596,7 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
     "architectureComplete",
     {
       description:
-        "Complete Architecture atomically; APEX derives identity, artifact hashes, exact must-requirement traceability, and cost/SKU bindings.",
+        "Complete Architecture atomically; APEX derives identity, artifact hashes, top-level requirementTraceability, and cost/SKU bindings. Each SKU and SLO decision lists its component requirementIds.",
       inputSchema: {
         taskId: z.string(),
         architecture: z.unknown(),

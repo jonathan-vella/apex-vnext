@@ -11,22 +11,15 @@ const repositoryRoot = resolve(packageRoot, "../..");
 const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
-const CLIENT_ADAPTER_VERSION = "1.6.0";
-const CLI_MODEL_IDS = new Map([
-  ["MAI-Code-1.1-Flash (copilot)", "mai-code-1.1-flash"],
-  ["gpt-6-sol", "gpt-6-sol"],
-  ["gpt-6-luna", "gpt-6-luna"],
-  ["GPT-5.6 Terra", "gpt-5.6-terra"],
-]);
+const CLIENT_ADAPTER_VERSION = "1.7.0";
+const RETIRED_SOURCE_FIELDS = ["argument-hint", "handoffs", "agents"];
+const RETIRED_SOURCE_TOOLS = ["vscode/askQuestions", "agent"];
 export const GENERATED_SHARED_FILES = [
   ".github/workflows/governance-policy-baseline.yml",
   "tools/scripts/collect-governance-baseline.ps1",
   "tools/schemas/governance-baseline.schema.json",
 ];
-const PROJECTION_TARGETS = new Map([
-  ["github-copilot-vscode", "vscode"],
-  ["github-copilot-cli", "github-copilot"],
-]);
+const PROJECTION_TARGETS = new Map([["github-copilot-cli", "github-copilot"]]);
 
 function bytewise(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -70,46 +63,27 @@ function serializeAgent(frontmatter, mechanics, body) {
 export function renderClientAgentProjection(source, clientId, toolInventory, options = {}) {
   const { frontmatter, body } = parseAgentSource(source);
   if ("target" in frontmatter) throw new Error("Shared agent source must not declare target");
-  if (clientId === "github-copilot-vscode") {
-    if (
-      Array.isArray(frontmatter.model) &&
-      frontmatter.model.length === 1 &&
-      frontmatter.model[0] === "MAI-Code-1.1-Flash (copilot)"
-    ) {
-      frontmatter.model = frontmatter.model[0];
-    }
-    const mechanics = [
-      frontmatter.name === "APEX"
-        ? "For requirements intake, present the declared Gather requirements handoff to `APEX Requirements` and stop for the user's interactive transition. State the user's scope and stop point beside the handoff; do not ask a role-selection question when the kernel has selected the owner. If unavailable, ask the user to select `APEX Requirements`. Use `vscode/askQuestions` only for project lifecycle or routing choices, never intake."
-        : Array.isArray(frontmatter.tools) && frontmatter.tools.includes("vscode/askQuestions")
-          ? "Use `vscode/askQuestions` for kernel-owned input requests."
-          : null,
-      Array.isArray(frontmatter.handoffs) && frontmatter.handoffs.length > 0
-        ? "Use the declared direct handoffs for interactive transitions."
-        : null,
-    ].filter(Boolean);
-    return serializeAgent(
-      { ...frontmatter, target: "vscode" },
-      mechanics.length === 0 ? "" : `## Client Mechanics\n\n${mechanics.join(" ")}\n\n`,
-      body,
-    );
-  }
   if (clientId !== "github-copilot-cli") throw new Error(`Unsupported client projection: ${clientId}`);
   const inventory = toolInventory ?? {
     interactiveTools: { askUser: "ask_user", delegate: "task" },
+    agentReadTools: ["view", "glob", "rg"],
     workspaceServer: "apex",
     operationIds: ["status", "recordInput"],
   };
-  const model = Array.isArray(frontmatter.model) ? frontmatter.model[0] : frontmatter.model;
-  if (typeof model !== "string" || model.length === 0) throw new Error("CLI agent projection requires one model");
+  for (const field of RETIRED_SOURCE_FIELDS)
+    if (field in frontmatter) throw new Error(`CLI agent source must not declare ${field}`);
+  const models = Array.isArray(frontmatter.model) ? frontmatter.model : [frontmatter.model];
+  if (models.length === 0 || models.some((model) => typeof model !== "string" || model.length === 0))
+    throw new Error("CLI agent projection requires a model");
+  if (!["required", "preferred"].includes(frontmatter["model-policy"]))
+    throw new Error("CLI agent source requires model-policy: required or preferred");
   const sourceTools = Array.isArray(frontmatter.tools) ? frontmatter.tools : [];
   const tools = [
     ...new Set(
       sourceTools
-        .filter((tool) => tool !== "agent" || options.delegates !== false)
+        .filter((tool) => tool !== inventory.interactiveTools.delegate || options.delegates !== false)
         .map((tool) => {
-          if (tool === "vscode/askQuestions") return inventory.interactiveTools.askUser;
-          if (tool === "agent") return inventory.interactiveTools.delegate;
+          if (RETIRED_SOURCE_TOOLS.includes(tool)) throw new Error(`CLI agent source must not use ${tool}`);
           if (typeof tool === "string" && tool.startsWith("apex/")) {
             const operation = tool.slice("apex/".length);
             if (!inventory.operationIds.includes(operation))
@@ -127,63 +101,39 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
     name: frontmatter.name,
     description: frontmatter.description,
     target: "github-copilot",
-    model: CLI_MODEL_IDS.get(model) ?? model,
+    model: frontmatter.model,
+    "model-policy": frontmatter["model-policy"],
     ...(frontmatter["reasoning-effort"] === undefined ? {} : { "reasoning-effort": frontmatter["reasoning-effort"] }),
     "user-invocable": frontmatter["user-invocable"] ?? true,
     "disable-model-invocation": frontmatter["disable-model-invocation"] ?? false,
     tools,
   };
+  const explores =
+    tools.includes(inventory.interactiveTools.delegate) &&
+    (inventory.agentReadTools ?? []).every((tool) => tools.includes(tool));
   const mechanics = [
     frontmatter.name === "APEX"
-      ? `For requirements intake, direct the user to select \`APEX Requirements\` as the foreground agent, then stop. Do not use \`${inventory.interactiveTools.delegate}\` for interactive intake or substitute Explore. Print the scope note verbatim for continuation: requested outcome, stop point, and prohibited operations. If the original scope is unavailable, limit continuation to intake through taskContext. State that routing is pending until the user switches; do not claim the handoff or input submission completed. Do not collect intake answers or replace invalid choices with defaults. Use \`${inventory.interactiveTools.askUser}\` only for project lifecycle or routing choices, never intake.`
+      ? `Route through the \`apex-next\` skill. Use \`${inventory.interactiveTools.delegate}\` only for the hidden workers it names, never for interactive intake, and do not substitute Explore. Use \`${inventory.interactiveTools.askUser}\` only for project lifecycle or routing choices, never intake.`
       : tools.includes(inventory.interactiveTools.askUser)
         ? `Use \`${inventory.interactiveTools.askUser}\` for kernel-owned input requests.`
         : null,
     frontmatter.name !== "APEX" && tools.includes(inventory.interactiveTools.delegate)
-      ? `Use \`${inventory.interactiveTools.delegate}\` for declared worker delegation.`
+      ? `Use \`${inventory.interactiveTools.delegate}\` only for declared worker delegation${explores ? " and Explore" : ""}; never for general-purpose, rubber-duck, code-review, security-review or research agents.`
+      : null,
+    explores
+      ? "Explore is advisory and read-only. Use it only for questions about explicit workspace paths, never for requirements intake. Name exact paths because it skips gitignored paths such as `.apex/work/`, verify every line it cites, and never treat its output as kernel evidence, task completion or approval."
       : null,
     frontmatter.name !== "APEX" && tools.includes(inventory.interactiveTools.askUser)
-      ? `Run user-facing questions as the foreground agent using \`${inventory.interactiveTools.askUser}\`, not as a delegated background task. For another interactive stage, ask the user to select its named agent and carry forward the scope note; do not delegate interactive work through \`${inventory.interactiveTools.delegate}\`. If the question tool is unavailable, report the limitation and stop without claiming answers were recorded.`
+      ? `Run user-facing questions as the foreground agent using \`${inventory.interactiveTools.askUser}\`, not as a delegated background task. For another interactive stage, use the \`apex-next\` skill to print its selection step and scope prompt; do not delegate interactive work through \`${inventory.interactiveTools.delegate}\`. If the question tool is unavailable, report the limitation and stop without claiming answers were recorded.`
       : null,
     frontmatter.name !== "APEX" && tools.includes(inventory.interactiveTools.askUser)
-      ? `For a kernel question with \`multiSelect: true\`, use native multi-select only when the exposed question-tool schema supports it. Otherwise, show every exact kernel option in its original order and collect one free-text answer through \`${inventory.interactiveTools.askUser}\` using its supported free-text input. Ask for exact option values, one per line. Validate every supplied value against the kernel options; request correction for invalid, empty, or ambiguous input instead of dropping values, guessing aliases, selecting defaults, or applying recommendations. Then show the complete proposed selection as an array and use the native question tool to request explicit confirmation or correction. A correction requires a fresh confirmation of the complete set. Call \`apex/recordInput\` only after confirmation, preserving the request ID, expected head, owner epoch, array value shape, other submitted answers, and the user's stop boundary. Cancellation means no submission; stale-request rejection requires fresh kernel input and confirmation, not replay. Never pass unsupported \`multiSelect\` parameters or silently replace multiple selection with a single-choice answer. If free-text input or confirmation is unavailable, report the limitation and stop. This fallback changes only input collection, not permitted values or kernel validation.`
+      ? `For a kernel question with \`multiSelect: true\`, use \`${inventory.interactiveTools.askUser}\` checkboxes when it offers an array field: offer the exact kernel option values as its choices and map the returned text back to those exact values; when every value matches, the checkbox answer needs no further confirmation. Otherwise, number every exact kernel option in its original order and collect one free-text answer through \`${inventory.interactiveTools.askUser}\` asking for the numbers. Resolve each number to its option; request correction for out-of-range, duplicate, non-numeric, empty, or ambiguous entries instead of dropping values, guessing aliases, selecting defaults, or applying recommendations. Then show the resolved selection as an array in kernel order and use \`${inventory.interactiveTools.askUser}\` to request explicit confirmation or correction. A correction requires a fresh confirmation of the complete set. Call \`apex/recordInput\` only after the checkbox answer or confirmation, preserving the request ID, expected head, owner epoch, array value shape, other submitted answers, and the user's stop boundary. Cancellation means no submission; stale-request rejection requires fresh kernel input and confirmation, not replay. Never pass unsupported \`multiSelect\` parameters or silently replace multiple selection with a single-choice answer. If free-text input or confirmation is unavailable, report the limitation and stop. Either way the kernel validates the values; this changes only input collection.`
       : null,
   ].filter(Boolean);
-  const rendered = serializeAgent(
+  return serializeAgent(
     cliFrontmatter,
     mechanics.length === 0 ? "" : `## Client Mechanics\n\n${mechanics.join(" ")}\n\n`,
     body,
-  );
-  if (options.agentNames === undefined) return rendered;
-  const entries = Object.entries(options.agentNames);
-  if (
-    entries.length === 0 ||
-    entries.some(
-      ([name, replacement]) =>
-        !/^APEX(?: [A-Za-z]+)*$/.test(name) ||
-        typeof replacement !== "string" ||
-        !/^APEX CLI(?: [A-Za-z]+)*$/.test(replacement),
-    ) ||
-    new Set(entries.map(([, replacement]) => replacement)).size !== entries.length ||
-    !Object.hasOwn(options.agentNames, frontmatter.name)
-  )
-    throw new Error("Invalid CLI agent name mapping");
-  const names = entries
-    .map(([name]) => name)
-    .filter((name) => name !== "APEX")
-    .sort((left, right) => right.length - left.length);
-  const pattern =
-    names.length === 0 ? undefined : new RegExp(`(?<![A-Za-z0-9_-])(?:${names.join("|")})(?![A-Za-z0-9_-])`, "gu");
-  const rewrite = (text) => {
-    const named = pattern === undefined ? text : text.replace(pattern, (name) => options.agentNames[name]);
-    return Object.hasOwn(options.agentNames, "APEX")
-      ? named.replaceAll("`APEX`", `\`${options.agentNames.APEX}\``)
-      : named;
-  };
-  return serializeAgent(
-    { ...cliFrontmatter, name: options.agentNames[frontmatter.name] },
-    mechanics.length === 0 ? "" : `## Client Mechanics\n\n${rewrite(mechanics.join(" "))}\n\n`,
-    rewrite(body),
   );
 }
 
@@ -319,7 +269,8 @@ export function validateClientProjectionDeclarations(customizationManifest) {
         projection.files.some((path) => !safeRelativePath(path)) ||
         projection.files.length !== new Set(projection.files).size,
     ) ||
-    clientProjections.length !== new Set(clientProjections.map(({ id }) => id)).size ||
+    clientProjections.length !== 1 ||
+    clientProjections[0].id !== "github-copilot-cli" ||
     !Array.isArray(roles) ||
     roles.some(
       (role) =>
@@ -434,12 +385,10 @@ async function prepareClientProjections(customizationManifest, pinnedCustomizati
   }
 
   for (const projection of clientProjections) {
-    const clients = projection.id === "both" ? ["github-copilot-vscode", "github-copilot-cli"] : [projection.id];
+    const client = projection.id;
     const generatedRoot = join(assetsRoot, projection.generatedRoot);
     assertContained(assetsRoot, generatedRoot);
-    const roleSources = new Set(
-      roles.filter((role) => clients.some((client) => roleSupportsClient(role, client))).map(({ source }) => source),
-    );
+    const roleSources = new Set(roles.filter((role) => roleSupportsClient(role, client)).map(({ source }) => source));
     const sources = [...new Set([...sharedFiles, ...sharedDirectoryFiles, ...projection.files])].filter(
       (path) => !roleSources.has(path),
     );
@@ -457,8 +406,7 @@ async function prepareClientProjections(customizationManifest, pinnedCustomizati
         source: {
           kind: "generated",
           composition: "client-projections",
-          clientId: clients[0],
-          ...(projection.id === "both" ? { installationId: "both" } : {}),
+          clientId: client,
           target: relativePath,
           adapterVersion: CLIENT_ADAPTER_VERSION,
           sourcePath: relativePath,
@@ -468,46 +416,33 @@ async function prepareClientProjections(customizationManifest, pinnedCustomizati
         bytes: bytes.byteLength,
       });
     }
-    for (const client of clients)
-      for (const role of roles) {
-        if (!roleSupportsClient(role, client)) continue;
-        const sourcePath = join(repositoryRoot, "customizations", role.source);
-        const source = (await readSourceFile(pinnedCustomizations.resolvedRoot, sourcePath)).toString("utf8");
-        const sourceHash = createHash("sha256").update(source).digest("hex");
-        const delegates = roleDelegatesOnClient(role, client, roles, customizationManifest.invocationEdges);
-        const namespaced = projection.id === "both" && client === "github-copilot-cli";
-        const agentNames = namespaced
-          ? Object.fromEntries(roles.map(({ agent }) => [agent, agent.replace(/^APEX/u, "APEX CLI")]))
-          : undefined;
-        const targetPath = namespaced ? role.source.replace(/\/apex(?=[.-])/u, "/apex-cli") : role.source;
-        const rendered = Buffer.from(
-          renderClientAgentProjection(source, client, toolInventory, {
-            delegates,
-            ...(agentNames === undefined ? {} : { agentNames }),
-          }),
-          "utf8",
-        );
-        const destination = join(generatedRoot, targetPath);
-        assertContained(generatedRoot, destination);
-        await mkdir(dirname(destination), { recursive: true });
-        await writeFile(destination, rendered);
-        inventory.push({
-          path: portablePath(relative(assetsRoot, destination)),
-          source: {
-            kind: "generated",
-            composition: "client-projections",
-            roleId: role.id,
-            sourcePath: role.source,
-            sourceHash,
-            clientId: client,
-            ...(projection.id === "both" ? { installationId: "both" } : {}),
-            target: targetPath,
-            adapterVersion: CLIENT_ADAPTER_VERSION,
-          },
-          sha256: createHash("sha256").update(rendered).digest("hex"),
-          bytes: rendered.byteLength,
-        });
-      }
+    for (const role of roles) {
+      if (!roleSupportsClient(role, client)) continue;
+      const sourcePath = join(repositoryRoot, "customizations", role.source);
+      const source = (await readSourceFile(pinnedCustomizations.resolvedRoot, sourcePath)).toString("utf8");
+      const sourceHash = createHash("sha256").update(source).digest("hex");
+      const delegates = roleDelegatesOnClient(role, client, roles, customizationManifest.invocationEdges);
+      const rendered = Buffer.from(renderClientAgentProjection(source, client, toolInventory, { delegates }), "utf8");
+      const destination = join(generatedRoot, role.source);
+      assertContained(generatedRoot, destination);
+      await mkdir(dirname(destination), { recursive: true });
+      await writeFile(destination, rendered);
+      inventory.push({
+        path: portablePath(relative(assetsRoot, destination)),
+        source: {
+          kind: "generated",
+          composition: "client-projections",
+          roleId: role.id,
+          sourcePath: role.source,
+          sourceHash,
+          clientId: client,
+          target: role.source,
+          adapterVersion: CLIENT_ADAPTER_VERSION,
+        },
+        sha256: createHash("sha256").update(rendered).digest("hex"),
+        bytes: rendered.byteLength,
+      });
+    }
   }
 }
 

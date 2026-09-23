@@ -1,15 +1,16 @@
 # Client Projections
 
-> [Current Version](../../VERSION.md) | How one managed source becomes bounded VS Code and Copilot CLI experiences.
+> [Current Version](../../VERSION.md) | How one managed source becomes the Copilot CLI experience in the terminal and
+> in VS Code.
 
 ## Canonical Source
 
-The managed source under `customizations/.github` defines shared coordinator, specialist, worker, skill, instruction, and
-MCP content. `customizations/manifest.json` records files, roles, supported targets, interaction types, models, and
-invocation edges.
+The managed source under `customizations/.github` defines the coordinator, specialists, workers, skills and
+instructions; `customizations/.mcp.json` defines workspace MCP. `customizations/manifest.json` records files, roles,
+the supported target, interaction types, models, and invocation edges.
 
-`packages/cli/scripts/prepare-assets.mjs` validates and renders client-specific projections. Packaged assets are derived
-output and must match canonical source.
+`packages/cli/scripts/prepare-assets.mjs` validates the sources and renders the single `github-copilot-cli` projection.
+Packaged assets are derived output and must match canonical source.
 
 ## Consumer Guidance
 
@@ -19,32 +20,40 @@ evidence; direct cloud operations, repository mutation, approval, and deployment
 versioned [guidance migration matrix](../../tools/registry/guidance-migration.v1.json) records the disposition of each
 root skill and instruction, including repository-only and deferred surfaces.
 
-## VS Code
+## One Projection, Two Hosts
 
-The VS Code projection supports the coordinator and interactive requirements, architecture, planning, and operations
-roles. It also supports autonomous code generation, review, and validation workers through bounded subagent delegation.
+Managed agents use Copilot CLI frontmatter: exact CLI model IDs, `model-policy` (`required` for workers, `preferred`
+for interactive agents) and `reasoning-effort`. Standalone Copilot CLI and the VS Code Copilot harness run the same
+projection; `github-copilot-vscode` remains only the evidence identity for VS Code runs. The VS Code Local projection is
+retired and archived under `.archive/vscode-projection/`.
 
-## GitHub Copilot CLI
+The coordinator and interactive specialists run as foreground agents, because only a foreground agent can ask
+questions. CodeGen, Reviewer and Validator are hidden workers that run through `task` delegation with kernel task
+context, not repository instructions. Direct-selection visibility is not an authorization boundary; kernel task,
+evidence, ownership and approval checks remain authoritative.
 
-The Copilot CLI projection supports the coordinator and interactive specialists. Autonomous workers remain omitted
-pending complete workflow qualification. Direct-selection visibility is not an authorization boundary; kernel task,
-evidence, ownership and approval checks remain authoritative. Candidate routing probes do not enable shipped edges.
+## Routing With apex-next
 
-The target product nevertheless requires complete generation, review and validation outcomes in both clients. Any
-missing bounded CLI path is implementation work, not an acceptable omission of the workload lifecycle. See the
-[client qualification matrix](../vnext/CLIENT-QUALIFICATION.md).
+Handoff buttons are gone. The `apex-next` skill reads kernel status and the next task and names the owning agent. It
+delegates a hidden worker, or prints the selection step (`/agent <name>` in Copilot CLI, the Agent picker in VS Code)
+with a ready-to-paste scope prompt. The coordinator routes through it, and other agents may use it for stage
+transitions.
+
+## Built-In Helpers
+
+Planner and Operator may use the built-in Explore agent for read-only questions about named workspace paths. Other
+built-in helpers inherit the calling agent's full tool set, so managed agents do not use them. You can still run
+`/review`, `/security-review` or `/research` yourself. Helper output is advisory: it never becomes kernel evidence,
+completes a task or approves a gate.
 
 ## Installation Lifecycle
 
-`apex init` selects one bundled client projection and records that selection. `apex update` performs a managed three-way
+`apex init` installs the CLI projection and records it in the managed lock. `apex update` performs a managed three-way
 update. Rollback, uninstall, and reinstall preserve unrelated files and report conflicts rather than overwriting user
 content silently.
 
 `apex bootstrap` is the common onboarding path for global CLI, one-shot `npx`, and Copilot-agent entry points. It pins
-the runtime that workspace MCP configuration executes, then delegates workspace projection installation to `apex init`.
-The optional VS Code profile bootstrap agent is deliberately outside the customization manifest and both client
-projections. It is a discovery and command-launching aid only; it cannot own workspace MCP configuration or kernel
-state.
+the runtime that `.mcp.json` launches, then delegates projection installation to `apex init`.
 
 This is the current npm-managed mechanism. [The roadmap](../vnext/ROADMAP.md#phase-6-distribution-last) defers Agent
 Plugins evaluation until feature completion and couples it with APEX MCP redistribution. A plugin format alone does

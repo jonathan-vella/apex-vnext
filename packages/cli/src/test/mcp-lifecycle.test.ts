@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
+import { mkdir, symlink } from "node:fs/promises";
+import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
@@ -7,8 +9,10 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { JSONRPCMessageSchema, SUPPORTED_PROTOCOL_VERSIONS } from "@modelcontextprotocol/sdk/types.js";
+import { mcpWorkspaceRoot } from "../cli.js";
 import { MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
 import { createMcpServer } from "../mcp.js";
+import { ApexError, EXIT_CODES } from "../errors.js";
 import { ApexService } from "../service.js";
 import { tempRoot } from "./helpers.js";
 
@@ -340,6 +344,34 @@ test(
   },
 );
 
+test("service validation reasons reach the agent while other errors stay generic", async (context) => {
+  const session = await connect(context, {
+    status: async () => {
+      throw new ApexError("APEX_VALIDATION", "REQ-002 needs a SKU decision", EXIT_CODES.validation);
+    },
+    capabilityList: async () => {
+      throw new ApexError("APEX_VALIDATION", "architecture validation failed", EXIT_CODES.validation, [
+        { path: "/components/0/requirementIds", message: "Expected required property" },
+        { path: "/components/0/requirementIds", message: "Expected array" },
+      ]);
+    },
+    listProjects: async () => {
+      throw new ApexError("APEX_CONFLICT", "private detail", EXIT_CODES.conflict);
+    },
+  });
+  assertError(await session.call("status"), "APEX_VALIDATION", "REQ-002 needs a SKU decision");
+  assertError(
+    await session.call("capabilityList"),
+    "APEX_VALIDATION",
+    "architecture validation failed: /components/0/requirementIds Expected required property",
+  );
+  assertError(
+    await session.call("projectList"),
+    "APEX_CONFLICT",
+    "The operation conflicts with current state; refresh status before retrying.",
+  );
+});
+
 test("oversized malformed arguments hit the size guard before schema parsing", { timeout: 10_000 }, async (context) => {
   let calls = 0;
   const session = await connect(context, {
@@ -550,4 +582,24 @@ test("invalid staging forms are rejected before staging", { timeout: 10_000 }, a
     assert.equal(response.isError, true, JSON.stringify(args));
   }
   assert.equal(calls, 0);
+});
+
+test("MCP serve finds the APEX workspace from a subdirectory without leaving the repository", async () => {
+  const root = await tempRoot();
+  await mkdir(join(root, ".git"));
+  await mkdir(join(root, ".apex"));
+  await mkdir(join(root, "infra", "bicep"), { recursive: true });
+  assert.equal(await mcpWorkspaceRoot(join(root, "infra", "bicep")), root);
+  assert.equal(await mcpWorkspaceRoot(root), root);
+  const nested = join(root, "nested");
+  await mkdir(join(nested, ".git"), { recursive: true });
+  await mkdir(join(nested, "sub"));
+  assert.equal(await mcpWorkspaceRoot(join(nested, "sub")), join(nested, "sub"));
+  const linked = await tempRoot();
+  await mkdir(join(linked, ".git"));
+  await mkdir(join(linked, "sub"));
+  await symlink(join(root, ".apex"), join(linked, ".apex"));
+  assert.equal(await mcpWorkspaceRoot(join(linked, "sub")), join(linked, "sub"));
+  const outside = await tempRoot();
+  assert.equal(await mcpWorkspaceRoot(outside), outside);
 });

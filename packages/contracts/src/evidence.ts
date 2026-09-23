@@ -24,6 +24,8 @@ export const CLIENT_OUTCOME_SCENARIO_IDS = [
   "CLIENT-010",
 ] as const;
 
+// Evidence identities, not installable projections: `github-copilot-vscode` is the VS Code Copilot harness running the
+// single Copilot CLI projection.
 export const CLIENT_OUTCOME_CLIENT_IDS = ["github-copilot-vscode", "github-copilot-cli"] as const;
 export const CLIENT_OUTCOME_EQUALITY_PATHS = [
   "/candidate",

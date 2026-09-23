@@ -39,8 +39,8 @@ For each selected client, use a clean consumer workspace and the exact candidate
 client versions, executable hashes, managed projection hashes, MCP inventory, discovery, routing, input handling,
 restart/resume, lifecycle behavior, and normalized outcomes.
 
-VS Code and Copilot CLI outcomes are compared only where both clients support the same interaction. Intentional worker
-asymmetry is not a parity failure.
+Standalone Copilot CLI and VS Code Copilot harness outcomes are compared on the same CLI projection, recorded under the
+`github-copilot-cli` and `github-copilot-vscode` evidence identities.
 
 Use Windows via WSL2 without a devcontainer and cover both ALZ-backed and standalone lab/demo profiles. COE import,
 relevant change questions, conflict handling and selective regeneration are required target outcomes; missing

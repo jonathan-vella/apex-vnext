@@ -57,7 +57,7 @@ npm install --save-dev @apexops/cli@RELEASE_VERSION
 npx apex version --json
 ```
 
-For the VS Code path, continue with the [installation guide](manage-installation.md). Do not claim client or cloud
+Continue with the [installation guide](manage-installation.md). Do not claim client or cloud
 qualification merely because npm publication succeeds.
 
 ## Related

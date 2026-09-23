@@ -47,3 +47,12 @@ export function normalizeError(error: unknown): ApexError {
     { cause: error },
   );
 }
+
+export function retiredProjectionError(): ApexError {
+  return new ApexError(
+    "APEX_VALIDATION",
+    "The VS Code projection is retired; run `apex init --client github-copilot-cli`",
+    EXIT_CODES.validation,
+    { reason: "CLIENT_PROJECTION_RETIRED" },
+  );
+}

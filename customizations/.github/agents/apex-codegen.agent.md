@@ -1,18 +1,15 @@
 ---
 name: APEX CodeGen
 description: Hidden worker that generates one bounded IaC batch in APEX staging.
-argument-hint: Generate the assigned IaC batch
-model: ["gpt-6-luna"]
+model: gpt-6-luna
+model-policy: required
 reasoning-effort: max
 user-invocable: false
 tools:
-  - agent
   - apex/taskContext
   - apex/stageFile
   - apex/generateIac
   - apex/completeTask
-agents:
-  - APEX Validator
 ---
 
 # Goal
@@ -31,7 +28,6 @@ Generate only the assigned IaC batch and return a traceable handoff that validat
   Use `apex/stageFile` only for bounded, assigned file content before generation completes.
 4. Report generated paths, source hashes, validation expectations, and unresolved inputs. Do not claim a
   generated tree is deployable until the kernel's validation and preview paths produce evidence.
-5. Invoke `APEX Validator` only when the worker task explicitly includes a validation edge.
 
 # Constraints
 

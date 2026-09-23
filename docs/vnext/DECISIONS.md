@@ -191,4 +191,11 @@ deferred until a Copilot CLI release launches custom sidekicks. Multi-choice inp
 where offered and numbered selection otherwise. Planner, Operator, Architect and Reviewer get read-only file tools so
 built-in helpers can read, and Reviewer gets `task`. Validator may run `bicep` and `terraform` pre-checks only through
 a shell limited to those commands. The VS Code installation lifecycle tests and client-comparison tooling are
-retargeted to the VS Code Copilot harness; only Local-only tests are archived.
+retargeted to the VS Code Copilot harness; only Local-only tests are archived. For slice 5 the maintainer retired the
+rule that a subagent may not use a costlier model tier than its parent, so the coordinator delegates CodeGen, Reviewer
+and Validator through `apex-next`. Under the maintainer's standing rule to take the recommended option while away,
+slice 6 ships only Explore: the other review helpers inherit the caller's APEX completion and disposition tools, and
+agent frontmatter cannot limit Validator's shell, so Validator gets none. For slice 7, checkbox answers that map
+exactly to kernel options need no extra question; numbered or free-text answers still require explicit confirmation.
+Slice 8 archived VS Code Local under `.archive/vscode-projection/`. Only its MCP config launched the Azure MCP shim,
+and no managed agent used Azure MCP tools, so the shim and its `@azure/mcp` dependency retired with it.
