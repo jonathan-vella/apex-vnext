@@ -41,6 +41,7 @@
     ".github/instructions/apex-python.instructions.md",
     ".github/instructions/apex-shell.instructions.md",
     ".github/skills/apex-workflow/SKILL.md",
+    ".github/skills/apex-next/SKILL.md",
     ".github/skills/apex-requirements/SKILL.md",
     ".github/skills/apex-architecture/SKILL.md",
     ".github/skills/apex-planning/SKILL.md",
@@ -175,8 +176,7 @@
       "role": "coordinator",
       "supportedTargets": ["github-copilot"],
       "interactionType": "interactive-handoff",
-      "model": "mai-code-1.1-flash",
-      "costTier": "fast"
+      "model": "mai-code-1.1-flash"
     },
     {
       "id": "requirements",
@@ -185,8 +185,7 @@
       "role": "requirements",
       "supportedTargets": ["github-copilot"],
       "interactionType": "interactive-handoff",
-      "model": "gpt-6-sol",
-      "costTier": "standard"
+      "model": "gpt-6-sol"
     },
     {
       "id": "architecture",
@@ -195,8 +194,7 @@
       "role": "architecture",
       "supportedTargets": ["github-copilot"],
       "interactionType": "interactive-handoff",
-      "model": "gpt-6-sol",
-      "costTier": "premium"
+      "model": "gpt-6-sol"
     },
     {
       "id": "planning",
@@ -205,8 +203,7 @@
       "role": "planning",
       "supportedTargets": ["github-copilot"],
       "interactionType": "interactive-handoff",
-      "model": "gpt-6-sol",
-      "costTier": "premium"
+      "model": "gpt-6-sol"
     },
     {
       "id": "operations",
@@ -215,8 +212,7 @@
       "role": "operations",
       "supportedTargets": ["github-copilot"],
       "interactionType": "interactive-handoff",
-      "model": "gpt-5.6-terra",
-      "costTier": "premium"
+      "model": "gpt-5.6-terra"
     },
     {
       "id": "code-generation",
@@ -225,8 +221,7 @@
       "role": "code-generation",
       "supportedTargets": ["github-copilot"],
       "interactionType": "autonomous-subagent",
-      "model": "gpt-6-luna",
-      "costTier": "standard"
+      "model": "gpt-6-luna"
     },
     {
       "id": "review",
@@ -235,8 +230,7 @@
       "role": "review",
       "supportedTargets": ["github-copilot"],
       "interactionType": "autonomous-subagent",
-      "model": "gpt-6-luna",
-      "costTier": "standard"
+      "model": "gpt-6-luna"
     },
     {
       "id": "validation",
@@ -245,8 +239,7 @@
       "role": "validation",
       "supportedTargets": ["github-copilot"],
       "interactionType": "autonomous-subagent",
-      "model": "gpt-6-luna",
-      "costTier": "standard"
+      "model": "gpt-6-luna"
     }
   ],
   "invocationEdges": [
@@ -257,6 +250,9 @@
     { "from": "APEX Requirements", "to": "APEX Architect", "type": "handoff" },
     { "from": "APEX Architect", "to": "APEX Planner", "type": "handoff" },
     { "from": "APEX Planner", "to": "APEX Operator", "type": "handoff" },
+    { "from": "APEX", "to": "APEX CodeGen", "type": "subagent" },
+    { "from": "APEX", "to": "APEX Reviewer", "type": "subagent" },
+    { "from": "APEX", "to": "APEX Validator", "type": "subagent" },
     { "from": "APEX Requirements", "to": "APEX Reviewer", "type": "subagent" },
     { "from": "APEX Requirements", "to": "APEX Validator", "type": "subagent" },
     { "from": "APEX Architect", "to": "APEX Reviewer", "type": "subagent" },

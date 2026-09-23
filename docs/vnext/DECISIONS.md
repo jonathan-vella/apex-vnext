@@ -191,4 +191,6 @@ deferred until a Copilot CLI release launches custom sidekicks. Multi-choice inp
 where offered and numbered selection otherwise. Planner, Operator, Architect and Reviewer get read-only file tools so
 built-in helpers can read, and Reviewer gets `task`. Validator may run `bicep` and `terraform` pre-checks only through
 a shell limited to those commands. The VS Code installation lifecycle tests and client-comparison tooling are
-retargeted to the VS Code Copilot harness; only Local-only tests are archived.
+retargeted to the VS Code Copilot harness; only Local-only tests are archived. For slice 5 the maintainer retired the
+rule that a subagent may not use a costlier model tier than its parent, so the coordinator delegates CodeGen, Reviewer
+and Validator through `apex-next`.

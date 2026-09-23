@@ -28,8 +28,9 @@ On 2026-09-23 the maintainer selected a single Copilot CLI projection. Supported
 and the VS Code Copilot harness, which runs CLI-format agents. The VS Code Local projection retires through
 DECISION-015 gates with an archive under `.archive/vscode-projection/`. An `apex-next` skill replaces handoffs, advisory
 built-in helpers join the workflow, and the context sidekick is deferred. Work proceeds on `feat/cli-projection`
-(draft PR #350) per the [CLI-only projection plan](ROADMAP.md#cli-only-projection); slices 1 to 4 are done, so
-`apex init` installs only the CLI projection and managed agent sources use CLI frontmatter.
+(draft PR #350) per the [CLI-only projection plan](ROADMAP.md#cli-only-projection); slices 1 to 5 are done, so
+`apex init` installs only the CLI projection, managed agent sources use CLI frontmatter, and the coordinator routes
+through `apex-next`.
 
 The maintainer parked all standalone desktop-app work on 2026-09-21. Preserve desktop probes, Windows fixes and
 upstream findings without additional app tests, adapter implementation, native Windows CI or host setup. The

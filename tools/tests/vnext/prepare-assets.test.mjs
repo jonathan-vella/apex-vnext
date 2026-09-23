@@ -324,24 +324,22 @@ test("managed role projections retain required tools and exclude unrelated grant
 test("managed routing distinguishes input, review dispositions, and exact task context", async () => {
   await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
   const agents = ["apex", "apex-requirements", "apex-architect", "apex-planner", "apex-operator"];
-  const skills = ["apex-workflow", "apex-requirements", "apex-operations"];
+  const skills = ["apex-workflow", "apex-next", "apex-requirements", "apex-operations"];
   for (const client of ["github-copilot-cli"]) {
     const projection = join(root, "packages/cli/assets/client-projections", client);
     const coordinator = await readFile(join(projection, ".github/agents/apex.agent.md"), "utf8");
     const mechanics = coordinator.split("<!-- apex-shared-body -->")[0];
     assert.match(mechanics, /never intake/);
     assert.match(coordinator, /exactly `APEX Requirements`, never Explore or a generic agent/);
-    assert.match(coordinator, /user's stop boundary/);
-    assert.match(coordinator, /If handoff is unavailable, ask the user/);
+    assert.match(coordinator, /exact stop point, and prohibited operations into the scope prompt/);
+    assert.match(coordinator, /Route every next step through the `apex-next` skill/);
     assert.match(coordinator, /Never use `session_store_sql`, SQL, session-history searches/);
     assert.match(coordinator, /Do not ask the user which role should handle it/);
     assert.match(coordinator, /status-only request calls `apex\/status` once and stops/);
     if (client === "github-copilot-cli") {
-      assert.match(mechanics, /select `APEX Requirements` as the foreground agent/);
+      assert.match(mechanics, /Route through the `apex-next` skill/);
       assert.doesNotMatch(mechanics, /for declared worker delegation/);
-      assert.match(mechanics, /Print the scope note verbatim for continuation/);
-      assert.match(mechanics, /Do not use `task` for interactive intake/);
-      assert.match(mechanics, /If the original scope is unavailable, limit continuation to intake through taskContext/);
+      assert.match(mechanics, /Use `task` only for the hidden workers it names, never for interactive intake/);
     }
     const requirements = await readFile(join(projection, ".github/agents/apex-requirements.agent.md"), "utf8");
     const submission = requirements.indexOf(
@@ -399,7 +397,16 @@ test("managed routing distinguishes input, review dispositions, and exact task c
       }
       if (skill === "apex-workflow") {
         assert.match(content, /status-only request, report that result and stop/);
-        assert.match(content, /do not ask the user to choose a role or search session history/);
+        assert.match(content, /route the next step with the `apex-next` skill/);
+      }
+      if (skill === "apex-next") {
+        assert.match(content, /Do not ask the user to choose a role or search session history/);
+        assert.match(content, /Delegate it with `task` and the scope prompt/);
+        assert.match(content, /Never delegate an interactive owner/);
+        assert.match(content, /Copilot CLI: `\/agent apex-requirements`/);
+        assert.match(content, /in the Agent picker/);
+        assert.match(content, /If the original scope is\s+unavailable, limit continuation to intake/);
+        assert.match(content, /Do not claim the switch, answer acceptance or task creation/);
       }
       for (const state of ["needs_input", "needs_review", "status=task", "task.taskId"]) {
         assert.ok(content.includes(state), `${client}/${skill}: missing ${state} routing`);
@@ -744,7 +751,7 @@ Coordinate.
   );
   assert.doesNotMatch(rendered, /\n\s+- task/u);
   assert.doesNotMatch(rendered, /collect one free-text answer/u);
-  assert.match(rendered, /foreground agent/);
+  assert.match(rendered, /Route through the `apex-next` skill/);
 });
 
 test("asset lifecycle carries restored managed skills to the CLI projection", async () => {
