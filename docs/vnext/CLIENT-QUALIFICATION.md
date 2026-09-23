@@ -66,15 +66,15 @@ do not build a separate benchmark harness. Record explicit gaps until implemente
 These scenarios belong to the [CLI-only projection plan](ROADMAP.md#cli-only-projection). They are planned acceptance,
 not evidence that the behavior exists.
 
-| ID           | Required outcome                                                                                | Standalone CLI | VS Code Copilot harness |
-| ------------ | ----------------------------------------------------------------------------------------------- | -------------- | ----------------------- |
-| `CLIENT-021` | `apex-next` names the kernel-selected owner, then delegates it or prints `/agent` and a prompt  | Required       | Required                |
-| `CLIENT-022` | The context sidekick loads, reads only status and next task, and changes no state               | Required       | Required                |
-| `CLIENT-023` | Numbered multi-choice resolves in kernel order; invalid numbers are corrected before recording  | Required       | Required                |
-| `CLIENT-024` | Built-in helper output alone cannot complete a task, create evidence or open a gate             | Required       | Required                |
-| `CLIENT-025` | Workers run their required models and effort without launch flags or user overrides             | Required       | Required                |
-| `CLIENT-026` | `init` and `update` reject the retired VS Code client; archived files are never installed       | Required       | Not applicable          |
-| `CLIENT-027` | `.mcp.json` starts APEX MCP in interactive sessions and, when enabled, in `-p` sessions         | Required       | Required                |
+| ID           | Required outcome                                                                               | Standalone CLI | VS Code Copilot harness |
+| ------------ | ---------------------------------------------------------------------------------------------- | -------------- | ----------------------- |
+| `CLIENT-021` | `apex-next` names the kernel-selected owner, then delegates it or prints `/agent` and a prompt | Required       | Required                |
+| `CLIENT-022` | The context sidekick loads, reads only status and next task, and changes no state              | Required       | Required                |
+| `CLIENT-023` | Numbered multi-choice resolves in kernel order; invalid numbers are corrected before recording | Required       | Required                |
+| `CLIENT-024` | Built-in helper output alone cannot complete a task, create evidence or open a gate            | Required       | Required                |
+| `CLIENT-025` | Workers run their required models and effort without launch flags or user overrides            | Required       | Required                |
+| `CLIENT-026` | `init` and `update` reject the retired VS Code client; archived files are never installed      | Required       | Not applicable          |
+| `CLIENT-027` | `.mcp.json` starts APEX MCP in interactive sessions and, when enabled, in `-p` sessions        | Required       | Required                |
 
 ## CLI-Only Projection Probes
 
@@ -115,13 +115,13 @@ clients; they are not APEX projection or scenario evidence.
   lines. Rubber-duck on `claude-haiku-4.5` cited wrong lines, and built-in Task ran `bicep build` under
   `shell(bicep:*)`. Helpers inherit `task`; in the `task`-only run they spawned general-purpose agents until the depth
   limit of 4, while the runtime blocked review-to-review delegation.
-- **VS Code Copilot harness.** The Agent Host discovered the workspace agents, flagged the `user-invocable: false`
-  worker as not user-invocable, and exposed `.mcp.json` tools from the second turn. The sidekick showed no activity.
-  Picking the agent did not apply it: each turn named it by a `vscode-remote://wsl%2Bubuntu/` URI, the host indexed
-  `file://` URIs, and the runtime deselected it before every turn. `/agent` is not a harness command; the default
-  agent ran the named agent through `task` instead. There the model list and efforts applied (`gpt-5.6-luna` high,
-  worker `gpt-6-luna` max) and `ask_user` was unavailable. The worker's empty tool list arrived as `null`, and its
-  prompt still carried `task` guidance.
+- **VS Code Copilot harness: failed.** The `harness-probe` test failed. The Agent Host listed the workspace agents and
+  flagged the `user-invocable: false` worker, but picking `harness-probe` did not apply it. Each turn named it by a
+  `vscode-remote://wsl%2Bubuntu/` URI, the host indexed `file://` URIs, and the runtime deselected it before every
+  turn, so the default agent answered. `/agent` is not a harness command either; the default agent ran `harness-probe`
+  through `task` instead. There its model list and efforts applied (`gpt-5.6-luna` high, worker `gpt-6-luna` max), but
+  `ask_user` was unavailable. `.mcp.json` tools appeared from the second turn, the sidekick showed no activity, and the
+  worker's empty tool list arrived as `null` with `task` guidance.
 
 Standalone sessions `60de3415`, `973b27ef`, `531d4b2a`, `b7cd037a` and `e37cc4bc` cover model settings. `dc91aa77`,
 `e717ed91`, `3a1f34a5`, `a11b5bbf`, `366fe888` and `42e4f63e` cover workspace MCP; `bd350038`, `f14677a5`, `bfff54a8`
@@ -139,8 +139,8 @@ results select these options:
    maintainer decision.
 5. Slice 7 chooses between native checkboxes, whose answer returns as text, and numbered selection. Either way, the
    kernel validates the values.
-6. Slice 11 cannot qualify the VS Code Copilot harness on WSL until picked agents apply, through an upstream fix or a
-   verified workaround.
+6. The failed harness probe blocks slice 11. The VS Code Copilot harness cannot qualify on WSL until picked agents
+   apply, through an upstream fix or a verified workaround.
 
 ## Execution Rules
 

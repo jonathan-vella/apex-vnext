@@ -6,15 +6,15 @@ Preserve working safety mechanisms; do not rebuild the runtime or create a gener
 
 ## Delivery Order
 
-| Phase | Outcome                                      | Primary acceptance                                                             |
-| ----- | -------------------------------------------- | ------------------------------------------------------------------------------ |
-| 1     | Correct and compact task inputs and guidance | First optimization batch passes; controls stay aligned and enforced            |
-| 2     | Complete governance baseline import          | Subscription policy reaches review, Gate 2, planning and code validation       |
-| 3     | Support both profiles and COE adaptation     | Independent import and conversational changes reuse accepted decisions         |
-| 4     | Complete design and operational output       | Useful, consistent documents and handoff match the quality reference           |
-| 5     | Close WSL2 and CLI-projection workflow gaps  | Standalone CLI and VS Code Copilot harness complete the lifecycle on WSL2      |
-| 6     | Finalize distribution and APEX MCP delivery  | Easy install/update/upgrade/rollback with compatible runtime versions          |
-| 7     | Qualify and release the final candidate      | Current evidence and explicit release authority                                |
+| Phase | Outcome                                      | Primary acceptance                                                        |
+| ----- | -------------------------------------------- | ------------------------------------------------------------------------- |
+| 1     | Correct and compact task inputs and guidance | First optimization batch passes; controls stay aligned and enforced       |
+| 2     | Complete governance baseline import          | Subscription policy reaches review, Gate 2, planning and code validation  |
+| 3     | Support both profiles and COE adaptation     | Independent import and conversational changes reuse accepted decisions    |
+| 4     | Complete design and operational output       | Useful, consistent documents and handoff match the quality reference      |
+| 5     | Close WSL2 and CLI-projection workflow gaps  | Standalone CLI and VS Code Copilot harness complete the lifecycle on WSL2 |
+| 6     | Finalize distribution and APEX MCP delivery  | Easy install/update/upgrade/rollback with compatible runtime versions     |
+| 7     | Qualify and release the final candidate      | Current evidence and explicit release authority                           |
 
 ## Current Completion Order
 
@@ -86,8 +86,9 @@ pass the same qualification. Builder-only VS Code tooling for this repository st
 Each slice is one commit, or a small set, on `feat/cli-agents`. Slices 5 to 7 may run in any order after slice 4;
 slice 8 follows them.
 
-- **Slice 1:** done on 2026-09-23. The [probe results](CLIENT-QUALIFICATION.md#cli-only-projection-probes) select
-  the frontmatter and MCP options and name the decisions that slices 5 to 7 and 11 need.
+- **Slice 1:** done on 2026-09-23; the VS Code Copilot harness probe failed. The
+  [probe results](CLIENT-QUALIFICATION.md#cli-only-projection-probes) select the frontmatter and MCP options and name
+  the decisions that slices 5 to 7 and 11 need.
 - **Slice 3:** remove `vscode/askQuestions`, handoffs, argument hints, agent allowlists and VS Code client mechanics.
   Workers use kernel task context, not repository instructions.
 - **Slice 5:** `apex-next` delegates the owning agent with the prepared prompt when the step can complete as a
