@@ -169,8 +169,8 @@ az account show --output table
 code --version
 ```
 
-For Copilot CLI users, also install and authenticate the GitHub Copilot CLI according to the GitHub CLI documentation,
-then verify its version and sign-in status.
+Install and authenticate GitHub Copilot CLI according to the GitHub Copilot CLI documentation, then verify its version
+and sign-in status. APEX agents run in Copilot CLI, standalone or through the VS Code Copilot harness.
 
 ## Automated Repository Setup
 
