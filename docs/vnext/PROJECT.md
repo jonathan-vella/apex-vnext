@@ -26,9 +26,10 @@ around vNext source authorities and Diátaxis navigation.
 
 On 2026-09-23 the maintainer selected a single Copilot CLI projection. Supported clients become standalone Copilot CLI
 and the VS Code Copilot harness, which runs CLI-format agents. The VS Code Local projection retires through
-DECISION-015 gates with an archive under `.archive/vscode-projection/`. An `apex-next` skill and a read-only context
-sidekick replace handoffs, and advisory built-in helpers join the workflow. Work proceeds on `feat/cli-agents` per the
-[CLI-only projection plan](ROADMAP.md#cli-only-projection); none of it is implemented yet.
+DECISION-015 gates with an archive under `.archive/vscode-projection/`. An `apex-next` skill replaces handoffs, advisory
+built-in helpers join the workflow, and the context sidekick is deferred. Work proceeds on `feat/cli-agents` per the
+[CLI-only projection plan](ROADMAP.md#cli-only-projection); slice 1 probes are recorded and no product slice is
+implemented yet.
 
 The maintainer parked all standalone desktop-app work on 2026-09-21. Preserve desktop probes, Windows fixes and
 upstream findings without additional app tests, adapter implementation, native Windows CI or host setup. The
@@ -269,8 +270,8 @@ pending the required broader qualification.
 - Implement and qualify COE import, provenance, relevant change questions, manual-edit conflicts and selective
   regeneration using existing contracts and parameters.
 - Complete design/ADR and operational/as-built output against the PRD quality checklist.
-- Deliver the [CLI-only projection](ROADMAP.md#cli-only-projection): CLI-native agents, `apex-next`, context sidekick,
-  advisory built-in helpers, numbered multi-choice, `.mcp.json` and gated VS Code projection retirement.
+- Deliver the [CLI-only projection](ROADMAP.md#cli-only-projection): CLI-native agents, `apex-next`, advisory built-in
+  helpers, checkbox or numbered multi-choice, `.mcp.json` and gated VS Code projection retirement.
 - Close standalone CLI and VS Code Copilot harness lifecycle gaps on WSL2 in both profiles; projections do not prove
   outcomes.
 - Evaluate Agent Plugins and APEX MCP redistribution after features work; npm remains the current implementation.

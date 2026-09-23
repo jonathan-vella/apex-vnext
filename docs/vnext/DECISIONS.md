@@ -179,10 +179,16 @@ Code running CLI agents, so paired-client comparison continues. Builder-only VS 
 
 An `apex-next` skill replaces handoff buttons. It reads kernel status and the next task, names the owning agent, and
 either delegates that agent with the prepared prompt or prints the client's selection step (`/agent` in standalone CLI,
-the Agent picker in the VS Code harness) and scope prompt. A read-only context sidekick keeps the next step visible.
-Built-in CLI agents are advisory helpers only: Explore, Rubber-duck, Code-review, Security-review, built-in Task and
-user-invoked Research never produce kernel evidence, complete tasks or approve gates. General-purpose delegation,
-`/fleet`, `/delegate` and plan mode stay out of managed workflows. Kernel authority, typed outcomes, the four review
-passes and human gates are unchanged.
+the Agent picker in the VS Code harness) and scope prompt. Built-in CLI agents are advisory helpers only: Explore,
+Rubber-duck, Code-review, Security-review, built-in Task and user-invoked Research never produce kernel evidence,
+complete tasks or approve gates. General-purpose delegation, `/fleet`, `/delegate` and plan mode stay out of managed
+workflows. Kernel authority, typed outcomes, the four review passes and human gates are unchanged.
 [REQ-CUSTOMIZATION-001](PRD.md#req-customization-001-managed-copilot-experiences) owns acceptance and the
 [CLI-only projection plan](ROADMAP.md#cli-only-projection) owns delivery.
+
+After the slice 1 probes on 2026-09-23, the maintainer settled slices 5 to 8. The read-only context sidekick is
+deferred until a Copilot CLI release launches custom sidekicks. Multi-choice input uses native `ask_user` checkboxes
+where offered and numbered selection otherwise. Planner, Operator, Architect and Reviewer get read-only file tools so
+built-in helpers can read, and Reviewer gets `task`. Validator may run `bicep` and `terraform` pre-checks only through
+a shell limited to those commands. The VS Code installation lifecycle tests and client-comparison tooling are
+retargeted to the VS Code Copilot harness; only Local-only tests are archived.

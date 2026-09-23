@@ -69,8 +69,8 @@ not evidence that the behavior exists.
 | ID           | Required outcome                                                                                              | Standalone CLI | VS Code Copilot harness |
 | ------------ | ------------------------------------------------------------------------------------------------------------- | -------------- | ----------------------- |
 | `CLIENT-021` | `apex-next` names the kernel-selected owner, then delegates it or prints its client selection step and prompt | Required       | Required                |
-| `CLIENT-022` | The context sidekick loads, reads only status and next task, and changes no state                             | Required       | Required                |
-| `CLIENT-023` | Numbered multi-choice resolves in kernel order; invalid numbers are corrected before recording                | Required       | Required                |
+| `CLIENT-022` | Deferred with the context sidekick until a CLI release launches custom sidekicks                              | Deferred       | Deferred                |
+| `CLIENT-023` | Multi-choice uses checkboxes or numbered fallback in kernel order; invalid entries are corrected first        | Required       | Required                |
 | `CLIENT-024` | Built-in helper output alone cannot complete a task, create evidence or open a gate                           | Required       | Required                |
 | `CLIENT-025` | Workers run their required models and effort without launch flags or user overrides                           | Required       | Required                |
 | `CLIENT-026` | `init` and `update` reject the retired VS Code client; archived files are never installed                     | Required       | Not applicable          |
@@ -133,18 +133,19 @@ Standalone sessions `60de3415`, `973b27ef`, `531d4b2a`, `b7cd037a` and `e37cc4bc
 `e717ed91`, `3a1f34a5`, `a11b5bbf`, `366fe888` and `42e4f63e` cover workspace MCP; `bd350038`, `f14677a5`, `bfff54a8`
 and `976871e9` cover the sidekick. `b3808832` covers `ask_user` and `/agent`, `dc3278a2` covers subagent input, and
 `a2a3b50d` and `9502efed` cover helpers. The harness runtime session is `a3253c03-533b-4779-9544-7818e113abb6`. The
-results select these options:
+results and the maintainer's decisions of the same day select these options:
 
 1. Slice 3 uses `model`, `model-policy` and `reasoning-effort`. Every listed model must support the declared effort.
    User effort overrides remain a CLIENT-025 gap.
 2. Slice 4 renders `.mcp.json` with a server command that does not depend on the session directory.
-3. Slice 5 collects required input in the foreground before delegation; `/agent` with a prompt remains the fallback.
-   The sidekick needs a maintainer decision because this CLI build does not launch custom sidekicks.
-4. Slice 6 passes explicit staging paths, relies on the owning agent's read tools and verifies helper line references.
-   Task pre-checks add shell to the caller, and a `task` grant also exposes general-purpose delegation; both need a
-   maintainer decision.
-5. Slice 7 chooses between native checkboxes, whose answer returns as text, and numbered selection. Either way, the
-   kernel validates the values.
+3. Slice 5 collects required input in the foreground before delegation; the client's selection step with a prompt
+   remains the fallback. The maintainer deferred the sidekick.
+4. Slice 6 passes explicit staging paths and verifies helper line references. The maintainer granted read-only file
+   tools to Planner, Operator, Architect and Reviewer and `task` to Reviewer. Validator gets a shell limited to `bicep`
+   and `terraform` only if the CLI enforces that limit. Agents with `task` can also reach general-purpose delegation,
+   which their instructions forbid.
+5. Slice 7 uses native checkboxes where offered, mapping their text answer back to exact option values, and numbered
+   selection otherwise. Either way, the kernel validates the values.
 6. The failed harness probe blocks slice 11. The VS Code Copilot harness cannot qualify on WSL until picked agents
    apply, through an upstream fix or a verified workaround.
 
@@ -327,9 +328,10 @@ had delegation only and the child had no tools; no kernel workflow or cloud auth
 Keep native multi-select in VS Code and wherever the exposed question-tool schema supports it. When a standalone CLI session
 exposes only single-choice and free-text input, collect the exact option values through the native tool's free-text
 field, then show the proposed array and obtain explicit confirmation through that tool before `recordInput`.
-Under the [CLI-only projection plan](ROADMAP.md#cli-only-projection), this becomes numbered selection: present the
-options numbered in kernel order, accept the user's numbers, resolve them to option values and let the kernel validate
-the array. Out-of-range, duplicate or non-numeric entries require correction. Confirmation is still required.
+Under the [CLI-only projection plan](ROADMAP.md#cli-only-projection), use `ask_user` checkboxes where the tool offers an
+array field and map the returned text back to exact option values. Otherwise present the options numbered in kernel
+order, accept the user's numbers and resolve them to option values. The kernel validates the array either way.
+Out-of-range, duplicate, non-numeric or unmatched entries require correction. Confirmation is still required.
 Preserve the kernel option order, allowed values, request identity, typed arrays and user stop boundary. Never invent a
 `multiSelect` parameter, silently reduce the question to one choice, infer aliases or record recommended defaults.
 Invalid, empty or ambiguous input requires correction; corrected selections require confirmation again. Cancellation

@@ -143,8 +143,8 @@ and the repository archives.
   agent allowlists and `.vscode/mcp.json` servers disappear, and the VS Code Agent Host does not forward servers that
   need interactive `${input:...}` values.
 - **Mitigation:** Apply [DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection) through DECISION-015
-  gates. Reject the retired client with a stable error code and migration hint. Replace handoffs with `apex-next` and
-  the context sidekick, multi-select with kernel-validated numbered selection, and allowlists with kernel task
+  gates. Reject the retired client with a stable error code and migration hint. Replace handoffs with `apex-next`,
+  multi-select with native checkboxes or kernel-validated numbered selection, and allowlists with kernel task
   ownership and scoped tools. Keep the archive out of packaging and add a negative reintroduction check.
 - **State:** Open; planned on `feat/cli-agents`
 - **Closure proof:** Migration, rejection, rollback and reintroduction tests pass, archive provenance is recorded, and
@@ -156,8 +156,9 @@ and the repository archives.
 - **Impact:** Explore, Rubber-duck, Code-review, Security-review, built-in Task or Research output could be treated as
   review completion, validation evidence or approval. Built-in models are set per user and add cost.
 - **Mitigation:** Keep helpers advisory. The owning APEX agent restates findings as typed kernel input with file and
-  line references. Helpers receive no completion or gate tools, and the kernel continues to reject unexecuted or
-  simulated evidence. Document per-user model overrides.
+  line references. Helpers receive no completion or gate tools and see only the calling agent's read-only tools.
+  Validator's pre-check shell is limited to `bicep` and `terraform` or not granted. The kernel continues to reject
+  unexecuted or simulated evidence. Document per-user model overrides.
 - **State:** Open; planned on `feat/cli-agents`
 - **Closure proof:** Projection tests cover helper grants, negative tests show helper output alone cannot complete a
   task or open a gate, and CLI probes cover each helper path.

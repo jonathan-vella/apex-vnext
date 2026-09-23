@@ -307,20 +307,24 @@ evidence. The VS Code Local projection, `vscode/askQuestions`, handoff frontmatt
 `init` and `update` reject that client with a stable error code and migration hint. Both clients must resolve the
 kernel-owned `needs_input` contract and record typed answers without relying on chat history.
 
-- Interactive specialists use `ask_user`. When a request needs several values and the tool lacks native multi-select,
-  present the options numbered in kernel order and accept the user's numbers. The kernel validates the resolved values;
-  confirmation, correction and cancellation follow [CLIENT-QUALIFICATION](CLIENT-QUALIFICATION.md#multiple-selection-input).
+- Interactive specialists use `ask_user`. When a request needs several values, use the tool's native checkboxes where
+  it offers them; otherwise present the options numbered in kernel order and accept the user's numbers. The kernel
+  validates the resolved values; confirmation, correction and cancellation follow
+  [CLIENT-QUALIFICATION](CLIENT-QUALIFICATION.md#multiple-selection-input).
 - An `apex-next` skill, invocable by users and agents, reads status and the next task and names the owning agent. It
   delegates the owner with the prepared prompt when the step can complete as a subagent, including any required input.
   Otherwise it prints the client's selection step (`/agent <name>` in standalone CLI, the Agent picker in the VS Code
   harness) and a ready-to-paste scope prompt. The coordinator routes through it.
-- A read-only context sidekick publishes the current project and next owner into the session inbox.
+- A read-only context sidekick is deferred until a Copilot CLI release launches custom sidekicks; `apex-next` shows the
+  next step on request.
 - CodeGen, Reviewer and Validator run through `task` delegation with `model-policy: required`; interactive agents use
   `preferred`. Workers rely on kernel task context, not repository instructions. The coordinator may monitor and steer
   delegated workers through agent listing and messaging.
 - Built-in helpers are advisory and bounded: Explore for Planner and Operator brownfield discovery (never intake),
-  Rubber-duck for Architect and Planner critique, Code-review and Security-review under Reviewer, optional built-in
-  Task pre-checks before kernel validation, and user-invoked Research. The owning APEX agent restates any finding as
+  Rubber-duck for Architect and Planner critique, Code-review and Security-review under Reviewer, and user-invoked
+  Research. Helpers see only what the calling agent can read, so Planner, Operator, Architect and Reviewer get
+  read-only file tools and Reviewer gets `task`. Validator may run optional `bicep` and `terraform` pre-checks before
+  kernel validation only through a shell limited to those commands. The owning APEX agent restates any finding as
   typed kernel input; helper output is never evidence, completion or approval.
 - Workspace MCP configuration uses `.mcp.json`. User documentation covers `/review` and `/security-review` for
   promoted output.
