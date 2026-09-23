@@ -120,8 +120,9 @@ clients; they are not APEX projection or scenario evidence.
   `vscode-remote://wsl%2Bubuntu/` URI, the host indexed `file://` URIs, and the runtime deselected it before every
   turn, so the default agent answered. `/agent` is not a harness command either; the default agent ran `harness-probe`
   through `task` instead. There its model list and efforts applied (`gpt-5.6-luna` high, worker `gpt-6-luna` max), but
-  `ask_user` was unavailable. `.mcp.json` tools appeared from the second turn, the sidekick showed no activity, and the
-  worker's empty tool list arrived as `null` with `task` guidance.
+  `ask_user` was unavailable: the colors question never appeared, so harness multi-select is untested. `.mcp.json`
+  tools appeared from the second turn, the sidekick showed no activity, and the worker's empty tool list arrived as
+  `null` with `task` guidance.
 
 Standalone sessions `60de3415`, `973b27ef`, `531d4b2a`, `b7cd037a` and `e37cc4bc` cover model settings. `dc91aa77`,
 `e717ed91`, `3a1f34a5`, `a11b5bbf`, `366fe888` and `42e4f63e` cover workspace MCP; `bd350038`, `f14677a5`, `bfff54a8`
