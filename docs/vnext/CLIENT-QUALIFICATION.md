@@ -1,12 +1,12 @@
 # Supported Client Qualification
 
-This control defines release-blocking evidence for GitHub Copilot in VS Code Local and standalone Copilot CLI.
+This control defines release-blocking evidence for the VS Code Copilot harness and standalone Copilot CLI.
 Generated projection tests are necessary but do not replace live client interaction.
 
 [DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection) replaces VS Code Local with the VS Code
-Copilot harness running the single CLI projection. Until that change ships, the VS Code column below describes the
-current Local projection; afterwards it applies to the Copilot harness, and the
-[planned CLI-only scenarios](#planned-cli-only-scenarios) become blocking.
+Copilot harness running the single CLI projection. Since slice 4, only that projection installs, so the VS Code column
+below applies to the Copilot harness; its remaining Local mechanics are restated during the plan. The
+[planned CLI-only scenarios](#planned-cli-only-scenarios) become blocking when the plan completes.
 
 Both clients use Windows via WSL2/Ubuntu, without Docker or a devcontainer. Required outcomes follow the
 [PRD](PRD.md), including both environment profiles, COE reuse and conversational changes. Basic interaction checks

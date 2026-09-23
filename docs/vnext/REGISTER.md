@@ -146,7 +146,7 @@ and the repository archives.
   gates. Reject the retired client with a stable error code and migration hint. Replace handoffs with `apex-next`,
   multi-select with native checkboxes or kernel-validated numbered selection, and allowlists with kernel task
   ownership and scoped tools. Keep the archive out of packaging and add a negative reintroduction check.
-- **State:** Open; planned on `feat/cli-agents`
+- **State:** Open; in progress on `feat/cli-projection`
 - **Closure proof:** Migration, rejection, rollback and reintroduction tests pass, archive provenance is recorded, and
   standalone CLI and VS Code Copilot harness qualification passes on the same candidate.
 
@@ -159,7 +159,7 @@ and the repository archives.
   line references. Helpers receive no completion or gate tools and see only the calling agent's read-only tools.
   Validator's pre-check shell is limited to `bicep` and `terraform` or not granted. The kernel continues to reject
   unexecuted or simulated evidence. Document per-user model overrides.
-- **State:** Open; planned on `feat/cli-agents`
+- **State:** Open; in progress on `feat/cli-projection`
 - **Closure proof:** Projection tests cover helper grants, negative tests show helper output alone cannot complete a
   task or open a gate, and CLI probes cover each helper path.
 
@@ -168,7 +168,7 @@ and the repository archives.
 ### Active Scope And CLI Worker Evidence
 
 As of 2026-09-23, DECISION-029 makes standalone Copilot CLI and the VS Code Copilot harness the target release clients,
-both running one CLI projection. VS Code Local remains the implemented VS Code path until that plan ships. Desktop-app
+both running one CLI projection. Since slice 4, `apex init` installs only that projection. Desktop-app
 work is [deferred](ROADMAP.md#deferred-standalone-copilot-desktop-app); preserve its evidence without inferring CLI
 parity. CLI CodeGen, Reviewer and Validator ship since adapter `1.6.0` under revised ADR-0006; kernel checks, not
 profile visibility, remain the security boundary. This does not authenticate independent reviewers or qualify every
