@@ -191,6 +191,58 @@ are probe evidence, not CLIENT-023 qualification.
 The numbered fallback did not run because the CLI offered checkboxes. Kernel and service tests cover duplicate, empty
 and unmatched values.
 
+### Slice 11 Standalone Attempt
+
+On 2026-09-23 the maintainer chose to qualify standalone Copilot CLI first and record the VS Code Copilot harness as
+blocked. Runs used Copilot CLI `1.0.88` (binary SHA-256 `487b36f3…f944550`), Node `v26.9.0`, packed candidates in
+clean Git consumers under an isolated `COPILOT_HOME`, target `local` (fake provider, no Azure deployment) and synthetic
+intake answers. Each fix below needed a new candidate, because a run stays pinned to its runtime generation. This is
+exploratory evidence, not CLIENT-001 to CLIENT-027 qualification. Maintainer hints were given in the `ce561ac` run, so
+a clean full run on the final candidate is still required.
+
+| Candidate | Scope                                                        | Sessions                                                   |
+| --------- | ------------------------------------------------------------ | ---------------------------------------------------------- |
+| `994895d` | Intake to Gate 1, restart, Architecture blocked              | `2d493452`, `23aedd61`, `5896a256`, `ce3c9a3d`, `7c6ef823` |
+| `ce561ac` | Intake to Gate 2 ready (CLI tarball `c110711a80dffe4b`)      | `3fc7d20e`                                                 |
+| `a8e65b9` | Lifecycle, retired client, `-p` MCP (CLI `e5a4d511d8d0f825`) | `7edbd926`, `d7a7efc5`                                     |
+
+| ID           | Standalone CLI result                                                                                            |
+| ------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `CLIENT-003` | Pass: one typed answer event per request; a missing single-select drew one targeted follow-up, not a default     |
+| `CLIENT-006` | Pass: `nextTask` returned `APEX_AUTHORIZATION` while Gate 1 was open                                             |
+| `CLIENT-007` | Pass: after `/exit` and a new session, the same journal head was reported                                        |
+| `CLIENT-009` | Pass: `update`, `rollback`, `uninstall`, `reinstall` and `status` succeeded with no tracked-file drift           |
+| `CLIENT-021` | Pass (fallback): `apex-next` named `apex-requirements` and printed `/agent` with a scope prompt                  |
+| `CLIENT-023` | Pass: checkboxes in kernel order; the UI answer `dev, prod, test` was stored as `["dev", "test", "prod"]`        |
+| `CLIENT-025` | Pass for Reviewer: `subagent.configured` shows `gpt-6-luna` at max with no launch flags; others not yet run      |
+| `CLIENT-026` | Pass: `init --client github-copilot-vscode` fails with `APEX_USAGE`; an adapters test covers the retired hint    |
+| `CLIENT-027` | Pass: `-p` with `GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP=true` called `apex/status`; without it no APEX tool    |
+| Others       | Not run: Gates 2 to 4, Planner, CodeGen, Validator, Operator deploy, CLIENT-008 and CLIENT-024 need a clean run  |
+
+Gate 1 was approved by the maintainer; the agent relayed the chat approval to `gateDecide` with `confirm: true` and
+did not ask again. Gate 2 was left open for the maintainer. Findings and fixes:
+
+- **Retired installs.** An existing VS Code install failed `update` with a generic selection error. Fixed in
+  `994895d`: `init` and `update` return `details.reason: CLIENT_PROJECTION_RETIRED` with the switch command, and
+  `apex init --client github-copilot-cli` replaces unchanged retired files.
+- **Hidden validation reasons.** `architectureComplete` failed with the generic MCP message. Fixed in `ce561ac` and
+  `3a3db69`: kernel `APEX_VALIDATION` reasons and up to five schema paths reach the agent unless they look secret.
+- **Architecture crash.** A decision manifest without `requirementIds` threw a `TypeError` (`APEX_INTERNAL`). Fixed
+  in `68bd1a8`: the submission is schema-checked first. The Architect also read "do not supply requirement
+  traceability" as covering per-decision `requirementIds`; `527d67c` clarifies the agent, skill and tool text.
+- **Governance templates.** Governance tasks had no output templates, so the Operator guessed shapes and failed. Fixed
+  in `a8e65b9`: a `policy-property-map` template and, for `local` targets only, a no-policy `governance-constraints`
+  template. Subscription targets still import a reviewed baseline.
+- **ARM MCP on WSL.** The OAuth callback returned 404 and the device-code flow hung, so pricing never connected. The
+  workaround was an `az account get-access-token` bearer header passed with `--additional-mcp-config`; the token
+  expires after about an hour, after which pricing calls hang instead of failing. A user-level MCP file did not
+  override the repository server.
+- **Other observations.** The coordinator called built-in Explore, which had no file tools. `ask_user` rejected one
+  malformed multi-field schema and the agent corrected it. The Architect asked for SLO values rather than inventing
+  them.
+
+The VS Code Copilot harness stays blocked on WSL, as the [slice 1 probe](#cli-only-projection-probes) found.
+
 ## Execution Rules
 
 The clean-install package regression now exercises local archetype listing, exact-commit inspection, independent copy,
