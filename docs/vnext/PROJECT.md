@@ -28,9 +28,12 @@ On 2026-09-23 the maintainer selected a single Copilot CLI projection. Supported
 and the VS Code Copilot harness, which runs CLI-format agents. The VS Code Local projection retires through
 DECISION-015 gates with an archive under `.archive/vscode-projection/`. An `apex-next` skill replaces handoffs, advisory
 built-in helpers join the workflow, and the context sidekick is deferred. Work proceeds on `feat/cli-projection`
-(draft PR #350) per the [CLI-only projection plan](ROADMAP.md#cli-only-projection); slices 1 to 10 are done, so
+(PR #350) per the [CLI-only projection plan](ROADMAP.md#cli-only-projection); slices 1 to 10 and 12 are done, so
 `apex init` installs only the CLI projection, managed agent sources use CLI frontmatter, the coordinator routes
-through `apex-next`, and VS Code Local is archived.
+through `apex-next`, and VS Code Local is archived. Slice 11 is partial: standalone CLI reached Gate 2 on a local
+target and four defects were fixed ([results](CLIENT-QUALIFICATION.md#slice-11-standalone-attempt)). A clean full
+standalone run with maintainer gate approvals and VS Code harness qualification remain before RISK-014 and RISK-015
+close; [issue #348](https://github.com/jonathan-vella/apex-vnext/issues/348) tracks them.
 
 The maintainer parked all standalone desktop-app work on 2026-09-21. Preserve desktop probes, Windows fixes and
 upstream findings without additional app tests, adapter implementation, native Windows CI or host setup. The
