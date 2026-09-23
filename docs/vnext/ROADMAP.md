@@ -22,7 +22,7 @@ As of 2026-09-23, focus on the single Copilot CLI projection selected by
 [DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection), used by standalone Copilot CLI and the VS Code
 Copilot harness on WSL2. Desktop-app support remains deferred below and is not a prerequisite for this release.
 
-1. Deliver the [CLI-only projection](#cli-only-projection) on `feat/cli-agents`. CLI CodeGen, Reviewer and Validator
+1. Deliver the [CLI-only projection](#cli-only-projection) on `feat/cli-projection`. CLI CodeGen, Reviewer and Validator
    already ship under revised ADR-0006; keep their evidence as history and requalify them on the new candidate.
    Task, evidence, ownership and approval checks stay authoritative; direct selection is not a security blocker.
 2. Finish acceptance for issue #344. Offline coverage now includes Bicep source-policy evidence, Terraform saved-plan
@@ -59,10 +59,10 @@ See [current checkpoint](PROJECT.md#development-diagnostics-checkpoint) and
 Owner: managed customization, CLI lifecycle and client experience maintainers. Decision:
 [DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection). Acceptance:
 [REQ-CUSTOMIZATION-001](PRD.md#req-customization-001-managed-copilot-experiences) and the planned
-[CLI-only scenarios](CLIENT-QUALIFICATION.md#planned-cli-only-scenarios). Branch: `feat/cli-agents`, draft PR #347.
-Tracking: [issue #348](https://github.com/jonathan-vella/apex-vnext/issues/348). Status: slice 1 probes are
-recorded in [CLIENT-QUALIFICATION](CLIENT-QUALIFICATION.md#cli-only-projection-probes); no other slice is implemented.
-The VS Code Local projection keeps shipping until slice 8 passes its gates.
+[CLI-only scenarios](CLIENT-QUALIFICATION.md#planned-cli-only-scenarios). Branch: `feat/cli-projection`, draft PR #350;
+the plan and slice 1 merged in #347. Tracking: [issue #348](https://github.com/jonathan-vella/apex-vnext/issues/348).
+Status: slices 1, 2 and 4 are done. `apex init` installs only the CLI projection; slice 8 archives the remaining VS Code
+Local files.
 
 Managed agents target Copilot CLI only. Users may still run them in VS Code through its Copilot harness, which must
 pass the same qualification. Builder-only VS Code tooling for this repository stays.
@@ -81,14 +81,17 @@ pass the same qualification. Builder-only VS Code tooling for this repository st
 | 9   | Documentation                 | Explanation, reference, how-to, tutorials, `copilot-instructions.md`, generated references     | Docs describe shipped behavior only, including `/review` and `/security-review`                                                                                                                                                                         | `lint:md`, `validate:docs`, `validate:docs-reference`                          |
 | 10  | Integration                   | Whole repository                                                                               | `npm run qualify:vnext` passes once                                                                                                                                                                                                                     | Full suite                                                                     |
 | 11  | Client qualification          | Candidate-bound evidence                                                                       | CLIENT-001 to CLIENT-027, except deferred CLIENT-022, pass in standalone CLI and the VS Code Copilot harness; RISK-014 and RISK-015 closure proof is met                                                                                                | CLIENT-QUALIFICATION evidence                                                  |
-| 12  | Close out                     | PROJECT, REGISTER, ROADMAP                                                                     | #347 is ready for review                                                                                                                                                                                                                                | Maintainer review                                                              |
+| 12  | Close out                     | PROJECT, REGISTER, ROADMAP                                                                     | #350 is ready for review                                                                                                                                                                                                                                | Maintainer review                                                              |
 
-Each slice is one commit, or a small set, on `feat/cli-agents`. Slices 5 to 7 may run in any order after slice 4;
+Each slice is one commit, or a small set, on `feat/cli-projection`. Slices 5 to 7 may run in any order after slice 4;
 slice 8 follows them.
 
 - **Slice 1:** done on 2026-09-23; the VS Code Copilot harness probe failed. The
   [probe results](CLIENT-QUALIFICATION.md#cli-only-projection-probes) select the frontmatter and MCP options and name
   the decisions that slices 5 to 7 and 11 need.
+- **Slices 2 and 4:** done on 2026-09-23 in one push so CI stayed green. Workspace MCP moved to `.mcp.json` with a
+  directory-independent `npx --no apex mcp serve` launch. VS Code profile commands and the VS Code render branch stay
+  until slice 8.
 - **Slice 3:** remove `vscode/askQuestions`, handoffs, argument hints, agent allowlists and VS Code client mechanics.
   Workers use kernel task context, not repository instructions.
 - **Slice 5:** `apex-next` delegates the owning agent with the prepared prompt when the step can complete as a
