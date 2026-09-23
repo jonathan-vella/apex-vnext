@@ -101,7 +101,7 @@ test("bootstrap wizard uses the reviewed local plan and reports governance pendi
     status: "ready",
     imported: false,
   }));
-  const answers = ["invalid", "both", "no", "yes", "yes", "central"];
+  const answers = ["invalid", "both", "no", "yes", "yes", "no", "central"];
   const shown: unknown[] = [];
   const result = await runBootstrapWizard(
     root,
@@ -195,9 +195,11 @@ test("bootstrap wizard selects multiple independent workloads and confirms each 
     "yes",
     "yes",
     "yes",
+    "no",
     "later",
     "yes",
     "yes",
+    "no",
     "later",
   ];
   const result = await runBootstrapWizard(
@@ -235,6 +237,7 @@ test("bootstrap wizard leaves consumer identity provisioning pending or blocked 
     "no",
     "yes",
     "yes",
+    "no",
     "consumer",
     "example/repo",
     "11111111-1111-1111-1111-111111111111",
@@ -285,6 +288,7 @@ test("wizard requires separate exact-plan confirmation for existing-identity pro
       "no",
       "yes",
       "yes",
+      "no",
       "consumer",
       "example/repo",
       "11111111-1111-1111-1111-111111111111",
@@ -319,7 +323,7 @@ test("wizard configures a real empty workspace without asking or inventing proje
   await mkdir(join(root, "node_modules/@apexops/cli"), { recursive: true });
   await writeFile(join(root, "node_modules/@apexops/cli/package.json"), JSON.stringify({ version: APEX_VERSION }));
   for (let attempt = 0; attempt < 2; attempt++) {
-    const answers = ["both", "no", "no", "yes", "later"];
+    const answers = ["both", "no", "no", "yes", "no", "later"];
     const questions: string[] = [];
     const result = await runBootstrapWizard(root, {
       ask: async (question) => {
@@ -335,5 +339,59 @@ test("wizard configures a real empty workspace without asking or inventing proje
     assert.deepEqual(await new ApexService(root).listProjects(), []);
     await assert.rejects(readFile(join(root, ".apex/config.json")), { code: "ENOENT" });
     assert.equal((await new ApexService(root).doctor()).healthy, true);
+  }
+});
+
+test("wizard publishes a GitHub repository only after showing owner, visibility and exact changes", async (context) => {
+  for (const approval of ["yes", "no"]) {
+    const root = await tempRoot();
+    const service = new ApexService(root);
+    context.mock.method(service, "bootstrap", async () => ({ runtimeInstalled: false }));
+    const plan = {
+      status: "pending" as const,
+      planHash: "b".repeat(64),
+      repository: { fullName: "Example/workload", visibility: "private", exists: false },
+      push: { branch: "main", commit: "a".repeat(40), files: ["README.md"], forcePush: false },
+    };
+    context.mock.method(service, "planRepositoryPublish", async () => plan);
+    const publish = context.mock.method(service, "publishRepository", async () => ({ status: "published" }));
+    const answers = ["both", "no", "yes", "yes", "yes", "Example", "workload", "", "", approval, "later"];
+    const shown: unknown[] = [];
+    const result = await runBootstrapWizard(
+      root,
+      {
+        ask: async () => {
+          assert.ok(answers.length);
+          return answers.shift()!;
+        },
+        show: (value) => {
+          shown.push(value);
+        },
+      },
+      () => service,
+    );
+    assert.equal(result.status, "pending");
+    assert.equal(answers.length, 0);
+    assert.ok(shown.includes(plan));
+    assert.equal(publish.mock.callCount(), approval === "yes" ? 1 : 0);
+    if (approval === "yes") {
+      const [submitted, hash, confirmed] = publish.mock.calls[0]!.arguments;
+      assert.deepEqual(submitted, {
+        schemaVersion: "1.0.0",
+        owner: "Example",
+        name: "workload",
+        visibility: "private",
+        branch: "main",
+        remote: "origin",
+      });
+      assert.equal(hash, "b".repeat(64));
+      assert.equal(confirmed, true);
+    }
+    assert.deepEqual(
+      result.progress.map(({ step }) => step),
+      approval === "yes"
+        ? ["local-bootstrap", "github-repository-plan", "github-repository", "governance"]
+        : ["local-bootstrap", "github-repository-plan", "governance"],
+    );
   }
 });

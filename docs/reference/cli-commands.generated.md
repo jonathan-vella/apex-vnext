@@ -18,6 +18,8 @@ This file is generated from [packages/cli/src/cli.ts](../../packages/cli/src/cli
 - `bootstrap governance-provision`
 - `bootstrap governance-provision-plan`
 - `bootstrap plan`
+- `bootstrap repository-plan`
+- `bootstrap repository-publish`
 - `bootstrap wizard`
 - `cache clear`
 - `cache status`

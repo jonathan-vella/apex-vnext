@@ -146,6 +146,16 @@ and verified, with local partial-outcome receipts and no automatic retry on unce
 stale plans, permission failures and changed protections. No live provisioning has been performed. New identity creation,
 GitHub environment/variable setup, collection dispatch and first baseline PR completion remain open.
 
+Reviewed GitHub repository creation and push now has a typed plan and a separately confirmed executor. The plan binds
+the authenticated viewer, requested owner type, existing repository identity and visibility, the local branch, commit,
+tracked files and any uncommitted changes. It blocks foreign owners, visibility drift, conflicting remotes, unclean
+working trees and divergent remote history; `forcePush` is a contract constant of `false`, so no force push can be
+planned or executed. Execution creates the repository, adds `origin` and pushes only the reviewed branch, rereading
+the plan before and after each action and writing a local partial-outcome receipt without retry or rollback. Already
+published commits report `ready` with no actions, making reruns duplicate-safe. `bootstrap repository-plan` and the
+confirmed `bootstrap repository-publish` expose the same deterministic implementation the wizard uses. All coverage is
+offline with a simulated process runner; no live GitHub repository has been created or pushed by this work.
+
 Terminal bootstrap now guides client selection, optional remote COE catalog selection, confirmed independent copies,
 per-workload local setup and consumer-governance plan inputs. It delegates mutations to existing service operations,
 retains partial progress and cancellation, and reports outstanding governance/client/GitHub work as pending or blocked.

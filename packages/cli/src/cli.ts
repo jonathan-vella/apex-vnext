@@ -11,6 +11,7 @@ import {
   type RequirementsV1,
   type RequirementsAmendmentV1,
   type GovernanceSetupConfigV1,
+  type RepositoryPublishConfigV1,
   type ArchetypeBatchConfigV1,
 } from "@apexops/contracts";
 import { Value } from "@sinclair/typebox/value";
@@ -487,6 +488,15 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
       );
     case "bootstrap baseline-check":
       return service.inspectGovernanceBaselineReadiness(required(flags, "path"));
+    case "bootstrap repository-plan":
+      return service.planRepositoryPublish((await inputJson(flags)) as RepositoryPublishConfigV1);
+    case "bootstrap repository-publish":
+      confirmed(flags, "bootstrap repository-publish");
+      return service.publishRepository(
+        (await inputJson(flags)) as RepositoryPublishConfigV1,
+        required(flags, "expected-hash"),
+        true,
+      );
     case "bootstrap coe-plan":
       return service.planArchetypeBatch((await inputJson(flags)) as ArchetypeBatchConfigV1);
     case "bootstrap coe-import":

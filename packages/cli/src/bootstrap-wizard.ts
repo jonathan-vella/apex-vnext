@@ -1,7 +1,12 @@
 import { createInterface } from "node:readline/promises";
 import { join } from "node:path";
 import { stdin, stdout } from "node:process";
-import type { ArchetypeBatchConfigV1, GovernanceSetupConfigV1, OnboardingConfigV1 } from "@apexops/contracts";
+import type {
+  ArchetypeBatchConfigV1,
+  GovernanceSetupConfigV1,
+  OnboardingConfigV1,
+  RepositoryPublishConfigV1,
+} from "@apexops/contracts";
 import { ApexService } from "./service.js";
 import { ApexError, EXIT_CODES } from "./errors.js";
 
@@ -17,6 +22,8 @@ type SetupService = Pick<
   | "importArchetypeBatch"
   | "planBootstrap"
   | "bootstrap"
+  | "planRepositoryPublish"
+  | "publishRepository"
   | "planGovernanceSetup"
   | "planGovernanceProvision"
   | "provisionGovernance"
@@ -129,6 +136,38 @@ export async function runBootstrapWizard(
         ...(client === undefined ? {} : { clientId: client }),
       });
       progress.push({ directory, step: "local-bootstrap", outcome: initialized });
+      if (await confirm("Create a GitHub repository and push this reviewed branch?")) {
+        const owner = await ask("Repository owner (user or organization login): ");
+        const name = await ask("Repository name: ");
+        const visibility = (await choose(
+          "Visibility [private/internal/public, default private]: ",
+          ["private", "internal", "public"],
+          "private",
+        )) as RepositoryPublishConfigV1["visibility"];
+        const branch = (await ask("Branch to publish [main]: ")) || "main";
+        const publishConfig: RepositoryPublishConfigV1 = {
+          schemaVersion: "1.0.0",
+          owner,
+          name,
+          visibility,
+          branch,
+          remote: "origin",
+        };
+        const publishPlan = await service.planRepositoryPublish(publishConfig);
+        interaction.show(publishPlan);
+        progress.push({ directory, step: "github-repository-plan", outcome: publishPlan });
+        if (publishPlan.status === "pending") {
+          if (
+            await confirm(
+              `Create ${publishPlan.repository.fullName} as ${publishPlan.repository.visibility} and push exactly commit ${publishPlan.push.commit} on ${publishPlan.push.branch} without force?`,
+            )
+          ) {
+            const published = await service.publishRepository(publishConfig, publishPlan.planHash, true);
+            interaction.show(published);
+            progress.push({ directory, step: "github-repository", outcome: published });
+          }
+        }
+      }
       const governance = await choose(
         "Governance source [consumer/central/later, default later]: ",
         ["consumer", "central", "later"],

@@ -33,12 +33,37 @@ test("init installs and update refreshes managed customizations", async () => {
   await writeFile(join(source, ".github", "managed.md"), "v1\n");
   const service = new ApexService(root);
   await service.init({ projectId: "demo", customizationsSource: source });
+  const assertPortableLock = async () => {
+    const lock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
+      files: Array<{ path: string; baseRef: string }>;
+      runtime: Array<{ path: string; baseRef: string }>;
+      previousLockRef?: string;
+    };
+    assert.ok(lock.files.some(({ path }) => path === ".github/managed.md"));
+    for (const file of [...lock.files, ...lock.runtime]) {
+      assert.equal(file.path.includes("\\"), false);
+      assert.equal(file.baseRef.includes("\\"), false);
+      assert.match(file.baseRef, /^\.apex\/customization-bases\//u);
+    }
+    if (lock.previousLockRef !== undefined) {
+      assert.match(lock.previousLockRef, /^\.apex\/customization-bases\/locks\/[a-f0-9]+\.json$/u);
+    }
+    const doctor = await service.doctor();
+    const managedChecks = doctor.checks.filter(({ id }) => id.startsWith("managed:") || id === "managed-files");
+    assert.ok(managedChecks.length > 0);
+    assert.ok(managedChecks.every(({ ok }) => ok));
+  };
+  await assertPortableLock();
   const runtimeLockHash = (await service.status()).run.runtimeLockHash;
   assert.equal(await readFile(join(root, ".github", "managed.md"), "utf8"), "v1\n");
   await writeFile(join(source, ".github", "managed.md"), "v2\n");
   await service.update(source);
+  await assertPortableLock();
   assert.equal(await readFile(join(root, ".github", "managed.md"), "utf8"), "v2\n");
   assert.equal((await service.status()).run.runtimeLockHash, runtimeLockHash);
+  assert.deepEqual((await service.rollbackCustomizations()).conflicts, []);
+  await assertPortableLock();
+  assert.equal(await readFile(join(root, ".github", "managed.md"), "utf8"), "v1\n");
   assert.equal((await service.nextTask()).status, "needs_input");
 });
 

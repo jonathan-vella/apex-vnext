@@ -1,0 +1,265 @@
+{
+  "$id": "https://schemas.apexops.dev/repository-publish-plan-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "actions": {
+      "items": {
+        "anyOf": [
+          {
+            "const": "create-repository",
+            "type": "string"
+          },
+          {
+            "const": "add-remote",
+            "type": "string"
+          },
+          {
+            "const": "push-branch",
+            "type": "string"
+          }
+        ]
+      },
+      "maxItems": 3,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "blockers": {
+      "items": {
+        "maxLength": 512,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 16,
+      "type": "array"
+    },
+    "config": {
+      "$id": "https://schemas.apexops.dev/repository-publish-config-v1.json",
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$(?![\\s\\S])",
+          "type": "string"
+        },
+        "name": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$(?![\\s\\S])",
+          "type": "string"
+        },
+        "owner": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,38}$(?![\\s\\S])",
+          "type": "string"
+        },
+        "remote": {
+          "const": "origin",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "1.0.0",
+          "type": "string"
+        },
+        "visibility": {
+          "anyOf": [
+            {
+              "const": "private",
+              "type": "string"
+            },
+            {
+              "const": "internal",
+              "type": "string"
+            },
+            {
+              "const": "public",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "owner",
+        "name",
+        "visibility",
+        "branch",
+        "remote"
+      ],
+      "type": "object"
+    },
+    "deploymentAuthorized": {
+      "const": false,
+      "type": "boolean"
+    },
+    "evidenceHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "executionAuthorized": {
+      "const": false,
+      "type": "boolean"
+    },
+    "filesModified": {
+      "const": false,
+      "type": "boolean"
+    },
+    "pendingActions": {
+      "items": {
+        "maxLength": 256,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 16,
+      "type": "array"
+    },
+    "planHash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "push": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "maxLength": 255,
+          "minLength": 1,
+          "type": "string"
+        },
+        "commit": {
+          "pattern": "^[0-9a-f]{40}$(?![\\s\\S])",
+          "type": "string"
+        },
+        "commitCount": {
+          "maximum": 1000000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "files": {
+          "items": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 512,
+          "type": "array"
+        },
+        "filesTruncated": {
+          "type": "boolean"
+        },
+        "forcePush": {
+          "const": false,
+          "type": "boolean"
+        },
+        "uncommittedChanges": {
+          "items": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 512,
+          "type": "array"
+        }
+      },
+      "required": [
+        "branch",
+        "commit",
+        "commitCount",
+        "files",
+        "filesTruncated",
+        "uncommittedChanges",
+        "forcePush"
+      ],
+      "type": "object"
+    },
+    "repository": {
+      "additionalProperties": false,
+      "properties": {
+        "exists": {
+          "type": "boolean"
+        },
+        "fullName": {
+          "maxLength": 140,
+          "minLength": 3,
+          "type": "string"
+        },
+        "owner": {
+          "maxLength": 39,
+          "minLength": 1,
+          "type": "string"
+        },
+        "ownerType": {
+          "anyOf": [
+            {
+              "const": "user",
+              "type": "string"
+            },
+            {
+              "const": "organization",
+              "type": "string"
+            },
+            {
+              "const": "unknown",
+              "type": "string"
+            }
+          ]
+        },
+        "visibility": {
+          "anyOf": [
+            {
+              "const": "private",
+              "type": "string"
+            },
+            {
+              "const": "internal",
+              "type": "string"
+            },
+            {
+              "const": "public",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "fullName",
+        "owner",
+        "ownerType",
+        "visibility",
+        "exists"
+      ],
+      "type": "object"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "status": {
+      "anyOf": [
+        {
+          "const": "ready",
+          "type": "string"
+        },
+        {
+          "const": "pending",
+          "type": "string"
+        },
+        {
+          "const": "blocked",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "config",
+    "evidenceHash",
+    "planHash",
+    "status",
+    "repository",
+    "actions",
+    "push",
+    "blockers",
+    "pendingActions",
+    "filesModified",
+    "executionAuthorized",
+    "deploymentAuthorized"
+  ],
+  "type": "object"
+}

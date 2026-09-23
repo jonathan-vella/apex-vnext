@@ -82,6 +82,9 @@ import {
   type BootstrapPlanV1,
   type GovernanceSetupConfigV1,
   type GovernanceProvisionPlanV1,
+  RepositoryPublishConfigV1Schema,
+  type RepositoryPublishConfigV1,
+  type RepositoryPublishPlanV1,
   type ProjectId,
   type ResourceInventoryV1,
   type ReviewFindingsV1,
@@ -113,6 +116,7 @@ import {
   listRemoteArchetypes,
   planGovernanceSetup as createGovernanceSetupPlan,
   planGovernanceProvision as createGovernanceProvisionPlan,
+  planRepositoryPublish as createRepositoryPublishPlan,
   GovernanceBaselineError,
   nativePolicyValidationBinding,
   assertGeneratedSourceUnchanged,
@@ -1174,6 +1178,212 @@ export class ApexService {
       };
     } finally {
       if (payloadCreated) await rm(payloadPath, { force: true });
+      await lock.close();
+      await rm(lockPath);
+    }
+  }
+
+  private async repositoryPublishEvidence(config: RepositoryPublishConfigV1) {
+    const readGitHub = async (endpoint: string): Promise<unknown> =>
+      this.governanceSetupRead("gh", ["api", "--hostname", "github.com", "--method", "GET", endpoint]);
+    const git = async (args: string[]): Promise<string | null> => {
+      try {
+        const result = await this.processRunner.run({
+          executable: "git",
+          args,
+          cwd: this.root,
+          timeoutMs: 30_000,
+          maxOutputBytes: 262_144,
+        });
+        if (result.exitCode !== 0 || result.signal !== null || result.timedOut || result.outputTruncated) return null;
+        return result.stdout;
+      } catch {
+        return null;
+      }
+    };
+    const lines = (value: string | null): string[] =>
+      value === null
+        ? []
+        : value
+            .split("\n")
+            .map((entry) => entry.trim())
+            .filter((entry) => entry.length > 0);
+    const single = (value: string | null): string => lines(value)[0] ?? "";
+    const isRepository = (await git(["rev-parse", "--git-dir"])) !== null;
+    const commit = single(await git(["rev-parse", "HEAD"]));
+    const branch = single(await git(["symbolic-ref", "--quiet", "--short", "HEAD"]));
+    const commitCount = Number.parseInt(single(await git(["rev-list", "--count", "HEAD"])) || "0", 10);
+    const files = lines(await git(["ls-tree", "-r", "--name-only", "HEAD"])).slice(0, 512);
+    const uncommittedChanges = lines(await git(["status", "--porcelain", "--untracked-files=all"])).slice(0, 512);
+    const remotes: Record<string, string> = {};
+    for (const entry of lines(await git(["remote", "-v"]))) {
+      const [name, url] = entry.split(/\s+/u);
+      if (name !== undefined && url !== undefined && remotes[name] === undefined) remotes[name] = url;
+    }
+    const repository = await readGitHub(`repos/${config.owner}/${config.name}`);
+    const owner = await readGitHub(`users/${config.owner}`);
+    const viewer = await readGitHub("user");
+    const remoteBranch =
+      repository === null
+        ? null
+        : await readGitHub(`repos/${config.owner}/${config.name}/branches/${encodeURIComponent(config.branch)}`);
+    const remoteBranchCommit =
+      remoteBranch !== null &&
+      typeof remoteBranch === "object" &&
+      typeof (remoteBranch as { commit?: { sha?: unknown } }).commit?.sha === "string"
+        ? ((remoteBranch as { commit: { sha: string } }).commit.sha as string)
+        : "";
+    const remoteBranchIsAncestor =
+      remoteBranchCommit.length === 40 &&
+      (await git(["merge-base", "--is-ancestor", remoteBranchCommit, "HEAD"])) !== null;
+    return {
+      viewer,
+      repository,
+      owner,
+      local: {
+        isRepository,
+        commit,
+        branch,
+        commitCount: Number.isSafeInteger(commitCount) ? commitCount : 0,
+        files,
+        uncommittedChanges,
+        remotes,
+        remoteBranchCommit,
+        remoteBranchIsAncestor,
+      },
+    };
+  }
+
+  /** Builds a reviewable GitHub repository creation and push plan. No remote state is modified. */
+  async planRepositoryPublish(config: RepositoryPublishConfigV1): Promise<RepositoryPublishPlanV1> {
+    config = structuredClone(config);
+    if (!Value.Check(RepositoryPublishConfigV1Schema, config) || Buffer.byteLength(JSON.stringify(config)) > 16_384)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Repository publish configuration is malformed or oversized",
+        EXIT_CODES.validation,
+      );
+    return createRepositoryPublishPlan(config, await this.repositoryPublishEvidence(config));
+  }
+
+  /** Executes exactly the confirmed repository creation, remote and non-forced push actions. */
+  async publishRepository(config: RepositoryPublishConfigV1, expectedHash: string, confirm: boolean) {
+    if (confirm !== true)
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Repository publication requires explicit confirmation",
+        EXIT_CODES.authorization,
+      );
+    config = structuredClone(config);
+    const initial = await this.planRepositoryPublish(config);
+    if (initial.planHash !== expectedHash)
+      throw new ApexError("APEX_STALE", "Repository publish plan changed; review a fresh plan", EXIT_CODES.stale);
+    if (initial.status === "blocked")
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Repository publication prerequisites are blocked",
+        EXIT_CODES.authorization,
+      );
+    const lockPath = join(this.root, ".apex-repository-publish.lock");
+    await this.assertSafeDestination(this.root, lockPath);
+    const lock = await open(lockPath, "wx", 0o600).catch(() => {
+      throw new ApexError(
+        "APEX_CONFLICT",
+        "A repository publish lock exists; inspect interrupted work before retrying",
+        EXIT_CODES.conflict,
+      );
+    });
+    const receiptPath = join(this.root, `.apex-repository-publish-${this.idSource()}.json`);
+    const actions: Array<{ action: string; status: "started" | "verified" | "indeterminate" }> = [];
+    const receipt = () => ({
+      schemaVersion: CONTRACT_VERSION,
+      planHash: initial.planHash,
+      repository: initial.repository.fullName,
+      visibility: initial.repository.visibility,
+      branch: initial.push.branch,
+      commit: initial.push.commit,
+      actions,
+      forcePush: false,
+      deploymentAuthorized: false,
+    });
+    try {
+      await this.assertSafeDestination(this.root, receiptPath);
+      await atomicWriteJson(receiptPath, receipt(), { refuseOverwrite: true });
+      for (const action of initial.actions) {
+        const current = await this.planRepositoryPublish(config);
+        if (
+          current.status === "blocked" ||
+          current.repository.fullName !== initial.repository.fullName ||
+          current.push.commit !== initial.push.commit ||
+          current.actions.some((item) => !initial.actions.includes(item))
+        )
+          throw new ApexError(
+            "APEX_STALE",
+            "Repository state changed during publication; review a new plan",
+            EXIT_CODES.stale,
+          );
+        if (!current.actions.includes(action)) continue;
+        const entry = { action, status: "started" as "started" | "verified" | "indeterminate" };
+        actions.push(entry);
+        await atomicWriteJson(receiptPath, receipt());
+        const request =
+          action === "create-repository"
+            ? {
+                executable: "gh" as const,
+                args: ["repo", "create", initial.repository.fullName, `--${initial.repository.visibility}`],
+              }
+            : action === "add-remote"
+              ? {
+                  executable: "git" as const,
+                  args: ["remote", "add", config.remote, `https://github.com/${initial.repository.fullName}.git`],
+                }
+              : {
+                  executable: "git" as const,
+                  args: ["push", "--set-upstream", config.remote, `${initial.push.branch}:${initial.push.branch}`],
+                };
+        try {
+          const result = await this.processRunner.run({
+            ...request,
+            cwd: this.root,
+            env: { ...process.env, GH_PROMPT_DISABLED: "1", GH_PAGER: "cat" },
+            timeoutMs: 120_000,
+            maxOutputBytes: 65_536,
+          });
+          if (result.exitCode !== 0 || result.signal !== null || result.timedOut || result.outputTruncated)
+            throw new Error("Mutation outcome unknown");
+          const verified = await this.planRepositoryPublish(config);
+          if (verified.status === "blocked" || verified.actions.includes(action))
+            throw new Error("Mutation not observed");
+          entry.status = "verified";
+          await atomicWriteJson(receiptPath, receipt());
+        } catch {
+          entry.status = "indeterminate";
+          await atomicWriteJson(receiptPath, receipt());
+          return {
+            status: "blocked",
+            ...receipt(),
+            receiptPath: relative(this.root, receiptPath),
+            nextAction:
+              "Inspect the repository and remote state and obtain a fresh plan before retrying; no rollback or force push was attempted.",
+          };
+        }
+      }
+      const final = await this.planRepositoryPublish(config);
+      if (final.status !== "ready")
+        return {
+          status: "blocked",
+          ...receipt(),
+          receiptPath: relative(this.root, receiptPath),
+          nextAction: "Final verification did not observe the published branch; preserve the receipt and replan.",
+        };
+      return {
+        status: "published",
+        ...receipt(),
+        receiptPath: relative(this.root, receiptPath),
+        nextAction:
+          "The reviewed branch is published. Governance setup, collection and client health checks remain pending; no deployment is authorized.",
+      };
+    } finally {
       await lock.close();
       await rm(lockPath);
     }
@@ -9734,7 +9944,7 @@ export class ApexService {
       const managed: ManagedFile[] = [];
       const incomingPaths = new Set<string>();
       for (const absoluteSource of sourceFiles) {
-        const path = relative(sourceRoot, absoluteSource);
+        const path = relative(sourceRoot, absoluteSource).split(sep).join("/");
         incomingPaths.add(path);
         const destination = resolve(destinationRoot, path);
         if (destination !== destinationRoot && !destination.startsWith(`${destinationRoot}${sep}`))
@@ -9767,7 +9977,7 @@ export class ApexService {
         const backup = existed ? join(transactionRoot, "backup", label, path) : undefined;
         if (backup !== undefined) await atomicWriteBytes(backup, await readFile(destination));
         entries.push({ destination, staged, ...(backup === undefined ? {} : { backup }), existed });
-        const baseRef = join(".apex", "customization-bases", sourceHash, label, path);
+        const baseRef = join(".apex", "customization-bases", sourceHash, label, path).split(sep).join("/");
         const baseDestination = join(this.root, baseRef);
         await this.assertSafeDestination(this.root, baseDestination);
         entries.push({
@@ -9808,7 +10018,7 @@ export class ApexService {
     let previousLockRef: string | undefined;
     if (previous !== undefined) {
       const previousHash = sha256Json(previous as unknown as JsonValue);
-      previousLockRef = join(".apex", "customization-bases", "locks", `${previousHash}.json`);
+      previousLockRef = join(".apex", "customization-bases", "locks", `${previousHash}.json`).split(sep).join("/");
       const previousLockDestination = join(this.root, previousLockRef);
       if (!(await this.pathExistsLstat(previousLockDestination))) {
         const stagedPreviousLock = join(transactionRoot, "previous-lock.json");

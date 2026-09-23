@@ -66,6 +66,62 @@ export const BootstrapPlanV1Schema = Type.Object(
 
 export type BootstrapPlanV1 = Static<typeof BootstrapPlanV1Schema>;
 
+export const RepositoryPublishConfigV1Schema = Type.Object(
+  {
+    schemaVersion: ContractVersionSchema,
+    owner: Type.String({ pattern: "^[A-Za-z0-9][A-Za-z0-9-]{0,38}$(?![\\s\\S])" }),
+    name: Type.String({ pattern: "^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$(?![\\s\\S])" }),
+    visibility: Type.Union([Type.Literal("private"), Type.Literal("internal"), Type.Literal("public")]),
+    branch: Type.String({ pattern: "^[A-Za-z0-9][A-Za-z0-9._/-]{0,254}$(?![\\s\\S])" }),
+    remote: Type.Literal("origin"),
+  },
+  { $id: "https://schemas.apexops.dev/repository-publish-config-v1.json", additionalProperties: false },
+);
+export type RepositoryPublishConfigV1 = Static<typeof RepositoryPublishConfigV1Schema>;
+
+export const RepositoryPublishPlanV1Schema = Type.Object(
+  {
+    schemaVersion: ContractVersionSchema,
+    config: RepositoryPublishConfigV1Schema,
+    evidenceHash: Sha256Schema,
+    planHash: Sha256Schema,
+    status: Type.Union([Type.Literal("ready"), Type.Literal("pending"), Type.Literal("blocked")]),
+    repository: Type.Object(
+      {
+        fullName: Type.String({ minLength: 3, maxLength: 140 }),
+        owner: Type.String({ minLength: 1, maxLength: 39 }),
+        ownerType: Type.Union([Type.Literal("user"), Type.Literal("organization"), Type.Literal("unknown")]),
+        visibility: Type.Union([Type.Literal("private"), Type.Literal("internal"), Type.Literal("public")]),
+        exists: Type.Boolean(),
+      },
+      { additionalProperties: false },
+    ),
+    actions: Type.Array(
+      Type.Union([Type.Literal("create-repository"), Type.Literal("add-remote"), Type.Literal("push-branch")]),
+      { maxItems: 3, uniqueItems: true },
+    ),
+    push: Type.Object(
+      {
+        branch: Type.String({ minLength: 1, maxLength: 255 }),
+        commit: Type.String({ pattern: "^[0-9a-f]{40}$(?![\\s\\S])" }),
+        commitCount: Type.Integer({ minimum: 0, maximum: 1_000_000 }),
+        files: Type.Array(Type.String({ minLength: 1, maxLength: 1024 }), { maxItems: 512 }),
+        filesTruncated: Type.Boolean(),
+        uncommittedChanges: Type.Array(Type.String({ minLength: 1, maxLength: 1024 }), { maxItems: 512 }),
+        forcePush: Type.Literal(false),
+      },
+      { additionalProperties: false },
+    ),
+    blockers: Type.Array(Type.String({ minLength: 1, maxLength: 512 }), { maxItems: 16 }),
+    pendingActions: Type.Array(Type.String({ minLength: 1, maxLength: 256 }), { maxItems: 16 }),
+    filesModified: Type.Literal(false),
+    executionAuthorized: Type.Literal(false),
+    deploymentAuthorized: Type.Literal(false),
+  },
+  { $id: "https://schemas.apexops.dev/repository-publish-plan-v1.json", additionalProperties: false },
+);
+export type RepositoryPublishPlanV1 = Static<typeof RepositoryPublishPlanV1Schema>;
+
 const AzureId = Type.String({
   pattern: "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$(?![\\s\\S])",
 });
