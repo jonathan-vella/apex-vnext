@@ -243,6 +243,24 @@ did not ask again. Gate 2 was left open for the maintainer. Findings and fixes:
 
 The VS Code Copilot harness stays blocked on WSL, as the [slice 1 probe](#cli-only-projection-probes) found.
 
+On 2026-09-24 a clean run on `main` `591ce2f` (session `4d332d30`) took the maintainer's own decisions and gate
+approvals. Requirements, Architecture (four schema retries, self-corrected from issue paths) and governance completed
+without hints; the maintainer approved Gates 1 and 2. Findings were acknowledged or risk-accepted where they were
+application-level or specific to the `local` target. The run paused at planning on four gaps, fixed on
+`fix/cli-run-gaps`:
+
+- **Stale task IDs.** Every `nextTask` call issued a new task, so the ID in a scope prompt went stale when the owner
+  called `nextTask` again. `nextTask` now returns the issued task while the journal head, owner epoch and expiry are
+  unchanged.
+- **Interactive delegation.** The coordinator delegated the Planner through `task`. The four interactive specialists
+  now set `disable-model-invocation: true`, and `apex-next` routes a `status=task` result for them to `/agent`.
+- **Module versions.** The Planner had no source for exact module or API versions and refused to bind from memory. It
+  now holds `web_fetch`, limited by guidance to the public Bicep, Terraform and Azure template references.
+- **Local governance.** The Planner treated `local` governance as blocking after the kernel issued its task. Its
+  guidance now records kernel-accepted governance and accepted risks as plan assumptions.
+
+The next clean run uses a subscription-bound target with a reviewed governance baseline.
+
 ## Execution Rules
 
 The clean-install package regression now exercises local archetype listing, exact-commit inspection, independent copy,

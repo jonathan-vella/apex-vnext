@@ -4,6 +4,7 @@ description: Explains APEX previews and performs bounded reconciliation, invento
 model: gpt-5.6-terra
 model-policy: preferred
 user-invocable: true
+disable-model-invocation: true
 tools:
   - ask_user
   - task
