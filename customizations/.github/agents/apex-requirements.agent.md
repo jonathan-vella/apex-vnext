@@ -4,6 +4,7 @@ description: Gathers missing requirements decisions and submits a typed result t
 model: gpt-6-sol
 model-policy: preferred
 user-invocable: true
+disable-model-invocation: true
 tools:
   - ask_user
   - task

@@ -80,6 +80,7 @@ const CONFIG_SHAPES = {
 const FORBIDDEN_TOOL = /(^|\/)(shell|terminal|filesystem|fs|edit|write|git|azure|az|bicep|terraform)(\/|$)/i;
 const RETIRED_AGENT_FIELDS = ["argument-hint", "handoffs", "agents"];
 const RETIRED_AGENT_TOOLS = ["vscode/askQuestions", "agent"];
+const INTERACTIVE_WEB_TOOLS = ["web_fetch"];
 const SECRET_KEY = /(secret|password|passwd|token|privateKey|clientSecret|connectionString)/i;
 const SOURCE_IMPORT = /(?:from\s+|import\s*\()["']([^"']+)["']/g;
 const ARM_MCP_ENDPOINT = "https://mcp.management.azure.com";
@@ -724,6 +725,16 @@ function validateCustomizations(model, findings) {
         finding(findings, "customization.retired-field", `${name} uses retired VS Code field ${field}`, agent.path);
     for (const tool of array(frontmatter.tools)) {
       if (tool === "task" || tool === "ask_user") continue;
+      if (INTERACTIVE_WEB_TOOLS.includes(tool)) {
+        if (!interactive)
+          finding(
+            findings,
+            "customization.worker-read-tool",
+            `${name} is a hidden worker and cannot hold web tool ${tool}`,
+            agent.path,
+          );
+        continue;
+      }
       if (agentReadTools.includes(tool)) {
         if (!interactive)
           finding(

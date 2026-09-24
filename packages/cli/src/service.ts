@@ -2326,7 +2326,10 @@ export class ApexService {
           : undefined;
       if (pending !== undefined)
         return { status: "needs_input", request: await this.issueRequirementsInput(run, pending) };
-      return { status: "task", task: await this.issueTask(run, TASKS[0]!, []) };
+      return {
+        status: "task",
+        task: (await this.currentIssuedTask(run, events, TASKS[0]!.id)) ?? (await this.issueTask(run, TASKS[0]!, [])),
+      };
     }
     const route = await this.route(run, events);
     if (route.blockers.length > 0 && route.reviewGate !== undefined) {
@@ -2360,10 +2363,28 @@ export class ApexService {
       const task = await this.issueTask(run, route.task, await this.inputRefs(run, events, route.task));
       return { status: "needs_input", request: await this.issueArchitectureDecision(run, task) };
     }
+    const issued = await this.currentIssuedTask(run, events, route.task.id);
     return {
       status: "task",
-      task: await this.issueTask(run, route.task, await this.inputRefs(run, events, route.task)),
+      task: issued ?? (await this.issueTask(run, route.task, await this.inputRefs(run, events, route.task))),
     };
+  }
+
+  private async currentIssuedTask(
+    run: RunConfigV1,
+    events: EventV1[],
+    taskType: string,
+  ): Promise<TaskEnvelopeV1 | undefined> {
+    const last = events.at(-1);
+    const payload = last?.payload as { taskId?: unknown; taskType?: unknown } | undefined;
+    if (last?.type !== "task.issued" || payload?.taskType !== taskType || typeof payload.taskId !== "string")
+      return undefined;
+    const task = await this.readTask(run, payload.taskId);
+    return task.expectedHead === last.hash &&
+      task.ownerEpoch === run.ownerEpoch &&
+      Date.parse(task.expiresAt) > this.clock().getTime()
+      ? task
+      : undefined;
   }
 
   async recordInput(input: InputSubmissionV1): Promise<{ recorded: true; requestId: string }> {

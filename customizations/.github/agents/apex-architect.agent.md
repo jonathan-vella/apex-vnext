@@ -4,6 +4,7 @@ description: Resolves architecture trade-offs and submits a typed result to the 
 model: gpt-6-sol
 model-policy: preferred
 user-invocable: true
+disable-model-invocation: true
 tools:
   - ask_user
   - task
