@@ -17,6 +17,12 @@ test("classifyModel: Claude Opus 4.7 → claude-opus", () => {
   assert.equal(classifyModel(["Claude Opus 4.7"]), "claude-opus");
 });
 
+test("classifyModel: Copilot CLI Claude IDs keep their family", () => {
+  assert.equal(classifyModel("claude-opus-4.7"), "claude-opus");
+  assert.equal(classifyModel("claude-sonnet-5"), "claude-sonnet");
+  assert.equal(classifyModel("claude-haiku-4.5"), "claude-haiku");
+});
+
 test("classifyModel: Claude Sonnet 5 → claude-sonnet", () => {
   assert.equal(classifyModel("Claude Sonnet 5"), "claude-sonnet");
 });

@@ -63,9 +63,6 @@ jobs:
       - name: Test Python
         run: npm run test:python
 
-      - name: Verify Azure MCP beta freshness
-        run: npm run validate:azure-mcp-latest
-
       - name: Build vNext and run Node.js validators (CI-safe)
         run: npm run validate:_node-ci
 
@@ -75,6 +72,3 @@ jobs:
       - name: Qualify APEX vNext
         if: steps.scope.outputs.docs_only != 'true'
         run: npm run qualify:vnext
-
-      - name: Validate handoff references
-        run: bash tools/scripts/validate-handoff-references.sh

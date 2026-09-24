@@ -1,12 +1,13 @@
 ---
 name: APEX Requirements
 description: Gathers missing requirements decisions and submits a typed result to the APEX kernel.
-argument-hint: Describe the workload and constraints
-model: ["gpt-6-sol"]
+model: gpt-6-sol
+model-policy: preferred
 user-invocable: true
+disable-model-invocation: true
 tools:
-  - vscode/askQuestions
-  - agent
+  - ask_user
+  - task
   - apex/status
   - apex/nextTask
   - apex/recordInput
@@ -16,14 +17,6 @@ tools:
   - apex/reviewDecide
   - apex/gateDecide
   - azure-resource-manager-mcp/get_retail_prices
-agents:
-  - APEX Reviewer
-  - APEX Validator
-handoffs:
-  - label: Continue to architecture
-    agent: APEX Architect
-    prompt: "Input: active project and architecture task. Output: complete typed architecture through APEX MCP."
-    send: true
 ---
 
 # Goal

@@ -136,18 +136,20 @@ test("rejects a divergent CI validation entrypoint", () => {
   assert.ok(hasRule(result, "ci.validation-entrypoint"));
 });
 
-test("rejects a subagent model escalation", () => {
-  const result = mutate((model) => {
-    model.customization.manifest.roles.find(({ agent }) => agent === "APEX Reviewer").costTier = "premium";
-  });
-  assert.ok(hasRule(result, "customization.model-escalation"));
-});
-
-test("CLI distinguishes interactive handoffs from supported subagent edges", () => {
+test("rejects a subagent edge to an interactive role", () => {
   const result = mutate((model) => {
     model.customization.manifest.invocationEdges.find(
       ({ from, to }) => from === "APEX" && to === "APEX Requirements",
     ).type = "subagent";
+  });
+  assert.ok(hasRule(result, "customization.interactive-edge"));
+});
+
+test("CLI distinguishes interactive handoffs from supported subagent edges", () => {
+  const result = mutate((model) => {
+    model.customization.manifest.invocationEdges = model.customization.manifest.invocationEdges.filter(
+      ({ from, type }) => from !== "APEX" || type !== "subagent",
+    );
   });
   assert.ok(hasRule(result, "customization.cli-delegation"));
 });
@@ -161,13 +163,39 @@ test("CLI preserves an explicit worker invocation-disable boundary", () => {
   assert.ok(hasRule(result, "customization.cli-authority"));
 });
 
-test("rejects askQuestions on an autonomous subagent", () => {
+test("keeps native read tools off hidden workers", () => {
   const result = mutate((model) => {
     model.customization.agents
       .find(({ frontmatter }) => frontmatter.name === "APEX Reviewer")
-      .frontmatter.tools.push("vscode/askQuestions");
+      .frontmatter.tools.push("view");
+  });
+  assert.ok(hasRule(result, "customization.worker-read-tool"));
+  const planner = mutate(() => {});
+  assert.ok(!hasRule(planner, "customization.worker-read-tool"));
+});
+
+test("rejects ask_user on an autonomous subagent", () => {
+  const result = mutate((model) => {
+    model.customization.agents
+      .find(({ frontmatter }) => frontmatter.name === "APEX Reviewer")
+      .frontmatter.tools.push("ask_user");
   });
   assert.ok(hasRule(result, "customization.subagent-questions"));
+});
+
+test("rejects retired VS Code agent fields and tools", () => {
+  for (const retire of [
+    (frontmatter) => frontmatter.tools.push("vscode/askQuestions"),
+    (frontmatter) => frontmatter.tools.push("agent"),
+    (frontmatter) => (frontmatter.handoffs = []),
+    (frontmatter) => (frontmatter.agents = []),
+    (frontmatter) => (frontmatter["argument-hint"] = "Describe the workload"),
+  ]) {
+    const result = mutate((model) => {
+      retire(model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX Planner").frontmatter);
+    });
+    assert.ok(hasRule(result, "customization.retired-field"));
+  }
 });
 
 test("rejects target declarations in shared managed agent sources", () => {
@@ -193,62 +221,55 @@ test("rejects a missing MCP tool", () => {
 
 test("rejects a PATH-dependent MCP launch", () => {
   const result = mutate((model) => {
-    model.customization.vscodeMcp.servers.apex.command = "apex";
-    model.customization.vscodeMcp.servers.apex.args = ["mcp", "serve"];
+    model.customization.cliMcp.mcpServers.apex.command = "apex";
+    model.customization.cliMcp.mcpServers.apex.args = ["mcp", "serve"];
   });
-  assert.ok(hasRule(result, "mcp.launch"));
+  assert.ok(hasRule(result, "mcp.cli-launch"));
 });
 
-test("rejects ARM and Azure MCP launch drift", () => {
+test("rejects ARM MCP launch drift", () => {
   const endpointResult = mutate((model) => {
-    model.customization.vscodeMcp.servers["azure-resource-manager-mcp"].url = "https://example.invalid";
+    model.customization.cliMcp.mcpServers["azure-resource-manager-mcp"].url = "https://example.invalid";
   });
-  assert.ok(hasRule(endpointResult, "mcp.arm-launch"));
+  assert.ok(hasRule(endpointResult, "mcp.cli-arm-launch"));
 
   const toolsetResult = mutate((model) => {
-    model.customization.vscodeMcp.servers["azure-resource-manager-mcp"].headers["x-mcp-toolset"] = "Pricing";
+    model.customization.cliMcp.mcpServers["azure-resource-manager-mcp"].headers["x-mcp-toolset"] = "Pricing";
   });
-  assert.ok(hasRule(toolsetResult, "mcp.arm-launch"));
+  assert.ok(hasRule(toolsetResult, "mcp.cli-arm-launch"));
 
   const allowlistResult = mutate((model) => {
     model.customization.cliMcp.mcpServers["azure-resource-manager-mcp"].tools.push("create_budget");
   });
   assert.ok(hasRule(allowlistResult, "mcp.cli-arm-launch"));
-
-  const azureMcpResult = mutate((model) => {
-    model.customization.vscodeMcp.servers["azure-mcp-server"].args[0] =
-      "${workspaceFolder}/node_modules/@azure/mcp/index.js";
-  });
-  assert.ok(hasRule(azureMcpResult, "mcp.azure-launch"));
-
-  const azureMcpPackageResult = mutate((model) => {
-    model.packages.cli.manifest.dependencies["@azure/mcp"] = "3.0.0-beta.38";
-  });
-  assert.ok(hasRule(azureMcpPackageResult, "mcp.azure-package"));
-
-  const serverSetResult = mutate((model) => {
-    model.customization.vscodeMcp.servers.extra = { type: "stdio" };
-  });
-  assert.ok(hasRule(serverSetResult, "mcp.vscode-server-set"));
 });
 
 test("rejects client projection declaration and CLI allowlist drift", () => {
   const projectionResult = mutate((model) => {
-    model.customization.manifest.clientProjections.find(({ id }) => id === "github-copilot-vscode").files = [
-      ".github/mcp.json",
-    ];
+    model.customization.manifest.clientProjections[0].files = [".github/mcp.json"];
   });
   assert.ok(hasRule(projectionResult, "customization.client-projection"));
 
-  const combinedResult = mutate((model) => {
-    model.customization.manifest.clientProjections.find(({ id }) => id === "both").files = [".vscode/mcp.json"];
-  });
-  assert.ok(hasRule(combinedResult, "customization.client-projection"));
+  for (const id of ["github-copilot-vscode", "both"]) {
+    const retiredResult = mutate((model) => {
+      model.customization.manifest.clientProjections.push({
+        id,
+        generatedRoot: `client-projections/${id}`,
+        files: [".vscode/mcp.json"],
+      });
+    });
+    assert.ok(hasRule(retiredResult, "customization.schema"));
+  }
 
   const allowlistResult = mutate((model) => {
     model.customization.cliMcp.mcpServers.apex.tools.pop();
   });
   assert.ok(hasRule(allowlistResult, "mcp.cli-launch"));
+
+  const launchResult = mutate((model) => {
+    model.customization.cliMcp.mcpServers.apex.args = ["node_modules/@apexops/cli/dist/cli.js", "mcp", "serve"];
+  });
+  assert.ok(hasRule(launchResult, "mcp.cli-launch"));
 });
 
 test("rejects an unsafe managed path", () => {

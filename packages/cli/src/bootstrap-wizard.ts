@@ -57,11 +57,6 @@ export async function runBootstrapWizard(
     interaction.show(
       "APEX repository bootstrap. Enter cancel at any question to stop. Never enter tokens, passwords or client secrets.",
     );
-    const client = (await choose(
-      "Client [both/github-copilot-vscode/github-copilot-cli, default both]: ",
-      ["both", "github-copilot-vscode", "github-copilot-cli"],
-      "both",
-    )) as OnboardingConfigV1["client"];
     let directories = [root];
     if (await confirm("Copy one or more independent workloads from a remote COE?")) {
       const repository = await ask("Remote COE HTTPS URL (https://github.com/OWNER/REPO): ");
@@ -113,7 +108,7 @@ export async function runBootstrapWizard(
       const createRepository = await confirm("Initialize a local Git repository if none exists here?");
       const config: OnboardingConfigV1 = {
         schemaVersion: "1.0.0",
-        ...(client === undefined ? {} : { client }),
+        client: "github-copilot-cli",
         createRepository,
       };
       const service = serviceAt(directory);
@@ -131,10 +126,7 @@ export async function runBootstrapWizard(
         ))
       )
         return { status: "pending", progress, nextAction: "Workspace setup was not confirmed." };
-      const initialized = await service.bootstrap({
-        createRepository,
-        ...(client === undefined ? {} : { clientId: client }),
-      });
+      const initialized = await service.bootstrap({ createRepository, clientId: "github-copilot-cli" });
       progress.push({ directory, step: "local-bootstrap", outcome: initialized });
       if (await confirm("Create a GitHub repository and push this reviewed branch?")) {
         const owner = await ask("Repository owner (user or organization login): ");
@@ -247,7 +239,7 @@ export async function runBootstrapWizard(
       status: blocked ? "blocked" : "pending",
       progress,
       nextAction:
-        "Workspace setup is complete; no project was created. Open APEX (APEX CLI in the combined CLI installation) to gather details and create the first project. Complete pending governance and client checks. No deployment is authorized.",
+        "Workspace setup is complete; no project was created. Open APEX to gather details and create the first project. Complete pending governance and client checks. No deployment is authorized.",
     };
   } catch (error) {
     return {

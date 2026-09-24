@@ -21,13 +21,13 @@ test("unavailable Azure Functions recipe pack is absent", async () => {
   assert.deepEqual(manifest.recipePacks, []);
 });
 
-test("active recipe guidance is copied into both client projections", async () => {
+test("active recipe guidance is copied into the CLI projection", async () => {
   await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
   const customization = JSON.parse(await readFile(join(root, "customizations", "manifest.json"), "utf8"));
   for (const reference of managedReferences) assert.ok(customization.managedFiles.includes(reference), reference);
 
   const assets = JSON.parse(await readFile(join(root, "packages", "cli", "assets", "manifest.json"), "utf8"));
-  for (const clientId of ["github-copilot-vscode", "github-copilot-cli"]) {
+  for (const clientId of ["github-copilot-cli"]) {
     const projection = assets.projections.find((entry) => entry.id === clientId);
     assert.ok(projection, clientId);
     for (const reference of managedReferences) {

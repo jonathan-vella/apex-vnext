@@ -50,14 +50,9 @@ npm install --ignore-scripts --no-audit --no-fund \
 npx apex version --json
 ```
 
-Initialize VS Code with `apex init --client github-copilot-vscode`, standalone CLI with
-`--client github-copilot-cli`, or a combined managed installation with `--client both`.
-
-The combined preset installs both MCP configurations and keeps one update/rollback ownership record. VS Code profiles
-retain their APEX names; CLI profiles use `APEX CLI`, `APEX CLI Requirements` and corresponding role names, with
-`apex-cli-*.agent.md` filenames. Start the CLI coordinator with `copilot --agent apex-cli`. Each definition retains its
-client's exact model and tool contracts. Distinct names avoid relying on unsupported CLI `target` filtering or added-root
-precedence. Complete paired-client workflow qualification remains pending; CLI worker membership is unchanged.
+Initialize the workspace with `apex init`. It installs the Copilot CLI projection and `.mcp.json`, which standalone
+Copilot CLI and the VS Code Copilot harness both use; `github-copilot-cli` is the only client value. Start the
+coordinator with `copilot --agent apex`.
 
 For an approved registry release, follow [Publish npm Packages](publish-npm.md) before using the published bootstrap
 route.
@@ -65,11 +60,11 @@ route.
 ## Bootstrap A Workspace
 
 Run `apex bootstrap` (or `apex-bootstrap` after machine installation) in an interactive terminal to start guided setup.
-`apex bootstrap wizard` selects the same flow explicitly. Choose either or both clients, optionally supply a remote
-COE URL and exact commit, select one or more listed workload numbers, and review each copy and workspace installation
-plan before confirming it. Bootstrap does not ask for or invent a project ID, environment, workload target or IaC track.
-Each selected copy uses a separate workspace; the APEX agent gathers details and creates the first project later.
-Enter `cancel` to stop; completed copies and configured workspaces are retained. Declining a plan does not execute it.
+`apex bootstrap wizard` selects the same flow explicitly. Optionally supply a remote COE URL and exact commit, select
+one or more listed workload numbers, and review each copy and workspace installation plan before confirming it.
+Bootstrap does not ask for or invent a project ID, environment, workload target or IaC track. Each selected copy uses
+a separate workspace; the APEX agent gathers details and creates the first project later. Enter `cancel` to stop;
+completed copies and configured workspaces are retained. Declining a plan does not execute it.
 
 The wizard can collect consumer-governance identity inputs and display the evidence-bound OIDC plan, or record that a
 central reviewed baseline will be used. Target-bound baseline checks are deferred until a project and target exist;
@@ -83,7 +78,7 @@ Automation must use the typed plan/import/bootstrap commands; the wizard rejects
 Inspect local initialization prerequisites without changing files or running commands:
 
 ```bash
-apex bootstrap plan --client both --create-repo --json
+apex bootstrap plan --create-repo --json
 ```
 
 This bounded preflight checks the local Git boundary, workspace APEX package version and existing APEX state. It returns
@@ -99,15 +94,15 @@ OIDC setup remain under implementation. Their acceptance contract is
 
 For a published package, use either a global CLI or a one-shot command. These routes are unavailable until
 `@apexops/cli` is published to your approved npm registry. Both routes install the exact APEX CLI as a workspace
-`devDependency`, update the npm lockfile, and create one selected client projection.
+`devDependency`, update the npm lockfile, and install the CLI projection.
 
 ```bash
 npm install -g @apexops/cli
-apex bootstrap --client github-copilot-vscode --create-repo --yes
+apex bootstrap --create-repo --yes
 ```
 
 ```bash
-npx --yes @apexops/cli bootstrap --client github-copilot-cli --create-repo --yes
+npx --yes @apexops/cli bootstrap --create-repo --yes
 ```
 
 Omit `--create-repo` only when the workspace already has a `.git` boundary. Omitting `--project` leaves the workspace
@@ -122,23 +117,11 @@ selected project and client; incompatible packages, manual managed-file edits or
 This only reuses completed local initialization. It does not yet resume interrupted COE, GitHub or OIDC provisioning,
 change the selected run, adopt conflicting files or repair partial state automatically.
 
-## Install The VS Code Bootstrap Agent
+## Use The Projection In VS Code
 
-The optional VS Code profile agent appears before a workspace APEX projection exists. It only guides and launches the
-same bootstrap command; it does not own MCP configuration, `.apex` state, approvals, or deployment.
-
-```bash
-apex profile install --client github-copilot-vscode --yes
-```
-
-In VS Code, select **APEX Bootstrap**, complete its questions, reload the window, and then select the workspace
-**APEX** agent. Manage the profile agent explicitly:
-
-```bash
-apex profile status --client github-copilot-vscode
-apex profile update --client github-copilot-vscode --yes
-apex profile uninstall --client github-copilot-vscode --yes
-```
+Open the workspace in VS Code, start a chat with the session target set to Copilot, and pick an APEX agent in the Agent
+picker. The VS Code Copilot harness reads the workspace `.mcp.json`. Over WSL, VS Code `1.139.0` with Copilot Chat
+`0.67.0` does not apply a picked agent yet; use standalone Copilot CLI there.
 
 The release-blocking end-user lifecycle scenarios are listed in the
 [VS Code installation lifecycle matrix](../vnext/CLIENT-QUALIFICATION.md#vs-code-installation-lifecycle). Run them in
@@ -158,6 +141,11 @@ remain pinned to their original generation and continue without deleting `.apex`
 
 Use `--customizations-source /absolute/path` only to test a deliberate local source bundle. Later updates of that
 selection require the same source.
+
+A workspace that still selects the retired VS Code projection fails `init` and `update` with `APEX_VALIDATION` and
+reason `CLIENT_PROJECTION_RETIRED`. Run `npx apex init --client github-copilot-cli --json` there to remove unchanged
+retired files and install the CLI projection; projects and runs are kept. Edited retired files stop the switch with
+`APEX_CONFLICT` and are listed; move them and run the command again.
 
 ## Roll Back Managed Files
 
@@ -193,8 +181,9 @@ follow the [governance baseline requirements](../vnext/PRD.md#req-gov-001-govern
 
 npm remains the current runtime delivery mechanism. Agent Plugins and easy APEX MCP redistribution are evaluated
 [at the end of feature delivery](../vnext/ROADMAP.md#phase-6-distribution-last). No plugin installation command is promised
-yet. The eventual path must cover both clients, the correct workspace, authentication, runtime dependencies, version
-compatibility and safe update/upgrade/rollback/uninstall without a second updater managing the same files.
+yet. The eventual path must cover standalone Copilot CLI and the VS Code harness, the correct workspace,
+authentication, runtime dependencies, version compatibility and safe update/upgrade/rollback/uninstall without a
+second updater managing the same files.
 
 Plugin removal must not accidentally remove consumer project state. Updating APEX does not automatically migrate
 persisted contracts, reconcile consumer design changes, or approve an infrastructure operation.

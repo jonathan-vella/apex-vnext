@@ -41,6 +41,7 @@
     ".github/instructions/apex-python.instructions.md",
     ".github/instructions/apex-shell.instructions.md",
     ".github/skills/apex-workflow/SKILL.md",
+    ".github/skills/apex-next/SKILL.md",
     ".github/skills/apex-requirements/SKILL.md",
     ".github/skills/apex-architecture/SKILL.md",
     ".github/skills/apex-planning/SKILL.md",
@@ -151,8 +152,7 @@
     ".github/skills/apex-artifacts/templates/operations-runbook.md",
     ".github/skills/apex-artifacts/templates/resource-inventory.md",
     ".github/copilot-instructions.md",
-    ".github/mcp.json",
-    ".vscode/mcp.json"
+    ".mcp.json"
   ],
   "sharedFiles": [
     ".github/copilot-instructions.md",
@@ -163,19 +163,9 @@
   "sharedDirectories": [".github/instructions", ".github/skills"],
   "clientProjections": [
     {
-      "id": "github-copilot-vscode",
-      "generatedRoot": "client-projections/github-copilot-vscode",
-      "files": [".vscode/mcp.json"]
-    },
-    {
       "id": "github-copilot-cli",
       "generatedRoot": "client-projections/github-copilot-cli",
-      "files": [".github/mcp.json"]
-    },
-    {
-      "id": "both",
-      "generatedRoot": "client-projections/both",
-      "files": [".vscode/mcp.json", ".github/mcp.json"]
+      "files": [".mcp.json"]
     }
   ],
   "roles": [
@@ -184,80 +174,72 @@
       "source": ".github/agents/apex.agent.md",
       "agent": "APEX",
       "role": "coordinator",
-      "supportedTargets": ["vscode", "github-copilot"],
+      "supportedTargets": ["github-copilot"],
       "interactionType": "interactive-handoff",
-      "model": "MAI-Code-1.1-Flash (copilot)",
-      "costTier": "fast"
+      "model": "mai-code-1.1-flash"
     },
     {
       "id": "requirements",
       "source": ".github/agents/apex-requirements.agent.md",
       "agent": "APEX Requirements",
       "role": "requirements",
-      "supportedTargets": ["vscode", "github-copilot"],
+      "supportedTargets": ["github-copilot"],
       "interactionType": "interactive-handoff",
-      "model": "gpt-6-sol",
-      "costTier": "standard"
+      "model": "gpt-6-sol"
     },
     {
       "id": "architecture",
       "source": ".github/agents/apex-architect.agent.md",
       "agent": "APEX Architect",
       "role": "architecture",
-      "supportedTargets": ["vscode", "github-copilot"],
+      "supportedTargets": ["github-copilot"],
       "interactionType": "interactive-handoff",
-      "model": "gpt-6-sol",
-      "costTier": "premium"
+      "model": "gpt-6-sol"
     },
     {
       "id": "planning",
       "source": ".github/agents/apex-planner.agent.md",
       "agent": "APEX Planner",
       "role": "planning",
-      "supportedTargets": ["vscode", "github-copilot"],
+      "supportedTargets": ["github-copilot"],
       "interactionType": "interactive-handoff",
-      "model": "gpt-6-sol",
-      "costTier": "premium"
+      "model": "gpt-6-sol"
     },
     {
       "id": "operations",
       "source": ".github/agents/apex-operator.agent.md",
       "agent": "APEX Operator",
       "role": "operations",
-      "supportedTargets": ["vscode", "github-copilot"],
+      "supportedTargets": ["github-copilot"],
       "interactionType": "interactive-handoff",
-      "model": "GPT-5.6 Terra",
-      "costTier": "premium"
+      "model": "gpt-5.6-terra"
     },
     {
       "id": "code-generation",
       "source": ".github/agents/apex-codegen.agent.md",
       "agent": "APEX CodeGen",
       "role": "code-generation",
-      "supportedTargets": ["vscode", "github-copilot"],
+      "supportedTargets": ["github-copilot"],
       "interactionType": "autonomous-subagent",
-      "model": "gpt-6-luna",
-      "costTier": "standard"
+      "model": "gpt-6-luna"
     },
     {
       "id": "review",
       "source": ".github/agents/apex-reviewer.agent.md",
       "agent": "APEX Reviewer",
       "role": "review",
-      "supportedTargets": ["vscode", "github-copilot"],
+      "supportedTargets": ["github-copilot"],
       "interactionType": "autonomous-subagent",
-      "model": "gpt-6-luna",
-      "costTier": "standard"
+      "model": "gpt-6-luna"
     },
     {
       "id": "validation",
       "source": ".github/agents/apex-validator.agent.md",
       "agent": "APEX Validator",
       "role": "validation",
-      "supportedTargets": ["vscode", "github-copilot"],
+      "supportedTargets": ["github-copilot"],
       "interactionType": "autonomous-subagent",
-      "model": "gpt-6-luna",
-      "costTier": "standard"
+      "model": "gpt-6-luna"
     }
   ],
   "invocationEdges": [
@@ -268,6 +250,9 @@
     { "from": "APEX Requirements", "to": "APEX Architect", "type": "handoff" },
     { "from": "APEX Architect", "to": "APEX Planner", "type": "handoff" },
     { "from": "APEX Planner", "to": "APEX Operator", "type": "handoff" },
+    { "from": "APEX", "to": "APEX CodeGen", "type": "subagent" },
+    { "from": "APEX", "to": "APEX Reviewer", "type": "subagent" },
+    { "from": "APEX", "to": "APEX Validator", "type": "subagent" },
     { "from": "APEX Requirements", "to": "APEX Reviewer", "type": "subagent" },
     { "from": "APEX Requirements", "to": "APEX Validator", "type": "subagent" },
     { "from": "APEX Architect", "to": "APEX Reviewer", "type": "subagent" },
@@ -276,7 +261,6 @@
     { "from": "APEX Planner", "to": "APEX Reviewer", "type": "subagent" },
     { "from": "APEX Planner", "to": "APEX Validator", "type": "subagent" },
     { "from": "APEX Operator", "to": "APEX Reviewer", "type": "subagent" },
-    { "from": "APEX Operator", "to": "APEX Validator", "type": "subagent" },
-    { "from": "APEX CodeGen", "to": "APEX Validator", "type": "subagent" }
+    { "from": "APEX Operator", "to": "APEX Validator", "type": "subagent" }
   ]
 }

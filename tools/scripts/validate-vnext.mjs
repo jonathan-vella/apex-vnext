@@ -17,7 +17,6 @@ import { GENERATED_SHARED_FILES } from "../../packages/cli/scripts/prepare-asset
 
 const REQUIRED_PACKAGES = ["contracts", "kernel", "capabilities", "renderers", "testkit", "cli"];
 const CORE_PACKAGES = new Set(["kernel", "capabilities", "renderers"]);
-const COST_TIERS = { fast: 0, standard: 1, premium: 2 };
 const CONFIG_SHAPES = {
   "workflow.v1.json": [
     "schemaVersion",
@@ -79,11 +78,13 @@ const CONFIG_SHAPES = {
   ],
 };
 const FORBIDDEN_TOOL = /(^|\/)(shell|terminal|filesystem|fs|edit|write|git|azure|az|bicep|terraform)(\/|$)/i;
+const RETIRED_AGENT_FIELDS = ["argument-hint", "handoffs", "agents"];
+const RETIRED_AGENT_TOOLS = ["vscode/askQuestions", "agent"];
+const INTERACTIVE_WEB_TOOLS = ["web_fetch"];
 const SECRET_KEY = /(secret|password|passwd|token|privateKey|clientSecret|connectionString)/i;
 const SOURCE_IMPORT = /(?:from\s+|import\s*\()["']([^"']+)["']/g;
 const ARM_MCP_ENDPOINT = "https://mcp.management.azure.com";
 const ARM_MCP_TOOLSET = "CostManagement,Pricing";
-const AZURE_MCP_PACKAGE_VERSION = "3.0.0-beta.46";
 const ARM_MCP_READ_TOOLS = [
   "get_retail_prices",
   "query_costs",
@@ -100,6 +101,7 @@ const ARM_MCP_READ_TOOLS = [
 
 const clone = (value) => structuredClone(value);
 const array = (value) => (Array.isArray(value) ? value : []);
+const modelIds = (value) => (typeof value === "string" ? [value] : array(value));
 const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const relative = (root, file) => path.relative(root, file).split(path.sep).join("/");
 const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));
@@ -232,8 +234,7 @@ export function loadRepositoryModel(root = process.cwd()) {
         content: readFileSync(file, "utf8"),
         frontmatter: parseFrontmatter(readFileSync(file, "utf8")),
       })),
-      vscodeMcp: readJson(path.join(root, "customizations", ".vscode", "mcp.json")),
-      cliMcp: readJson(path.join(root, "customizations", ".github", "mcp.json")),
+      cliMcp: readJson(path.join(root, "customizations", ".mcp.json")),
     },
     contracts: {
       registry: parseContractRegistry(contractSource),
@@ -576,12 +577,7 @@ function validateCustomizations(model, findings) {
   const sharedDirectories = array(customization.manifest.sharedDirectories);
   const skillCoveredByDirectory = (file) => sharedDirectories.some((directory) => file.startsWith(`${directory}/`));
   const expectedProjectionFiles = new Map([
-    [
-      "github-copilot-vscode",
-      { files: [".vscode/mcp.json"], generatedRoot: "client-projections/github-copilot-vscode" },
-    ],
-    ["github-copilot-cli", { files: [".github/mcp.json"], generatedRoot: "client-projections/github-copilot-cli" }],
-    ["both", { files: [".vscode/mcp.json", ".github/mcp.json"], generatedRoot: "client-projections/both" }],
+    ["github-copilot-cli", { files: [".mcp.json"], generatedRoot: "client-projections/github-copilot-cli" }],
   ]);
   const expectedAgentFiles = new Set(customization.agents.map(({ path: file }) => file));
   const expectedFiles = new Set([
@@ -644,7 +640,7 @@ function validateCustomizations(model, findings) {
     finding(
       findings,
       "customization.client-projection",
-      "Installation presets must exactly cover VS Code, Copilot CLI and their combined selection",
+      "Installation presets must cover exactly the github-copilot-cli projection",
       "customizations/manifest.json",
     );
   const manifestRoles = array(customization.manifest.roles);
@@ -684,6 +680,9 @@ function validateCustomizations(model, findings) {
         `${skill.path} needs name and description frontmatter`,
         skill.path,
       );
+  const agentReadTools = array(
+    readJson(path.join(model.root, "tools", "registry", "copilot-cli-agent-tools.json")).agentReadTools,
+  );
   for (const [name, agent] of agents) {
     const frontmatter = agent.frontmatter;
     const role = roles.get(name);
@@ -691,7 +690,7 @@ function validateCustomizations(model, findings) {
       !frontmatter ||
       !name ||
       !frontmatter.description ||
-      !array(frontmatter.model).length ||
+      !modelIds(frontmatter.model).length ||
       typeof frontmatter["user-invocable"] !== "boolean"
     )
       finding(findings, "customization.frontmatter", `${agent.path} has incomplete frontmatter`, agent.path);
@@ -699,76 +698,63 @@ function validateCustomizations(model, findings) {
       finding(
         findings,
         "customization.source-target",
-        `${agent.path} must omit target because it is shared by both client projections`,
+        `${agent.path} must omit target; the CLI projection sets it`,
         agent.path,
       );
     if (!role)
       finding(findings, "customization.role-reference", `${name} has no manifest role`, "customizations/manifest.json");
-    if (role && (!array(frontmatter.model).includes(role.model) || !(role.costTier in COST_TIERS)))
+    if (role && !modelIds(frontmatter.model).includes(role.model))
       finding(
         findings,
         "customization.model-role",
-        `${name} frontmatter model or cost tier disagrees with its manifest role`,
+        `${name} frontmatter model disagrees with its manifest role`,
         agent.path,
       );
     const interactive = role?.interactionType === "interactive-handoff";
     if (interactive && frontmatter["user-invocable"] !== true)
       finding(findings, "customization.interactive", `${name} must be user-invocable`, agent.path);
-    if (
-      !interactive &&
-      (frontmatter["user-invocable"] !== false || array(frontmatter.tools).includes("vscode/askQuestions"))
-    )
+    if (!interactive && (frontmatter["user-invocable"] !== false || array(frontmatter.tools).includes("ask_user")))
       finding(
         findings,
         "customization.subagent-questions",
         `${name} is autonomous and cannot ask questions or be user-invocable`,
         agent.path,
       );
+    for (const field of RETIRED_AGENT_FIELDS)
+      if (frontmatter && field in frontmatter)
+        finding(findings, "customization.retired-field", `${name} uses retired VS Code field ${field}`, agent.path);
     for (const tool of array(frontmatter.tools)) {
-      if (tool === "agent" || tool === "vscode/askQuestions") continue;
-      if (FORBIDDEN_TOOL.test(tool))
+      if (tool === "task" || tool === "ask_user") continue;
+      if (INTERACTIVE_WEB_TOOLS.includes(tool)) {
+        if (!interactive)
+          finding(
+            findings,
+            "customization.worker-read-tool",
+            `${name} is a hidden worker and cannot hold web tool ${tool}`,
+            agent.path,
+          );
+        continue;
+      }
+      if (agentReadTools.includes(tool)) {
+        if (!interactive)
+          finding(
+            findings,
+            "customization.worker-read-tool",
+            `${name} is a hidden worker and cannot hold native read tool ${tool}`,
+            agent.path,
+          );
+        continue;
+      }
+      if (RETIRED_AGENT_TOOLS.includes(tool))
+        finding(findings, "customization.retired-field", `${name} uses retired VS Code tool ${tool}`, agent.path);
+      else if (FORBIDDEN_TOOL.test(tool))
         finding(findings, "customization.forbidden-tool", `${name} references forbidden tool ${tool}`, agent.path);
       else if (!allowedMcp.has(tool))
         finding(findings, "customization.mcp-tool", `${name} references unknown MCP tool ${tool}`, agent.path);
     }
-    for (const handoff of array(frontmatter.handoffs)) {
-      if (
-        !agents.has(handoff.agent) ||
-        !/\bInput:/i.test(handoff.prompt ?? "") ||
-        !/\bOutput:/i.test(handoff.prompt ?? "")
-      )
-        finding(
-          findings,
-          "customization.handoff",
-          `${name} has an invalid handoff to ${handoff.agent ?? "<missing>"}`,
-          agent.path,
-        );
-    }
-    for (const child of array(frontmatter.agents))
-      if (!agents.has(child))
-        finding(findings, "customization.agent-reference", `${name} references unknown child ${child}`, agent.path);
   }
 
   const declaredEdges = array(customization.manifest.invocationEdges);
-  const vscodeRoot = path.join(model.root, "packages", "cli", "assets", "client-projections", "github-copilot-vscode");
-  const vscodeAgents = walk(path.join(vscodeRoot, ".github", "agents"), (file) => file.endsWith(".agent.md"));
-  for (const file of vscodeAgents) {
-    const projectionPath = relative(vscodeRoot, file);
-    const repositoryPath = relative(model.root, file);
-    const { frontmatter, error } = parseProjectionFrontmatter(readFileSync(file, "utf8"));
-    if (error) {
-      finding(findings, "customization.vscode-agent-frontmatter", `${repositoryPath}: ${error}`, repositoryPath);
-      continue;
-    }
-    if (frontmatter?.target !== "vscode") {
-      finding(
-        findings,
-        "customization.vscode-agent-target",
-        `${projectionPath} must declare target: vscode`,
-        repositoryPath,
-      );
-    }
-  }
   const cliRoot = path.join(model.root, "packages", "cli", "assets", "client-projections", "github-copilot-cli");
   const cliAgents = walk(path.join(cliRoot, ".github", "agents"), (file) => file.endsWith(".agent.md"));
   for (const file of cliAgents) {
@@ -850,20 +836,6 @@ function validateCustomizations(model, findings) {
       "customizations/manifest.json",
     );
   }
-  const sourceEdgeKeys = customization.agents.flatMap(({ frontmatter }) => [
-    ...array(frontmatter?.handoffs).map(({ agent }) => `${frontmatter.name}\0${agent}\0handoff`),
-    ...array(frontmatter?.agents).map((agent) => `${frontmatter.name}\0${agent}\0subagent`),
-  ]);
-  for (const key of new Set([...declaredEdgeKeys, ...sourceEdgeKeys])) {
-    if (!declaredEdgeKeys.includes(key) || !sourceEdgeKeys.includes(key)) {
-      finding(
-        findings,
-        "customization.edge-source-drift",
-        `Manifest and source invocation edge disagree: ${key.replaceAll("\0", " -> ")}`,
-        "customizations/manifest.json",
-      );
-    }
-  }
   for (const edge of declaredEdges) {
     const parent = roles.get(edge.from);
     const child = roles.get(edge.to);
@@ -876,20 +848,11 @@ function validateCustomizations(model, findings) {
       );
       continue;
     }
-    const requiresHandoff =
-      child.interactionType === "interactive-handoff" || COST_TIERS[child.costTier] > COST_TIERS[parent.costTier];
-    if (requiresHandoff && edge.type !== "handoff")
+    if (child.interactionType === "interactive-handoff" && edge.type !== "handoff")
       finding(
         findings,
-        "customization.model-escalation",
+        "customization.interactive-edge",
         `${edge.from} -> ${edge.to} must be a handoff`,
-        "customizations/manifest.json",
-      );
-    if (edge.type === "subagent" && COST_TIERS[child.costTier] > COST_TIERS[parent.costTier])
-      finding(
-        findings,
-        "customization.model-escalation",
-        `Subagent ${edge.to} exceeds parent ${edge.from} cost tier`,
         "customizations/manifest.json",
       );
   }
@@ -918,75 +881,14 @@ function validateCustomizations(model, findings) {
 }
 
 function validateMcp(model, findings) {
-  const servers = model.customization.vscodeMcp.servers;
-  const expectedVscodeServers = ["apex", "azure-resource-manager-mcp", "azure-mcp-server"];
-  if (JSON.stringify(Object.keys(servers ?? {}).sort()) !== JSON.stringify(expectedVscodeServers.sort()))
-    finding(
-      findings,
-      "mcp.vscode-server-set",
-      "Managed VS Code MCP config must declare exactly the APEX, ARM, and Azure MCP servers",
-      "customizations/.vscode/mcp.json",
-    );
-  const apex = servers?.apex;
-  const armMcp = servers?.["azure-resource-manager-mcp"];
-  const azureMcp = servers?.["azure-mcp-server"];
-  if (
-    !apex ||
-    apex.type !== "stdio" ||
-    apex.command !== "node" ||
-    JSON.stringify(apex.args) !==
-      JSON.stringify(["${workspaceFolder}/node_modules/@apexops/cli/dist/cli.js", "mcp", "serve"]) ||
-    apex.cwd !== "${workspaceFolder}" ||
-    (apex.env && Object.keys(apex.env).length > 0)
-  )
-    finding(
-      findings,
-      "mcp.launch",
-      "Managed MCP config must launch the workspace-local APEX CLI through Node without environment secrets",
-      "customizations/.vscode/mcp.json",
-    );
-  if (
-    !armMcp ||
-    armMcp.type !== "http" ||
-    armMcp.url !== ARM_MCP_ENDPOINT ||
-    JSON.stringify(armMcp.headers) !== JSON.stringify({ "x-mcp-toolset": ARM_MCP_TOOLSET })
-  )
-    finding(
-      findings,
-      "mcp.arm-launch",
-      "Managed MCP config must connect directly to Microsoft ARM MCP with the exact toolset header",
-      "customizations/.vscode/mcp.json",
-    );
-  if (
-    !azureMcp ||
-    azureMcp.type !== "stdio" ||
-    azureMcp.command !== "node" ||
-    JSON.stringify(azureMcp.args) !==
-      JSON.stringify(["${workspaceFolder}/node_modules/@apexops/cli/dist/azure-mcp.js"]) ||
-    azureMcp.cwd !== "${workspaceFolder}" ||
-    (azureMcp.env && Object.keys(azureMcp.env).length > 0)
-  )
-    finding(
-      findings,
-      "mcp.azure-launch",
-      "Managed VS Code config must launch the workspace-local Azure MCP shim without environment secrets",
-      "customizations/.vscode/mcp.json",
-    );
-  if (model.packages.cli.manifest.dependencies?.["@azure/mcp"] !== AZURE_MCP_PACKAGE_VERSION)
-    finding(
-      findings,
-      "mcp.azure-package",
-      "CLI package must pin the Azure MCP dependency used by the VS Code MCP shim",
-      "packages/cli/package.json",
-    );
   const cliServers = model.customization.cliMcp.mcpServers;
   const cliApex = cliServers && Object.keys(cliServers).length === 2 ? cliServers.apex : undefined;
   const cliArmMcp = cliServers?.["azure-resource-manager-mcp"];
   if (
     !cliApex ||
     cliApex.type !== "local" ||
-    cliApex.command !== "node" ||
-    JSON.stringify(cliApex.args) !== JSON.stringify(["node_modules/@apexops/cli/dist/cli.js", "mcp", "serve"]) ||
+    cliApex.command !== "npx" ||
+    JSON.stringify(cliApex.args) !== JSON.stringify(["--no", "apex", "mcp", "serve"]) ||
     Object.keys(cliApex.env ?? {}).length > 0 ||
     JSON.stringify(cliApex.tools) !== JSON.stringify(model.mcpTools)
   )
@@ -994,7 +896,7 @@ function validateMcp(model, findings) {
       findings,
       "mcp.cli-launch",
       "Managed Copilot CLI MCP config must launch the workspace-local APEX CLI with the exact tool allowlist",
-      "customizations/.github/mcp.json",
+      "customizations/.mcp.json",
     );
   if (
     !cliArmMcp ||
@@ -1007,7 +909,7 @@ function validateMcp(model, findings) {
       findings,
       "mcp.cli-arm-launch",
       "Managed Copilot CLI config must connect directly to ARM MCP with the exact read-only tool allowlist",
-      "customizations/.github/mcp.json",
+      "customizations/.mcp.json",
     );
 }
 

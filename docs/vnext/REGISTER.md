@@ -9,7 +9,9 @@ and the repository archives.
 - **Impact:** Managed agents, input handling, MCP discovery, or routing may differ from deterministic projections.
 - **Mitigation:** Bind observed client versions and hashes; run the complete client matrix on the exact candidate.
 - **State:** Open
-- **Closure proof:** Current VS Code and Copilot CLI evidence satisfies [CLIENT-QUALIFICATION.md](CLIENT-QUALIFICATION.md).
+- **Closure proof:** Exact-candidate standalone Copilot CLI and VS Code Copilot harness evidence satisfies
+  [CLIENT-QUALIFICATION.md](CLIENT-QUALIFICATION.md). The slice 1 probes only characterize the clients, and the harness
+  cannot qualify until picked agents apply.
 
 ## RISK-002: Live Cloud Behavior Can Differ From Deterministic Providers
 
@@ -134,22 +136,55 @@ and the repository archives.
 - **Closure proof:** All registered results validate, cancellation/retry tests preserve committed-state semantics,
   and both supported clients have evidence for the exact negotiated protocol and candidate.
 
+## RISK-014: Retiring The VS Code Local Projection Can Strand Consumers Or Lose Mechanics
+
+- **Owner:** Client experience and CLI lifecycle maintainers
+- **Impact:** Existing VS Code installations lose their managed agents. Handoff buttons, native multi-select, per-parent
+  agent allowlists and `.vscode/mcp.json` servers disappear, and the VS Code Agent Host does not forward servers that
+  need interactive `${input:...}` values.
+- **Mitigation:** Apply [DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection) through DECISION-015
+  gates. Retired client values fail validation with reason `CLIENT_PROJECTION_RETIRED`; there is no automatic
+  migration, and only an explicit `apex init --client github-copilot-cli` swaps the managed files. Replace
+  handoffs with `apex-next`, multi-select with native checkboxes or kernel-validated numbered selection, and allowlists
+  with kernel task ownership and scoped tools. The archive under `.archive/vscode-projection/` records rollback notes,
+  stays out of packaging, and `retired-paths.v1.json` keeps the former live paths absent.
+- **State:** Open; standalone CLI partially qualified in slice 11; VS Code harness blocked on WSL
+- **Closure proof:** Rejection and reintroduction tests pass, archive provenance and rollback notes are recorded, and
+  standalone CLI and VS Code Copilot harness qualification passes on the same candidate.
+
+## RISK-015: Built-In Helper Output Can Be Mistaken For Evidence
+
+- **Owner:** Managed customization and kernel maintainers
+- **Impact:** Explore, Rubber-duck, Code-review, Security-review, built-in Task or Research output could be treated as
+  review completion, validation evidence or approval. Built-in models are set per user and add cost.
+- **Mitigation:** Keep helpers advisory. Managed agents use only Explore, which receives just `view`, `glob` and
+  `rg`. Rubber-duck, Code-review and Security-review inherit the caller's APEX completion and disposition tools, so
+  they stay out until the CLI scopes helper tools. Validator has no shell. The owning APEX agent restates findings as
+  typed kernel input with verified file and line references. The kernel continues to reject unexecuted or simulated
+  evidence. Document per-user model overrides.
+- **State:** Open; standalone CLI partially qualified in slice 11; VS Code harness blocked on WSL
+- **Closure proof:** Projection tests cover helper grants, negative tests show helper output alone cannot complete a
+  task or open a gate, and CLI probes cover each granted helper path. Slice 6 covers Explore; the other helpers need
+  CLI tool scoping first.
+
 ## ASSUMPTION-001: Supported Clients Can Share Typed Outcomes
 
 ### Active Scope And CLI Worker Evidence
 
-As of 2026-09-21, only VS Code Local and standalone Copilot CLI are active release clients. Desktop-app work is
-[deferred](ROADMAP.md#deferred-standalone-copilot-desktop-app); preserve its evidence without inferring CLI parity.
-Revised ADR-0006 removes direct-selection visibility as a security prerequisite. The `1.0.86` probe confirmed direct
-selection; subsequent runtime and CLI-to-MCP checks rejected invalid/stale tasks without state changes and accepted a
-valid review without gate approval. This does not authenticate independent reviewers or qualify all production workers.
+As of 2026-09-23, DECISION-029 makes standalone Copilot CLI and the VS Code Copilot harness the target release clients,
+both running one CLI projection. Since slice 4, `apex init` installs only that projection. Desktop-app
+work is [deferred](ROADMAP.md#deferred-standalone-copilot-desktop-app); preserve its evidence without inferring CLI
+parity. CLI CodeGen, Reviewer and Validator ship since adapter `1.6.0` under revised ADR-0006; kernel checks, not
+profile visibility, remain the security boundary. This does not authenticate independent reviewers or qualify every
+production worker path.
 Owner: client experience and kernel maintainers. Closure requires actual generation/review/validation and parent-routing
 evidence with unchanged scoped permissions. Generic delegation and visibility-only probes are not closure.
 
 - **Owner:** Client experience
-- **Assumption:** VS Code and Copilot CLI can produce equivalent kernel outcomes for their shared supported interactions.
-- **Constraint:** Copilot CLI autonomous workers remain omitted; required generation/review/validation outcomes still
-  need a supported path. Unavailable mechanics cannot be inferred as passing.
+- **Assumption:** Standalone Copilot CLI and the VS Code Copilot harness produce equivalent kernel outcomes from the same
+  CLI-format agents.
+- **Constraint:** Shared agent format does not prove Agent Host behavior; the VS Code Copilot harness is qualified
+  separately. Unavailable mechanics cannot be inferred as passing.
 - **State:** Pending current-candidate proof
 
 ## ASSUMPTION-002: Equal IaC Support Means Equivalent Governed Outcomes
