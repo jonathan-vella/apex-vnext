@@ -90,7 +90,12 @@ test("nextTask returns the issued task until the journal moves", async () => {
   await service.completeRequirements(first.task.taskId, requirements());
   const next = await service.nextTask();
   assert.equal(next.status, "task");
-  if (next.status === "task") assert.notEqual(next.task.taskId, first.task.taskId);
+  if (next.status !== "task") return;
+  assert.notEqual(next.task.taskId, first.task.taskId);
+  for (const reader of [service, new ApexService(root)]) {
+    const again = await reader.nextTask();
+    assert.equal(again.status === "task" && again.task.taskId, next.task.taskId);
+  }
 });
 
 test("requirements change preview binds retained decisions and leaves workflow and files unchanged", async () => {
