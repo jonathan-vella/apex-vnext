@@ -274,6 +274,7 @@ test("managed role projections retain required tools and exclude unrelated grant
   };
   const readTools = ["view", "glob", "rg"];
   const explorers = ["planning", "operations"];
+  const webTools = { planning: ["web_fetch"] };
   assert.deepEqual(manifest.roles.map(({ id }) => id).sort(), Object.keys(requiredApex).sort());
   for (const client of ["github-copilot-cli"]) {
     for (const role of manifest.roles) {
@@ -329,7 +330,12 @@ test("managed role projections retain required tools and exclude unrelated grant
         );
       }
       assert.ok(!metadata.tools.some((tool) => /^(bash|shell)/u.test(tool)), `${label}: no shell`);
-      const allowed = new Set([...apexTools, ...armTools, ...interactive, ...nativeRead]);
+      assert.deepEqual(
+        metadata.tools.filter((tool) => tool === "web_fetch"),
+        webTools[role.id] ?? [],
+        `${label}: web tools`,
+      );
+      const allowed = new Set([...apexTools, ...armTools, ...interactive, ...nativeRead, ...(webTools[role.id] ?? [])]);
       for (const tool of metadata.tools) assert.ok(allowed.has(tool), `${label}: unexpected tool ${tool}`);
       for (const tool of [...arm.managedPolicy.denyBeforeTransport, ...arm.managedPolicy.deferredTools]) {
         assert.ok(
