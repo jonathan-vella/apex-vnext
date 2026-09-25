@@ -144,7 +144,7 @@ async function reachCodegen(
   const policy = policyMap(
     runId,
     governanceHashes["governance-constraints"]!,
-    await governanceFindings(service, architectureTask),
+    await governanceFindings(service, architectureTask, ["Microsoft.Web/sites"]),
   ) as PolicyPropertyMapV1;
   await configurePolicy?.(policy);
   const architectureValue = architecture(runId);
@@ -1566,7 +1566,11 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
   );
   const governanceHash = (await service.importGovernanceReference()).outputHash;
   const architectureTask = await task(service, "architecture");
-  const policy = policyMap(runId, governanceHash, await governanceFindings(service, architectureTask));
+  const policy = policyMap(
+    runId,
+    governanceHash,
+    await governanceFindings(service, architectureTask, ["Microsoft.Web/sites"]),
+  );
   const untraceableArchitecture = architecture(runId);
   untraceableArchitecture.components[0]!.requirementIds = ["REQ-UNKNOWN"];
   const untraceableCost = costEstimate(runId);
@@ -1623,10 +1627,7 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
     { kind: "policy-property-map", value: policyValue },
   ];
   await assert.rejects(
-    service.completeTaskOutputs(
-      architectureTask,
-      architectureBundle({ ...policy, mappings: policy.mappings.filter(({ effect }) => effect !== "deny") }),
-    ),
+    service.completeTaskOutputs(architectureTask, architectureBundle({ ...policy, mappings: [] })),
     /Policy mappings are required/,
   );
   await assert.rejects(
@@ -4334,7 +4335,7 @@ for (const track of ["bicep", "terraform"] as const) {
         scope,
         assignment_id: `${scope}/providers/Microsoft.Authorization/policyAssignments/${effect}`,
         classification: effect === "deny" ? "blocker" : "auto-remediate",
-        resource_types: [mode !== "simulated" ? "Microsoft.Storage/storageAccounts" : "Microsoft.Web/sites"],
+        resource_types: ["Microsoft.Web/sites"],
         exemption: null,
         reported_exemptions: [],
         required_value: true,

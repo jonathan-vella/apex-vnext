@@ -1293,6 +1293,21 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
       ({ resourceTypes }) => resourceTypes.length === 0 || resourceTypes.some((type) => designed.has(type)),
     );
     assert.ok(findings.length > decided.length, "the reference baseline has findings for undesigned resource types");
+    const summary = (context as unknown as { governanceFindings: { count: number; read: string } }).governanceFindings;
+    assert.equal(summary.count, findings.length);
+    assert.match(summary.read, /^governance-findings:/u);
+    const selected = await service.readTaskInput(
+      issued.task.taskId,
+      0,
+      6_000,
+      `governance-findings:${[...designed].join(",")}`,
+    );
+    const firstChunk = selected.content;
+    assert.ok(firstChunk.startsWith("["));
+    await assert.rejects(
+      service.readTaskInput(issued.task.taskId, 0, 6_000, "governance-findings:bad type"),
+      /Input hash is not a current task dependency|invalid/u,
+    );
     await assert.rejects(
       service.completeArchitecture(issued.task.taskId, architectureValue, partialCost, manifest, []),
       /Policy mappings are required/u,
@@ -1315,12 +1330,7 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
     const storedMap = await new ObjectStore(service.root).getJson<PolicyPropertyMapV1>(
       completed.outputHashes["policy-property-map"]!,
     );
-    assert.equal(storedMap.mappings.length, findings.length);
-    assert.ok(
-      storedMap.mappings.some(
-        ({ disposition, reason }) => disposition === "not-applicable" && reason?.startsWith("No designed resource"),
-      ),
-    );
+    assert.equal(storedMap.mappings.length, decided.length);
     assert.match(completed.outputHashes.architecture ?? "", /^[0-9a-f]{64}$/u);
     assert.match(completed.outputHashes["workload-decision-manifest"] ?? "", /^[0-9a-f]{64}$/u);
     const store = new ObjectStore(service.root);
@@ -2000,6 +2010,7 @@ test("imported initiative members require distinct mappings and run-owned eviden
       policyId: "definition",
       policyDefinitionReferenceId,
       effect: "deployIfNotExists",
+      resourceTypes: [],
     })),
   };
   const digest = await objects.putJson(snapshot);
@@ -2180,7 +2191,7 @@ test("plan task context projects source hashes and valid output templates", asyn
   const governanceHash = await importReferenceGovernance(service);
   const architectureTask = await nextTaskAfterInput(service);
   if (architectureTask.status !== "task") throw new Error("Expected architecture");
-  const findings = await governanceFindings(service, architectureTask.task.taskId);
+  const findings = await governanceFindings(service, architectureTask.task.taskId, ["Microsoft.Web/sites"]);
   const architectureValue = {
     ...architecture(initialized.runId),
     decisionRecords: [

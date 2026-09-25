@@ -385,12 +385,18 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
     "readTaskInput",
     {
       description:
-        "Read authoritative UTF-8-bounded task input; inputHash selects an authorized dependency or review-metadata from taskContext.",
+        "Read authoritative UTF-8-bounded task input; inputHash selects an authorized dependency, review-metadata, or governance-findings:<ARM types> for the enforcing policies an Architecture design must map.",
       inputSchema: {
         taskId: z.string(),
         offset: z.number().int().nonnegative().optional(),
         limit: z.number().int().min(1).max(6_000).optional(),
-        inputHash: z.union([z.string().regex(/^[0-9a-f]{64}$/u), z.literal("review-metadata")]).optional(),
+        inputHash: z
+          .union([
+            z.string().regex(/^[0-9a-f]{64}$/u),
+            z.literal("review-metadata"),
+            z.string().regex(/^governance-findings:[A-Za-z0-9./,]{0,2000}$/u),
+          ])
+          .optional(),
       },
     },
     async ({ taskId, offset, limit, inputHash }) =>
