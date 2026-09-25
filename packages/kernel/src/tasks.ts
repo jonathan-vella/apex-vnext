@@ -60,15 +60,21 @@ export function validateInputAnswers(questions: QuestionV1[], submitted: InputAn
   const answers = new Map<string, InputAnswerV1["value"]>();
   for (const answer of submitted) {
     if (answers.has(answer.questionId)) throw new Error(`Duplicate answer: ${answer.questionId}`);
+    const question = questions.find(({ id }) => id === answer.questionId);
+    if (question?.optional === true && typeof answer.value === "string" && answer.value.trim().length === 0) {
+      continue;
+    }
     answers.set(answer.questionId, answer.value);
   }
   for (const answerId of answers.keys()) {
     if (!questions.some(({ id }) => id === answerId)) throw new Error(`Unknown answer: ${answerId}`);
   }
-  if (answers.size !== questions.length || questions.some(({ id }) => !answers.has(id))) {
+  const requiredQuestions = questions.filter(({ optional }) => optional !== true);
+  if (answers.size < requiredQuestions.length || requiredQuestions.some(({ id }) => !answers.has(id))) {
     throw new Error("Every requested question requires exactly one answer");
   }
-  return questions.map((question) => {
+  return questions.flatMap((question) => {
+    if (!answers.has(question.id)) return [];
     const value = answers.get(question.id)!;
     if (isDeferredOrUnknown(value)) return { questionId: question.id, value };
     const selections = Array.isArray(value)

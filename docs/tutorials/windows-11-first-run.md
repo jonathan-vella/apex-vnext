@@ -29,7 +29,7 @@ workloads; its folder name identifies the consumer, not a single workload:
 ```bash
 mkdir -p ~/src/contoso-platform
 cd ~/src/contoso-platform
-apex bootstrap --project payments --create-repo --yes
+apex bootstrap --project payments --risk-owner partner --create-repo --yes
 ```
 
 ## Choose Where To Run APEX
@@ -50,6 +50,7 @@ From the workspace terminal, initialize the projection directly. This example se
 ```bash
 npx apex init \
   --project payments \
+  --risk-owner partner \
   --name "Payments platform" \
   --environment dev \
   --target "resource-group:payments-dev" \

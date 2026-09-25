@@ -23,7 +23,7 @@ const policy: ImprovementPolicyV1 = {
 test("trusted service stores bounded observations without changing run authority", async () => {
   const root = await tempRoot();
   const service = new ApexService(root, { improvementPolicy: policy });
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   const before = await service.status();
   const observed = await service.improvementObserve({
     source: "validation-failure",
@@ -42,7 +42,7 @@ test("trusted service stores bounded observations without changing run authority
 
 test("CLI observation uses structured files and destructive improvement operations require confirmation", async () => {
   const root = await tempRoot();
-  await execute(["init", "--project", "demo"], root);
+  await execute(["init", "--project", "demo", "--risk-owner", "partner"], root);
   const input = join(root, "observation.json");
   await writeJson(input, {
     source: "explicit-correction",
@@ -81,7 +81,7 @@ test("CLI observation uses structured files and destructive improvement operatio
 
 test("CLI records only confirmed immutable human proposal decisions", async () => {
   const root = await tempRoot();
-  await execute(["init", "--project", "demo"], root);
+  await execute(["init", "--project", "demo", "--risk-owner", "partner"], root);
   const store = new ImprovementStore(root, policy, () => new Date("2026-07-17T12:00:00.000Z"));
   for (const runId of ["run-1", "run-2", "run-3"]) {
     await store.observe({
@@ -118,7 +118,7 @@ test("CLI records only confirmed immutable human proposal decisions", async () =
 test("improvement operations reject runtime policy drift", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   assert.deepEqual(await service.improvementObservations(), []);
   const policyPath = join(
     root,
@@ -133,7 +133,7 @@ test("improvement operations reject runtime policy drift", async () => {
 
 test("CLI exposes no proposal application or autonomous repository operation", async () => {
   const root = await tempRoot();
-  await execute(["init", "--project", "demo"], root);
+  await execute(["init", "--project", "demo", "--risk-owner", "partner"], root);
   for (const command of [
     ["quality", "apply"],
     ["quality", "create-issue"],

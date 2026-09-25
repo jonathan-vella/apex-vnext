@@ -499,7 +499,7 @@ test(
       executableChecker: async () => false,
       azureAuthStatus: async () => ({ authenticated: false, detail: "Offline lifecycle test" }),
     });
-    await service.init({ projectId: "lifecycle" });
+    await service.init({ projectId: "lifecycle", riskOwner: "partner" });
     const expected = await service.status();
     const client = new Client({ name: "stdio-lifecycle-test", version: "1.0.0" });
     const transport = new StdioClientTransport({

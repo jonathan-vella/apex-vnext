@@ -22,6 +22,9 @@ Use this skill only for an active architecture task.
 2. Complete the task template's qualitative assessment for Security, Reliability, Cost Optimization, Operational
    Excellence, and Performance Efficiency. Bind every pillar to accepted requirements and evidence; do not derive
    numeric scores.
+   Treat performance and scale values as later-validated goals. Missing or unverified measurement boundaries, latency,
+   scale, or capacity-test feasibility are not Architecture blockers and may produce at most an info check-later note.
+   Availability and recovery targets, including RTO/RPO, remain real architecture requirements.
 3. Keep identity, networking, diagnostics, recovery, data, and lifecycle decisions explicit.
    For decisions requiring an ADR, include `architecture.decisionRecords`: a stable `ADR-NNNN` ID, title, context,
    decision, accepted requirement IDs, at least two considered alternatives with benefits/drawbacks/rejection reasons,

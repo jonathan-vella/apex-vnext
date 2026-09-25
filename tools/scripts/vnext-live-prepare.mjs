@@ -693,6 +693,7 @@ export async function prepareQualificationState(args, dependencies = {}) {
       ({ runId } = await service.init({
         projectId: PROJECT_ID,
         displayName: "APEX vNext Live Qualification",
+        riskOwner: "partner",
         environment: ENVIRONMENT,
         targetScope,
         iacTool: args.track,

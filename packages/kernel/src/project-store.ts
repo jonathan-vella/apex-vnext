@@ -1,4 +1,4 @@
-import type { IacTool, ProjectConfigV1, ProjectId, RunConfigV1, RunId } from "@apexops/contracts";
+import type { IacTool, ProjectConfigV1, ProjectId, RiskOwner, RunConfigV1, RunId } from "@apexops/contracts";
 import { CONTRACT_VERSION } from "@apexops/contracts";
 import { mkdir, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -11,6 +11,7 @@ export interface InitializeProjectInput {
   projectId: ProjectId;
   displayName: string;
   defaultIacTool: IacTool;
+  riskOwner: RiskOwner;
 }
 
 export interface CreateRunInput {
@@ -39,6 +40,7 @@ export class ProjectStore {
       displayName: input.displayName,
       createdAt: this.clock().toISOString(),
       defaultIacTool: input.defaultIacTool,
+      riskOwner: input.riskOwner,
     };
     const directory = this.projectDirectory(input.projectId);
     await mkdir(join(directory, "runs"), { recursive: true });

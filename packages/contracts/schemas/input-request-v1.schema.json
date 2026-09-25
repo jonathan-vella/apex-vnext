@@ -72,6 +72,9 @@
               "multiSelect": {
                 "type": "boolean"
               },
+              "optional": {
+                "type": "boolean"
+              },
               "options": {
                 "items": {
                   "minLength": 1,
@@ -225,6 +228,9 @@
                 "type": "string"
               },
               "multiSelect": {
+                "type": "boolean"
+              },
+              "optional": {
                 "type": "boolean"
               },
               "options": {
@@ -406,6 +412,9 @@
                 "type": "string"
               },
               "multiSelect": {
+                "type": "boolean"
+              },
+              "optional": {
                 "type": "boolean"
               },
               "options": {

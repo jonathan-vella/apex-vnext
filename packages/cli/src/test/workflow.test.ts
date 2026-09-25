@@ -62,7 +62,7 @@ async function snapshotFiles(directory: string): Promise<unknown[]> {
 test("status is read-only across repeated active-run reads and restart", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"));
   const events = await journal.replay();
   const files = await snapshotFiles(root);
@@ -79,7 +79,7 @@ test("status is read-only across repeated active-run reads and restart", async (
 test("nextTask returns the issued task until the journal moves", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const first = await nextTaskAfterInput(service);
   assert.equal(first.status, "task");
   if (first.status !== "task") return;
@@ -101,7 +101,7 @@ test("nextTask returns the issued task until the journal moves", async () => {
 test("requirements change preview binds retained decisions and leaves workflow and files unchanged", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(service, runId, "bicep");
   const before = await service.status();
   const current = requirements();
@@ -144,7 +144,7 @@ test("requirements change preview binds retained decisions and leaves workflow a
 test("requirements amendments preserve untouched decisions and require current confirmed revision", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(service, runId, "bicep");
   const base = requirements();
   const amendment: RequirementsAmendmentV1 = {
@@ -211,7 +211,7 @@ test("requirements amendments preserve untouched decisions and require current c
 test("requirements amendments reject a revision change during asynchronous preview", async (context) => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo", iacTool: "terraform" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: "terraform" });
   await prepareValidatedRun(service, runId, "terraform");
   const amendment: RequirementsAmendmentV1 = {
     schemaVersion: "1.0.0",
@@ -242,7 +242,7 @@ test("requirements amendments reject a revision change during asynchronous previ
 test("confirmed requirements revision invalidates proof without approvals or file replacement", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(service, runId, "bicep");
   const before = await service.status();
   const candidate = { ...requirements(), budgetAndOperations: "Monthly limit is EUR 500" };
@@ -287,7 +287,7 @@ test("confirmed requirements revision invalidates proof without approvals or fil
 test("confirmed decision adoption reuses recovered requirements without importing approvals", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   await writeFile(join(root, "manual-workload.md"), "Existing independently copied design\n");
   const candidate = requirements();
   const before = await service.status();
@@ -317,7 +317,7 @@ test("confirmed decision adoption reuses recovered requirements without importin
 test("a later review invalidation does not resurrect an older confirmed requirements candidate", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   const candidate = { ...requirements(), budgetAndOperations: "Adopted budget" };
   const proposal = await service.previewRequirementsChange(candidate, "Adopt", "adopt");
   await service.reviseRequirements(candidate, {
@@ -359,7 +359,7 @@ test("a later review invalidation does not resurrect an older confirmed requirem
 test("requirements revision rejects stale heads and unresolved deployment execution", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo", iacTool: "terraform" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: "terraform" });
   await prepareValidatedRun(service, runId, "terraform");
   const candidate = { ...requirements(), budgetAndOperations: "Monthly limit is EUR 500" };
   const first = await service.previewRequirementsChange(candidate, "Change budget");
@@ -395,7 +395,7 @@ for (const track of ["bicep", "terraform"] as const) {
   test(`deployment guide binds current accepted ${track} plan and refuses invalidated sources`, async (context) => {
     const root = await tempRoot();
     const service = new ApexService(root);
-    const { runId } = await service.init({ projectId: "demo", iacTool: track });
+    const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: track });
     await assert.rejects(service.render("deployment-guide"), /No current accepted plan/);
     await assert.rejects(service.render("implementation-plan"), /No current accepted implementation intent/);
     await prepareValidatedRun(service, runId, track);
@@ -441,7 +441,7 @@ for (const track of ["bicep", "terraform"] as const) {
 test("manual deployment guide blocks plan acceptance without replacing user content", async (context) => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   const directory = join(root, "agent-output", "demo", runId, "plan");
   const originalComplete = service.completeTaskOutputs.bind(service);
   let planHead: string | null | undefined;
@@ -463,7 +463,7 @@ test("manual deployment guide blocks plan acceptance without replacing user cont
 test("deployment summary binds accepted operation evidence and never upgrades simulated execution", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   await assert.rejects(service.render("deployment-summary"), /No completed deployment/);
   await prepareValidatedRun(service, runId, "bicep");
   const preview = await service.preview({ operation: "apply", provider: "fake" });
@@ -515,7 +515,7 @@ test("deployment summary binds accepted operation evidence and never upgrades si
 test("operational handoff requires current inventory and pinned evidence before runbook materialization", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(service, runId, "bicep");
   const preview = await service.preview({ operation: "apply", provider: "fake" });
   await service.decideGateNumber(4, "approved", "tester");
@@ -608,7 +608,7 @@ test("operational handoff requires current inventory and pinned evidence before 
 test("status leaves pending run transaction recovery to an advancing operation", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   const directory = join(root, ".apex", "projects", "demo", "runs", initialized.runId);
   const journal = new EventJournal(join(directory, "journal"));
   const events = await journal.replay();
@@ -630,7 +630,7 @@ for (const interrupted of [false, true]) {
   test(`status is read-only at terminal completion (${interrupted ? "interrupted" : "normal"})`, async (context) => {
     const root = await tempRoot();
     const service = new ApexService(root);
-    const { runId } = await service.init({ projectId: "demo" });
+    const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
     await prepareValidatedRun(service, runId, "bicep");
     const preview = await service.preview({ operation: "apply", provider: "fake" });
     await service.decideGateNumber(4, "approved", "tester");
@@ -710,7 +710,7 @@ for (const interrupted of [false, true]) {
 test("full requirements to fake deploy workflow survives restart", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(service, initialized.runId, "bicep");
   const planReviewDirectory = join(root, "agent-output", "demo", initialized.runId, "plan");
   assert.match(await readFile(join(planReviewDirectory, "implementation-plan.md"), "utf8"), /Logical Resources/u);
@@ -771,7 +771,7 @@ test("full requirements to fake deploy workflow survives restart", async () => {
 
 test("requirements task remains blocked until pending input is recorded", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const requested = await service.nextTask();
   assert.equal(requested.status, "needs_input");
   const stillWaiting = await service.nextTask();
@@ -793,7 +793,7 @@ for (const profile of ["alz-backed", "standalone-lab"]) {
   test(`requirements intake records explicit workload profile ${profile} across restart`, async () => {
     const root = await tempRoot();
     const service = new ApexService(root);
-    const initialized = await service.init({ projectId: "demo" });
+    const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
     const pending = await service.nextTask();
     assert.equal(pending.status, "needs_input");
     if (pending.status !== "needs_input") return;
@@ -844,7 +844,7 @@ for (const profile of ["alz-backed", "standalone-lab"]) {
 
 test("requirements intake issues three panels before the requirements task", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const rounds = ["business-discovery", "workload-pattern", "security-compliance"];
 
   for (const [index, round] of rounds.entries()) {
@@ -885,7 +885,7 @@ test("requirements intake issues three panels before the requirements task", asy
 
 test("requirements intake adds migration questions only for migration scenarios", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   await recordRequirementsRound(service, {
     workload: "ecommerce",
     industry: "retail",
@@ -927,7 +927,7 @@ test("requirements intake adds migration questions only for migration scenarios"
 
 test("requirements intake recommends a workload pattern and asks pattern-specific scale questions", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   await recordRequirementsRound(service, {
     workload: "IoT sensors publish telemetry for offline field devices",
     industry: "manufacturing",
@@ -945,13 +945,14 @@ test("requirements intake recommends a workload pattern and asks pattern-specifi
   });
   assert.equal(
     pending.request.questions.find(({ id }) => id === "scale")?.prompt,
-    "Describe device count, message rate, payload size, and offline behavior.",
+    "Optionally describe device count, message rate, payload size, and offline behavior; leave empty to check later.",
   );
+  assert.equal(pending.request.questions.find(({ id }) => id === "scale")?.optional, true);
 });
 
 test("greenfield service intake skips retained services and uses selectable recovery capabilities", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   await recordRequirementsRound(service, {
     workload: "ecommerce",
     industry: "retail",
@@ -1026,7 +1027,7 @@ test("greenfield service intake skips retained services and uses selectable reco
 
 test("requirements intake provides selectable Azure service and security recommendations", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   await recordRequirementsRound(service, {
     workload: "ecommerce",
     industry: "retail",
@@ -1134,7 +1135,7 @@ test("requirements intake provides selectable Azure service and security recomme
 
 test("architecture task waits for a kernel-owned decision and resumes the issued task", async () => {
   const service = new ApexService(await tempRoot());
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   const requirementsTask = await nextTaskAfterInput(service);
   assert.equal(requirementsTask.status, "task");
   if (requirementsTask.status !== "task") return;
@@ -1303,7 +1304,7 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
 
 test("architecture decision is reissued after its journal head becomes stale", async () => {
   const service = new ApexService(await tempRoot());
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   const requirementsTask = await nextTaskAfterInput(service);
   assert.equal(requirementsTask.status, "task");
   if (requirementsTask.status !== "task") return;
@@ -1335,7 +1336,7 @@ test("architecture decision is reissued after its journal head becomes stale", a
 
 test("render requirements reads the accepted requirements artifact", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
@@ -1347,7 +1348,7 @@ test("render requirements reads the accepted requirements artifact", async () =>
 test("requirements acceptance records a bound rendered document", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
@@ -1382,7 +1383,7 @@ test("requirements acceptance records a bound rendered document", async () => {
 test("requirements review package escapes user-provided Markdown", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
@@ -1399,7 +1400,7 @@ test("requirements review package escapes user-provided Markdown", async () => {
 test("requirements document rendering escapes table cells without rejecting content braces", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
@@ -1425,9 +1426,10 @@ test("requirements document rendering escapes table cells without rejecting cont
 test("an initialized workspace can create and select independent projects", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "payments", displayName: "Payments" });
+  await service.init({ projectId: "payments", riskOwner: "partner", displayName: "Payments" });
   const dataPlatform = await service.createProject({
     projectId: "data-platform",
+    riskOwner: "partner",
     displayName: "Data platform",
     environment: "test",
     targetScope: "resource-group:data-platform-test",
@@ -1449,7 +1451,12 @@ test("an initialized workspace can create and select independent projects", asyn
 test("a project promotes independently through multiple environments", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const initialized = await service.init({ projectId: "demo", environment: "dev", targetScope: "local" });
+  const initialized = await service.init({
+    projectId: "demo",
+    riskOwner: "partner",
+    environment: "dev",
+    targetScope: "local",
+  });
   await prepareValidatedRun(service, initialized.runId, "bicep");
 
   const testRun = await service.promote("test", "resource-group:payments-test");
@@ -1468,7 +1475,7 @@ test("a project promotes independently through multiple environments", async () 
 test("typed input recording rejects premature, stale, malformed, duplicate, and replayed answers", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   await assert.rejects(
     service.recordInput({
       schemaVersion: "1.0.0",
@@ -1549,7 +1556,7 @@ test("typed input recording rejects premature, stale, malformed, duplicate, and 
 test("requirements task context includes recorded input and stageable output templates", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   await recordRequirementsRound(service, {
     workload: "ecommerce",
     industry: "retail",
@@ -1645,8 +1652,11 @@ test("requirements task context includes recorded input and stageable output tem
   assert.deepEqual(template.unknowns, []);
   assert.equal(template.businessContext, "retail; greenfield; web-api");
   assert.match(template.successCriteria!, /^100 concurrent users\n\nRecommendation \(proposed, not confirmed\):/);
-  assert.match(template.successCriteria!, /p95 and p99/);
-  assert.equal(template.nonFunctionalRequirements, "availability-zones, automated-backups, point-in-time-restore");
+  assert.match(template.successCriteria!, /Validate performance and scale later/);
+  assert.equal(
+    template.nonFunctionalRequirements,
+    "availability-zones, automated-backups, point-in-time-restore\n\nPerformance and scale goals: 100 concurrent users (validated at a later stage)",
+  );
   assert.equal(
     template.securityAndCompliance,
     "managed-identity, private-endpoints, key-vault, diagnostic-logging; pci-dss; microsoft-entra-id, managed-identity; confidential",
@@ -1667,7 +1677,7 @@ test("requirements task context includes recorded input and stageable output tem
     context.outputTemplates.requirements as Parameters<typeof service.completeRequirements>[1],
   );
   const document = await readFile(join(root, "agent-output", "demo", initialized.runId, "01-requirements.md"), "utf8");
-  assert.match(document, /p95 and p99/);
+  assert.match(document, /Validate performance and scale later/);
   assert.match(document, /ingress and DNS/);
   assert.match(document, /proposed, not confirmed/);
 });
@@ -1677,10 +1687,14 @@ test("requirements recommendations document GDPR planning without confirmed obli
   const project = service as unknown as {
     requirementsTemplateFromIntake(input: Record<string, InputValueV1>): {
       requirements: Array<{ source: string; statement: string }>;
+      nonFunctionalRequirements: string;
       securityAndCompliance: string;
+      successCriteria: string;
     };
   };
   const template = project.requirementsTemplateFromIntake({ compliance: { kind: "compliance", scopes: ["gdpr"] } });
+  assert.match(template.nonFunctionalRequirements, /Performance and scale: check later/);
+  assert.match(template.successCriteria, /intentionally deferred for later validation/);
   assert.match(template.securityAndCompliance, /Recommendation \(proposed, not confirmed\)/);
   assert.match(template.securityAndCompliance, /retention\/deletion and data-subject handling/);
   assert.match(template.securityAndCompliance, /no assignment, retention period or GDPR compliance is asserted/);
@@ -1698,7 +1712,7 @@ test("requirements recommendations document GDPR planning without confirmed obli
 test("task context rejects a task whose journal head changed", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
@@ -1720,7 +1734,7 @@ test("task context rejects a task whose journal head changed", async () => {
 
 test("large multibyte review context stays bounded with authorized selective reads", async () => {
   const service = new ApexService(await tempRoot(), { clock: () => new Date("2026-01-01T00:00:00.000Z") });
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
@@ -1765,7 +1779,7 @@ test("large multibyte review context stays bounded with authorized selective rea
 test("review context filters current dispositions and selectively reads oversized metadata", async () => {
   const root = await tempRoot();
   const service = new ApexService(root, { clock: () => new Date("2026-01-01T00:00:00.000Z") });
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   const requirementsTask = await nextTaskAfterInput(service);
   assert.equal(requirementsTask.status, "task");
   if (requirementsTask.status !== "task") return;
@@ -1883,7 +1897,7 @@ test("review context filters current dispositions and selectively reads oversize
 
 test("codegen task inputs exclude invalidated revisions and unrelated accepted artifacts", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const internal = service as unknown as {
     currentRun(): Promise<RunConfigV1>;
     inputRefs(run: RunConfigV1, events: EventV1[], descriptor: { id: string }): Promise<string[]>;
@@ -1908,7 +1922,7 @@ test("codegen task inputs exclude invalidated revisions and unrelated accepted a
 
 test("issued task output limit matches locked defaults and counts multibyte content", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
@@ -1925,7 +1939,7 @@ test("imported initiative members require distinct mappings and run-owned eviden
   const root = await tempRoot();
   const service = new ApexService(root);
   const subscriptionId = "11111111-1111-1111-1111-111111111111";
-  await service.init({ projectId: "demo", targetScope: `/subscriptions/${subscriptionId}` });
+  await service.init({ projectId: "demo", riskOwner: "partner", targetScope: `/subscriptions/${subscriptionId}` });
   const internal = service as unknown as {
     currentRun(): Promise<RunConfigV1>;
     validateBundle(
@@ -2024,7 +2038,7 @@ test("imported initiative members require distinct mappings and run-owned eviden
 test("plan task context projects source hashes and valid output templates", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   const assertReviewContext = async (taskId: string, taskType: string, subjectHash: string) => {
     const context = await service.taskContext(taskId);
     const packs: Record<string, { subjectKind: string; criteria: string[]; kinds: string[] }> = {
@@ -2321,7 +2335,7 @@ test("direct worker calls preserve authority across missing, foreign, wrong, rep
   let now = Date.parse("2026-09-21T00:00:00.000Z");
   const root = await tempRoot();
   const service = new ApexService(root, { clock: () => new Date(now) });
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   const runPath = join(root, ".apex", "projects", "demo", "runs", runId);
   const journal = new EventJournal(join(runPath, "journal"));
   const canary = join(root, "user-notes.md");
@@ -2352,7 +2366,7 @@ test("direct worker calls preserve authority across missing, foreign, wrong, rep
   ])
     await unchangedAfterRejection(operation, /task|gate|review|approval/i);
   const other = new ApexService(await tempRoot());
-  await other.init({ projectId: "other" });
+  await other.init({ projectId: "other", riskOwner: "partner" });
   const foreign = await nextTaskAfterInput(other);
   if (foreign.status !== "task") throw new Error("Expected foreign task");
   await unchangedAfterRejection(() => service.completeReview(foreign.task.taskId, []), /task|ENOENT/i);
@@ -2378,7 +2392,7 @@ test("direct worker calls preserve authority across missing, foreign, wrong, rep
 test("same client can submit valid requirements and review without authenticating distinct agent identities", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const issued = await nextTaskAfterInput(service);
   if (issued.status !== "task") throw new Error("Expected requirements task");
   const accepted = await service.completeRequirements(issued.task.taskId, requirements());
@@ -2393,7 +2407,7 @@ test("same client can submit valid requirements and review without authenticatin
 test("review input reads reject expired tasks", async () => {
   let now = Date.parse("2026-01-01T00:00:00.000Z");
   const service = new ApexService(await tempRoot(), { clock: () => new Date(now) });
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const requirementsTask = await nextTaskAfterInput(service);
   assert.equal(requirementsTask.status, "task");
   if (requirementsTask.status !== "task") return;
@@ -2409,7 +2423,7 @@ test("review input reads reject expired tasks", async () => {
 test("reviewer summary preserves non-empty findings and evidence references", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   const requirementsTask = await nextTaskAfterInput(service);
   assert.equal(requirementsTask.status, "task");
   if (requirementsTask.status !== "task") return;
@@ -2445,7 +2459,7 @@ test("reviewer summary preserves non-empty findings and evidence references", as
 test("requirements intake preserves explicit unresolved answers", async () => {
   for (const availabilityRecovery of ["deferred: product owner", "unknown"] as const) {
     const service = new ApexService(await tempRoot());
-    await service.init({ projectId: "demo" });
+    await service.init({ projectId: "demo", riskOwner: "partner" });
     await recordRequirementsRound(service, {
       workload: "ecommerce",
       industry: "retail",
@@ -2497,7 +2511,7 @@ test("requirements intake preserves explicit unresolved answers", async () => {
 
 test("pending input is reissued after writer transfer", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const before = await service.nextTask();
   assert.equal(before.status, "needs_input");
   if (before.status !== "needs_input") return;
@@ -2534,7 +2548,7 @@ test("pending input is reissued after writer transfer", async () => {
 test("typed input rejects obsolete answers without recording unrelated values", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   await assert.rejects(
     service.recordInput({ workload: "demo", secretToken: "do-not-journal" } as never),
     (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
@@ -2554,7 +2568,7 @@ test("typed input rejects obsolete answers without recording unrelated values", 
 
 test("concurrent input submissions return only stable Apex errors", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const pending = await service.nextTask();
   assert.equal(pending.status, "needs_input");
   if (pending.status !== "needs_input") return;
@@ -2582,7 +2596,7 @@ for (const total of [3, 4]) {
   test(`obsolete ${total}-round intake requests fail closed without mutation`, async () => {
     const root = await tempRoot();
     const service = new ApexService(root);
-    const initialized = await service.init({ projectId: "demo" });
+    const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
     const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"));
     await journal.append({
       eventId: "legacy-request",
@@ -2619,7 +2633,7 @@ for (const total of [3, 4]) {
 test("malformed persisted input requests fail closed", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   const journalDirectory = join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal");
   const journal = new EventJournal(journalDirectory);
   await journal.append({
@@ -2641,7 +2655,7 @@ test("malformed persisted input requests fail closed", async () => {
 
 test("a task remains current across stage then complete", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
@@ -2661,7 +2675,7 @@ test("expired preview and wrong preview hash are rejected", async () => {
   let now = Date.parse("2026-01-01T00:00:00.000Z");
   const root = await tempRoot();
   const service = new ApexService(root, { clock: () => new Date(now) });
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(service, initialized.runId, "bicep");
   const preview = await service.preview({ operation: "apply", provider: "fake", expiresInMs: 1 });
   const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", initialized.runId, "journal"));
@@ -2685,7 +2699,7 @@ test("expired preview and wrong preview hash are rejected", async () => {
 test("gate approval rejects stale dependencies while explicit rejection remains available", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
@@ -2718,7 +2732,7 @@ test("gate approval rejects stale dependencies while explicit rejection remains 
 test("Gate 4 approval rejects an expired preview before changing gate state", async () => {
   let now = Date.parse("2026-01-01T00:00:00.000Z");
   const service = new ApexService(await tempRoot(), { clock: () => new Date(now) });
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(service, initialized.runId, "bicep");
   await service.preview({ operation: "apply", provider: "fake", expiresInMs: 1 });
   now += 2;
@@ -2729,7 +2743,7 @@ test("Gate 4 approval rejects an expired preview before changing gate state", as
 test("deploy rejects a preview and approval from an older owner epoch", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(service, initialized.runId, "bicep");
   const preview = await service.preview({ operation: "apply", provider: "fake" });
   await service.decideGateNumber(4, "approved", "tester");
@@ -2744,7 +2758,7 @@ test("deploy rejects a preview and approval from an older owner epoch", async ()
 
 test("Gate 4 approval binds the current transferred writer identity", async () => {
   const service = new ApexService(await tempRoot());
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(service, initialized.runId, "bicep");
   const transfer = (await service.createWriterTransfer({
     repository: "owner/repo",
@@ -2764,7 +2778,7 @@ test("Gate 4 approval binds the current transferred writer identity", async () =
 
 test("Gate 4 approves and deploys an exact preview after one post-preview writer transfer", async () => {
   const service = new ApexService(await tempRoot());
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(service, initialized.runId, "bicep");
   const preview = await service.preview({ operation: "apply", provider: "fake" });
   const transfer = (await service.createWriterTransfer({
@@ -2786,7 +2800,7 @@ test("Gate 4 approves and deploys an exact preview after one post-preview writer
 
 test("Gate 4 rejects authority relinquished by a pending transfer", async () => {
   const service = new ApexService(await tempRoot());
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(service, initialized.runId, "bicep");
   await service.preview({ operation: "apply", provider: "fake" });
   await service.createWriterTransfer({
@@ -2806,7 +2820,7 @@ test("Gate 4 rejects authority relinquished by a pending transfer", async () => 
 test("Gate 4 rejects an accepted writer after its lease expires", async () => {
   let now = Date.parse("2026-01-01T00:00:00.000Z");
   const service = new ApexService(await tempRoot(), { clock: () => new Date(now) });
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(service, initialized.runId, "bicep");
   const transfer = (await service.createWriterTransfer({
     repository: "owner/repo",
@@ -2828,7 +2842,7 @@ test("Gate 4 rejects an accepted writer after its lease expires", async () => {
 test("Gate 4 approval cannot outlive the current writer lease", async () => {
   let now = Date.parse("2026-01-01T00:00:00.000Z");
   const service = new ApexService(await tempRoot(), { clock: () => new Date(now) });
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(service, initialized.runId, "bicep");
   const transfer = (await service.createWriterTransfer({
     repository: "owner/repo",
@@ -2849,7 +2863,7 @@ test("Gate 4 approval cannot outlive the current writer lease", async () => {
 
 test("Gate 4 rejects a second post-preview writer hop and remains open", async () => {
   const service = new ApexService(await tempRoot());
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(service, initialized.runId, "bicep");
   await service.preview({ operation: "apply", provider: "fake" });
   const first = (await service.createWriterTransfer({
@@ -2880,7 +2894,7 @@ test("Gate 4 rejects a second post-preview writer hop and remains open", async (
 
 test("Gate 4 reopens for an exact superseding destroy preview and requires new approval", async () => {
   const service = new ApexService(await tempRoot());
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(service, initialized.runId, "bicep");
   const applyPreview = await service.preview({ operation: "apply", provider: "fake" });
   await service.decideGateNumber(4, "approved", "tester");
@@ -2903,7 +2917,7 @@ test("Gate 4 reopens for an exact superseding destroy preview and requires new a
 test("Gate 4 refreshes an expired open preview without promotion", async () => {
   let now = Date.parse("2026-01-01T00:00:00.000Z");
   const service = new ApexService(await tempRoot(), { clock: () => new Date(now) });
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(service, initialized.runId, "bicep");
   const expired = await service.preview({ operation: "apply", provider: "fake", expiresInMs: 1 });
   now += 2;

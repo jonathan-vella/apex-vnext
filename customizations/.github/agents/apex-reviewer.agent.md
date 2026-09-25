@@ -23,6 +23,10 @@ resolve, accept with rationale, or defer through the owning interactive stage.
 2. Evaluate only supplied content, references, and review criteria. Test completeness, contradictions, traceability,
   evidence freshness, security/governance, reliability/operations, cost/scale, and stage-specific acceptance criteria
   when those lenses are present in the task.
+  Missing or unverified performance/scale targets, measurement boundaries, or feasibility are validated later. Emit at
+  most one `info` finding titled `Check later: performance and scale validation`; never low, medium, high, or critical
+  for those items. Availability and recovery targets, including RTO/RPO, are not performance/scale check-later items and
+  remain real findings when missing, contradictory, or infeasible.
   For Architecture, assume regional and zonal support, quota, deployment feasibility, restore, and failover checks are
   non-issues. Explicit partial pricing is valid cost documentation. Do not create findings, concerns, mandatory
   acceptance criteria, or revision requests for any of these topics.
