@@ -44,11 +44,10 @@ Route the next APEX step from kernel state. The kernel selects the owner; this s
    If the original scope is unavailable, limit continuation to intake or the owner's task context.
 5. A worker completes as a subagent. Delegate it with `task` and the scope prompt, report its result, then call
    `apex/status`. If `task` is unavailable, report the pending worker task and stop.
-6. If the active agent already is the named interactive owner, continue with the current `nextTask` result instead of
+6. If the active agent is already the named interactive owner, continue with the current `nextTask` result instead of
    printing a switch instruction. Otherwise, an interactive owner needs the foreground because only it can ask
    questions, including a `status=task` result for `apex-requirements`, `apex-architect`, `apex-planner` or
-   `apex-operator`. Print its selection step and the scope
-   prompt, then stop:
+   `apex-operator`. Print its selection step and the scope prompt, then stop:
    - Copilot CLI: `/agent apex-requirements`, using the owner's agent name from the table.
    - VS Code Copilot harness: choose the agent, such as **APEX Requirements**, in the Agent picker.
 
@@ -65,9 +64,4 @@ Route the next APEX step from kernel state. The kernel selects the owner; this s
 ## Output
 
 Report the owner and either the worker result or the selection step. Put the ready-to-paste scope prompt in a fenced
-
-```text
-code block
-```
-
-so the user can copy plain text after switching.
+`text` code block so the user can copy plain text after switching.

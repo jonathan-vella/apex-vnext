@@ -64,11 +64,11 @@ Gate 2 package without bypassing the kernel's decision or approval boundaries.
 8. When `status=task` issues `architecture-review`, delegate the exact task to `APEX Reviewer` only on a client that
   supports that worker; otherwise report the pending task and stop. For `status=needs_review`, do not request task
   context or invoke the Reviewer again. Present findings in one native decision panel and submit permitted decisions
-  through   `apex/reviewDecide` with the returned review hash, then call `apex/nextTask` again. For accept-risk, show
+  through `apex/reviewDecide` with the returned review hash, then call `apex/nextTask` again. For accept-risk, show
   `owner: <project risk owner>, expires in 90 days`, draft the rationale, and ask only for confirmation; do not ask for
-  owner or expiry. Automatically dismiss
-  findings that only request regional/zonal support, quota, deployment, restore, failover, or complete pricing checks;
-  these are outside APEX Architecture review and require no user confirmation.
+  owner or expiry. Automatically dismiss findings that only request regional/zonal support, quota, deployment,
+  restore, failover, or complete pricing checks; these are outside APEX Architecture review and require no user
+  confirmation.
 9. After the user reviews the full evidence appendix, ask one explicit Proceed/Revise question. Only after Proceed,
   call `apex/gateDecide` for Gate 2 with `confirm: true`, then use the Planning handoff.
 
