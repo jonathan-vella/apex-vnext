@@ -31,6 +31,15 @@
             "type": "array",
             "uniqueItems": true
           },
+          "resourceTypes": {
+            "items": {
+              "pattern": "^[A-Za-z][A-Za-z0-9]*\\.[A-Za-z][A-Za-z0-9.]*(?:/[A-Za-z][A-Za-z0-9]*)+$",
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
           "service": {
             "minLength": 1,
             "type": "string"
@@ -39,6 +48,7 @@
         "required": [
           "id",
           "service",
+          "resourceTypes",
           "purpose",
           "requirementIds",
           "dependsOn"

@@ -62,7 +62,8 @@ export interface GovernanceBaselineSelection {
     readonly contentHash: string;
     readonly provenance: {
       readonly root: GovernanceBaselineRoot;
-      readonly source: "github-actions-baseline";
+      readonly source: "github-actions-baseline" | "alz-corp-reference";
+      readonly reference?: { readonly release: string; readonly commit: string };
       readonly discoveryStatus: "COMPLETE";
       readonly managementGroups: readonly string[];
       readonly completenessSignature: string;
@@ -692,5 +693,67 @@ export function inspectGovernanceBaseline(
   return {
     observedAt: selection.constraints.discoveredAt,
     refreshRequired: Date.parse(options.now) >= Date.parse(selection.constraints.expiresAt),
+  };
+}
+
+export interface GovernanceReferenceImportOptions {
+  readonly targetScope: string;
+  readonly now: string;
+}
+
+export function importGovernanceReference(
+  input: unknown,
+  options: GovernanceReferenceImportOptions,
+): GovernanceBaselineSelection {
+  const source = record(jsonInput(input));
+  if (source.schema_version !== "governance-reference-v1" || source.source !== "alz-corp-reference") fail();
+  const library = record(source.library);
+  const release = text(library.release);
+  const commit = text(library.commit);
+  if (!/^[0-9a-f]{40}$/u.test(commit)) fail();
+  const now = timestamp(options.now);
+  const findings = array(source.policies).map((item) => finding(item, ""));
+  const identities = findings.map((item) =>
+    canonical([item.assignmentId.toLowerCase(), item.policyId.toLowerCase(), item.policyDefinitionReferenceId ?? null]),
+  );
+  if (findings.length === 0 || new Set(identities).size !== findings.length) fail("incomplete");
+  const managementGroups = [...new Set(findings.map((item) => item.scope.split("/").at(-1)!.toLowerCase()))].sort();
+  const targetScope = text(options.targetScope);
+  const subscriptionId = /^\/subscriptions\/([0-9a-f-]{36})(?:\/|$)/iu.exec(targetScope)?.[1]?.toLowerCase() ?? "";
+  return {
+    snapshot: {
+      schemaVersion: "governance-baseline-selection-v2",
+      subscriptionId,
+      targetScope: targetScope.toLowerCase(),
+      contentHash: createHash("sha256")
+        .update(canonical({ release, commit, findings, targetScope: targetScope.toLowerCase() }))
+        .digest("hex"),
+      provenance: {
+        root: { kind: "management-group", managementGroupId: managementGroups[0]! },
+        source: "alz-corp-reference",
+        reference: { release, commit },
+        discoveryStatus: "COMPLETE",
+        managementGroups,
+        completenessSignature: `alz:${release}@${commit}`,
+        signatureStatus: "unverified",
+      },
+      findings,
+      tagsRequired: [],
+      allowedLocations: [],
+      reconciliationRequired: true,
+    },
+    constraints: {
+      schemaVersion: "1.0.0",
+      targetScope,
+      discoveredAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + GOVERNANCE_MAX_AGE_MS).toISOString(),
+      summary: {
+        assignmentCount: new Set(findings.map((item) => item.assignmentId.toLowerCase())).size,
+        denyCount: findings.filter((item) => item.effect === "deny").length,
+        modifyCount: findings.filter((item) => item.effect === "modify").length,
+        auditCount: findings.filter((item) => item.effect === "audit" || item.effect === "auditIfNotExists").length,
+        exemptionCount: 0,
+      },
+    },
   };
 }

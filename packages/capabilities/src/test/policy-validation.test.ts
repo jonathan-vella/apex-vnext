@@ -704,6 +704,26 @@ describe("bounded policy property validation", () => {
       assert.equal(receipt.outcome, "fail");
     });
 
+    it(`${track}: not-applicable rows and platform-remediated effects pass without a property check`, () => {
+      const request = input(track);
+      request.policyMap.mappings[0]!.disposition = "not-applicable";
+      request.policyMap.mappings[0]!.reason = "No designed resource has this type";
+      request.policyMap.mappings[1]!.effect = "deployIfNotExists";
+      delete request.policyMap.mappings[1]!.expectedValue;
+      request.policyMap.mappings[2]!.effect = "deny";
+      delete request.policyMap.mappings[2]!.expectedValue;
+      const receipt = validatePolicyProperties(request);
+      assert.deepEqual(
+        receipt.results.map(({ outcome, reason }) => [outcome, reason]),
+        [
+          ["pass", "not-applicable"],
+          ["pass", "platform-remediated"],
+          ["unsupported", "missing-expected-value"],
+        ],
+      );
+      assert.equal(hasValidPolicyValidation(receipt, receipt), true);
+    });
+
     it(`${track}: out-of-scope logical resources and dangerous paths are unsupported`, () => {
       const request = input(track);
       request.policyMap.mappings[0]!.logicalResourceId = "logresource";

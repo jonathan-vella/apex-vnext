@@ -203,8 +203,16 @@ corrections, not silent substitutions.
 
 Azure Policy always wins in both profiles. Follow [issue #344](https://github.com/jonathan-vella/apex-vnext/issues/344):
 a scheduled/manual GitHub Actions collector exports effective management-group policy, including inheritance and
-exemptions, to one reviewed committed JSON baseline. Resolve the subscription from the run scope, import only its entry,
-and preserve discovery, reconciliation, governance review, then Gate 2.
+exemptions, to one reviewed committed JSON baseline. Resolve the subscription from the run scope, import only its entry.
+Governance discovery runs after Gate 1 and before Architecture ([DECISION-030](DECISIONS.md)); the Architect maps every
+enforcing finding inside Architecture, the Architecture review checks the map, then Gate 2.
+
+When no reviewed subscription baseline exists, discovery imports the shipped ALZ Corp reference baseline, generated
+from a pinned Azure Landing Zones Library release (root, landing zones and corp archetypes) in the collector's finding
+format. Local targets always use it. For a subscription target it supports design, pricing and Gate 2 (for example
+pre-sales without Azure access) but cannot authorize planning: the reviewed subscription baseline replaces it before
+Gate 3. Findings whose resource types match no designed component are marked `not-applicable` by the kernel; any other
+`not-applicable` disposition needs a factual reason.
 
 The consumer repository owns the collection workflow, variables and GitHub Secrets/environment settings. Prefer OIDC
 with a read-only collection identity separate from deployment authority; never commit credentials. Azure remains the
@@ -231,7 +239,8 @@ applicable effects need a mapped or explicit disposition. Missing, stale, unmapp
 be surfaced under existing governance checks, never interpreted as no policy.
 
 The same collector/import contract must represent a standalone subscription's effective policies or an evidenced empty
-result; labs do not require an ALZ hierarchy. No new Governance agent, hidden worker, local live discovery path,
+result; labs do not require an ALZ hierarchy. The reference baseline is an assumption, not evidence of a consumer's
+policy. No new Governance agent, hidden worker, local live discovery path,
 capability-pack execution, external storage, GitHub artifact delivery or new gate. The full baseline stays outside MCP
 payloads, task/model context and journals. Copied COE policy is not consumer authority. A baseline does not guarantee
 that Azure Policy will remain unchanged at deployment time.

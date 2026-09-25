@@ -18,15 +18,10 @@ test("retired paths remain absent without requiring historical evidence", () => 
   }
 });
 
-test("all four review requirements survive workflow cleanup", () => {
+test("all review requirements survive workflow cleanup", () => {
   const workflow = JSON.parse(readFileSync("config/workflow.v1.json", "utf8"));
   assert.deepEqual(validateReviewDependencies(workflow), []);
-  for (const review of [
-    "requirements-review",
-    "architecture-review",
-    "governance-reconciliation-review",
-    "plan-review",
-  ]) {
+  for (const review of ["requirements-review", "architecture-review", "plan-review"]) {
     const changed = structuredClone(workflow);
     for (const node of changed.nodes)
       node.sourceDependencies = node.sourceDependencies.filter((dependency) => dependency !== review);

@@ -259,7 +259,17 @@ application-level or specific to the `local` target. The run paused at planning 
 - **Local governance.** The Planner treated `local` governance as blocking after the kernel issued its task. Its
   guidance now records kernel-accepted governance and accepted risks as plan assumptions.
 
-The next clean run uses a subscription-bound target with a reviewed governance baseline.
+On 2026-09-24 a subscription-bound run on `main` `371e2b6` (run `b1903107`, `apex-shared` resource group) imported a
+reviewed baseline collected read-only with `-IncludeDescendants` (328 policies, 59 enforcing). The `nextTask` and
+`/agent` routing fixes held, and the maintainer approved Gate 1. Two gaps remained:
+
+- **Project inference.** Given "start a new workload" while a project was selected, the coordinator created a second
+  project from inferred values instead of asking. Its guidance now forbids deriving project values and asks whether to
+  continue the selected project.
+- **Unworkable reconciliation.** The kernel required one mapping per enforcing finding, but the Operator saw only
+  aggregate counts and had no disposition for policies on undesigned resource types. The maintainer decided on
+  [DECISION-030](DECISIONS.md): governance before Architecture, an ALZ Corp reference baseline, Architect-owned
+  mapping and kernel `not-applicable` marking.
 
 ## Execution Rules
 

@@ -68,7 +68,7 @@ function requireMetadata(metadata: BoundEnvelopeMetadata): void {
 }
 
 function decodePayload(value: string): Buffer {
-  if (value.length === 0 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {
+  if (value.length === 0 || value.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(value)) {
     throw new Error("Bound envelope payload is invalid base64");
   }
   const payload = Buffer.from(value, "base64");

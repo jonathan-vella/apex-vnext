@@ -423,8 +423,8 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
     requirementsComplete: { method: "completeRequirements", input: { taskId, requirements: {} }, args: [taskId, {}] },
     architectureComplete: {
       method: "completeArchitecture",
-      input: { taskId, architecture: {}, costEstimate: {}, decisionManifest: {} },
-      args: [taskId, {}, {}, {}],
+      input: { taskId, architecture: {}, costEstimate: {}, decisionManifest: {}, policyMappings: [] },
+      args: [taskId, {}, {}, {}, []],
     },
     reviewComplete: { method: "completeReview", input: { taskId, findings: [] }, args: [taskId, [], undefined] },
     planComplete: {

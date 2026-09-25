@@ -20,9 +20,11 @@ effective result supplied by governance evidence rather than assuming the neares
 
 ## Reconciliation
 
-Map each applicable constraint to a typed property, architecture adaptation, binding decision, dependent resource,
-evidence obligation, accepted exception, or explicit blocker. Account for auto-deployed resources in ownership, cost,
-and drift expectations.
+The Architect maps each enforcing finding (deny, modify, deployIfNotExists) during Architecture to a component,
+property and disposition, or to `not-applicable` with a reason. APEX marks findings whose resource types match no
+designed component not-applicable. Map each applicable constraint to a typed property, architecture adaptation,
+binding decision, dependent resource, evidence obligation, or explicit blocker. Account for auto-deployed resources
+in ownership, cost, and drift expectations.
 
 Return a blocker when discovery is incomplete, a required parameter is unresolved, or the selected track/module cannot
 represent the effect. Do not query assignments, create exemptions, or claim remediation from this skill.

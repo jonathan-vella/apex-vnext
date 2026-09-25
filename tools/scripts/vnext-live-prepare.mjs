@@ -3,7 +3,7 @@
 
 import { execFile as execFileCallback } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, readdir, rename, rm } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import process from "node:process";
@@ -56,12 +56,12 @@ export function parsePrepareArgs(argv) {
       values[key] = value;
     }
   }
-  const allowed = new Set(["yes", "replace_existing", "track", "actor", "subscription"]);
+  const allowed = new Set(["yes", "replace_existing", "track", "actor", "subscription", "baseline"]);
   for (const key of Object.keys(values)) {
     if (!allowed.has(key)) throw new Error(`Unknown argument: --${key.replaceAll("_", "-")}`);
   }
   if (values.yes !== true) throw new Error("qualification preparation requires --yes");
-  for (const key of ["track", "actor", "subscription"]) {
+  for (const key of ["track", "actor", "subscription", "baseline"]) {
     if (typeof values[key] !== "string" || values[key].trim().length === 0) {
       throw new Error(`Missing --${key}`);
     }
@@ -132,37 +132,34 @@ async function sourceTree(root, track) {
   return { relativeRoot, absoluteRoot, entries, treeHash: sha256Json(entries) };
 }
 
-function governanceSummary(governance) {
-  const findings = Array.isArray(governance.findings) ? governance.findings : [];
-  const count = (effect) => findings.filter((finding) => finding.effect === effect).length;
-  return {
-    assignmentCount: Number(governance.discovery_summary?.assignment_kept ?? 0),
-    denyCount: count("deny"),
-    modifyCount: count("modify"),
-    auditCount: count("audit"),
-    exemptionCount: findings.filter((finding) => finding.exemption != null).length,
-  };
-}
+const STORAGE_TYPE = "microsoft.storage/storageaccounts";
 
-function policyMappings(governance) {
-  const supported = new Set(["deny", "modify", "append", "audit", "deployIfNotExists", "disabled"]);
-  return (Array.isArray(governance.findings) ? governance.findings : []).flatMap((finding, index) => {
-    if (!supported.has(finding.effect)) return [];
-    const policyAssignmentId = finding.assignment_id ?? finding.policy_id;
-    if (typeof policyAssignmentId !== "string" || policyAssignmentId.length === 0) return [];
-    return [
-      {
-        policyAssignmentId,
-        effect: finding.effect,
-        logicalResourceId: "qualification-storage",
-        propertyPath:
-          typeof finding.azurePropertyPath === "string" && finding.azurePropertyPath.length > 0
-            ? finding.azurePropertyPath
-            : `/applicability/${index}`,
-        ...(finding.required_value == null ? {} : { expectedValue: finding.required_value }),
-        disposition: "planned",
-      },
-    ];
+function qualificationPolicyMappings(findings) {
+  return findings.map((finding) => {
+    const identity = {
+      policyAssignmentId: finding.policyAssignmentId,
+      policyDefinitionId: finding.policyDefinitionId,
+      ...(finding.policyDefinitionReferenceId === undefined
+        ? {}
+        : { policyDefinitionReferenceId: finding.policyDefinitionReferenceId }),
+      effect: finding.effect,
+    };
+    const types = finding.resourceTypes.map((type) => type.toLowerCase());
+    return types.length > 0 && !types.includes(STORAGE_TYPE)
+      ? {
+          ...identity,
+          logicalResourceId: "none",
+          propertyPath: "type",
+          disposition: "not-applicable",
+          reason: `The qualification marker deploys no ${finding.resourceTypes.join(", ")} resource`,
+        }
+      : {
+          ...identity,
+          logicalResourceId: "qualification-storage",
+          propertyPath: "properties",
+          ...(finding.requiredValue === undefined ? {} : { expectedValue: finding.requiredValue }),
+          disposition: "planned",
+        };
   });
 }
 
@@ -206,14 +203,10 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
   if (typeof requiredToolVersion !== "string" || !/^\d+\.\d+\.\d+$/u.test(requiredToolVersion)) {
     throw new Error(`Missing canonical ${track} tool version pin`);
   }
-  const governancePath = join(root, "agent-output/vnext-qualification/04-governance-constraints.json");
-  const governanceBytes = await readFile(governancePath);
-  const governance = JSON.parse(governanceBytes.toString("utf8"));
   const mainPath = join(tree.absoluteRoot, track === "bicep" ? "main.bicep" : "main.tf");
   const mainSource = await readFile(mainPath, "utf8");
   const sourceHash = sha256Json({
     candidate: availability.candidateSha,
-    governance: sha256Bytes(governanceBytes),
     tree: tree.treeHash,
   });
   const requirements = {
@@ -262,6 +255,7 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
       {
         id: "qualification-storage",
         service: price.productName,
+        resourceTypes: ["Microsoft.Storage/storageAccounts"],
         purpose: "Isolated lifecycle marker and diagnostics target",
         requirementIds: requirements.requirements.map(({ id }) => id),
         dependsOn: [],
@@ -359,41 +353,9 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
     ],
     revisions: [{ number: 1, createdAt: now, sourceHash, reason: "Exact repository qualification candidate" }],
   };
-  const exceptionExpiry = governance.security_exceptions?.find(
-    ({ id }) => id === "vnext-qualification-backend-entra-session",
-  )?.expires_at;
-  const discoveredAt = new Date(governance.discovered_at).toISOString();
-  const expiresAt = new Date(
-    exceptionExpiry ?? Date.parse(governance.discovered_at) + 24 * 60 * 60 * 1000,
-  ).toISOString();
-  const governanceArtifact = {
-    schemaVersion: "1.0.0",
-    projectId: PROJECT_ID,
-    runId,
-    targetScope,
-    discoveredAt,
-    expiresAt,
-    summary: governanceSummary(governance),
-    constraintsRef: {
-      mediaType: "application/json",
-      uri: "agent-output/vnext-qualification/04-governance-constraints.json",
-      digest: sha256Bytes(governanceBytes),
-      bytes: governanceBytes.byteLength,
-    },
-  };
-  const governanceHash = sha256Json(governanceArtifact);
-  const policyMap = {
-    schemaVersion: "1.0.0",
-    projectId: PROJECT_ID,
-    runId,
-    governanceHash,
-    mappings: policyMappings(governance),
-  };
   const sourceHashes = {
     requirements: requirementsHash,
     architecture: sha256Json(architecture),
-    "governance-constraints": governanceHash,
-    "policy-property-map": sha256Json(policyMap),
   };
   const intent = {
     schemaVersion: "1.0.0",
@@ -480,8 +442,6 @@ export async function buildQualificationArtifacts({ root, track, subscription, r
     workloadDecisionManifest,
     architecture,
     costEstimate,
-    governanceArtifact,
-    policyMap,
     intent,
     binding,
     environmentInputs,
@@ -771,10 +731,37 @@ export async function prepareQualificationState(args, dependencies = {}) {
       },
     ]);
     await service.decideGateNumber(1, "approved", args.actor);
-    const architecture = await complete(service, "architecture", [
+    const baselinePath = ".github/data/governance-policy-baseline.json";
+    await mkdir(join(root, ".github/data"), { recursive: true });
+    if (resolve(args.baseline) !== join(root, baselinePath))
+      await copyFile(resolve(args.baseline), join(root, baselinePath));
+    await taskId(service, "governance-discovery");
+    const governanceHash = (await service.importGovernanceBaseline(baselinePath)).outputHash;
+    const architectureTask = await taskId(service, "architecture");
+    let serializedFindings = "";
+    for (let offset = 0; offset !== undefined;) {
+      const chunk = await service.readTaskInput(
+        architectureTask,
+        offset,
+        6_000,
+        "governance-findings:Microsoft.Storage/storageAccounts",
+      );
+      serializedFindings += chunk.content;
+      offset = chunk.nextOffset;
+    }
+    const governanceFindings = JSON.parse(serializedFindings);
+    artifacts.policyMap = {
+      schemaVersion: "1.0.0",
+      projectId: PROJECT_ID,
+      runId,
+      governanceHash,
+      mappings: qualificationPolicyMappings(governanceFindings),
+    };
+    const architecture = await service.completeTaskOutputs(architectureTask, [
       { kind: "architecture", value: artifacts.architecture },
       { kind: "cost-estimate", value: artifacts.costEstimate },
       { kind: "workload-decision-manifest", value: artifacts.workloadDecisionManifest },
+      { kind: "policy-property-map", value: artifacts.policyMap },
     ]);
     await complete(service, "architecture-review", [
       {
@@ -782,25 +769,12 @@ export async function prepareQualificationState(args, dependencies = {}) {
         value: review(PROJECT_ID, runId, "architecture", architecture.outputHashes.architecture, now),
       },
     ]);
-    const governance = await complete(service, "governance-discovery", [
-      { kind: "governance-constraints", value: artifacts.governanceArtifact },
-    ]);
-    artifacts.policyMap.governanceHash = governance.outputHashes["governance-constraints"];
-    const policy = await complete(service, "governance-reconciliation", [
-      { kind: "policy-property-map", value: artifacts.policyMap },
-    ]);
-    await complete(service, "governance-review", [
-      {
-        kind: "review-findings",
-        value: review(PROJECT_ID, runId, "policy-property-map", policy.outputHashes["policy-property-map"], now),
-      },
-    ]);
     await service.decideGateNumber(2, "approved", args.actor);
     artifacts.intent.sourceHashes = {
       requirements: requirements.outputHashes.requirements,
       architecture: architecture.outputHashes.architecture,
-      "governance-constraints": governance.outputHashes["governance-constraints"],
-      "policy-property-map": policy.outputHashes["policy-property-map"],
+      "governance-constraints": governanceHash,
+      "policy-property-map": architecture.outputHashes["policy-property-map"],
     };
     artifacts.binding.intentHash = sha256Json(artifacts.intent);
     artifacts.handoff.intentHash = sha256Json(artifacts.intent);

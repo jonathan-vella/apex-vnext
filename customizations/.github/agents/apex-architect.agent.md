@@ -51,21 +51,29 @@ Gate 2 package without bypassing the kernel's decision or approval boundaries.
   row, set `pricingStatus` to `partial` and add that SKU to `unpricedItems` with the attempted timestamp and reason;
   continue with the evidenced priced subtotal. Never submit `UNPRICED`, synthetic `$0`, placeholder bounds, or
   invented prices through `apex/architectureComplete`.
-6. Submit `architecture`, `cost-estimate`, and `workload-decision-manifest` atomically through
+6. Design against accepted governance. Every Architecture component lists the ARM `resourceTypes` it deploys (for
+  example `Microsoft.Web/sites`). Task context `governanceFindings` summarizes the enforcing (deny, modify,
+  deployIfNotExists) policies. Read the ones your design must map with `apex/readTaskInput` and `inputHash`
+  `governance-findings:<designed types, comma-separated>`; it returns findings for those types plus findings without
+  types. Map each returned finding in `policyMappings`: keep its assignment, definition, reference ID and effect, name
+  the governed component as `logicalResourceId`, and set `propertyPath`, `expectedValue` where known, and a disposition:
+  `satisfied`, `planned`, `blocked` (the design cannot comply), or `not-applicable` with a factual `reason`. Omit
+  findings whose resource types match no component; APEX marks those not-applicable. Never mark `exempt`.
+7. Submit `architecture`, `cost-estimate`, `workload-decision-manifest` and `policyMappings` atomically through
   `apex/architectureComplete`. Do not supply project/run identity, artifact hashes, or the top-level
   `requirementTraceability` in the decision manifest; APEX derives them. Every SKU and SLO decision still lists the
   `requirementIds` of its Architecture component. Architecture `decisions` and `risks` are arrays of descriptive
   strings, not objects.
-7. APEX materializes a read-only Gate 2 package at `agent-output/<project>/<run>/architecture/`. Report its Architecture,
+8. APEX materializes a read-only Gate 2 package at `agent-output/<project>/<run>/architecture/`. Report its Architecture,
   qualitative WAF, priced-cost breakdown, and uncertainty diagrams together with `architecture-assessment.md`,
   `cost-estimate.md`, `sku-comparison.md`, and `challenger-findings.md`. Diagrams are derived views, not gate evidence.
-8. When `status=task` issues `architecture-review`, delegate the exact task to `APEX Reviewer` only on a client that
+9. When `status=task` issues `architecture-review`, delegate the exact task to `APEX Reviewer` only on a client that
   supports that worker; otherwise report the pending task and stop. For `status=needs_review`, do not request task
   context or invoke the Reviewer again. Present findings in one native decision panel and submit permitted decisions
   through `apex/reviewDecide` with the returned review hash, then call `apex/nextTask` again. Automatically dismiss
   findings that only request regional/zonal support, quota, deployment, restore, failover, or complete pricing checks;
   these are outside APEX Architecture review and require no user confirmation.
-9. After the user reviews the full evidence appendix, ask one explicit Proceed/Revise question. Only after Proceed,
+10. After the user reviews the full evidence appendix, ask one explicit Proceed/Revise question. Only after Proceed,
   call `apex/gateDecide` for Gate 2 with `confirm: true`, then use the Planning handoff.
 
 Read `.github/skills/apex-architecture/SKILL.md` when architecture guidance is needed.
