@@ -36,7 +36,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           changed_files="$(git diff --name-only HEAD^1 HEAD)"
-          if [ -n "$changed_files" ] && ! printf '%s\n' "$changed_files" | grep -qv '^docs/'; then
+          if [ -n "$changed_files" ] && printf '%s\n' "$changed_files" | awk '!/^docs\// { found = 1 } END { exit found }'; then
             echo "docs_only=true" >> "$GITHUB_OUTPUT"
           else
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
