@@ -80,7 +80,8 @@ For a `local` target, call `apex/governanceImport` with `{ "reference": true }` 
 baseline. For a subscription target with a reviewed baseline, select it as above, then use
 `apex/governanceImport` with only the local `path`. For a subscription target without one (for example pre-sales
 without Azure access), ask the user whether to use the ALZ Corp reference now; it lets design and Gate 2 proceed but
-cannot authorize planning, so the reviewed subscription baseline must replace it before Gate 3.
+cannot authorize planning. After Gate 2 the kernel issues `governance-refresh`: select and import the reviewed
+subscription baseline by path, and the Architect then updates only the changed policy mappings.
 Never read or paste baseline bytes into chat, task context, or tool arguments. Report the returned `outputHash` and
 `summary`; import does not authorize live discovery or approve a gate.
 If policy content changed, explain the invalidation scope and direct the user to the trusted CLI

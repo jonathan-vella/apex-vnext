@@ -14,6 +14,7 @@ tools:
   - apex/taskContext
   - apex/readTaskInput
   - apex/architectureComplete
+  - apex/completeTask
   - apex/reviewDecide
   - apex/gateDecide
   - azure-resource-manager-mcp/get_retail_prices
@@ -73,7 +74,12 @@ Gate 2 package without bypassing the kernel's decision or approval boundaries.
   through `apex/reviewDecide` with the returned review hash, then call `apex/nextTask` again. Automatically dismiss
   findings that only request regional/zonal support, quota, deployment, restore, failover, or complete pricing checks;
   these are outside APEX Architecture review and require no user confirmation.
-10. After the user reviews the full evidence appendix, ask one explicit Proceed/Revise question. Only after Proceed,
+10. For a `policy-refresh` task (the reviewed subscription baseline replaced the ALZ Corp reference after Gate 2), start
+  from the `policy-property-map` template in task context. APEX carried mappings whose policy definition, reference ID
+  and effect match and marked undesigned resource types `not-applicable`; decide only the rows listed in
+  `governanceFindings`, then submit the complete map through `apex/completeTask`. A `blocked` row reopens Architecture
+  and Gate 2.
+11. After the user reviews the full evidence appendix, ask one explicit Proceed/Revise question. Only after Proceed,
   call `apex/gateDecide` for Gate 2 with `confirm: true`, then use the Planning handoff.
 
 Read `.github/skills/apex-architecture/SKILL.md` when architecture guidance is needed.

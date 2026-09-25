@@ -123,6 +123,7 @@ import {
   GovernanceBaselineError,
   nativePolicyValidationBinding,
   assertGeneratedSourceUnchanged,
+  type GovernanceBaselineFinding,
   type GovernanceBaselineSelection,
   type CapabilityPackInstallOptions,
   type IacProvider,
@@ -394,6 +395,13 @@ const TASKS: readonly WorkflowTaskDescriptor[] = [
     outputs: ["architecture", "cost-estimate", "workload-decision-manifest", "policy-property-map"],
   },
   { id: "architecture-review", role: "reviewer", outputs: ["review-findings"], reviewSubject: "architecture", gate: 2 },
+  {
+    id: "governance-refresh",
+    role: "governance-operator",
+    outputs: ["governance-constraints"],
+    capabilities: ["governance-discovery"],
+  },
+  { id: "policy-refresh", role: "architect", outputs: ["policy-property-map"] },
   { id: "plan", role: "planner", outputs: ["implementation-intent", "iac-binding", "environment-inputs"] },
   { id: "plan-review", role: "reviewer", outputs: ["review-findings"], reviewSubject: "plan", gate: 3 },
   { id: "codegen-bicep", role: "bicep-codegen", outputs: ["logical-resource-manifest", "iac-handoff"], track: "bicep" },
@@ -2593,6 +2601,8 @@ export class ApexService {
         outputTemplates[kind as ArtifactKind] = this.outputTemplate(kind as ArtifactKind, run, events, task.taskType);
       }
     }
+    if (task.taskType === "policy-refresh")
+      outputTemplates["policy-property-map"] = (await this.refreshedPolicyMap(run, events)).policyMap;
     const requirementsRevision = this.pendingRequirementsRevision(events);
     const requirementsCandidateHash = requirementsRevision?.candidateHash ?? this.previousRequirementsHash(events);
     if (task.taskType === "requirements" && requirementsCandidateHash !== undefined)
@@ -2615,7 +2625,21 @@ export class ApexService {
       decisions: task.taskType === "architecture" ? this.architectureDecisionValues(events, task.taskId) : {},
       ...(task.taskType === "architecture"
         ? { governanceFindings: await this.governanceFindingsSummary(run, events) }
-        : {}),
+        : task.taskType === "policy-refresh"
+          ? {
+              governanceFindings: (await this.refreshedPolicyMap(run, events)).delta.map((finding) => ({
+                policyAssignmentId: finding.assignmentId,
+                policyDefinitionId: finding.policyId,
+                ...(finding.policyDefinitionReferenceId === undefined
+                  ? {}
+                  : { policyDefinitionReferenceId: finding.policyDefinitionReferenceId }),
+                effect: finding.effect,
+                displayName: finding.displayName,
+                resourceTypes: finding.resourceTypes,
+                ...(finding.requiredValue === undefined ? {} : { requiredValue: finding.requiredValue }),
+              })),
+            }
+          : {}),
       outputTemplates,
       reviewMetadata,
       ...(reviewMetadata === undefined
@@ -3462,12 +3486,17 @@ export class ApexService {
         throw new ApexError("APEX_STALE", "Governance import must use the selected candidate path", EXIT_CODES.stale);
       await this.assertGovernanceCandidate(run, state.request, state.choice, bytes);
     }
-    if (governanceHash === undefined) {
+    const refreshing =
+      governanceHash !== undefined &&
+      (await this.objects.getJson<GovernanceConstraintsV1>(governanceHash)).source === "reference";
+    const expectedTask = refreshing ? "governance-refresh" : "governance-discovery";
+    const expectedLabel = refreshing ? "governance refresh" : "discovery";
+    if (governanceHash === undefined || refreshing) {
       const route = await this.route(run, events);
-      if (route.task?.id !== "governance-discovery" || route.blockers.length > 0)
+      if (route.task?.id !== expectedTask || route.blockers.length > 0)
         throw new ApexError(
           "APEX_AUTHORIZATION",
-          "Governance import requires the active discovery task",
+          `Governance import requires the active ${expectedLabel} task`,
           EXIT_CODES.authorization,
         );
     }
@@ -3493,7 +3522,7 @@ export class ApexService {
             observedAt: selection.constraints.discoveredAt,
           }
         : undefined;
-    if (governanceHash !== undefined) {
+    if (governanceHash !== undefined && !refreshing) {
       const governance = await this.objects.getJson<GovernanceConstraintsV1>(governanceHash);
       if (governance.constraintsRef.uri !== `apex-object:${governance.constraintsRef.digest}`)
         throw new ApexError(
@@ -3592,10 +3621,10 @@ export class ApexService {
       return { outputHash: governanceHash, summary: "Unchanged governance observation renewed" };
     }
     const route = await this.route(run, events);
-    if (route.task?.id !== "governance-discovery" || route.blockers.length > 0)
+    if (route.task?.id !== expectedTask || route.blockers.length > 0)
       throw new ApexError(
         "APEX_AUTHORIZATION",
-        "Governance import requires the active discovery task",
+        `Governance import requires the active ${expectedLabel} task`,
         EXIT_CODES.authorization,
       );
     const digest = await this.objects.putJson(selectedSnapshot);
@@ -4036,7 +4065,50 @@ export class ApexService {
     taskId: string,
     outputs: TaskOutput[],
   ): Promise<{ outputHashes: Partial<Record<ArtifactKind, string>>; summary: string }> {
-    return this.acceptTaskOutputs(taskId, outputs);
+    const run = await this.currentRun();
+    const refresh = (await this.readTask(run, taskId)).taskType === "policy-refresh";
+    const completed = await this.acceptTaskOutputs(taskId, outputs);
+    const policy = outputs.find(({ kind }) => kind === "policy-property-map")?.value as PolicyPropertyMapV1 | undefined;
+    if (!refresh || !policy?.mappings.some(({ disposition }) => disposition === "blocked")) return completed;
+    await this.reopenArchitecture("Refreshed subscription governance blocks the approved Architecture");
+    return {
+      ...completed,
+      summary: "Refreshed governance blocks the approved Architecture; Architecture and Gate 2 reopened",
+    };
+  }
+
+  private async reopenArchitecture(reason: string): Promise<void> {
+    const run = await this.currentRun();
+    const workflow = await this.lockedWorkflowEngine(run);
+    const nodeIds = [
+      ...new Set([
+        "architecture",
+        "architecture-review",
+        ...workflow.invalidationPlan("architecture", reason).map(({ nodeId }) => nodeId),
+      ]),
+    ];
+    const payload = {
+      reason,
+      nodeIds,
+      artifactKinds: [...new Set(TASKS.filter(({ id }) => nodeIds.includes(id)).flatMap(({ outputs }) => outputs))],
+    };
+    const events = await this.journal(run).replay();
+    const dependencyHash = this.dependencyRevision(run, [
+      ...events,
+      { type: "workflow.invalidated", payload } as EventV1,
+    ]);
+    await this.mutateRun(
+      run,
+      {
+        ...run,
+        gates: run.gates.map((gate) =>
+          nodeIds.includes(`gate-${gate.gate}`) ? invalidateGate(gate, dependencyHash, reason) : gate,
+        ),
+      },
+      "workflow.invalidated",
+      payload,
+      events.at(-1)?.hash ?? null,
+    );
   }
 
   async completeRequirements(
@@ -8250,6 +8322,9 @@ export class ApexService {
       })
       .filter(({ track }) => track === undefined || track === run.iacTool);
     for (const descriptor of ordered) {
+      if (descriptor.id === "governance-refresh" && !(await this.referenceGovernanceNeedsRefresh(run, events)))
+        continue;
+      if (descriptor.id === "policy-refresh" && !(await this.policyMapNeedsRefresh(events))) continue;
       if (completed.has(descriptor.id)) {
         const reviewBlockers = descriptor.reviewSubject === undefined ? [] : this.reviewBlockers(events, descriptor.id);
         if (reviewBlockers.length > 0)
@@ -8380,7 +8455,12 @@ export class ApexService {
       ),
     ];
     const route = engine.route({
-      run: { iacTool: run.iacTool, targetScope: run.targetScope },
+      run: {
+        iacTool: run.iacTool,
+        targetScope: run.targetScope,
+        governanceRefreshRequired: await this.referenceGovernanceNeedsRefresh(run, events),
+        policyRefreshRequired: await this.policyMapNeedsRefresh(events),
+      },
       artifacts,
       completedNodes,
       gateStates: Object.fromEntries(run.gates.map((gate) => [`gate-${gate.gate}`, gate.state])),
@@ -8540,7 +8620,7 @@ export class ApexService {
         );
       }
     }
-    if (descriptor.id === "governance-discovery") {
+    if (descriptor.id === "governance-discovery" || descriptor.id === "governance-refresh") {
       const governance = byKind["governance-constraints"] as GovernanceConstraintsV1;
       if (governance.constraintsRef.uri !== `apex-object:${governance.constraintsRef.digest}`)
         throw new ApexError(
@@ -8548,14 +8628,21 @@ export class ApexService {
           "Governance discovery accepts only an imported baseline or the shipped ALZ Corp reference",
           EXIT_CODES.validation,
         );
+      if (descriptor.id === "governance-refresh" && governance.source !== "collected")
+        throw new ApexError(
+          "APEX_VALIDATION",
+          "Governance refresh requires the reviewed subscription baseline",
+          EXIT_CODES.validation,
+        );
       await this.selectedGovernanceSnapshot(run, governance);
     }
-    if (descriptor.id === "architecture")
+    if (descriptor.id === "architecture" || descriptor.id === "policy-refresh")
       await this.assertPolicyMapCoverage(
         run,
         events,
         byKind["policy-property-map"] as PolicyPropertyMapV1,
-        byKind.architecture as ArchitectureV1,
+        (byKind.architecture as ArchitectureV1 | undefined) ??
+          (await this.objects.getJson<ArchitectureV1>(this.artifactHash(events, "architecture")!)),
       );
     if (descriptor.reviewSubject !== undefined) {
       const review = byKind["review-findings"] as {
@@ -8630,6 +8717,78 @@ export class ApexService {
         );
       })
     );
+  }
+
+  private async referenceGovernanceNeedsRefresh(run: RunConfigV1, events: EventV1[]): Promise<boolean> {
+    const hash = this.artifactHash(events, "governance-constraints");
+    return (
+      hash !== undefined &&
+      /^\/subscriptions\/[0-9a-f-]{36}(?:\/|$)/iu.test(run.targetScope) &&
+      (await this.objects.getJson<GovernanceConstraintsV1>(hash)).source === "reference"
+    );
+  }
+
+  private async policyMapNeedsRefresh(events: EventV1[]): Promise<boolean> {
+    const policyHash = this.artifactHash(events, "policy-property-map");
+    const governanceHash = this.artifactHash(events, "governance-constraints");
+    return (
+      policyHash !== undefined &&
+      governanceHash !== undefined &&
+      (await this.objects.getJson<PolicyPropertyMapV1>(policyHash)).governanceHash !== governanceHash
+    );
+  }
+
+  private async refreshedPolicyMap(run: RunConfigV1, events: EventV1[]) {
+    const previous = await this.objects.getJson<PolicyPropertyMapV1>(this.artifactHash(events, "policy-property-map")!);
+    const architecture = await this.objects.getJson<ArchitectureV1>(this.artifactHash(events, "architecture")!);
+    const designed = new Set(
+      architecture.components.flatMap(({ resourceTypes }) => resourceTypes.map((type) => type.toLowerCase())),
+    );
+    const carryKey = (definitionId: string | undefined, referenceId: string | undefined, effect: string) =>
+      [(definitionId ?? "").split("/").at(-1)!.toLowerCase(), referenceId ?? "", effect].join("\u0000");
+    const prior = new Map<string, PolicyPropertyMapV1["mappings"][number]>();
+    for (const mapping of previous.mappings) {
+      const key = carryKey(mapping.policyDefinitionId, mapping.policyDefinitionReferenceId, mapping.effect);
+      if (!prior.has(key)) prior.set(key, mapping);
+    }
+    const delta: GovernanceBaselineFinding[] = [];
+    const mappings = (await this.enforcingGovernanceFindings(run, events))
+      .filter(
+        ({ resourceTypes }) =>
+          resourceTypes.length === 0 || resourceTypes.some((type) => designed.has(type.toLowerCase())),
+      )
+      .map((finding) => {
+        const identity = {
+          policyAssignmentId: finding.assignmentId,
+          policyDefinitionId: finding.policyId,
+          ...(finding.policyDefinitionReferenceId === undefined
+            ? {}
+            : { policyDefinitionReferenceId: finding.policyDefinitionReferenceId }),
+          effect: finding.effect as PolicyPropertyMapV1["mappings"][number]["effect"],
+        };
+        const carried = prior.get(carryKey(finding.policyId, finding.policyDefinitionReferenceId, finding.effect));
+        if (carried !== undefined) {
+          const { policyDefinitionReferenceId: _reference, ...rest } = carried;
+          return { ...rest, ...identity };
+        }
+        delta.push(finding);
+        return {
+          ...identity,
+          logicalResourceId: "LOGICAL_RESOURCE_ID",
+          propertyPath: "PROPERTY_PATH",
+          disposition: "DISPOSITION" as unknown as PolicyPropertyMapV1["mappings"][number]["disposition"],
+        };
+      });
+    return {
+      delta,
+      policyMap: {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: run.projectId,
+        runId: run.runId,
+        governanceHash: this.artifactHash(events, "governance-constraints")!,
+        mappings,
+      } satisfies PolicyPropertyMapV1,
+    };
   }
 
   private async enforcingGovernanceFindings(run: RunConfigV1, events: EventV1[]) {
@@ -8923,8 +9082,10 @@ export class ApexService {
     let deploymentInventory: ResourceInventoryV1 | undefined;
     let importedPolicyEffects: string[] | undefined;
     const governance = artifacts["governance-constraints"] as GovernanceConstraintsV1 | undefined;
-    if (descriptor.id === "architecture" && governance !== undefined) {
-      const architecture = outputs.find(({ kind }) => kind === "architecture")?.value as ArchitectureV1 | undefined;
+    if ((descriptor.id === "architecture" || descriptor.id === "policy-refresh") && governance !== undefined) {
+      const architecture =
+        (outputs.find(({ kind }) => kind === "architecture")?.value as ArchitectureV1 | undefined) ??
+        (artifacts.architecture as ArchitectureV1 | undefined);
       const designed = new Set(
         (architecture?.components ?? []).flatMap(({ resourceTypes }) =>
           resourceTypes.map((type) => type.toLowerCase()),
