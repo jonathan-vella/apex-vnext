@@ -738,7 +738,18 @@ export async function prepareQualificationState(args, dependencies = {}) {
     await taskId(service, "governance-discovery");
     const governanceHash = (await service.importGovernanceBaseline(baselinePath)).outputHash;
     const architectureTask = await taskId(service, "architecture");
-    const { governanceFindings = [] } = await service.taskContext(architectureTask);
+    let serializedFindings = "";
+    for (let offset = 0; offset !== undefined;) {
+      const chunk = await service.readTaskInput(
+        architectureTask,
+        offset,
+        6_000,
+        "governance-findings:Microsoft.Storage/storageAccounts",
+      );
+      serializedFindings += chunk.content;
+      offset = chunk.nextOffset;
+    }
+    const governanceFindings = JSON.parse(serializedFindings);
     artifacts.policyMap = {
       schemaVersion: "1.0.0",
       projectId: PROJECT_ID,
