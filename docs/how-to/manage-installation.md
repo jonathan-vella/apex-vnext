@@ -108,8 +108,9 @@ npx --yes @apexops/cli bootstrap --create-repo --yes
 Omit `--create-repo` only when the workspace already has a `.git` boundary. Omitting `--project` leaves the workspace
 without a project, selected run or workload defaults. `apex status` reports `needs_project`; `doctor` checks workspace
 integrity without requiring Azure authentication, a backend or an IaC choice. Open the workspace APEX agent to gather
-project details and invoke `projectCreate`. Explicit `apex init` or `project create` remains available for automation
-that already knows those details. Use `--file onboarding.json --yes` for validated noninteractive workspace settings.
+project details, including the `partner` or `customer` risk-owner role, and invoke `projectCreate`. Explicit
+`apex init` or `project create` remains available for automation that already knows those details. Use
+`--file onboarding.json --yes` for validated noninteractive workspace settings.
 
 Repeating `bootstrap --yes` for matching, intact workspace setup returns `resumed: true`, without
 reinstalling packages, rewriting managed files or creating another run. Explicitly supplied settings must match the

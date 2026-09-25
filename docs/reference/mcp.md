@@ -22,13 +22,15 @@ APEX server with independent state.
 | `requirementsComplete` | Complete Requirements without constructing a generic bundle.          |
 | `architectureComplete` | Complete Architecture, cost, and decisions atomically.                |
 | `reviewComplete`       | Complete a review with APEX-derived identity and evidence binding.    |
-| `reviewDecide`         | Revise, acknowledge owned obligations, or accept time-bound risk.     |
+| `reviewDecide`         | Revise, acknowledge obligations, or accept risk with project owner and 90-day default expiry. |
 | `planComplete`         | Complete a plan with an APEX-derived intent binding.                  |
 
 Handle `needs_input` before requesting task context. Only a `nextTask` result with `status=task` provides a valid task
 ID. New Requirements runs return three adaptive panels before the task. Handle `needs_review` through the returned
 finding actions and `reviewDecide`.
 The returned request ID, expected head, and owner epoch are required for `recordInput`.
+`projectCreate` requires `riskOwner` (`partner` or `customer`). `reviewDecide` accept-risk decisions derive owner from
+that project value; omit `expiresAt` to use the 90-day default.
 
 ## Read And Operations Tools
 

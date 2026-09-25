@@ -405,7 +405,7 @@ test("exports content-free pending and recorded input evidence from a real works
   const root = await mkdtemp(join(tmpdir(), "apex-input-adapter-"));
   context.after(() => rm(root, { recursive: true, force: true }));
   const service = new ApexService(root);
-  await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+  await service.init({ projectId: "demo", riskOwner: "partner", clientId: "github-copilot-cli" });
   const pending = await service.nextTask();
   assert.equal(pending.status, "needs_input");
   if (pending.status !== "needs_input") return;
@@ -443,7 +443,7 @@ test("exports input evidence for the VS Code Copilot harness identity", async (c
   const root = await mkdtemp(join(tmpdir(), "apex-vscode-input-adapter-"));
   context.after(() => rm(root, { recursive: true, force: true }));
   const service = new ApexService(root);
-  await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+  await service.init({ projectId: "demo", riskOwner: "partner", clientId: "github-copilot-cli" });
   const pending = await service.nextTask();
   assert.equal(pending.status, "needs_input");
   await assert.rejects(
@@ -464,7 +464,7 @@ test("exports content-free restart evidence from distinct service instances", as
     const root = await mkdtemp(join(tmpdir(), "apex-restart-adapter-"));
     context.after(() => rm(root, { recursive: true, force: true }));
     const service = new ApexService(root);
-    const initialized = await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+    const initialized = await service.init({ projectId: "demo", riskOwner: "partner", clientId: "github-copilot-cli" });
     await service.nextTask();
     const instances = [];
     const evidence = await collectRestartEvidence(
@@ -497,7 +497,7 @@ test("restart evidence rejects state changes and managed projection drift", asyn
   const root = await mkdtemp(join(tmpdir(), "apex-restart-refusal-"));
   context.after(() => rm(root, { recursive: true, force: true }));
   const service = new ApexService(root);
-  const initialized = await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner", clientId: "github-copilot-cli" });
   await service.nextTask();
   const singleton = new ApexService(root);
   await assert.rejects(
@@ -530,7 +530,7 @@ test("restart evidence rejects journal mutation and malformed status", async (co
   const root = await mkdtemp(join(tmpdir(), "apex-restart-mutation-"));
   context.after(() => rm(root, { recursive: true, force: true }));
   const service = new ApexService(root);
-  await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+  await service.init({ projectId: "demo", riskOwner: "partner", clientId: "github-copilot-cli" });
   await service.nextTask();
   const status = await service.status();
   const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", status.run.runId, "journal"));
@@ -581,7 +581,7 @@ test("restart command refuses to overwrite an existing evidence file", async (co
   const root = await mkdtemp(join(tmpdir(), "apex-restart-output-"));
   context.after(() => rm(root, { recursive: true, force: true }));
   const service = new ApexService(root);
-  await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+  await service.init({ projectId: "demo", riskOwner: "partner", clientId: "github-copilot-cli" });
   await service.nextTask();
   const output = join(root, "existing.json");
   await writeFile(output, "preserve\n");
@@ -600,7 +600,7 @@ test("exports content-free pending and accepted writer transfer evidence", async
     const root = await mkdtemp(join(tmpdir(), "apex-transfer-adapter-"));
     context.after(() => rm(root, { recursive: true, force: true }));
     const service = new ApexService(root);
-    await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+    await service.init({ projectId: "demo", riskOwner: "partner", clientId: "github-copilot-cli" });
     const created = await service.createWriterTransfer({
       repository: "owner/repository",
       branch: "main",
@@ -635,7 +635,7 @@ test("writer transfer evidence rejects claim, ownership, and projection tamperin
     const root = await mkdtemp(join(tmpdir(), `apex-transfer-${name}-`));
     context.after(() => rm(root, { recursive: true, force: true }));
     const service = new ApexService(root);
-    const initialized = await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+    const initialized = await service.init({ projectId: "demo", riskOwner: "partner", clientId: "github-copilot-cli" });
     const created = await service.createWriterTransfer({
       repository: "owner/repository",
       branch: "main",
@@ -740,7 +740,7 @@ test("transfer command refuses to overwrite an existing evidence file", async (c
   const root = await mkdtemp(join(tmpdir(), "apex-transfer-output-"));
   context.after(() => rm(root, { recursive: true, force: true }));
   const service = new ApexService(root);
-  await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+  await service.init({ projectId: "demo", riskOwner: "partner", clientId: "github-copilot-cli" });
   await service.createWriterTransfer({
     repository: "owner/repository",
     branch: "main",
@@ -767,7 +767,7 @@ test("writer transfer evidence rejects mixed identity and owner epoch drift", as
   const root = await mkdtemp(join(tmpdir(), "apex-transfer-journal-"));
   context.after(() => rm(root, { recursive: true, force: true }));
   const service = new ApexService(root);
-  const initialized = await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner", clientId: "github-copilot-cli" });
   await service.createWriterTransfer({
     repository: "owner/repository",
     branch: "main",
@@ -814,7 +814,7 @@ test("input command refuses to overwrite an existing evidence file", async (cont
   const root = await mkdtemp(join(tmpdir(), "apex-input-output-"));
   context.after(() => rm(root, { recursive: true, force: true }));
   const service = new ApexService(root);
-  await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+  await service.init({ projectId: "demo", riskOwner: "partner", clientId: "github-copilot-cli" });
   await service.nextTask();
   const output = join(root, "existing.json");
   await writeFile(output, "preserve\n");
@@ -833,7 +833,7 @@ test("input evidence rejects malformed, replayed, and drifted source state", asy
     const root = await mkdtemp(join(tmpdir(), `apex-input-${name}-`));
     context.after(() => rm(root, { recursive: true, force: true }));
     const service = new ApexService(root);
-    await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+    await service.init({ projectId: "demo", riskOwner: "partner", clientId: "github-copilot-cli" });
     const pending = await service.nextTask();
     assert.equal(pending.status, "needs_input");
     if (pending.status !== "needs_input") throw new Error("fixture did not request input");

@@ -20,7 +20,12 @@ test("project store creates deterministic project and run layouts with four clos
   const root = await mkdtemp(join(tmpdir(), "apex-project-"));
   const clock = () => new Date("2026-01-01T00:00:00.000Z");
   const store = new ProjectStore(root, clock, () => "run-fixed");
-  await store.initializeProject({ projectId: "demo", displayName: "Demo", defaultIacTool: "bicep" });
+  await store.initializeProject({
+    projectId: "demo",
+    displayName: "Demo",
+    defaultIacTool: "bicep",
+    riskOwner: "partner",
+  });
   const run = await store.createRun("demo", {
     environment: "dev",
     targetScope: "/subscriptions/test",
@@ -93,6 +98,21 @@ test("kernel validates freeform, single-select, and multi-select answers", () =>
     ],
   );
   assert.throws(() => validateInputAnswers(questions, [{ questionId: "name", value: "one" }]), /exactly one answer/u);
+  assert.deepEqual(
+    validateInputAnswers(
+      [...questions, { id: "scale", prompt: "Scale?", optional: true }],
+      [
+        { questionId: "features", value: ["backup", "logs"] },
+        { questionId: "name", value: "demo" },
+        { questionId: "region", value: "sweden" },
+      ],
+    ),
+    [
+      { questionId: "name", value: "demo" },
+      { questionId: "region", value: "sweden" },
+      { questionId: "features", value: ["logs", "backup"] },
+    ],
+  );
   assert.throws(
     () =>
       validateInputAnswers(questions, [

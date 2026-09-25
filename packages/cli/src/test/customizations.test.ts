@@ -32,7 +32,7 @@ test("init installs and update refreshes managed customizations", async () => {
   await mkdir(join(source, ".github"), { recursive: true });
   await writeFile(join(source, ".github", "managed.md"), "v1\n");
   const service = new ApexService(root);
-  await service.init({ projectId: "demo", customizationsSource: source });
+  await service.init({ projectId: "demo", riskOwner: "partner", customizationsSource: source });
   const assertPortableLock = async () => {
     const lock = JSON.parse(await readFile(join(root, ".apex", "customizations.lock.json"), "utf8")) as {
       files: Array<{ path: string; baseRef: string }>;
@@ -70,7 +70,7 @@ test("init installs and update refreshes managed customizations", async () => {
 test("init installs bundled customizations and runtime config by default", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const coordinatorAgent = await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8");
   assert.match(coordinatorAgent, /name: APEX/u);
   assert.match(coordinatorAgent, /target: github-copilot/u);
@@ -227,7 +227,7 @@ test("init installs bundled customizations and runtime config by default", async
 test("init installs only the selected Copilot CLI projection and records it in the lock", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "demo", clientId: "github-copilot-cli" });
+  await service.init({ projectId: "demo", riskOwner: "partner", clientId: "github-copilot-cli" });
   for (const retired of [join(".vscode", "mcp.json"), join(".github", "mcp.json")])
     await assert.rejects(readFile(join(root, retired), "utf8"), /ENOENT/u);
   assert.match(await readFile(join(root, ".mcp.json"), "utf8"), /"recordInput"/u);
@@ -382,7 +382,7 @@ test("init installs only the selected Copilot CLI projection and records it in t
 test("missing customization selection fails closed and custom sources require explicit updates", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   await rm(join(root, ".apex", "customizations.selection.json"));
   await assert.rejects(service.update(), /Customization selection is missing/);
   await assert.rejects(service.reinstallCustomizations(), /Customization selection is missing/);
@@ -393,7 +393,7 @@ test("missing customization selection fails closed and custom sources require ex
   const customSource = await tempRoot();
   await writeFile(join(customSource, "custom.txt"), "custom\n");
   const custom = new ApexService(customRoot);
-  await custom.init({ projectId: "custom", customizationsSource: customSource });
+  await custom.init({ projectId: "custom", riskOwner: "partner", customizationsSource: customSource });
   await assert.rejects(custom.update(), (error: unknown) => error instanceof ApexError && error.code === "APEX_USAGE");
   await assert.rejects(
     custom.doctor(true, true),
@@ -408,7 +408,7 @@ test("missing customization selection fails closed and custom sources require ex
 test("rollback and recovery reject lock-controlled path escapes", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const lockPath = join(root, ".apex", "customizations.lock.json");
   const lock = JSON.parse(await readFile(lockPath, "utf8")) as Record<string, unknown>;
   await writeFile(lockPath, `${JSON.stringify({ ...lock, previousLockRef: "../outside.json" })}\n`);
@@ -430,7 +430,7 @@ test("rollback and recovery reject lock-controlled path escapes", async () => {
 test("update rejects lock-controlled customization base escapes", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const lockPath = join(root, ".apex", "customizations.lock.json");
   const lock = JSON.parse(await readFile(lockPath, "utf8")) as {
     files: Array<{ path: string; baseRef?: string }>;
@@ -448,7 +448,7 @@ test("update rejects lock-controlled customization base escapes", async () => {
 test("doctor does not read lock-controlled paths outside the workspace", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const outside = join(root, "..", "doctor-outside.txt");
   await writeFile(outside, "external sentinel\n");
   const outsideHash = createHash("sha256")
@@ -472,7 +472,7 @@ test("update refuses local managed-file conflicts", async () => {
   const source = await tempRoot();
   await writeFile(join(source, "managed.txt"), "base\n");
   const service = new ApexService(root);
-  await service.init({ projectId: "demo", customizationsSource: source });
+  await service.init({ projectId: "demo", riskOwner: "partner", customizationsSource: source });
   await writeFile(join(root, "managed.txt"), "local\n");
   await writeFile(join(source, "managed.txt"), "upstream\n");
   await assert.rejects(
@@ -486,7 +486,7 @@ test("update rolls back every managed file after an injected apply failure", asy
   const source = await tempRoot();
   await writeFile(join(source, "a.txt"), "a1\n");
   await writeFile(join(source, "b.txt"), "b1\n");
-  await new ApexService(root).init({ projectId: "demo", customizationsSource: source });
+  await new ApexService(root).init({ projectId: "demo", riskOwner: "partner", customizationsSource: source });
   await writeFile(join(source, "a.txt"), "a2\n");
   await writeFile(join(source, "b.txt"), "b2\n");
   const failing = new ApexService(root, {
@@ -505,7 +505,7 @@ test("update merges nonoverlapping text changes and deletes unchanged removed fi
   await writeFile(join(source, "managed.txt"), "one\ntwo\nthree\n");
   await writeFile(join(source, "removed.txt"), "remove\n");
   const service = new ApexService(root);
-  await service.init({ projectId: "demo", customizationsSource: source });
+  await service.init({ projectId: "demo", riskOwner: "partner", customizationsSource: source });
   await writeFile(join(root, "managed.txt"), "ONE\ntwo\nthree\n");
   await writeFile(join(source, "managed.txt"), "one\ntwo\nTHREE\n");
   await import("node:fs/promises").then(({ rm }) => rm(join(source, "removed.txt")));
@@ -522,7 +522,7 @@ test("customization install rejects symlinked destination ancestors", async () =
   await writeFile(join(source, ".github", "managed.md"), "managed\n");
   await symlink(outside, join(root, ".github"));
   await assert.rejects(
-    new ApexService(root).init({ projectId: "demo", customizationsSource: source }),
+    new ApexService(root).init({ projectId: "demo", riskOwner: "partner", customizationsSource: source }),
     (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
   );
   await assert.rejects(stat(join(outside, "managed.md")), /ENOENT/);
@@ -534,7 +534,7 @@ test("rollback restores the prior bundle and uninstall preserves modified files 
   await writeFile(join(source, "managed.txt"), "v1\n");
   await writeFile(join(source, "modified.txt"), "v1\n");
   const service = new ApexService(root);
-  await service.init({ projectId: "demo", customizationsSource: source });
+  await service.init({ projectId: "demo", riskOwner: "partner", customizationsSource: source });
   await writeFile(join(source, "managed.txt"), "v2\n");
   await writeFile(join(source, "modified.txt"), "v2\n");
   await service.update(source);
@@ -555,7 +555,7 @@ test("init refuses to overwrite an unrelated workspace file", async () => {
   await writeFile(join(source, "managed.txt"), "managed\n");
   await writeFile(join(root, "managed.txt"), "unrelated\n");
   await assert.rejects(
-    new ApexService(root).init({ projectId: "demo", customizationsSource: source }),
+    new ApexService(root).init({ projectId: "demo", riskOwner: "partner", customizationsSource: source }),
     (error: unknown) => error instanceof ApexError && error.code === "APEX_CONFLICT",
   );
   assert.equal(await readFile(join(root, "managed.txt"), "utf8"), "unrelated\n");
@@ -563,7 +563,7 @@ test("init refuses to overwrite an unrelated workspace file", async () => {
 
 test("promotion invalidates environment-specific gates when target scope changes", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const state = await service.status();
   const runPath = join(service.root, ".apex", "projects", "demo", "runs", state.run.runId, "run.json");
   const approved = {
@@ -591,7 +591,7 @@ test("doctor previews remedies without applying fixes", async () => {
 test("update rejects and doctor repairs a modified local Git boundary", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const boundary = join(root, ".apex", ".gitignore");
   await writeFile(boundary, "/local/\n");
   await assert.rejects(service.update(), /local Git boundary was modified/);
@@ -610,7 +610,7 @@ test("init writes a real runtime lock and doctor detects managed tampering", asy
     executableChecker: async () => true,
     azureAuthStatus: async () => ({ authenticated: true, detail: "injected" }),
   });
-  const initialized = await service.init({ projectId: "demo" });
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
   const lockBytes = await readFile(join(root, ".apex", "apex.lock.json"));
   const lock = JSON.parse(lockBytes.toString("utf8")) as {
     workflowHash: string;
@@ -646,7 +646,7 @@ test("init writes a real runtime lock and doctor detects managed tampering", asy
 test("existing runs use their immutable runtime generation", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const initial = await service.status();
   const generation = join(root, ".apex", "runtime-generations", initial.run.runtimeLockHash);
   assert.equal(
@@ -665,7 +665,7 @@ test("doctor and core routes work without shipped governance discovery packs", a
     executableChecker: async () => true,
     azureAuthStatus: async () => ({ authenticated: true, detail: "injected" }),
   });
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   const initial = await service.doctor();
   assert.equal(
     initial.checks.some(({ id }) => id.startsWith("capability-pack:")),

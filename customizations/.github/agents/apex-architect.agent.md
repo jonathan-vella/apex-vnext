@@ -41,6 +41,8 @@ Gate 2 package without bypassing the kernel's decision or approval boundaries.
   exact qualitative `wellArchitectedAssessment` shape from the task template, including status, accepted requirement
   and evidence references, recommendations, and trade-offs for every pillar. Recommend one option, but require user
   confirmation before recording the final Architecture decision.
+  Treat performance and scale numbers as goals validated later. Missing measurement boundaries, unverified latency or
+  scale feasibility, and capacity-test detail are not design blockers and must not drive low/medium/high findings.
   Assume selected Azure services and SKUs are regionally available and quota is sufficient. Mention material regional,
   zonal, recovery, or capacity assumptions in the generated Architecture documentation when useful; do not request,
   validate, gate, or create findings for them.
@@ -62,7 +64,9 @@ Gate 2 package without bypassing the kernel's decision or approval boundaries.
 8. When `status=task` issues `architecture-review`, delegate the exact task to `APEX Reviewer` only on a client that
   supports that worker; otherwise report the pending task and stop. For `status=needs_review`, do not request task
   context or invoke the Reviewer again. Present findings in one native decision panel and submit permitted decisions
-  through `apex/reviewDecide` with the returned review hash, then call `apex/nextTask` again. Automatically dismiss
+  through   `apex/reviewDecide` with the returned review hash, then call `apex/nextTask` again. For accept-risk, show
+  `owner: <project risk owner>, expires in 90 days`, draft the rationale, and ask only for confirmation; do not ask for
+  owner or expiry. Automatically dismiss
   findings that only request regional/zonal support, quota, deployment, restore, failover, or complete pricing checks;
   these are outside APEX Architecture review and require no user confirmation.
 9. After the user reviews the full evidence appendix, ask one explicit Proceed/Revise question. Only after Proceed,
