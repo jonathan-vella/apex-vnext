@@ -3113,17 +3113,23 @@ test("expired accepted risk can be replaced without reopening an open gate", asy
     },
   ]);
   const dependencyHash = sha256Json({ "review-findings": reviewHashes["review-findings"]! });
-  await service.resolveReview({
+  const acceptedRisk = {
     findingId: "F-1",
     reviewHash: reviewHashes["review-findings"]!,
     subjectHash: hashes.requirements!,
-    disposition: "accepted-risk",
+    disposition: "accepted-risk" as const,
     actor: "tester",
     rationale: "temporary exception",
     evidenceRefs: [],
     expiresAt: "2026-01-02T00:00:00.000Z",
     dependencyHash,
-  });
+  };
+  for (const owner of [undefined, "customer" as const])
+    await assert.rejects(
+      service.resolveReview({ ...acceptedRisk, ...(owner === undefined ? {} : { owner }) }),
+      (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
+    );
+  await service.resolveReview({ ...acceptedRisk, owner: "partner" });
   assert.equal((await service.status()).run.gates[0]?.state, "open");
 
   now = Date.parse("2026-01-03T00:00:00.000Z");

@@ -878,6 +878,7 @@ test("bootstrap reruns reuse matching intact state without commands or new runs"
     { iacTool: "bicep" as const },
     { targetScope: "/foreign" },
     { displayName: "Different" },
+    { riskOwner: "customer" as const },
   ]) {
     await assert.rejects(service.bootstrap({ ...input, ...changed }), /resume is blocked/);
     assert.deepEqual(await service.status(), before);

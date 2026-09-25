@@ -1503,6 +1503,7 @@ export class ApexService {
       (config.environment !== undefined && config.environment !== run.environment) ||
       (config.targetScope !== undefined && config.targetScope !== run.targetScope) ||
       (config.iacTool !== undefined && config.iacTool !== run.iacTool) ||
+      (config.riskOwner !== undefined && config.riskOwner !== project.riskOwner) ||
       (config.client !== undefined && config.client !== customization.clientId) ||
       customization.sourceMode !== "bundled-projection"
     )
@@ -5300,6 +5301,15 @@ export class ApexService {
         "APEX_AUTHORIZATION",
         `${finding.severity} findings cannot be accepted as risk by default policy`,
         EXIT_CODES.authorization,
+      );
+    if (
+      resolution.disposition === "accepted-risk" &&
+      resolution.owner !== (await this.projects.getProject(run.projectId)).riskOwner
+    )
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Accepted risk owner must match the project risk owner",
+        EXIT_CODES.validation,
       );
     const priorResolutions = events.flatMap((event) => {
       if (event.type !== "review.resolved") return [];

@@ -182,7 +182,7 @@ function evidenceClientId(options) {
 async function lifecycleClient(root, clientId, projectId, serviceFactory) {
   await mkdir(root, { recursive: false });
   const service = serviceFactory(root);
-  await service.init({ projectId, clientId: PROJECTION_CLIENT_ID });
+  await service.init({ projectId, clientId: PROJECTION_CLIENT_ID, riskOwner: "partner" });
   const lockPath = join(root, ".apex", "customizations.lock.json");
   const lock = async () => {
     const bytes = await readBoundedRegularFile(lockPath, MAX_MANAGED_FILE_BYTES, "Lifecycle customization lock");
@@ -228,7 +228,11 @@ async function prepareClient(root, clientId, projectId, serviceFactory, installR
     timeout: 30_000,
     maxBuffer: MAX_CLI_OUTPUT_BYTES,
   });
-  const initialized = await serviceFactory(root).init({ projectId, clientId: PROJECTION_CLIENT_ID });
+  const initialized = await serviceFactory(root).init({
+    projectId,
+    clientId: PROJECTION_CLIENT_ID,
+    riskOwner: "partner",
+  });
   await installRuntime(root, options);
   const launcher = join(root, QUALIFICATION_RUNTIME_LAUNCHER_PATH);
   await mkdir(dirname(launcher), { recursive: true });
