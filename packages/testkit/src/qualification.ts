@@ -438,7 +438,14 @@ async function completeCreativeWorkflow(context: TrackContext): Promise<void> {
   const governanceHash = (await context.service.importGovernanceReference()).outputHash;
   const architectureValue = architecture(context);
   const costValue = costEstimate(context);
-  const architectureHashes = await complete(context, "architecture", (projection) => [
+  const run = await context.service["currentRun"]();
+  const findings = (
+    await context.service["enforcingGovernanceFindings"](run, await context.service["journal"](run).replay())
+  ).filter(
+    ({ resourceTypes }: { resourceTypes: readonly string[] }) =>
+      resourceTypes.length === 0 || resourceTypes.includes("Microsoft.Web/sites"),
+  );
+  const architectureHashes = await complete(context, "architecture", [
     { kind: "architecture", value: architectureValue },
     { kind: "cost-estimate", value: costValue },
     {
@@ -450,7 +457,7 @@ async function completeCreativeWorkflow(context: TrackContext): Promise<void> {
         sha256Json(costValue),
       ),
     },
-    { kind: "policy-property-map", value: policyMap(context, governanceHash, projection) },
+    { kind: "policy-property-map", value: policyMap(context, governanceHash, findings) },
   ]);
   await complete(context, "architecture-review", [
     { kind: "review-findings", value: review(context, "architecture", architectureHashes.architecture!) },
@@ -477,7 +484,7 @@ async function completeCreativeWorkflow(context: TrackContext): Promise<void> {
 async function complete(
   context: TrackContext,
   expected: string,
-  outputs: TaskOutput[] | ((projection: Awaited<ReturnType<ApexService["taskContext"]>>) => TaskOutput[]),
+  outputs: TaskOutput[],
 ): Promise<Partial<Record<TaskOutput["kind"], string>>> {
   let issued = await context.service.nextTask();
   while (issued.status === "needs_input") {
@@ -488,12 +495,7 @@ async function complete(
   if (issued.task.taskType !== expected) throw new Error(`Expected ${expected}, received ${issued.task.taskType}`);
   const projection = await context.service.taskContext(issued.task.taskId);
   context.taskContextBytes.push(Buffer.byteLength(JSON.stringify(projection), "utf8"));
-  return (
-    await context.service.completeTaskOutputs(
-      issued.task.taskId,
-      typeof outputs === "function" ? outputs(projection) : outputs,
-    )
-  ).outputHashes;
+  return (await context.service.completeTaskOutputs(issued.task.taskId, outputs)).outputHashes;
 }
 
 function projectId(track: QualificationTrack): string {
@@ -687,23 +689,22 @@ function availabilityEvidence(context: TrackContext, evidenceRefs: Record<string
 function policyMap(
   context: TrackContext,
   governanceHash: string,
-  projection: Awaited<ReturnType<ApexService["taskContext"]>>,
+  findings: readonly { assignmentId: string; policyId: string; policyDefinitionReferenceId?: string; effect: string }[],
 ) {
-  const findings = (projection as { governanceFindings?: Array<Record<string, string>> }).governanceFindings ?? [];
   return {
     schemaVersion: CONTRACT_VERSION,
     projectId: projectId(context.track),
     runId: context.runId,
     governanceHash,
     mappings: findings.map((finding) => ({
-      policyAssignmentId: finding.policyAssignmentId!,
-      policyDefinitionId: finding.policyDefinitionId!,
+      policyAssignmentId: finding.assignmentId,
+      policyDefinitionId: finding.policyId,
       ...(finding.policyDefinitionReferenceId === undefined
         ? {}
         : { policyDefinitionReferenceId: finding.policyDefinitionReferenceId }),
-      effect: finding.effect!,
+      effect: finding.effect,
       logicalResourceId: "none",
-      propertyPath: finding.propertyPath ?? "type",
+      propertyPath: "type",
       disposition: "not-applicable",
       reason: "The qualification fixture deploys no resource this policy governs",
     })),

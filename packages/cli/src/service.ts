@@ -378,6 +378,7 @@ interface WorkflowValidationExecution {
 }
 
 const ENFORCING_POLICY_EFFECTS = new Set(["deny", "modify", "deployIfNotExists"]);
+const GOVERNANCE_FINDINGS_SELECTOR = "governance-findings:";
 
 const TASKS: readonly WorkflowTaskDescriptor[] = [
   { id: "requirements", role: "requirements", outputs: ["requirements"] },
@@ -2622,24 +2623,23 @@ export class ApexService {
       artifactHashes,
       recordedInput: task.taskType === "requirements" ? this.recordedRequirementsInput(events) : null,
       decisions: task.taskType === "architecture" ? this.architectureDecisionValues(events, task.taskId) : {},
-      ...(task.taskType === "architecture" || task.taskType === "policy-refresh"
-        ? {
-            governanceFindings: (task.taskType === "policy-refresh"
-              ? (await this.refreshedPolicyMap(run, events)).delta
-              : await this.enforcingGovernanceFindings(run, events)
-            ).map((finding) => ({
-              policyAssignmentId: finding.assignmentId,
-              policyDefinitionId: finding.policyId,
-              ...(finding.policyDefinitionReferenceId === undefined
-                ? {}
-                : { policyDefinitionReferenceId: finding.policyDefinitionReferenceId }),
-              effect: finding.effect,
-              displayName: finding.displayName,
-              resourceTypes: finding.resourceTypes,
-              ...(finding.requiredValue === undefined ? {} : { requiredValue: finding.requiredValue }),
-            })),
-          }
-        : {}),
+      ...(task.taskType === "architecture"
+        ? { governanceFindings: await this.governanceFindingsSummary(run, events) }
+        : task.taskType === "policy-refresh"
+          ? {
+              governanceFindings: (await this.refreshedPolicyMap(run, events)).delta.map((finding) => ({
+                policyAssignmentId: finding.assignmentId,
+                policyDefinitionId: finding.policyId,
+                ...(finding.policyDefinitionReferenceId === undefined
+                  ? {}
+                  : { policyDefinitionReferenceId: finding.policyDefinitionReferenceId }),
+                effect: finding.effect,
+                displayName: finding.displayName,
+                resourceTypes: finding.resourceTypes,
+                ...(finding.requiredValue === undefined ? {} : { requiredValue: finding.requiredValue }),
+              })),
+            }
+          : {}),
       outputTemplates,
       reviewMetadata,
       ...(reviewMetadata === undefined
@@ -2717,7 +2717,29 @@ export class ApexService {
       throw new ApexError("APEX_STALE", "Review task input is unavailable or stale", EXIT_CODES.stale);
     }
     const metadataSelected = inputHash === "review-metadata" && descriptor.reviewSubject !== undefined;
+    const findingTypes = inputHash?.startsWith(GOVERNANCE_FINDINGS_SELECTOR)
+      ? inputHash
+          .slice(GOVERNANCE_FINDINGS_SELECTOR.length)
+          .split(",")
+          .filter((type) => type.length > 0)
+      : undefined;
     if (
+      findingTypes !== undefined &&
+      (findingTypes.length === 0 ||
+        findingTypes.length > 64 ||
+        findingTypes.some(
+          (type) => !/^[A-Za-z][A-Za-z0-9]*\.[A-Za-z][A-Za-z0-9.]*(?:\/[A-Za-z][A-Za-z0-9]*)+$/u.test(type),
+        ))
+    )
+      throw new ApexError("APEX_VALIDATION", "Governance findings selector is invalid", EXIT_CODES.validation);
+    if (findingTypes !== undefined && task.taskType !== "architecture")
+      throw new ApexError(
+        "APEX_AUTHORIZATION",
+        "Governance findings are an Architecture input",
+        EXIT_CODES.authorization,
+      );
+    if (
+      findingTypes === undefined &&
       !metadataSelected &&
       inputHash !== undefined &&
       (!task.inputRefs.includes(inputHash) || !authorizedRefs.includes(inputHash))
@@ -2727,23 +2749,28 @@ export class ApexService {
         "Input hash is not a current task dependency",
         EXIT_CODES.authorization,
       );
-    const selectedHash = metadataSelected ? undefined : (inputHash ?? reviewSubjectHash);
-    const context = !metadataSelected && selectedHash === undefined ? await this.taskContext(taskId) : undefined;
+    const selectedHash = metadataSelected || findingTypes !== undefined ? undefined : (inputHash ?? reviewSubjectHash);
+    const context =
+      !metadataSelected && findingTypes === undefined && selectedHash === undefined
+        ? await this.taskContext(taskId)
+        : undefined;
     const serialized = JSON.stringify(
-      metadataSelected
-        ? await this.taskReviewMetadata(run, task, events, descriptor)
-        : context !== undefined
-          ? {
-              inputs: context.inputs,
-              inputReferences: context.inputReferences,
-              artifactHashes: context.artifactHashes,
-              recordedInput: context.recordedInput,
-              decisions: context.decisions,
-              outputTemplates: context.outputTemplates,
-              reviewMetadata: context.reviewMetadata,
-              reviewMetadataReference: context.reviewMetadataReference,
-            }
-          : await this.objects.getJson(selectedHash!),
+      findingTypes !== undefined
+        ? await this.governanceFindingsFor(run, events, findingTypes)
+        : metadataSelected
+          ? await this.taskReviewMetadata(run, task, events, descriptor)
+          : context !== undefined
+            ? {
+                inputs: context.inputs,
+                inputReferences: context.inputReferences,
+                artifactHashes: context.artifactHashes,
+                recordedInput: context.recordedInput,
+                decisions: context.decisions,
+                outputTemplates: context.outputTemplates,
+                reviewMetadata: context.reviewMetadata,
+                reviewMetadataReference: context.reviewMetadataReference,
+              }
+            : await this.objects.getJson(selectedHash!),
     );
     if (offset >= serialized.length) {
       throw new ApexError("APEX_VALIDATION", "Input read offset is outside the review subject", EXIT_CODES.validation);
@@ -4525,7 +4552,7 @@ export class ApexService {
       { kind: "workload-decision-manifest", value: boundDecisionManifest },
       {
         kind: "policy-property-map",
-        value: await this.completePolicyMap(run, events, boundArchitecture, policyMappings),
+        value: await this.completePolicyMap(run, events, policyMappings),
       },
     ]);
   }
@@ -8725,36 +8752,33 @@ export class ApexService {
       if (!prior.has(key)) prior.set(key, mapping);
     }
     const delta: GovernanceBaselineFinding[] = [];
-    const mappings = (await this.enforcingGovernanceFindings(run, events)).map((finding) => {
-      const identity = {
-        policyAssignmentId: finding.assignmentId,
-        policyDefinitionId: finding.policyId,
-        ...(finding.policyDefinitionReferenceId === undefined
-          ? {}
-          : { policyDefinitionReferenceId: finding.policyDefinitionReferenceId }),
-        effect: finding.effect as PolicyPropertyMapV1["mappings"][number]["effect"],
-      };
-      const carried = prior.get(carryKey(finding.policyId, finding.policyDefinitionReferenceId, finding.effect));
-      if (carried !== undefined) {
-        const { policyDefinitionReferenceId: _reference, ...rest } = carried;
-        return { ...rest, ...identity };
-      }
-      if (finding.resourceTypes.length > 0 && !finding.resourceTypes.some((type) => designed.has(type.toLowerCase())))
+    const mappings = (await this.enforcingGovernanceFindings(run, events))
+      .filter(
+        ({ resourceTypes }) =>
+          resourceTypes.length === 0 || resourceTypes.some((type) => designed.has(type.toLowerCase())),
+      )
+      .map((finding) => {
+        const identity = {
+          policyAssignmentId: finding.assignmentId,
+          policyDefinitionId: finding.policyId,
+          ...(finding.policyDefinitionReferenceId === undefined
+            ? {}
+            : { policyDefinitionReferenceId: finding.policyDefinitionReferenceId }),
+          effect: finding.effect as PolicyPropertyMapV1["mappings"][number]["effect"],
+        };
+        const carried = prior.get(carryKey(finding.policyId, finding.policyDefinitionReferenceId, finding.effect));
+        if (carried !== undefined) {
+          const { policyDefinitionReferenceId: _reference, ...rest } = carried;
+          return { ...rest, ...identity };
+        }
+        delta.push(finding);
         return {
           ...identity,
-          logicalResourceId: "none",
-          propertyPath: "type",
-          disposition: "not-applicable" as const,
-          reason: `No designed resource has type ${finding.resourceTypes.join(", ")}`,
+          logicalResourceId: "LOGICAL_RESOURCE_ID",
+          propertyPath: "PROPERTY_PATH",
+          disposition: "DISPOSITION" as unknown as PolicyPropertyMapV1["mappings"][number]["disposition"],
         };
-      delta.push(finding);
-      return {
-        ...identity,
-        logicalResourceId: "LOGICAL_RESOURCE_ID",
-        propertyPath: "PROPERTY_PATH",
-        disposition: "DISPOSITION" as unknown as PolicyPropertyMapV1["mappings"][number]["disposition"],
-      };
-    });
+      });
     return {
       delta,
       policyMap: {
@@ -8777,6 +8801,38 @@ export class ApexService {
     return snapshot.findings.filter(({ effect }) => ENFORCING_POLICY_EFFECTS.has(effect));
   }
 
+  private async governanceFindingsSummary(run: RunConfigV1, events: EventV1[]) {
+    const findings = await this.enforcingGovernanceFindings(run, events);
+    return {
+      count: findings.length,
+      untypedCount: findings.filter(({ resourceTypes }) => resourceTypes.length === 0).length,
+      resourceTypeCount: new Set(
+        findings.flatMap(({ resourceTypes }) => resourceTypes.map((type) => type.toLowerCase())),
+      ).size,
+      read: `${GOVERNANCE_FINDINGS_SELECTOR}<designed ARM resource types, comma-separated>`,
+    };
+  }
+
+  private async governanceFindingsFor(run: RunConfigV1, events: EventV1[], types: string[]) {
+    const wanted = new Set(types.map((type) => type.toLowerCase()));
+    return (await this.enforcingGovernanceFindings(run, events))
+      .filter(
+        ({ resourceTypes }) =>
+          resourceTypes.length === 0 || resourceTypes.some((type) => wanted.has(type.toLowerCase())),
+      )
+      .map((finding) => ({
+        policyAssignmentId: finding.assignmentId,
+        policyDefinitionId: finding.policyId,
+        ...(finding.policyDefinitionReferenceId === undefined
+          ? {}
+          : { policyDefinitionReferenceId: finding.policyDefinitionReferenceId }),
+        effect: finding.effect,
+        displayName: finding.displayName,
+        resourceTypes: finding.resourceTypes,
+        ...(finding.requiredValue === undefined ? {} : { requiredValue: finding.requiredValue }),
+      }));
+  }
+
   private policyMappingKey(mapping: {
     policyAssignmentId: string;
     policyDefinitionId?: string;
@@ -8794,48 +8850,12 @@ export class ApexService {
   private async completePolicyMap(
     run: RunConfigV1,
     events: EventV1[],
-    architecture: ArchitectureV1,
     mappings: PolicyPropertyMapV1["mappings"],
   ): Promise<PolicyPropertyMapV1> {
     const governanceHash = this.artifactHash(events, "governance-constraints");
     if (governanceHash === undefined)
       throw new ApexError("APEX_STALE", "Accepted governance is unavailable", EXIT_CODES.stale);
-    const designed = new Set(
-      architecture.components.flatMap(({ resourceTypes }) => resourceTypes.map((type) => type.toLowerCase())),
-    );
-    const supplied = new Set(mappings.map((mapping) => this.policyMappingKey(mapping)));
-    const derived = (await this.enforcingGovernanceFindings(run, events)).flatMap((finding) => {
-      const mapping = {
-        policyAssignmentId: finding.assignmentId,
-        policyDefinitionId: finding.policyId,
-        ...(finding.policyDefinitionReferenceId === undefined
-          ? {}
-          : { policyDefinitionReferenceId: finding.policyDefinitionReferenceId }),
-        effect: finding.effect as PolicyPropertyMapV1["mappings"][number]["effect"],
-      };
-      if (
-        supplied.has(this.policyMappingKey(mapping)) ||
-        finding.resourceTypes.length === 0 ||
-        finding.resourceTypes.some((type) => designed.has(type.toLowerCase()))
-      )
-        return [];
-      return [
-        {
-          ...mapping,
-          logicalResourceId: "none",
-          propertyPath: "type",
-          disposition: "not-applicable" as const,
-          reason: `No designed resource has type ${finding.resourceTypes.join(", ")}`,
-        },
-      ];
-    });
-    return {
-      schemaVersion: CONTRACT_VERSION,
-      projectId: run.projectId,
-      runId: run.runId,
-      governanceHash,
-      mappings: [...mappings, ...derived],
-    };
+    return { schemaVersion: CONTRACT_VERSION, projectId: run.projectId, runId: run.runId, governanceHash, mappings };
   }
 
   private async assertPolicyMapCoverage(
@@ -8850,18 +8870,26 @@ export class ApexService {
     if (policyMap.governanceHash !== this.artifactHash(events, "governance-constraints"))
       fail("Policy property map does not bind accepted governance constraints");
     const components = new Set(architecture.components.map(({ id }) => id));
+    const designed = new Set(
+      architecture.components.flatMap(({ resourceTypes }) => resourceTypes.map((type) => type.toLowerCase())),
+    );
     const findings = new Map(
-      (await this.enforcingGovernanceFindings(run, events)).map((finding) => [
-        this.policyMappingKey({
-          policyAssignmentId: finding.assignmentId,
-          policyDefinitionId: finding.policyId,
-          ...(finding.policyDefinitionReferenceId === undefined
-            ? {}
-            : { policyDefinitionReferenceId: finding.policyDefinitionReferenceId }),
-          effect: finding.effect,
-        }),
-        finding.displayName,
-      ]),
+      (await this.enforcingGovernanceFindings(run, events))
+        .filter(
+          ({ resourceTypes }) =>
+            resourceTypes.length === 0 || resourceTypes.some((type) => designed.has(type.toLowerCase())),
+        )
+        .map((finding) => [
+          this.policyMappingKey({
+            policyAssignmentId: finding.assignmentId,
+            policyDefinitionId: finding.policyId,
+            ...(finding.policyDefinitionReferenceId === undefined
+              ? {}
+              : { policyDefinitionReferenceId: finding.policyDefinitionReferenceId }),
+            effect: finding.effect,
+          }),
+          finding.displayName,
+        ]),
     );
     const seen = new Set<string>();
     for (const mapping of policyMap.mappings) {
@@ -9055,9 +9083,20 @@ export class ApexService {
     let importedPolicyEffects: string[] | undefined;
     const governance = artifacts["governance-constraints"] as GovernanceConstraintsV1 | undefined;
     if ((descriptor.id === "architecture" || descriptor.id === "policy-refresh") && governance !== undefined) {
-      importedPolicyEffects = (await this.selectedGovernanceSnapshot(run, governance)).findings.map(
-        ({ effect }) => effect,
+      const architecture =
+        (outputs.find(({ kind }) => kind === "architecture")?.value as ArchitectureV1 | undefined) ??
+        (artifacts.architecture as ArchitectureV1 | undefined);
+      const designed = new Set(
+        (architecture?.components ?? []).flatMap(({ resourceTypes }) =>
+          resourceTypes.map((type) => type.toLowerCase()),
+        ),
       );
+      importedPolicyEffects = (await this.selectedGovernanceSnapshot(run, governance)).findings
+        .filter(
+          ({ resourceTypes }) =>
+            resourceTypes.length === 0 || resourceTypes.some((type) => designed.has(type.toLowerCase())),
+        )
+        .map(({ effect }) => effect);
     }
     if (descriptor.id === "architecture") {
       const pinnedRefs = new Set(task.inputRefs);

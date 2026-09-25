@@ -53,10 +53,11 @@ Gate 2 package without bypassing the kernel's decision or approval boundaries.
   continue with the evidenced priced subtotal. Never submit `UNPRICED`, synthetic `$0`, placeholder bounds, or
   invented prices through `apex/architectureComplete`.
 6. Design against accepted governance. Every Architecture component lists the ARM `resourceTypes` it deploys (for
-  example `Microsoft.Web/sites`). Task context `governanceFindings` lists every enforcing (deny, modify,
-  deployIfNotExists) policy. Map each finding that governs a designed resource type, and each finding without
-  `resourceTypes`, in `policyMappings`: keep its assignment, definition, reference ID and effect, name the governed
-  component as `logicalResourceId`, and set `propertyPath`, `expectedValue` where known, and a disposition:
+  example `Microsoft.Web/sites`). Task context `governanceFindings` summarizes the enforcing (deny, modify,
+  deployIfNotExists) policies. Read the ones your design must map with `apex/readTaskInput` and `inputHash`
+  `governance-findings:<designed types, comma-separated>`; it returns findings for those types plus findings without
+  types. Map each returned finding in `policyMappings`: keep its assignment, definition, reference ID and effect, name
+  the governed component as `logicalResourceId`, and set `propertyPath`, `expectedValue` where known, and a disposition:
   `satisfied`, `planned`, `blocked` (the design cannot comply), or `not-applicable` with a factual `reason`. Omit
   findings whose resource types match no component; APEX marks those not-applicable. Never mark `exempt`.
 7. Submit `architecture`, `cost-estimate`, `workload-decision-manifest` and `policyMappings` atomically through

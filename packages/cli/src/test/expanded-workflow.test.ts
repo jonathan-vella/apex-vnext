@@ -144,7 +144,7 @@ async function reachCodegen(
   const policy = policyMap(
     runId,
     governanceHashes["governance-constraints"]!,
-    await governanceFindings(service, architectureTask),
+    await governanceFindings(service, architectureTask, ["Microsoft.Web/sites"]),
   ) as PolicyPropertyMapV1;
   await configurePolicy?.(policy);
   const architectureValue = architecture(runId);
@@ -1566,7 +1566,11 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
   );
   const governanceHash = (await service.importGovernanceReference()).outputHash;
   const architectureTask = await task(service, "architecture");
-  const policy = policyMap(runId, governanceHash, await governanceFindings(service, architectureTask));
+  const policy = policyMap(
+    runId,
+    governanceHash,
+    await governanceFindings(service, architectureTask, ["Microsoft.Web/sites"]),
+  );
   const untraceableArchitecture = architecture(runId);
   untraceableArchitecture.components[0]!.requirementIds = ["REQ-UNKNOWN"];
   const untraceableCost = costEstimate(runId);
@@ -1623,10 +1627,7 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
     { kind: "policy-property-map", value: policyValue },
   ];
   await assert.rejects(
-    service.completeTaskOutputs(
-      architectureTask,
-      architectureBundle({ ...policy, mappings: policy.mappings.filter(({ effect }) => effect !== "deny") }),
-    ),
+    service.completeTaskOutputs(architectureTask, architectureBundle({ ...policy, mappings: [] })),
     /Policy mappings are required/,
   );
   await assert.rejects(
@@ -4334,7 +4335,7 @@ for (const track of ["bicep", "terraform"] as const) {
         scope,
         assignment_id: `${scope}/providers/Microsoft.Authorization/policyAssignments/${effect}`,
         classification: effect === "deny" ? "blocker" : "auto-remediate",
-        resource_types: [mode !== "simulated" ? "Microsoft.Storage/storageAccounts" : "Microsoft.Web/sites"],
+        resource_types: ["Microsoft.Web/sites"],
         exemption: null,
         reported_exemptions: [],
         required_value: true,
@@ -5250,8 +5251,9 @@ test("a blocked control after governance refresh reopens Architecture and Gate 2
 
 test("governance refresh carries matching mappings and asks only for new controls", async () => {
   const scope = "/subscriptions/11111111-1111-1111-1111-111111111111";
-  const finding = (name: string, resourceTypes: string[]) => ({
+  const finding = (name: string, resourceTypes: string[], policyDefinitionReferenceId?: string) => ({
     policy_id: `/providers/Microsoft.Authorization/policyDefinitions/${name}`,
+    ...(policyDefinitionReferenceId === undefined ? {} : { policyDefinitionReferenceId }),
     display_name: name,
     effect: "deny",
     scope,
@@ -5262,14 +5264,17 @@ test("governance refresh carries matching mappings and asks only for new control
     reported_exemptions: [],
   });
   const { template, context } = await approveOnReferenceGovernance([
-    finding("06a78e20-9358-41c9-923c-fb736d382a4d", ["Microsoft.Compute/virtualMachines"]),
+    finding("1b5ef780-c53c-4a64-87f3-bb9c8c8094ba", ["Microsoft.Web/sites"], "AsDenyPublicIP"),
     finding("tenant-custom-control", []),
+    finding("tenant-vm-control", ["Microsoft.Compute/virtualMachines"]),
   ]);
   const [carried, delta] = template.mappings;
   assert.equal(carried?.disposition, "not-applicable");
   assert.equal(carried?.reason, "The test fixture deploys no resource this policy governs");
-  assert.match(carried?.policyAssignmentId ?? "", /policyAssignments\/06a78e20/);
+  assert.match(carried?.policyAssignmentId ?? "", /policyAssignments\/1b5ef780/);
+  assert.equal(carried?.policyDefinitionReferenceId, "AsDenyPublicIP");
   assert.equal(delta?.disposition, "DISPOSITION");
+  assert.equal(template.mappings.length, 2);
   assert.deepEqual(
     ((context as { governanceFindings?: Array<{ displayName: string }> }).governanceFindings ?? []).map(
       ({ displayName }) => displayName,
