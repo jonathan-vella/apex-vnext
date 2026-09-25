@@ -174,7 +174,9 @@ apex governance import --reference --json
 
 The reference comes from a pinned Azure Landing Zones Library release (root, landing zones and corp archetypes). It is
 an assumption, not your policy: a subscription target can design, price and pass Gate 2 on it, but planning requires
-the reviewed subscription baseline. Replace it with `apex governance revise` (below) before Gate 3.
+the reviewed subscription baseline. After Gate 2 the kernel issues a `governance-refresh` task: select and import the
+reviewed baseline as below. A `policy-refresh` task follows, where APEX carries matching mappings and the Architect
+decides only new or changed controls. Gate 2 stays approved unless a control is `blocked`, which reopens Architecture.
 
 The Architect maps every enforcing policy (deny, modify, deployIfNotExists) to a designed component inside
 Architecture. APEX marks policies whose resource types match no component `not-applicable`; every other

@@ -5129,3 +5129,151 @@ for (const track of ["bicep", "terraform"] as const) {
     }
   });
 }
+
+function baselineWithFindings(subscriptionId: string, observedAt: string, findings: Record<string, unknown>[]) {
+  const baseline = emptyGovernanceBaseline(subscriptionId, observedAt);
+  const scope = `/subscriptions/${subscriptionId}`;
+  const entry = baseline.subscriptions[subscriptionId]!;
+  const blockers = findings.filter(({ effect }) => effect === "deny").length;
+  Object.assign(entry, {
+    findings,
+    policies: findings,
+    assignment_inventory: findings.map((finding) => ({
+      scope,
+      assignmentId: finding.assignment_id,
+      assignmentType: "subscription",
+      displayName: finding.display_name,
+      policyDefinitionId: finding.policy_id,
+    })),
+  });
+  Object.assign(entry.discovery_summary, {
+    assignment_total: findings.length,
+    assignment_kept: findings.length,
+    subscription_scope_count: findings.length,
+    blocker_count: blockers,
+    auto_remediate_count: findings.length - blockers,
+    classified_policy_count: findings.length,
+  });
+  entry.discovery_metadata.page_counts.policyAssignments = findings.length;
+  entry.discovery_metadata.page_counts.policyDefinitions = findings.length;
+  Object.assign(baseline.summary, {
+    total_findings: findings.length,
+    total_blockers: blockers,
+    total_auto_remediate: findings.length - blockers,
+  });
+  return baseline;
+}
+
+async function approveOnReferenceGovernance(findings: Record<string, unknown>[] = []) {
+  const root = await tempRoot();
+  const subscriptionId = "11111111-1111-1111-1111-111111111111";
+  const service = new ApexService(root);
+  const { runId } = await service.init({
+    projectId: "demo",
+    targetScope: `/subscriptions/${subscriptionId}/resourceGroups/rg-test`,
+  });
+  await service.nextTask();
+  const requirementHashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
+  await complete(service, "requirements-review", [
+    { kind: "review-findings", value: review(runId, "requirements", requirementHashes.requirements!) },
+  ]);
+  await service.decideGateNumber(1, "approved", "tester");
+  await acceptAvailabilityEvidence(service, runId);
+  await task(service, "governance-discovery");
+  const referenceHash = (await service.importGovernanceReference()).outputHash;
+  const architectureValue = architecture(runId);
+  const costValue = costEstimate(runId);
+  const architectureHashes = await complete(service, "architecture", [
+    { kind: "architecture", value: architectureValue },
+    { kind: "cost-estimate", value: costValue },
+    {
+      kind: "workload-decision-manifest",
+      value: workloadDecisionManifest({
+        runId,
+        requirementsHash: requirementHashes.requirements!,
+        architectureHash: sha256Json(architectureValue),
+        costEstimateHash: sha256Json(costValue),
+      }),
+    },
+  ]);
+  await complete(service, "architecture-review", [
+    { kind: "review-findings", value: review(runId, "architecture", architectureHashes.architecture!) },
+  ]);
+  await service.decideGateNumber(2, "approved", "tester");
+  await task(service, "governance-refresh");
+  const path = join(root, "baseline.json");
+  const observedAt = new Date(Math.floor(Date.now() / 1000) * 1000 - 60_000).toISOString();
+  await writeJson(path, baselineWithFindings(subscriptionId, observedAt, findings));
+  const refreshedHash = (await service.importGovernanceBaseline(path)).outputHash;
+  assert.notEqual(refreshedHash, referenceHash);
+  const policyTask = await task(service, "policy-refresh");
+  const context = await service.taskContext(policyTask);
+  const template = context.outputTemplates["policy-property-map"] as PolicyPropertyMapV1;
+  assert.equal(template.governanceHash, refreshedHash);
+  return { service, policyTask, template, context };
+}
+
+test("reference governance refreshes to the subscription baseline without reopening Gate 2", async () => {
+  const { service, policyTask, template, context } = await approveOnReferenceGovernance();
+  assert.deepEqual((context as { governanceFindings?: unknown[] }).governanceFindings, []);
+  const gate = (await service.status()).run.gates[1];
+  assert.equal(gate?.state, "approved");
+  await service.completeTaskOutputs(policyTask, [{ kind: "policy-property-map", value: template }]);
+  assert.deepEqual((await service.status()).run.gates[1], gate);
+  await task(service, "plan");
+});
+
+test("a blocked control after governance refresh reopens Architecture and Gate 2", async () => {
+  const { service, policyTask, template } = await approveOnReferenceGovernance();
+  const completed = await service.completeTaskOutputs(policyTask, [
+    {
+      kind: "policy-property-map",
+      value: {
+        ...template,
+        mappings: [
+          ...template.mappings,
+          {
+            policyAssignmentId: "blocked-control",
+            effect: "deny",
+            logicalResourceId: "api",
+            propertyPath: "properties.publicNetworkAccess",
+            disposition: "blocked",
+          },
+        ],
+      },
+    },
+  ]);
+  assert.match(completed.summary, /Architecture and Gate 2 reopened/);
+  assert.equal((await service.status()).run.gates[1]?.state, "invalidated");
+  await task(service, "architecture");
+});
+
+test("governance refresh carries matching mappings and asks only for new controls", async () => {
+  const scope = "/subscriptions/11111111-1111-1111-1111-111111111111";
+  const finding = (name: string, resourceTypes: string[]) => ({
+    policy_id: `/providers/Microsoft.Authorization/policyDefinitions/${name}`,
+    display_name: name,
+    effect: "deny",
+    scope,
+    assignment_id: `${scope}/providers/Microsoft.Authorization/policyAssignments/${name}`,
+    classification: "blocker",
+    resource_types: resourceTypes,
+    exemption: null,
+    reported_exemptions: [],
+  });
+  const { template, context } = await approveOnReferenceGovernance([
+    finding("06a78e20-9358-41c9-923c-fb736d382a4d", ["Microsoft.Compute/virtualMachines"]),
+    finding("tenant-custom-control", []),
+  ]);
+  const [carried, delta] = template.mappings;
+  assert.equal(carried?.disposition, "not-applicable");
+  assert.equal(carried?.reason, "The test fixture deploys no resource this policy governs");
+  assert.match(carried?.policyAssignmentId ?? "", /policyAssignments\/06a78e20/);
+  assert.equal(delta?.disposition, "DISPOSITION");
+  assert.deepEqual(
+    ((context as { governanceFindings?: Array<{ displayName: string }> }).governanceFindings ?? []).map(
+      ({ displayName }) => displayName,
+    ),
+    ["tenant-custom-control"],
+  );
+});
