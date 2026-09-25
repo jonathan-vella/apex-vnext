@@ -22,8 +22,10 @@ Use this skill to orient an interactive agent without reconstructing workflow st
 3. If status identifies blockers, gates, or a terminal run, report that kernel state and do not infer a task.
 4. Otherwise route the next step with the `apex-next` skill (`.github/skills/apex-next/SKILL.md`). It maps
    `needs_input`, `needs_review` and `status=task` results to their owner and preserves the exact request, review hash
-   or `task.taskId`. Read task context only for `status=task`, as its owner. Do not poll unresolved input or review
-   results; obtain a fresh result after the owning role records answers or dispositions.
+   or `task.taskId` for that owner task only. It must not add later-stage prerequisites to an earlier task, and it
+   continues directly when the active agent already owns the next result. Read task context only for `status=task`, as
+   its owner. Do not poll unresolved input or review results; obtain a fresh result after the owning role records
+   answers or dispositions.
 5. For resume, fetch fresh status instead of relying on an earlier conversation. On an `APEX_STALE` error, refresh
    status and do not reuse a task ID, request ID, journal head, or owner epoch.
 

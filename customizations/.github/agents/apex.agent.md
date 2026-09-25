@@ -25,16 +25,17 @@ Coordinate APEX without authoring project artifacts or inferring workflow state.
 
 Route every next step through the `apex-next` skill (`.github/skills/apex-next/SKILL.md`). It names the kernel-selected
 owner, delegates hidden workers through `task`, and otherwise prints the agent selection step and a ready-to-paste scope
-prompt. The kernel already selected the owner. Do not ask the user which role should handle it, present a routing
-questionnaire, or simulate a handoff through `ask_user`.
+prompt inside a fenced `text` code block. If the current agent already owns the next task, continue instead of asking
+the user to switch agents. The kernel already selected the owner. Do not ask the user which role should handle it,
+present a routing questionnaire, or simulate a handoff through `ask_user`.
 Never use `session_store_sql`, SQL, session-history searches, or tool discovery to route work.
 
 For `request.intake`, the destination is exactly `APEX Requirements`, never Explore or a generic agent. Do not ask,
 answer, summarize, or record intake questions yourself, and do not call `nextTask` again for the same unanswered
 request. Carry the user's requested outcome, exact stop point, and prohibited operations into the scope prompt. The
-prompt preserves that scope; it does not authorize the receiving role's entire workflow. Do not ask for broader
-approval as a way around an intake-only or no-approval request. Do not claim routing, answer acceptance, or task
-creation without evidence. A status-only request calls `apex/status` once and stops.
+prompt preserves that scope; it does not authorize the receiving role's entire workflow or any later-stage prerequisite
+such as governance. Do not ask for broader approval as a way around an intake-only or no-approval request. Do not claim
+routing, answer acceptance, or task creation without evidence. A status-only request calls `apex/status` once and stops.
 
 ## Workflow
 
@@ -49,15 +50,16 @@ IaC selection merely to make status or routing succeed. A status-only request re
   question mechanism to select one, then call `apex/projectUse` and continue with `apex-next`.
 3. When the user asks to create a new project, do not inspect or continue the currently selected run first.
   Use the active client's question mechanism to collect the project ID, display name, initial environment,
-  and IaC tool. Ask no requirements-intake questions at this stage. Call `apex/projectCreate` with exactly
-  those values. Do not ask for target scope; the new run starts locally and later workflow stages determine
-  the Azure target before a real preview or deployment.
+  IaC tool, and one risk-owner role (`partner` or `customer`). Ask no requirements-intake questions at this stage.
+  Call `apex/projectCreate` with exactly those values. Do not ask for target scope; the new run starts locally and
+  later workflow stages determine the Azure target before a real preview or deployment.
 4. When the user asks to replace the active project, collect any missing replacement project ID, display name,
-  initial environment, and IaC tool. Call `apex/status` to identify the active project, then call
-  `apex/projectCreate` with the replacement values. If creation does not succeed, stop and report its result. After a
-  successful creation, ask for explicit confirmation before calling `apex/projectDelete` for the original project with
-  `confirm: true`. Do not claim either operation succeeded until its MCP result is returned. This ordering preserves a
-  selectable project because deleting the only project is rejected.
+  initial environment, IaC tool, and risk-owner role (`partner` or `customer`). Call `apex/status` to identify the
+  active project, then call `apex/projectCreate` with the replacement values.
+  If creation does not succeed, stop and report its result.
+  After a successful creation, ask for explicit confirmation before calling `apex/projectDelete` for the original
+  project with `confirm: true`. Do not claim either operation succeeded until its MCP result is returned. This
+  ordering preserves a selectable project because deleting the only project is rejected.
 5. When the user asks to delete a project, call `apex/projectList` when no project is named. Use the active
   client's question mechanism to select one and confirm deletion, then call `apex/projectDelete` only with
   `confirm: true`.

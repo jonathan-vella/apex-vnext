@@ -5,7 +5,7 @@ import { nextTaskAfterInput, tempRoot } from "./helpers.js";
 
 test("writer transfer binds the current head and advances ownership", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   await assert.rejects(
     service.createWriterTransfer({
       repository: "owner/repo",
@@ -39,7 +39,7 @@ test("writer transfer binds the current head and advances ownership", async () =
 
 test("writer transfer rejects a spoofed sender and preserves local retry authority", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const input = {
     repository: "owner/repo",
     branch: "main",
@@ -60,7 +60,7 @@ test("writer transfer rejects a spoofed sender and preserves local retry authori
 
 test("evidence redacts secret keys, rejects required high-risk content, and telemetry is user-controlled", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const accepted = (await service.acceptEvidence({
     kind: "task-json",
     contentType: "application/json",
@@ -86,7 +86,7 @@ test("evidence redacts secret keys, rejects required high-risk content, and tele
 
 test("validation cache keys include journal head and cache clear is deterministic", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const first = await service.validate();
   assert.equal((await service.cacheStatus()).entries, 1);
   await nextTaskAfterInput(service);
@@ -99,7 +99,7 @@ test("validation cache keys include journal head and cache clear is deterministi
 
 test("project history and search include event payloads and artifact kinds", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   await nextTaskAfterInput(service);
   const history = await service.history(10);
   assert.ok(history.some(({ type }) => type === "requirements.input-recorded"));

@@ -175,7 +175,7 @@ test("CLI archetype inspection and confirmed copy preserve independent origin an
     (await readdir(root)).some((path) => path.startsWith(".apex")),
     false,
   );
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const before = await service.status();
   await service.importArchetype({ ...request, destination: "active-project-copy" });
   assert.deepEqual(await service.status(), before);
@@ -346,7 +346,7 @@ test("remote archetype CLI import rechecks exact content and records remote prov
   assert.equal(cliResult.status, "copied");
   const initializedChild = new ApexService(join(root, "one"));
   await mkdir(join(root, "one/.git"));
-  await initializedChild.init({ projectId: "child", clientId: "github-copilot-cli" });
+  await initializedChild.init({ projectId: "child", riskOwner: "partner", clientId: "github-copilot-cli" });
   const packageDirectory = join(root, "one/node_modules/@apexops/cli");
   await mkdir(packageDirectory, { recursive: true });
   await writeJson(join(packageDirectory, "package.json"), { version: APEX_VERSION });
@@ -670,7 +670,15 @@ test("workspace installation leaves first project creation to APEX", async () =>
   assert.match((await service.doctor()).nextAction, /first project/);
   await service.update();
   assert.deepEqual(await service.listProjects(), []);
-  const created = await new ApexService(root).createProject({ projectId: "chosen-later", iacTool: "terraform" });
+  await assert.rejects(
+    new ApexService(root).createProject({ projectId: "missing-owner", iacTool: "terraform" } as never),
+    /Project risk owner must be partner or customer/u,
+  );
+  const created = await new ApexService(root).createProject({
+    projectId: "chosen-later",
+    riskOwner: "partner",
+    iacTool: "terraform",
+  });
   assert.equal(created.projectId, "chosen-later");
   assert.equal((await service.status()).run.iacTool, "terraform");
 });
@@ -684,7 +692,12 @@ test("bootstrap plan is read-only and reports missing, conflicting and existing 
       },
     },
   });
-  const config = { schemaVersion: CONTRACT_VERSION, projectId: "demo", createRepository: true };
+  const config = {
+    schemaVersion: CONTRACT_VERSION,
+    projectId: "demo",
+    riskOwner: "partner" as const,
+    createRepository: true,
+  };
   const before = await readdir(root);
   const initial = await service.planBootstrap(config);
   assert.equal(initial.status, "pending");
@@ -713,7 +726,10 @@ test("bootstrap plan is read-only and reports missing, conflicting and existing 
   await symlink(packageDirectory, join(unsafe, "node_modules"));
   await assert.rejects(new ApexService(unsafe).planBootstrap(config), /symlink/);
   const fresh = await tempRoot();
-  const result = (await execute(["bootstrap", "plan", "--project", "demo", "--create-repo"], fresh)) as typeof initial;
+  const result = (await execute(
+    ["bootstrap", "plan", "--project", "demo", "--risk-owner", "partner", "--create-repo"],
+    fresh,
+  )) as typeof initial;
   assert.equal(result.status, "pending");
   assert.deepEqual(await readdir(fresh), []);
   const configPath = join(fresh, "onboarding.json");
@@ -731,6 +747,7 @@ test("CLI bootstrap validates onboarding files before initializing a selected cl
   await writeJson(configPath, {
     schemaVersion: CONTRACT_VERSION,
     projectId: "payments",
+    riskOwner: "partner",
     displayName: "Payments platform",
     client: "github-copilot-cli",
     environment: "test",
@@ -798,7 +815,7 @@ test("CLI bootstrap validates onboarding files before initializing a selected cl
     /conflicts with the onboarding configuration/u,
   );
   const noGitPath = join(root, "no-git-onboarding.json");
-  await writeJson(noGitPath, { schemaVersion: CONTRACT_VERSION, projectId: "no-git" });
+  await writeJson(noGitPath, { schemaVersion: CONTRACT_VERSION, projectId: "no-git", riskOwner: "partner" });
   await assert.rejects(
     execute(["bootstrap", "--file", noGitPath, "--yes"], await tempRoot()),
     /requires a Git repository/u,
@@ -817,14 +834,14 @@ test("bootstrap reuses an exact local runtime and rejects a conflicting version"
       },
     },
   });
-  assert.equal((await service.bootstrap({ projectId: "existing" })).runtimeInstalled, false);
+  assert.equal((await service.bootstrap({ projectId: "existing", riskOwner: "partner" })).runtimeInstalled, false);
 
   const conflictingRoot = await tempRoot();
   await mkdir(join(conflictingRoot, ".git"));
   await mkdir(join(conflictingRoot, "node_modules", "@apexops", "cli"), { recursive: true });
   await writeFile(join(conflictingRoot, "node_modules", "@apexops", "cli", "package.json"), '{"version":"0.9.0"}\n');
   await assert.rejects(
-    new ApexService(conflictingRoot).bootstrap({ projectId: "conflicting" }),
+    new ApexService(conflictingRoot).bootstrap({ projectId: "conflicting", riskOwner: "partner" }),
     /Workspace has @apexops\/cli@0\.9\.0/u,
   );
 });
@@ -842,7 +859,12 @@ test("bootstrap reruns reuse matching intact state without commands or new runs"
       },
     },
   });
-  const input = { projectId: "demo", clientId: "github-copilot-cli" as const, iacTool: "terraform" as const };
+  const input = {
+    projectId: "demo",
+    riskOwner: "partner" as const,
+    clientId: "github-copilot-cli" as const,
+    iacTool: "terraform" as const,
+  };
   const initial = await service.bootstrap(input);
   assert.equal(initial.resumed, false);
   const before = await service.status();
@@ -856,6 +878,7 @@ test("bootstrap reruns reuse matching intact state without commands or new runs"
     { iacTool: "bicep" as const },
     { targetScope: "/foreign" },
     { displayName: "Different" },
+    { riskOwner: "customer" as const },
   ]) {
     await assert.rejects(service.bootstrap({ ...input, ...changed }), /resume is blocked/);
     assert.deepEqual(await service.status(), before);
@@ -890,13 +913,13 @@ test("init rejects retired clients and the CLI projection keeps one managed life
   for (const client of ["github-copilot-vscode", "both"]) {
     const rejected = await tempRoot();
     await assert.rejects(
-      execute(["init", "--project", "demo", "--client", client], rejected),
+      execute(["init", "--project", "demo", "--risk-owner", "partner", "--client", client], rejected),
       /--client must be github-copilot-cli/u,
     );
     assert.deepEqual(await readdir(rejected), []);
   }
   const root = await tempRoot();
-  await execute(["init", "--project", "demo"], root);
+  await execute(["init", "--project", "demo", "--risk-owner", "partner"], root);
   const service = new ApexService(root);
   const before = await service.status();
   const agent = join(root, ".github/agents/apex.agent.md");
@@ -923,7 +946,7 @@ test("init rejects retired clients and the CLI projection keeps one managed life
 
 test("a retired VS Code install stops until init explicitly selects the CLI projection", async () => {
   const root = await tempRoot();
-  await execute(["init", "--project", "demo"], root);
+  await execute(["init", "--project", "demo", "--risk-owner", "partner"], root);
   const service = new ApexService(root);
   const before = await service.status();
   const selectionPath = join(root, ".apex/customizations.selection.json");
@@ -934,7 +957,7 @@ test("a retired VS Code install stops until init explicitly selects the CLI proj
     message: /apex init --client github-copilot-cli/u,
   };
   await assert.rejects(service.update(), retired);
-  await assert.rejects(execute(["init", "--project", "demo"], root), retired);
+  await assert.rejects(execute(["init", "--project", "demo", "--risk-owner", "partner"], root), retired);
   const edited = join(root, ".github/agents/apex-planner.agent.md");
   await writeFile(edited, "Manual edit\n");
   await assert.rejects(execute(["init", "--client", "github-copilot-cli"], root), (error: ApexError) => {
@@ -952,7 +975,7 @@ test("a retired VS Code install stops until init explicitly selects the CLI proj
   assert.equal((await service.status()).run.runId, before.run.runId);
   await service.update();
   await assert.rejects(
-    execute(["init", "--project", "demo", "--client", "github-copilot-cli"], root),
+    execute(["init", "--project", "demo", "--risk-owner", "partner", "--client", "github-copilot-cli"], root),
     /already initialized/u,
   );
 });
@@ -1061,7 +1084,7 @@ test("MCP preserves valid result envelopes and sanitized execution errors", asyn
 
 test("MCP registers only narrow tools and calls the service", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const server = createMcpServer(service);
   const client = new Client({ name: "test", version: "1.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -1125,6 +1148,7 @@ test("MCP registers only narrow tools and calls the service", async () => {
       displayName: "Data platform",
       environment: "dev",
       iacTool: "terraform",
+      riskOwner: "partner",
     },
   });
   assert.equal(createdProject.isError, undefined, JSON.stringify(createdProject));
@@ -1365,9 +1389,10 @@ test("MCP registers only narrow tools and calls the service", async () => {
 test("project deletion validates a replacement run before mutating selection", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "payments" });
+  await service.init({ projectId: "payments", riskOwner: "partner" });
   await service.createProject({
     projectId: "data-platform",
+    riskOwner: "partner",
     displayName: "Data platform",
     environment: "dev",
     targetScope: "local",
@@ -1463,7 +1488,7 @@ test("MCP planComplete derives the canonical binding intent hash", async () => {
 test("CLI completes an artifact bundle from JSON", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
@@ -1481,7 +1506,7 @@ test("CLI completes an artifact bundle from JSON", async () => {
 test("CLI task complete accepts repeated self-describing files", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
@@ -1578,7 +1603,7 @@ test("CLI rejects a stale Terraform lock hash", async () => {
 
 test("CLI capability commands report retained packs and require confirmation for mutation", async () => {
   const root = await tempRoot();
-  await new ApexService(root).init({ projectId: "demo" });
+  await new ApexService(root).init({ projectId: "demo", riskOwner: "partner" });
   const listed = (await execute(["capability", "list"], root)) as Array<{ id: string; state: string; reason?: string }>;
   assert.deepEqual(listed, []);
   await assert.rejects(

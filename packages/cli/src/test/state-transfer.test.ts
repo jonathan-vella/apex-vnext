@@ -33,7 +33,7 @@ async function sourceState(clock = instant): Promise<SourceState> {
     clock: () => clock,
     idSource: () => (nextId++ === 0 ? "run-1" : `event-${nextId}`),
   });
-  const selected = await service.init({ projectId: "demo" });
+  const selected = await service.init({ projectId: "demo", riskOwner: "partner" });
   await rm(join(root, ".apex", "runtime"), { recursive: true, force: true });
   await rm(join(root, ".apex", "runtime-generations"), { recursive: true, force: true });
   await mkdir(join(root, ".apex", "runtime"), { recursive: true });
@@ -374,7 +374,7 @@ test("state import preflights conflicts, permits idempotence, and preserves writ
 test("post-preview state transfer resumes in a fresh workspace and deploys the exact preview", async () => {
   const sourceRoot = await tempRoot();
   const source = new ApexService(sourceRoot, { clock: () => instant });
-  const initialized = await source.init({ projectId: "demo" });
+  const initialized = await source.init({ projectId: "demo", riskOwner: "partner" });
   await prepareValidatedRun(source, initialized.runId, "bicep");
   const preview = await source.preview({ operation: "apply", provider: "fake" });
   const approval = await source.decideGateNumber(4, "approved", "local-maintainer", {

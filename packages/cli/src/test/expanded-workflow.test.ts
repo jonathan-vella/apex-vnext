@@ -225,7 +225,7 @@ test("material governance revision requires confirmation before accessing run or
     code: "APEX_AUTHORIZATION",
   });
   assert.deepEqual(await readdir(root), []);
-  await service.init({ projectId: "demo", iacTool: "bicep" });
+  await service.init({ projectId: "demo", riskOwner: "partner", iacTool: "bicep" });
   await assert.rejects(
     service.reviseGovernanceBaseline("missing.json", { confirm: true, reason: "Policy changed" }),
     /requires accepted imported governance/,
@@ -272,6 +272,7 @@ for (const track of ["bicep", "terraform"] as const) {
       const service = new ApexService(root, { providers: { [track]: provider } });
       const initialized = await service.init({
         projectId: "demo",
+        riskOwner: "partner",
         iacTool: track,
         targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
       });
@@ -344,7 +345,7 @@ for (const track of ["bicep", "terraform"] as const) {
   test(`${track} rejects contradictory resource ownership before staging`, async () => {
     const root = await tempRoot();
     const service = new ApexService(root);
-    const initialized = await service.init({ projectId: "demo", iacTool: track });
+    const initialized = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: track });
     const codegen = await reachCodegen(service, initialized.runId, track);
     const bundle = codegenBundle(initialized.runId, track, codegen.plan);
     const output = bundle.find(({ kind }) => kind === "logical-resource-manifest")!;
@@ -641,7 +642,7 @@ test("validation completion executes configured native checks instead of trustin
       },
     },
   });
-  const { runId } = await service.init({ projectId: "demo", iacTool: "bicep" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: "bicep" });
   const generated = await reachCodegen(service, runId, "bicep");
   await service.completeTaskOutputs(generated.taskId, codegenBundle(runId, "bicep", generated.plan));
   const validationTask = await task(service, "validation-bicep");
@@ -676,7 +677,7 @@ test("native validation receives accepted concrete policy mappings and resource 
       },
     };
     const service = new ApexService(root, { providers: { [track]: provider } });
-    const { runId } = await service.init({ projectId: "demo", iacTool: track });
+    const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: track });
     const generated = await reachCodegen(service, runId, track, undefined, false, undefined, (policy) => {
       for (const effect of ["deny", "modify", "deployIfNotExists"] as const) {
         policy.mappings.push({
@@ -725,7 +726,7 @@ test("native adapters cannot silently fall back to simulated validation", async 
   const provider = bicepPreviewProvider(new Date());
   Reflect.deleteProperty(provider, "validationMode");
   const service = new ApexService(root, { providers: { bicep: provider } });
-  const { runId } = await service.init({ projectId: "demo", iacTool: "bicep" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: "bicep" });
   const generated = await reachCodegen(service, runId, "bicep");
   await service.completeTaskOutputs(generated.taskId, codegenBundle(runId, "bicep", generated.plan));
   await assert.rejects(
@@ -902,6 +903,7 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
     const service = new ApexService(root, { providers: { [track]: provider }, clock: () => now });
     const { runId } = await service.init({
       projectId: "demo",
+      riskOwner: "partner",
       iacTool: track,
       targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
     });
@@ -1130,6 +1132,7 @@ for (const secure of [true, false]) {
     const service = new ApexService(root, { providers: { bicep: provider } });
     const { runId } = await service.init({
       projectId: "demo",
+      riskOwner: "partner",
       iacTool: "bicep",
       targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
     });
@@ -1294,7 +1297,7 @@ test("Bicep validation acceptance requires complete bound policy evidence before
     },
   };
   const service = new ApexService(root, { providers: { bicep: provider } });
-  const { runId } = await service.init({ projectId: "demo", iacTool: "bicep" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: "bicep" });
   const generated = await reachCodegen(service, runId, "bicep", undefined, false, undefined, (policy) => {
     for (const effect of ["deny", "modify", "deployIfNotExists"] as const) {
       policy.mappings.push({
@@ -1361,6 +1364,7 @@ test("native preview refuses historical label-only validation when source checks
   const service = new ApexService(root);
   const { runId } = await service.init({
     projectId: "demo",
+    riskOwner: "partner",
     iacTool: "bicep",
     targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
   });
@@ -1389,7 +1393,7 @@ test("validation without a submitted bundle cannot claim executed checks", async
   for (const track of ["bicep", "terraform"] as const) {
     const root = await tempRoot();
     const service = new ApexService(root);
-    const { runId } = await service.init({ projectId: "demo", iacTool: track });
+    const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: track });
     const generated = await reachCodegen(service, runId, track);
     await service.completeTaskOutputs(generated.taskId, codegenBundle(runId, track, generated.plan));
     const validationTask = await task(service, `validation-${track}`);
@@ -1402,7 +1406,7 @@ test("validation without a submitted bundle cannot claim executed checks", async
 test("validation task inputs include the accepted policy map on both tracks", async () => {
   for (const track of ["bicep", "terraform"] as const) {
     const service = new ApexService(await tempRoot());
-    const { runId } = await service.init({ projectId: "demo", iacTool: track });
+    const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: track });
     const generated = await reachCodegen(service, runId, track);
     await service.completeTaskOutputs(generated.taskId, codegenBundle(runId, track, generated.plan));
     const validationTask = await task(service, `validation-${track}`);
@@ -1416,7 +1420,7 @@ test("validation task inputs include the accepted policy map on both tracks", as
 test("task completion records executed manifest validators in order", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   await service.nextTask();
   await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
 
@@ -1433,7 +1437,7 @@ test("task completion records executed manifest validators in order", async () =
 test("task validation refuses workflow bytes outside the run lock", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
@@ -1455,7 +1459,7 @@ test("task validation refuses workflow bytes outside the run lock", async () => 
 test("gate approval records executed manifest validators in order", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   await service.nextTask();
   const requirementHashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
   await complete(service, "requirements-review", [
@@ -1490,7 +1494,7 @@ test("gate approval records executed manifest validators in order", async () => 
 test("task-bound workflow validators reject semantic and evidence mutations", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo", iacTool: "bicep" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: "bicep" });
   await service.nextTask();
 
   const requirementTask = await task(service, "requirements");
@@ -1719,7 +1723,7 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
 test("architecture assumes availability and permits dismissal of out-of-scope review findings", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   await service.nextTask();
   const requirementHashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
   await complete(service, "requirements-review", [
@@ -1786,7 +1790,7 @@ test("authorized capability adapter accepts native architecture availability evi
       acceptedTarget = evidence.targetScope;
     },
   });
-  const { runId } = await service.init({ projectId: "demo", targetScope: "resource-group:test" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", targetScope: "resource-group:test" });
 
   const hash = await acceptAvailabilityEvidence(service, runId, "demo", "resource-group:test", { mode: "native" });
 
@@ -1798,7 +1802,7 @@ for (const track of ["bicep", "terraform"] as const) {
   test(`full logical ${track} workflow reaches fake deploy and quality`, async () => {
     const root = await tempRoot();
     const service = new ApexService(root);
-    const { runId } = await service.init({ projectId: "demo", iacTool: track });
+    const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: track });
     await reachValidation(service, runId, track);
     const preview = await service.preview({ operation: "apply", provider: "fake" });
     const previewEvents = await new EventJournal(
@@ -2013,6 +2017,7 @@ test("native Bicep deploy records stack ownership evidence in manifest order", a
   const service = new ApexService(root, { clock: () => now, providers: { bicep: bicepPreviewProvider(now) } });
   const { runId } = await service.init({
     projectId: "demo",
+    riskOwner: "partner",
     iacTool: "bicep",
     targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
   });
@@ -2061,7 +2066,7 @@ test("native Bicep child preview authorizes only the explicitly bound child ID",
     },
   };
   const service = new ApexService(root, { clock: () => now, providers: { bicep: provider } });
-  const { runId } = await service.init({ projectId: "demo", iacTool: "bicep", targetScope });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: "bicep", targetScope });
   await reachValidation(service, runId, "bicep", (plan) => {
     const intent = plan[0]!.value as ImplementationIntentV1;
     intent.resources[0]!.type = "Microsoft.Storage/storageAccounts/blobServices";
@@ -2105,7 +2110,7 @@ test("native Bicep scoped diagnostic preview binds the exact extension target", 
     },
   };
   const service = new ApexService(root, { clock: () => now, providers: { bicep: provider } });
-  const { runId } = await service.init({ projectId: "demo", iacTool: "bicep", targetScope });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: "bicep", targetScope });
   const generated = await reachCodegen(service, runId, "bicep", (plan) => {
     configureNativeBicepPlan(plan);
     const intent = plan[0]!.value as ImplementationIntentV1;
@@ -2173,6 +2178,7 @@ for (const scenario of ["foreign ID", "existing update", "existing delete"] as c
     const service = new ApexService(root, { clock: () => now, providers: { bicep: provider } });
     const { runId } = await service.init({
       projectId: "demo",
+      riskOwner: "partner",
       iacTool: "bicep",
       targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
     });
@@ -2244,6 +2250,7 @@ for (const track of ["bicep", "terraform"] as const) {
         const service = new ApexService(root, { clock: () => now, providers: { [track]: provider } });
         const { runId } = await service.init({
           projectId: "demo",
+          riskOwner: "partner",
           iacTool: track,
           targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
         });
@@ -2311,7 +2318,7 @@ test("Bicep AVM exact scope binds requests and rejects foreign inventory", async
     },
   };
   const service = new ApexService(root, { clock: () => now, providers: { bicep: provider } });
-  const { runId } = await service.init({ projectId: "demo", iacTool: "bicep", targetScope });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: "bicep", targetScope });
   const codegen = await reachCodegen(service, runId, "bicep", (plan) => {
     configureNativeBicepPlan(plan);
     const binding = (plan[1]!.value as IacBindingV1).resourceBindings.api!;
@@ -2407,6 +2414,7 @@ test("native apply requires complete source-bound policy receipts before Gate 4"
   const service = new ApexService(root, { clock: () => now, providers: { bicep: provider } });
   const { runId } = await service.init({
     projectId: "demo",
+    riskOwner: "partner",
     iacTool: "bicep",
     targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-test",
   });
@@ -2521,7 +2529,7 @@ test("policy mapping failures cannot complete planning or open Gate 3", async (c
       await context.test(`${track}: ${failure}`, async () => {
         const root = await tempRoot();
         const service = new ApexService(root);
-        const { runId } = await service.init({ projectId: "demo", iacTool: track });
+        const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: track });
         await assert.rejects(
           reachCodegen(service, runId, track, undefined, false, undefined, (policy) => {
             policy.mappings.push({
@@ -2626,7 +2634,7 @@ test("native Terraform apply requires complete source-bound policy receipts befo
     },
   };
   const service = new ApexService(root, { clock: () => now, providers: { terraform: provider } });
-  const { runId } = await service.init({ projectId: "demo", iacTool: "terraform" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: "terraform" });
   const codegen = await reachCodegen(service, runId, "terraform", undefined, false, undefined, (policy) => {
     policy.mappings.push({
       policyAssignmentId: "https",
@@ -2700,7 +2708,7 @@ test("native Terraform service preview rejects a foreign managed address", async
     clock: () => now,
     providers: { terraform: terraformPreviewProvider(now, "foreign-address") },
   });
-  const { runId } = await service.init({ projectId: "demo", iacTool: "terraform" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: "terraform" });
   await reachValidation(service, runId, "terraform");
   const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
   const head = await journal.head();
@@ -2714,7 +2722,7 @@ test("native Terraform preview records saved-plan validation and rejects wrong b
   const root = await tempRoot();
   const provider = terraformPreviewProvider(now);
   const service = new ApexService(root, { clock: () => now, providers: { terraform: provider } });
-  const { runId } = await service.init({ projectId: "demo", iacTool: "terraform" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: "terraform" });
   await reachValidation(service, runId, "terraform");
   const preview = await service.preview({ operation: "apply", provider: "terraform" });
   const events = await new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal")).replay();
@@ -2756,7 +2764,7 @@ test("native Terraform preview records saved-plan validation and rejects wrong b
     clock: () => now,
     providers: { terraform: terraformPreviewProvider(now, "missing-receipt") },
   });
-  const receiptRun = await missingReceipt.init({ projectId: "demo", iacTool: "terraform" });
+  const receiptRun = await missingReceipt.init({ projectId: "demo", riskOwner: "partner", iacTool: "terraform" });
   await reachValidation(missingReceipt, receiptRun.runId, "terraform");
   const receiptPreview = await missingReceipt.preview({ operation: "apply", provider: "terraform" });
   await missingReceipt.decideGateNumber(4, "approved", "tester");
@@ -2780,7 +2788,7 @@ test("native Terraform preview records saved-plan validation and rejects wrong b
     clock: () => now,
     providers: { terraform: terraformPreviewProvider(now, "extra-receipt") },
   });
-  const extraRun = await extraReceipt.init({ projectId: "demo", iacTool: "terraform" });
+  const extraRun = await extraReceipt.init({ projectId: "demo", riskOwner: "partner", iacTool: "terraform" });
   await reachValidation(extraReceipt, extraRun.runId, "terraform");
   const extraPreview = await extraReceipt.preview({ operation: "apply", provider: "terraform" });
   await extraReceipt.decideGateNumber(4, "approved", "tester");
@@ -2792,7 +2800,7 @@ test("native Terraform preview records saved-plan validation and rejects wrong b
     clock: () => now,
     providers: { terraform: reconcileProvider },
   });
-  const reconcileRun = await reconciling.init({ projectId: "demo", iacTool: "terraform" });
+  const reconcileRun = await reconciling.init({ projectId: "demo", riskOwner: "partner", iacTool: "terraform" });
   await reachValidation(reconciling, reconcileRun.runId, "terraform");
   const reconcilePreview = await reconciling.preview({ operation: "apply", provider: "terraform" });
   await reconciling.decideGateNumber(4, "approved", "tester");
@@ -2812,7 +2820,7 @@ test("native Terraform preview records saved-plan validation and rejects wrong b
     clock: () => now,
     providers: { terraform: terraformPreviewProvider(now, "apply-error") },
   });
-  const indeterminateRun = await indeterminate.init({ projectId: "demo", iacTool: "terraform" });
+  const indeterminateRun = await indeterminate.init({ projectId: "demo", riskOwner: "partner", iacTool: "terraform" });
   await reachValidation(indeterminate, indeterminateRun.runId, "terraform");
   const indeterminatePreview = await indeterminate.preview({ operation: "apply", provider: "terraform" });
   await indeterminate.decideGateNumber(4, "approved", "tester");
@@ -2836,7 +2844,7 @@ test("native Terraform preview records saved-plan validation and rejects wrong b
       clock: () => now,
       providers: { terraform: terraformPreviewProvider(now, mutation) },
     });
-    const inventoryRun = await inventoryService.init({ projectId: "demo", iacTool: "terraform" });
+    const inventoryRun = await inventoryService.init({ projectId: "demo", riskOwner: "partner", iacTool: "terraform" });
     await reachValidation(inventoryService, inventoryRun.runId, "terraform");
     const inventoryPreview = await inventoryService.preview({ operation: "apply", provider: "terraform" });
     await inventoryService.decideGateNumber(4, "approved", "tester");
@@ -2862,7 +2870,7 @@ test("native Terraform preview records saved-plan validation and rejects wrong b
     clock: () => now,
     providers: { terraform: terraformPreviewProvider(now, "input-hash") },
   });
-  const initialized = await invalid.init({ projectId: "demo", iacTool: "terraform" });
+  const initialized = await invalid.init({ projectId: "demo", riskOwner: "partner", iacTool: "terraform" });
   await reachValidation(invalid, initialized.runId, "terraform");
   await assert.rejects(invalid.preview({ operation: "apply", provider: "terraform" }), /preview:hash-bindings/);
   assert.equal((await invalid.status()).run.gates[3]?.state, "closed");
@@ -2883,7 +2891,7 @@ test("native Terraform preview records saved-plan validation and rejects wrong b
     clock: () => now,
     providers: { terraform: terraformPreviewProvider(now, "operation") },
   });
-  const operationRun = await wrongOperation.init({ projectId: "demo", iacTool: "terraform" });
+  const operationRun = await wrongOperation.init({ projectId: "demo", riskOwner: "partner", iacTool: "terraform" });
   await reachValidation(wrongOperation, operationRun.runId, "terraform");
   await assert.rejects(wrongOperation.preview({ operation: "apply", provider: "terraform" }), /preview:hash-bindings/);
 
@@ -2892,7 +2900,7 @@ test("native Terraform preview records saved-plan validation and rejects wrong b
     clock: () => now,
     providers: { terraform: terraformPreviewProvider(now, "state") },
   });
-  const stateRun = await wrongState.init({ projectId: "demo", iacTool: "terraform" });
+  const stateRun = await wrongState.init({ projectId: "demo", riskOwner: "partner", iacTool: "terraform" });
   await reachValidation(wrongState, stateRun.runId, "terraform");
   await assert.rejects(
     wrongState.preview({ operation: "apply", provider: "terraform" }),
@@ -2922,7 +2930,7 @@ test("terminal validator rejects unaccounted active validators", () => {
 test("review blockers persist, resolve, and permit gate approval", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   await service.nextTask();
   const hashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
   const reviewHashes = await complete(service, "requirements-review", [
@@ -2975,7 +2983,7 @@ test("review blockers persist, resolve, and permit gate approval", async () => {
 
 test("requirements obligations can be acknowledged with a downstream owner", async () => {
   const service = new ApexService(await tempRoot());
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   await service.nextTask();
   const hashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
   const reviewHashes = await complete(service, "requirements-review", [
@@ -3007,9 +3015,57 @@ test("requirements obligations can be acknowledged with a downstream owner", asy
   assert.equal((await service.status()).run.gates[0]?.state, "open");
 });
 
+test("accept-risk decisions use project owner and default ninety-day expiry", async () => {
+  let now = Date.parse("2026-01-01T00:00:00.000Z");
+  const root = await tempRoot();
+  const service = new ApexService(root, { clock: () => new Date(now) });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "customer" });
+  await service.nextTask();
+  const hashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
+  const reviewHashes = await complete(service, "requirements-review", [
+    {
+      kind: "review-findings",
+      value: review(runId, "requirements", hashes.requirements!, [
+        { id: "F-1", severity: "medium", disposition: "open", title: "Risk", detail: "Resolve", evidenceRefs: [] },
+      ]),
+    },
+  ]);
+
+  await assert.rejects(
+    service.decideReview(reviewHashes["review-findings"]!, [
+      { findingId: "F-1", action: "accept-risk", owner: "partner", rationale: "Temporary acceptance." },
+    ]),
+    /Accept-risk owner must match project risk owner 'customer'/u,
+  );
+  await assert.rejects(
+    service.decideReview(reviewHashes["review-findings"]!, [
+      {
+        findingId: "F-1",
+        action: "accept-risk",
+        rationale: "Temporary acceptance.",
+        expiresAt: "2025-12-31T00:00:00.000Z",
+      },
+    ]),
+    /Accept-risk expiry must be in the future/u,
+  );
+  assert.deepEqual(
+    await service.decideReview(reviewHashes["review-findings"]!, [
+      { findingId: "F-1", action: "accept-risk", rationale: "Temporary acceptance." },
+    ]),
+    { status: "resolved" },
+  );
+  const events = await new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal")).replay();
+  const resolution = events.findLast(({ type }) => type === "review.resolved")?.payload as {
+    resolution?: { owner?: string; expiresAt?: string };
+  };
+  assert.equal(resolution.resolution?.owner, "customer");
+  assert.equal(resolution.resolution?.expiresAt, "2026-04-01T00:00:00.000Z");
+  assert.equal((await service.status()).run.gates[0]?.state, "open");
+});
+
 test("requirements revision invalidates the old artifact and requires a fresh review", async () => {
   const service = new ApexService(await tempRoot());
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   await service.nextTask();
   const initial = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
   const reviewHashes = await complete(service, "requirements-review", [
@@ -3045,7 +3101,7 @@ test("requirements revision invalidates the old artifact and requires a fresh re
 test("expired accepted risk can be replaced without reopening an open gate", async () => {
   let now = Date.parse("2026-01-01T00:00:00.000Z");
   const service = new ApexService(await tempRoot(), { clock: () => new Date(now) });
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   await service.nextTask();
   const hashes = await complete(service, "requirements", [{ kind: "requirements", value: requirements() }]);
   const reviewHashes = await complete(service, "requirements-review", [
@@ -3057,17 +3113,23 @@ test("expired accepted risk can be replaced without reopening an open gate", asy
     },
   ]);
   const dependencyHash = sha256Json({ "review-findings": reviewHashes["review-findings"]! });
-  await service.resolveReview({
+  const acceptedRisk = {
     findingId: "F-1",
     reviewHash: reviewHashes["review-findings"]!,
     subjectHash: hashes.requirements!,
-    disposition: "accepted-risk",
+    disposition: "accepted-risk" as const,
     actor: "tester",
     rationale: "temporary exception",
     evidenceRefs: [],
     expiresAt: "2026-01-02T00:00:00.000Z",
     dependencyHash,
-  });
+  };
+  for (const owner of [undefined, "customer" as const])
+    await assert.rejects(
+      service.resolveReview({ ...acceptedRisk, ...(owner === undefined ? {} : { owner }) }),
+      (error: unknown) => error instanceof ApexError && error.code === "APEX_VALIDATION",
+    );
+  await service.resolveReview({ ...acceptedRisk, owner: "partner" });
   assert.equal((await service.status()).run.gates[0]?.state, "open");
 
   now = Date.parse("2026-01-03T00:00:00.000Z");
@@ -3089,7 +3151,7 @@ test("expired accepted risk can be replaced without reopening an open gate", asy
 test("promotion inherits neutral progression and restarts at the first environment-specific dependency", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   const codegen = await reachCodegen(service, runId, "bicep");
   await service.cancelTask(codegen.taskId);
   const sameScope = await service.promote("stage", "local");
@@ -3114,7 +3176,7 @@ test("promotion inherits neutral progression and restarts at the first environme
 test("approval bookkeeping preserves authority while runtime dependency mutation blocks deploy", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   await reachValidation(service, runId, "bicep");
   const preview = await service.preview({ operation: "apply", provider: "fake" });
   await service.decideGateNumber(4, "approved", "tester");
@@ -3123,7 +3185,7 @@ test("approval bookkeeping preserves authority while runtime dependency mutation
 
   const secondRoot = await tempRoot();
   const second = new ApexService(secondRoot);
-  const initialized = await second.init({ projectId: "demo" });
+  const initialized = await second.init({ projectId: "demo", riskOwner: "partner" });
   await reachValidation(second, initialized.runId, "bicep");
   const stalePreview = await second.preview({ operation: "apply", provider: "fake" });
   await second.decideGateNumber(4, "approved", "tester");
@@ -3139,7 +3201,7 @@ test("approval bookkeeping preserves authority while runtime dependency mutation
 
 test("invalid bundles are rejected before completion state changes", async () => {
   const service = new ApexService(await tempRoot());
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   await service.nextTask();
   const requirementTask = await task(service, "requirements");
   const before = await service.status();
@@ -3182,13 +3244,13 @@ test("invalid bundles are rejected before completion state changes", async () =>
 
 test("plan rejects wrong track and secret literals", async () => {
   const service = new ApexService(await tempRoot());
-  const { runId } = await service.init({ projectId: "demo", iacTool: "bicep" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: "bicep" });
   await reachValidation(service, runId, "bicep");
   const promoted = await service.promote("dev", "local-next");
   assert.equal(promoted.parentRunId, runId);
 
   const isolated = new ApexService(await tempRoot());
-  const initialized = await isolated.init({ projectId: "demo", iacTool: "bicep" });
+  const initialized = await isolated.init({ projectId: "demo", riskOwner: "partner", iacTool: "bicep" });
   await reachCodegen(isolated, initialized.runId, "bicep", async (plan) => {
     const planTask = await task(isolated, "plan");
     const sourceHashes = (plan[0]!.value as ImplementationIntentV1).sourceHashes;
@@ -3212,7 +3274,7 @@ test("plan rejects wrong track and secret literals", async () => {
 test("governance review completion uses the accepted policy artifact subject", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner" });
   const stop = new Error("Governance review checked");
   const original = service.completeTaskOutputs.bind(service);
   service.completeTaskOutputs = async (taskId, outputs) => {
@@ -3244,7 +3306,7 @@ test("governance review completion uses the accepted policy artifact subject", a
 
 test("MCP completeTask accepts an output bundle", async () => {
   const service = new ApexService(await tempRoot());
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const issued = await nextTaskAfterInput(service);
   assert.equal(issued.status, "task");
   if (issued.status !== "task") return;
@@ -3314,7 +3376,7 @@ test("codegen acceptance rejects rehashed manifests that diverge from approved i
   for (const track of ["bicep", "terraform"] as const) {
     const root = await tempRoot();
     const service = new ApexService(root);
-    const { runId } = await service.init({ projectId: "demo", iacTool: track });
+    const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: track });
     const generated = await reachCodegen(service, runId, track);
     const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
     const head = await journal.head();
@@ -3345,7 +3407,7 @@ test("codegen acceptance rejects rehashed manifests that diverge from approved i
 test("restricted staging and generateIac produce a real accepted tree", async () => {
   const root = await tempRoot();
   const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo", iacTool: "bicep" });
+  const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: "bicep" });
   const { taskId } = await reachCodegen(service, runId, "bicep");
   const first = await service.stageFile(taskId, "notes.md", "bounded\n");
   const second = await service.stageFile(taskId, "notes.md", "bounded\n");
@@ -3390,7 +3452,7 @@ for (const track of ["bicep", "terraform"] as const) {
   test(`regeneration preserves and blocks manual edits in previous ${track} source`, async () => {
     const root = await tempRoot();
     const service = new ApexService(root);
-    const { runId } = await service.init({ projectId: "demo", iacTool: track });
+    const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: track });
     const first = await reachCodegen(service, runId, track);
     const generated = await service.generateIac(first.taskId);
     const main = generated.files.find(({ path }) => path.endsWith(`main.${track === "bicep" ? "bicep" : "tf"}`))!;
@@ -3507,7 +3569,11 @@ test("bootstrap baseline readiness is read-only before discovery and enforces ta
   let now = new Date("2026-09-19T00:00:00Z");
   const subscriptionId = "11111111-1111-1111-1111-111111111111";
   const service = new ApexService(root, { clock: () => now });
-  await service.init({ projectId: "demo", targetScope: `/subscriptions/${subscriptionId}/resourceGroups/rg-test` });
+  await service.init({
+    projectId: "demo",
+    riskOwner: "partner",
+    targetScope: `/subscriptions/${subscriptionId}/resourceGroups/rg-test`,
+  });
   const path = join(root, "baseline.json");
   const baseline = emptyGovernanceBaseline(subscriptionId, now.toISOString());
   await writeJson(path, baseline);
@@ -3538,6 +3604,7 @@ async function materialGovernanceFixture(track: "bicep" | "terraform", native = 
   const service = new ApexService(root, { clock: () => now, ...(native ? { providers: { [track]: provider } } : {}) });
   const { runId } = await service.init({
     projectId: "demo",
+    riskOwner: "partner",
     iacTool: track,
     targetScope: `/subscriptions/${subscriptionId}/resourceGroups/rg-test`,
   });
@@ -3996,6 +4063,7 @@ for (const track of ["bicep", "terraform"] as const) {
     const service = new ApexService(root, { clock: () => now });
     const { runId } = await service.init({
       projectId: "demo",
+      riskOwner: "partner",
       iacTool: track,
       targetScope: `/subscriptions/${subscriptionId}`,
     });
@@ -4273,6 +4341,7 @@ for (const track of ["bicep", "terraform"] as const) {
     const service = new ApexService(root, { clock: () => now });
     const { runId } = await service.init({
       projectId: "demo",
+      riskOwner: "partner",
       iacTool: track,
       targetScope: `/subscriptions/${subscriptionId}`,
     });
@@ -4314,7 +4383,7 @@ for (const track of ["bicep", "terraform"] as const) {
   test(`${track} generates the replacement intent after plan review revision`, async () => {
     const root = await tempRoot();
     const service = new ApexService(root);
-    const { runId } = await service.init({ projectId: "demo", iacTool: track });
+    const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: track });
     const { taskId, plan } = await reachCodegen(service, runId, track, undefined, true);
     const generated = await service.generateIac(taskId);
     const main = generated.files.find(({ path }) => path.endsWith(track === "bicep" ? "main.bicep" : "main.tf"));
@@ -4381,7 +4450,7 @@ for (const track of ["bicep", "terraform"] as const) {
       await writeJson(path, baseline);
       const service = new ApexService(root, { clock: () => now });
       const targetScope = mode !== "simulated" ? `${scope}/resourceGroups/rg-test` : scope;
-      const { runId } = await service.init({ projectId: "demo", iacTool: track, targetScope });
+      const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: track, targetScope });
       const generated = await reachCodegen(
         service,
         runId,
@@ -4730,6 +4799,7 @@ for (const track of ["bicep", "terraform"] as const) {
     const service = new ApexService(root, { clock: () => now });
     const { runId } = await service.init({
       projectId: "demo",
+      riskOwner: "partner",
       iacTool: track,
       targetScope: `/subscriptions/${subscriptionId}`,
     });

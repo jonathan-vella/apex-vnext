@@ -8,22 +8,23 @@ Commands that change installation, capability, transfer, or improvement state ma
 
 ## Lifecycle
 
-| Command                         | Required or notable flags                                                                                  |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `apex version`                  | None                                                                                                       |
-| `apex init`                     | `--project`; optional `--name --environment --target --iac --client --customizations-source`               |
-| `apex bootstrap`                | `--project` or `--file`; `--yes`; optional client, name, environment, target, IaC, and repo creation flags |
-| `apex project create`           | `--project`; optional `--name --environment --target --iac`                                                |
-| `apex project promote`          | `--environment --target`                                                                                   |
-| `apex update`                   | Optional `--customizations-source`                                                                         |
-| `apex setup`                    | Optional `--live`                                                                                          |
-| `apex doctor`                   | Optional `--fix --yes`                                                                                     |
-| `apex customizations rollback`  | None                                                                                                       |
-| `apex customizations uninstall` | None                                                                                                       |
-| `apex customizations reinstall` | Optional `--customizations-source`                                                                         |
+| Command                         | Required or notable flags                                                                                               |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `apex version`                  | None                                                                                                                    |
+| `apex init`                     | `--project --risk-owner`; optional `--name --environment --target --iac --client --customizations-source`               |
+| `apex bootstrap`                | `--project --risk-owner` or `--file`; `--yes`; optional client, name, environment, target, IaC, and repo creation flags |
+| `apex project create`           | `--project --risk-owner`; optional `--name --environment --target --iac`                                                |
+| `apex project promote`          | `--environment --target`                                                                                                |
+| `apex update`                   | Optional `--customizations-source`                                                                                      |
+| `apex setup`                    | Optional `--live`                                                                                                       |
+| `apex doctor`                   | Optional `--fix --yes`                                                                                                  |
+| `apex customizations rollback`  | None                                                                                                                    |
+| `apex customizations uninstall` | None                                                                                                                    |
+| `apex customizations reinstall` | Optional `--customizations-source`                                                                                      |
 
 `--client` accepts only `github-copilot-cli`, the default. `--iac terraform` selects Terraform; otherwise initialization
-selects Bicep.
+selects Bicep. `--risk-owner` is required when creating a project and must be `partner` or `customer`; review
+accept-risk decisions reuse that role and default to a 90-day expiry.
 
 `apex bootstrap` is the end-user entry point. It requires confirmation, creates a Git repository only with
 `--create-repo`, installs the exact CLI as a workspace `devDependency`, and then delegates projection and state setup

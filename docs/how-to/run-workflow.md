@@ -22,6 +22,7 @@ projection:
 ```bash
 apex project create \
   --project payments \
+  --risk-owner partner \
   --name "Payments platform" \
   --environment dev \
   --target local \

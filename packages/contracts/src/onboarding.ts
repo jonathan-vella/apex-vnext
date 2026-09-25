@@ -5,6 +5,7 @@ import {
   IacToolSchema,
   NonEmptyStringSchema,
   ProjectIdSchema,
+  RiskOwnerSchema,
   Sha256Schema,
 } from "./common.js";
 
@@ -19,6 +20,7 @@ export const OnboardingConfigV1Schema = Type.Object(
     environment: Type.Optional(EnvironmentSchema),
     targetScope: Type.Optional(NonEmptyStringSchema),
     iacTool: Type.Optional(IacToolSchema),
+    riskOwner: Type.Optional(RiskOwnerSchema),
     createRepository: Type.Optional(Type.Boolean()),
   },
   { $id: "https://schemas.apexops.dev/onboarding-config-v1.json", additionalProperties: false },

@@ -10,7 +10,12 @@ async function fixture(repositoryOptions = {}) {
   let now = new Date("2026-01-01T00:00:00.000Z");
   const clock = () => now;
   const projects = new ProjectStore(root, clock, () => "run-1");
-  await projects.initializeProject({ projectId: "demo", displayName: "Demo", defaultIacTool: "bicep" });
+  await projects.initializeProject({
+    projectId: "demo",
+    displayName: "Demo",
+    defaultIacTool: "bicep",
+    riskOwner: "partner",
+  });
   await projects.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
   const transfers = new WriterTransferStore(projects.runDirectory("demo", "run-1"), clock, repositoryOptions);
   await transfers.leaseStore().acquire("alice", 10_000);

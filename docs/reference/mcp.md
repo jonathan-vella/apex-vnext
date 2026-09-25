@@ -7,28 +7,30 @@ APEX server with independent state.
 
 ## Workflow Tools
 
-| Tool                   | Purpose                                                               |
-| ---------------------- | --------------------------------------------------------------------- |
-| `status`               | Read selected project and run status.                                 |
-| `nextTask`             | Get the next input, review decision, task, or terminal status.        |
-| `taskContext`          | Read context for the exact task ID returned by `nextTask`.            |
-| `readTaskInput`        | Read externalized active-task context in bounded chunks.              |
-| `recordInput`          | Submit answers for the exact pending requirements input request.      |
-| `stageArtifact`        | Stage one or more typed outputs for a task.                           |
-| `stageFile`            | Stage a bounded file for a task, optionally with an expected SHA-256. |
-| `generateIac`          | Generate the selected task's Bicep or Terraform batch.                |
-| `validateTask`         | Validate staged or supplied task outputs without completion.          |
-| `completeTask`         | Atomically accept a complete typed output bundle.                     |
-| `requirementsComplete` | Complete Requirements without constructing a generic bundle.          |
-| `architectureComplete` | Complete Architecture, cost, and decisions atomically.                |
-| `reviewComplete`       | Complete a review with APEX-derived identity and evidence binding.    |
-| `reviewDecide`         | Revise, acknowledge owned obligations, or accept time-bound risk.     |
-| `planComplete`         | Complete a plan with an APEX-derived intent binding.                  |
+| Tool                   | Purpose                                                                                       |
+| ---------------------- | --------------------------------------------------------------------------------------------- |
+| `status`               | Read selected project and run status.                                                         |
+| `nextTask`             | Get the next input, review decision, task, or terminal status.                                |
+| `taskContext`          | Read context for the exact task ID returned by `nextTask`.                                    |
+| `readTaskInput`        | Read externalized active-task context in bounded chunks.                                      |
+| `recordInput`          | Submit answers for the exact pending requirements input request.                              |
+| `stageArtifact`        | Stage one or more typed outputs for a task.                                                   |
+| `stageFile`            | Stage a bounded file for a task, optionally with an expected SHA-256.                         |
+| `generateIac`          | Generate the selected task's Bicep or Terraform batch.                                        |
+| `validateTask`         | Validate staged or supplied task outputs without completion.                                  |
+| `completeTask`         | Atomically accept a complete typed output bundle.                                             |
+| `requirementsComplete` | Complete Requirements without constructing a generic bundle.                                  |
+| `architectureComplete` | Complete Architecture, cost, and decisions atomically.                                        |
+| `reviewComplete`       | Complete a review with APEX-derived identity and evidence binding.                            |
+| `reviewDecide`         | Revise, acknowledge obligations, or accept risk with project owner and 90-day default expiry. |
+| `planComplete`         | Complete a plan with an APEX-derived intent binding.                                          |
 
 Handle `needs_input` before requesting task context. Only a `nextTask` result with `status=task` provides a valid task
 ID. New Requirements runs return three adaptive panels before the task. Handle `needs_review` through the returned
 finding actions and `reviewDecide`.
 The returned request ID, expected head, and owner epoch are required for `recordInput`.
+`projectCreate` requires `riskOwner` (`partner` or `customer`). `reviewDecide` accept-risk decisions derive owner from
+that project value; omit `expiresAt` to use the 90-day default.
 
 ## Read And Operations Tools
 

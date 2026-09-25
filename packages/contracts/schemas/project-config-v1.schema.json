@@ -27,6 +27,18 @@
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     },
+    "riskOwner": {
+      "anyOf": [
+        {
+          "const": "partner",
+          "type": "string"
+        },
+        {
+          "const": "customer",
+          "type": "string"
+        }
+      ]
+    },
     "schemaVersion": {
       "const": "1.0.0",
       "type": "string"
@@ -37,7 +49,8 @@
     "projectId",
     "displayName",
     "createdAt",
-    "defaultIacTool"
+    "defaultIacTool",
+    "riskOwner"
   ],
   "type": "object"
 }

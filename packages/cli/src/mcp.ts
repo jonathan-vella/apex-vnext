@@ -164,6 +164,7 @@ const projectCreateInput = z
     environment: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
     targetScope: z.string().min(1).max(1024).optional(),
     iacTool: z.enum(["bicep", "terraform"]),
+    riskOwner: z.enum(["partner", "customer"]),
   })
   .strict();
 const projectIdInput = z.object({ projectId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/) }).strict();

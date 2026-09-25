@@ -85,7 +85,7 @@ test("governance package payload installs and updates the CLI projection without
   for (const clientId of ["github-copilot-cli"]) {
     const consumer = join(temporaryRoot, clientId);
     const service = new ApexService(consumer);
-    await service.init({ projectId: "test", clientId });
+    await service.init({ projectId: "test", riskOwner: "partner", clientId });
     await service.update();
     const lock = JSON.parse(await readFile(join(consumer, ".apex/customizations.lock.json"), "utf8"));
     for (const path of paths) {
@@ -540,7 +540,7 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     result: { version: "0.10.0-next.5", bundleVersion: "0.10.0-next.5", configVersion: "1.0.0" },
   });
   await runInTest("git", ["init", "--initial-branch", "qualification"], project);
-  await runInTest(apexBin, ["init", "--project", "demo", "--json"], project);
+  await runInTest(apexBin, ["init", "--project", "demo", "--risk-owner", "partner", "--json"], project);
   await readFile(join(project, ".github", "agents", "apex.agent.md"));
   const sharedSkillReferences = [
     "apex-azure-compute/references/recommendation-and-scale-rules.md",
@@ -620,13 +620,22 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
       const repeated = await cli(["bootstrap", "--client", clientId, "--yes"]);
       assert.equal(repeated.resumed, true);
       assert.equal(repeated.projectCreated, false);
-      await cli(["project", "create", "--project", "demo"]);
+      await cli(["project", "create", "--project", "demo", "--risk-owner", "partner"]);
     }
     await readFile(join(consumer, ".mcp.json"));
     for (const retired of [".vscode/mcp.json", ".github/mcp.json", ".github/agents/apex-cli.agent.md"])
       await assert.rejects(readFile(join(consumer, retired)), { code: "ENOENT" });
     const before = await cli(["status"]);
-    const resumed = await cli(["bootstrap", "--project", "demo", "--client", clientId, "--yes"]);
+    const resumed = await cli([
+      "bootstrap",
+      "--project",
+      "demo",
+      "--risk-owner",
+      "partner",
+      "--client",
+      clientId,
+      "--yes",
+    ]);
     assert.equal(resumed.resumed, true);
     assert.equal(resumed.runId, before.run.runId);
     assert.equal(resumed.runtimeInstalled, false);

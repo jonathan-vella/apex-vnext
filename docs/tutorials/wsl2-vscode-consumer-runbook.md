@@ -88,6 +88,7 @@ repository boundary:
 ```bash
 npx --yes @apexops/cli@next bootstrap \
   --project payments \
+  --risk-owner partner \
   --create-repo \
   --yes
 ```
@@ -125,6 +126,7 @@ The equivalent deterministic CLI fallback is:
 ```bash
 npx apex project create \
   --project data-platform \
+  --risk-owner partner \
   --name "Data platform" \
   --environment dev \
   --target local \
