@@ -46,6 +46,8 @@ import {
   codegenBundle,
   costEstimate,
   governance,
+  governanceFindings,
+  withPolicyMap,
   nextTaskAfterInput,
   planBundle,
   policyMap,
@@ -58,8 +60,21 @@ import {
   writeJson,
 } from "./helpers.js";
 
+async function importTestGovernance(service: ApexService): Promise<string> {
+  const subscription = /^\/subscriptions\/([0-9a-f-]{36})/iu.exec((await service.status()).run.targetScope)?.[1];
+  if (subscription === undefined) return (await service.importGovernanceReference()).outputHash;
+  const path = join(service.root, "test-governance-baseline.json");
+  const observedAt = new Date(Math.floor(service["clock"]().getTime() / 1000) * 1000 - 60_000).toISOString();
+  await writeJson(path, emptyGovernanceBaseline(subscription, observedAt));
+  return (await service.importGovernanceBaseline(path)).outputHash;
+}
+
 async function task(service: ApexService, expected: string): Promise<string> {
-  const next = await nextTaskAfterInput(service);
+  let next = await nextTaskAfterInput(service);
+  if (expected === "architecture" && next.status === "task" && next.task.taskType === "governance-discovery") {
+    await importTestGovernance(service);
+    next = await nextTaskAfterInput(service);
+  }
   assert.equal(next.status, "task");
   if (next.status !== "task") throw new Error("Expected task");
   assert.equal(next.task.taskType, expected);
@@ -71,7 +86,11 @@ async function complete(
   expected: string,
   outputs: TaskOutput[],
 ): Promise<Record<string, string>> {
-  const result = await service.completeTaskOutputs(await task(service, expected), outputs);
+  const taskId = await task(service, expected);
+  const result = await service.completeTaskOutputs(
+    taskId,
+    expected === "architecture" ? await withPolicyMap(service, taskId, outputs) : outputs,
+  );
   return result.outputHashes as Record<string, string>;
 }
 
@@ -94,26 +113,6 @@ async function reachCodegen(
   await service.decideGateNumber(1, "approved", "tester");
   await acceptAvailabilityEvidence(service, runId);
 
-  const architectureValue = architecture(runId);
-  const costValue = costEstimate(runId);
-  const architectureValues: TaskOutput[] = [
-    { kind: "architecture", value: architectureValue },
-    { kind: "cost-estimate", value: costValue },
-    {
-      kind: "workload-decision-manifest",
-      value: workloadDecisionManifest({
-        runId,
-        requirementsHash: requirementHashes.requirements!,
-        architectureHash: sha256Json(architectureValue),
-        costEstimateHash: sha256Json(costValue),
-      }),
-    },
-  ];
-  const architectureHashes = await complete(service, "architecture", architectureValues);
-  await complete(service, "architecture-review", [
-    { kind: "review-findings", value: review(runId, "architecture", architectureHashes.architecture!) },
-  ]);
-  const governanceValue = governance(runId);
   await beforeGovernanceImport?.();
   if (baselinePath !== undefined) {
     await assert.rejects(service.importGovernanceBaseline("../outside-baseline.json"), /escapes its root/);
@@ -121,30 +120,54 @@ async function reachCodegen(
     await symlink(join(baselinePath, ".."), link);
     await assert.rejects(service.importGovernanceBaseline(join(link, "baseline.json")), /symlink/);
   }
-  const governanceHashes =
-    baselinePath === undefined
-      ? await complete(service, "governance-discovery", [{ kind: "governance-constraints", value: governanceValue }])
-      : { "governance-constraints": (await service.importGovernanceBaseline(baselinePath)).outputHash };
+  const status = await service.status();
+  const events = await new EventJournal(
+    join(service.root, ".apex", "projects", status.run.projectId, "runs", runId, "journal"),
+  ).replay();
+  let governanceHash: string | undefined = service["acceptedArtifactHashes"](events)["governance-constraints"];
+  if (governanceHash === undefined) {
+    await task(service, "governance-discovery");
+    governanceHash =
+      baselinePath === undefined
+        ? await importTestGovernance(service)
+        : (await service.importGovernanceBaseline(baselinePath)).outputHash;
+  }
+  const governanceHashes = { "governance-constraints": governanceHash };
+  const architectureTask = await task(service, "architecture");
   if (baselinePath !== undefined) {
-    const reconciliationTask = await task(service, "governance-reconciliation");
-    const context = await service.taskContext(reconciliationTask);
-    assert.ok(
-      context.inputs.some(
-        (value) => (value as { schemaVersion?: string }).schemaVersion === "governance-baseline-selection-v2",
-      ),
-    );
+    const context = await service.taskContext(architectureTask);
     const selected = context.inputReferences.find(({ hash }) => !Object.values(context.artifactHashes).includes(hash));
     assert.ok(selected);
-    const chunk = await service.readTaskInput(reconciliationTask, 0, 6_000, selected.hash);
+    const chunk = await service.readTaskInput(architectureTask, 0, 6_000, selected.hash);
     assert.match(chunk.content, /governance-baseline-selection-v2/);
   }
-  const policy = policyMap(runId, governanceHashes["governance-constraints"]!) as PolicyPropertyMapV1;
+  const policy = policyMap(
+    runId,
+    governanceHashes["governance-constraints"]!,
+    await governanceFindings(service, architectureTask),
+  ) as PolicyPropertyMapV1;
   await configurePolicy?.(policy);
-  const policyHashes = await complete(service, "governance-reconciliation", [
-    { kind: "policy-property-map", value: policy },
-  ]);
-  await complete(service, "governance-review", [
-    { kind: "review-findings", value: review(runId, "policy-property-map", policyHashes["policy-property-map"]!) },
+  const architectureValue = architecture(runId);
+  const costValue = costEstimate(runId);
+  const architectureHashes = (
+    await service.completeTaskOutputs(architectureTask, [
+      { kind: "architecture", value: architectureValue },
+      { kind: "cost-estimate", value: costValue },
+      {
+        kind: "workload-decision-manifest",
+        value: workloadDecisionManifest({
+          runId,
+          requirementsHash: requirementHashes.requirements!,
+          architectureHash: sha256Json(architectureValue),
+          costEstimateHash: sha256Json(costValue),
+        }),
+      },
+      { kind: "policy-property-map", value: policy },
+    ])
+  ).outputHashes;
+  const policyHashes = { "policy-property-map": architectureHashes["policy-property-map"]! };
+  await complete(service, "architecture-review", [
+    { kind: "review-findings", value: review(runId, "architecture", architectureHashes.architecture!) },
   ]);
   await service.decideGateNumber(2, "approved", "tester");
 
@@ -1296,16 +1319,17 @@ test("Bicep validation acceptance requires complete bound policy evidence before
   const service = new ApexService(root, { providers: { bicep: provider } });
   const { runId } = await service.init({ projectId: "demo", iacTool: "bicep" });
   const generated = await reachCodegen(service, runId, "bicep", undefined, false, undefined, (policy) => {
-    for (const effect of ["deny", "modify", "deployIfNotExists"] as const) {
-      policy.mappings.push({
+    policy.mappings = [
+      ...(["deny", "modify", "deployIfNotExists"] as const).map((effect) => ({
         policyAssignmentId: effect,
         effect,
         logicalResourceId: "api",
         propertyPath: "properties.httpsOnly",
         expectedValue: true,
-        disposition: "planned",
-      });
-    }
+        disposition: "planned" as const,
+      })),
+      ...policy.mappings,
+    ];
   });
   await service.completeTaskOutputs(generated.taskId, codegenBundle(runId, "bicep", generated.plan));
   const validationTask = await task(service, "validation-bicep");
@@ -1535,7 +1559,14 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
   await service.decideGateNumber(1, "approved", "tester");
   const availabilityHash = await acceptAvailabilityEvidence(service, runId);
 
+  const governanceTask = await task(service, "governance-discovery");
+  await assert.rejects(
+    service.completeTaskOutputs(governanceTask, [{ kind: "governance-constraints", value: governance(runId) }]),
+    /imported baseline or the shipped ALZ Corp reference/,
+  );
+  const governanceHash = (await service.importGovernanceReference()).outputHash;
   const architectureTask = await task(service, "architecture");
+  const policy = policyMap(runId, governanceHash, await governanceFindings(service, architectureTask));
   const untraceableArchitecture = architecture(runId);
   untraceableArchitecture.components[0]!.requirementIds = ["REQ-UNKNOWN"];
   const untraceableCost = costEstimate(runId);
@@ -1552,6 +1583,7 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
           costEstimateHash: sha256Json(untraceableCost),
         }),
       },
+      { kind: "policy-property-map", value: policy },
     ]),
     /business:requirements-traceability/,
   );
@@ -1572,10 +1604,11 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
           costEstimateHash: sha256Json(costValue),
         }),
       },
+      { kind: "policy-property-map", value: policy },
     ]),
     /business:well-architected-assessment-complete/,
   );
-  const architectureHashes = await service.completeTaskOutputs(architectureTask, [
+  const architectureBundle = (policyValue: unknown): TaskOutput[] => [
     { kind: "architecture", value: architectureValue },
     { kind: "cost-estimate", value: costValue },
     {
@@ -1587,7 +1620,28 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
         costEstimateHash: sha256Json(costValue),
       }),
     },
-  ]);
+    { kind: "policy-property-map", value: policyValue },
+  ];
+  await assert.rejects(
+    service.completeTaskOutputs(
+      architectureTask,
+      architectureBundle({ ...policy, mappings: policy.mappings.filter(({ effect }) => effect !== "deny") }),
+    ),
+    /Policy mappings are required/,
+  );
+  await assert.rejects(
+    service.completeTaskOutputs(
+      architectureTask,
+      architectureBundle({
+        ...policy,
+        mappings: policy.mappings.map(({ reason, ...mapping }, index) =>
+          index === 0 ? mapping : { ...mapping, reason },
+        ),
+      }),
+    ),
+    /needs a reason/,
+  );
+  const architectureHashes = await service.completeTaskOutputs(architectureTask, architectureBundle(policy));
   const architectureEvents = await new EventJournal(
     join(root, ".apex", "projects", "demo", "runs", runId, "journal"),
   ).replay();
@@ -1597,10 +1651,12 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
   assert.deepEqual((architectureCompleted?.payload as { validatorIds?: unknown }).validatorIds, [
     "schema:architecture-v1",
     "schema:workload-decision-manifest-v1",
+    "schema:policy-property-map-v1",
     "business:requirements-traceability",
     "business:well-architected-assessment-complete",
     "business:workload-decision-manifest-coverage",
     "business:cost-arithmetic",
+    "business:policy-effect-coverage",
   ]);
   assert.equal(availabilityHash.length, 64);
   const architectureReviewTask = await task(service, "architecture-review");
@@ -1617,58 +1673,13 @@ test("task-bound workflow validators reject semantic and evidence mutations", as
     },
   ]);
 
-  const governanceTask = await task(service, "governance-discovery");
-  await assert.rejects(
-    service.completeTaskOutputs(governanceTask, [
-      { kind: "governance-constraints", value: { ...governance(runId), expiresAt: "2020-01-01T00:00:00.000Z" } },
-    ]),
-    /business:governance-freshness/,
-  );
-  const multiEffectGovernance = governance(runId);
-  multiEffectGovernance.summary.assignmentCount = 1;
-  multiEffectGovernance.summary.denyCount = 1;
-  multiEffectGovernance.summary.auditCount = 1;
-  multiEffectGovernance.constraintsRef.bytes = 1;
-  const governanceHashes = await service.completeTaskOutputs(governanceTask, [
-    { kind: "governance-constraints", value: multiEffectGovernance },
-  ]);
-  const policyHashes = await complete(service, "governance-reconciliation", [
-    {
-      kind: "policy-property-map",
-      value: {
-        ...policyMap(runId, governanceHashes.outputHashes["governance-constraints"]!),
-        mappings: [
-          {
-            policyAssignmentId: "assignment-1",
-            effect: "deny",
-            logicalResourceId: "api",
-            propertyPath: "properties.deny",
-            disposition: "planned",
-          },
-          {
-            policyAssignmentId: "assignment-1",
-            effect: "audit",
-            logicalResourceId: "api",
-            propertyPath: "properties.audit",
-            disposition: "planned",
-          },
-        ],
-      },
-    },
-  ]);
-  await complete(service, "governance-review", [
-    {
-      kind: "review-findings",
-      value: review(runId, "policy-property-map", policyHashes["policy-property-map"]!),
-    },
-  ]);
   await service.decideGateNumber(2, "approved", "tester");
 
   const sourceHashes = {
     requirements: requirementHashes.outputHashes.requirements!,
     architecture: architectureHashes.outputHashes.architecture!,
-    "governance-constraints": governanceHashes.outputHashes["governance-constraints"]!,
-    "policy-property-map": policyHashes["policy-property-map"]!,
+    "governance-constraints": governanceHash,
+    "policy-property-map": architectureHashes.outputHashes["policy-property-map"]!,
   };
   const validPlan = planBundle(runId, "bicep", {}, sourceHashes);
   const cyclicPlan = structuredClone(validPlan) as TaskOutput[];
@@ -1731,19 +1742,21 @@ test("architecture assumes availability and permits dismissal of out-of-scope re
   await service.decideGateNumber(1, "approved", "tester");
   const architectureValue = architecture(runId);
   const costValue = costEstimate(runId);
-  const architectureHashes = await service.completeTaskOutputs(await task(service, "architecture"), [
-    { kind: "architecture", value: architectureValue },
-    { kind: "cost-estimate", value: costValue },
-    {
-      kind: "workload-decision-manifest",
-      value: workloadDecisionManifest({
-        runId,
-        requirementsHash: requirementHashes.requirements!,
-        architectureHash: sha256Json(architectureValue),
-        costEstimateHash: sha256Json(costValue),
-      }),
-    },
-  ]);
+  const architectureHashes = {
+    outputHashes: await complete(service, "architecture", [
+      { kind: "architecture", value: architectureValue },
+      { kind: "cost-estimate", value: costValue },
+      {
+        kind: "workload-decision-manifest",
+        value: workloadDecisionManifest({
+          runId,
+          requirementsHash: requirementHashes.requirements!,
+          architectureHash: sha256Json(architectureValue),
+          costEstimateHash: sha256Json(costValue),
+        }),
+      },
+    ]),
+  };
   const architectureReview = review(runId, "architecture", architectureHashes.outputHashes.architecture!, [
     {
       id: "F-ARCH-1",
@@ -1775,7 +1788,7 @@ test("architecture assumes availability and permits dismissal of out-of-scope re
     ]),
     { status: "resolved" },
   );
-  assert.equal((await service.nextTask()).status, "task");
+  await assert.rejects(service.nextTask(), /Gate 2 approval is required/);
 });
 
 test("authorized capability adapter accepts native architecture availability evidence", async () => {
@@ -2533,7 +2546,7 @@ test("policy mapping failures cannot complete planning or open Gate 3", async (c
               disposition: failure === "blocked" ? "blocked" : "planned",
             });
           }),
-          /business:plan-source-coverage validation failed/,
+          /business:plan-source-coverage validation failed|must name an Architecture component/,
         );
         const events = await new EventJournal(
           join(root, ".apex", "projects", "demo", "runs", runId, "journal"),
@@ -2675,7 +2688,7 @@ test("native Terraform apply requires complete source-bound policy receipts befo
   const storedReceipt = await objects.getJson<PolicyValidationV1>(payload.policyValidationHash);
   assert.deepEqual(storedReceipt, receipt);
   assert.equal(storedReceipt.outcome, "pass");
-  assert.equal(storedReceipt.results.length, 1);
+  assert.equal(storedReceipt.results.filter(({ reason }) => reason === "matched").length, 1);
   assert.deepEqual(await objects.getJson<ExecutionPlanAttestationV1>(payload.attestationHash), attestation);
   assert.equal(attestation?.previewHash, preview.previewHash);
   assert.ok(payload.validatorIds.includes("terraform:saved-plan-binding"));
@@ -3163,19 +3176,22 @@ test("invalid bundles are rejected before completion state changes", async () =>
   const invalidCostArchitecture = architecture(runId);
   const invalidCostEstimate = costEstimate(runId, 2);
   await assert.rejects(
-    service.completeTaskOutputs(architectureTask, [
-      { kind: "architecture", value: invalidCostArchitecture },
-      { kind: "cost-estimate", value: invalidCostEstimate },
-      {
-        kind: "workload-decision-manifest",
-        value: workloadDecisionManifest({
-          runId,
-          requirementsHash: accepted.outputHashes.requirements!,
-          architectureHash: sha256Json(invalidCostArchitecture),
-          costEstimateHash: sha256Json(invalidCostEstimate),
-        }),
-      },
-    ]),
+    service.completeTaskOutputs(
+      architectureTask,
+      await withPolicyMap(service, architectureTask, [
+        { kind: "architecture", value: invalidCostArchitecture },
+        { kind: "cost-estimate", value: invalidCostEstimate },
+        {
+          kind: "workload-decision-manifest",
+          value: workloadDecisionManifest({
+            runId,
+            requirementsHash: accepted.outputHashes.requirements!,
+            architectureHash: sha256Json(invalidCostArchitecture),
+            costEstimateHash: sha256Json(invalidCostEstimate),
+          }),
+        },
+      ]),
+    ),
     /arithmetic/i,
   );
 });
@@ -3207,39 +3223,6 @@ test("plan rejects wrong track and secret literals", async () => {
     );
     assert.equal((await isolated.status()).head, before.head);
   });
-});
-
-test("governance review completion uses the accepted policy artifact subject", async () => {
-  const root = await tempRoot();
-  const service = new ApexService(root);
-  const { runId } = await service.init({ projectId: "demo" });
-  const stop = new Error("Governance review checked");
-  const original = service.completeTaskOutputs.bind(service);
-  service.completeTaskOutputs = async (taskId, outputs) => {
-    if (
-      outputs.some(
-        ({ kind, value }) =>
-          kind === "review-findings" && (value as { subjectKind?: string }).subjectKind === "policy-property-map",
-      )
-    ) {
-      service.completeTaskOutputs = original;
-      const context = await service.taskContext(taskId);
-      assert.equal(
-        (context.outputTemplates["review-findings"] as { subjectKind: string }).subjectKind,
-        "policy-property-map",
-      );
-      const completed = await service.completeReview(taskId, []);
-      const stored = await new ObjectStore(root).getJson<{ subjectKind: string; subjectHash: string }>(
-        completed.outputHashes["review-findings"]!,
-      );
-      assert.equal(stored.subjectKind, "policy-property-map");
-      assert.equal(stored.subjectHash, context.artifactHashes["policy-property-map"]);
-      assert.notEqual((await service.status()).run.gates[1]!.state, "approved");
-      throw stop;
-    }
-    return original(taskId, outputs);
-  };
-  await assert.rejects(reachCodegen(service, runId, "bicep"), (error) => error === stop);
 });
 
 test("MCP completeTask accepts an output bundle", async () => {
@@ -3766,7 +3749,7 @@ for (const stage of ["intent", "journal", "run", "cleanup"] as const) {
     }
     assert.ok(!(await readdir(directory)).includes(".run-transaction.json"));
     await restarted.importGovernanceBaseline(path);
-    await task(restarted, "governance-reconciliation");
+    await task(restarted, "architecture");
   });
 }
 
@@ -3822,8 +3805,8 @@ for (const track of ["bicep", "terraform"] as const) {
     assert.equal(result.candidateHash, sha256Bytes(await readFile(path)));
     for (const node of [
       "governance-discovery",
-      "governance-reconciliation",
-      "governance-review",
+      "architecture",
+      "architecture-review",
       "gate-2",
       "plan",
       "plan-review",
@@ -3842,7 +3825,7 @@ for (const track of ["bicep", "terraform"] as const) {
       "quality",
     ])
       assert.ok(result.invalidatedNodes.includes(node), node);
-    for (const node of ["requirements", "requirements-review", "gate-1", "architecture", "architecture-review"])
+    for (const node of ["requirements", "requirements-review", "gate-1"])
       assert.ok(!result.invalidatedNodes.includes(node), node);
     const after = await journal.replay();
     assert.deepEqual(after.slice(0, -1), before);
@@ -3857,16 +3840,16 @@ for (const track of ["bicep", "terraform"] as const) {
     );
     assert.notEqual(dependencyRevision(afterRun, after), dependencyRevision(beforeRun, before));
     const remaining = service["acceptedArtifactHashes"](after);
-    for (const kind of ["requirements", "architecture", "cost-estimate", "workload-decision-manifest"])
-      assert.equal(remaining[kind], previousHashes[kind]);
-    assert.equal(remaining["governance-constraints"], undefined);
-    const architectureReview = before.findLast(
+    assert.equal(remaining.requirements, previousHashes.requirements);
+    for (const kind of ["governance-constraints", "architecture", "policy-property-map"])
+      assert.equal(remaining[kind], undefined);
+    const requirementsReview = before.findLast(
       (event) =>
-        event.type === "task.completed" && (event.payload as { nodeId?: string }).nodeId === "architecture-review",
+        event.type === "task.completed" && (event.payload as { nodeId?: string }).nodeId === "requirements-review",
     )!;
     assert.equal(
       remaining["review-findings"],
-      (architectureReview.payload as { artifactHashes: Record<string, string> }).artifactHashes["review-findings"],
+      (requirementsReview.payload as { artifactHashes: Record<string, string> }).artifactHashes["review-findings"],
     );
     await assert.rejects(service.taskContext(generated.taskId), /stale|head/i);
     await assert.rejects(service.currentPreview());
@@ -3885,7 +3868,7 @@ for (const track of ["bicep", "terraform"] as const) {
     await assert.rejects(restarted.taskContext(discoveryTask), /stale|head/i);
     const imported = await restarted.importGovernanceBaseline(path);
     assert.notEqual(imported.outputHash, result.previousGovernanceHash);
-    await task(restarted, "governance-reconciliation");
+    await task(restarted, "architecture");
     assert.deepEqual(
       (await restarted.status()).run.gates.slice(1).map(({ state }) => state),
       ["invalidated", "invalidated", "invalidated"],
@@ -3950,11 +3933,24 @@ for (const track of ["bicep", "terraform"] as const) {
     await assert.rejects(service.deploy(preview.previewHash));
     await assert.rejects(service.decideGateNumber(4, "approved", "tester"));
     const imported = await service.importGovernanceBaseline(path);
-    const policy = await complete(service, "governance-reconciliation", [
-      { kind: "policy-property-map", value: policyMap(runId, imported.outputHash) },
+    const requirementsHash = service["acceptedArtifactHashes"](await journal.replay()).requirements!;
+    const architectureValue = architecture(runId);
+    const costValue = costEstimate(runId);
+    const policy = await complete(service, "architecture", [
+      { kind: "architecture", value: architectureValue },
+      { kind: "cost-estimate", value: costValue },
+      {
+        kind: "workload-decision-manifest",
+        value: workloadDecisionManifest({
+          runId,
+          requirementsHash,
+          architectureHash: sha256Json(architectureValue),
+          costEstimateHash: sha256Json(costValue),
+        }),
+      },
     ]);
-    await complete(service, "governance-review", [
-      { kind: "review-findings", value: review(runId, "policy-property-map", policy["policy-property-map"]!) },
+    await complete(service, "architecture-review", [
+      { kind: "review-findings", value: review(runId, "architecture", policy.architecture!) },
     ]);
     await service.decideGateNumber(2, "approved", "tester");
     const hashes = service["acceptedArtifactHashes"](await journal.replay());
@@ -4416,9 +4412,9 @@ for (const track of ["bicep", "terraform"] as const) {
             expectedValue: true,
             disposition: "planned",
           }));
-          const reconciliationTask = await task(service, "governance-reconciliation");
           const journal = new EventJournal(join(root, ".apex", "projects", "demo", "runs", runId, "journal"));
           const head = await journal.head();
+          const run = await service["currentRun"]();
           for (const effect of ["deny", "modify", "deployIfNotExists"] as const) {
             for (const mutation of ["omit", "assignment", "definition", "member", "effect", "exempt"] as const) {
               const invalid = structuredClone(policy);
@@ -4430,8 +4426,8 @@ for (const track of ["bicep", "terraform"] as const) {
               else if (mutation === "effect") mapping.effect = "audit";
               else mapping.disposition = "exempt";
               await assert.rejects(
-                service.completeTaskOutputs(reconciliationTask, [{ kind: "policy-property-map", value: invalid }]),
-                /Imported policy controls require explicit mappings/,
+                service["assertPolicyMapCoverage"](run, await journal.replay(), invalid, architecture(runId)),
+                /Policy mappings are required|Reported exemptions are not verified/,
               );
               assert.equal(await journal.head(), head);
               assert.equal((await service.status()).run.gates[1]!.state, "closed");

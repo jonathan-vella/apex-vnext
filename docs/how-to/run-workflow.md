@@ -160,9 +160,25 @@ read-only check after a project and target have been created. Workspace-only boo
 A `ready` result includes the candidate hash and observation time but does not establish human review,
 import the baseline, change the journal or approve a gate. Acceptance remains at the normal discovery stage below.
 
-Before planning, import the reviewed JSON snapshot for the run's target through the governance-discovery task. Azure
-Policy remains authoritative; a snapshot is evidence, not permission to override a policy. The consumer owns the
-collection workflow and its GitHub configuration; do not commit Azure credentials.
+Governance discovery runs after Gate 1 and before Architecture. Import the reviewed JSON snapshot for the run's target
+through the governance-discovery task. Azure Policy remains authoritative; a snapshot is evidence, not permission to
+override a policy. The consumer owns the collection workflow and its GitHub configuration; do not commit Azure
+credentials.
+
+Without a reviewed subscription baseline, import the shipped ALZ Corp reference baseline instead. Local targets always
+use it:
+
+```bash
+apex governance import --reference --json
+```
+
+The reference comes from a pinned Azure Landing Zones Library release (root, landing zones and corp archetypes). It is
+an assumption, not your policy: a subscription target can design, price and pass Gate 2 on it, but planning requires
+the reviewed subscription baseline. Replace it with `apex governance revise` (below) before Gate 3.
+
+The Architect maps every enforcing policy (deny, modify, deployIfNotExists) to a designed component inside
+Architecture. APEX marks policies whose resource types match no component `not-applicable`; every other
+`not-applicable` needs a reason. The Architecture review checks the map before Gate 2.
 
 Imported snapshots less than 30 days old can be reused. Refresh is optional, including before deployment. The runtime
 measures age from successful Azure collection, not file download, import or commit time. At exactly 30 days, imported
@@ -217,7 +233,8 @@ apex governance import --path .github/data/governance-policy-baseline.json --jso
 Revision is a trusted CLI-only operation. It atomically invalidates the workflow's governance dependency closure and
 Gates 2-4, preserving requirements, architecture and historical evidence. It does not import the replacement, approve
 policy, or change Azure. The later import must match the exact confirmed path and bytes; a changed candidate requires
-new confirmation. Reconciliation, governance review, planning and affected approvals must run again.
+new confirmation. Architecture (including its policy map), its review, planning and affected approvals must run
+again.
 
 In-flight or indeterminate deployments block revision until their outcome is resolved. Do not bypass this by editing
 journal/state files. Legacy snapshots without content digests still require a separately supported migration path.

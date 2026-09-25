@@ -432,9 +432,13 @@ async function completeCreativeWorkflow(context: TrackContext): Promise<void> {
     required: true,
   });
   restart(context);
+  const discovery = await context.service.nextTask();
+  if (discovery.status !== "task" || discovery.task.taskType !== "governance-discovery")
+    throw new Error(`Expected governance-discovery, received ${discovery.status}`);
+  const governanceHash = (await context.service.importGovernanceReference()).outputHash;
   const architectureValue = architecture(context);
   const costValue = costEstimate(context);
-  const architectureHashes = await complete(context, "architecture", [
+  const architectureHashes = await complete(context, "architecture", (projection) => [
     { kind: "architecture", value: architectureValue },
     { kind: "cost-estimate", value: costValue },
     {
@@ -446,26 +450,18 @@ async function completeCreativeWorkflow(context: TrackContext): Promise<void> {
         sha256Json(costValue),
       ),
     },
+    { kind: "policy-property-map", value: policyMap(context, governanceHash, projection) },
   ]);
   await complete(context, "architecture-review", [
     { kind: "review-findings", value: review(context, "architecture", architectureHashes.architecture!) },
-  ]);
-  const governanceHashes = await complete(context, "governance-discovery", [
-    { kind: "governance-constraints", value: governance(context) },
-  ]);
-  const policyHashes = await complete(context, "governance-reconciliation", [
-    { kind: "policy-property-map", value: policyMap(context, governanceHashes["governance-constraints"]!) },
-  ]);
-  await complete(context, "governance-review", [
-    { kind: "review-findings", value: review(context, "policy-property-map", policyHashes["policy-property-map"]!) },
   ]);
   await context.service.decideGateNumber(2, "approved", "qualification");
   restart(context);
   const plan = planBundle(context, {
     requirements: requirementHashes.requirements!,
     architecture: architectureHashes.architecture!,
-    "governance-constraints": governanceHashes["governance-constraints"]!,
-    "policy-property-map": policyHashes["policy-property-map"]!,
+    "governance-constraints": governanceHash,
+    "policy-property-map": architectureHashes["policy-property-map"]!,
   });
   const planHashes = await complete(context, "plan", plan);
   await complete(context, "plan-review", [
@@ -481,7 +477,7 @@ async function completeCreativeWorkflow(context: TrackContext): Promise<void> {
 async function complete(
   context: TrackContext,
   expected: string,
-  outputs: TaskOutput[],
+  outputs: TaskOutput[] | ((projection: Awaited<ReturnType<ApexService["taskContext"]>>) => TaskOutput[]),
 ): Promise<Partial<Record<TaskOutput["kind"], string>>> {
   let issued = await context.service.nextTask();
   while (issued.status === "needs_input") {
@@ -492,7 +488,12 @@ async function complete(
   if (issued.task.taskType !== expected) throw new Error(`Expected ${expected}, received ${issued.task.taskType}`);
   const projection = await context.service.taskContext(issued.task.taskId);
   context.taskContextBytes.push(Buffer.byteLength(JSON.stringify(projection), "utf8"));
-  return (await context.service.completeTaskOutputs(issued.task.taskId, outputs)).outputHashes;
+  return (
+    await context.service.completeTaskOutputs(
+      issued.task.taskId,
+      typeof outputs === "function" ? outputs(projection) : outputs,
+    )
+  ).outputHashes;
 }
 
 function projectId(track: QualificationTrack): string {
@@ -584,7 +585,16 @@ function architecture(context: TrackContext) {
     title: "Qualification",
     summary: "Equivalent fake architecture",
     sourceHashes: { requirements: HASH },
-    components: [{ id: "api", service: "fake/service", purpose: "Serve", requirementIds: ["REQ-1"], dependsOn: [] }],
+    components: [
+      {
+        id: "api",
+        service: "fake/service",
+        resourceTypes: ["Microsoft.Web/sites"],
+        purpose: "Serve",
+        requirementIds: ["REQ-1"],
+        dependsOn: [],
+      },
+    ],
     decisions: [],
     risks: [],
     wellArchitectedAssessment: {
@@ -655,18 +665,6 @@ function review(context: TrackContext, subjectKind: string, subjectHash: string)
       : {}),
   };
 }
-function governance(context: TrackContext) {
-  return {
-    schemaVersion: CONTRACT_VERSION,
-    projectId: projectId(context.track),
-    runId: context.runId,
-    targetScope: "local",
-    discoveredAt: context.clock.now().toISOString(),
-    expiresAt: "2027-01-01T00:00:00.000Z",
-    summary: { assignmentCount: 0, denyCount: 0, modifyCount: 0, auditCount: 0, exemptionCount: 0 },
-    constraintsRef: { mediaType: "application/json", uri: "memory://constraints", digest: HASH, bytes: 0 },
-  };
-}
 function availabilityEvidence(context: TrackContext, evidenceRefs: Record<string, string>) {
   return {
     schemaVersion: CONTRACT_VERSION,
@@ -686,13 +684,29 @@ function availabilityEvidence(context: TrackContext, evidenceRefs: Record<string
     },
   };
 }
-function policyMap(context: TrackContext, governanceHash: string) {
+function policyMap(
+  context: TrackContext,
+  governanceHash: string,
+  projection: Awaited<ReturnType<ApexService["taskContext"]>>,
+) {
+  const findings = (projection as { governanceFindings?: Array<Record<string, string>> }).governanceFindings ?? [];
   return {
     schemaVersion: CONTRACT_VERSION,
     projectId: projectId(context.track),
     runId: context.runId,
     governanceHash,
-    mappings: [],
+    mappings: findings.map((finding) => ({
+      policyAssignmentId: finding.policyAssignmentId!,
+      policyDefinitionId: finding.policyDefinitionId!,
+      ...(finding.policyDefinitionReferenceId === undefined
+        ? {}
+        : { policyDefinitionReferenceId: finding.policyDefinitionReferenceId }),
+      effect: finding.effect!,
+      logicalResourceId: "none",
+      propertyPath: finding.propertyPath ?? "type",
+      disposition: "not-applicable",
+      reason: "The qualification fixture deploys no resource this policy governs",
+    })),
   };
 }
 function planBundle(context: TrackContext, sourceHashes: Record<string, string>): TaskOutput[] {

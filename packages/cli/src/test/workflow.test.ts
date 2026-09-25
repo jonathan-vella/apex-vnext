@@ -4,6 +4,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { EventJournal, ObjectStore, sha256Json } from "@apexops/kernel";
 import type {
+  ArchitectureV1,
   EventV1,
   InputValueV1,
   RunConfigV1,
@@ -17,9 +18,12 @@ import {
   architecture,
   costEstimate,
   governance,
+  governanceFindings,
+  importReferenceGovernance,
   nextTaskAfterInput,
   planBundle,
   policyMap,
+  type GovernanceFindingProjection,
   prepareValidatedRun,
   qualityReport,
   requirements,
@@ -1152,6 +1156,7 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
   ]);
   await service.decideGateNumber(1, "approved", "tester");
   await acceptAvailabilityEvidence(service, initialized.runId);
+  await importReferenceGovernance(service);
 
   const pending = await service.nextTask();
   assert.equal(pending.status, "needs_input");
@@ -1179,6 +1184,7 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
     assert.deepEqual(Object.keys(context.outputTemplates).sort(), [
       "architecture",
       "cost-estimate",
+      "policy-property-map",
       "workload-decision-manifest",
     ]);
     assert.deepEqual(
@@ -1211,6 +1217,7 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
     architectureValue.components.push({
       id: "identity",
       service: "global/identity",
+      resourceTypes: ["Microsoft.ManagedIdentity/userAssignedIdentities"],
       purpose: "Authenticate external users",
       requirementIds: ["REQ-1"],
       dependsOn: [],
@@ -1261,6 +1268,7 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
         architectureValue,
         partialCost,
         untraced as Parameters<typeof service.completeArchitecture>[3],
+        [],
       ),
       (error: unknown) =>
         error instanceof ApexError &&
@@ -1273,10 +1281,46 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
         architectureValue,
         unpriced as Parameters<typeof service.completeArchitecture>[2],
         manifest,
+        [],
       ),
       /Current ARM MCP pricing evidence is required/u,
     );
-    const completed = await service.completeArchitecture(issued.task.taskId, architectureValue, partialCost, manifest);
+    const designed = new Set(architectureValue.components.flatMap(({ resourceTypes }) => resourceTypes));
+    const findings = (await governanceFindings(service, issued.task.taskId)) as Array<
+      GovernanceFindingProjection & { resourceTypes: string[] }
+    >;
+    const decided = findings.filter(
+      ({ resourceTypes }) => resourceTypes.length === 0 || resourceTypes.some((type) => designed.has(type)),
+    );
+    assert.ok(findings.length > decided.length, "the reference baseline has findings for undesigned resource types");
+    await assert.rejects(
+      service.completeArchitecture(issued.task.taskId, architectureValue, partialCost, manifest, []),
+      /Policy mappings are required/u,
+    );
+    const mappings = policyMap(initialized.runId, "0".repeat(64), decided).mappings;
+    await assert.rejects(
+      service.completeArchitecture(issued.task.taskId, architectureValue, partialCost, manifest, [
+        ...mappings,
+        { ...mappings[0]!, disposition: "planned", logicalResourceId: "missing-component" },
+      ]),
+      /Policy mapping is duplicated|Policy mapping must name an Architecture component/u,
+    );
+    const completed = await service.completeArchitecture(
+      issued.task.taskId,
+      architectureValue,
+      partialCost,
+      manifest,
+      mappings,
+    );
+    const storedMap = await new ObjectStore(service.root).getJson<PolicyPropertyMapV1>(
+      completed.outputHashes["policy-property-map"]!,
+    );
+    assert.equal(storedMap.mappings.length, findings.length);
+    assert.ok(
+      storedMap.mappings.some(
+        ({ disposition, reason }) => disposition === "not-applicable" && reason?.startsWith("No designed resource"),
+      ),
+    );
     assert.match(completed.outputHashes.architecture ?? "", /^[0-9a-f]{64}$/u);
     assert.match(completed.outputHashes["workload-decision-manifest"] ?? "", /^[0-9a-f]{64}$/u);
     const store = new ObjectStore(service.root);
@@ -1320,6 +1364,7 @@ test("architecture decision is reissued after its journal head becomes stale", a
     },
   ]);
   await service.decideGateNumber(1, "approved", "tester");
+  await importReferenceGovernance(service);
   const firstEvidence = await acceptAvailabilityEvidence(service, initialized.runId);
   const first = await service.nextTask();
   assert.equal(first.status, "needs_input");
@@ -1935,6 +1980,12 @@ test("imported initiative members require distinct mappings and run-owned eviden
       events: EventV1[],
     ): Promise<void>;
     inputRefs(run: RunConfigV1, events: EventV1[], descriptor: { id: string }): Promise<string[]>;
+    assertPolicyMapCoverage(
+      run: RunConfigV1,
+      events: EventV1[],
+      policyMap: PolicyPropertyMapV1,
+      architecture: ArchitectureV1,
+    ): Promise<void>;
   };
   const run = await internal.currentRun();
   const objects = new ObjectStore(root);
@@ -1980,14 +2031,8 @@ test("imported initiative members require distinct mappings and run-owned eviden
       },
     ],
   };
-  const validate = () =>
-    internal.validateBundle(
-      run,
-      { id: "governance-reconciliation" },
-      [{ kind: "policy-property-map", value: policy }],
-      events,
-    );
-  await assert.rejects(validate(), /explicit mappings/);
+  const validate = () => internal.assertPolicyMapCoverage(run, events, policy, architecture(run.runId));
+  await assert.rejects(validate(), /Policy mappings are required/);
   policy.mappings.push({ ...policy.mappings[0]!, policyDefinitionReferenceId: "member-2" });
   await validate();
   policy.mappings[1]!.disposition = "exempt";
@@ -2015,7 +2060,7 @@ test("imported initiative members require distinct mappings and run-owned eviden
           },
         },
       ] as EventV1[],
-      { id: "governance-reconciliation" },
+      { id: "architecture" },
     ),
     /does not belong/,
   );
@@ -2036,12 +2081,14 @@ test("plan task context projects source hashes and valid output templates", asyn
       "architecture-review": {
         subjectKind: "architecture",
         criteria: ["review:architecture-comprehensive", "review:well-architected-criteria-complete"],
-        kinds: ["requirements", "architecture", "cost-estimate", "workload-decision-manifest"],
-      },
-      "governance-review": {
-        subjectKind: "policy-property-map",
-        criteria: ["review:governance-reconciliation"],
-        kinds: ["architecture", "governance-constraints", "policy-property-map"],
+        kinds: [
+          "requirements",
+          "governance-constraints",
+          "architecture",
+          "cost-estimate",
+          "workload-decision-manifest",
+          "policy-property-map",
+        ],
       },
       "plan-review": {
         subjectKind: "implementation-intent",
@@ -2078,10 +2125,7 @@ test("plan task context projects source hashes and valid output templates", asyn
       criteria?: unknown[];
     };
     assert.equal(template.subjectHash, subjectHash);
-    assert.equal(
-      template.subjectKind,
-      taskType === "governance-review" ? "policy-property-map" : taskType.replace("-review", ""),
-    );
+    assert.equal(template.subjectKind, taskType.replace("-review", ""));
     if (taskType === "architecture-review") assert.equal(template.criteria?.length, 5);
     for (const reference of context.inputReferences) {
       const chunk = await service.readTaskInput(taskId, 0, 6_000, reference.hash);
@@ -2133,6 +2177,10 @@ test("plan task context projects source hashes and valid output templates", asyn
   );
   await service.decideGateNumber(1, "approved", "tester");
   await acceptAvailabilityEvidence(service, initialized.runId);
+  const governanceHash = await importReferenceGovernance(service);
+  const architectureTask = await nextTaskAfterInput(service);
+  if (architectureTask.status !== "task") throw new Error("Expected architecture");
+  const findings = await governanceFindings(service, architectureTask.task.taskId);
   const architectureValue = {
     ...architecture(initialized.runId),
     decisionRecords: [
@@ -2183,6 +2231,7 @@ test("plan task context projects source hashes and valid output templates", asyn
         costEstimateHash: sha256Json(costValue),
       }),
     },
+    { kind: "policy-property-map", value: policyMap(initialized.runId, governanceHash, findings) },
   ]);
   const architectureReviewDirectory = join(root, "agent-output", "demo", initialized.runId, "architecture");
   const decisions = await service.render("architecture-decisions");
@@ -2231,32 +2280,6 @@ test("plan task context projects source hashes and valid output templates", asyn
     await readFile(join(reviewsDirectory, "architecture-findings.md"), "utf8"),
     /Reviewed artifact kind: architecture/u,
   );
-  const template = async (kind: "governance-constraints" | "policy-property-map") => {
-    const issued = await nextTaskAfterInput(service);
-    if (issued.status !== "task") throw new Error("Expected a task");
-    return (await service.taskContext(issued.task.taskId)).outputTemplates[kind];
-  };
-  const governanceHashes = await complete("governance-discovery", [
-    { kind: "governance-constraints", value: await template("governance-constraints") },
-  ]);
-  const policyTemplate = await template("policy-property-map");
-  assert.deepEqual(
-    policyTemplate,
-    policyMap(initialized.runId, governanceHashes.outputHashes["governance-constraints"]!),
-  );
-  const policyHashes = await complete("governance-reconciliation", [
-    { kind: "policy-property-map", value: policyTemplate },
-  ]);
-  await complete("governance-review", [
-    {
-      kind: "review-findings",
-      value: review(initialized.runId, "policy-property-map", policyHashes.outputHashes["policy-property-map"]!),
-    },
-  ]);
-  assert.match(
-    await readFile(join(reviewsDirectory, "governance-reconciliation-findings.md"), "utf8"),
-    /Reviewed artifact kind: policy-property-map/u,
-  );
   await service.decideGateNumber(2, "approved", "tester");
 
   const issued = await service.nextTask();
@@ -2294,8 +2317,8 @@ test("plan task context projects source hashes and valid output templates", asyn
     {
       requirements: requirementHashes.outputHashes.requirements!,
       architecture: architectureHashes.outputHashes.architecture!,
-      "governance-constraints": governanceHashes.outputHashes["governance-constraints"]!,
-      "policy-property-map": policyHashes.outputHashes["policy-property-map"]!,
+      "governance-constraints": governanceHash,
+      "policy-property-map": architectureHashes.outputHashes["policy-property-map"]!,
     },
   );
   const planHashes = await service.completeTaskOutputs(issued.task.taskId, plan);

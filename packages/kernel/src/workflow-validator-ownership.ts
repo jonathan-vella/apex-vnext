@@ -78,7 +78,6 @@ const ownershipGroups: readonly OwnershipGroup[] = [
   {
     ids: [
       "review:architecture-comprehensive",
-      "review:governance-reconciliation",
       "review:plan-comprehensive",
       "review:requirements-comprehensive",
       "review:well-architected-criteria-complete",

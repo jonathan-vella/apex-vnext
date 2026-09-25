@@ -641,7 +641,7 @@ function planSourceCoverage(value: unknown): ValidationIssue[] {
   }
   const resources = new Set(intent.resources.map(({ id }) => id));
   for (const mapping of policy?.mappings ?? []) {
-    if (!resources.has(mapping.logicalResourceId))
+    if (mapping.disposition !== "not-applicable" && !resources.has(mapping.logicalResourceId))
       issues.push({
         path: "/outputs/implementation-intent/resources",
         message: "Policy mapping references a resource absent from the plan",
@@ -779,7 +779,7 @@ function bindingCoverage(expectedTrack: "bicep" | "terraform", value: unknown): 
 function comprehensiveReview(expectedNode: string, value: unknown): ValidationIssue[] {
   const context = taskContext(value);
   const review = context.outputs["review-findings"] as ReviewFindingsV1;
-  const subjectKind = expectedNode === "governance-reconciliation" ? "policy-property-map" : expectedNode;
+  const subjectKind = expectedNode;
   const artifactKind = subjectKind === "plan" ? "implementation-intent" : subjectKind;
   const expectedHash = context.artifactHashes[artifactKind];
   const findingIds = review.findings.map(({ id }) => id);
@@ -870,7 +870,7 @@ function gateReady(expectedGate: 1 | 2 | 3, value: unknown): ValidationIssue[] {
   };
   const requiredReviews: Record<1 | 2 | 3, readonly string[]> = {
     1: ["requirements-review"],
-    2: ["architecture-review", "governance-review"],
+    2: ["architecture-review"],
     3: ["plan-review"],
   };
   const issues: ValidationIssue[] = [];
@@ -1456,9 +1456,6 @@ export function registerWorkflowValidators(registry: ValidatorRegistry): void {
   registry.registerHandler("review:requirements-comprehensive", (value) => comprehensiveReview("requirements", value));
   registry.registerHandler("review:architecture-comprehensive", (value) => comprehensiveReview("architecture", value));
   registry.registerHandler("review:well-architected-criteria-complete", wellArchitectedCriteriaComplete);
-  registry.registerHandler("review:governance-reconciliation", (value) =>
-    comprehensiveReview("governance-reconciliation", value),
-  );
   registry.registerHandler("review:plan-comprehensive", (value) => comprehensiveReview("plan", value));
 
   for (const id of VALIDATION_EVIDENCE_IDS) {

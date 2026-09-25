@@ -409,10 +409,16 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
     "governanceImport",
     {
       description:
-        "Import the active subscription from a reviewed local governance baseline; provide only its path, never baseline contents.",
-      inputSchema: { path: z.string().min(1) },
+        "Import governance for the active discovery task: either a reviewed local subscription baseline by path (never its contents) or reference: true for the shipped ALZ Corp reference baseline.",
+      inputSchema: { path: z.string().min(1).optional(), reference: z.literal(true).optional() },
     },
-    async ({ path }) => result(await service.importGovernanceBaseline(path)),
+    async ({ path, reference }) => {
+      if ((path === undefined) === (reference === undefined))
+        throw new ApexError("APEX_USAGE", "Provide exactly one of path or reference", EXIT_CODES.usage);
+      return result(
+        await (path === undefined ? service.importGovernanceReference() : service.importGovernanceBaseline(path)),
+      );
+    },
   );
   server.registerTool(
     "governanceSelect",
@@ -596,21 +602,23 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
     "architectureComplete",
     {
       description:
-        "Complete Architecture atomically; APEX derives identity, artifact hashes, top-level requirementTraceability, and cost/SKU bindings. Each SKU and SLO decision lists its component requirementIds.",
+        "Complete Architecture atomically; APEX derives identity, artifact hashes, top-level requirementTraceability, and cost/SKU bindings. Each SKU and SLO decision lists its component requirementIds. policyMappings maps each governanceFindings entry from task context to a component; APEX marks findings whose resource types match no component resourceTypes not-applicable.",
       inputSchema: {
         taskId: z.string(),
         architecture: z.unknown(),
         costEstimate: z.unknown(),
         decisionManifest: z.unknown(),
+        policyMappings: z.array(z.unknown()),
       },
     },
-    async ({ taskId, architecture, costEstimate, decisionManifest }) =>
+    async ({ taskId, architecture, costEstimate, decisionManifest, policyMappings }) =>
       result(
         await service.completeArchitecture(
           taskId,
           architecture as Parameters<typeof service.completeArchitecture>[1],
           costEstimate as Parameters<typeof service.completeArchitecture>[2],
           decisionManifest as Parameters<typeof service.completeArchitecture>[3],
+          policyMappings as Parameters<typeof service.completeArchitecture>[4],
         ),
       ),
   );

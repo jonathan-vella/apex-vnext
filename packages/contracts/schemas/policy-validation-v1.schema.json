@@ -64,6 +64,10 @@
               {
                 "const": "blocked",
                 "type": "string"
+              },
+              {
+                "const": "not-applicable",
+                "type": "string"
               }
             ]
           },
@@ -203,6 +207,14 @@
               },
               {
                 "const": "invalid-source",
+                "type": "string"
+              },
+              {
+                "const": "not-applicable",
+                "type": "string"
+              },
+              {
+                "const": "platform-remediated",
                 "type": "string"
               }
             ]

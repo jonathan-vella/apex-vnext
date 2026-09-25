@@ -1176,6 +1176,7 @@ describe("target family contracts", () => {
           {
             id: "api",
             service: "Azure App Service",
+            resourceTypes: ["Microsoft.Web/sites"],
             purpose: "Host API",
             requirementIds: ["REQ-001"],
             dependsOn: [],
@@ -1270,6 +1271,7 @@ describe("target family contracts", () => {
         projectId: "example-project",
         runId: "run-1",
         targetScope: "/subscriptions/example",
+        source: "collected",
         discoveredAt: timestamp,
         expiresAt: expiry,
         summary: { assignmentCount: 3, denyCount: 1, modifyCount: 1, auditCount: 1, exemptionCount: 0 },

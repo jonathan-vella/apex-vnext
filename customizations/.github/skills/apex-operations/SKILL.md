@@ -39,9 +39,12 @@ Use this skill only in the interactive Operator agent.
    An explicit request to reconsider refresh can use `reopen: true` (CLI `--reopen`) for the same candidate; it asks
    again without selecting an answer. At 30 days reuse remains unavailable. Never reopen automatically.
 7. For reviewed governance baseline import, call `apex/governanceImport` with `{ "path": "<local-baseline-path>" }` only.
-   The trusted CLI equivalent is `apex governance import --path <local-baseline-path>`. Return the service's `outputHash`
-   and `summary`, never baseline bytes. Import preserves reconciliation, governance review, and Gate 2; it does not
-   perform live discovery or authorize deployment.
+   For a `local` target, or a user-chosen pre-sales start without a subscription baseline, call it with
+   `{ "reference": true }` to import the shipped ALZ Corp reference baseline. The trusted CLI equivalents are
+   `apex governance import --path <local-baseline-path>` and `apex governance import --reference`. Return the service's
+   `outputHash` and `summary`, never baseline bytes. Import happens before Architecture, which maps the policies; it
+   does not perform live discovery or authorize deployment. The reference baseline cannot authorize planning for a
+   subscription target.
 
 ## Output
 

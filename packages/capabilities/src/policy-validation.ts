@@ -229,8 +229,12 @@ function observe(
 ): Observation {
   if (mapping.disposition === "blocked") return { outcome: "fail", reason: "blocked" };
   if (mapping.disposition === "exempt") return { outcome: "unsupported", reason: "unverified-exemption" };
+  if (mapping.disposition === "not-applicable") return { outcome: "pass", reason: "not-applicable" };
   if (mapping.effect === "disabled") return { outcome: "unsupported", reason: "unsupported-effect" };
-  if (!Object.hasOwn(mapping, "expectedValue")) return { outcome: "unsupported", reason: "missing-expected-value" };
+  if (!Object.hasOwn(mapping, "expectedValue"))
+    return ["modify", "deployIfNotExists"].includes(mapping.effect)
+      ? { outcome: "pass", reason: "platform-remediated" }
+      : { outcome: "unsupported", reason: "missing-expected-value" };
   return observeBoundProperty(mapping, request, resources);
 }
 

@@ -693,7 +693,10 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
         confirm: true,
       });
     case "governance import":
-      return service.importGovernanceBaseline(required(flags, "path"));
+      if (flags.reference === undefined) return service.importGovernanceBaseline(required(flags, "path"));
+      if (flags.reference !== true || flags.path !== undefined)
+        throw new ApexError("APEX_USAGE", "Use exactly one of --path or --reference", EXIT_CODES.usage);
+      return service.importGovernanceReference();
     case "governance revise": {
       confirmed(flags, "governance revise");
       return service.reviseGovernanceBaseline(required(flags, "path"), {

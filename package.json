@@ -31,6 +31,7 @@
     "lint:md": "markdownlint-cli2",
     "lint:md:fix": "markdownlint-cli2 --fix",
     "lint:links": "find docs README.md CONTRIBUTING.md CHANGELOG.md -type f -name '*.md' -print | xargs -I {} markdown-link-check {} --config .markdown-link-check.json",
+    "generate:alz-reference": "node tools/scripts/generate-alz-reference-baseline.mjs",
     "generate:docs-reference": "node tools/scripts/generate-documentation-reference.mjs",
     "validate:docs-reference": "node tools/scripts/generate-documentation-reference.mjs --check",
     "validate:docs": "run-p lint:md lint:links lint:docs-freshness validate:docs-reference",

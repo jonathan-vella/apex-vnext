@@ -25,7 +25,10 @@ resolve, accept with rationale, or defer through the owning interactive stage.
   when those lenses are present in the task.
   For Architecture, assume regional and zonal support, quota, deployment feasibility, restore, and failover checks are
   non-issues. Explicit partial pricing is valid cost documentation. Do not create findings, concerns, mandatory
-  acceptance criteria, or revision requests for any of these topics.
+  acceptance criteria, or revision requests for any of these topics. APEX builds the hosting platform: application
+  functionality such as business workflows, approval paths or application data-lifecycle rules is out of scope.
+  For Architecture, check the policy map: each enforcing finding maps to a component with a plausible property and
+  disposition, `blocked` rows are findings, and every `not-applicable` reason is factually consistent with the design.
 3. Return one typed finding per issue with `id`, `severity`, `title`, and `detail`. For Architecture, also return one
   criterion receipt for every Well-Architected pillar using the exact task template; link `finding` outcomes to finding
   IDs and explain every `pass` or `not-applicable` outcome. Do not manufacture findings to satisfy a quota.
