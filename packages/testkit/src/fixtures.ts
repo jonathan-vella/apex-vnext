@@ -44,6 +44,7 @@ export function projectFixture(overrides: Partial<ProjectConfigV1> = {}): Projec
     displayName: "Test Project",
     createdAt: FIXTURE_TIME,
     defaultIacTool: "bicep",
+    riskOwner: "partner",
     ...overrides,
   };
 }

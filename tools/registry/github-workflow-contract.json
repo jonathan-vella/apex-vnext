@@ -65,7 +65,7 @@
       "triggerDigest": "5c375602c9ef5d8ec711bfa7db1aaaf0484d84e8339627fa7f3bcb8de81edbb6",
       "permissionsDigest": "d8d6aceb1abc41990618a503082c3badcca8897feee0976f222af5b74e30bec2",
       "concurrencyDigest": "4e63af8b5ea8ea847d4c0b1282cb5baa562c55fcba853882a909c27b7ee81670",
-      "jobsDigest": "c4e71d924fffb4e0b9d79155f4ba021188dabf35daf41777d6c2a0f23cac63d1",
+      "jobsDigest": "f79c9d3e33245cc50083bfec874dff9e8b54890baff51637cf911208d359aa17",
       "jobs": {
         "ci": "ci"
       }

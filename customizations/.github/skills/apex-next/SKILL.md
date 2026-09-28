@@ -38,14 +38,16 @@ Route the next APEX step from kernel state. The kernel selects the owner; this s
    | `validator`                                  | worker `APEX Validator` |
 
    For any other result or role, report it and stop.
-4. Write the scope prompt: the owner, the exact `request.requestId`, `review.reviewHash` or `task.taskId`, and the
-   user's requested outcome, exact stop point and prohibited operations, verbatim. If the original scope is
-   unavailable, limit continuation to intake or the owner's task context.
+4. Write the scope prompt for the owner's current task only: the owner, the exact `request.requestId`,
+   `review.reviewHash` or `task.taskId`, and the user's requested outcome, exact stop point and prohibited operations,
+   verbatim. Do not carry later-stage prerequisites, such as governance-discovery evidence, into an earlier owner task.
+   If the original scope is unavailable, limit continuation to intake or the owner's task context.
 5. A worker completes as a subagent. Delegate it with `task` and the scope prompt, report its result, then call
    `apex/status`. If `task` is unavailable, report the pending worker task and stop.
-6. An interactive owner needs the foreground because only it can ask questions, including a `status=task` result for
-   `apex-requirements`, `apex-architect`, `apex-planner` or `apex-operator`. Print its selection step and the scope
-   prompt, then stop:
+6. If the active agent is already the named interactive owner, continue with the current `nextTask` result instead of
+   printing a switch instruction. Otherwise, an interactive owner needs the foreground because only it can ask
+   questions, including a `status=task` result for `apex-requirements`, `apex-architect`, `apex-planner` or
+   `apex-operator`. Print its selection step and the scope prompt, then stop:
    - Copilot CLI: `/agent apex-requirements`, using the owner's agent name from the table.
    - VS Code Copilot harness: choose the agent, such as **APEX Requirements**, in the Agent picker.
 
@@ -61,5 +63,5 @@ Route the next APEX step from kernel state. The kernel selects the owner; this s
 
 ## Output
 
-Report the owner and either the worker result or the selection step. Put the scope prompt in a fenced block so the
-user can paste it after switching.
+Report the owner and either the worker result or the selection step. Put the ready-to-paste scope prompt in a fenced
+`text` code block so the user can copy plain text after switching.

@@ -78,6 +78,13 @@ function clientId(flags: Flags): "github-copilot-cli" {
   return value;
 }
 
+function riskOwner(flags: Flags): "partner" | "customer" {
+  const value = required(flags, "risk-owner");
+  if (value !== "partner" && value !== "customer")
+    throw new ApexError("APEX_USAGE", "--risk-owner must be partner or customer", EXIT_CODES.usage);
+  return value;
+}
+
 async function inputJson(flags: Flags): Promise<unknown> {
   return JSON.parse(await readFile(required(flags, "file"), "utf8")) as unknown;
 }
@@ -94,10 +101,17 @@ async function onboardingConfig(flags: Flags, _root: string): Promise<Onboarding
           ...(typeof flags.environment === "string" ? { environment: flags.environment } : {}),
           ...(typeof flags.target === "string" ? { targetScope: flags.target } : {}),
           ...(flags.iac === "terraform" ? { iacTool: "terraform" } : {}),
+          ...(typeof flags["risk-owner"] === "string" ? { riskOwner: flags["risk-owner"] } : {}),
           ...(flags["create-repo"] === true ? { createRepository: true } : {}),
         };
   if (!Value.Check(OnboardingConfigV1Schema, config)) {
     throw new ApexError("APEX_VALIDATION", "Onboarding configuration is malformed", EXIT_CODES.validation);
+  }
+  if (config.projectId !== undefined && config.riskOwner === undefined) {
+    throw new ApexError("APEX_VALIDATION", "Project risk owner must be partner or customer", EXIT_CODES.validation);
+  }
+  if (config.projectId === undefined && config.riskOwner !== undefined) {
+    throw new ApexError("APEX_USAGE", "--risk-owner requires --project", EXIT_CODES.usage);
   }
   if (typeof flags.client === "string" && config.client !== undefined && flags.client !== config.client) {
     throw new ApexError("APEX_USAGE", "--client conflicts with the onboarding configuration", EXIT_CODES.usage);
@@ -456,6 +470,7 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
         ...(typeof flags.environment === "string" ? { environment: flags.environment } : {}),
         ...(typeof flags.target === "string" ? { targetScope: flags.target } : {}),
         iacTool: flags.iac === "terraform" ? "terraform" : "bicep",
+        riskOwner: riskOwner(flags),
         clientId: clientId(flags),
         ...(typeof flags["customizations-source"] === "string"
           ? { customizationsSource: flags["customizations-source"] }
@@ -512,6 +527,7 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
         ...(config.environment === undefined ? {} : { environment: config.environment }),
         ...(config.targetScope === undefined ? {} : { targetScope: config.targetScope }),
         ...(config.iacTool === undefined ? {} : { iacTool: config.iacTool }),
+        ...(config.riskOwner === undefined ? {} : { riskOwner: config.riskOwner }),
         clientId: config.client ?? clientId(flags),
         ...(config.createRepository === undefined ? {} : { createRepository: config.createRepository }),
       });
@@ -571,6 +587,7 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
         ...(typeof flags.environment === "string" ? { environment: flags.environment } : {}),
         ...(typeof flags.target === "string" ? { targetScope: flags.target } : {}),
         iacTool: flags.iac === "terraform" ? "terraform" : "bicep",
+        riskOwner: riskOwner(flags),
       });
     case "project delete":
       confirmed(flags, "project delete");

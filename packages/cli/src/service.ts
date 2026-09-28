@@ -87,6 +87,7 @@ import {
   type RepositoryPublishConfigV1,
   type RepositoryPublishPlanV1,
   type ProjectId,
+  type RiskOwner,
   type ResourceInventoryV1,
   type ReviewFindingsV1,
   type QualityScorecardV1,
@@ -293,6 +294,7 @@ export interface ReviewResolution {
   disposition: "fixed" | "accepted-risk" | "acknowledged" | "dismissed";
   actor: string;
   rationale: string;
+  owner?: RiskOwner;
   evidenceRefs: string[];
   expiresAt?: string;
   dependencyHash: string;
@@ -476,7 +478,12 @@ const REQUIREMENTS_INTAKE: readonly RequirementsIntakeRound[] = [
         prompt: "Which workload pattern best fits the solution?",
         options: ["web-api", "event-driven", "data-analytics", "iot", "batch"],
       },
-      { id: "scale", prompt: "Describe expected users, concurrency, throughput, or data volume." },
+      {
+        id: "scale",
+        prompt:
+          "Optionally describe expected users, concurrency, throughput, data volume, or latency goals; leave empty to check later.",
+        optional: true,
+      },
       { id: "budget", prompt: "State the monthly budget or explicitly defer it.", valueType: "budget" },
       {
         id: "data-sensitivity",
@@ -755,6 +762,7 @@ export class ApexService {
     environment?: string;
     targetScope?: string;
     iacTool?: "bicep" | "terraform";
+    riskOwner: RiskOwner;
     customizationsSource?: string;
     clientId?: BundledClientProjection["id"];
   }): Promise<{ projectId: ProjectId; runId: RunId }> {
@@ -1496,6 +1504,7 @@ export class ApexService {
       (config.environment !== undefined && config.environment !== run.environment) ||
       (config.targetScope !== undefined && config.targetScope !== run.targetScope) ||
       (config.iacTool !== undefined && config.iacTool !== run.iacTool) ||
+      (config.riskOwner !== undefined && config.riskOwner !== project.riskOwner) ||
       (config.client !== undefined && config.client !== customization.clientId) ||
       customization.sourceMode !== "bundled-projection"
     )
@@ -1525,6 +1534,7 @@ export class ApexService {
     environment?: string;
     targetScope?: string;
     iacTool?: "bicep" | "terraform";
+    riskOwner: RiskOwner;
     clientId?: BundledClientProjection["id"];
     createRepository?: boolean;
   }): Promise<{
@@ -1541,6 +1551,7 @@ export class ApexService {
     environment?: string;
     targetScope?: string;
     iacTool?: "bicep" | "terraform";
+    riskOwner?: RiskOwner;
     clientId?: BundledClientProjection["id"];
     createRepository?: boolean;
   }): Promise<{
@@ -1557,6 +1568,7 @@ export class ApexService {
     environment?: string;
     targetScope?: string;
     iacTool?: "bicep" | "terraform";
+    riskOwner?: RiskOwner;
     clientId?: BundledClientProjection["id"];
     createRepository?: boolean;
   }): Promise<{
@@ -1569,13 +1581,19 @@ export class ApexService {
   }> {
     if (
       input.projectId === undefined &&
-      [input.displayName, input.environment, input.targetScope, input.iacTool].some((value) => value !== undefined)
+      [input.displayName, input.environment, input.targetScope, input.iacTool, input.riskOwner].some(
+        (value) => value !== undefined,
+      )
     )
       throw new ApexError(
         "APEX_USAGE",
         "Project settings belong to explicit project creation, not workspace bootstrap",
         EXIT_CODES.usage,
       );
+    if (input.projectId !== undefined && input.riskOwner === undefined) {
+      throw new ApexError("APEX_VALIDATION", "Project risk owner must be partner or customer", EXIT_CODES.validation);
+    }
+    const riskOwner = input.riskOwner;
     if (await this.pathExistsLstat(join(this.root, ".apex"))) {
       const { clientId, ...settings } = input;
       const config = {
@@ -1604,7 +1622,9 @@ export class ApexService {
     const runtimeInstalled = await this.ensureWorkspaceRuntime();
     await this.initializeWorkspace(input);
     const initialized =
-      input.projectId === undefined ? {} : await this.createProject({ ...input, projectId: input.projectId });
+      input.projectId === undefined
+        ? {}
+        : await this.createProject({ ...input, projectId: input.projectId, riskOwner: riskOwner! });
     return {
       ...initialized,
       workspaceReady: true as const,
@@ -1620,6 +1640,7 @@ export class ApexService {
     environment?: string;
     targetScope?: string;
     iacTool?: "bicep" | "terraform";
+    riskOwner: RiskOwner;
   }): Promise<{ projectId: ProjectId; runId: RunId }> {
     let runtimeLock: unknown;
     try {
@@ -1635,10 +1656,14 @@ export class ApexService {
       throw error;
     }
     const runtimeLockHash = sha256Json(runtimeLock);
+    if (input.riskOwner !== "partner" && input.riskOwner !== "customer") {
+      throw new ApexError("APEX_VALIDATION", "Project risk owner must be partner or customer", EXIT_CODES.validation);
+    }
     await this.projects.initializeProject({
       projectId: input.projectId,
       displayName: input.displayName ?? input.projectId,
       defaultIacTool: input.iacTool ?? "bicep",
+      riskOwner: input.riskOwner,
     });
     const run = await this.projects.createRun(input.projectId, {
       environment: input.environment ?? "dev",
@@ -5371,6 +5396,15 @@ export class ApexService {
         `${finding.severity} findings cannot be accepted as risk by default policy`,
         EXIT_CODES.authorization,
       );
+    if (
+      resolution.disposition === "accepted-risk" &&
+      resolution.owner !== (await this.projects.getProject(run.projectId)).riskOwner
+    )
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Accepted risk owner must match the project risk owner",
+        EXIT_CODES.validation,
+      );
     const priorResolutions = events.flatMap((event) => {
       if (event.type !== "review.resolved") return [];
       const prior = (event.payload as { resolution?: ReviewResolution }).resolution;
@@ -5419,6 +5453,7 @@ export class ApexService {
       );
     }
     const run = await this.currentRun();
+    const project = await this.projects.getProject(run.projectId);
     const events = await this.journal(run).replay();
     const reviewEvent = [...events]
       .reverse()
@@ -5452,6 +5487,8 @@ export class ApexService {
           EXIT_CODES.authorization,
         );
       }
+      const acceptedRisk =
+        decision.action === "accept-risk" ? this.reviewAcceptedRiskDefaults(decision, project.riskOwner) : undefined;
       await this.resolveReview({
         findingId: decision.findingId,
         reviewHash,
@@ -5468,11 +5505,38 @@ export class ApexService {
           decision.action === "acknowledge"
             ? `Acknowledged for downstream owner: ${decision.owner}`
             : (decision.rationale ?? ""),
+        ...(acceptedRisk === undefined ? {} : { owner: acceptedRisk.owner }),
         evidenceRefs: [],
-        ...(decision.expiresAt === undefined ? {} : { expiresAt: decision.expiresAt }),
+        ...(acceptedRisk !== undefined
+          ? { expiresAt: acceptedRisk.expiresAt }
+          : decision.expiresAt === undefined
+            ? {}
+            : { expiresAt: decision.expiresAt }),
       });
     }
     return { status: "resolved" };
+  }
+
+  private reviewAcceptedRiskDefaults(
+    decision: ReviewDecision,
+    riskOwner: RiskOwner,
+  ): { owner: RiskOwner; expiresAt: string } {
+    if (decision.owner !== undefined && decision.owner !== riskOwner) {
+      throw new ApexError(
+        "APEX_VALIDATION",
+        `Accept-risk owner must match project risk owner '${riskOwner}'`,
+        EXIT_CODES.validation,
+      );
+    }
+    const now = this.clock().getTime();
+    if (decision.expiresAt === undefined) {
+      return { owner: riskOwner, expiresAt: new Date(now + 90 * 86_400_000).toISOString() };
+    }
+    const supplied = Date.parse(decision.expiresAt);
+    if (!Number.isFinite(supplied) || supplied <= now) {
+      throw new ApexError("APEX_VALIDATION", "Accept-risk expiry must be in the future", EXIT_CODES.validation);
+    }
+    return { owner: riskOwner, expiresAt: decision.expiresAt };
   }
 
   private async pendingReview(
@@ -7424,11 +7488,15 @@ export class ApexService {
 
   private workloadScalePrompt(pattern: "web-api" | "event-driven" | "data-analytics" | "iot" | "batch"): string {
     const prompts = {
-      "web-api": "Describe normal and peak concurrency, request or order rate, and latency expectations.",
-      "event-driven": "Describe normal and peak event rates, ordering requirements, and delivery guarantees.",
-      "data-analytics": "Describe ingest rate, retained volume, growth, and data-freshness expectations.",
-      iot: "Describe device count, message rate, payload size, and offline behavior.",
-      batch: "Describe schedule, data volume, expected duration, and completion window.",
+      "web-api":
+        "Optionally describe normal and peak concurrency, request or order rate, and latency goals; leave empty to check later.",
+      "event-driven":
+        "Optionally describe normal and peak event rates, ordering requirements, and delivery guarantees; leave empty to check later.",
+      "data-analytics":
+        "Optionally describe ingest rate, retained volume, growth, and data-freshness goals; leave empty to check later.",
+      iot: "Optionally describe device count, message rate, payload size, and offline behavior; leave empty to check later.",
+      batch:
+        "Optionally describe schedule, data volume, expected duration, and completion window; leave empty to check later.",
     } as const;
     return prompts[pattern];
   }
@@ -8125,13 +8193,19 @@ export class ApexService {
       !Array.isArray(compliance) &&
       compliance.kind === "compliance" &&
       compliance.scopes.includes("gdpr");
+    const performanceScale =
+      text("scale") === undefined
+        ? "Performance and scale: check later (validated at a later stage)"
+        : `Performance and scale goals: ${text("scale")} (validated at a later stage)`;
     const reviewFields = {
       businessContext: joinValues("industry", "delivery-scenario", "workload-pattern"),
       successCriteria: recommend(
-        text("scale"),
-        "Measure end-to-end latency at normal and peak load using p95 and p99, with error rate and test duration recorded. Use the stated latency target; do not invent an acceptance threshold. Suggested role: application team; no assignment is implied.",
+        text("scale") ?? "Performance and scale goals are intentionally deferred for later validation.",
+        "Validate performance and scale later with defined measurement boundaries, normal and peak load, percentiles, error rate, and test duration. Treat stated numbers as goals, not acceptance gates.",
       ),
-      nonFunctionalRequirements: text("availability-recovery") ?? text("recovery"),
+      nonFunctionalRequirements: [text("availability-recovery") ?? text("recovery"), performanceScale]
+        .filter((value): value is string => value !== undefined)
+        .join("\n\n"),
       securityAndCompliance: gdpr
         ? recommend(
             joinValues("security-controls", "compliance", "authentication", "data-sensitivity"),
