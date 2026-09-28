@@ -168,9 +168,9 @@ A data-only workflow manifest must be routing authority. A run targets one envir
 track. It exposes Requirements, Architecture and Cost, Implementation Plan, and Deployment Preview as the only human
 approval gates; required deterministic validation and reviews remain blocking preconditions.
 
-Retain requirements-review, architecture-review, governance-review and plan-review. Each must complete against its
-current subject and required dependencies before the corresponding gate can proceed. Both clients must handle
-`needs_input`, `needs_review` and `task` explicitly; a missing worker is not evidence that a review ran.
+Retain requirements-review, architecture-review (which also covers the policy map) and plan-review. Each must
+complete against its current subject and required dependencies before the corresponding gate can proceed. Both clients
+must handle `needs_input`, `needs_review` and `task` explicitly; a missing worker is not evidence that a review ran.
 
 ### REQ-REQUIREMENTS-001: Requirements And Intent
 

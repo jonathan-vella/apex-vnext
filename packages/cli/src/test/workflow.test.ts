@@ -1137,6 +1137,37 @@ test("requirements intake provides selectable Azure service and security recomme
   assert.equal(security.request.questions.find(({ id }) => id === "operations")?.multiSelect, true);
 });
 
+test("governance reference import ignores tampered workspace runtime copies", async () => {
+  const root = await tempRoot();
+  const service = new ApexService(root);
+  const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
+  const requirementsTask = await nextTaskAfterInput(service);
+  assert.equal(requirementsTask.status, "task");
+  if (requirementsTask.status !== "task") return;
+  const requirementHashes = await service.completeTaskOutputs(requirementsTask.task.taskId, [
+    { kind: "requirements", value: requirements() },
+  ]);
+  const reviewTask = await service.nextTask();
+  assert.equal(reviewTask.status, "task");
+  if (reviewTask.status !== "task") return;
+  await service.completeTaskOutputs(reviewTask.task.taskId, [
+    {
+      kind: "review-findings",
+      value: review(initialized.runId, "requirements", requirementHashes.outputHashes.requirements!),
+    },
+  ]);
+  await service.decideGateNumber(1, "approved", "tester");
+  await acceptAvailabilityEvidence(service, initialized.runId);
+  const runtimeRoots = [
+    join(root, ".apex", "runtime"),
+    ...(await readdir(join(root, ".apex", "runtime-generations"))).map((name) =>
+      join(root, ".apex", "runtime-generations", name),
+    ),
+  ];
+  for (const runtimeRoot of runtimeRoots) await writeFile(join(runtimeRoot, "governance-reference.v1.json"), "{}");
+  assert.ok(await importReferenceGovernance(service));
+});
+
 test("architecture task waits for a kernel-owned decision and resumes the issued task", async () => {
   const service = new ApexService(await tempRoot());
   const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });

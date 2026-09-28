@@ -182,7 +182,7 @@ import { constants } from "node:fs";
 import { access, cp, lstat, mkdir, open, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
 import { userInfo } from "node:os";
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { resolveBundledAssets, type BundledClientProjection } from "./assets.js";
+import { readBundledFile, resolveBundledAssets, type BundledClientProjection } from "./assets.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
 import { ApexError, EXIT_CODES, retiredProjectionError } from "./errors.js";
 import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "./version.js";
@@ -3695,10 +3695,10 @@ export class ApexService {
       );
     let selection: GovernanceBaselineSelection;
     try {
-      selection = importGovernanceReference(
-        await readFile(join(await this.runtimeRootForRun(run), "governance-reference.v1.json")),
-        { targetScope: run.targetScope, now: this.clock().toISOString() },
-      );
+      selection = importGovernanceReference(await this.bundledGovernanceReference(), {
+        targetScope: run.targetScope,
+        now: this.clock().toISOString(),
+      });
     } catch (error) {
       if (!(error instanceof GovernanceBaselineError)) throw error;
       throw new ApexError("APEX_VALIDATION", error.message, EXIT_CODES.validation);
@@ -9855,6 +9855,19 @@ export class ApexService {
       await rename(staging, destination);
     }
     return destination;
+  }
+
+  private async bundledGovernanceReference(): Promise<Buffer> {
+    const assets = await resolveBundledAssets();
+    const entry = assets.manifest.files.find(({ path }) => path === "config/governance-reference.v1.json");
+    const bytes = entry === undefined ? undefined : await readBundledFile(assets.root, entry.path);
+    if (entry === undefined || bytes === undefined || sha256Bytes(bytes) !== entry.sha256)
+      throw new ApexError(
+        "APEX_VALIDATION",
+        "Bundled governance reference failed verification",
+        EXIT_CODES.validation,
+      );
+    return bytes;
   }
 
   private async runtimeRootForRun(run: RunConfigV1): Promise<string> {
