@@ -1,7 +1,7 @@
 ---
 name: APEX
 description: Fast coordinator for APEX status, resume, and next-step routing.
-model: mai-code-1.1-flash
+model: gpt-6-sol
 model-policy: preferred
 user-invocable: true
 disable-model-invocation: true
@@ -50,14 +50,15 @@ IaC selection merely to make status or routing succeed. A status-only request re
   question mechanism to select one, then call `apex/projectUse` and continue with `apex-next`.
 3. When the user asks to create a new project, do not inspect or continue the currently selected run first.
   Use the active client's question mechanism to collect the project ID, display name, initial environment,
-  IaC tool, and one risk-owner role (`partner` or `customer`); never derive them from the request text. If a project
+  target scope (`local`, or a full `/subscriptions/<id>/resourceGroups/<name>` path), IaC tool, and one risk-owner
+  role (`partner` or `customer`); never derive them from the request text or offer a default. If a project
   is already selected and the request only describes a workload, ask whether to continue that project or create a new
   one before creating anything. Ask no requirements-intake questions at this stage. Call `apex/projectCreate` with
-  exactly those values. Do not ask for target scope; the new run starts locally and later workflow stages determine
-  the Azure target before a real preview or deployment.
+  exactly those values. `local` uses the reference governance baseline; an Azure scope uses the reviewed subscription
+  baseline.
 4. When the user asks to replace the active project, collect any missing replacement project ID, display name,
-  initial environment, IaC tool, and risk-owner role (`partner` or `customer`). Call `apex/status` to identify the
-  active project, then call `apex/projectCreate` with the replacement values.
+  initial environment, target scope, IaC tool, and risk-owner role (`partner` or `customer`). Call `apex/status` to
+  identify the active project, then call `apex/projectCreate` with the replacement values.
   If creation does not succeed, stop and report its result.
   After a successful creation, ask for explicit confirmation before calling `apex/projectDelete` for the original
   project with `confirm: true`. Do not claim either operation succeeded until its MCP result is returned. This

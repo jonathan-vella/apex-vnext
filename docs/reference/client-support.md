@@ -31,7 +31,7 @@ workers. CLI workers were enabled with maintainer authorization after bounded Lu
 not authorization. Kernel task, evidence, ownership and approval checks remain mandatory, and worker tool grants are
 unchanged. A directly selectable profile is not itself a security failure.
 
-The coordinator uses `mai-code-1.1-flash`, Requirements, Architect and Planner use `gpt-6-sol`, and Operator uses
+The coordinator, Requirements, Architect and Planner use `gpt-6-sol`, and Operator uses
 `gpt-5.6-terra`, each with `model-policy: preferred`. CodeGen, Reviewer and Validator use `gpt-6-luna` with
 `model-policy: required` and `reasoning-effort: max`. Copilot CLI `1.0.88` honors these fields for delegated and
 directly selected agents, but a user `subagents` override can still lower a worker's effort. Historical Sol

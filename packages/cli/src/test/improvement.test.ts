@@ -42,7 +42,7 @@ test("trusted service stores bounded observations without changing run authority
 
 test("CLI observation uses structured files and destructive improvement operations require confirmation", async () => {
   const root = await tempRoot();
-  await execute(["init", "--project", "demo", "--risk-owner", "partner"], root);
+  await execute(["init", "--project", "demo", "--risk-owner", "partner", "--target", "local"], root);
   const input = join(root, "observation.json");
   await writeJson(input, {
     source: "explicit-correction",
@@ -81,7 +81,7 @@ test("CLI observation uses structured files and destructive improvement operatio
 
 test("CLI records only confirmed immutable human proposal decisions", async () => {
   const root = await tempRoot();
-  await execute(["init", "--project", "demo", "--risk-owner", "partner"], root);
+  await execute(["init", "--project", "demo", "--risk-owner", "partner", "--target", "local"], root);
   const store = new ImprovementStore(root, policy, () => new Date("2026-07-17T12:00:00.000Z"));
   for (const runId of ["run-1", "run-2", "run-3"]) {
     await store.observe({
@@ -133,7 +133,7 @@ test("improvement operations reject runtime policy drift", async () => {
 
 test("CLI exposes no proposal application or autonomous repository operation", async () => {
   const root = await tempRoot();
-  await execute(["init", "--project", "demo", "--risk-owner", "partner"], root);
+  await execute(["init", "--project", "demo", "--risk-owner", "partner", "--target", "local"], root);
   for (const command of [
     ["quality", "apply"],
     ["quality", "create-issue"],

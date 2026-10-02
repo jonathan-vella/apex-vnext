@@ -540,7 +540,11 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     result: { version: "0.10.0-next.5", bundleVersion: "0.10.0-next.5", configVersion: "1.0.0" },
   });
   await runInTest("git", ["init", "--initial-branch", "qualification"], project);
-  await runInTest(apexBin, ["init", "--project", "demo", "--risk-owner", "partner", "--json"], project);
+  await runInTest(
+    apexBin,
+    ["init", "--project", "demo", "--risk-owner", "partner", "--target", "local", "--json"],
+    project,
+  );
   await readFile(join(project, ".github", "agents", "apex.agent.md"));
   const sharedSkillReferences = [
     "apex-azure-compute/references/recommendation-and-scale-rules.md",
@@ -620,7 +624,7 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
       const repeated = await cli(["bootstrap", "--client", clientId, "--yes"]);
       assert.equal(repeated.resumed, true);
       assert.equal(repeated.projectCreated, false);
-      await cli(["project", "create", "--project", "demo", "--risk-owner", "partner"]);
+      await cli(["project", "create", "--project", "demo", "--risk-owner", "partner", "--target", "local"]);
     }
     await readFile(join(consumer, ".mcp.json"));
     for (const retired of [".vscode/mcp.json", ".github/mcp.json", ".github/agents/apex-cli.agent.md"])
@@ -632,6 +636,8 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
       "demo",
       "--risk-owner",
       "partner",
+      "--target",
+      "local",
       "--client",
       clientId,
       "--yes",

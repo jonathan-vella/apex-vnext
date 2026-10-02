@@ -6,6 +6,7 @@ import { APEX_VERSION } from "./version.js";
 import { ApexError, EXIT_CODES, normalizeError, type ApexErrorCode } from "./errors.js";
 import { SECRET_VALUE_PATTERN } from "@apexops/contracts";
 import { MCP_OUTPUT_SCHEMAS } from "./mcp-output-schemas.js";
+import { TARGET_SCOPE_HINT, TARGET_SCOPE_PATTERN } from "./target-scope.js";
 import { ListToolsRequestSchema, type Tool } from "@modelcontextprotocol/sdk/types.js";
 
 const errorMessages: Record<ApexErrorCode, string> = {
@@ -162,7 +163,7 @@ const projectCreateInput = z
     projectId: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
     displayName: z.string().min(1).max(256),
     environment: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-    targetScope: z.string().min(1).max(1024).optional(),
+    targetScope: z.string().max(1024).regex(TARGET_SCOPE_PATTERN, `Use ${TARGET_SCOPE_HINT}`),
     iacTool: z.enum(["bicep", "terraform"]),
     riskOwner: z.enum(["partner", "customer"]),
   })
@@ -440,7 +441,8 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
   server.registerTool(
     "projectCreate",
     {
-      description: "Create and select a new project with its initial environment run",
+      description:
+        "Create and select a new project with its initial environment run. targetScope is the user's explicit choice: local, or a full /subscriptions/<id>/resourceGroups/<name> path.",
       inputSchema: projectCreateInput,
     },
     async (input) => result(await service.createProject(input as Parameters<typeof service.createProject>[0])),

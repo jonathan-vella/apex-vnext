@@ -252,6 +252,12 @@ test("init installs only the selected Copilot CLI projection and records it in t
   );
   const coordinatorAgent = await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8");
   assert.match(coordinatorAgent, /- apex\/projectCreate/u);
+  assert.match(
+    coordinatorAgent,
+    /target scope \(`local`, or a full `\/subscriptions\/<id>\/resourceGroups\/<name>` path\)/u,
+  );
+  assert.match(coordinatorAgent, /never derive them from the request text or offer a default/u);
+  assert.doesNotMatch(coordinatorAgent, /Do not ask for target scope/u);
   assert.match(coordinatorAgent, /- apex\/gateDecide/u);
   assert.match(coordinatorAgent, /Use `ask_user` only for project lifecycle or routing choices, never intake/u);
   assert.match(coordinatorAgent, /Route through the `apex-next` skill/u);

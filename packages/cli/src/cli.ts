@@ -25,6 +25,7 @@ import { dirname, join, resolve } from "node:path";
 import { ApexError, EXIT_CODES, normalizeError } from "./errors.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
 import { resolveBundledAssets } from "./assets.js";
+import { assertTargetScope } from "./target-scope.js";
 import { serveMcp } from "./mcp.js";
 import { createFileProviderRuntime, hashTerraformConfiguration, hashTerraformLockFile } from "./provider-runtime.js";
 import { exportProviderTransfer, importProviderTransfer } from "./provider-transfer.js";
@@ -110,6 +111,10 @@ async function onboardingConfig(flags: Flags, _root: string): Promise<Onboarding
   if (config.projectId !== undefined && config.riskOwner === undefined) {
     throw new ApexError("APEX_VALIDATION", "Project risk owner must be partner or customer", EXIT_CODES.validation);
   }
+  if (config.projectId !== undefined && config.targetScope === undefined) {
+    throw new ApexError("APEX_USAGE", "--project requires --target", EXIT_CODES.usage);
+  }
+  if (config.targetScope !== undefined) assertTargetScope(config.targetScope);
   if (config.projectId === undefined && config.riskOwner !== undefined) {
     throw new ApexError("APEX_USAGE", "--risk-owner requires --project", EXIT_CODES.usage);
   }
@@ -468,7 +473,7 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
         projectId: required(flags, "project") as never,
         ...(typeof flags.name === "string" ? { displayName: flags.name } : {}),
         ...(typeof flags.environment === "string" ? { environment: flags.environment } : {}),
-        ...(typeof flags.target === "string" ? { targetScope: flags.target } : {}),
+        targetScope: assertTargetScope(required(flags, "target")),
         iacTool: flags.iac === "terraform" ? "terraform" : "bicep",
         riskOwner: riskOwner(flags),
         clientId: clientId(flags),
@@ -585,7 +590,7 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
         projectId: required(flags, "project") as never,
         ...(typeof flags.name === "string" ? { displayName: flags.name } : {}),
         ...(typeof flags.environment === "string" ? { environment: flags.environment } : {}),
-        ...(typeof flags.target === "string" ? { targetScope: flags.target } : {}),
+        targetScope: assertTargetScope(required(flags, "target")),
         iacTool: flags.iac === "terraform" ? "terraform" : "bicep",
         riskOwner: riskOwner(flags),
       });

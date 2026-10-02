@@ -701,6 +701,7 @@ test("bootstrap plan is read-only and reports missing, conflicting and existing 
     schemaVersion: CONTRACT_VERSION,
     projectId: "demo",
     riskOwner: "partner" as const,
+    targetScope: "local",
     createRepository: true,
   };
   const before = await readdir(root);
@@ -731,8 +732,19 @@ test("bootstrap plan is read-only and reports missing, conflicting and existing 
   await symlink(packageDirectory, join(unsafe, "node_modules"));
   await assert.rejects(new ApexService(unsafe).planBootstrap(config), /symlink/);
   const fresh = await tempRoot();
+  await assert.rejects(
+    execute(["bootstrap", "plan", "--project", "demo", "--risk-owner", "partner", "--create-repo"], fresh),
+    /requires --target/u,
+  );
+  await assert.rejects(
+    execute(
+      ["bootstrap", "plan", "--project", "demo", "--risk-owner", "partner", "--target", "resource-group:demo"],
+      fresh,
+    ),
+    /--target must be local or \/subscriptions/u,
+  );
   const result = (await execute(
-    ["bootstrap", "plan", "--project", "demo", "--risk-owner", "partner", "--create-repo"],
+    ["bootstrap", "plan", "--project", "demo", "--risk-owner", "partner", "--target", "local", "--create-repo"],
     fresh,
   )) as typeof initial;
   assert.equal(result.status, "pending");
@@ -756,7 +768,7 @@ test("CLI bootstrap validates onboarding files before initializing a selected cl
     displayName: "Payments platform",
     client: "github-copilot-cli",
     environment: "test",
-    targetScope: "resource-group:payments-test",
+    targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-payments-test",
     iacTool: "terraform",
     createRepository: true,
   });
@@ -820,7 +832,12 @@ test("CLI bootstrap validates onboarding files before initializing a selected cl
     /conflicts with the onboarding configuration/u,
   );
   const noGitPath = join(root, "no-git-onboarding.json");
-  await writeJson(noGitPath, { schemaVersion: CONTRACT_VERSION, projectId: "no-git", riskOwner: "partner" });
+  await writeJson(noGitPath, {
+    schemaVersion: CONTRACT_VERSION,
+    projectId: "no-git",
+    riskOwner: "partner",
+    targetScope: "local",
+  });
   await assert.rejects(
     execute(["bootstrap", "--file", noGitPath, "--yes"], await tempRoot()),
     /requires a Git repository/u,
@@ -918,13 +935,16 @@ test("init rejects retired clients and the CLI projection keeps one managed life
   for (const client of ["github-copilot-vscode", "both"]) {
     const rejected = await tempRoot();
     await assert.rejects(
-      execute(["init", "--project", "demo", "--risk-owner", "partner", "--client", client], rejected),
+      execute(
+        ["init", "--project", "demo", "--risk-owner", "partner", "--target", "local", "--client", client],
+        rejected,
+      ),
       /--client must be github-copilot-cli/u,
     );
     assert.deepEqual(await readdir(rejected), []);
   }
   const root = await tempRoot();
-  await execute(["init", "--project", "demo", "--risk-owner", "partner"], root);
+  await execute(["init", "--project", "demo", "--risk-owner", "partner", "--target", "local"], root);
   const service = new ApexService(root);
   const before = await service.status();
   const agent = join(root, ".github/agents/apex.agent.md");
@@ -951,7 +971,7 @@ test("init rejects retired clients and the CLI projection keeps one managed life
 
 test("a retired VS Code install stops until init explicitly selects the CLI projection", async () => {
   const root = await tempRoot();
-  await execute(["init", "--project", "demo", "--risk-owner", "partner"], root);
+  await execute(["init", "--project", "demo", "--risk-owner", "partner", "--target", "local"], root);
   const service = new ApexService(root);
   const before = await service.status();
   const selectionPath = join(root, ".apex/customizations.selection.json");
@@ -962,7 +982,10 @@ test("a retired VS Code install stops until init explicitly selects the CLI proj
     message: /apex init --client github-copilot-cli/u,
   };
   await assert.rejects(service.update(), retired);
-  await assert.rejects(execute(["init", "--project", "demo", "--risk-owner", "partner"], root), retired);
+  await assert.rejects(
+    execute(["init", "--project", "demo", "--risk-owner", "partner", "--target", "local"], root),
+    retired,
+  );
   const edited = join(root, ".github/agents/apex-planner.agent.md");
   await writeFile(edited, "Manual edit\n");
   await assert.rejects(execute(["init", "--client", "github-copilot-cli"], root), (error: ApexError) => {
@@ -980,7 +1003,10 @@ test("a retired VS Code install stops until init explicitly selects the CLI proj
   assert.equal((await service.status()).run.runId, before.run.runId);
   await service.update();
   await assert.rejects(
-    execute(["init", "--project", "demo", "--risk-owner", "partner", "--client", "github-copilot-cli"], root),
+    execute(
+      ["init", "--project", "demo", "--risk-owner", "partner", "--target", "local", "--client", "github-copilot-cli"],
+      root,
+    ),
     /already initialized/u,
   );
 });
@@ -1146,12 +1172,43 @@ test("MCP registers only narrow tools and calls the service", async () => {
   const response = await client.callTool({ name: "status", arguments: {} });
   assert.equal(response.isError, undefined);
   assert.equal((response.structuredContent as { run: { projectId: string } }).run.projectId, "demo");
+  const untargeted = await client.callTool({
+    name: "projectCreate",
+    arguments: {
+      projectId: "data-platform",
+      displayName: "Data platform",
+      environment: "dev",
+      iacTool: "terraform",
+      riskOwner: "partner",
+    },
+  });
+  assert.equal(untargeted.isError, true);
+  assert.equal((untargeted.structuredContent as { error: { code: string } }).error.code, "APEX_VALIDATION");
+  for (const targetScope of ["invented-scope", "resource-group:data-platform", "/subscriptions/not-a-guid"]) {
+    const invalid = await client.callTool({
+      name: "projectCreate",
+      arguments: {
+        projectId: "data-platform",
+        displayName: "Data platform",
+        environment: "dev",
+        targetScope,
+        iacTool: "terraform",
+        riskOwner: "partner",
+      },
+    });
+    assert.equal((invalid.structuredContent as { error: { code: string } }).error.code, "APEX_VALIDATION", targetScope);
+  }
+  assert.deepEqual(
+    (await service.listProjects()).map(({ projectId }) => projectId),
+    ["demo"],
+  );
   const createdProject = await client.callTool({
     name: "projectCreate",
     arguments: {
       projectId: "data-platform",
       displayName: "Data platform",
       environment: "dev",
+      targetScope: "local",
       iacTool: "terraform",
       riskOwner: "partner",
     },
