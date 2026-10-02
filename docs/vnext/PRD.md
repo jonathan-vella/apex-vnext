@@ -210,9 +210,10 @@ enforcing finding inside Architecture, the Architecture review checks the map, t
 When no reviewed subscription baseline exists, discovery imports the shipped ALZ Corp reference baseline, generated
 from a pinned Azure Landing Zones Library release (root, landing zones and corp archetypes) in the collector's finding
 format. Local targets always use it. For a subscription target it supports design, pricing and Gate 2 (for example
-pre-sales without Azure access) but cannot authorize planning: the reviewed subscription baseline replaces it before
-Gate 3. Findings whose resource types match no designed component are marked `not-applicable` by the kernel; any other
-`not-applicable` disposition needs a factual reason.
+pre-sales without Azure access) but cannot authorize planning. After Gate 2 the reviewed subscription baseline replaces
+it; matching mappings carry over, only new or changed findings need Architect decisions, and Gate 2 reopens only for a
+`blocked` conflict. Findings whose resource types match no designed component are marked `not-applicable` by the
+kernel; any other `not-applicable` disposition needs a factual reason.
 
 The consumer repository owns the collection workflow, variables and GitHub Secrets/environment settings. Prefer OIDC
 with a read-only collection identity separate from deployment authority; never commit credentials. Azure remains the

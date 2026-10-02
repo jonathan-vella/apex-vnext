@@ -241,6 +241,7 @@ test("managed role projections retain required tools and exclude unrelated grant
       "taskContext",
       "readTaskInput",
       "architectureComplete",
+      "completeTask",
       "reviewDecide",
       "gateDecide",
     ],

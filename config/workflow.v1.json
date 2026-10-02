@@ -82,7 +82,9 @@
         "deploy-terraform",
         "inventory",
         "diagnosis",
-        "quality"
+        "quality",
+        "governance-refresh",
+        "policy-refresh"
       ]
     },
     {
@@ -126,7 +128,8 @@
         "deploy-terraform",
         "inventory",
         "diagnosis",
-        "quality"
+        "quality",
+        "policy-refresh"
       ]
     },
     {
@@ -146,6 +149,71 @@
       ],
       "validators": ["gate:architecture-cost-governance-ready"],
       "invalidates": []
+    },
+    {
+      "id": "governance-refresh",
+      "kind": "capability",
+      "ownerRole": "governance-operator",
+      "sourceDependencies": ["gate-2", "run-config.targetScope", "governance-capability-lock"],
+      "outputs": ["governance-constraints-v1"],
+      "validators": [
+        "schema:governance-constraints-v1",
+        "business:governance-completeness",
+        "business:governance-freshness"
+      ],
+      "invalidates": [
+        "policy-refresh",
+        "plan",
+        "gate-3",
+        "validation-bicep",
+        "validation-terraform",
+        "preview-bicep",
+        "preview-terraform",
+        "gate-4",
+        "deploy-bicep",
+        "deploy-terraform",
+        "inventory",
+        "diagnosis",
+        "quality"
+      ],
+      "condition": {
+        "equals": [
+          {
+            "path": "run.governanceRefreshRequired"
+          },
+          true
+        ]
+      }
+    },
+    {
+      "id": "policy-refresh",
+      "kind": "creative",
+      "ownerRole": "architect",
+      "sourceDependencies": ["gate-2", "architecture-v1", "governance-constraints-v1"],
+      "outputs": ["policy-property-map-v1"],
+      "validators": ["schema:policy-property-map-v1", "business:policy-effect-coverage"],
+      "invalidates": [
+        "plan",
+        "gate-3",
+        "validation-bicep",
+        "validation-terraform",
+        "preview-bicep",
+        "preview-terraform",
+        "gate-4",
+        "deploy-bicep",
+        "deploy-terraform",
+        "inventory",
+        "diagnosis",
+        "quality"
+      ],
+      "condition": {
+        "equals": [
+          {
+            "path": "run.policyRefreshRequired"
+          },
+          true
+        ]
+      }
     },
     {
       "id": "plan",
@@ -668,6 +736,21 @@
     {
       "from": "quality",
       "to": "completed",
+      "event": "completed"
+    },
+    {
+      "from": "gate-2",
+      "to": "governance-refresh",
+      "event": "approved"
+    },
+    {
+      "from": "governance-refresh",
+      "to": "policy-refresh",
+      "event": "completed"
+    },
+    {
+      "from": "policy-refresh",
+      "to": "plan",
       "event": "completed"
     }
   ],
