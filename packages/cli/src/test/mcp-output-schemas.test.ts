@@ -382,6 +382,7 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
     projectId: "demo",
     displayName: "Demo",
     environment: "dev",
+    targetScope: "local",
     iacTool: "bicep",
     riskOwner: "partner",
   };

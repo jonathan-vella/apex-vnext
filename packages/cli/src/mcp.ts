@@ -162,7 +162,7 @@ const projectCreateInput = z
     projectId: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
     displayName: z.string().min(1).max(256),
     environment: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-    targetScope: z.string().min(1).max(1024).optional(),
+    targetScope: z.string().min(1).max(1024),
     iacTool: z.enum(["bicep", "terraform"]),
     riskOwner: z.enum(["partner", "customer"]),
   })
@@ -440,7 +440,8 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
   server.registerTool(
     "projectCreate",
     {
-      description: "Create and select a new project with its initial environment run",
+      description:
+        "Create and select a new project with its initial environment run. targetScope is the user's explicit choice: local, or a full /subscriptions/<id>/resourceGroups/<name> path.",
       inputSchema: projectCreateInput,
     },
     async (input) => result(await service.createProject(input as Parameters<typeof service.createProject>[0])),

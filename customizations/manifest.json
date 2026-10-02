@@ -176,7 +176,7 @@
       "role": "coordinator",
       "supportedTargets": ["github-copilot"],
       "interactionType": "interactive-handoff",
-      "model": "mai-code-1.1-flash"
+      "model": "gpt-6-sol"
     },
     {
       "id": "requirements",

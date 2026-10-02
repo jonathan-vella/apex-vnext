@@ -11,9 +11,9 @@ Commands that change installation, capability, transfer, or improvement state ma
 | Command                         | Required or notable flags                                                                                               |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `apex version`                  | None                                                                                                                    |
-| `apex init`                     | `--project --risk-owner`; optional `--name --environment --target --iac --client --customizations-source`               |
-| `apex bootstrap`                | `--project --risk-owner` or `--file`; `--yes`; optional client, name, environment, target, IaC, and repo creation flags |
-| `apex project create`           | `--project --risk-owner`; optional `--name --environment --target --iac`                                                |
+| `apex init`                     | `--project --risk-owner --target`; optional `--name --environment --iac --client --customizations-source`               |
+| `apex bootstrap`                | `--project --risk-owner --target` or `--file`; `--yes`; optional client, name, environment, IaC, and repo creation flags |
+| `apex project create`           | `--project --risk-owner --target`; optional `--name --environment --iac`                                                |
 | `apex project promote`          | `--environment --target`                                                                                                |
 | `apex update`                   | Optional `--customizations-source`                                                                                      |
 | `apex setup`                    | Optional `--live`                                                                                                       |

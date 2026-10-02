@@ -218,7 +218,7 @@
       "apex-operator.agent.md": "gpt-5.6-terra",
       "apex-planner.agent.md": "gpt-6-sol",
       "apex-requirements.agent.md": "gpt-6-sol",
-      "apex.agent.md": "mai-code-1.1-flash"
+      "apex.agent.md": "gpt-6-sol"
     },
     "subagents": {
       "apex-codegen.agent.md": "gpt-6-luna",

@@ -110,6 +110,13 @@ async function onboardingConfig(flags: Flags, _root: string): Promise<Onboarding
   if (config.projectId !== undefined && config.riskOwner === undefined) {
     throw new ApexError("APEX_VALIDATION", "Project risk owner must be partner or customer", EXIT_CODES.validation);
   }
+  if (config.projectId !== undefined && config.targetScope === undefined) {
+    throw new ApexError(
+      "APEX_USAGE",
+      "--project requires --target (local or an Azure resource group scope)",
+      EXIT_CODES.usage,
+    );
+  }
   if (config.projectId === undefined && config.riskOwner !== undefined) {
     throw new ApexError("APEX_USAGE", "--risk-owner requires --project", EXIT_CODES.usage);
   }
@@ -468,7 +475,7 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
         projectId: required(flags, "project") as never,
         ...(typeof flags.name === "string" ? { displayName: flags.name } : {}),
         ...(typeof flags.environment === "string" ? { environment: flags.environment } : {}),
-        ...(typeof flags.target === "string" ? { targetScope: flags.target } : {}),
+        targetScope: required(flags, "target"),
         iacTool: flags.iac === "terraform" ? "terraform" : "bicep",
         riskOwner: riskOwner(flags),
         clientId: clientId(flags),
@@ -585,7 +592,7 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
         projectId: required(flags, "project") as never,
         ...(typeof flags.name === "string" ? { displayName: flags.name } : {}),
         ...(typeof flags.environment === "string" ? { environment: flags.environment } : {}),
-        ...(typeof flags.target === "string" ? { targetScope: flags.target } : {}),
+        targetScope: required(flags, "target"),
         iacTool: flags.iac === "terraform" ? "terraform" : "bicep",
         riskOwner: riskOwner(flags),
       });
