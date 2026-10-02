@@ -22,7 +22,9 @@ Use this skill only for an active requirements task.
 2. When it returns `needs_input`, use its `intake` metadata and `questions` exactly as returned; do not maintain a
    separate client-side question list.
 3. Ask the returned questions through the active client projection's question mechanism. Record each response as a
-   supplied value, typed unknown, or explicit deferral with its owner; never replace an unknown with an inferred value.
+   supplied value, typed unknown, explicit deferral with its owner, or omit an optional performance/scale answer to let
+   the kernel record `Performance and scale: check later (validated at a later stage)`. Never replace an unknown
+   with an inferred value.
 4. Submit that request only through `apex/recordInput`, preserving its request ID, expected journal head, and owner
    epoch. Include `schemaVersion` and one `{ questionId, value }` entry per question. A question-tool response is not
    acceptance: wait for `recorded: true` with the same request ID before advancing. Never call `nextTask` in place of
@@ -37,9 +39,12 @@ Use this skill only for an active requirements task.
 7. Only for explicitly requested full Requirements completion, submit the task-context-defined output through
    `apex/requirementsComplete`, invoke the required Reviewer, and handle
    `needs_review` through one native findings panel and `apex/reviewDecide`. Populate existing narrative fields with
-   labeled recommendations for latency measurement, access/ingress/DNS, and GDPR data lifecycle instead of asking
-   supplemental owner questions. Include retention, deletion, data-subject handling and telemetry minimization as
-   proposals, not confirmed commitments. Do not invent assigned owners, accepted risk or compliance evidence.
+   labeled recommendations for access/ingress/DNS and GDPR data lifecycle instead of asking
+   supplemental owner questions. Treat performance and scale values as later-validated goals; missing values are
+   check-later notes, not follow-ups. Include retention, deletion, data-subject handling and telemetry minimization
+   as proposals, not confirmed commitments. Do not invent assigned owners, accepted risk or compliance evidence.
+   For accept-risk, show `owner: <project risk owner>, expires in 90 days`, draft the rationale, and ask only for
+   confirmation; do not ask for owner or expiry.
    Actual policy/security conflicts remain blocking. Existing blocking findings require the normal correction/review
    path, not automatic disposition.
 8. After a clean or fully dispositioned review, ask for explicit Gate 1 approval only if the user's scope permits it.

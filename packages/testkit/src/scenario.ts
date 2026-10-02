@@ -34,6 +34,7 @@ export async function createScenario(workspaceRoot: string, options: ScenarioOpt
     projectId: options.projectId ?? "test-project",
     displayName: options.displayName ?? "Test Project",
     defaultIacTool: "bicep",
+    riskOwner: "partner",
   });
   const run = await projectStore.createRun(project.projectId, {
     environment: options.environment ?? "test",

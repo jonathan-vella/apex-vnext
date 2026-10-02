@@ -378,7 +378,13 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
     ownerEpoch: 1,
     answers: [{ questionId: "workload", value: "web" }],
   };
-  const project = { projectId: "demo", displayName: "Demo", environment: "dev", iacTool: "bicep" };
+  const project = {
+    projectId: "demo",
+    displayName: "Demo",
+    environment: "dev",
+    iacTool: "bicep",
+    riskOwner: "partner",
+  };
   const decisions = [{ findingId: "finding-1", action: "revise" }];
   const binding = { schemaVersion: "1.0.0", ...selection, track: "bicep", resourceBindings: {} };
   const observationInput = {
@@ -680,7 +686,7 @@ test("schemas accept real offline service results through requirements completio
     executableChecker: async () => false,
     azureAuthStatus: async () => ({ authenticated: false, detail: "Offline test" }),
   });
-  await service.init({ projectId: "demo" });
+  await service.init({ projectId: "demo", riskOwner: "partner" });
   const check = (name: ToolName, value: unknown) => assert.deepEqual(MCP_OUTPUT_SCHEMAS[name].parse(value), value);
   check("status", await service.status());
   check("nextTask", await service.nextTask());

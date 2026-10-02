@@ -12,6 +12,7 @@ export const TaskIdSchema = Type.String({ pattern: "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,
 export const EnvironmentSchema = Type.String({ pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" });
 export const IacToolSchema = Type.Union([Type.Literal("bicep"), Type.Literal("terraform")]);
 export const OperationSchema = Type.Union([Type.Literal("apply"), Type.Literal("destroy")]);
+export const RiskOwnerSchema = Type.Union([Type.Literal("partner"), Type.Literal("customer")]);
 export const SECRET_FIELD_PATTERN =
   /(?:secret|password|passphrase|token|authorization|auth[-_]?header|api[-_]?key|private[-_]?key|connection[-_]?string|credential(?:s)?(?:$|[-_]|value|data)|session[-_]?cookie|sas[-_]?token)/i;
 export const SECRET_VALUE_PATTERN =
@@ -35,3 +36,4 @@ export type RunId = Static<typeof RunIdSchema>;
 export type TaskId = Static<typeof TaskIdSchema>;
 export type IacTool = Static<typeof IacToolSchema>;
 export type Operation = Static<typeof OperationSchema>;
+export type RiskOwner = Static<typeof RiskOwnerSchema>;

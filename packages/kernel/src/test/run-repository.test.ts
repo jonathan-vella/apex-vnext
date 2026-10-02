@@ -12,7 +12,12 @@ test("run repository CAS permits one mutation and rejects a racing stale hash", 
     () => new Date("2026-01-01T00:00:00.000Z"),
     () => "run-1",
   );
-  await store.initializeProject({ projectId: "demo", displayName: "Demo", defaultIacTool: "bicep" });
+  await store.initializeProject({
+    projectId: "demo",
+    displayName: "Demo",
+    defaultIacTool: "bicep",
+    riskOwner: "partner",
+  });
   await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
   const repository = new RunRepository(store.runDirectory("demo", "run-1"));
   const expectedRunHash = await repository.hash();
@@ -44,7 +49,12 @@ test("run repository never exposes partial lock metadata under contention", asyn
     () => new Date("2026-01-01T00:00:00.000Z"),
     () => "run-1",
   );
-  await store.initializeProject({ projectId: "demo", displayName: "Demo", defaultIacTool: "bicep" });
+  await store.initializeProject({
+    projectId: "demo",
+    displayName: "Demo",
+    defaultIacTool: "bicep",
+    riskOwner: "partner",
+  });
   await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
   const repository = new RunRepository(store.runDirectory("demo", "run-1"));
   const results = await Promise.allSettled(Array.from({ length: 64 }, () => repository.read()));
@@ -62,7 +72,12 @@ test("run repository reclaims an expired dead-owner generation into a permanent 
     () => now,
     () => "run-1",
   );
-  await store.initializeProject({ projectId: "demo", displayName: "Demo", defaultIacTool: "bicep" });
+  await store.initializeProject({
+    projectId: "demo",
+    displayName: "Demo",
+    defaultIacTool: "bicep",
+    riskOwner: "partner",
+  });
   await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
   const directory = store.runDirectory("demo", "run-1");
   const lockPath = join(directory, ".run-mutation.lock");
@@ -107,7 +122,12 @@ test("run repository never reclaims an expired lock owned by a live local proces
     () => now,
     () => "run-1",
   );
-  await store.initializeProject({ projectId: "demo", displayName: "Demo", defaultIacTool: "bicep" });
+  await store.initializeProject({
+    projectId: "demo",
+    displayName: "Demo",
+    defaultIacTool: "bicep",
+    riskOwner: "partner",
+  });
   await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
   const directory = store.runDirectory("demo", "run-1");
   const lockPath = join(directory, ".run-mutation.lock");
@@ -136,7 +156,12 @@ test("run repository rejects missing metadata in a stable lock generation", asyn
     () => new Date("2026-01-01T00:00:00.000Z"),
     () => "run-1",
   );
-  await store.initializeProject({ projectId: "demo", displayName: "Demo", defaultIacTool: "bicep" });
+  await store.initializeProject({
+    projectId: "demo",
+    displayName: "Demo",
+    defaultIacTool: "bicep",
+    riskOwner: "partner",
+  });
   await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
   const directory = store.runDirectory("demo", "run-1");
   await mkdir(join(directory, ".run-mutation.lock"));
@@ -150,7 +175,12 @@ test("run repository rejects a mutation when the validated journal head changed"
     () => new Date("2026-01-01T00:00:00.000Z"),
     () => "run-1",
   );
-  await store.initializeProject({ projectId: "demo", displayName: "Demo", defaultIacTool: "bicep" });
+  await store.initializeProject({
+    projectId: "demo",
+    displayName: "Demo",
+    defaultIacTool: "bicep",
+    riskOwner: "partner",
+  });
   await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
   const repository = new RunRepository(store.runDirectory("demo", "run-1"));
   const validatedHead = await repository.journal.head();
@@ -192,7 +222,12 @@ for (const stage of ["intent", "journal", "run", "cleanup"] as const) {
       () => new Date("2026-01-01T00:00:00.000Z"),
       () => "run-1",
     );
-    await store.initializeProject({ projectId: "demo", displayName: "Demo", defaultIacTool: "bicep" });
+    await store.initializeProject({
+      projectId: "demo",
+      displayName: "Demo",
+      defaultIacTool: "bicep",
+      riskOwner: "partner",
+    });
     await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
     const directory = store.runDirectory("demo", "run-1");
     const repository = new RunRepository(directory, {

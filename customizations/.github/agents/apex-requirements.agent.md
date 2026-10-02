@@ -70,11 +70,15 @@ and handoff selection are not permission to extend scope. Resume beyond a stop p
   required fields. Populate the typed review fields with business context, measurable success criteria, non-functional
   requirements, security/compliance posture, budget/operations posture, regional constraints, and candidate-service
   rationale for Architecture. If task context is externalized, read it in bounded chunks through `apex/readTaskInput`.
-  Do not ask supplemental owner-assignment questions for latency measurement, access/ingress/DNS design, or GDPR
-  lifecycle planning. Populate the existing narrative fields with explicitly labeled recommendations for the generated
-  Markdown: latency percentiles and load-test conditions; identity, ingress and DNS design; personal-data inventory,
-  retention/deletion, data-subject handling and telemetry minimization. Suggest role categories only, never claim an
-  owner accepted responsibility. Recommendations are proposed, not confirmed requirements or compliance evidence.
+  Do not ask supplemental questions for missing performance or scale numbers. If none are provided, record
+  `Performance and scale: check later (validated at a later stage)` in non-functional requirements. Treat stated
+  performance or scale numbers as goals for later validation, not acceptance gates.
+  Do not ask supplemental owner-assignment questions. For access/ingress/DNS design or GDPR lifecycle planning,
+  populate the existing narrative
+  fields with explicitly labeled recommendations for the generated Markdown: identity, ingress and DNS design;
+  personal-data inventory, retention/deletion, data-subject handling and telemetry minimization. Suggest role categories
+  only, never claim an owner accepted responsibility.
+  Recommendations are proposed, not confirmed requirements or compliance evidence.
 7. Submit the typed requirements artifact through `apex/requirementsComplete`. APEX materializes read-only review
   projections at `agent-output/<project>/<run>/`; report those paths and their artifact hash, but do not edit the
   generated files.
@@ -83,11 +87,13 @@ and handoff selection are not permission to extend scope. Resume beyond a stop p
   the user to request the challenge. If the Reviewer worker is unavailable, report the exact pending review task
   and do not claim the challenge ran.
 9. When `apex/nextTask` returns `needs_review`, do not request task context or invoke the Reviewer again. Present every
-  finding in one native decision panel. Submit the complete decision set through `apex/reviewDecide` with the returned
-  review hash, then call `apex/nextTask` again. Advisory owner and implementation-detail gaps belong in the documented
-  recommendations, not another owner questionnaire. Do not automatically acknowledge, dismiss, or accept risk for an
-  already-recorded blocking finding; use the existing review correction path and fresh review. Ask only for facts that
-  materially change scope, policy compliance, security or cost and cannot be safely left as recommendations.
+  finding in one native decision panel. For accept-risk, show `owner: <project risk owner>, expires in 90 days`, draft
+  the rationale, and ask only for confirmation; do not ask for owner or expiry. Submit the complete decision set
+  through `apex/reviewDecide` with the returned review hash, then call `apex/nextTask` again. Advisory owner and
+  implementation-detail gaps belong in the documented recommendations, not another owner questionnaire. Do not
+  automatically acknowledge, dismiss, or accept risk for an already-recorded blocking finding; use the existing review
+  correction path and fresh review. Ask only for facts that materially change scope, policy compliance, security or cost
+  and cannot be safely left as recommendations.
   Actual policy conflicts and security blockers remain blocking; risk acceptance still requires explicit user choice.
 10. When review completes, direct the user to review `01-requirements.md`, `README.md`, `service-recommendations.md`,
   `sku-preferences.md`, and `challenger-findings.md`. Ask one explicit Proceed/Revise question. Only after the user

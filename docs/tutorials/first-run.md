@@ -46,6 +46,7 @@ Install the complete package set from one qualified build. Do not mix tarballs f
 ```bash
 npx apex init \
   --project demo \
+  --risk-owner partner \
   --name "Demo workload" \
   --environment dev \
   --target local \

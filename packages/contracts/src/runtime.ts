@@ -6,6 +6,7 @@ import {
   IsoDateTimeSchema,
   NonEmptyStringSchema,
   ProjectIdSchema,
+  RiskOwnerSchema,
   RunIdSchema,
   Sha256Schema,
   TaskIdSchema,
@@ -33,6 +34,7 @@ export const ProjectConfigV1Schema = Type.Object(
     displayName: NonEmptyStringSchema,
     createdAt: IsoDateTimeSchema,
     defaultIacTool: IacToolSchema,
+    riskOwner: RiskOwnerSchema,
   },
   { $id: "https://schemas.apexops.dev/project-config-v1.json", additionalProperties: false },
 );
@@ -108,6 +110,7 @@ export const QuestionV1Schema = Type.Object(
   {
     id: NonEmptyStringSchema,
     prompt: NonEmptyStringSchema,
+    optional: Type.Optional(Type.Boolean()),
     options: Type.Optional(Type.Array(NonEmptyStringSchema, { minItems: 1, uniqueItems: true })),
     multiSelect: Type.Optional(Type.Boolean()),
     recommendation: Type.Optional(

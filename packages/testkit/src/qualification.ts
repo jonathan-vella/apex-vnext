@@ -164,6 +164,7 @@ async function runTrack(
       context.runId = (
         await context.service.init({
           projectId: `qualification-${track}`,
+          riskOwner: "partner",
           iacTool: track,
           customizationsSource: source,
         })
@@ -866,7 +867,7 @@ async function faultStaleTask(
   ids: SequenceIds,
 ): Promise<void> {
   const service = new ApexService(join(root, ".scenarios", "stale-task"), { clock: clock.now, idSource: ids.next });
-  await service.init({ projectId: `stale-${track}`, iacTool: track });
+  await service.init({ projectId: `stale-${track}`, riskOwner: "partner", iacTool: track });
   await completeRequirementsIntake(service, `${track} stale task workload`);
   const issued = await service.nextTask();
   if (issued.status !== "task") throw new Error("Expected fault task");
@@ -957,7 +958,7 @@ async function minimalService(
     checks: [],
     taskContextBytes: [],
   };
-  context.runId = (await service.init({ projectId: projectId(track), iacTool: track })).runId;
+  context.runId = (await service.init({ projectId: projectId(track), riskOwner: "partner", iacTool: track })).runId;
   await completeCreativeWorkflow(context);
   return service;
 }
