@@ -37,6 +37,7 @@ import { EventJournal, ObjectStore, RunRepository, ValidatorRegistry, sha256Byte
 import { ApexError } from "../errors.js";
 import { dependencyRevision } from "../dependency-revision.js";
 import { createMcpServer } from "../mcp.js";
+import { MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
 import { ApexService, type TaskOutput } from "../service.js";
 import { registerWorkflowValidators } from "../workflow-validators.js";
 import { createFileProviderRuntime, hashTerraformConfiguration } from "../provider-runtime.js";
@@ -5253,6 +5254,8 @@ async function approveOnReferenceGovernance(findings: Record<string, unknown>[] 
   await acceptAvailabilityEvidence(service, runId);
   await task(service, "governance-discovery");
   const referenceHash = (await service.importGovernanceReference()).outputHash;
+  const architectureContext = await service.taskContext(await task(service, "architecture"));
+  assert.equal(MCP_OUTPUT_SCHEMAS.taskContext.safeParse(architectureContext).success, true);
   const architectureValue = architecture(runId);
   const costValue = costEstimate(runId);
   const architectureHashes = await complete(service, "architecture", [
@@ -5287,6 +5290,7 @@ async function approveOnReferenceGovernance(findings: Record<string, unknown>[] 
 
 test("reference governance refreshes to the subscription baseline without reopening Gate 2", async () => {
   const { service, policyTask, template, context } = await approveOnReferenceGovernance();
+  assert.equal(MCP_OUTPUT_SCHEMAS.taskContext.safeParse(context).success, true);
   assert.deepEqual((context as { governanceFindings?: unknown[] }).governanceFindings, []);
   const gate = (await service.status()).run.gates[1];
   assert.equal(gate?.state, "approved");
