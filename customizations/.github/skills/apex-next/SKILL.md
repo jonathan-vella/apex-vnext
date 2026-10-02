@@ -42,6 +42,8 @@ Route the next APEX step from kernel state. The kernel selects the owner; this s
    `review.reviewHash` or `task.taskId`, and the user's requested outcome, exact stop point and prohibited operations,
    verbatim. Do not carry later-stage prerequisites, such as governance-discovery evidence, into an earlier owner task.
    If the original scope is unavailable, limit continuation to intake or the owner's task context.
+   For `request.intake`, state the round as `request.intake.ordinal` of `request.intake.total` and say that the owner
+   continues through every remaining intake round, each with its own kernel request ID, up to the user's stop point.
 5. A worker completes as a subagent. Delegate it with `task` and the scope prompt, report its result, then call
    `apex/status`. If `task` is unavailable, report the pending worker task and stop.
 6. If the active agent is already the named interactive owner, continue with the current `nextTask` result instead of
