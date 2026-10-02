@@ -8223,24 +8223,23 @@ export class ApexService {
       { id: "region", label: "Region", priority: "should" },
       { id: "workload-profile", label: "Workload profile", priority: "must" },
     ];
-    const requirements = fields.flatMap(({ id, label, priority }, index) => {
-      const value = input?.[id];
-      const text = this.renderInputValue(value);
-      if (typeof text !== "string" || text.length === 0) return [];
+    const answered = fields.flatMap((field) => {
+      const text = this.renderInputValue(input?.[field.id]);
+      return typeof text === "string" && text.length > 0 ? [{ ...field, text }] : [];
+    });
+    const requirements = answered.map(({ id, label, priority, text }, index) => {
       const status: "confirmed" | "unknown" | "deferred" = /^deferred:/iu.test(text.trim())
         ? "deferred"
         : /^unknown$/iu.test(text.trim())
           ? "unknown"
           : "confirmed";
-      return [
-        {
-          id: `REQ-${String(index + 1).padStart(3, "0")}`,
-          statement: `${label}: ${text}`,
-          priority,
-          status,
-          source: `intake:${id}`,
-        },
-      ];
+      return {
+        id: `REQ-${String(index + 1).padStart(3, "0")}`,
+        statement: `${label}: ${text}`,
+        priority,
+        status,
+        source: `intake:${id}`,
+      };
     });
     const assumptions = ["industry", "target-environments"].flatMap((id) => {
       const value = input?.[id];
