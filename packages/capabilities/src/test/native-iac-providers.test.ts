@@ -541,7 +541,7 @@ for (const location of ["original", "scratch"] as const) {
 test("installed Bicep validates nested formatting and lint without changing accepted source", async (context) => {
   const runner = new ProcessRunner();
   try {
-    await runner.run({ executable: "bicep", args: ["--version"], timeoutMs: 10_000, maxOutputBytes: 4096 });
+    await runner.run({ executable: "bicep", args: ["--version"], timeoutMs: 60_000, maxOutputBytes: 4096 });
   } catch (error) {
     if ((error as { code?: string }).code === "PROCESS_SPAWN_ERROR") {
       context.skip("Bicep is not installed");
