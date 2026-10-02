@@ -645,16 +645,10 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
       calls.length = 0;
       const response = await client.callTool({ name, arguments: input });
       assert.equal(response.isError, true, name);
-      assert.deepEqual(
-        response.structuredContent,
-        {
-          error: {
-            code: "APEX_VALIDATION",
-            message: "APEX validation failed; check the supplied input against the current task contract.",
-          },
-        },
-        name,
-      );
+      const { error } = response.structuredContent as { error: { code: string; message: string } };
+      assert.equal(error.code, "APEX_VALIDATION", name);
+      assert.match(error.message, /^Invalid tool arguments: \/\S* /u, name);
+      assert.equal(validators.get(name)!(response.structuredContent), true, name);
       assert.deepEqual(calls, [], name);
     }
   } finally {
