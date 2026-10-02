@@ -83,6 +83,11 @@ test("init installs bundled customizations and runtime config by default", async
   assert.match(requirementsAgent, /invoke `APEX Reviewer` through the active client's delegation tool/u);
   assert.match(requirementsAgent, /^tools:\n(?: {2}- .+\n)*? {2}- task\n/mu);
   assert.doesNotMatch(requirementsAgent, /^agents:/mu);
+  for (const owner of ["apex-requirements", "apex-architect", "apex-planner"]) {
+    const agent = await readFile(join(root, ".github", "agents", `${owner}.agent.md`), "utf8");
+    assert.match(agent, /call `apex\/status`[.;]\s+[Ii]f a gate is pending, report it\s+and stop/u, owner);
+    assert.doesNotMatch(agent, /reviewDecide`[^\n]*then call `apex\/nextTask`/u, owner);
+  }
   await readFile(join(root, ".mcp.json"));
   assert.match(
     await readFile(join(root, ".github", "instructions", "apex-agent-authoring.instructions.md"), "utf8"),

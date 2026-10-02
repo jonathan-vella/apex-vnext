@@ -438,6 +438,8 @@ test("managed routing distinguishes input, review dispositions, and exact task c
         assert.match(content, /in the Agent picker/);
         assert.match(content, /If the original scope is\s+unavailable, limit continuation to intake/);
         assert.match(content, /Do not claim the switch, answer acceptance or task creation/);
+        assert.match(content, /`request\.intake\.ordinal` of `request\.intake\.total`/);
+        assert.match(content, /continues through every\s+remaining intake round, each with its own kernel request ID/);
       }
       for (const state of ["needs_input", "needs_review", "status=task", "task.taskId"]) {
         assert.ok(content.includes(state), `${client}/${skill}: missing ${state} routing`);

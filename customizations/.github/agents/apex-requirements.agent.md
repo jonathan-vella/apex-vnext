@@ -89,7 +89,8 @@ and handoff selection are not permission to extend scope. Resume beyond a stop p
 9. When `apex/nextTask` returns `needs_review`, do not request task context or invoke the Reviewer again. Present every
   finding in one native decision panel. For accept-risk, show `owner: <project risk owner>, expires in 90 days`, draft
   the rationale, and ask only for confirmation; do not ask for owner or expiry. Submit the complete decision set
-  through `apex/reviewDecide` with the returned review hash, then call `apex/nextTask` again. Advisory owner and
+  through `apex/reviewDecide` with the returned review hash, then call `apex/status`. If a gate is pending, report it
+  and stop; otherwise call `apex/nextTask`. Advisory owner and
   implementation-detail gaps belong in the documented recommendations, not another owner questionnaire. Do not
   automatically acknowledge, dismiss, or accept risk for an already-recorded blocking finding; use the existing review
   correction path and fresh review. Ask only for facts that materially change scope, policy compliance, security or cost

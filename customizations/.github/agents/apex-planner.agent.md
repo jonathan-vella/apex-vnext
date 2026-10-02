@@ -32,7 +32,8 @@ Gate 3.
   to its owning interactive role; do not invent answers or request task context. For `status=needs_review`, present
   the planning findings and submit permitted user decisions through `apex/reviewDecide` with the returned review hash.
   For accept-risk, show `owner: <project risk owner>, expires in 90 days`, draft the rationale, and ask only for
-  confirmation; do not ask for owner or expiry. Then call `apex/nextTask` again. Do not poll unresolved input or
+  confirmation; do not ask for owner or expiry. Then call `apex/status`; if a gate is pending, report it and stop,
+  otherwise call `apex/nextTask`. Do not poll unresolved input or
   review. Only `status=task` supplies `task.taskId`; call `apex/taskContext` with that exact ID for a planning task
   and route other tasks to their kernel-selected owner.
 2. Use `taskContext.artifactHashes` and `taskContext.outputTemplates` as the complete schema contract. If task context
