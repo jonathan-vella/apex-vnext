@@ -9862,11 +9862,7 @@ export class ApexService {
     const entry = assets.manifest.files.find(({ path }) => path === "config/governance-reference.v1.json");
     const bytes = entry === undefined ? undefined : await readBundledFile(assets.root, entry.path);
     if (entry === undefined || bytes === undefined || sha256Bytes(bytes) !== entry.sha256)
-      throw new ApexError(
-        "APEX_VALIDATION",
-        "Bundled governance reference failed verification",
-        EXIT_CODES.validation,
-      );
+      throw new ApexError("APEX_VALIDATION", "Bundled governance reference failed verification", EXIT_CODES.validation);
     return bytes;
   }
 
