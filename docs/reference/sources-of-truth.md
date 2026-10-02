@@ -58,13 +58,13 @@ decisions.
 The [COE and change requirements](../vnext/PRD.md#req-reuse-001-coe-archetype-import) extend this ownership model, not
 replace it with another project-definition format. Use the existing owner for each fact and derive other views:
 
-| Concern                                             | Intended ownership                                                           |
-| --------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Business/compliance requirements                    | Accepted requirements, referenced by design and review                       |
-| Service/SKU choices and rationale                   | Accepted architecture and workload decisions                                 |
-| Environment values and supplied-resource references | Existing environment inputs and IaC bindings/parameters                      |
-| Target constraints                                  | Selected subscription's reviewed policy baseline and accepted reconciliation |
-| Documents and diagrams                              | Derived from those accepted sources and observed deployment evidence         |
+| Concern                                             | Intended ownership                                                               |
+| --------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Business/compliance requirements                    | Accepted requirements, referenced by design and review                           |
+| Service/SKU choices and rationale                   | Accepted architecture and workload decisions                                     |
+| Environment values and supplied-resource references | Existing environment inputs and IaC bindings/parameters                          |
+| Target constraints                                  | Reviewed policy baseline (or ALZ Corp reference) and the Architecture policy map |
+| Documents and diagrams                              | Derived from those accepted sources and observed deployment evidence             |
 
 COE imports create independent projects with origin/revision, not inherited writer or approval authority. Legacy files
 may be inspected once to recover proposed intent, then confirmed; they are not executable runtime state. Manual edits

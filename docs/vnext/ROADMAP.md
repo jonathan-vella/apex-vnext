@@ -227,7 +227,10 @@ benchmarks or telemetry to unlock them under this plan. Neither tool wire bytes 
 - Renew observation time on every successful collection, including unchanged content. Separate observation receipts
   from semantic policy identity before claiming timestamp-only refresh preserves planning and approval dependencies.
 - Package and qualify the consumer collect/import/plan path, then native validation and deployment enforcement.
-- Preserve discovery, reconciliation, governance review and Gate 2; no new agent, gate or delivery infrastructure.
+- Discover governance before Architecture and map policy inside it ([DECISION-030](DECISIONS.md)); no new agent,
+  gate or delivery infrastructure. Default to the ALZ Corp reference baseline until a reviewed subscription baseline
+  replaces it before Gate 3. The delta-only replacement (carry unchanged mappings, reopen Gate 2 only on `blocked`)
+  is still to do.
 - Include effective-policy and evidenced-empty cases for standalone labs as well as management-group inheritance.
 - Test paging, exemptions, ordering, errors and full-baseline exclusion from model-facing surfaces. Carry mappings
   through both IaC tracks, preview and deployment tests. Azure Policy always wins.

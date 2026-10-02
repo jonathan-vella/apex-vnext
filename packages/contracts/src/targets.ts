@@ -147,6 +147,10 @@ export const ArchitectureV1Schema = Type.Object(
         {
           id: NonEmptyStringSchema,
           service: NonEmptyStringSchema,
+          resourceTypes: Type.Array(
+            Type.String({ pattern: "^[A-Za-z][A-Za-z0-9]*\\.[A-Za-z][A-Za-z0-9.]*(?:/[A-Za-z][A-Za-z0-9]*)+$" }),
+            { minItems: 1, uniqueItems: true },
+          ),
           purpose: NonEmptyStringSchema,
           requirementIds: Type.Array(NonEmptyStringSchema, { uniqueItems: true }),
           dependsOn: Type.Array(NonEmptyStringSchema, { uniqueItems: true }),
@@ -334,6 +338,7 @@ export const GovernanceConstraintsV1Schema = Type.Object(
     projectId: ProjectIdSchema,
     runId: RunIdSchema,
     targetScope: NonEmptyStringSchema,
+    source: Type.Union([Type.Literal("collected"), Type.Literal("reference")]),
     discoveredAt: IsoDateTimeSchema,
     expiresAt: IsoDateTimeSchema,
     summary: Type.Object(
@@ -387,7 +392,9 @@ export const PolicyPropertyMapV1Schema = Type.Object(
             Type.Literal("planned"),
             Type.Literal("exempt"),
             Type.Literal("blocked"),
+            Type.Literal("not-applicable"),
           ]),
+          reason: Type.Optional(Type.String({ minLength: 1, maxLength: 1024 })),
         },
         { additionalProperties: false },
       ),

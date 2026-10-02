@@ -17,7 +17,13 @@ governance evidence in `apex/taskContext` is authoritative.
 - Accepted governance evidence includes its discovery status, discovery time,
   freshness limit, completeness signature, and scope.
 
-Return a blocker when evidence is missing, partial, failed, stale,
+Governance is accepted after Gate 1 and before Architecture. It is either a reviewed collected subscription baseline
+or the shipped ALZ Corp reference baseline (`source: reference`), generated from a pinned Azure Landing Zones Library
+release (root, landing zones and corp archetypes). The reference is the default for `local` targets and for pre-sales
+work without Azure access; it has no freshness window, and a subscription target must replace it with its reviewed
+baseline before Gate 3.
+
+Return a blocker when collected evidence is missing, partial, failed, stale,
 or scoped to a different subscription or management-group ancestry. Do not
 infer policy state from model memory, templates, or a prior task.
 Imported completeness signatures are retained as unverified metadata; never describe them as verified signatures.

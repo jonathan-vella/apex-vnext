@@ -416,7 +416,7 @@ test("managed routing distinguishes input, review dispositions, and exact task c
       if (skill === "apex-operations") {
         assert.match(content, /apex\/governanceImport.*\{ "path": "<local-baseline-path>" \}.*only/u);
         assert.match(content, /apex governance import --path <local-baseline-path>/u);
-        assert.match(content, /Import preserves reconciliation, governance review, and Gate 2/u);
+        assert.match(content, /Import happens before Architecture, which maps the policies/u);
       }
       if (skill === "apex-requirements") {
         assert.match(content, /If scope is unavailable, stop after intake\s+and task context/);

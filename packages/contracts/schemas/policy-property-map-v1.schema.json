@@ -28,6 +28,10 @@
               {
                 "const": "blocked",
                 "type": "string"
+              },
+              {
+                "const": "not-applicable",
+                "type": "string"
               }
             ]
           },
@@ -77,6 +81,11 @@
             "type": "string"
           },
           "propertyPath": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 1024,
             "minLength": 1,
             "type": "string"
           }

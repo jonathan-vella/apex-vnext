@@ -5,20 +5,21 @@
 ## Workflow Shape
 
 A run covers one environment, one Azure scope, and one IaC track. The versioned workflow advances through requirements,
-architecture and governance, implementation planning, IaC generation and validation, preview, deployment, inventory,
-diagnosis, and quality evaluation.
+governance discovery, architecture with policy mapping, implementation planning, IaC generation and validation,
+preview, deployment, inventory, diagnosis, and quality evaluation. Governance comes before architecture so the design
+starts from known policy: a reviewed subscription baseline, or the shipped ALZ Corp reference baseline when none exists.
 
 Creative specialists propose typed results. Deterministic validators decide whether those results satisfy contracts and
 business rules. Human-owned gates authorize progression.
 
 ## Gates
 
-| Gate | Decision boundary                                                                     |
-| ---: | ------------------------------------------------------------------------------------- |
-|    1 | Requirements and SKU intent are complete and reviewed.                                |
-|    2 | Architecture, cost, governance constraints, and policy reconciliation are acceptable. |
-|    3 | Implementation intent, IaC binding, environment inputs, and review are acceptable.    |
-|    4 | The exact current preview is approved for its bound recipient and operation.          |
+| Gate | Decision boundary                                                                  |
+| ---: | ---------------------------------------------------------------------------------- |
+|    1 | Requirements and SKU intent are complete and reviewed.                             |
+|    2 | Architecture, cost, governance constraints, and its policy map are acceptable.     |
+|    3 | Implementation intent, IaC binding, environment inputs, and review are acceptable. |
+|    4 | The exact current preview is approved for its bound recipient and operation.       |
 
 Gate 4 is local runtime authority. CI may transport and prove the approved candidate, but it does not silently recreate
 or inherit approval.
