@@ -736,6 +736,13 @@ test("bootstrap plan is read-only and reports missing, conflicting and existing 
     execute(["bootstrap", "plan", "--project", "demo", "--risk-owner", "partner", "--create-repo"], fresh),
     /requires --target/u,
   );
+  await assert.rejects(
+    execute(
+      ["bootstrap", "plan", "--project", "demo", "--risk-owner", "partner", "--target", "resource-group:demo"],
+      fresh,
+    ),
+    /--target must be local or \/subscriptions/u,
+  );
   const result = (await execute(
     ["bootstrap", "plan", "--project", "demo", "--risk-owner", "partner", "--target", "local", "--create-repo"],
     fresh,
@@ -761,7 +768,7 @@ test("CLI bootstrap validates onboarding files before initializing a selected cl
     displayName: "Payments platform",
     client: "github-copilot-cli",
     environment: "test",
-    targetScope: "resource-group:payments-test",
+    targetScope: "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-payments-test",
     iacTool: "terraform",
     createRepository: true,
   });
@@ -1177,6 +1184,20 @@ test("MCP registers only narrow tools and calls the service", async () => {
   });
   assert.equal(untargeted.isError, true);
   assert.equal((untargeted.structuredContent as { error: { code: string } }).error.code, "APEX_VALIDATION");
+  for (const targetScope of ["invented-scope", "resource-group:data-platform", "/subscriptions/not-a-guid"]) {
+    const invalid = await client.callTool({
+      name: "projectCreate",
+      arguments: {
+        projectId: "data-platform",
+        displayName: "Data platform",
+        environment: "dev",
+        targetScope,
+        iacTool: "terraform",
+        riskOwner: "partner",
+      },
+    });
+    assert.equal((invalid.structuredContent as { error: { code: string } }).error.code, "APEX_VALIDATION", targetScope);
+  }
   assert.deepEqual(
     (await service.listProjects()).map(({ projectId }) => projectId),
     ["demo"],

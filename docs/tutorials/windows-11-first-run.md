@@ -53,7 +53,7 @@ npx apex init \
   --risk-owner partner \
   --name "Payments platform" \
   --environment dev \
-  --target "resource-group:payments-dev" \
+  --target local \
   --iac bicep \
   --json
 ```

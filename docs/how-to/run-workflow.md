@@ -40,7 +40,7 @@ environment run:
 ```bash
 apex project promote \
   --environment test \
-  --target resource-group:payments-test \
+  --target /subscriptions/<subscription-id>/resourceGroups/rg-payments-test \
   --json
 ```
 

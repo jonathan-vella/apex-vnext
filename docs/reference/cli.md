@@ -34,6 +34,10 @@ Initialize a customer workspace once, then create additional independently gover
 `apex project create`. The shared client projection is installed only by `apex init`; project creation adds a project,
 its first run, and its selected IaC track under the existing `.apex` state.
 
+`--target` is required whenever a project is created. Use `local` for a run without an Azure target (it uses the
+shipped reference governance baseline), or a full Azure scope such as
+`/subscriptions/<subscription-id>/resourceGroups/<name>` (it uses the reviewed subscription baseline).
+
 Each project can have multiple environment-scoped runs. Use `apex project promote` after Gates 1 through 3 are approved
 to create a linked run for the next environment. It inherits only still-valid upstream proof and always requires a
 new preview and Gate 4 approval.
