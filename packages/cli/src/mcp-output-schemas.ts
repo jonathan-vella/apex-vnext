@@ -194,6 +194,22 @@ export const MCP_OUTPUT_SCHEMAS = {
       artifactHashes: Type.Record(Type.String(), Sha256Schema),
       recordedInput: Type.Union([Type.Record(Type.String(), InputValueV1Schema), Type.Null()]),
       decisions: Type.Record(Type.String(), InputValueV1Schema),
+      governanceFindings: Type.Optional(
+        Type.Union([
+          object({ count, untypedCount: count, resourceTypeCount: count, read: NonEmptyStringSchema }),
+          Type.Array(
+            object({
+              policyAssignmentId: NonEmptyStringSchema,
+              policyDefinitionId: NonEmptyStringSchema,
+              policyDefinitionReferenceId: Type.Optional(NonEmptyStringSchema),
+              effect: Type.Union([Type.Literal("deny"), Type.Literal("modify"), Type.Literal("deployIfNotExists")]),
+              displayName: Type.String(),
+              resourceTypes: strings,
+              requiredValue: Type.Optional(Type.Unknown()),
+            }),
+          ),
+        ]),
+      ),
       outputTemplates: object(
         Object.fromEntries(SUPPORTED_ARTIFACT_KINDS.map((kind) => [kind, Type.Optional(Type.Unknown())])),
       ),
