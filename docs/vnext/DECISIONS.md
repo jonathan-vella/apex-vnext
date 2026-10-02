@@ -212,7 +212,9 @@ pre-sales without Azure access, but its reviewed subscription baseline must repl
 The Architect owns policy reconciliation inside Architecture. Every enforcing finding (deny, modify, deployIfNotExists)
 maps once to a component, property and disposition. APEX marks a finding `not-applicable` when its resource types
 match no designed component; any other `not-applicable` needs a factual reason. The separate reconciliation task and
-governance review retire; the Architecture review covers the policy map. When the real baseline replaces the reference,
-the kernel will diff the two, carry unchanged mappings, send only new or changed findings to the Architect and reopen
-Gate 2 only for a `blocked` conflict. Until that delta path ships, the replacement uses `apex governance revise`, which
-re-runs Architecture. [REQ-GOV-001](PRD.md#req-gov-001-governance-and-policy) owns acceptance.
+governance review retire; the Architecture review covers the policy map. After Gate 2, a subscription target still on
+the reference gets a `governance-refresh` task that imports the reviewed baseline, then a `policy-refresh` task. The
+kernel carries mappings whose policy definition, reference ID and effect match, marks undesigned resource types
+`not-applicable` and sends only the remaining findings to the Architect. Gate 2 stays approved unless a refreshed row
+is `blocked`, which reopens Architecture and Gate 2. [REQ-GOV-001](PRD.md#req-gov-001-governance-and-policy) owns
+acceptance.
