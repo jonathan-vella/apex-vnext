@@ -234,7 +234,7 @@ const validVariants: Array<[ToolName, Record<string, unknown>]> = [
         {
           policyAssignmentId: "/providers/Microsoft.Authorization/policyAssignments/a",
           policyDefinitionId: "/providers/Microsoft.Authorization/policyDefinitions/d",
-          effect: "Deny",
+          effect: "deny",
           displayName: "Deny public access",
           resourceTypes: ["Microsoft.Storage/storageAccounts"],
           requiredValue: false,
@@ -322,6 +322,21 @@ const invalidVariants: Array<[ToolName, Record<string, unknown>]> = [
   ["taskContext", { ...fixtures.taskContext, artifactHashes: { requirements: "invalid" } }],
   ["taskContext", { ...fixtures.taskContext, outputTemplates: { unsupported: {} } }],
   ["taskContext", { ...fixtures.taskContext, governanceFindings: { count: -1 } }],
+  [
+    "taskContext",
+    {
+      ...fixtures.taskContext,
+      governanceFindings: [
+        {
+          policyAssignmentId: "/providers/Microsoft.Authorization/policyAssignments/a",
+          policyDefinitionId: "/providers/Microsoft.Authorization/policyDefinitions/d",
+          effect: "audit",
+          displayName: "Audit only",
+          resourceTypes: [],
+        },
+      ],
+    },
+  ],
   ["completeTask", { ...completion, outputHashes: { unsupported: hash } }],
   ["inventory", { ...inventory, resources: [{ ...inventory.resources[0], resourceId: 1 }] }],
   ["promote", { ...run, gates: [] }],
