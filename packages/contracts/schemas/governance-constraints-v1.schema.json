@@ -51,6 +51,18 @@
       "const": "1.0.0",
       "type": "string"
     },
+    "source": {
+      "anyOf": [
+        {
+          "const": "collected",
+          "type": "string"
+        },
+        {
+          "const": "reference",
+          "type": "string"
+        }
+      ]
+    },
     "summary": {
       "additionalProperties": false,
       "properties": {
@@ -94,6 +106,7 @@
     "projectId",
     "runId",
     "targetScope",
+    "source",
     "discoveredAt",
     "expiresAt",
     "summary",

@@ -10,6 +10,7 @@ import {
   calculateNativeValidationCommandHash,
   calculateNativeValidationReceiptHash,
   calculatePolicyValidationDigest,
+  hasActionablePolicyMappings,
   hasValidNativeValidationReceipt,
   PolicyPropertyMapV1Schema,
   LogicalResourceManifestV1Schema,
@@ -384,7 +385,7 @@ abstract class NativeProviderBase {
         treeHash: generatedSource.treeHash,
         policyHash: request.policyHash,
         inputHash: request.inputHash,
-        ...(policyInput?.policyMap.mappings.length === 0
+        ...(policyInput !== undefined && !hasActionablePolicyMappings(policyInput.policyMap)
           ? {
               policyApplicability: {
                 status: "no-actionable-mappings" as const,
@@ -513,7 +514,7 @@ abstract class NativeProviderBase {
         if (!previousHash) throw sourceBindingError();
         receipt.receiptHash = calculateNativeValidationReceiptHash(updated);
       }
-      if (track === "bicep" && policyInput !== undefined && policyInput.policyMap.mappings.length > 0) {
+      if (track === "bicep" && policyInput !== undefined && hasActionablePolicyMappings(policyInput.policyMap)) {
         let policyValidation: PolicyValidationV1;
         try {
           policyValidation = validatePolicyProperties({
@@ -647,7 +648,7 @@ abstract class NativeProviderBase {
     blockers: string[],
   ): NativePolicyBinding {
     const input = request.policyValidation;
-    if (input === undefined || input.policyMap.mappings.length === 0) return {};
+    if (input === undefined || !hasActionablePolicyMappings(input.policyMap)) return {};
     const receipt = validatePolicyProperties({
       ...input,
       track,

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -25,6 +25,69 @@ function minutesAfterGovernance(minutes) {
 }
 
 const NOW = minutesAfterGovernance(10);
+const BASELINE = join(mkdtempSyncCompat(), "governance-policy-baseline.json");
+
+function mkdtempSyncCompat() {
+  const directory = join(tmpdir(), `apex-live-prepare-baseline-${process.pid}`);
+  mkdirSync(directory, { recursive: true });
+  return directory;
+}
+
+writeFileSync(
+  BASELINE,
+  JSON.stringify({
+    schema_version: "governance-baseline-v1",
+    subscription_id: SUBSCRIPTION,
+    coverage_status: "COMPLETE",
+    subscriptions_discovered: 1,
+    subscriptions_processed: 1,
+    subscriptions_skipped: [],
+    subscriptions_excluded: [],
+    summary: { total_findings: 0, total_blockers: 0, total_auto_remediate: 0, subscriptions_complete: 1 },
+    subscriptions: {
+      [SUBSCRIPTION]: {
+        schema_version: "governance-constraints-v1",
+        subscription_id: SUBSCRIPTION,
+        discovered_at: GOVERNANCE_DISCOVERED_AT,
+        source: "github-actions-baseline",
+        discovery_status: "COMPLETE",
+        discovery_metadata: {
+          discovery_status: "COMPLETE",
+          discovered_at: GOVERNANCE_DISCOVERED_AT,
+          scope: { subscription_id: SUBSCRIPTION, management_groups: [], coverage: "subscription-and-descendants-v1" },
+          api_versions: {
+            policyAssignments: "2022-06-01",
+            policyDefinitions: "2021-06-01",
+            policyExemptions: "2022-07-01-preview",
+          },
+          page_counts: { policyAssignments: 0, policyDefinitions: 0, policyExemptions: 0 },
+          completeness_signature: "",
+          ttl_days: 7,
+        },
+        discovery_summary: {
+          assignment_total: 0,
+          assignment_kept: 0,
+          defender_auto_filtered: 0,
+          subscription_scope_count: 0,
+          management_group_inherited_count: 0,
+          blocker_count: 0,
+          auto_remediate_count: 0,
+          informational_count: 0,
+          audit_count: 0,
+          disabled_count: 0,
+          exempted_count: 0,
+          classified_policy_count: 0,
+          other_effect_count: 0,
+        },
+        assignment_inventory: [],
+        findings: [],
+        policies: [],
+        tags_required: [],
+        allowed_locations: [],
+      },
+    },
+  }),
+);
 
 function digest(value) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -61,16 +124,18 @@ function validationEntries(track) {
   }));
 }
 
-test("prepare arguments require explicit actor, track, subscription, and confirmation", () => {
-  assert.deepEqual(
-    parsePrepareArgs(["--yes", "--track", "bicep", "--actor", "maintainer", "--subscription", SUBSCRIPTION]),
-    { yes: true, track: "bicep", actor: "maintainer", subscription: SUBSCRIPTION },
-  );
+test("prepare arguments require explicit actor, track, subscription, baseline, and confirmation", () => {
+  const base = ["--yes", "--actor", "maintainer", "--subscription", SUBSCRIPTION, "--baseline", "baseline.json"];
+  assert.deepEqual(parsePrepareArgs([...base, "--track", "bicep"]), {
+    yes: true,
+    track: "bicep",
+    actor: "maintainer",
+    subscription: SUBSCRIPTION,
+    baseline: "baseline.json",
+  });
   assert.throws(() => parsePrepareArgs(["--track", "bicep"]), /requires --yes/);
-  assert.throws(
-    () => parsePrepareArgs(["--yes", "--track", "fake", "--actor", "maintainer", "--subscription", SUBSCRIPTION]),
-    /bicep or terraform/,
-  );
+  assert.throws(() => parsePrepareArgs(base.slice(0, -2).concat("--track", "bicep")), /Missing --baseline/);
+  assert.throws(() => parsePrepareArgs([...base, "--track", "fake"]), /bicep or terraform/);
   assert.equal(
     parsePrepareArgs([
       "--yes",
@@ -81,6 +146,8 @@ test("prepare arguments require explicit actor, track, subscription, and confirm
       "maintainer",
       "--subscription",
       SUBSCRIPTION,
+      "--baseline",
+      "baseline.json",
     ]).replace_existing,
     true,
   );
@@ -121,7 +188,7 @@ test("qualification pricing rejects unrelated LRS products and selects the base 
 });
 
 for (const track of ["bicep", "terraform"]) {
-  test(`${track} qualification artifacts bind the exact repository tree and governance snapshot`, async () => {
+  test(`${track} qualification artifacts bind the exact repository tree`, async () => {
     const artifacts = await buildQualificationArtifacts({
       root: ROOT,
       track,
@@ -140,8 +207,7 @@ for (const track of ["bicep", "terraform"]) {
     );
     assert.match(artifacts.handoff.treeHash, /^[0-9a-f]{64}$/);
     assert.deepEqual(artifacts.handoff.requiredToolVersions, { [track]: TOOL_PINS[track].min });
-    assert.match(artifacts.governanceArtifact.constraintsRef.digest, /^[0-9a-f]{64}$/);
-    assert.equal(artifacts.governanceArtifact.targetScope, `${artifacts.targetScope}`);
+    assert.deepEqual(artifacts.architecture.components[0].resourceTypes, ["Microsoft.Storage/storageAccounts"]);
   });
 }
 
@@ -151,7 +217,7 @@ test("preparation creates a validated run with Gates 1-3 approved and Gate 4 clo
     await mkdir(join(stateRoot, ".github"), { recursive: true });
     await writeFile(join(stateRoot, ".github/copilot-instructions.md"), "source-owned\n", "utf8");
     const result = await prepareQualificationState(
-      { yes: true, track: "bicep", actor: "maintainer", subscription: SUBSCRIPTION },
+      { yes: true, track: "bicep", actor: "maintainer", subscription: SUBSCRIPTION, baseline: BASELINE },
       {
         root: stateRoot,
         sourceRoot: ROOT,
@@ -197,6 +263,7 @@ test("preparation creates a validated run with Gates 1-3 approved and Gate 4 clo
           track: "bicep",
           actor: "maintainer",
           subscription: SUBSCRIPTION,
+          baseline: BASELINE,
         },
         {
           root: stateRoot,
@@ -221,7 +288,14 @@ test("preparation creates a validated run with Gates 1-3 approved and Gate 4 clo
     await writeFile(ownershipPath, "{}\n", "utf8");
     await assert.rejects(
       prepareQualificationState(
-        { yes: true, replace_existing: true, track: "bicep", actor: "maintainer", subscription: SUBSCRIPTION },
+        {
+          yes: true,
+          replace_existing: true,
+          track: "bicep",
+          actor: "maintainer",
+          subscription: SUBSCRIPTION,
+          baseline: BASELINE,
+        },
         {
           root: stateRoot,
           sourceRoot: ROOT,
@@ -248,6 +322,7 @@ test("preparation creates a validated run with Gates 1-3 approved and Gate 4 clo
         track: "bicep",
         actor: "maintainer",
         subscription: SUBSCRIPTION,
+        baseline: BASELINE,
       },
       {
         root: stateRoot,
@@ -275,6 +350,7 @@ test("preparation creates a validated run with Gates 1-3 approved and Gate 4 clo
           track: "bicep",
           actor: "maintainer",
           subscription: SUBSCRIPTION,
+          baseline: BASELINE,
         },
         {
           root: stateRoot,

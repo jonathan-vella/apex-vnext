@@ -115,7 +115,16 @@ export function architecture(runId: string): ArchitectureV1 {
     title: "Demo",
     summary: "Demo architecture",
     sourceHashes: { requirements: "a".repeat(64) },
-    components: [{ id: "api", service: "fake/service", purpose: "Serve", requirementIds: ["REQ-1"], dependsOn: [] }],
+    components: [
+      {
+        id: "api",
+        service: "fake/service",
+        resourceTypes: ["Microsoft.Web/sites"],
+        purpose: "Serve",
+        requirementIds: ["REQ-1"],
+        dependsOn: [],
+      },
+    ],
     decisions: [],
     risks: [],
     wellArchitectedAssessment: {
@@ -195,6 +204,7 @@ export function governance(runId: string) {
     projectId: "demo",
     runId,
     targetScope: "local",
+    source: "collected" as const,
     discoveredAt: "2026-01-01T00:00:00.000Z",
     expiresAt: "2099-01-01T00:00:00.000Z",
     summary: { assignmentCount: 0, denyCount: 0, modifyCount: 0, auditCount: 0, exemptionCount: 0 },
@@ -284,8 +294,94 @@ export async function acceptAvailabilityEvidence(
   return accepted.hash;
 }
 
-export function policyMap(runId: string, governanceHash: string) {
-  return { schemaVersion: CONTRACT_VERSION, projectId: "demo", runId, governanceHash, mappings: [] };
+export interface GovernanceFindingProjection {
+  policyAssignmentId: string;
+  policyDefinitionId: string;
+  policyDefinitionReferenceId?: string;
+  effect: "deny" | "modify" | "deployIfNotExists";
+  propertyPath?: string;
+}
+
+export function policyMap(
+  runId: string,
+  governanceHash: string,
+  findings: readonly GovernanceFindingProjection[] = [],
+) {
+  return {
+    schemaVersion: CONTRACT_VERSION,
+    projectId: "demo",
+    runId,
+    governanceHash,
+    mappings: findings.map((finding) => ({
+      policyAssignmentId: finding.policyAssignmentId,
+      policyDefinitionId: finding.policyDefinitionId,
+      ...(finding.policyDefinitionReferenceId === undefined
+        ? {}
+        : { policyDefinitionReferenceId: finding.policyDefinitionReferenceId }),
+      effect: finding.effect,
+      logicalResourceId: "none",
+      propertyPath: finding.propertyPath ?? "type",
+      disposition: "not-applicable" as const,
+      reason: "The test fixture deploys no resource this policy governs",
+    })),
+  };
+}
+
+export async function governanceFindings(service: ApexService, _taskId?: string, designedTypes?: readonly string[]) {
+  const run = await service["currentRun"]();
+  const events = await service["journal"](run).replay();
+  const designed = designedTypes === undefined ? undefined : new Set(designedTypes.map((type) => type.toLowerCase()));
+  return (await service["enforcingGovernanceFindings"](run, events))
+    .filter(
+      ({ resourceTypes }) =>
+        designed === undefined ||
+        resourceTypes.length === 0 ||
+        resourceTypes.some((type) => designed.has(type.toLowerCase())),
+    )
+    .map((finding) => ({
+      policyAssignmentId: finding.assignmentId,
+      policyDefinitionId: finding.policyId,
+      ...(finding.policyDefinitionReferenceId === undefined
+        ? {}
+        : { policyDefinitionReferenceId: finding.policyDefinitionReferenceId }),
+      effect: finding.effect as GovernanceFindingProjection["effect"],
+      resourceTypes: [...finding.resourceTypes],
+    }));
+}
+
+export async function withPolicyMap(
+  service: ApexService,
+  taskId: string,
+  outputs: TaskOutput[],
+): Promise<TaskOutput[]> {
+  if (outputs.some(({ kind }) => kind === "policy-property-map")) return outputs;
+  const architectureOutput = outputs.find(({ kind }) => kind === "architecture")?.value as
+    { runId: string; components: Array<{ resourceTypes: string[] }> } | undefined;
+  const context = (await service.taskContext(taskId)) as { artifactHashes: Record<string, string> };
+  const governanceHash = context.artifactHashes["governance-constraints"];
+  if (architectureOutput === undefined || governanceHash === undefined) return outputs;
+  return [
+    ...outputs,
+    {
+      kind: "policy-property-map",
+      value: policyMap(
+        architectureOutput.runId,
+        governanceHash,
+        await governanceFindings(
+          service,
+          taskId,
+          architectureOutput.components.flatMap(({ resourceTypes }) => resourceTypes),
+        ),
+      ),
+    },
+  ];
+}
+
+export async function importReferenceGovernance(service: ApexService): Promise<string> {
+  const next = await nextTaskAfterInput(service);
+  if (next.status !== "task" || next.task.taskType !== "governance-discovery")
+    throw new Error("Expected governance-discovery");
+  return (await service.importGovernanceReference()).outputHash;
 }
 
 export function planBundle(
@@ -441,9 +537,12 @@ export async function prepareValidatedRun(service: ApexService, runId: string, t
   ]);
   await service.decideGateNumber(1, "approved", "tester");
   await acceptAvailabilityEvidence(service, runId);
+  const governanceHash = await importReferenceGovernance(service);
   const architectureValue = architecture(runId);
   const costValue = costEstimate(runId);
-  const architectureHashes = await complete("architecture", [
+  const architectureTask = await nextTask("architecture");
+  const findings = await governanceFindings(service, architectureTask, ["Microsoft.Web/sites"]);
+  const architectureHashes = await service.completeTaskOutputs(architectureTask, [
     { kind: "architecture", value: architectureValue },
     { kind: "cost-estimate", value: costValue },
     {
@@ -455,24 +554,10 @@ export async function prepareValidatedRun(service: ApexService, runId: string, t
         costEstimateHash: sha256Json(costValue),
       }),
     },
+    { kind: "policy-property-map", value: policyMap(runId, governanceHash, findings) },
   ]);
   await complete("architecture-review", [
     { kind: "review-findings", value: review(runId, "architecture", architectureHashes.outputHashes.architecture!) },
-  ]);
-  const governanceHashes = await complete("governance-discovery", [
-    { kind: "governance-constraints", value: governance(runId) },
-  ]);
-  const policyHashes = await complete("governance-reconciliation", [
-    {
-      kind: "policy-property-map",
-      value: policyMap(runId, governanceHashes.outputHashes["governance-constraints"]!),
-    },
-  ]);
-  await complete("governance-review", [
-    {
-      kind: "review-findings",
-      value: review(runId, "policy-property-map", policyHashes.outputHashes["policy-property-map"]!),
-    },
   ]);
   await service.decideGateNumber(2, "approved", "tester");
   const plan = planBundle(
@@ -482,8 +567,8 @@ export async function prepareValidatedRun(service: ApexService, runId: string, t
     {
       requirements: requirementHashes.outputHashes.requirements!,
       architecture: architectureHashes.outputHashes.architecture!,
-      "governance-constraints": governanceHashes.outputHashes["governance-constraints"]!,
-      "policy-property-map": policyHashes.outputHashes["policy-property-map"]!,
+      "governance-constraints": governanceHash,
+      "policy-property-map": architectureHashes.outputHashes["policy-property-map"]!,
     },
   );
   const planHashes = await complete("plan", plan);

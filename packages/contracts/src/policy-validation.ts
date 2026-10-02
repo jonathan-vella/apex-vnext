@@ -56,6 +56,8 @@ export const PolicyValidationV1Schema = Type.Object(
             Type.Literal("ambiguous-resource"),
             Type.Literal("unsupported-resource"),
             Type.Literal("invalid-source"),
+            Type.Literal("not-applicable"),
+            Type.Literal("platform-remediated"),
           ]),
         },
         { additionalProperties: false },
@@ -67,6 +69,10 @@ export const PolicyValidationV1Schema = Type.Object(
 );
 
 export type PolicyValidationV1 = Static<typeof PolicyValidationV1Schema>;
+
+export function hasActionablePolicyMappings(policyMap: Static<typeof PolicyPropertyMapV1Schema>): boolean {
+  return policyMap.mappings.some(({ disposition }) => disposition !== "not-applicable");
+}
 export type PolicyValidationResultV1 = PolicyValidationV1["results"][number];
 export type PolicyValidationBinding = Pick<
   PolicyValidationV1,
@@ -192,9 +198,18 @@ export function hasValidPolicyValidation(
           result.expectedValueDigest === result.observedValueDigest &&
           result.disposition !== "blocked" &&
           result.disposition !== "exempt" &&
+          result.disposition !== "not-applicable" &&
           result.effect !== "disabled"
         );
       }
+      if (result.reason === "not-applicable")
+        return result.outcome === "pass" && result.disposition === "not-applicable";
+      if (result.reason === "platform-remediated")
+        return (
+          result.outcome === "pass" &&
+          ["modify", "deployIfNotExists"].includes(result.effect) &&
+          ["satisfied", "planned"].includes(result.disposition)
+        );
       if (["blocked", "value-mismatch", "missing-property"].includes(result.reason)) return result.outcome === "fail";
       return result.outcome === "unsupported";
     })

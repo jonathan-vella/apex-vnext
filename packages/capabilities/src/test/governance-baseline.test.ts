@@ -3,7 +3,12 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { GovernanceConstraintsV1Schema, PolicyPropertyMapV1Schema } from "@apexops/contracts";
-import { GovernanceBaselineError, importGovernanceBaseline, inspectGovernanceBaseline } from "../index.js";
+import {
+  GovernanceBaselineError,
+  importGovernanceBaseline,
+  importGovernanceReference,
+  inspectGovernanceBaseline,
+} from "../index.js";
 
 const validate = new Ajv2020({ strict: false }).compile(
   JSON.parse(
@@ -94,6 +99,7 @@ test("selects only the active subscription and produces runtime-compatible compa
   assert.ok(
     validateConstraints({
       ...selected.constraints,
+      source: "collected",
       projectId: "example",
       runId: "run-1",
       constraintsRef: {
@@ -879,4 +885,70 @@ test("rejects excessive nesting, hidden errors and missing inherited ancestry", 
   const inherited = inheritedBaseline();
   inherited.subscriptions[subscriptionId]!.discovery_metadata.scope.management_groups = [];
   rejected(inherited, "target-mismatch");
+});
+
+function reference(policies: Record<string, unknown>[]) {
+  return {
+    schema_version: "governance-reference-v1",
+    source: "alz-corp-reference",
+    library: { release: "platform/alz/2026.08.1", commit: "c".repeat(40) },
+    policies,
+  };
+}
+
+function referencePolicy(name: string, effect: string, resourceTypes: string[]) {
+  const scope = "/providers/Microsoft.Management/managementGroups/corp";
+  return {
+    policy_id: `/providers/Microsoft.Authorization/policyDefinitions/${name}`,
+    display_name: name,
+    effect,
+    scope,
+    assignment_display_name: name,
+    assignment_id: `${scope}/providers/Microsoft.Authorization/policyAssignments/${name}`,
+    classification: effect === "deny" ? "blocker" : "informational",
+    resource_types: resourceTypes,
+    exemption: null,
+  };
+}
+
+test("imports the ALZ Corp reference for any target without subscription binding", () => {
+  const source = reference([
+    referencePolicy("deny-public-ip", "deny", ["Microsoft.Network/publicIPAddresses"]),
+    referencePolicy("audit-tags", "audit", []),
+  ]);
+  for (const targetScope of ["local", `/subscriptions/${subscriptionId}/resourceGroups/rg-demo`]) {
+    const selected = importGovernanceReference(source, { targetScope, now: options.now });
+    assert.equal(selected.snapshot.provenance.source, "alz-corp-reference");
+    assert.deepEqual(selected.snapshot.provenance.reference, {
+      release: "platform/alz/2026.08.1",
+      commit: "c".repeat(40),
+    });
+    assert.equal(selected.snapshot.targetScope, targetScope.toLowerCase());
+    assert.deepEqual(
+      selected.snapshot.findings.map(({ effect, resourceTypes }) => [effect, resourceTypes]),
+      [
+        ["deny", ["Microsoft.Network/publicIPAddresses"]],
+        ["audit", []],
+      ],
+    );
+    assert.deepEqual(selected.constraints.summary, {
+      assignmentCount: 2,
+      denyCount: 1,
+      modifyCount: 0,
+      auditCount: 1,
+      exemptionCount: 0,
+    });
+  }
+  assert.throws(
+    () =>
+      importGovernanceReference(
+        { ...source, source: "github-actions-baseline" },
+        { targetScope: "local", now: options.now },
+      ),
+    GovernanceBaselineError,
+  );
+  assert.throws(
+    () => importGovernanceReference(reference([]), { targetScope: "local", now: options.now }),
+    GovernanceBaselineError,
+  );
 });

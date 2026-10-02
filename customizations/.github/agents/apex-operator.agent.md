@@ -75,15 +75,17 @@ user's behalf. A recorded reuse choice permits explicit import; refresh waits fo
 at that path and does not run Azure collection. Do not ask again when selection returns the recorded choice.
 Only when the user explicitly asks to reconsider a pending refresh, pass `reopen: true` to `apex/governanceSelect`.
 Present the new question and record its answer; never reopen automatically to bypass a blocker.
-For an explicitly requested reviewed governance baseline import, use `apex/governanceImport` with only the local `path`.
+Governance discovery runs after Gate 1 and before Architecture. Only discover and import; the Architect maps policies.
+For a `local` target, call `apex/governanceImport` with `{ "reference": true }` to import the shipped ALZ Corp reference
+baseline. For a subscription target with a reviewed baseline, select it as above, then use
+`apex/governanceImport` with only the local `path`. For a subscription target without one (for example pre-sales
+without Azure access), ask the user whether to use the ALZ Corp reference now; it lets design and Gate 2 proceed but
+cannot authorize planning, so the reviewed subscription baseline must replace it before Gate 3.
 Never read or paste baseline bytes into chat, task context, or tool arguments. Report the returned `outputHash` and
-`summary`; import does not authorize live discovery, bypass reconciliation or governance review, or approve Gate 2.
+`summary`; import does not authorize live discovery or approve a gate.
 If policy content changed, explain the invalidation scope and direct the user to the trusted CLI
 `apex governance revise --path <reviewed-path> --reason <reason> --yes --json`, followed by explicit import and renewed
 reviews/approvals. Never infer revision confirmation or substitute deployment `reconcile` for governance revision.
-A `local` target has no Azure Policy: submit the `governance-constraints` template from `apex/taskContext` unchanged
-through `apex/completeTask`. For governance reconciliation, start from the `policy-property-map` template and add one
-mapping per accepted governance finding; an empty finding set keeps `mappings` empty.
 If an indeterminate deployment has no recorded execution receipt, report that current reconciliation cannot establish
 its outcome and retain the blocker for operator/provider-supported resolution; do not repeat deployment or reconciliation.
 

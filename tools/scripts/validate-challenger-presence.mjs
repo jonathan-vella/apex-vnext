@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 export function validateReviewDependencies(workflow) {
   const required = {
     "gate-1": ["requirements-review"],
-    "gate-2": ["architecture-review", "governance-reconciliation-review"],
+    "gate-2": ["architecture-review"],
     "gate-3": ["plan-review"],
   };
   const errors = [];
@@ -25,6 +25,6 @@ export function validateReviewDependencies(workflow) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const errors = validateReviewDependencies(JSON.parse(readFileSync("config/workflow.v1.json", "utf8")));
   for (const error of errors) console.error(error);
-  if (errors.length === 0) console.log("All four vNext reviews remain required gate dependencies");
+  if (errors.length === 0) console.log("All vNext reviews remain required gate dependencies");
   process.exitCode = errors.length ? 1 : 0;
 }

@@ -501,7 +501,7 @@ test("CLI rejects the retired bare promote alias", async () => {
   );
 });
 
-test("CLI governance import requires a path and forwards only that path", async (context) => {
+test("CLI governance import forwards only a path or the reference flag", async (context) => {
   const root = await tempRoot();
   const expected = { outputHash: "a".repeat(64), summary: "Reviewed baseline imported" };
   const importer = context.mock.method(ApexService.prototype, "importGovernanceBaseline", async () => expected);
@@ -512,6 +512,11 @@ test("CLI governance import requires a path and forwards only that path", async 
   const path = "reviewed baselines/governance.json";
   assert.deepEqual(await execute(["governance", "import", "--path", path], root), expected);
   assert.deepEqual(importer.mock.calls[0]?.arguments, [path]);
+  const reference = context.mock.method(ApexService.prototype, "importGovernanceReference", async () => expected);
+  await assert.rejects(execute(["governance", "import", "--reference", "--path", path], root), /exactly one/u);
+  assert.deepEqual(await execute(["governance", "import", "--reference"], root), expected);
+  assert.equal(reference.mock.callCount(), 1);
+  assert.equal(importer.mock.callCount(), 1);
 });
 
 test("CLI governance select forwards a path without importing or inventing a choice", async (context) => {
