@@ -70,6 +70,11 @@ async function importTestGovernance(service: ApexService): Promise<string> {
   return (await service.importGovernanceBaseline(path)).outputHash;
 }
 
+function assertMcpContract(tool: keyof typeof MCP_OUTPUT_SCHEMAS, value: unknown): void {
+  const parsed = MCP_OUTPUT_SCHEMAS[tool].safeParse(value);
+  assert.ok(parsed.success, `${tool} MCP contract: ${JSON.stringify(parsed.error?.issues)}`);
+}
+
 async function task(service: ApexService, expected: string): Promise<string> {
   let next = await nextTaskAfterInput(service);
   if (expected === "architecture" && next.status === "task" && next.task.taskType === "governance-discovery") {
@@ -79,6 +84,8 @@ async function task(service: ApexService, expected: string): Promise<string> {
   assert.equal(next.status, "task");
   if (next.status !== "task") throw new Error("Expected task");
   assert.equal(next.task.taskType, expected);
+  assertMcpContract("nextTask", next);
+  assertMcpContract("taskContext", await service.taskContext(next.task.taskId));
   return next.task.taskId;
 }
 
@@ -1220,10 +1227,12 @@ for (const secure of [true, false]) {
       binding.intentHash = sha256Json(intent);
     });
     const output = await service.generateIac(generated.taskId);
+    assertMcpContract("generateIac", output);
     assert.ok(output.files.some(({ path }) => path.endsWith("bicepconfig.json")));
     const validationId = await task(service, "validation-bicep");
     const before = await service.status();
     const validated = await service.validateTask(validationId);
+    assertMcpContract("validateTask", validated);
     if (!secure) {
       assert.equal(validated.valid, false);
       assert.deepEqual(validated.execution!.blockedValidatorIds, ["business:security-baseline"]);
@@ -1820,6 +1829,7 @@ for (const track of ["bicep", "terraform"] as const) {
     const { runId } = await service.init({ projectId: "demo", riskOwner: "partner", iacTool: track });
     await reachValidation(service, runId, track);
     const preview = await service.preview({ operation: "apply", provider: "fake" });
+    assertMcpContract("preview", { markdown: await service.currentPreview() });
     const previewEvents = await new EventJournal(
       join(root, ".apex", "projects", "demo", "runs", runId, "journal"),
     ).replay();
