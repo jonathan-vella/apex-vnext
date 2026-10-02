@@ -1726,9 +1726,14 @@ test("requirements task context includes recorded input and stageable output tem
   ]);
   assert.deepEqual(template.assumptions, ["industry: retail", "target-environments: dev"]);
   assert.deepEqual(
+    template.requirements.map(({ id }) => id),
+    template.requirements.map((_, index) => `REQ-${String(index + 1).padStart(3, "0")}`),
+  );
+  assert.ok(!template.requirements.some(({ source }) => source === "intake:retained-services"));
+  assert.deepEqual(
     template.requirements.find(({ source }) => source === "intake:workload-profile"),
     {
-      id: "REQ-018",
+      id: `REQ-${String(template.requirements.length).padStart(3, "0")}`,
       statement: "Workload profile: standalone-lab",
       priority: "must",
       status: "confirmed",
@@ -1786,7 +1791,7 @@ test("requirements recommendations document GDPR planning without confirmed obli
   assert.match(template.securityAndCompliance, /no assignment, retention period or GDPR compliance is asserted/);
   assert.deepEqual(template.requirements, [
     {
-      id: "REQ-003",
+      id: "REQ-001",
       statement: "Compliance: gdpr",
       priority: "should",
       status: "confirmed",
