@@ -124,6 +124,7 @@ import {
   GovernanceBaselineError,
   nativePolicyValidationBinding,
   assertGeneratedSourceUnchanged,
+  resolveExecutable,
   type GovernanceBaselineFinding,
   type GovernanceBaselineSelection,
   type CapabilityPackInstallOptions,
@@ -181,9 +182,9 @@ import {
   type DiagramSource,
 } from "@apexops/renderers";
 import { constants } from "node:fs";
-import { access, cp, lstat, mkdir, open, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
+import { cp, lstat, mkdir, open, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
 import { userInfo } from "node:os";
-import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { readBundledFile, resolveBundledAssets, type BundledClientProjection } from "./assets.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
 import { ApexError, EXIT_CODES, governanceBaselineApexError, retiredProjectionError } from "./errors.js";
@@ -10402,16 +10403,7 @@ export class ApexService {
   }
 
   private async pathExecutableExists(executable: string): Promise<boolean> {
-    for (const directory of (process.env.PATH ?? "").split(delimiter).filter((item) => item.length > 0)) {
-      try {
-        await access(join(directory, executable), constants.X_OK);
-        return true;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT" && (error as NodeJS.ErrnoException).code !== "EACCES")
-          throw error;
-      }
-    }
-    return false;
+    return resolveExecutable(executable) !== undefined;
   }
 
   private async installCustomizations(

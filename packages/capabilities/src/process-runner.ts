@@ -1,4 +1,5 @@
 import { spawn, type SpawnOptionsWithoutStdio } from "node:child_process";
+import { planLaunch } from "./executable-resolution.js";
 import { redactStructuredSecrets } from "./secret-redaction.js";
 
 export type ProcessErrorCode =
@@ -60,15 +61,22 @@ export class ProcessRunner implements ProcessRunnerLike {
       throw new TypeError("Process arguments must be an explicit array");
     }
 
+    let launch: ReturnType<typeof planLaunch>;
+    try {
+      launch = planLaunch(request.executable, request.args, { env: request.env ?? process.env });
+    } catch (error) {
+      throw new ProcessRunnerError("PROCESS_SPAWN_ERROR", (error as Error).message);
+    }
     const options: SpawnOptionsWithoutStdio = {
       shell: false,
       windowsHide: true,
+      windowsVerbatimArguments: launch.windowsVerbatimArguments,
       ...(request.cwd === undefined ? {} : { cwd: request.cwd }),
       ...(request.env === undefined ? {} : { env: request.env }),
     };
 
     return await new Promise<ProcessResult>((resolve, reject) => {
-      const child = spawn(request.executable, [...request.args], options);
+      const child = spawn(launch.command, [...launch.args], options);
       let stdout: Buffer<ArrayBufferLike> = Buffer.alloc(0);
       let stderr: Buffer<ArrayBufferLike> = Buffer.alloc(0);
       let outputTruncated = false;

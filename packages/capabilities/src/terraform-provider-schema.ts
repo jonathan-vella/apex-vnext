@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { planLaunch } from "./executable-resolution.js";
 import { TerraformCommandAdapter, type CommandPlan } from "./command-plans.js";
 import { ProcessRunnerError, type ProcessErrorCode } from "./process-runner.js";
 
@@ -157,13 +158,16 @@ class TerraformMetadataRunner implements TerraformMetadataRunnerLike {
       throw new TypeError("Terraform metadata runner accepts only schema and version plans");
     }
 
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(([key]) => !key.toUpperCase().startsWith("TF_CLI_ARGS")),
+    );
+    const launch = planLaunch(request.plan.executable, request.plan.args, { env });
     return await new Promise<string>((resolve, reject) => {
-      const child = spawn(request.plan.executable, [...request.plan.args], {
+      const child = spawn(launch.command, [...launch.args], {
         shell: false,
         windowsHide: true,
-        env: Object.fromEntries(
-          Object.entries(process.env).filter(([key]) => !key.toUpperCase().startsWith("TF_CLI_ARGS")),
-        ),
+        windowsVerbatimArguments: launch.windowsVerbatimArguments,
+        env,
         ...(request.plan.cwd === undefined ? {} : { cwd: request.plan.cwd }),
       });
       let stdout: Buffer<ArrayBufferLike> = Buffer.alloc(0);
