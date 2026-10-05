@@ -49,15 +49,16 @@ environments are reviewed through their manifests and lockfiles rather than as s
 
 ## Contract Register
 
-| Family                                                  | Current disposition                                                     | Evidence and required tests                             |
-| ------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------- |
-| `governance-baseline-selection-v1`                      | Obsolete input; reject before mutation                                  | WP04 target-bound import tests                          |
-| `governance-baseline-selection-v2`                      | Current target-bound selection                                          | Target, scope, assignment identity, and freshness tests |
-| `governance-baseline-v1`                                | Current only for its strict current shape; suffix alone is not obsolete | Collector/importer schema and rejection tests           |
-| `policy-precheck-v2`                                    | Current strict precheck format                                          | `tools/tests/validate-policy-precheck.test.mjs`         |
-| `policy-precheck-v1` and unsupported versions           | Reject before side effects                                              | `tools/tests/validate-policy-precheck.test.mjs`         |
-| Exported contracts in `packages/contracts/src/index.ts` | Current strict contracts; metadata and generated schemas are complete   | Contract registry, metadata, producer, and reader tests |
-| Kernel journal and transaction formats                  | Preserve current crash recovery and integrity                           | Kernel journal, transaction, and fault-injection tests  |
+| Family                                                  | Current disposition                                                   | Evidence and required tests                             |
+| ------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------- |
+| `governance-baseline-selection-v1`                      | Obsolete input; reject before mutation                                | WP04 target-bound import tests                          |
+| `governance-baseline-selection-v2`                      | Current target-bound selection                                        | Target, scope, assignment identity, and freshness tests |
+| `governance-baseline-v1`                                | Obsolete input; reject before mutation (duplicated `policies`)        | Importer rejection tests                                |
+| `governance-baseline-v2`                                | Current collector output without the `policies` copy                  | Collector/importer schema and rejection tests           |
+| `policy-precheck-v2`                                    | Current strict precheck format                                        | `tools/tests/validate-policy-precheck.test.mjs`         |
+| `policy-precheck-v1` and unsupported versions           | Reject before side effects                                            | `tools/tests/validate-policy-precheck.test.mjs`         |
+| Exported contracts in `packages/contracts/src/index.ts` | Current strict contracts; metadata and generated schemas are complete | Contract registry, metadata, producer, and reader tests |
+| Kernel journal and transaction formats                  | Preserve current crash recovery and integrity                         | Kernel journal, transaction, and fault-injection tests  |
 
 ## Initial Findings
 

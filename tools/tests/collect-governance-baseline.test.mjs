@@ -60,7 +60,7 @@ function collect(context, responses, options = {}) {
         param([Parameter(ValueFromPipeline)]$InputObject, [int]$Depth, [switch]$Compress)
         process {
           if ($env:COLLECTOR_FAULT -eq "serialize" -and $Depth -eq 50 -and
-              $InputObject.schema_version -eq "governance-baseline-v1") {
+              $InputObject.schema_version -eq "governance-baseline-v2") {
             throw "offline serialization failure"
           }
           Microsoft.PowerShell.Utility\\ConvertTo-Json -InputObject $InputObject -Depth $Depth -Compress:$Compress
@@ -580,7 +580,7 @@ test(
         [policyId, "blocking-member", "blocker"],
       ],
     );
-    assert.deepEqual(envelope.policies, envelope.findings);
+    assert.equal(Object.hasOwn(envelope, "policies"), false);
     assert.equal(
       result.stdout
         .split("\n")
@@ -653,7 +653,7 @@ for (const explicit of [false, true]) {
       assert.equal(envelope.discovery_summary.disabled_count, 1);
       assert.equal(envelope.discovery_summary.other_effect_count, 1);
       assert.equal(envelope.findings.length, 2);
-      assert.deepEqual(envelope.policies, envelope.findings);
+      assert.equal(Object.hasOwn(envelope, "policies"), false);
       const initiativeTag = explicit ? "assigned-tag" : "initiative-default";
       for (const [index, reference, tagName] of [
         [0, "bound", initiativeTag],
@@ -664,9 +664,6 @@ for (const explicit of [false, true]) {
         assert.equal(finding.policyDefinitionReferenceId, reference);
         assert.equal(finding.required_value, "[parameters('tagName')]");
         assert.deepEqual(finding.assignment_parameters, {
-          initiativeTag,
-          locations: explicit ? [] : ["swedencentral"],
-          settings: { enabled: false, limit: 0 },
           effect: "Deny",
           tagName,
           enabled: false,
@@ -720,7 +717,7 @@ for (const mode of [undefined, "Default", "DoNotEnforce"]) {
             ["deployIfNotExists", "auto-remediate", mode ?? "Default"],
           ],
         );
-        assert.deepEqual(envelope.policies, envelope.findings);
+        assert.equal(Object.hasOwn(envelope, "policies"), false);
         assert.equal(envelope.discovery_summary.blocker_count, 1);
         assert.equal(envelope.discovery_summary.auto_remediate_count, 2);
         assert.equal(envelope.discovery_summary.disabled_count, 0);
@@ -1069,10 +1066,9 @@ for (const scenario of [
       assert.equal(finding.scope, managementGroupScope);
       assert.deepEqual(finding.override, scenario.overrides?.[0] ?? null);
       if (Object.hasOwn(scenario, "assigned")) {
-        assert.equal(
-          finding.assignment_parameters[scenario.initiative ? "initiativeEffect" : "effect"],
-          scenario.assigned,
-        );
+        // Initiative members keep only their own parameters, resolved from the initiative's assigned values.
+        assert.equal(finding.assignment_parameters.effect, scenario.assigned);
+        assert.equal(Object.hasOwn(finding.assignment_parameters, "initiativeEffect"), false);
       }
     }
   });

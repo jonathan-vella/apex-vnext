@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Collects Azure Policy assignments across all subscriptions under a
-    Management Group or one subscription and writes a governance-baseline-v1 JSON.
+    Management Group or one subscription and writes a governance-baseline-v2 JSON.
 
 .DESCRIPTION
     Authenticates via the workflow's azure/login@v2 context, discovers
@@ -589,7 +589,9 @@ function Process-Subscription {
                     }
                     $memberValues[$parameter.Name] = $val
                 }
-                foreach ($key in $memberValues.Keys) { $paramValues[$key] = $memberValues[$key] }
+                # A member's rule reads only its own parameters, already resolved from the initiative's values.
+                # Storing every initiative parameter on every member made baselines too large to import.
+                $paramValues = $memberValues
             }
             if ($paramValues.Count -gt 0) { $finding.assignment_parameters = $paramValues }
             if ($paths.pathSemantics) { $finding.pathSemantics = $paths.pathSemantics }
@@ -674,7 +676,6 @@ function Process-Subscription {
         }
         assignment_inventory = @($assignmentInventory)
         findings = @($findings)
-        policies = @($findings)
         tags_required = @($tagsRequired)
         allowed_locations = @($allowedLocations)
     }
@@ -772,7 +773,7 @@ foreach ($sub in $subscriptions.Values) {
 }
 
 $baseline = [ordered]@{
-    schema_version = "governance-baseline-v1"
+    schema_version = "governance-baseline-v2"
     coverage_status = $coverageStatus
     subscriptions_discovered = $allSubs.Count
     subscriptions_processed = $totalProcessed
