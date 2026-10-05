@@ -419,7 +419,7 @@ test("preserves inherited findings and reported exemptions deterministically wit
   );
 });
 
-test("target projection retains inherited and child policies only after full cache validation", () => {
+function descendantsBaseline(assignmentName = "policy") {
   const source = baseline();
   const entry = source.subscriptions[subscriptionId]!;
   Object.assign(entry.discovery_metadata.scope, {
@@ -439,7 +439,7 @@ test("target projection retains inherited and child policies only after full cac
     display_name: `Policy ${index}`,
     effect: "deny",
     scope,
-    assignment_id: `${scope}/providers/Microsoft.Authorization/policyAssignments/policy`,
+    assignment_id: `${scope}/providers/Microsoft.Authorization/policyAssignments/${assignmentName}`,
     classification: "blocker",
     resource_types: ["Microsoft.Storage/storageAccounts"],
     exemption: null,
@@ -448,7 +448,7 @@ test("target projection retains inherited and child policies only after full cac
   entry.policies = structuredClone(entry.findings);
   entry.assignment_inventory = scopes.map((scope) => ({
     scope,
-    assignmentId: `${scope}/providers/Microsoft.Authorization/policyAssignments/policy`,
+    assignmentId: `${scope}/providers/Microsoft.Authorization/policyAssignments/${assignmentName}`,
     displayName: "Policy",
     policyDefinitionId: "policy",
     assignmentType: scope === managementScope ? "management-group" : "subscription",
@@ -464,6 +464,11 @@ test("target projection retains inherited and child policies only after full cac
   });
   entry.discovery_metadata.page_counts.policyAssignments = 5;
   Object.assign(source.summary, { total_findings: 5, total_blockers: 5 });
+  return { source, entry, targetScope, scopes };
+}
+
+test("target projection retains inherited and child policies only after full cache validation", () => {
+  const { source, entry, targetScope, scopes } = descendantsBaseline();
   const selected = importGovernanceBaseline(source, { ...options, targetScope }, validate);
   assert.equal(selected.snapshot.schemaVersion, "governance-baseline-selection-v2");
   assert.equal(selected.snapshot.targetScope, targetScope.toLowerCase());
@@ -596,13 +601,51 @@ test("preserves scoped exemption provenance without granting verification", () =
 });
 
 test("rejects malformed assignment resource identities", () => {
-  for (const suffix of ["", "name/child", "name?query", "name#fragment", "white space"]) {
+  for (const suffix of [
+    "",
+    "name/child",
+    "name?query",
+    "name#fragment",
+    "name%2F",
+    " leading",
+    "trailing ",
+    "tab\tname",
+    "line\nbreak",
+    "\u0007",
+    "\u0007name",
+    "name\u0007",
+    "na\u0007me",
+  ]) {
     const source = inheritedBaseline();
     source.subscriptions[subscriptionId]!.findings[0]!.assignment_id =
       `${managementScope}/providers/Microsoft.Authorization/policyAssignments/${suffix}`;
     source.subscriptions[subscriptionId]!.policies = structuredClone(source.subscriptions[subscriptionId]!.findings);
     rejected(source, "target-mismatch");
   }
+});
+
+test("accepts assignment names with inner spaces, as Azure allows", () => {
+  const name = "(ArcBox) Tag resources-Solution";
+  const inherited = inheritedBaseline();
+  const assignmentId = `${managementScope}/providers/Microsoft.Authorization/policyAssignments/${name}`;
+  const inheritedEntry = inherited.subscriptions[subscriptionId]!;
+  const originalId = inheritedEntry.findings[0]!.assignment_id;
+  for (const item of inheritedEntry.findings) if (item.assignment_id === originalId) item.assignment_id = assignmentId;
+  inherited.subscriptions[subscriptionId]!.policies = structuredClone(
+    inherited.subscriptions[subscriptionId]!.findings,
+  );
+  assert.ok(
+    importGovernanceBaseline(inherited, options, validate).snapshot.findings.some(
+      (item) => item.assignmentId === assignmentId,
+    ),
+  );
+  const { source, targetScope } = descendantsBaseline(name);
+  const selected = importGovernanceBaseline(source, { ...options, targetScope }, validate);
+  assert.ok(
+    selected.snapshot.findings.some(
+      (item) => item.assignmentId === `${targetScope}/providers/Microsoft.Authorization/policyAssignments/${name}`,
+    ),
+  );
 });
 
 test("retains effective constraints while excluding arbitrary metadata and collector mapping guesses", () => {
