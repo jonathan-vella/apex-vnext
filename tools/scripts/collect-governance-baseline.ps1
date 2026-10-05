@@ -349,6 +349,8 @@ function Process-Subscription {
     param([string]$SubId, [string]$Token)
 
     $base = "$ARM/subscriptions/$SubId/providers/Microsoft.Authorization"
+    # Policy assignment and exemption names may contain inner spaces, for example "(ArcBox) Tag resources".
+    $POLICY_RESOURCE_NAME = '[^/?#%\s](?:[^/?#%\p{Cc}]*[^/?#%\s])?'
     $scopePattern = if ($IncludeDescendants) { "(/subscriptions/$SubId(?:/resourceGroups/[^/?#%\s]+)?(?:/providers/[^/?#%\s]+(?:/[^/?#%\s]+/[^/?#%\s]+)+)*|/providers/Microsoft.Management/managementGroups/[^/?#%\s]+)" } else { '(/subscriptions/[0-9a-f-]{36}|/providers/Microsoft.Management/managementGroups/[^/?#\s]+)' }
 
     $scopeFilter = if ($IncludeDescendants) { "" } else { '$filter=atScope()&' }
@@ -371,11 +373,11 @@ function Process-Subscription {
         if (-not $exProps -or -not $exProps.policyAssignmentId -or $exProps.exemptionCategory -notin @("Waiver", "Mitigated")) {
             throw "Invalid policy exemption"
         }
-        if ($ex.id -isnot [string] -or $ex.id -notmatch "^$scopePattern/providers/Microsoft.Authorization/policyExemptions/[^/?#%\s]+`$") {
+        if ($ex.id -isnot [string] -or $ex.id -notmatch "^$scopePattern/providers/Microsoft.Authorization/policyExemptions/$POLICY_RESOURCE_NAME`$") {
             throw "Invalid or unsupported policy exemption scope"
         }
         $exemptionScope = $Matches[1]
-        if ($exProps.policyAssignmentId -isnot [string] -or $exProps.policyAssignmentId -notmatch "^$scopePattern/providers/Microsoft.Authorization/policyAssignments/[^/?#%\s]+`$") {
+        if ($exProps.policyAssignmentId -isnot [string] -or $exProps.policyAssignmentId -notmatch "^$scopePattern/providers/Microsoft.Authorization/policyAssignments/$POLICY_RESOURCE_NAME`$") {
             throw "Invalid policy exemption assignment identity"
         }
         $assignmentScope = $Matches[1]
@@ -423,7 +425,7 @@ function Process-Subscription {
         if ($IncludeDescendants -and ($a.properties.scope -notmatch "^$scopePattern`$" -or $a.properties.scope -match '/\.{1,2}(?:/|$)')) {
             throw "Invalid policy assignment scope"
         }
-        if ($a.id -isnot [string] -or $a.id -notmatch '^(.+)/providers/Microsoft.Authorization/policyAssignments/[^/?#\s]+$' -or
+        if ($a.id -isnot [string] -or $a.id -notmatch "^(.+)/providers/Microsoft.Authorization/policyAssignments/$POLICY_RESOURCE_NAME`$" -or
             $Matches[1] -ine $a.properties.scope) {
             throw "Invalid policy assignment identity"
         }

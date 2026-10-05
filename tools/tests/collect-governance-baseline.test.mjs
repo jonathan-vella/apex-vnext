@@ -1159,6 +1159,49 @@ test(
   },
 );
 
+test(
+  "descendant collection accepts resource group assignment names with inner spaces",
+  powershellOptions,
+  (context) => {
+    const responses = routes();
+    const policyId = "/providers/Microsoft.Authorization/policyDefinitions/arcbox-tag";
+    const target = `${subscriptionScope}/resourceGroups/rg-arcbox`;
+    const assigned = assignment(policyId, target, "(ArcBox) Tag resources-Solution");
+    responses[assignmentsUrl.replace("$filter=atScope()&", "")] = { value: [assigned] };
+    responses[exemptionsUrl.replace("$filter=atScope()&", "")] = {
+      value: [
+        {
+          id: `${target}/providers/Microsoft.Authorization/policyExemptions/(ArcBox) waiver`,
+          properties: { policyAssignmentId: assigned.id, exemptionCategory: "Waiver" },
+        },
+      ],
+    };
+    responses[definitionsUrl].value = [definition(policyId)];
+    const envelope = assertComplete(
+      collect(context, responses, { root: { SubscriptionId: subscriptionId, IncludeDescendants: true } }),
+    ).subscriptions[subscriptionId];
+    assert.equal(envelope.findings.length, 1);
+    assert.equal(envelope.findings[0].assignment_id, assigned.id);
+    assert.equal(envelope.findings[0].reported_exemptions[0].scope, target);
+  },
+);
+
+for (const name of [" leading", "trailing ", "tab\tname"]) {
+  test(`descendant collection rejects assignment name ${JSON.stringify(name)}`, powershellOptions, (context) => {
+    const responses = routes();
+    const policyId = "/providers/Microsoft.Authorization/policyDefinitions/bad-name";
+    responses[assignmentsUrl.replace("$filter=atScope()&", "")] = {
+      value: [assignment(policyId, `${subscriptionScope}/resourceGroups/target`, name)],
+    };
+    responses[exemptionsUrl.replace("$filter=atScope()&", "")] = { value: [] };
+    responses[definitionsUrl].value = [definition(policyId)];
+    assertAborted(
+      collect(context, responses, { root: { SubscriptionId: subscriptionId, IncludeDescendants: true } }),
+      /Invalid policy assignment identity/,
+    );
+  });
+}
+
 for (const effect of ["Manual", "DenyAction", "Mutate"]) {
   test(`descendant collection rejects unsupported ${effect} without publication`, powershellOptions, (context) => {
     const responses = routes();
@@ -1197,7 +1240,16 @@ for (const effect of ["Audit", "AuditIfNotExists", "Disabled", "Append"]) {
   });
 }
 
-for (const suffix of ["", "name/child", "name?query", "name#fragment", "white space"]) {
+for (const suffix of [
+  "",
+  "name/child",
+  "name?query",
+  "name#fragment",
+  "name%2F",
+  " leading",
+  "trailing ",
+  "tab\tname",
+]) {
   test(`exemption rejects malformed assignment identity ${JSON.stringify(suffix)}`, powershellOptions, (context) => {
     const responses = routes();
     responses[exemptionsUrl].value = [

@@ -191,6 +191,17 @@ function scopeSegment(value: string): boolean {
   return value.length > 0 && value !== "." && value !== ".." && !/[?#%\s]/u.test(value);
 }
 
+// Policy assignment and exemption names may contain inner spaces (for example "(ArcBox) Tag resources").
+const POLICY_RESOURCE_NAME = String.raw`[^/?#%\s](?:[^/?#%\p{Cc}]*[^/?#%\s])?`;
+const POLICY_ASSIGNMENT_SUFFIX = new RegExp(
+  `^/providers/microsoft\\.authorization/policyassignments/${POLICY_RESOURCE_NAME}$`,
+  "iu",
+);
+const POLICY_EXEMPTION_SUFFIX = new RegExp(
+  `^/providers/microsoft\\.authorization/policyexemptions/${POLICY_RESOURCE_NAME}$`,
+  "iu",
+);
+
 function scope(value: unknown, subscriptionId: string): string {
   const result = text(value);
   const normalized = result.toLowerCase();
@@ -256,7 +267,7 @@ function finding(value: unknown, subscriptionId: string, descendants = false): G
       const suffix = exemptionId.slice(exemptionScope.length);
       if (
         exemptionId.slice(0, exemptionScope.length).toLowerCase() !== exemptionScope.toLowerCase() ||
-        !/^\/providers\/microsoft\.authorization\/policyexemptions\/[^/?#\s]+$/iu.test(suffix) ||
+        !POLICY_EXEMPTION_SUFFIX.test(suffix) ||
         (!(descendants && exemptionScope.toLowerCase().startsWith(`/subscriptions/${subscriptionId}/`)) &&
           exemptionScope.toLowerCase() !== `/subscriptions/${subscriptionId}` &&
           (!/^\/providers\/microsoft\.management\/managementgroups\/[^/?#\s]+$/iu.test(exemptionScope) ||
@@ -297,9 +308,7 @@ function finding(value: unknown, subscriptionId: string, descendants = false): G
   const assignmentId = text(source.assignment_id);
   if (
     assignmentId.slice(0, findingScope.length).toLowerCase() !== findingScope.toLowerCase() ||
-    !/^\/providers\/microsoft\.authorization\/policyassignments\/[^/?#\s]+$/iu.test(
-      assignmentId.slice(findingScope.length),
-    )
+    !POLICY_ASSIGNMENT_SUFFIX.test(assignmentId.slice(findingScope.length))
   )
     fail("target-mismatch");
   return {
@@ -412,9 +421,7 @@ function selectEntry(
       const assignmentScope = scope(assignment.scope, subscriptionId).toLowerCase();
       if (
         !assignmentId.startsWith(assignmentScope) ||
-        !/^\/providers\/microsoft\.authorization\/policyassignments\/[^/?#%\s]+$/u.test(
-          assignmentId.slice(assignmentScope.length),
-        )
+        !POLICY_ASSIGNMENT_SUFFIX.test(assignmentId.slice(assignmentScope.length))
       )
         fail("target-mismatch");
       return assignmentId;
