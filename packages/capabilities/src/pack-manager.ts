@@ -1,8 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { access, cp, lstat, mkdir, readFile, readdir, realpath, rename, rm, writeFile } from "node:fs/promises";
+import { access, cp, lstat, mkdir, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { ProcessRunnerLike } from "./process-runner.js";
+import { renameWithRetry } from "./rename-retry.js";
 
 const HASH = /^[0-9a-f]{64}$/;
 const EMPTY_DIGEST = createHash("sha256").update("").digest("hex");
@@ -170,13 +171,13 @@ export class CapabilityPackManager {
     let currentIsPrevious = false;
     let previousIsCurrent = false;
     try {
-      await rename(previous, staged);
+      await renameWithRetry(previous, staged);
       previousIsStaged = true;
       if (await this.#exists(target)) {
-        await rename(target, previous);
+        await renameWithRetry(target, previous);
         currentIsPrevious = true;
       }
-      await rename(staged, target);
+      await renameWithRetry(staged, target);
       previousIsStaged = false;
       previousIsCurrent = true;
       const verified = await this.verify(id);
@@ -184,14 +185,14 @@ export class CapabilityPackManager {
       return { ...verified, changed: true, lock: await this.#readLock(target) };
     } catch (error) {
       if (previousIsCurrent) {
-        await rename(target, staged);
-        if (currentIsPrevious) await rename(previous, target);
-        await rename(staged, previous);
+        await renameWithRetry(target, staged);
+        if (currentIsPrevious) await renameWithRetry(previous, target);
+        await renameWithRetry(staged, previous);
       } else if (currentIsPrevious) {
-        await rename(previous, target);
-        await rename(staged, previous);
+        await renameWithRetry(previous, target);
+        await renameWithRetry(staged, previous);
       } else if (previousIsStaged) {
-        await rename(staged, previous);
+        await renameWithRetry(staged, previous);
       }
       throw error;
     }
@@ -343,17 +344,17 @@ export class CapabilityPackManager {
       await this.#assertTreeSafe(staged);
       await mkdir(dirname(target), { recursive: true });
       await rm(previous, { recursive: true, force: true });
-      if (await this.#exists(target)) await rename(target, previous);
+      if (await this.#exists(target)) await renameWithRetry(target, previous);
       try {
-        await rename(staged, target);
+        await renameWithRetry(staged, target);
       } catch (error) {
-        if (await this.#exists(previous)) await rename(previous, target);
+        if (await this.#exists(previous)) await renameWithRetry(previous, target);
         throw error;
       }
       const verified = await this.verify(definition.id);
       if (verified.state !== "installed") {
         await rm(target, { recursive: true, force: true });
-        if (await this.#exists(previous)) await rename(previous, target);
+        if (await this.#exists(previous)) await renameWithRetry(previous, target);
         throw new Error(verified.reason ?? "installed pack verification failed");
       }
       return { ...verified, changed: true, lock: packLock };

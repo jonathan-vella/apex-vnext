@@ -1,7 +1,8 @@
-import { lstat, mkdir, open, realpath, rename, rm } from "node:fs/promises";
+import { lstat, mkdir, open, realpath, rm } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { IacBindingV1, ImplementationIntentV1, LogicalResourceManifestV1 } from "@apexops/contracts";
 import type { CommandPlan } from "./command-plans.js";
+import { renameWithRetry } from "./rename-retry.js";
 import type { ProcessResult, ProcessRunnerLike } from "./process-runner.js";
 import { sha256 } from "./iac.js";
 
@@ -809,7 +810,7 @@ export async function writeVirtualTree(
       }
     }
     for (const { destination, temporary } of staged) {
-      await rename(temporary, destination);
+      await renameWithRetry(temporary, destination);
     }
   } catch (error) {
     await Promise.all(staged.map(async ({ temporary }) => await rm(temporary, { force: true })));

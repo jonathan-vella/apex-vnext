@@ -158,6 +158,7 @@ import {
   sha256Json,
   validateInputAnswers,
   workflowValidatorOwnership,
+  renameWithRetry,
   type JsonValue,
   type ValidationIssue,
 } from "@apexops/kernel";
@@ -182,7 +183,7 @@ import {
   type DiagramSource,
 } from "@apexops/renderers";
 import { constants } from "node:fs";
-import { cp, lstat, mkdir, open, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
+import { cp, lstat, mkdir, open, readFile, readdir, realpath, rm, stat } from "node:fs/promises";
 import { userInfo } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { readBundledFile, resolveBundledAssets, type BundledClientProjection } from "./assets.js";
@@ -10132,7 +10133,7 @@ export class ApexService {
         force: false,
       });
       await atomicWriteJson(join(staging, "apex.lock.json"), lock);
-      await rename(staging, destination);
+      await renameWithRetry(staging, destination);
     }
     return destination;
   }
@@ -10548,7 +10549,7 @@ export class ApexService {
         if (entry.remove) await rm(entry.destination, { force: true });
         else {
           await mkdir(resolve(entry.destination, ".."), { recursive: true });
-          await rename(entry.staged!, entry.destination);
+          await renameWithRetry(entry.staged!, entry.destination);
         }
       }
       await rm(join(this.root, ".apex", "local", "customization-transaction.json"), { force: true });
@@ -10573,7 +10574,7 @@ export class ApexService {
       errorOnExist: true,
       force: false,
     });
-    await rename(join(destination, "registry.v1.json"), join(runtimeRoot, "capability-packs.registry.json"));
+    await renameWithRetry(join(destination, "registry.v1.json"), join(runtimeRoot, "capability-packs.registry.json"));
   }
 
   private async recoverCustomizationTransaction(): Promise<void> {
