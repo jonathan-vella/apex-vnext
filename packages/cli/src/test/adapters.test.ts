@@ -462,8 +462,9 @@ test("CLI requirements amendment adapters preserve base-bound inputs and require
 });
 
 test("CLI Node minimum compares complete stable versions", () => {
-  assert.equal(meetsMinimumVersion("26.8.9", MINIMUM_NODE_VERSION), false);
-  assert.equal(meetsMinimumVersion("26.9.0", MINIMUM_NODE_VERSION), true);
+  assert.equal(meetsMinimumVersion("22.22.2", MINIMUM_NODE_VERSION), false);
+  assert.equal(meetsMinimumVersion("24.20.9", MINIMUM_NODE_VERSION), false);
+  assert.equal(meetsMinimumVersion("24.21.0", MINIMUM_NODE_VERSION), true);
   assert.equal(meetsMinimumVersion("26.10.0", MINIMUM_NODE_VERSION), true);
   assert.equal(meetsMinimumVersion("27.0.0", MINIMUM_NODE_VERSION), true);
   assert.equal(meetsMinimumVersion("invalid", MINIMUM_NODE_VERSION), false);
