@@ -185,7 +185,7 @@ import { userInfo } from "node:os";
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { readBundledFile, resolveBundledAssets, type BundledClientProjection } from "./assets.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
-import { ApexError, EXIT_CODES, retiredProjectionError } from "./errors.js";
+import { ApexError, EXIT_CODES, governanceBaselineApexError, retiredProjectionError } from "./errors.js";
 import { APEX_VERSION, meetsMinimumVersion, MINIMUM_NODE_VERSION } from "./version.js";
 import {
   registerWorkflowValidators,
@@ -3137,6 +3137,19 @@ export class ApexService {
     );
   }
 
+  private async inspectBaseline(
+    run: RunConfigV1,
+    bytes: Buffer,
+  ): Promise<ReturnType<typeof inspectGovernanceBaseline>> {
+    const validate = await this.governanceBaselineValidator();
+    try {
+      return inspectGovernanceBaseline(bytes, this.governanceBaselineOptions(run), validate);
+    } catch (error) {
+      if (error instanceof GovernanceBaselineError) throw governanceBaselineApexError(error);
+      throw error;
+    }
+  }
+
   private async assertGovernanceCandidate(
     run: RunConfigV1,
     request: InputRequestV1,
@@ -3146,11 +3159,7 @@ export class ApexService {
     this.assertGovernanceInputBinding(run, request, mode === "answer");
     const candidate = request.governance!;
     const raw = bytes ?? (await this.readGovernanceBaselineBytes(candidate.candidatePath));
-    const inspected = inspectGovernanceBaseline(
-      raw,
-      this.governanceBaselineOptions(run),
-      await this.governanceBaselineValidator(),
-    );
+    const inspected = await this.inspectBaseline(run, raw);
     if (mode === "refresh") {
       if (
         sha256Bytes(raw) === candidate.candidateHash ||
@@ -3172,11 +3181,7 @@ export class ApexService {
   async inspectGovernanceBaselineReadiness(path: string) {
     const run = await this.run(await this.selection(), { readOnly: true });
     const bytes = await this.readGovernanceBaselineBytes(path);
-    const inspected = inspectGovernanceBaseline(
-      bytes,
-      this.governanceBaselineOptions(run),
-      await this.governanceBaselineValidator(),
-    );
+    const inspected = await this.inspectBaseline(run, bytes);
     return {
       status: inspected.refreshRequired ? "blocked" : "ready",
       candidateHash: sha256Bytes(bytes),
@@ -3225,11 +3230,7 @@ export class ApexService {
     }
     const bytes = await this.readGovernanceBaselineBytes(path);
     const candidatePath = relative(this.root, resolve(this.root, path)).split(sep).join("/");
-    const inspected = inspectGovernanceBaseline(
-      bytes,
-      this.governanceBaselineOptions(run),
-      await this.governanceBaselineValidator(),
-    );
+    const inspected = await this.inspectBaseline(run, bytes);
     const candidateHash = sha256Bytes(bytes);
     const state = await this.governanceInputState(run, events);
     if (options.reopen === true && (state === undefined || state.choice !== "refresh" || state.fulfilled))
@@ -3410,12 +3411,8 @@ export class ApexService {
         await this.governanceBaselineValidator(),
       );
     } catch (error) {
-      if (!(error instanceof GovernanceBaselineError)) throw error;
-      throw new ApexError(
-        error.code === "stale" ? "APEX_STALE" : "APEX_VALIDATION",
-        error.message,
-        error.code === "stale" ? EXIT_CODES.stale : EXIT_CODES.validation,
-      );
+      if (error instanceof GovernanceBaselineError) throw governanceBaselineApexError(error);
+      throw error;
     }
     if (selection.snapshot.contentHash === snapshot.contentHash)
       throw new ApexError(
@@ -3530,12 +3527,8 @@ export class ApexService {
     try {
       selection = importGovernanceBaseline(bytes, options, validate);
     } catch (error) {
-      if (!(error instanceof GovernanceBaselineError)) throw error;
-      throw new ApexError(
-        error.code === "stale" ? "APEX_STALE" : "APEX_VALIDATION",
-        error.message,
-        error.code === "stale" ? EXIT_CODES.stale : EXIT_CODES.validation,
-      );
+      if (error instanceof GovernanceBaselineError) throw governanceBaselineApexError(error);
+      throw error;
     }
     const selectedSnapshot = { ...selection.snapshot, projectId: run.projectId, runId: run.runId };
     const selectionMetadata =
@@ -3729,8 +3722,8 @@ export class ApexService {
         now: this.clock().toISOString(),
       });
     } catch (error) {
-      if (!(error instanceof GovernanceBaselineError)) throw error;
-      throw new ApexError("APEX_VALIDATION", error.message, EXIT_CODES.validation);
+      if (error instanceof GovernanceBaselineError) throw governanceBaselineApexError(error, "reference");
+      throw error;
     }
     const digest = await this.objects.putJson({ ...selection.snapshot, projectId: run.projectId, runId: run.runId });
     const constraints = {

@@ -1,3 +1,5 @@
+import { GovernanceBaselineError } from "@apexops/capabilities";
+
 export const EXIT_CODES = {
   success: 0,
   usage: 2,
@@ -33,6 +35,7 @@ export class ApexError extends Error {
 
 export function normalizeError(error: unknown): ApexError {
   if (error instanceof ApexError) return error;
+  if (error instanceof GovernanceBaselineError) return governanceBaselineApexError(error);
   if (error instanceof Error && /expired|stale/i.test(error.message)) {
     return new ApexError("APEX_STALE", error.message, EXIT_CODES.stale, undefined, { cause: error });
   }
@@ -44,6 +47,35 @@ export function normalizeError(error: unknown): ApexError {
     error instanceof Error ? error.message : String(error),
     EXIT_CODES.internal,
     undefined,
+    { cause: error },
+  );
+}
+
+const GOVERNANCE_BASELINE_HINTS: Record<GovernanceBaselineError["code"], string> = {
+  incomplete:
+    "the baseline does not fully cover the target scope; recollect it with tools/scripts/collect-governance-baseline.ps1 -IncludeDescendants and confirm coverage_status is COMPLETE",
+  "target-mismatch":
+    "the baseline scope does not match the project target scope; collect it for the target subscription or its management group",
+  stale: "the baseline is too old; collect a fresh baseline",
+  "invalid-input":
+    "the file does not match the governance baseline schema; recollect it with tools/scripts/collect-governance-baseline.ps1",
+  "invalid-options": "the project target scope cannot be checked against a baseline; check the project target scope",
+};
+
+export function governanceBaselineApexError(
+  error: GovernanceBaselineError,
+  source: "baseline" | "reference" = "baseline",
+): ApexError {
+  const stale = error.code === "stale";
+  const hint =
+    source === "reference"
+      ? "the bundled governance reference is unusable; run apex doctor --fix --yes or update APEX"
+      : GOVERNANCE_BASELINE_HINTS[error.code];
+  return new ApexError(
+    stale ? "APEX_STALE" : "APEX_VALIDATION",
+    `${error.message}: ${hint}`,
+    stale ? EXIT_CODES.stale : EXIT_CODES.validation,
+    { reason: `GOVERNANCE_${source.toUpperCase()}_${error.code.toUpperCase().replaceAll("-", "_")}` },
     { cause: error },
   );
 }
