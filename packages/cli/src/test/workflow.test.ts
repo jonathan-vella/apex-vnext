@@ -1418,6 +1418,24 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
         return true;
       },
     );
+    await assert.rejects(
+      service.completeArchitecture(
+        issued.task.taskId,
+        null as unknown as typeof architectureValue,
+        [] as unknown as typeof partialCost,
+        manifest,
+        {} as unknown as typeof mappings,
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof ApexError && error.code === "APEX_VALIDATION");
+        assert.deepEqual(error.details, [
+          { path: "/architecture", message: "Expected object" },
+          { path: "/costEstimate", message: "Expected object" },
+          { path: "/policyMappings", message: "Expected array" },
+        ]);
+        return true;
+      },
+    );
     const misplaced = structuredClone(manifest);
     misplaced.skuDecisions[0]!.service = "wrong-service";
     misplaced.skuDecisions[0]!.requirementIds = [...misplaced.skuDecisions[0]!.requirementIds, "REQ-UNKNOWN"];

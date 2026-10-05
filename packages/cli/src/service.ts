@@ -4448,6 +4448,14 @@ export class ApexService {
     if (requirementsHash === undefined)
       throw new ApexError("APEX_STALE", "Accepted Requirements are unavailable", EXIT_CODES.stale);
     const requirements = await this.objects.getJson<RequirementsV1>(requirementsHash);
+    const plainObject = (value: unknown) => value !== null && typeof value === "object" && !Array.isArray(value);
+    const rootIssues: ValidationIssue[] = [
+      ...(plainObject(architecture) ? [] : [{ path: "/architecture", message: "Expected object" }]),
+      ...(plainObject(costEstimate) ? [] : [{ path: "/costEstimate", message: "Expected object" }]),
+      ...(plainObject(decisionManifest) ? [] : [{ path: "/decisionManifest", message: "Expected object" }]),
+      ...(Array.isArray(policyMappings) ? [] : [{ path: "/policyMappings", message: "Expected array" }]),
+    ];
+    if (rootIssues.length > 0) throw architectureSubmissionError(rootIssues);
     const boundArchitecture = {
       ...architecture,
       projectId: run.projectId,
