@@ -1,6 +1,6 @@
 # APEX vNext Checkpoint
 
-- **Updated:** 2026-09-23
+- **Updated:** 2026-10-05
 - **Repository:** `jonathan-vella/apex-vnext`
 - **Integration branch:** `main`
 - **Product status:** Pre-release
@@ -9,8 +9,9 @@
 ## Current State
 
 The approved direction is a COE workload factory with independent archetype reuse and conversational changes.
-Both ALZ-backed workloads and standalone single-subscription labs/demos are day-one requirements. Windows users run
-through WSL2. Neither client requires a devcontainer. Desktop-app work is parked.
+Both ALZ-backed workloads and standalone single-subscription labs/demos are day-one requirements. Under DECISION-033
+the supported clients become the VS Code Copilot harness and the GitHub Copilot app on native Windows and Copilot CLI
+on Linux and WSL2, delivered as an Agent Plugin; the current package still uses WSL2 and the CLI projection.
 [PRD.md](PRD.md) is the canonical scope and quality reference.
 
 The standalone vNext repository owns a deterministic TypeScript runtime, versioned contracts, bounded capabilities,
@@ -24,6 +25,12 @@ around vNext source authorities and Diátaxis navigation.
 
 ## Active Completion Focus
 
+On 2026-10-05 the maintainer started the [client pivot](ROADMAP.md#client-pivot) under DECISION-031 (captured
+rubber-duck reviews), DECISION-032 (one APEX agent) and DECISION-033 (native Windows clients, Agent Plugin plus
+`apex init` onboarding, session-selected models, worktrees). Slice 11 ran against a real subscription on 2026-10-02 and
+stopped at Gate 2; its fixes merged in #356 to #366
+([results](CLIENT-QUALIFICATION.md#slice-11-re-run-on-a-subscription)). The CLI-only projection plan below is closed.
+
 On 2026-09-23 the maintainer selected a single Copilot CLI projection. Supported clients become standalone Copilot CLI
 and the VS Code Copilot harness, which runs CLI-format agents. The VS Code Local projection retires through
 DECISION-015 gates with an archive under `.archive/vscode-projection/`. An `apex-next` skill replaces handoffs, advisory
@@ -35,9 +42,9 @@ target and four defects were fixed ([results](CLIENT-QUALIFICATION.md#slice-11-s
 standalone run with maintainer gate approvals and VS Code harness qualification remain before RISK-014 and RISK-015
 close; [issue #348](https://github.com/jonathan-vella/apex-vnext/issues/348) tracks them.
 
-The maintainer parked all standalone desktop-app work on 2026-09-21. Preserve desktop probes, Windows fixes and
-upstream findings without additional app tests, adapter implementation, native Windows CI or host setup. The
-[desktop backlog](ROADMAP.md#deferred-standalone-copilot-desktop-app) owns reactivation.
+The maintainer parked all standalone desktop-app work on 2026-09-21; DECISION-033 makes the app a supported client
+again. The [superseded desktop plan](ROADMAP.md#superseded-standalone-copilot-desktop-plan) explains what carries
+forward.
 
 PR #345 merged as `afca69ee4318052550d4993145e896329827a5fd`; its post-merge CI and release qualification passed.
 Candidate `67fefa2` has bounded user-confirmed VS Code/CLI intake and restart observations, not full workflow parity.

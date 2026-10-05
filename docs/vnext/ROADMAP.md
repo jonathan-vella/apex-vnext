@@ -6,34 +6,36 @@ Preserve working safety mechanisms; do not rebuild the runtime or create a gener
 
 ## Delivery Order
 
-| Phase | Outcome                                      | Primary acceptance                                                        |
-| ----- | -------------------------------------------- | ------------------------------------------------------------------------- |
-| 1     | Correct and compact task inputs and guidance | First optimization batch passes; controls stay aligned and enforced       |
-| 2     | Complete governance baseline import          | Subscription policy reaches review, Gate 2, planning and code validation  |
-| 3     | Support both profiles and COE adaptation     | Independent import and conversational changes reuse accepted decisions    |
-| 4     | Complete design and operational output       | Useful, consistent documents and handoff match the quality reference      |
-| 5     | Close WSL2 and CLI-projection workflow gaps  | Standalone CLI and VS Code Copilot harness complete the lifecycle on WSL2 |
-| 6     | Finalize distribution and APEX MCP delivery  | Easy install/update/upgrade/rollback with compatible runtime versions     |
-| 7     | Qualify and release the final candidate      | Current evidence and explicit release authority                           |
+| Phase | Outcome                                      | Primary acceptance                                                       |
+| ----- | -------------------------------------------- | ------------------------------------------------------------------------ |
+| 1     | Correct and compact task inputs and guidance | First optimization batch passes; controls stay aligned and enforced      |
+| 2     | Complete governance baseline import          | Subscription policy reaches review, Gate 2, planning and code validation |
+| 3     | Support both profiles and COE adaptation     | Independent import and conversational changes reuse accepted decisions   |
+| 4     | Complete design and operational output       | Useful, consistent documents and handoff match the quality reference     |
+| 5     | Complete the three supported clients         | VS Code and the app on Windows and the CLI on Linux/WSL2 finish the flow |
+| 6     | Deliver APEX as an Agent Plugin              | Plugin install/update/rollback with the bundled runtime in every client  |
+| 7     | Qualify and release the final candidate      | Current evidence and explicit release authority                          |
 
 ## Current Completion Order
 
-As of 2026-09-23, focus on the single Copilot CLI projection selected by
-[DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection), used by standalone Copilot CLI and the VS Code
-Copilot harness on WSL2. Desktop-app support remains deferred below and is not a prerequisite for this release.
+As of 2026-10-05, follow the [client pivot](#client-pivot) under
+[DECISION-031](DECISIONS.md#decision-031-replace-the-apex-reviewer-with-captured-rubber-duck-reviews),
+[DECISION-032](DECISIONS.md#decision-032-use-one-interactive-apex-agent) and
+[DECISION-033](DECISIONS.md#decision-033-support-native-windows-clients-and-deliver-apex-as-an-agent-plugin):
+VS Code (Copilot harness) and the GitHub Copilot app on native Windows, Copilot CLI on Linux and WSL2, one APEX agent,
+and an Agent Plugin plus `apex init` onboarding. The slice 11 fixes are merged (#356 to #366).
 
-1. Deliver the [CLI-only projection](#cli-only-projection) on `feat/cli-projection`. CLI CodeGen, Reviewer and Validator
-   already ship under revised ADR-0006; keep their evidence as history and requalify them on the new candidate.
-   Task, evidence, ownership and approval checks stay authoritative; direct selection is not a security blocker.
+1. Deliver the client pivot workstreams in the order of the [backlog](#client-pivot-backlog). Task, evidence,
+   ownership and approval checks stay authoritative.
 2. Finish acceptance for issue #344. Offline coverage now includes Bicep source-policy evidence, Terraform saved-plan
    evidence, nonempty imports, identity/isolation rejection and bounded module-child bindings. Confirm the same
    candidate in supported clients; actual AVM-version/workload and cloud evidence require separate qualification.
    Unresolved ARM expressions remain unsupported rather than being treated as compliant.
 3. Reconcile and finish COE/profile/change and artifact-output requirements; reuse implemented controls. Include the
    first-time install/bootstrap acceptance agreed on 2026-09-22 under `REQ-ONBOARDING-001`.
-4. Qualify complete workflows and lifecycle in standalone CLI and the VS Code Copilot harness on the same candidate,
-   then finalize distribution and separately authorized cloud/release evidence. Preserve all review, freshness,
-   ownership and human approval gates.
+4. Qualify complete workflows and the plugin lifecycle in all three clients on the same candidate, then obtain
+   separately authorized cloud and release evidence. Preserve all review, freshness, ownership and human approval
+   gates.
 
 Use narrow regression-first slices and integration checks at checkpoints. No new optimization campaign, broad rewrite
 or optional feature expansion is needed to follow this order.
@@ -58,14 +60,13 @@ See [current checkpoint](PROJECT.md#development-diagnostics-checkpoint) and
 
 Owner: managed customization, CLI lifecycle and client experience maintainers. Decision:
 [DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection). Acceptance:
-[REQ-CUSTOMIZATION-001](PRD.md#req-customization-001-managed-copilot-experiences) and the planned
-[CLI-only scenarios](CLIENT-QUALIFICATION.md#planned-cli-only-scenarios). Branch: `feat/cli-projection`, PR #350;
-the plan and slice 1 merged in #347. Tracking: [issue #348](https://github.com/jonathan-vella/apex-vnext/issues/348).
-Status: slices 1 to 10 are done. `apex init` installs only the CLI projection, managed agent sources use CLI
-frontmatter, the coordinator routes through `apex-next`, and VS Code Local is archived under `.archive/vscode-projection/`.
-`npm run qualify:vnext` passed at `e645d92` on 2026-09-23. Slice 11 is partial: a standalone attempt reached Gate 2
-and fixed four defects ([results](CLIENT-QUALIFICATION.md#slice-11-standalone-attempt)). A clean full run needs the
-maintainer for gate approvals, and the VS Code harness stays blocked on WSL. Slice 12 closed out on 2026-09-23.
+[REQ-CUSTOMIZATION-001](PRD.md#req-customization-001-managed-copilot-experiences) and the planned [CLI-only
+scenarios](CLIENT-QUALIFICATION.md#planned-cli-only-scenarios). Branch: `feat/cli-projection`, PR #350; the plan and
+slice 1 merged in #347. Tracking: [issue #348](https://github.com/jonathan-vella/apex-vnext/issues/348). Status: closed
+on 2026-10-05. Slices 1 to 10 and 12 are done; slice 11 ran on 2026-10-02 against a real subscription and stopped at
+Gate 2 ([results](CLIENT-QUALIFICATION.md#slice-11-re-run-on-a-subscription)). Its fixes merged
+in #356 to #366. The [client pivot](#client-pivot) replaces the remaining plan: the VS Code harness now targets native
+Windows instead of WSL, and CLIENT-021 and CLIENT-025 retire with agent switching and model pins.
 
 Managed agents target Copilot CLI only. Users may still run them in VS Code through its Copilot harness, which must
 pass the same qualification. Builder-only VS Code tooling for this repository stays.
@@ -118,6 +119,56 @@ slice 8 follows them.
 
 General-purpose delegation, `/fleet`, `/delegate`, `/pr automerge` and plan mode are out of scope; see
 [excluded CLI helpers](#excluded-cli-helpers).
+
+## Client Pivot
+
+Owner: client experience, CLI lifecycle and managed customization maintainers. Decisions:
+[DECISION-031](DECISIONS.md#decision-031-replace-the-apex-reviewer-with-captured-rubber-duck-reviews),
+[DECISION-032](DECISIONS.md#decision-032-use-one-interactive-apex-agent) and
+[DECISION-033](DECISIONS.md#decision-033-support-native-windows-clients-and-deliver-apex-as-an-agent-plugin). Tracking:
+[epic #387](https://github.com/jonathan-vella/apex-vnext/issues/387). The separate apex-jon modernization already proved
+the client mechanics in a spike (8 of 8 checks in all three clients); vNext ports its helpers into the TypeScript
+packages with tests rather than copying files. No separate Windows probe runs; everything is proven in final
+qualification.
+
+### Client Pivot Traceability
+
+| Decision                           | Requirement                                 | Backlog                      | Qualification                                                |
+| ---------------------------------- | ------------------------------------------- | ---------------------------- | ------------------------------------------------------------ |
+| DECISION-031 rubber-duck review    | `REQ-CUSTOMIZATION-001`                     | CP-16                        | CLIENT-033                                                   |
+| DECISION-032 one APEX agent        | `REQ-CUSTOMIZATION-001`, `REQ-WORKFLOW-001` | CP-13, CP-14, CP-15          | CLIENT-031, CLIENT-032, CLIENT-037                           |
+| DECISION-033 hosts and sandbox     | `REQ-HOST-001`, `REQ-COPILOT-APP-001`       | CP-01 to CP-04, CP-12, CP-20 | CLIENT-012, CLIENT-035                                       |
+| DECISION-033 plugin and onboarding | `REQ-DIST-001`, `REQ-ONBOARDING-001`        | CP-05 to CP-11, CP-19        | CLIENT-009, CLIENT-011, CLIENT-020, CLIENT-028 to CLIENT-030 |
+| DECISION-033 models and worktrees  | `REQ-CUSTOMIZATION-001`, `REQ-STATE-001`    | CP-05, CP-10, CP-14          | CLIENT-034, CLIENT-036, CLIENT-037                           |
+| Governance and content follow-ups  | `REQ-GOV-001`, `REQ-GUIDANCE-001`           | CP-17, CP-18                 | CLIENT-018                                                   |
+
+### Client Pivot Backlog
+
+| ID                                                               | Workstream      | Item                                                                                                                                                                                                                 | Done when                                                                                         |
+| ---------------------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| [CP-01](https://github.com/jonathan-vella/apex-vnext/issues/367) | Windows runtime | Resolve executables with `PATHEXT` and run `.cmd` shims safely                                                                                                                                                       | `az`, `npm` and `npx` launch and `doctor` finds tools on native Windows                           |
+| [CP-02](https://github.com/jonathan-vella/apex-vnext/issues/368) | Windows runtime | Retry atomic renames on `EPERM`, `EACCES` and `EBUSY`                                                                                                                                                                | Kernel and CLI writes survive transient Windows sharing violations                                |
+| [CP-03](https://github.com/jonathan-vella/apex-vnext/issues/369) | Windows runtime | Run kernel, capabilities and CLI tests on a Windows runner                                                                                                                                                           | A `windows-2025` CI job is required and green                                                     |
+| [CP-04](https://github.com/jonathan-vella/apex-vnext/issues/370) | Windows runtime | Lower the Node minimum to 24 LTS                                                                                                                                                                                     | Engines, toolchain and doctor agree on Node 24                                                    |
+| [CP-05](https://github.com/jonathan-vella/apex-vnext/issues/371) | Plugin          | Explicit workspace path on every MCP tool; shared `.apex/` via the git common directory                                                                                                                              | Worktree sessions share one run state; a second writer is rejected                                |
+| [CP-06](https://github.com/jonathan-vella/apex-vnext/issues/372) | Plugin          | Agent Plugins 1.0 package build with a bundled MCP runtime and assets                                                                                                                                                | Deterministic build; `node ${PLUGIN_ROOT}/...` starts APEX MCP offline                            |
+| [CP-07](https://github.com/jonathan-vella/apex-vnext/issues/373) | Plugin          | Separate vNext marketplace repository and a dry-run-first publish script                                                                                                                                             | A release publishes pinned to a commit SHA with a matching changelog                              |
+| [CP-08](https://github.com/jonathan-vella/apex-vnext/issues/374) | Plugin          | CI smoke test that installs the packed plugin with Copilot CLI                                                                                                                                                       | The installed MCP server starts with only `PLUGIN_ROOT` set                                       |
+| [CP-09](https://github.com/jonathan-vella/apex-vnext/issues/375) | Plugin          | MCP server instructions, remediation field and a result size cap with cursors                                                                                                                                        | Agents get remediation text; large results page instead of failing                                |
+| [CP-10](https://github.com/jonathan-vella/apex-vnext/issues/376) | Plugin          | Repeat-safe state-changing MCP tools                                                                                                                                                                                 | A duplicated call has no extra effect, with a test per tool                                       |
+| [CP-11](https://github.com/jonathan-vella/apex-vnext/issues/377) | Onboarding      | Thin `apex init` projection with plugin settings; retire copied agents and skills                                                                                                                                    | `.github/copilot/settings.json` installs the plugin; DECISION-015 gates pass                      |
+| [CP-12](https://github.com/jonathan-vella/apex-vnext/issues/378) | Onboarding      | `apex-install` and setup/doctor per host (Windows 11; Linux or WSL2)                                                                                                                                                 | A clean host reaches a ready state without WSL on Windows                                         |
+| [CP-13](https://github.com/jonathan-vella/apex-vnext/issues/379) | Agents          | Merge coordinator, Requirements, Architect, Planner and Operator into one APEX agent                                                                                                                                 | One agent runs every stage; R1 to R3 routing fixes included                                       |
+| [CP-14](https://github.com/jonathan-vella/apex-vnext/issues/380) | Agents          | Remove model pins; validate tool names, `ask_user` arguments and self-contained worker prompts                                                                                                                       | Validators enforce the agent rules in `REQ-CUSTOMIZATION-001`                                     |
+| [CP-15](https://github.com/jonathan-vella/apex-vnext/issues/381) | Agents          | Managed hooks with bash and PowerShell commands; deny the APEX agent as a `task` target                                                                                                                              | Hook tests pass on Linux and Windows                                                              |
+| [CP-16](https://github.com/jonathan-vella/apex-vnext/issues/382) | Review          | Rubber-duck capture bound in the kernel journal; deny APEX mutations during rubber-duck calls; retire the APEX Reviewer                                                                                              | Findings come only from captured output; tampering and reviewer mutations fail closed             |
+| [CP-17](https://github.com/jonathan-vella/apex-vnext/issues/383) | Governance      | Shrink the governance baseline format                                                                                                                                                                                | A management-group baseline with descendants fits the 20 MB import limit                          |
+| [CP-18](https://github.com/jonathan-vella/apex-vnext/issues/384) | Content         | Re-port the current `jonathan-vella/apex` Azure skills into the shipped `apex-azure-*` skills, keeping vNext kernel rules; record source commits in an upstream-pins ledger; delete the stale repository-root copies | Shipped skills carry the improved guidance and their lineage; no stale copies remain              |
+| [CP-19](https://github.com/jonathan-vella/apex-vnext/issues/385) | Docs            | Install, update and reset docs per host                                                                                                                                                                              | One channel per machine, Agent Host restart, Windows update lock and sandbox steps are documented |
+| [CP-20](https://github.com/jonathan-vella/apex-vnext/issues/386) | Qualification   | Three-client qualification, including sandbox, Azure sign-in, bubblewrap on WSL2 and app worktrees                                                                                                                   | CLIENT-001 to CLIENT-037 pass in their applicable clients                                         |
+
+Order: CP-01 to CP-04 and CP-17 and CP-18 can start now. CP-05 precedes CP-06 to CP-11. CP-13 and CP-14 precede
+CP-15 and CP-16. CP-19 and CP-20 come last.
 
 ## Phase 1: Align Without Rebuilding
 
@@ -270,20 +321,21 @@ both-track policy/ownership qualification are still required; packaging tests do
 - Apply R-10 pricing-row reuse with exact evidence matching. Assess R-05 reference-only assets against their actual
   consumers and planned output needs; preserve domain-specific checklists and prove replacements before retirement.
 
-## Phase 5: Complete Both WSL2 Client Experiences
+## Phase 5: Complete The Three Supported Clients
 
-**Requirements:** `REQ-HOST-001`, `REQ-CUSTOMIZATION-001`, `REQ-GUIDANCE-001`, `REQ-WORKFLOW-001`.
+**Requirements:** `REQ-HOST-001`, `REQ-COPILOT-APP-001`, `REQ-CUSTOMIZATION-001`, `REQ-GUIDANCE-001`,
+`REQ-WORKFLOW-001`.
 
 - Run basic client checks during earlier slices; use this phase to close end-to-end gaps, not first discover them.
-- Scope this phase to standalone Copilot CLI and the VS Code Copilot harness, both using the single CLI projection.
-  Do not add a desktop projection, native Windows lane or desktop test prerequisite. Qualify standalone CLI worker
-  behavior independently of the parked desktop probes.
+- Scope this phase to the VS Code Copilot harness and the GitHub Copilot app on native Windows and Copilot CLI on Linux
+  and WSL2, all running the APEX plugin and one APEX agent.
 - Prove greenfield, COE import, changes, review, generation, validation and resume in both profiles.
 - Preserve kernel authority and existing worker grants while qualifying required outcomes; profile visibility is not
   an authentication or security gate.
 - Address R-22's outcome-parity goal without assuming a terminal invocation authenticates a worker's caller. Do not add
   a review command, broaden worker visibility or delegate generic tasks without proving the authority boundary.
-- Validate WSL2 setup/doctor, least-privilege prerequisites and the selected IaC tool without Docker or source checkout.
+- Validate setup/doctor on each host, least-privilege prerequisites and the selected IaC tool without Docker or a
+  source checkout.
 - Use compact inputs, scoped skills and deterministic filtering throughout; no current token benchmark is required.
 
 ### First-Time Setup Delivery
@@ -292,9 +344,10 @@ Owner: CLI lifecycle and managed customization maintainers. Acceptance: `REQ-ONB
 These are planned additions, not capabilities established by existing bootstrap or clean-install tests.
 
 1. Record a bounded install/setup plan with readiness, conflicts and approval boundaries; reuse setup/doctor and the
-   canonical toolchain. Deliver `apex-install` from ready WSL2 Ubuntu without requiring Node/APEX first, covering the
-   CLI projection, both supported clients and both IaC tracks. Verify installations and preserve compatible tools.
-2. Extend repository bootstrap to resumable new/existing/cloned-repo setup that installs the single CLI projection.
+   canonical toolchain. Deliver `apex-install` on each supported host without requiring Node/APEX first, covering the
+   plugin, the three supported clients and both IaC tracks. Verify installations and preserve compatible tools.
+2. Extend repository bootstrap to resumable new/existing/cloned-repo setup that writes the thin projection and plugin
+   settings.
    Retain one managed ownership/update path, conflict preservation and explicit partial outcomes.
 3. Add remote-only COE selection during setup, independent multi-archetype copies and confirmed defaults/decision
    adoption. Reuse bounded import validation and provenance; never execute imported instructions or copy approvals.
@@ -302,20 +355,22 @@ These are planned additions, not capabilities established by existing bootstrap 
    dedicated creation. Keep Azure read roles separate from deployment authority; preserve administrator handoffs.
 5. Verify repository/client health and create the first collection review PR, or verify/import an existing central
    reviewed baseline. Preserve human review and report governance pending where appropriate.
-6. Qualify reruns, interruption, missing permissions, conflicts, standalone CLI and the VS Code Copilot harness in one
-   workspace, and secret-safe authentication.
+6. Qualify reruns, interruption, missing permissions, conflicts, each supported client on its host, and secret-safe
+   authentication.
    Live identity, federation, role and repository changes require separate explicit authorization during qualification.
 
-## Phase 6: Distribution Last
+## Phase 6: Deliver APEX As An Agent Plugin
 
-**Requirements:** `REQ-DIST-001`, `REQ-HOST-001`, `REQ-SECURITY-001`, `REQ-DETERMINISM-001`.
+**Requirements:** `REQ-DIST-001`, `REQ-ONBOARDING-001`, `REQ-HOST-001`, `REQ-SECURITY-001`, `REQ-DETERMINISM-001`.
 
-- Keep npm functional until this phase. Evaluate Agent Plugins and APEX MCP redistribution after features work.
-- Compare npm-only, plugin plus npm runtime and bundled runtime using existing builds and canonical customizations.
-- Prove workspace selection, authentication, prerequisites, version compatibility, upgrades, rollback, uninstall and
-  active-run preservation in both clients. Avoid duplicate discovery and competing file owners/updaters.
-- Record the decision before changing distribution authority. Do not create a hosted control plane or custom installer
-  framework merely to package the runtime. Requalify changed delivery boundaries.
+- Build one Agent Plugins 1.0 package with the bundled `@apexops/cli` runtime and publish it from the separate vNext
+  marketplace repository, pinned to a commit SHA. Keep `@apexops/cli` on npm at the same exact version.
+- Install through one channel, the Copilot CLI store, which VS Code reads. `apex init` writes the thin projection and
+  plugin settings.
+- Prove workspace selection, prerequisites, version compatibility, updates, rollback, uninstall and active-run
+  preservation in all three clients. Avoid duplicate discovery and competing file owners or updaters.
+- Retire the copied agents and skills through the DECISION-015 gates. Do not create a hosted control plane or custom
+  installer framework. Requalify changed delivery boundaries.
 
 ## Phase 7: Final Qualification And Release
 
@@ -331,35 +386,23 @@ These are planned additions, not capabilities established by existing bootstrap 
 
 ## Later Work And Non-Goals
 
-### Deferred: Standalone Copilot Desktop App
+### Superseded: Standalone Copilot Desktop Plan
 
-Owner: client experience maintainers. Parked by explicit maintainer direction on 2026-09-21, superseding the earlier
-mandatory-third-client scope. `REQ-COPILOT-APP-001` is retained but is not an active release acceptance requirement.
-Resume only after standalone CLI and VS Code Copilot harness required workflows are confirmed and the maintainer
-explicitly selects it.
-
-The [parked desktop implementation plan](COPILOT-DESKTOP-PLAN.md) retains the historical phases, proof requirements
-and implementation references. It is supporting design history, not a current release control or execution instruction.
-
-Preserve the native Windows fixtures, immutable probe receipts, input/confirmation observations and child-worktree
-binding results. The app's model selection was manual; the worker probe did not establish declared-parent enforcement.
-Track upstream [model selection #4097](https://github.com/github/app/issues/4097) and
-[parent-specific delegation #4098](https://github.com/github/app/issues/4098). An upstream reply does not authorize
-resuming work or prove that a fix is qualified.
-
-Park all remaining desktop adapter/identity contracts, Windows CI, worktree lifecycle, newline-checkout handling,
-worker authorization investigation and app-specific host/tool setup. Existing uncommitted Windows fixes are retained
-for later review, not evidence of shipped native Windows support. Do not mutate or delete existing test runs.
-On reactivation, rebind exact app/runtime versions and separately prove M1 native runtime, M2 adapter/interactions and
-M3 full applicable local workflows. Earlier smoke/intake checks do not establish any complete milestone.
+DECISION-033 makes the GitHub Copilot app a supported client again, so the separate desktop backlog parked on
+2026-09-21 is closed. The [desktop implementation plan](COPILOT-DESKTOP-PLAN.md) is design history. Its native Windows
+findings (process launching, newline checkout, worktree binding, worker authorization) feed the
+[client pivot backlog](#client-pivot-backlog); its probe receipts are provenance, not qualification evidence.
+github/app#4097 and github/app#4098 no longer block: APEX stops pinning models, and a managed hook denies the APEX agent
+as a subagent target.
 
 ### Excluded CLI Helpers
 
-On 2026-09-23 the maintainer moved advisory built-in helpers into the active [CLI-only projection](#cli-only-projection):
-Explore, Rubber-duck, Code-review, Security-review, Validator `bicep` and `terraform` pre-checks and user-invoked
-Research. They remain advisory and never replace APEX CodeGen, Reviewer or Validator contracts, create validation
-receipts or approve gates. The slice 6 probes kept only Explore in managed agents; the other helpers and Validator
-pre-checks wait for helper tool scoping and a CLI-enforced shell limit.
+On 2026-09-23 the maintainer moved advisory built-in helpers into the active [CLI-only
+projection](#cli-only-projection): Explore, Rubber-duck, Code-review, Security-review, Validator `bicep` and `terraform`
+pre-checks and user-invoked Research. They remain advisory and never replace APEX CodeGen or Validator contracts, create
+validation receipts or approve gates. DECISION-031 later made rubber-duck the managed reviewer, with kernel-captured
+output. The slice 6 probes kept only Explore in managed agents; the other helpers and Validator pre-checks wait for
+helper tool scoping and a CLI-enforced shell limit.
 
 General-purpose delegation, `/fleet`, `/delegate`, `/pr automerge` and plan mode stay out of managed workflows.
 General-purpose delegation defeats bounded least-privilege roles, `/fleet` bypasses kernel batch control, `/delegate`
@@ -369,9 +412,8 @@ named need, an authority design, focused tests and client evidence.
 ### Other Deferred Work
 
 Application deployment pipelines and application-specific configuration are optional after the core product works.
-Token benchmarking is not current work. Continuous COE synchronization, multi-archetype composition, native Windows and
-additional desktop
-hosts, ALZ foundation deployment, application development and generic orchestration/synchronization frameworks
+Token benchmarking is not current work. Continuous COE synchronization, multi-archetype composition, hosts beyond
+`REQ-HOST-001`, ALZ foundation deployment, application development and generic orchestration/synchronization frameworks
 are not initial scope. Existing advanced capabilities need no expansion or deletion merely to simplify this plan.
 The read-only context sidekick waits until a Copilot CLI release launches custom sidekicks; the slice 1 probe found
 that CLI `1.0.88` does not.

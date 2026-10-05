@@ -9,16 +9,19 @@ archetypes, and consumers reuse independent copies and adapt them through APEX.
 Preserve rich output while minimizing repeated input and keeping one owner per
 fact. Both ALZ-backed workloads and standalone labs/demos are initial scope.
 
-The target user experience is VS Code and Copilot CLI on Windows via WSL2,
-without a devcontainer. npm remains the current implementation; Agent Plugins
-and APEX MCP redistribution are evaluated at the end of feature delivery.
+The target user experience is VS Code and the GitHub Copilot app on native
+Windows, and GitHub Copilot CLI on Linux or WSL2, without a devcontainer. APEX
+is moving to an Agent Plugin plus `apex init` onboarding
+([DECISION-033](docs/vnext/DECISIONS.md)); npm and WSL2 remain the current
+implementation until that ships.
 See the [PRD](docs/vnext/PRD.md) and [roadmap](docs/vnext/ROADMAP.md) for planned
 scope, and the [checkpoint](docs/vnext/PROJECT.md) for implementation status.
 
 > [!WARNING]
 > This repository is a pre-cutover release line with no current release
 > candidate. The `0.10.0` contract is being re-baselined for GitHub Copilot in
-> VS Code and GitHub Copilot CLI. Prior qualification is historical only.
+> VS Code, the GitHub Copilot app and GitHub Copilot CLI. Prior qualification
+> is historical only.
 
 ## Start Here
 

@@ -5,25 +5,32 @@
 APEX vNext is pre-release. A projection being implemented does not mean that live parity or release acceptance has
 passed.
 
-The active client is GitHub Copilot CLI, standalone or through the VS Code Copilot harness, on Windows via WSL2,
-without Docker or a devcontainer. VS Code Local is retired. Standalone desktop-app and native Windows support are
-deferred. Both ALZ-backed workloads and standalone labs/demos, independent COE import, conversational changes and
-complete design/operational output are release goals. They are not marked implemented by this support matrix. See the
+Under [DECISION-033][decision-033] the supported clients are the VS Code Copilot harness and the GitHub Copilot app on
+native Windows, and GitHub Copilot CLI on Linux and WSL2. That change is in progress under the [client
+pivot](../vnext/ROADMAP.md#client-pivot). Today's package still installs the Copilot CLI projection with npm and
+`apex init`; the sections below describe that shipped behavior unless they say otherwise. VS Code Local is retired. Both
+ALZ-backed workloads and standalone labs/demos, independent COE import, conversational changes and complete
+design/operational output are release goals. They are not marked implemented by this support matrix. See the
 [checkpoint](../vnext/PROJECT.md) and [target client scenarios](../vnext/CLIENT-QUALIFICATION.md).
 
 ## Support Matrix
 
-| Surface                        | Implementation                                   | Deterministic proof                       | Live client proof                             | Current status    |
-| ------------------------------ | ------------------------------------------------ | ----------------------------------------- | --------------------------------------------- | ----------------- |
-| Direct APEX CLI                | Implemented                                      | Required CI and package qualification     | Not applicable                                | Preview-supported |
-| GitHub Copilot CLI             | Coordinator, specialists and workers implemented | Projection generation and lifecycle tests | Current candidate pending                     | Conditional       |
-| VS Code Copilot harness        | Runs the CLI projection                          | Projection generation and lifecycle tests | Blocked on WSL: picked agents are not applied | Conditional       |
-| GitHub Copilot desktop app     | Parked; historical feasibility probes only       | No current acceptance claim               | Incomplete historical probes                  | Deferred          |
-| Copilot CLI autonomous workers | Enabled; permissions unchanged                   | Runtime authority and projection tests    | Bounded Luna workflow probes passed           | Conditional       |
-| Bicep track                    | Implemented                                      | Deterministic provider and package tests  | Current cloud candidate pending               | Conditional       |
-| Terraform track                | Implemented                                      | Deterministic provider and package tests  | Current cloud candidate pending               | Conditional       |
+| Surface                             | Implementation                                    | Deterministic proof                       | Live client proof               | Current status    |
+| ----------------------------------- | ------------------------------------------------- | ----------------------------------------- | ------------------------------- | ----------------- |
+| Direct APEX CLI                     | Implemented                                       | Required CI and package qualification     | Not applicable                  | Preview-supported |
+| GitHub Copilot CLI (Linux, WSL2)    | CLI projection: coordinator, specialists, workers | Projection generation and lifecycle tests | Slice 11 exploratory runs       | Conditional       |
+| VS Code Copilot harness (Windows)   | Runs the CLI projection; plugin delivery planned  | Projection generation and lifecycle tests | Pending on native Windows       | Target, pending   |
+| GitHub Copilot app (Windows)        | Plugin delivery and worktree support planned      | None yet                                  | Historical probes only          | Target, planned   |
+| GitHub Copilot CLI (native Windows) | Not supported                                     | None                                      | None                            | Unsupported       |
+| Copilot CLI autonomous workers      | Enabled; permissions unchanged                    | Runtime authority and projection tests    | Bounded Luna workflow probes    | Conditional       |
+| Bicep track                         | Implemented                                       | Deterministic provider and package tests  | Current cloud candidate pending | Conditional       |
+| Terraform track                     | Implemented                                       | Deterministic provider and package tests  | Current cloud candidate pending | Conditional       |
 
-## Client Behavior
+## Current Client Behavior
+
+The [client pivot](../vnext/ROADMAP.md#client-pivot) replaces several behaviors below: one `APEX` agent replaces the
+coordinator and specialists (DECISION-032), rubber-duck replaces the Reviewer (DECISION-031), and agents stop pinning
+models (DECISION-033).
 
 The CLI projection ships the coordinator, interactive specialists, and autonomous CodeGen, Reviewer and Validator
 workers. CLI workers were enabled with maintainer authorization after bounded Luna workflow probes. Revised
@@ -56,7 +63,8 @@ findings as advice and record any change through the owning APEX agent. General-
 
 In VS Code, open the workspace, start a chat with the session target set to Copilot, and pick an APEX agent in the
 Agent picker; `/agent` is not a harness command. With VS Code `1.139.0` and Copilot Chat `0.67.0` over WSL, a picked
-agent is not applied and the default agent answers, so the harness cannot run APEX agents on WSL yet.
+agent is not applied and the default agent answers. DECISION-033 moves VS Code to native Windows, where the apex-jon
+spike found plugin agents apply.
 
 Hidden-user discovery does not implicitly disable model invocation. The adapter preserves explicit invocation-disable
 settings; isolated review-routing probes cover the canonical parent-to-Reviewer path on both tracks. This does not
@@ -83,16 +91,23 @@ requirements, architecture, or planning work by itself.
 
 Onboarding is shared: global CLI, one-shot `npx`, and Copilot CLI all invoke `apex bootstrap`.
 
-Agent Plugins and APEX MCP redistribution are evaluated last. Their eventual support must be proven using exact client
-versions and lifecycle tests, not inferred from plugin-format compatibility alone.
+Under DECISION-033, APEX moves to an Agent Plugin plus `apex init` onboarding. Until the plugin ships, install with npm
+and `apex init`. Plugin support must still be proven with exact client versions and lifecycle tests.
 
-## Deferred Desktop App
+## Planned Client Changes
 
-All standalone desktop-app work was parked on 2026-09-21. It is not an active release target under the deferred
-[REQ-COPILOT-APP-001](../vnext/PRD.md#req-copilot-app-001-standalone-desktop-app).
-The [backlog](../vnext/ROADMAP.md#deferred-standalone-copilot-desktop-app) retains observed limitations and upstream issues.
-Existing local intake/worktree probes are characterization only, not full desktop qualification or standalone CLI proof.
-No app-specific runtime, adapter, host setup or test expansion should resume without explicit maintainer selection.
+These follow DECISION-033 and are not implemented yet:
+
+- **Hosts.** VS Code and the Copilot app run on native Windows 11 (25H2 or 24H2), without WSL. Copilot CLI runs on
+  Linux or WSL2. Each workspace uses one host.
+- **Sandbox.** Turn on client local sandboxing before using APEX. In the Copilot app it is a project setting; APEX
+  cannot set it for you. Outbound network stays allowed.
+- **Install.** `apex init` writes `.github/copilot/settings.json`, which installs the APEX plugin through the Copilot
+  CLI store. VS Code reads that install; do not also install the plugin from the VS Code marketplace.
+- **Models.** Pick the session model yourself (currently HydraFusion); agents no longer pin one.
+- **Copilot app worktrees.** Sessions in app-created worktrees share the main checkout's APEX state.
+
+The [GitHub Copilot app requirement](../vnext/PRD.md#req-copilot-app-001-github-copilot-app) owns app acceptance.
 
 ## Evidence Boundary
 
@@ -110,3 +125,5 @@ to the exact candidate, observed client versions, managed projection hashes, and
 - [Client projections](../explanation/client-projections.md)
 - [Qualification reference](qualification.md)
 - [Manage installation](../how-to/manage-installation.md)
+
+[decision-033]: ../vnext/DECISIONS.md#decision-033-support-native-windows-clients-and-deliver-apex-as-an-agent-plugin

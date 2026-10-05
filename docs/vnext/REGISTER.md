@@ -89,9 +89,11 @@ and the repository archives.
 
 - **Owner:** Release engineering and client experience
 - **Impact:** A plugin update could launch the wrong MCP runtime, select the wrong workspace or alter an active run.
-- **Mitigation:** Evaluate distribution last; pin compatible components, preserve state and avoid competing updaters.
-- **State:** Open; final distribution option not selected
-- **Closure proof:** Final delivery lifecycle passes in both clients on WSL2, including rollback and uninstall.
+- **Mitigation:** DECISION-033 selects one Agent Plugin with the bundled runtime, pinned to a commit SHA and installed
+  through one channel; `apex init` writes only the thin projection. Preserve state and avoid competing updaters.
+- **State:** Open; plugin delivery selected, not yet implemented
+- **Closure proof:** The plugin lifecycle (install, update, rollback, uninstall) passes in all three supported clients
+  on their hosts without disturbing an active run.
 
 ## RISK-010: Revised Plans Can Outrun Executable Controls
 
@@ -134,7 +136,7 @@ and the repository archives.
 - **State:** Open for exact-client evidence; all-tool schema, safe-error, input-boundary, queue/cancellation and real
   stdio regressions cover the current SDK. Protocol migration is separately pending.
 - **Closure proof:** All registered results validate, cancellation/retry tests preserve committed-state semantics,
-  and both supported clients have evidence for the exact negotiated protocol and candidate.
+  and all three supported clients have evidence for the exact negotiated protocol and candidate.
 
 ## RISK-014: Retiring The VS Code Local Projection Can Strand Consumers Or Lose Mechanics
 
@@ -171,20 +173,20 @@ and the repository archives.
 
 ### Active Scope And CLI Worker Evidence
 
-As of 2026-09-23, DECISION-029 makes standalone Copilot CLI and the VS Code Copilot harness the target release clients,
-both running one CLI projection. Since slice 4, `apex init` installs only that projection. Desktop-app
-work is [deferred](ROADMAP.md#deferred-standalone-copilot-desktop-app); preserve its evidence without inferring CLI
-parity. CLI CodeGen, Reviewer and Validator ship since adapter `1.6.0` under revised ADR-0006; kernel checks, not
-profile visibility, remain the security boundary. This does not authenticate independent reviewers or qualify every
-production worker path.
-Owner: client experience and kernel maintainers. Closure requires actual generation/review/validation and parent-routing
-evidence with unchanged scoped permissions. Generic delegation and visibility-only probes are not closure.
+As of 2026-10-05, DECISION-033 makes the VS Code Copilot harness and the GitHub Copilot app on native Windows and
+Copilot CLI on Linux and WSL2 the target release clients, delivered as one Agent Plugin; until it ships, `apex init`
+installs the CLI projection. Historical desktop probes remain provenance ([superseded
+plan](ROADMAP.md#superseded-standalone-copilot-desktop-plan)) and do not show CLI parity. CLI CodeGen, Reviewer and
+Validator ship since adapter `1.6.0` under revised ADR-0006; kernel checks, not profile visibility, remain the security
+boundary. This does not authenticate independent reviewers or qualify every production worker path. Owner: client
+experience and kernel maintainers. Closure requires actual generation/review/validation and parent-routing evidence with
+unchanged scoped permissions. Generic delegation and visibility-only probes are not closure.
 
 - **Owner:** Client experience
-- **Assumption:** Standalone Copilot CLI and the VS Code Copilot harness produce equivalent kernel outcomes from the same
-  CLI-format agents.
-- **Constraint:** Shared agent format does not prove Agent Host behavior; the VS Code Copilot harness is qualified
-  separately. Unavailable mechanics cannot be inferred as passing.
+- **Assumption:** The VS Code Copilot harness and the GitHub Copilot app on native Windows and Copilot CLI on Linux and
+  WSL2 produce equivalent kernel outcomes from the same plugin agents.
+- **Constraint:** A shared plugin does not prove per-client behavior; each client and host is qualified separately.
+  Unavailable mechanics cannot be inferred as passing.
 - **State:** Pending current-candidate proof
 
 ## ASSUMPTION-002: Equal IaC Support Means Equivalent Governed Outcomes

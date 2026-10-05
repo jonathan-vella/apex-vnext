@@ -1,15 +1,14 @@
 # Plan: Native Windows Copilot App Support
 
-**PARKED - 2026-09-21.** The maintainer deferred all standalone desktop-app work and native Windows qualification.
-Active work now targets VS Code Local and standalone Copilot CLI on WSL2 only. Do not execute the phases below unless
-the maintainer explicitly reactivates this plan after those clients' required workflows are confirmed.
-Preserve probe state and evidence. Upstream issues [github/app#4097](https://github.com/github/app/issues/4097) and
-[github/app#4098](https://github.com/github/app/issues/4098) are retained follow-up items; their resolution alone does
-not authorize resuming this plan. The current [PRD](PRD.md) and [roadmap](ROADMAP.md) supersede its release scope.
+**SUPERSEDED - 2026-10-05.** Parked on 2026-09-21. DECISION-033 makes the GitHub Copilot app on native Windows a
+supported client again, and the [client pivot](ROADMAP.md#client-pivot) replaces the phases below. Do not execute
+them. Their native Windows findings feed the pivot backlog. Upstream issues
+[github/app#4097](https://github.com/github/app/issues/4097) and [github/app#4098](https://github.com/github/app/issues/4098)
+no longer block: APEX stops pinning models and denies its main agent as a subagent target through a hook.
 
 Owner: client experience maintainers. This document preserves historical implementation planning; it is not a binding
-release control, executable prompt, qualification receipt or independent workflow authority. Reactivation is governed
-by the [deferred backlog](ROADMAP.md#deferred-standalone-copilot-desktop-app).
+release control, executable prompt, qualification receipt or independent workflow authority. It will not be reactivated;
+see the [superseded plan note](ROADMAP.md#superseded-standalone-copilot-desktop-plan).
 
 ## Historical Plan
 

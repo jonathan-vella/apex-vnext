@@ -77,9 +77,9 @@ reintroduction check.
 
 ## DECISION-016: Keep Npm As The Sole Distribution Authority
 
-Current implementation remains npm-owned: CLI packages, exact dependencies, release manifest, SBOM and provenance.
-The permanent npm-only product restriction is superseded by DECISION-024. No distribution migration has been selected
-or implemented by revising the plan.
+Superseded by DECISION-033. Current implementation remains npm-owned: CLI packages, exact dependencies, release
+manifest, SBOM and provenance. The permanent npm-only product restriction is superseded by DECISION-024. No distribution
+migration has been selected or implemented by revising the plan.
 
 ## DECISION-017: Operationalize Bounded Improvement Without Promotion Authority
 
@@ -127,9 +127,10 @@ optional work. Quality is not document length or a numeric score copied from a r
 
 ## DECISION-024: Use WSL2 And Decide Distribution Last
 
-Windows via WSL2 is the initial host path; consumers do not require Docker or a devcontainer. Keep npm usable now.
-Evaluate Agent Plugins together with APEX MCP redistribution only after functional delivery, then qualify the chosen
-lifecycle in both clients. The choice remains open; avoid competing runtime owners, updaters and custom frameworks.
+Superseded by DECISION-033. Windows via WSL2 is the initial host path; consumers do not require Docker or a
+devcontainer. Keep npm usable now. Evaluate Agent Plugins together with APEX MCP redistribution only after functional
+delivery, then qualify the chosen lifecycle in both clients. The choice remains open; avoid competing runtime owners,
+updaters and custom frameworks.
 
 ## DECISION-025: Minimize Input Without A Token Baseline Now
 
@@ -168,14 +169,15 @@ does not alter executable gates or close historical findings.
 
 ## DECISION-029: Ship One Copilot CLI Projection
 
-Maintainer direction on 2026-09-23 supersedes DECISION-012. Managed agents, skills and MCP configuration use only the
-Copilot CLI agent format. Supported clients are standalone Copilot CLI and the VS Code Copilot harness, which runs
-CLI-format agents in the VS Code Agent Host. The VS Code Local projection, its renderer path, `.vscode/mcp.json` and the
-combined installation mode retire through DECISION-015 gates: consumer migration, replacement proof, archive provenance
-under `.archive/vscode-projection/`, rollback and a negative reintroduction check. `apex init` and `apex update` reject
-the retired client with a stable error code and migration guidance. The archive is never a runtime dependency.
-`github-copilot-cli` is the only installable projection; `github-copilot-vscode` remains the evidence identity for VS
-Code running CLI agents, so paired-client comparison continues. Builder-only VS Code tooling for this repository stays.
+Amended by DECISION-031, DECISION-032 and DECISION-033. Maintainer direction on 2026-09-23 supersedes DECISION-012.
+Managed agents, skills and MCP configuration use only the Copilot CLI agent format. Supported clients are standalone
+Copilot CLI and the VS Code Copilot harness, which runs CLI-format agents in the VS Code Agent Host. The VS Code Local
+projection, its renderer path, `.vscode/mcp.json` and the combined installation mode retire through DECISION-015 gates:
+consumer migration, replacement proof, archive provenance under `.archive/vscode-projection/`, rollback and a negative
+reintroduction check. `apex init` and `apex update` reject the retired client with a stable error code and migration
+guidance. The archive is never a runtime dependency. `github-copilot-cli` is the only installable projection;
+`github-copilot-vscode` remains the evidence identity for VS Code running CLI agents, so paired-client comparison
+continues. Builder-only VS Code tooling for this repository stays.
 
 An `apex-next` skill replaces handoff buttons. It reads kernel status and the next task, names the owning agent, and
 either delegates that agent with the prepared prompt or prints the client's selection step (`/agent` in standalone CLI,
@@ -218,3 +220,64 @@ kernel carries mappings whose policy definition, reference ID and effect match, 
 `not-applicable` and sends only the remaining findings to the Architect. Gate 2 stays approved unless a refreshed row
 is `blocked`, which reopens Architecture and Gate 2. [REQ-GOV-001](PRD.md#req-gov-001-governance-and-policy) owns
 acceptance.
+
+## DECISION-031: Replace The APEX Reviewer With Captured Rubber-Duck Reviews
+
+Maintainer direction on 2026-10-02, design settled on 2026-10-05, amends DECISION-029. The built-in Copilot
+`rubber-duck` agent replaces the managed `APEX Reviewer` for the requirements, architecture and plan reviews. A managed
+`postToolUse` hook saves rubber-duck's exact output. The kernel records it in the run journal, bound to the review
+prompt hash (with a request nonce) and the reviewed artifact hash, and derives the findings from it. The calling agent
+adds dispositions only and cannot author or edit findings. A missing, edited, replayed or mismatched capture fails
+closed. Hooks only capture; they never decide. Rubber-duck inherits the caller's tools, so a managed `preToolUse` hook
+denies APEX state-changing MCP tools during rubber-duck calls; a negative test must prove that before captured output
+counts as findings. Accepted risk: its model is not pinned. Slice 11 finding R9 (findings drifting across blind retries)
+motivates kernel capture.
+
+## DECISION-032: Use One Interactive APEX Agent
+
+Maintainer direction on 2026-10-02 and 2026-10-05 amends DECISION-029. One user-facing `APEX` agent replaces the
+coordinator, Requirements, Architect, Planner and Operator agents. Stage guidance moves into skills loaded per kernel
+task. CodeGen and Validator stay hidden workers that never ask the user questions; rubber-duck replaces the Reviewer
+(DECISION-031). `apex-next` stops printing scope prompts and agent switches. The APEX agent asks for all human input
+in chat, including gate decisions, without forms or terminal gates. Accepted risk: an agent could claim an approval
+the user did not give; the kernel records the claim with the actor and the audit log shows it. Kernel authority, typed
+outcomes and the four gates are unchanged. The routing findings R1 to R3 from slice 11 are fixed in this work.
+
+## DECISION-033: Support Native Windows Clients And Deliver APEX As An Agent Plugin
+
+Maintainer direction on 2026-10-02 and 2026-10-05 supersedes DECISION-016 and DECISION-024 and amends DECISION-029.
+It replaces the parked desktop plan. Client support matches the separate apex-jon modernization:
+
+| Client                                | Host                   | Status                                  |
+| ------------------------------------- | ---------------------- | --------------------------------------- |
+| VS Code, Copilot harness (Agent Host) | Native Windows         | Supported target; qualification pending |
+| GitHub Copilot app                    | Native Windows         | Supported target; qualification pending |
+| GitHub Copilot CLI                    | Linux and WSL2         | Supported target; qualification pending |
+| GitHub Copilot CLI                    | Native Windows         | Unsupported                             |
+| VS Code Local harness                 | Any                    | Unsupported                             |
+| VS Code or the app                    | macOS or Linux desktop | Best effort, not qualified              |
+
+- **Hosts.** One host per workspace; runs do not move between a Windows client and the WSL CLI. Windows means the
+  latest Windows 11 release and the one before it (25H2, 24H2), or any build where the client reports local
+  sandboxing as supported.
+- **Sandbox.** Client local sandboxing is a documented prerequisite that APEX assumes is on and does not check.
+  Outbound network stays allowed. Because the sandbox is on, clients may use Allow All tool permissions; gate decisions
+  still come from the user. Azure CLI sign-in inside the sandbox is settled during qualification.
+- **Distribution.** APEX ships as one Agent Plugins 1.0 plugin: skills, the APEX agent and workers, hooks, and an MCP
+  server that runs the bundled `@apexops/cli` runtime with `node`. A separate vNext marketplace repository publishes it.
+  Installs and release provenance pin an immutable commit SHA; tags are release labels only. `apex init` and bootstrap
+  remain the onboarding path and write a thin workspace projection: `.github/copilot/settings.json` with
+  `enabledPlugins` and `extraKnownMarketplaces`, instructions with `applyTo` globs, the governance workflow and scripts,
+  and `.apex/`. The plugin installs through one channel, the Copilot CLI store, which VS Code reads. `@apexops/cli`
+  stays on npm for the terminal at the same exact version the plugin bundles. Node 24 LTS is the minimum. Retiring the
+  copied agents and skills follows the DECISION-015 gates.
+- **Models.** Agent files carry no `model`, `model-policy` or `reasoning-effort`; the user picks the session model,
+  currently HydraFusion. Every state-changing MCP tool must be safe to call twice with the same input.
+- **Worktrees.** Supported. Every APEX MCP tool takes an explicit workspace path, and the server resolves the shared
+  `.apex/` in the main checkout through the git common directory. One writer per run applies across worktrees.
+
+Evidence: the apex-jon Phase 0 spike passed 8 of 8 checks in all three clients on 2026-10-03 and 2026-10-04 (plugin
+install, plugin agents, plugin MCP through `${PLUGIN_ROOT}`, hooks with bash and PowerShell, `ask_user`, rubber-duck
+isolation and hook deny). The separate Windows probe was skipped; sandbox, Azure sign-in and worktree behavior are
+proven during final qualification. The [client pivot plan](ROADMAP.md#client-pivot) owns delivery and
+[REQ-HOST-001](PRD.md#req-host-001-supported-hosts-and-clients) owns acceptance.

@@ -5,9 +5,11 @@
 This guide assumes Windows 11, WSL2 with Ubuntu, an existing Azure subscription, and a GitHub account with an active
 Copilot entitlement. Run Linux commands from an Ubuntu WSL terminal unless a step explicitly says PowerShell.
 
-This is the initial supported Windows host path. Docker, a devcontainer and a clone of the APEX development repository
-are not consumer prerequisites. Install tools for the selected client and requested stage; cloud credentials are not
-needed merely to inspect local project state. Both workload profiles follow the [PRD boundary](../vnext/PRD.md#workload-boundary).
+This is the current Windows host path. Under DECISION-033, VS Code and the GitHub Copilot app will run on native Windows
+without WSL once the [client pivot](../vnext/ROADMAP.md#client-pivot) ships; this guide changes then. Docker, a
+devcontainer and a clone of the APEX development repository are not consumer prerequisites. Install tools for the
+selected client and requested stage; cloud credentials are not needed merely to inspect local project state. Both
+workload profiles follow the [PRD boundary](../vnext/PRD.md#workload-boundary).
 
 > [!IMPORTANT]
 > Use a Linux workspace under your WSL home directory, such as `~/src`. Do not create the APEX workspace under

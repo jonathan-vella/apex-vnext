@@ -1,17 +1,19 @@
 # Supported Client Qualification
 
-This control defines release-blocking evidence for the VS Code Copilot harness and standalone Copilot CLI.
-Generated projection tests are necessary but do not replace live client interaction.
+This control defines release-blocking evidence for the three supported clients under
+[DECISION-033](DECISIONS.md#decision-033-support-native-windows-clients-and-deliver-apex-as-an-agent-plugin): the VS
+Code Copilot harness and the GitHub Copilot app on native Windows, and GitHub Copilot CLI on Linux and WSL2.
+Generated projection and plugin tests are necessary but do not replace live client interaction.
 
-[DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection) replaces VS Code Local with the VS Code
-Copilot harness running the single CLI projection. Since slice 4, only that projection installs, so the VS Code column
-below applies to the Copilot harness; its remaining Local mechanics are restated during the plan. The
-[planned CLI-only scenarios](#planned-cli-only-scenarios) become blocking when the plan completes.
+The release target is the [client pivot scenarios](#client-pivot-scenarios) plus the shared matrix below. Until the
+plugin ships, today's package installs the single CLI projection from
+[DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection), and the slice results below are
+exploratory history for that projection, not release evidence.
 
-Both clients use Windows via WSL2/Ubuntu, without Docker or a devcontainer. Required outcomes follow the
-[PRD](PRD.md), including both environment profiles, COE reuse and conversational changes. Basic interaction checks
-accompany feature delivery; final installation qualification follows the distribution decision. No token baseline is
-required now. Existing executable gate alignment must be completed before affected scenarios; do not bypass it.
+Each client runs on its supported host with client local sandboxing on, without Docker or a devcontainer. Required
+outcomes follow the [PRD](PRD.md), including both environment profiles, COE reuse and conversational changes. Basic
+interaction checks accompany feature delivery; final installation qualification uses the APEX plugin. No token baseline
+is required now. Existing executable gate alignment must be completed before affected scenarios; do not bypass it.
 
 ## Candidate Binding
 
@@ -19,52 +21,57 @@ Before interaction, record the exact source commit, package and runtime locks, m
 versions, executable hashes, MCP inventory, and clean consumer workspace identity. An update during a run invalidates
 that client result.
 
-Desktop-app work is deferred. Preserve its historical receipts separately; do not count them as evidence for either
-active client. No third-client schema or acceptance expansion is required for the current two-client release.
+The GitHub Copilot app is a supported client again. Its historical desktop receipts are provenance only and do not
+count as current evidence. The app needs its own evidence identity alongside `github-copilot-cli` and
+`github-copilot-vscode`. Also record the Windows build, whether local sandboxing is on, and the session model.
 
 ## Scenario Matrix
 
-| ID           | Shared required outcome                                                  | VS Code               | Copilot CLI                         |
-| ------------ | ------------------------------------------------------------------------ | --------------------- | ----------------------------------- |
-| `CLIENT-001` | Candidate versions and hashes are bound before work.                     | Required              | Required                            |
-| `CLIENT-002` | Instructions, target projection, agents, and skills are discovered once. | Required              | Required                            |
-| `CLIENT-003` | Missing input creates one kernel request and one typed answer event.     | `vscode/askQuestions` | Interactive `ask_user`              |
-| `CLIENT-004` | APEX MCP starts with the exact managed allowlist.                        | Required              | Required                            |
-| `CLIENT-005` | Specialists route correctly and kernel worker boundaries hold.           | Workers delegated     | Actual worker qualification pending |
-| `CLIENT-006` | Gates, stale-state rejection, and operation denial match.                | Required              | Required                            |
-| `CLIENT-007` | Restart resumes the same journal head without chat history.              | Required              | Required                            |
-| `CLIENT-008` | Writer conflict and accepted transfer preserve owner epochs.             | Required              | Required                            |
-| `CLIENT-009` | Init, update, conflict, rollback, uninstall, and reinstall are atomic.   | Required              | Required                            |
-| `CLIENT-010` | Shared fake-provider workflow outcomes normalize equally.                | Required              | Required                            |
-| `CLIENT-011` | Bootstrap installs the exact local runtime and selected projection.      | Profile or CLI route  | CLI route                           |
+| ID           | Shared required outcome                                                                  | VS Code (Windows) | Copilot app (Windows) | Copilot CLI (Linux/WSL2) |
+| ------------ | ---------------------------------------------------------------------------------------- | ----------------- | --------------------- | ------------------------ |
+| `CLIENT-001` | Candidate versions and hashes are bound before work.                                     | Required          | Required              | Required                 |
+| `CLIENT-002` | Instructions, plugin agents, skills and hooks are discovered once.                       | Required          | Required              | Required                 |
+| `CLIENT-003` | Missing input creates one kernel request and one typed answer event.                     | `ask_user`        | `ask_user`            | `ask_user`               |
+| `CLIENT-004` | APEX MCP starts with the exact managed allowlist.                                        | Required          | Required              | Required                 |
+| `CLIENT-005` | The APEX agent routes each stage and kernel worker boundaries hold.                      | Required          | Required              | Required                 |
+| `CLIENT-006` | Gates, stale-state rejection, and operation denial match.                                | Required          | Required              | Required                 |
+| `CLIENT-007` | Restart resumes the same journal head without chat history.                              | Required          | Required              | Required                 |
+| `CLIENT-008` | Writer conflict and accepted transfer preserve owner epochs.                             | Required          | Required              | Required                 |
+| `CLIENT-009` | Init, update, conflict, rollback, uninstall, and reinstall are atomic.                   | Required          | Required              | Required                 |
+| `CLIENT-010` | Shared fake-provider workflow outcomes normalize equally.                                | Required          | Required              | Required                 |
+| `CLIENT-011` | Bootstrap writes the thin projection and plugin settings at the runtime's exact version. | Required          | Required              | Required                 |
 
-Unavailable client mechanics remain unavailable; they are not inferred as passing. Copilot CLI CodeGen, Reviewer and
-Validator ship since adapter `1.6.0` under revised ADR-0006; their current-candidate qualification is pending.
+Unavailable client mechanics remain unavailable; they are not inferred as passing. CodeGen and Validator remain hidden
+workers under revised ADR-0006, and rubber-duck replaces the Reviewer (DECISION-031); current-candidate qualification
+is pending.
 Direct-selection visibility is not a security pass/fail criterion; worker permissions remain unchanged.
 
 That omission is a current qualification status, not permission to omit generation, review or validation. Demonstrate a
 supported bounded path for every required outcome. These additional acceptance scenarios are planned requirements,
 not assertions that corresponding runtime or registry coverage already exists:
 
-| ID           | Required outcome in both clients                                                              |
-| ------------ | --------------------------------------------------------------------------------------------- |
-| `CLIENT-012` | WSL2 clean consumer setup and use without a devcontainer or APEX source checkout              |
-| `CLIENT-013` | Explicit ALZ/lab profile selection and correct supplied-versus-owned resource handling        |
-| `CLIENT-014` | COE discovery, one-archetype selection, independent import and recorded source revision       |
-| `CLIENT-015` | Manually copied project adoption without importing secrets, state or approval authority       |
-| `CLIENT-016` | Relevant change questions, consequences and confirmation; unchanged decisions are reused      |
-| `CLIENT-017` | Affected outputs refresh, unrelated files remain unchanged and manual conflicts are confirmed |
-| `CLIENT-018` | Target-subscription policy import; full baseline never enters model-facing context            |
-| `CLIENT-019` | Complete design and operational handoff reviewed against the PRD quality reference            |
-| `CLIENT-020` | Final distribution starts the correct APEX MCP and preserves active runs across updates       |
+| ID           | Required outcome in every supported client                                                      |
+| ------------ | ----------------------------------------------------------------------------------------------- |
+| `CLIENT-012` | Clean consumer setup on the client's host, without WSL on Windows, a devcontainer or a checkout |
+| `CLIENT-013` | Explicit ALZ/lab profile selection and correct supplied-versus-owned resource handling          |
+| `CLIENT-014` | COE discovery, one-archetype selection, independent import and recorded source revision         |
+| `CLIENT-015` | Manually copied project adoption without importing secrets, state or approval authority         |
+| `CLIENT-016` | Relevant change questions, consequences and confirmation; unchanged decisions are reused        |
+| `CLIENT-017` | Affected outputs refresh, unrelated files remain unchanged and manual conflicts are confirmed   |
+| `CLIENT-018` | Target-subscription policy import; full baseline never enters model-facing context              |
+| `CLIENT-019` | Complete design and operational handoff reviewed against the PRD quality reference              |
+| `CLIENT-020` | The plugin starts the bundled APEX MCP and preserves active runs across plugin updates          |
 
 Exercise both IaC tracks and both profiles with representative cases in the existing tests. Reuse fixtures and helpers;
 do not build a separate benchmark harness. Record explicit gaps until implemented.
 
 ## Planned CLI-Only Scenarios
 
-These scenarios belong to the [CLI-only projection plan](ROADMAP.md#cli-only-projection). They are planned acceptance,
-not evidence that the behavior exists.
+These scenarios belong to the [CLI-only projection plan](ROADMAP.md#cli-only-projection), closed on 2026-10-05.
+DECISION-032 retires CLIENT-021 (agent selection and scope prompts) and DECISION-033 retires CLIENT-025 (pinned worker
+models); CLIENT-031 and CLIENT-037 replace them. CLIENT-027 now applies to the plugin's `mcp.json`. CLIENT-023,
+CLIENT-024, CLIENT-026 and CLIENT-027 stay release-blocking in every supported client alongside the client pivot
+scenarios; CLIENT-022 stays deferred.
 
 | ID           | Required outcome                                                                                              | Standalone CLI | VS Code Copilot harness |
 | ------------ | ------------------------------------------------------------------------------------------------------------- | -------------- | ----------------------- |
@@ -79,6 +86,25 @@ not evidence that the behavior exists.
 The selection step is `/agent <name>` in standalone CLI and the Agent picker in the VS Code Copilot harness, where
 `/agent` is not a command. Harness scenarios that need a selected agent, including CLIENT-021, depend on picked agents
 applying; the [slice 1 probe](#cli-only-projection-probes) found that they do not over WSL.
+
+## Client Pivot Scenarios
+
+These scenarios belong to the [client pivot](ROADMAP.md#client-pivot). They are planned acceptance, not evidence that
+the behavior exists. Each is required in the VS Code Copilot harness and the GitHub Copilot app on Windows and in
+Copilot CLI on Linux and WSL2, unless noted.
+
+| ID           | Required outcome                                                                                                     |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `CLIENT-028` | The plugin installs through the Copilot CLI store; its agents, skills, hooks and MCP server load once in each client |
+| `CLIENT-029` | Plugin MCP starts with `node` from the plugin folder without registry access and receives the workspace explicitly   |
+| `CLIENT-030` | Plugin update and rollback preserve an active run; on Windows the update follows the documented VS Code steps        |
+| `CLIENT-031` | One APEX agent completes every stage without agent switches; it reuses stated project values and stops at gates      |
+| `CLIENT-032` | Hidden workers never ask questions, and the hook denies the APEX agent as a `task` target                            |
+| `CLIENT-033` | Review findings come only from captured rubber-duck output bound to the prompt and artifact; tampering fails closed  |
+| `CLIENT-034` | Sessions in app-created worktrees share the main checkout's `.apex/`, and a second writer is rejected (app, CLI)     |
+| `CLIENT-035` | With local sandboxing on, the workflow completes, including Azure CLI sign-in, pricing and native validation         |
+| `CLIENT-036` | A duplicated state-changing tool call, as HydraFusion can produce, has no extra effect                               |
+| `CLIENT-037` | Agents without model pins run under the user-selected session model                                                  |
 
 ## CLI-Only Projection Probes
 
@@ -271,6 +297,34 @@ reviewed baseline collected read-only with `-IncludeDescendants` (328 policies, 
   [DECISION-030](DECISIONS.md): governance before Architecture, an ALZ Corp reference baseline, Architect-owned
   mapping and kernel `not-applicable` marking.
 
+### Slice 11 Re-Run On A Subscription
+
+On 2026-10-02 the maintainer ran standalone Copilot CLI `1.0.91` with Node `v26.10.0` and Bicep `0.47.16` against
+resource group `rg-qual-webapp-dev` (run `064a07aa`). The candidate was `main` at `db015a5`; the morning attempt used
+`fe99d76`. These SHAs are after the 2026-10-02 history rewrite. Gate 1 was approved, Architecture completed, and the
+run was stopped at the Gate 2 review to move to the [client pivot](ROADMAP.md#client-pivot). This is exploratory
+evidence, not scenario qualification.
+
+| Finding | Problem                                                               | Fix                                                               |
+| ------- | --------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| 1, 6    | The coordinator invented project values and bound the run to `local`  | #359 requires an explicit target scope                            |
+| 2, 3    | The scope prompt was hard to copy and covered only intake round 1     | #358; CP-13 removes scope prompts                                 |
+| 4       | A Windows `az` token ended in `\r` and broke the Authorization header | Launcher strips and validates the token                           |
+| 5       | Requirement IDs skipped numbers                                       | #357 numbers after filtering                                      |
+| 7, R3   | `nextTask` hit `APEX_AUTHORIZATION` while a gate was pending          | #358 for review decisions; the rest moves to CP-13                |
+| 8       | Architecture task context rejected `governanceFindings`               | #356; #360 checks real results against MCP contracts              |
+| R1, R2  | Project values were asked again; Requirements stopped after intake    | Moved to CP-13                                                    |
+| R4      | An incomplete baseline surfaced as `APEX_INTERNAL`                    | #364 maps baseline errors with hints; #365 refreshed the baseline |
+| R5      | The collector crashed on policy names with spaces                     | #365                                                              |
+| R6      | Service-only scripts missed date-time format registration             | Open; latent                                                      |
+| R7      | `architectureComplete` needed seven attempts                          | #366 reports every problem in one rejection                       |
+| R8      | `reviewComplete` was rejected eight times with a generic message      | #363 names failing input paths and defaults `findingIds`          |
+| R9      | Review findings drifted across blind retries                          | DECISION-031 kernel capture (CP-16)                               |
+
+The Gate 2 reviewer accepted findings were an info check-later note on performance and scale and a low finding that
+the Bicep was not traced to REQ-007. Governance imported a reviewed subscription baseline collected with
+`-IncludeDescendants`.
+
 ## Execution Rules
 
 The clean-install package regression now exercises local archetype listing, exact-commit inspection, independent copy,
@@ -280,13 +334,15 @@ review remains next and no gate is approved. This is package/command-path eviden
 CLIENT-017, not live VS Code or Copilot CLI agent interaction and not complete acceptance of those scenarios.
 
 1. Use clean independent consumer workspaces for each client.
-2. Install the same exact package candidate and one selected projection.
+2. Install the same exact plugin and package candidate through one channel.
 3. Trust only the qualification workspace. A disposable, isolated profile root may be mutated solely for the managed
    VS Code bootstrap agent scenario; do not mutate a real user profile or global MCP configuration.
-4. Use explicit tool grants. Broad allow-all or remote delegation modes are prohibited.
+4. Turn on client local sandboxing and record the client-reported sandbox state in the candidate binding. Allow All
+   tool permissions are allowed only when the client reports sandboxing on; otherwise use explicit tool grants. Remote
+   delegation modes stay prohibited, and gate decisions still come from the maintainer.
 5. Record structured outcomes and content-free provenance, not raw chat or secrets.
-6. Repeat affected scenarios in both clients after release-relevant runtime, contract, projection, MCP,
-   skill or toolchain changes; retain exact candidate binding for cross-client comparisons.
+6. Repeat affected scenarios in every supported client after release-relevant runtime, contract, plugin, MCP, skill or
+   toolchain changes; retain exact candidate binding for cross-client comparisons.
 
 ## CLI Worker Qualification
 
@@ -466,13 +522,13 @@ confirmation, and fresh confirmation after a stale request. Use a disposable run
 Projection tests verify the instructions, not model compliance or UI capability. Record the actual input mechanism;
 a confirmed free-text fallback can satisfy typed selection semantics but is not native checkbox qualification.
 
-## Deferred Desktop Qualification
+## Copilot App Qualification
 
-Desktop qualification is parked, not passed or waived for a claimed supported client. Its M1/M2/M3 milestones and
-remaining worker, worktree, native Windows and model-routing concerns are retained in the
-[deferred backlog](ROADMAP.md#deferred-standalone-copilot-desktop-app). They do not block this two-client release.
-No desktop-specific transfer exception changes CLIENT-008 for the active VS Code and standalone CLI clients.
-Confirmed-selection fallback observations from the app do not qualify the current standalone CLI candidate.
+DECISION-033 makes the GitHub Copilot app a supported client, so desktop qualification is no longer parked. The app
+runs the same scenarios as the other clients, plus CLIENT-034 for app-created worktrees. Turn on local sandboxing in
+the app's project settings before a run. The parked M1/M2/M3 milestones in the
+[desktop plan](COPILOT-DESKTOP-PLAN.md) are design history; their receipts and confirmed-selection observations do not
+qualify the current candidate.
 
 ## Acceptance
 

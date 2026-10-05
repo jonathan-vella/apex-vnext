@@ -12,9 +12,9 @@ work. Updating this plan does not implement new commands or authorize live opera
 ## Goals
 
 - Preserve existing APEX output quality while reducing input-token demand through reuse.
-- Complete the workload lifecycle in standalone GitHub Copilot CLI and the VS Code Copilot harness from one CLI-format
-  agent projection.
-- Support Windows through WSL2 without Docker or a devcontainer requirement.
+- Complete the workload lifecycle in the VS Code Copilot harness and the GitHub Copilot app on native Windows, and in
+  GitHub Copilot CLI on Linux and WSL2, from one APEX agent plugin.
+- Run on native Windows for VS Code and the app without WSL, Docker or a devcontainer.
 - Make installation, everyday use, updates, upgrades, rollback, and eventual distribution straightforward.
 - Reuse one COE archetype per consumer project, then adapt only what changes.
 - Keep one authoritative location per fact, reuse existing contracts and parameters, and avoid parallel frameworks.
@@ -54,41 +54,44 @@ subscription so the application team can deploy its existing code.
 
 ### REQ-DIST-001: Distribution And Installation
 
-Keep the existing npm `apex` CLI and kernel usable during implementation. Init, update, rollback, and uninstall must
-detect local edits, preserve unrelated files and project state, and retain exact runtime/customization compatibility.
-Use one canonical customization source and existing package tooling rather than a second editable distribution tree.
+APEX ships as one Agent Plugins 1.0 plugin under DECISION-033, published from a separate vNext marketplace repository.
+Installs and release provenance pin an immutable commit SHA; tags are release labels only. The plugin carries the
+skills, the APEX agent and hidden workers, hooks, and an MCP server that runs the bundled `@apexops/cli` runtime with
+`node` from the plugin folder; starting it must not need a registry download. `@apexops/cli` stays on npm for the
+terminal at the same exact version the plugin bundles. Clients install the plugin through one channel, the Copilot CLI
+store, which VS Code reads; installing through more than one channel is unsupported.
 
-Agent Plugins evaluation and implementation belong at the end of feature delivery, together with easy redistribution
-of the APEX MCP server and its dependencies. Evaluate npm-only, plugin plus npm runtime, and bundled runtime delivery
-against actual standalone Copilot CLI and VS Code Copilot harness lifecycle behavior on WSL2. No option is selected
-here. Cover
-workspace binding, authentication, prerequisites, version pinning, updates, upgrades, rollback, uninstall, duplicate
-discovery, and preservation of active runs. Avoid competing updaters or a hosted service unless separately approved.
-Final package and client qualification follows any distribution change.
+`apex init` and bootstrap write a thin workspace projection: `.github/copilot/settings.json` with `enabledPlugins` and
+`extraKnownMarketplaces`, instructions with `applyTo` globs, the governance workflow and scripts, and `.apex/`. Init,
+update, rollback, and uninstall detect local edits, preserve unrelated files and project state, and keep plugin and
+runtime versions exact. Plugin-owned files are neither copied into the workspace nor checked as workspace files.
+Retiring the copied agents and skills follows the DECISION-015 gates. Avoid competing updaters or a hosted service
+unless separately approved. Final package and client qualification follows any distribution change.
 
 ### REQ-ONBOARDING-001: First-Time Install And Repository Bootstrap
 
 Provide `apex-install` and `apex-bootstrap` terminal entry points with guided Copilot entry points using the same
 deterministic implementation. These are setup operations, not another infrastructure workflow or source of approval.
 
-`apex-install` starts from working WSL2 Ubuntu without assuming Node, npm or APEX exists. Detect missing or incompatible
-prerequisites for both supported clients and both IaC tracks, show one installation plan, and obtain confirmation before
-installing prerequisites and APEX. Preserve compatible installations; require separate confirmation for incompatible
-replacement or privileged actions. Authentication remains interactive with credentials outside model-visible inputs.
-Verify installed versions and report remaining host or account prerequisites. Native Windows/WSL installation remains
-outside this scope; guide users when the required host setup is absent. No source checkout or devcontainer is required.
+`apex-install` starts from a supported host (Windows 11 for VS Code and the Copilot app; Linux or WSL2 Ubuntu for
+Copilot CLI) without assuming Node, npm or APEX exists. Detect missing or incompatible prerequisites for all three supported
+clients and both IaC tracks, show one installation plan, and obtain confirmation before installing prerequisites and
+APEX. Preserve compatible installations; require separate confirmation for incompatible replacement or privileged
+actions. Authentication remains interactive with credentials outside model-visible inputs. Verify installed versions and
+report remaining host or account prerequisites. Installing Windows, WSL or the clients themselves remains outside this
+scope; guide users when the required host setup is absent. No source checkout or devcontainer is required.
 
-`apex-bootstrap` configures new, existing or cloned repositories and installs the single Copilot CLI projection used by
-standalone CLI and the VS Code Copilot harness. Inspect existing state before proposing changes. Ask whether to copy
-from a COE and request its remote
-repository URL during setup. Permit one or more selected archetypes from that remote, pinned to exact commits, as
-independent workloads in separate folders with separate project state. Do not compose their infrastructure automatically.
-Show differences and obtain confirmation before adopting organization defaults or reusable decisions. Existing choices,
-manual files and unrelated content remain protected; Azure Policy and mandatory security constraints stay authoritative.
+`apex-bootstrap` configures new, existing or cloned repositories and writes the thin workspace projection and plugin
+settings that the supported clients install from (`REQ-DIST-001`). Inspect existing state before proposing changes. Ask
+whether to copy from a COE and request its remote repository URL during setup. Permit one or more selected archetypes
+from that remote, pinned to exact commits, as independent workloads in separate folders with separate project state. Do
+not compose their infrastructure automatically. Show differences and obtain confirmation before adopting organization
+defaults or reusable decisions. Existing choices, manual files and unrelated content remain protected; Azure Policy and
+mandatory security constraints stay authoritative.
 
 Bootstrap configures the repository, runtime, clients and governance prerequisites without requiring or inventing a
 project ID, project environment, workload target or IaC choice. A configured workspace with zero projects is a valid
-ready-to-start state. Only after setup does the APEX coordinator gather workload details and create the first project
+ready-to-start state. Only after setup does the APEX agent gather workload details and create the first project
 through the kernel-owned project operation. Empty-workspace status and health checks must not require a selected run.
 
 After confirming repository identity and workload choices, configure APEX and the selected clients. When no usable
@@ -109,17 +112,20 @@ pending. All setup paths report explicit ready, pending or blocked outcomes and 
 imports, repositories, identities or role assignments. Preserve partial progress and evidence; do not claim success while
 required actions remain pending. Implementing this feature does not itself authorize live Azure or GitHub mutations.
 
-### REQ-HOST-001: WSL2 Without A Devcontainer
+### REQ-HOST-001: Supported Hosts And Clients
 
-The initial supported Windows experience uses WSL2 with Ubuntu, standalone Copilot CLI or the VS Code Copilot harness,
-and the required local toolchain.
-Users must not need Docker, a devcontainer, a source-repository clone, or repository development tools to use APEX.
-Document and check operational prerequisites through existing setup/doctor surfaces; require only tools needed for the
-selected track and requested stage. The first-time installer provisions both client and IaC toolchains under
-`REQ-ONBOARDING-001`; operational readiness checks remain stage-scoped.
+Under DECISION-033, the supported and qualified clients are the VS Code Copilot harness (Agent Host) and the GitHub
+Copilot app on native Windows, and GitHub Copilot CLI on Linux and WSL2. Windows means the latest Windows 11 release and
+the one before it (25H2 and 24H2), or any build where the client reports local sandboxing as supported. Native-Windows
+Copilot CLI and the VS Code Local harness are unsupported; VS Code and the app on macOS or Linux desktop are best effort
+and not qualified. Each workspace uses one host; runs do not move between a Windows client and the WSL CLI.
 
-Native Windows runtime qualification and standalone desktop-app hosting are deferred under `REQ-COPILOT-APP-001`.
-They are not current release prerequisites or supported-host promises.
+Client local sandboxing is a documented prerequisite. APEX assumes it is on and does not check it; outbound network
+stays allowed. Users must not need Docker, a devcontainer, a source-repository clone, or repository development tools.
+Document and check operational prerequisites, including Node 24 LTS or later, through existing setup/doctor surfaces on
+each host; require only tools needed for the selected track and requested stage. Process launching, path handling and
+file replacement work on native Windows, and Windows CI covers the runtime. The first-time installer provisions client
+and IaC toolchains under `REQ-ONBOARDING-001`; operational readiness checks remain stage-scoped.
 
 ### REQ-REUSE-001: COE Archetype Import
 
@@ -310,50 +316,45 @@ otherwise.
 
 ### REQ-CUSTOMIZATION-001: Managed Copilot Experiences
 
-APEX ships one managed projection in the Copilot CLI agent format under DECISION-029. Supported clients are standalone
-GitHub Copilot CLI and the GitHub Copilot harness in VS Code, which runs CLI-format agents in the VS Code Agent Host.
-Both must produce the same typed workflow outcomes, state and resume behavior, authorization decisions, gates and
-evidence. The VS Code Local projection, `vscode/askQuestions`, handoff frontmatter and `.vscode/mcp.json` are retired;
-`init` and `update` reject that client with a stable error code and migration hint. Both clients must resolve the
-kernel-owned `needs_input` contract and record typed answers without relying on chat history.
+APEX ships one plugin under DECISION-033 with one user-facing `APEX` agent (DECISION-032) and the hidden CodeGen and
+Validator workers. Every supported client must produce the same typed workflow outcomes, state and resume behavior,
+authorization decisions, gates and evidence. The VS Code Local projection, `vscode/askQuestions`, handoff frontmatter
+and `.vscode/mcp.json` stay retired. Every client must resolve the kernel-owned `needs_input` contract and record typed
+answers without relying on chat history.
 
-- Interactive specialists use `ask_user`. When a request needs several values, use the tool's native checkboxes where
-  it offers them; otherwise present the options numbered in kernel order and accept the user's numbers. The kernel
-  validates the resolved values; confirmation, correction and cancellation follow
-  [CLIENT-QUALIFICATION](CLIENT-QUALIFICATION.md#multiple-selection-input).
-- An `apex-next` skill, invocable by users and agents, reads status and the next task and names the owning agent. It
-  delegates the owner with the prepared prompt when the step can complete as a subagent, including any required input.
-  Otherwise it prints the client's selection step (`/agent <name>` in standalone CLI, the Agent picker in the VS Code
-  harness) and a ready-to-paste scope prompt. The coordinator routes through it.
-- A read-only context sidekick is deferred until a Copilot CLI release launches custom sidekicks; `apex-next` shows the
-  next step on request.
-- CodeGen, Reviewer and Validator run through `task` delegation with `model-policy: required`; interactive agents use
-  `preferred`. Workers rely on kernel task context, not repository instructions. The coordinator may monitor and steer
-  delegated workers through agent listing and messaging.
-- Built-in helpers are advisory and bounded. Explore serves Planner and Operator brownfield discovery (never intake)
-  through their read-only file tools. Rubber-duck, Code-review and Security-review inherit the calling agent's full
-  tool set, so managed agents do not use them until the CLI can scope helper tools; users may run `/review`,
-  `/security-review` and `/research` themselves. Agent frontmatter cannot limit shell commands, so Validator has no
-  shell. The owning APEX agent restates any finding as typed kernel input; helper output is never evidence,
-  completion or approval.
-- Workspace MCP configuration uses `.mcp.json`. User documentation covers `/review` and `/security-review` for
-  promoted output.
+- The APEX agent asks all human questions in chat with `ask_user`, including gate decisions. Guidance never prescribes
+  `ask_user` argument names, because the CLI and the VS Code and app clients use different shapes. When a request needs
+  several values, use the tool's native checkboxes where offered; otherwise present the options numbered in kernel
+  order. The kernel validates the resolved values; confirmation, correction and cancellation follow
+  [CLIENT-QUALIFICATION](CLIENT-QUALIFICATION.md#multiple-selection-input). The agent uses project values the user
+  already stated, asks only for missing ones, and never invents or defaults them.
+- Stage guidance lives in skills the APEX agent loads per kernel task. `apex-next` reads status and the next task and
+  continues in the same agent, without agent switches or scope prompts. It carries the user's requested outcome to
+  the next stop point and stops while a gate is pending.
+- Hidden workers never ask the user questions. Their task prompts carry everything they need, because a subagent cannot
+  see the calling agent's file.
+- The built-in `rubber-duck` agent performs the requirements, architecture and plan reviews under DECISION-031, and a
+  managed hook captures its output for the kernel. A `preToolUse` hook denies APEX state-changing MCP tools during
+  rubber-duck calls. Other built-in helpers are advisory and never produce kernel
+  evidence, completion or approval. A managed `preToolUse` hook denies the APEX agent as a `task` target.
+- Agent files carry no `model`, `model-policy` or `reasoning-effort`; the user selects the session model.
+  State-changing MCP tools are safe to call twice with the same input, and every MCP tool takes an explicit workspace
+  path.
 
-General-purpose delegation, `/fleet`, `/delegate` and plan mode are not part of managed workflows. Model availability,
-grants, agents, skills, managed files and MCP inventory are qualified per client. Qualify both environment profiles and
-COE import/change workflows on each supported client. Basic checks accompany features; distribution work is last.
+General-purpose delegation, `/fleet`, `/delegate` and plan mode are not part of managed workflows. Agents, skills,
+hooks, the MCP inventory and the plugin lifecycle are qualified per client. Qualify both environment profiles and COE
+import/change workflows on each supported client.
 
-### REQ-COPILOT-APP-001: Standalone Desktop App
+### REQ-COPILOT-APP-001: GitHub Copilot App
 
-**Deferred by maintainer direction on 2026-09-21.** This supersedes the earlier mandatory-third-client decision.
-The standalone [GitHub Copilot app](https://github.com/github/app), its native Windows runtime, app-created worktree
-integration and app-specific qualification are outside the active release scope. Preserve the requirement ID, probe
-evidence and unresolved findings; do not represent deferred work as implemented or qualified.
-
-Resume only after the required standalone CLI and VS Code Copilot harness workflows are confirmed and the maintainer explicitly
-selects this backlog item. Upstream replies alone do not resume implementation. See the
-[desktop backlog](ROADMAP.md#deferred-standalone-copilot-desktop-app) for retained blockers and restart criteria.
-Historical desktop observations do not qualify standalone CLI behavior or replace current supported-client evidence.
+**Active again under DECISION-033**; it was deferred on 2026-09-21. The
+[GitHub Copilot app](https://github.com/github/app) on native Windows is a supported client. It installs the APEX
+plugin from the shared Copilot CLI store and runs sessions in app-created git worktrees by default; APEX supports them
+through the explicit workspace path and the shared `.apex/` in the main checkout. Users turn on local sandboxing in the
+app's project settings, because no repository file can set it. The app does not apply per-agent `model` pins
+(github/app#4097), and APEX no longer pins models. It does not enforce per-parent subagent limits (github/app#4098); a
+managed hook denies the APEX agent as a subagent target, and kernel authorization still owns state changes. Historical
+desktop probes and the parked desktop plan are provenance, not qualification evidence.
 
 ### REQ-GUIDANCE-001: Skill And Instruction Capability Parity
 
@@ -553,8 +554,9 @@ does not become the default for other workloads. Human quality review complement
 - **Reliability:** Runs survive restart at each gate, reject stale writers, reconcile partial commits, and retain evidence.
 - **Performance:** Release measurements meet [quality-scorecard.v1.json](../../config/quality-scorecard.v1.json) targets,
   tolerances, minimum samples, and unavailable-data rules.
-- **Portability:** VS Code and standalone CLI use Windows via WSL2; native Windows desktop support is deferred.
-  Consumer use requires neither Docker nor a devcontainer and must not depend on unpublished source-workspace state.
+- **Portability:** The VS Code Copilot harness and the GitHub Copilot app run on native Windows; Copilot CLI runs on
+  Linux and WSL2. Consumer use requires neither Docker nor a devcontainer and must not depend on unpublished
+  source-workspace state.
 - **Accessibility:** User-facing CLI and documentation provide clear text status, actionable diagnostics, and no
   color-only meaning.
 - **Privacy:** Telemetry is separate, optional, exportable, and deletable; raw chat history is never scraped or replayed.
@@ -566,14 +568,14 @@ does not become the default for other workloads. Human quality review complement
 
 - Distributed collaborative writers.
 - Resume of state that does not satisfy current vNext contracts.
-- Standalone GitHub Copilot desktop-app work, GitHub Copilot cloud coding-agent sessions, Copilot code review as an
-  APEX client, the retired VS Code Local projection, and client runtimes other than standalone Copilot CLI and the VS
-  Code Copilot harness.
+- GitHub Copilot cloud coding-agent sessions, Copilot code review as an APEX client, the VS Code Local harness,
+  native-Windows Copilot CLI, and clients other than the VS Code Copilot harness, the GitHub Copilot app and Copilot
+  CLI.
 - General-purpose built-in delegation, `/fleet`, `/delegate` and plan mode in managed workflows.
-- Early Agent Plugins implementation; the distribution decision is the final feature-delivery phase.
+- Installing the APEX plugin through more than one channel on the same machine.
 - A second independent runtime/distribution authority or a new hosted control plane without explicit approval.
 - Continuous COE synchronization, cross-archetype composition, and a generic document/code synchronization engine.
-- ALZ foundation deployment, application development, native Windows runtime and additional-host promises.
+- ALZ foundation deployment, application development, and hosts beyond `REQ-HOST-001`.
 - Token-baseline or comparative-token benchmarking work for now.
 - Application deployment pipelines and application-specific deployment configuration until follow-on work.
 - Autonomous issue creation, repository edits, pull requests, approvals, releases, or deployments from improvement data
@@ -606,13 +608,15 @@ Cutover requires all of the following on the exact candidate head:
 - COE import and conversational changes preserve independent origin, exclude source authority, and leave unaffected
   outputs unchanged; manual conflicts require confirmation.
 - Human review against the output-quality reference passes; mandatory application and operational handoff is complete.
-- WSL2 consumer installation and both client workflows work without a devcontainer or source-repository clone.
-- The final distribution decision covers the APEX MCP lifecycle and is followed by exact-candidate qualification.
+- Consumer installation and all three client workflows work on their supported hosts without a devcontainer or
+  source-repository clone.
+- Plugin install, update, rollback and uninstall, including the bundled MCP runtime, pass on the exact candidate in
+  every supported client.
 - Required CI and CodeQL checks pass, with no unresolved critical or high security finding.
 - Clean install, update, rollback, uninstall, package reproducibility, SBOM, provenance, and publication dry run pass.
-- Standalone Copilot CLI and VS Code Copilot harness agents, questions, next-step routing, worker execution, MCP startup,
-  restart and cross-device resume are qualified against equivalent typed outcomes and client-specific authority
-  boundaries.
+- The APEX agent, questions, next-step routing, worker execution, rubber-duck capture, MCP startup, restart and resume
+  are qualified in the VS Code Copilot harness, the GitHub Copilot app and Copilot CLI against equivalent typed
+  outcomes and client-specific authority boundaries.
 - Astro, Terraform, custom pricing, and Draw.io MCP dependencies are absent from active discovery only after their
   applicable replacement gates pass.
 - ARM pricing and Python diagram replacements satisfy their measured compatibility, reliability, security, and
