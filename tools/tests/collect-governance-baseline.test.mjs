@@ -1186,7 +1186,16 @@ test(
   },
 );
 
-for (const name of [" leading", "trailing ", "tab\tname", "\u0007", "\u0007name", "name\u0007", "na\u0007me"]) {
+for (const name of [
+  " leading",
+  "trailing ",
+  "tab\tname",
+  "\u0007",
+  "\u0007name",
+  "name\u0007",
+  "na\u0007me",
+  "name\n",
+]) {
   test(`descendant collection rejects assignment name ${JSON.stringify(name)}`, powershellOptions, (context) => {
     const responses = routes();
     const policyId = "/providers/Microsoft.Authorization/policyDefinitions/bad-name";
@@ -1249,6 +1258,7 @@ for (const suffix of [
   " leading",
   "trailing ",
   "tab\tname",
+  "name\n",
 ]) {
   test(`exemption rejects malformed assignment identity ${JSON.stringify(suffix)}`, powershellOptions, (context) => {
     const responses = routes();
