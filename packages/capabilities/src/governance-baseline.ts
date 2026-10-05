@@ -380,7 +380,8 @@ function selectEntry(
     count(pageCounts[endpoint]);
   }
   const rawFindings = array(entry.findings);
-  if (canonical(array(entry.policies)) !== canonical(rawFindings)) fail("incomplete");
+  // governance-baseline-v1 duplicated findings as policies; v2 drops the copy and v1 files must be recollected.
+  if (Object.hasOwn(entry, "policies")) fail();
   const findings = rawFindings.map((item) => finding(item, subscriptionId, descendants));
   const findingIdentities = findings.map((item) =>
     canonical([item.assignmentId.toLowerCase(), item.policyId.toLowerCase(), item.policyDefinitionReferenceId ?? null]),
@@ -584,7 +585,7 @@ function validateGovernanceBaseline(
   } catch {
     return fail();
   }
-  if (baseline.schema_version !== "governance-baseline-v1") fail();
+  if (baseline.schema_version !== "governance-baseline-v2") fail();
   if (baseline.coverage_status !== "COMPLETE" || array(baseline.subscriptions_skipped).length !== 0) fail("incomplete");
   const hasManagementGroup = Object.hasOwn(baseline, "management_group_id");
   if (hasManagementGroup === Object.hasOwn(baseline, "subscription_id")) fail();

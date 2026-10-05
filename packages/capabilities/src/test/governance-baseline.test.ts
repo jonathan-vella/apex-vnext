@@ -56,7 +56,6 @@ function envelope(id = subscriptionId) {
     },
     assignment_inventory: [] as Record<string, unknown>[],
     findings: [] as Record<string, unknown>[],
-    policies: [] as Record<string, unknown>[],
     tags_required: [] as Record<string, unknown>[],
     allowed_locations: [] as string[],
   };
@@ -64,7 +63,7 @@ function envelope(id = subscriptionId) {
 
 function baseline() {
   return {
-    schema_version: "governance-baseline-v1",
+    schema_version: "governance-baseline-v2",
     management_group_id: "root",
     coverage_status: "COMPLETE",
     subscriptions_discovered: 1,
@@ -239,7 +238,6 @@ test("rejects absent, mismatched and malformed other subscriptions", () => {
   source.subscriptions[otherId] = envelope(otherId);
   source.subscriptions_discovered = source.subscriptions_processed = source.summary.subscriptions_complete = 2;
   source.subscriptions[otherId]!.findings.push({ arbitrary: "malformed" });
-  source.subscriptions[otherId]!.policies = source.subscriptions[otherId]!.findings;
   rejected(source, "invalid-input");
 });
 
@@ -281,7 +279,6 @@ function inheritedBaseline() {
     resource_types: ["Microsoft.Storage/storageAccounts"],
     exemption: { category: "Waiver", policyDefinitionReferenceIds: ["member-b", "member-a"] },
   }));
-  entry.policies = structuredClone(entry.findings);
   Object.assign(entry.discovery_summary, {
     assignment_total: 1,
     assignment_kept: 1,
@@ -300,7 +297,6 @@ test("enforcementMode preserves supported modes without weakening desired compli
     entry.assignment_inventory[0]!.enforcementMode = mode;
     for (const item of entry.findings)
       Object.assign(item, { enforcementMode: mode, classification: "blocker", exemption: null });
-    entry.policies = structuredClone(entry.findings);
     Object.assign(entry.discovery_summary, { blocker_count: 2, informational_count: 0, exempted_count: 0 });
     source.summary.total_blockers = 2;
     const selected = importGovernanceBaseline(source, options, validate);
@@ -323,7 +319,6 @@ test("enforcementMode leaves legacy absence unknown and does not guess inventory
   const entry = source.subscriptions[subscriptionId]!;
   entry.assignment_inventory[0]!.enforcementMode = "Default";
   entry.findings[0]!.enforcementMode = "DoNotEnforce";
-  entry.policies = structuredClone(entry.findings);
   const findings = importGovernanceBaseline(source, options, validate).snapshot.findings;
   assert.equal(
     Object.hasOwn(
@@ -360,7 +355,6 @@ test("enforcementMode rejects unsupported and malformed explicit values in inven
       const source = inheritedBaseline();
       const entry = source.subscriptions[subscriptionId]!;
       entry[field][0]!.enforcementMode = mode;
-      entry.policies = structuredClone(entry.findings);
       rejected(source, "invalid-input");
     }
   }
@@ -371,10 +365,8 @@ test("enforcementMode rejects conflicting explicit modes for the same exact assi
   const entry = source.subscriptions[subscriptionId]!;
   entry.findings[0]!.enforcementMode = "Default";
   entry.findings[1]!.enforcementMode = "DoNotEnforce";
-  entry.policies = structuredClone(entry.findings);
   rejected(source, "incomplete");
   entry.findings[1]!.assignment_id = String(entry.findings[1]!.assignment_id).toUpperCase();
-  entry.policies = structuredClone(entry.findings);
   rejected(source, "incomplete");
   entry.findings[1]!.assignment_id = `${managementScope}/providers/Microsoft.Authorization/policyAssignments/different`;
   entry.assignment_inventory.push({ ...entry.assignment_inventory[0]! });
@@ -384,7 +376,6 @@ test("enforcementMode rejects conflicting explicit modes for the same exact assi
     assignment_kept: 2,
     management_group_inherited_count: 2,
   });
-  entry.policies = structuredClone(entry.findings);
   assert.equal(importGovernanceBaseline(source, options, validate).snapshot.findings.length, 2);
 });
 
@@ -408,7 +399,6 @@ test("preserves inherited findings and reported exemptions deterministically wit
   );
   const entry = source.subscriptions[subscriptionId]!;
   entry.findings.reverse();
-  entry.policies.reverse();
   const reordered = importGovernanceBaseline(source, options, validate);
   assert.deepEqual(reordered.snapshot.findings, selected.snapshot.findings);
   assert.notEqual(reordered.snapshot.contentHash, selected.snapshot.contentHash);
@@ -445,7 +435,6 @@ function descendantsBaseline(assignmentName = "policy") {
     exemption: null,
     reported_exemptions: [],
   }));
-  entry.policies = structuredClone(entry.findings);
   entry.assignment_inventory = scopes.map((scope) => ({
     scope,
     assignmentId: `${scope}/providers/Microsoft.Authorization/policyAssignments/${assignmentName}`,
@@ -489,7 +478,6 @@ test("target projection retains inherited and child policies only after full cac
   }));
   scopedEntry.findings[1]!.reported_exemptions = reported;
   Object.assign(scopedEntry.findings[2]!, { effect: "auditIfNotExists", classification: "informational" });
-  scopedEntry.policies = structuredClone(scopedEntry.findings);
   Object.assign(scopedEntry.discovery_summary, { blocker_count: 4, informational_count: 1, audit_count: 1 });
   scopedEntry.discovery_metadata.page_counts.policyExemptions = 2;
   scoped.summary.total_blockers = 4;
@@ -518,7 +506,6 @@ test("target projection retains inherited and child policies only after full cac
   ]) {
     const invalid = structuredClone(scoped);
     mutate(invalid);
-    invalid.subscriptions[subscriptionId]!.policies = structuredClone(invalid.subscriptions[subscriptionId]!.findings);
     assert.throws(
       () => importGovernanceBaseline(invalid, { ...options, targetScope }, validate),
       GovernanceBaselineError,
@@ -558,7 +545,6 @@ test("preserves scoped exemption provenance without granting verification", () =
     expiresOn: "2027-01-01T00:00:00Z",
   };
   for (const item of entry.findings) Object.assign(item.exemption!, provenance);
-  entry.policies = structuredClone(entry.findings);
   const selected = importGovernanceBaseline(source, options, validate);
   assert.deepEqual(selected.snapshot.findings[0]!.exemption, {
     ...provenance,
@@ -577,9 +563,6 @@ test("preserves scoped exemption provenance without granting verification", () =
       expiresOn: null,
     });
   }
-  management.subscriptions[subscriptionId]!.policies = structuredClone(
-    management.subscriptions[subscriptionId]!.findings,
-  );
   const inherited = importGovernanceBaseline(management, options, validate);
   assert.equal(inherited.snapshot.findings[0]!.exemption?.scope, managementScope);
   assert.notEqual(inherited.snapshot.contentHash, selected.snapshot.contentHash);
@@ -595,7 +578,6 @@ test("preserves scoped exemption provenance without granting verification", () =
   ]) {
     const invalid = structuredClone(source);
     Object.assign(invalid.subscriptions[subscriptionId]!.findings[0]!.exemption!, changes);
-    invalid.subscriptions[subscriptionId]!.policies = structuredClone(invalid.subscriptions[subscriptionId]!.findings);
     assert.throws(() => importGovernanceBaseline(invalid, options, validate), GovernanceBaselineError);
   }
 });
@@ -619,7 +601,6 @@ test("rejects malformed assignment resource identities", () => {
     const source = inheritedBaseline();
     source.subscriptions[subscriptionId]!.findings[0]!.assignment_id =
       `${managementScope}/providers/Microsoft.Authorization/policyAssignments/${suffix}`;
-    source.subscriptions[subscriptionId]!.policies = structuredClone(source.subscriptions[subscriptionId]!.findings);
     rejected(source, "target-mismatch");
   }
 });
@@ -631,9 +612,6 @@ test("accepts assignment names with inner spaces, as Azure allows", () => {
   const inheritedEntry = inherited.subscriptions[subscriptionId]!;
   const originalId = inheritedEntry.findings[0]!.assignment_id;
   for (const item of inheritedEntry.findings) if (item.assignment_id === originalId) item.assignment_id = assignmentId;
-  inherited.subscriptions[subscriptionId]!.policies = structuredClone(
-    inherited.subscriptions[subscriptionId]!.findings,
-  );
   assert.ok(
     importGovernanceBaseline(inherited, options, validate).snapshot.findings.some(
       (item) => item.assignmentId === assignmentId,
@@ -663,7 +641,6 @@ test("retains effective constraints while excluding arbitrary metadata and colle
     { name: "owner", allowed_values: ["team-b", "team-a"], default: "team-a", unknown: "MALICIOUS_PAYLOAD" },
   ];
   entry.allowed_locations = ["swedencentral", "germanywestcentral"];
-  entry.policies = structuredClone(entry.findings);
   const result = importGovernanceBaseline(source, options, validate);
   assert.equal(JSON.stringify(result).includes("MALICIOUS_PAYLOAD"), false);
   assert.equal(JSON.stringify(result).includes("policies"), false);
@@ -684,11 +661,9 @@ test("different enforced values remain distinct and absent values differ from nu
     const entry = source.subscriptions[subscriptionId]!;
     const original = importGovernanceBaseline(source, options, validate);
     entry.findings[0]![field] = field === "required_value" ? null : { mode: "deny" };
-    entry.policies = structuredClone(entry.findings);
     const first = importGovernanceBaseline(source, options, validate);
     assert.notDeepEqual(first, original);
     entry.findings[0]![field] = field === "required_value" ? false : { mode: "audit" };
-    entry.policies = structuredClone(entry.findings);
     assert.notDeepEqual(importGovernanceBaseline(source, options, validate), first);
   }
 });
@@ -711,7 +686,6 @@ test("content digest covers the entire selected raw envelope and root except obs
       const renewed = structuredClone(refreshed);
       const renewedEntry = renewed.subscriptions[subscriptionId]!;
       for (const item of renewedEntry[field]) item.enforcementMode = mode;
-      renewedEntry.policies = structuredClone(renewedEntry.findings);
       hashes.push(importGovernanceBaseline(renewed, options, validate).snapshot.contentHash);
     }
     assert.equal(new Set(hashes).size, 3, `${field} mode changes must not become observation-only renewal`);
@@ -734,11 +708,9 @@ test("content digest covers the entire selected raw envelope and root except obs
     },
     (value) => {
       value.subscriptions[subscriptionId]!.findings[0]!.required_value = false;
-      value.subscriptions[subscriptionId]!.policies = structuredClone(value.subscriptions[subscriptionId]!.findings);
     },
     (value) => {
       value.subscriptions[subscriptionId]!.findings[0]!.audit = { discovered_at: "not-a-collection-time", ttl_days: 2 };
-      value.subscriptions[subscriptionId]!.policies = structuredClone(value.subscriptions[subscriptionId]!.findings);
     },
   ];
   for (const mutate of mutations) {
@@ -769,19 +741,16 @@ test("rejects nonfinite and oversized effective JSON constraints", () => {
       const source = inheritedBaseline();
       const entry = source.subscriptions[subscriptionId]!;
       entry.findings[0]![field] = field === "assignment_parameters" ? { value } : value;
-      entry.policies = structuredClone(entry.findings);
       rejected(source, "invalid-input");
     }
     const source = inheritedBaseline();
     const entry = source.subscriptions[subscriptionId]!;
     entry.findings[0]![field] = { value: "OVERFLOW_NUMBER" };
-    entry.policies = structuredClone(entry.findings);
     rejected(JSON.stringify(source).replaceAll('"OVERFLOW_NUMBER"', "1e400"), "invalid-input");
   }
   const source = inheritedBaseline();
   const entry = source.subscriptions[subscriptionId]!;
   entry.findings[0]!.assignment_parameters = ["not-an-object"];
-  entry.policies = structuredClone(entry.findings);
   rejected(source, "invalid-input");
 });
 
@@ -790,9 +759,12 @@ test("fails closed on malformed JSON, invalid UTF-8 and full-schema violations",
   rejected(new Uint8Array([0xff]), "invalid-input");
   rejected({ ...baseline(), unknown: "secret" }, "invalid-input");
   rejected(null, "invalid-input");
-  const source = inheritedBaseline();
-  source.subscriptions[subscriptionId]!.policies = [];
-  rejected(source, "incomplete");
+  const obsolete = inheritedBaseline();
+  Object.assign(obsolete.subscriptions[subscriptionId]!, {
+    policies: structuredClone(obsolete.subscriptions[subscriptionId]!.findings),
+  });
+  rejected(obsolete, "invalid-input");
+  rejected({ ...inheritedBaseline(), schema_version: "governance-baseline-v1" }, "invalid-input");
 });
 
 test("distinguishes repeated initiative policies by member reference and rejects duplicate identities", () => {
@@ -802,24 +774,21 @@ test("distinguishes repeated initiative policies by member reference and rejects
     ...entry.findings[0]!,
     policyDefinitionReferenceId: memberId,
   }));
-  entry.policies = structuredClone(entry.findings);
   const selected = importGovernanceBaseline(source, options, validate);
   assert.deepEqual(
     selected.snapshot.findings.map((item) => item.policyDefinitionReferenceId),
     ["member-a", "member-b"],
   );
   entry.findings[1]!.policyDefinitionReferenceId = "member-a";
-  entry.policies = structuredClone(entry.findings);
   rejected(source, "incomplete");
   for (const item of entry.findings) delete item.policyDefinitionReferenceId;
-  entry.policies = structuredClone(entry.findings);
   rejected(source, "incomplete");
 });
 
 test("fails closed on unclassified kept assignments but accepts audit and disabled members", () => {
   const source = inheritedBaseline();
   const entry = source.subscriptions[subscriptionId]!;
-  entry.findings = entry.policies = [];
+  entry.findings = [];
   entry.discovery_summary.informational_count = entry.discovery_summary.exempted_count = 0;
   source.summary.total_findings = 0;
   rejected(source, "incomplete");

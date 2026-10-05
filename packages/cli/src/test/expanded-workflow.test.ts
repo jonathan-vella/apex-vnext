@@ -3501,7 +3501,7 @@ for (const track of ["bicep", "terraform"] as const) {
 
 function emptyGovernanceBaseline(subscriptionId: string, discoveredAt: string) {
   return {
-    schema_version: "governance-baseline-v1",
+    schema_version: "governance-baseline-v2",
     subscription_id: subscriptionId,
     coverage_status: "COMPLETE",
     subscriptions_discovered: 1,
@@ -3550,7 +3550,6 @@ function emptyGovernanceBaseline(subscriptionId: string, discoveredAt: string) {
         },
         assignment_inventory: [],
         findings: [],
-        policies: [],
         tags_required: [],
         allowed_locations: [],
         irrelevant_metadata: "UNSELECTED_BASELINE_MARKER",
@@ -4431,7 +4430,6 @@ for (const track of ["bicep", "terraform"] as const) {
       const entry = baseline.subscriptions[subscriptionId]!;
       Object.assign(entry, {
         findings,
-        policies: findings,
         assignment_inventory: findings.map((finding) => ({
           scope,
           assignmentId: finding.assignment_id,
@@ -4937,7 +4935,6 @@ for (const track of ["bicep", "terraform"] as const) {
         };
         Object.assign(entry, {
           findings: [finding],
-          policies: [finding],
           assignment_inventory: [
             {
               scope: `/subscriptions/${subscriptionId}`,
@@ -4982,7 +4979,6 @@ for (const track of ["bicep", "terraform"] as const) {
       };
       Object.assign(entry, {
         findings: [finding],
-        policies: [finding],
         assignment_inventory: [
           {
             scope: finding.scope,
@@ -5227,7 +5223,6 @@ function baselineWithFindings(subscriptionId: string, observedAt: string, findin
   const blockers = findings.filter(({ effect }) => effect === "deny").length;
   Object.assign(entry, {
     findings,
-    policies: findings,
     assignment_inventory: findings.map((finding) => ({
       scope,
       assignmentId: finding.assignment_id,

@@ -36,7 +36,7 @@ function mkdtempSyncCompat() {
 writeFileSync(
   BASELINE,
   JSON.stringify({
-    schema_version: "governance-baseline-v1",
+    schema_version: "governance-baseline-v2",
     subscription_id: SUBSCRIPTION,
     coverage_status: "COMPLETE",
     subscriptions_discovered: 1,
@@ -81,7 +81,6 @@ writeFileSync(
         },
         assignment_inventory: [],
         findings: [],
-        policies: [],
         tags_required: [],
         allowed_locations: [],
       },
