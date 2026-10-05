@@ -171,14 +171,14 @@ and the repository archives.
 
 ### Active Scope And CLI Worker Evidence
 
-As of 2026-09-23, DECISION-029 makes standalone Copilot CLI and the VS Code Copilot harness the target release clients,
-both running one CLI projection. Since slice 4, `apex init` installs only that projection. Desktop-app
-work is [deferred](ROADMAP.md#deferred-standalone-copilot-desktop-app); preserve its evidence without inferring CLI
-parity. CLI CodeGen, Reviewer and Validator ship since adapter `1.6.0` under revised ADR-0006; kernel checks, not
-profile visibility, remain the security boundary. This does not authenticate independent reviewers or qualify every
-production worker path.
-Owner: client experience and kernel maintainers. Closure requires actual generation/review/validation and parent-routing
-evidence with unchanged scoped permissions. Generic delegation and visibility-only probes are not closure.
+As of 2026-10-05, DECISION-033 makes the VS Code Copilot harness and the GitHub Copilot app on native Windows and
+Copilot CLI on Linux and WSL2 the target release clients, delivered as one Agent Plugin; until it ships, `apex init`
+installs the CLI projection. Historical desktop probes remain provenance ([superseded
+plan](ROADMAP.md#superseded-standalone-copilot-desktop-plan)) and do not show CLI parity. CLI CodeGen, Reviewer and
+Validator ship since adapter `1.6.0` under revised ADR-0006; kernel checks, not profile visibility, remain the security
+boundary. This does not authenticate independent reviewers or qualify every production worker path. Owner: client
+experience and kernel maintainers. Closure requires actual generation/review/validation and parent-routing evidence with
+unchanged scoped permissions. Generic delegation and visibility-only probes are not closure.
 
 - **Owner:** Client experience
 - **Assumption:** Standalone Copilot CLI and the VS Code Copilot harness produce equivalent kernel outcomes from the same
