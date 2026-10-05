@@ -1,5 +1,5 @@
 export const APEX_VERSION = "0.10.0-next.5" as const;
-export const MINIMUM_NODE_VERSION = "26.9.0" as const;
+export const MINIMUM_NODE_VERSION = "24.21.0" as const;
 
 export function meetsMinimumVersion(current: string, minimum: string): boolean {
   const currentParts = current.split(".").map(Number);

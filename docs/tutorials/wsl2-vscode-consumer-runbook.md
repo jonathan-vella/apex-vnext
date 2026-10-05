@@ -53,7 +53,7 @@ Install and authenticate GitHub Copilot CLI in Ubuntu as described in
 
 ## Install Node.js
 
-Install Node.js 26.9.0 or later in Ubuntu. The Linux runtime is separate from any Node.js installation on Windows:
+Install Node.js 24.21.0 (LTS) or later in Ubuntu. The Linux runtime is separate from any Node.js installation on Windows:
 
 ```bash
 NVM_VERSION=v0.40.1

@@ -3,7 +3,7 @@
   "observationCutoff": "2026-09-20",
   "supportPolicy": {
     "selection": "newest-production-supported-mutually-compatible-set-at-cutoff",
-    "node": "newest-stable-current-patch",
+    "node": "newest-lts-patch",
     "npm": "newest-stable-compatible-with-selected-node",
     "typescript": "newest-stable-ga-compatible-with-selected-node-and-npm",
     "vscode": "newest-stable-release-qualified-by-manual-host-tests",
@@ -14,11 +14,11 @@
   "core": {
     "node": {
       "authoritativeSource": "https://nodejs.org/dist/index.json",
-      "releaseChannel": "current",
-      "newestObservedVersion": "26.9.0",
-      "selectedExactVersion": "26.9.0",
-      "installedVersion": "26.9.0",
-      "observedAt": "2026-09-20"
+      "releaseChannel": "lts",
+      "newestObservedVersion": "24.21.0",
+      "selectedExactVersion": "24.21.0",
+      "installedVersion": "24.21.0",
+      "observedAt": "2026-10-05"
     },
     "npm": {
       "authoritativeSource": "https://www.npmjs.com/package/npm",
@@ -101,7 +101,7 @@
     }
   },
   "compatibilitySet": {
-    "node": "26.9.0",
+    "node": "24.21.0",
     "npm": "12.0.2",
     "typescript": "7.0.2",
     "minimumVscode": "1.138.0",
