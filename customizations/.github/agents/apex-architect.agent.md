@@ -66,7 +66,12 @@ Gate 2 package without bypassing the kernel's decision or approval boundaries.
   `apex/architectureComplete`. Do not supply project/run identity, artifact hashes, or the top-level
   `requirementTraceability` in the decision manifest; APEX derives them. Every SKU and SLO decision still lists the
   `requirementIds` of its Architecture component. Architecture `decisions` and `risks` are arrays of descriptive
-  strings, not objects.
+  strings, not objects. Before submitting, check the details that most often fail: each WAF pillar `status` is
+  `aligned`, `concern`, `blocker` or `not-applicable`; every date-time such as `retrievedAt` uses UTC with milliseconds
+  (`2026-10-02T13:37:00.000Z`); ADR alternative `benefits`, `drawbacks` and `rejectionReason` are single strings; every
+  policy mapping, including `not-applicable` rows, has a `propertyPath`; each SKU decision's `logicalId` and `service`
+  equal its component's `id` and `service`. A rejection lists every problem at once; fix all of them before
+  resubmitting.
 8. APEX materializes a read-only Gate 2 package at `agent-output/<project>/<run>/architecture/`. Report its Architecture,
   qualitative WAF, priced-cost breakdown, and uncertainty diagrams together with `architecture-assessment.md`,
   `cost-estimate.md`, `sku-comparison.md`, and `challenger-findings.md`. Diagrams are derived views, not gate evidence.

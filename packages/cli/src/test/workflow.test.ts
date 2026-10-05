@@ -1168,6 +1168,14 @@ test("governance reference import ignores tampered workspace runtime copies", as
   assert.ok(await importReferenceGovernance(service));
 });
 
+function architectureProblem(pattern: RegExp) {
+  return (error: unknown) =>
+    error instanceof ApexError &&
+    error.code === "APEX_VALIDATION" &&
+    /^architectureComplete found \d+ problems?/u.test(error.message) &&
+    (error.details as Array<{ message: string }>).some(({ message }) => pattern.test(message));
+}
+
 test("architecture task waits for a kernel-owned decision and resumes the issued task", async () => {
   const service = new ApexService(await tempRoot());
   const initialized = await service.init({ projectId: "demo", riskOwner: "partner" });
@@ -1315,7 +1323,7 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
         manifest,
         [],
       ),
-      /Current ARM MCP pricing evidence is required/u,
+      architectureProblem(/Current ARM MCP pricing evidence is required/u),
     );
     const designed = new Set(architectureValue.components.flatMap(({ resourceTypes }) => resourceTypes));
     const findings = (await governanceFindings(service, issued.task.taskId)) as Array<
@@ -1342,7 +1350,9 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
     );
     await assert.rejects(
       service.completeArchitecture(issued.task.taskId, architectureValue, partialCost, manifest, []),
-      /Policy mappings are required/u,
+      architectureProblem(
+        /^Policy mappings are required for \d+ enforcing findings; read them with apex\/readTaskInput/u,
+      ),
     );
     const mappings = policyMap(initialized.runId, "0".repeat(64), decided).mappings;
     await assert.rejects(
@@ -1350,7 +1360,84 @@ test("architecture task waits for a kernel-owned decision and resumes the issued
         ...mappings,
         { ...mappings[0]!, disposition: "planned", logicalResourceId: "missing-component" },
       ]),
-      /Policy mapping is duplicated|Policy mapping must name an Architecture component/u,
+      architectureProblem(/Policy mapping is duplicated|Policy mapping must name an Architecture component/u),
+    );
+    const broken = structuredClone(architectureValue) as unknown as Record<string, unknown> & {
+      wellArchitectedAssessment: { pillars: Array<{ status: string }> };
+    };
+    broken.wellArchitectedAssessment.pillars[1]!.status = "partial";
+    broken.decisionRecords = [
+      {
+        id: "ADR-0001",
+        title: "Database",
+        context: "Context",
+        decision: "Decision",
+        requirementIds: ["REQ-1"],
+        alternatives: ["a", "b"].map((option) => ({
+          option,
+          benefits: ["listed"],
+          drawbacks: ["listed"],
+          rejectionReason: "Reason",
+        })),
+        positiveConsequences: ["Good"],
+        negativeConsequences: ["Bad"],
+        wafImpacts: {
+          security: "x",
+          reliability: "x",
+          "performance-efficiency": "x",
+          "cost-optimization": "x",
+          "operational-excellence": "x",
+        },
+        complianceConsiderations: "None",
+        implementationNotes: "None",
+      },
+    ];
+    const lateCost = structuredClone(partialCost);
+    lateCost.lineItems[0]!.source.retrievedAt = "2026-10-02T13:37:00Z";
+    const unmapped = mappings.map(({ propertyPath: _omitted, ...mapping }) => mapping);
+    await assert.rejects(
+      service.completeArchitecture(
+        issued.task.taskId,
+        broken as unknown as typeof architectureValue,
+        lateCost,
+        manifest,
+        unmapped as typeof mappings,
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof ApexError && error.code === "APEX_VALIDATION");
+        const details = error.details as Array<{ path: string; message: string }>;
+        const at = (path: string) => details.find((issue) => issue.path === path)?.message;
+        assert.match(error.message, /^architectureComplete found \d+ problems; fix them all/u);
+        assert.equal(
+          at("/architecture/wellArchitectedAssessment/pillars/1/status"),
+          'Expected one of: "aligned", "concern", "blocker", "not-applicable"',
+        );
+        assert.equal(at("/architecture/decisionRecords/0/alternatives/1/benefits"), "Expected string");
+        assert.match(at("/costEstimate/lineItems/0/source/retrievedAt") ?? "", /UTC with milliseconds/u);
+        assert.equal(at("/policyMappings/0/propertyPath"), "Expected required property");
+        return true;
+      },
+    );
+    const misplaced = structuredClone(manifest);
+    misplaced.skuDecisions[0]!.service = "wrong-service";
+    misplaced.skuDecisions[0]!.requirementIds = [...misplaced.skuDecisions[0]!.requirementIds, "REQ-UNKNOWN"];
+    await assert.rejects(
+      service.completeArchitecture(issued.task.taskId, architectureValue, partialCost, misplaced, mappings),
+      (error: unknown) => {
+        assert.ok(error instanceof ApexError);
+        const messages = (error.details as Array<{ path: string; message: string }>).map(
+          ({ path, message }) => `${path} ${message}`,
+        );
+        assert.ok(
+          messages.some((line) => /^\/decisionManifest\/skuDecisions\/0\/service .*must equal component/u.test(line)),
+        );
+        assert.ok(
+          messages.some((line) =>
+            /^\/decisionManifest\/skuDecisions\/0\/requirementIds .*REQ-UNKNOWN not listed/u.test(line),
+          ),
+        );
+        return true;
+      },
     );
     const completed = await service.completeArchitecture(
       issued.task.taskId,

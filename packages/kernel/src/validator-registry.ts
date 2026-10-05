@@ -22,6 +22,15 @@ interface RegisteredValidator {
   kind: ValidatorKind;
 }
 
+// "Expected union value" gives an agent nothing to correct; enumerations name their allowed values instead.
+function literalUnionMessage(schema: TSchema): string | undefined {
+  const options = (schema as { anyOf?: unknown }).anyOf;
+  if (!Array.isArray(options) || options.length === 0) return undefined;
+  if (!options.every((option) => option !== null && typeof option === "object" && Object.hasOwn(option, "const")))
+    return undefined;
+  return `Expected one of: ${options.map((option) => JSON.stringify((option as { const: unknown }).const)).join(", ")}`;
+}
+
 export class ValidatorRegistry {
   private readonly validators = new Map<string, RegisteredValidator>();
   private readonly cache = new Map<string, Omit<ValidationResult, "cached">>();
@@ -32,7 +41,7 @@ export class ValidatorRegistry {
       (value) =>
         [...Value.Errors(schema, value)].map((error) => ({
           path: error.path,
-          message: error.message,
+          message: literalUnionMessage(error.schema) ?? error.message,
         })),
       kind,
     );

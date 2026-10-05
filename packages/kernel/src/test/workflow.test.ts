@@ -203,6 +203,26 @@ test("kernel validates freeform, single-select, and multi-select answers", () =>
   );
 });
 
+test("validator registry names the allowed values of a failed literal union", () => {
+  const registry = new ValidatorRegistry();
+  registry.register(
+    "status",
+    Type.Object(
+      {
+        status: Type.Union([Type.Literal("aligned"), Type.Literal("concern")]),
+        shape: Type.Union([Type.String(), Type.Integer()]),
+      },
+      { additionalProperties: false },
+    ),
+  );
+  const { issues } = registry.validate("status", { status: "partial", shape: false });
+  assert.deepEqual(
+    issues.find(({ path }) => path === "/status"),
+    { path: "/status", message: 'Expected one of: "aligned", "concern"' },
+  );
+  assert.equal(issues.find(({ path }) => path === "/shape")?.message, "Expected union value");
+});
+
 test("validator registry caches pure results by content and never caches freshness or authorization", () => {
   const schema = Type.Object({ value: Type.Integer() }, { additionalProperties: false });
   const registry = new ValidatorRegistry();
