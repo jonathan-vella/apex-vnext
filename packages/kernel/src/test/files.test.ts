@@ -43,3 +43,12 @@ test("renameWithRetry gives up after the attempt budget and never retries other 
   await assert.rejects(renameWithRetry("a.tmp", "a", { platform: "linux", rename: linux.rename }), { code: "EPERM" });
   assert.equal(linux.calls.length, 1);
 });
+
+test("renameWithRetry rejects attempt budgets outside 1 to 10", async () => {
+  for (const attempts of [0, 11, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+    await assert.rejects(
+      renameWithRetry("a.tmp", "a", { platform: "win32", attempts, rename: async () => {}, sleep: async () => {} }),
+      RangeError,
+    );
+  }
+});

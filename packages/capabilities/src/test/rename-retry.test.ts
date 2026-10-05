@@ -17,3 +17,12 @@ test("capabilities renameWithRetry matches the kernel retry policy", async () =>
   await assert.rejects(renameWithRetry("a.tmp", "a", { platform: "darwin", rename }), { code: "EPERM" });
   assert.equal(calls, 1);
 });
+
+test("renameWithRetry rejects attempt budgets outside 1 to 10", async () => {
+  for (const attempts of [0, 11, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+    await assert.rejects(
+      renameWithRetry("a.tmp", "a", { platform: "win32", attempts, rename: async () => {}, sleep: async () => {} }),
+      RangeError,
+    );
+  }
+});

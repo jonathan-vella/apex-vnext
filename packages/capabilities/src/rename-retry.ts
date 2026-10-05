@@ -15,6 +15,11 @@ export interface RenameRetryOptions {
  * make an atomic replace fail with EPERM, EACCES or EBUSY. Other platforms and other errors fail on the first attempt.
  */
 export async function renameWithRetry(from: string, to: string, options: RenameRetryOptions = {}): Promise<void> {
+  if (
+    options.attempts !== undefined &&
+    (!Number.isSafeInteger(options.attempts) || options.attempts < 1 || options.attempts > 10)
+  )
+    throw new RangeError("Rename attempts must be an integer from 1 to 10");
   const attempts = (options.platform ?? process.platform) === "win32" ? (options.attempts ?? 10) : 1;
   const move = options.rename ?? rename;
   const sleep =
