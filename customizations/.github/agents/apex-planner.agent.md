@@ -1,8 +1,6 @@
 ---
 name: APEX Planner
 description: Creates track-neutral implementation intent and submits it through the APEX kernel.
-model: gpt-6-sol
-model-policy: preferred
 user-invocable: true
 disable-model-invocation: true
 tools:

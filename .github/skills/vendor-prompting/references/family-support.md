@@ -33,7 +33,7 @@ Family status determines per-rule severity overrides.
 | `gpt-codex`     | reviewer-only | Decision-log only; no automated enforcement        | `GPT-5.3-Codex`     |
 | `gpt-4o`        | reviewer-only | Legacy; no new enforcement                         | `GPT-4o`            |
 | `mai-code`      | reviewer-only | Microsoft model; no MAI-specific prompting rules   | `MAI-Code-1.1-Flash (copilot)` (VS Code); `mai-code-1.1-flash` (CLI); `MAI-Code-1-Flash` (deprecated) |
-| `unknown`       | enforced      | Raises ERROR to force explicit `model:` value      | (anything else)     |
+| `unknown`       | enforced      | Family-neutral rules only; repository agents omit `model:` | (no model, anything else) |
 
 ## How severity is computed
 

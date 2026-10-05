@@ -113,7 +113,7 @@ pre-commit:
       fail_text: |
         ❌ Agent validation failed!
 
-        Checks: frontmatter syntax, model-prompt alignment, body size (<500 lines),
+        Checks: frontmatter syntax, no model pins, body size (<500 lines),
         language density (<5 absolute terms per 100 lines), classifier unit tests,
         managed role and hidden-worker contracts
         📚 Reference: customizations/.github/instructions/apex-agent-authoring.instructions.md

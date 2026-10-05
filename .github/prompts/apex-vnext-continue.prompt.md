@@ -1,7 +1,6 @@
 ---
 description: "Resume and execute the next bounded APEX vNext project slice with durable checkpoints and integration safeguards."
 agent: agent
-model: "Claude Opus 4.7"
 argument-hint: "Optional: issue number or approved roadmap slice. Leave blank to resume from the durable checkpoint."
 tools: [vscode/askQuestions, execute/runInTerminal, read, search, edit, todo, agent]
 ---

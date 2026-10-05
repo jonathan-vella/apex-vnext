@@ -162,7 +162,7 @@ and `976871e9` cover the sidekick. `b3808832` covers `ask_user` and `/agent`, `d
 results and the maintainer's decisions of the same day select these options:
 
 1. Slice 3 uses `model`, `model-policy` and `reasoning-effort`. Every listed model must support the declared effort.
-   User effort overrides remain a CLIENT-025 gap.
+   User effort overrides remain a CLIENT-025 gap. DECISION-033 later removed these model pins.
 2. Slice 4 renders `.mcp.json` with a server command that does not depend on the session directory.
 3. Slice 5 collects required input in the foreground before delegation; the client's selection step with a prompt
    remains the fallback. The maintainer deferred the sidekick.

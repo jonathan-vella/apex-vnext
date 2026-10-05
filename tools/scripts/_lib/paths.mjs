@@ -19,7 +19,7 @@ export const PROMPTS_DIR = "tools/apex-prompts";
  * Additional prompt-source directories scanned by `getPromptFiles()`.
  * `tools/tests/prompts/` holds E2E loop and benchmark prompts that ship
  * alongside production prompts and must satisfy the same vendor-prompting
- * rules (notably `prompt-model-source-001`).
+ * rules (notably `model-pin-001`).
  */
 export const PROMPT_SOURCE_DIRS = ["tools/apex-prompts", "tools/tests/prompts"];
 

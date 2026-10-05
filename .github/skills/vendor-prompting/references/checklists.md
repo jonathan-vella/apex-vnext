@@ -17,12 +17,9 @@ Two parallel checklists: agent (`*.agent.md`) and prompt
 
 ### Cross-vendor (apply to every agent)
 
-- [ ] **R-X-3** Frontmatter `model:` uses exact Copilot CLI model IDs, not display names.
-      _(rule `frontmatter-model-style-001`)_
-      Hint: `head -10 <file>` and confirm `model: gpt-6-sol` (or an ordered list of IDs).
-- [ ] **R-X-2** No `handoffs[].model` overrides match the target
-      agent's own model. _(rule `legacy-002`)_
-      Hint: `--only=vendor-prompting` flags `legacy-002`.
+- [ ] **R-X-3** Frontmatter has no `model:`, `model-policy:` or `reasoning-effort:`.
+      _(rule `model-pin-001`)_
+      Hint: `head -10 <file>`.
 - [ ] **R-X-4** Every `handoffs[].prompt` contains both an Input
       reference and an Output reference. _(rule `handoff-enrichment-001`)_
       Hint: `grep -A1 "prompt:" <file> | grep -E "agent-output|Input:|Output:"`.
@@ -31,9 +28,6 @@ Two parallel checklists: agent (`*.agent.md`) and prompt
       _(rule `cross-language-density-001`)_
       Hint: `grep -ciE "ALWAYS|NEVER|MUST|HARD RULE" <file>` and divide
       by `wc -l`.
-- [ ] **R-X-8** Model is not on the deprecation list.
-      _(rule `model-deprecation-001`)_
-      Hint: `node tools/scripts/validate-models.mjs --only=deprecated`.
 
 ### Claude family (Opus / Sonnet / Haiku)
 
@@ -91,13 +85,9 @@ Two parallel checklists: agent (`*.agent.md`) and prompt
 
 ### Cross-vendor
 
-- [ ] **R-X-3** Frontmatter `model:` is string form, not array.
-      _(rule `frontmatter-model-style-001`)_
-- [ ] **R-X-1** Prompt `model:` matches target agent's `model:`.
-      _(rule `legacy-001` / `prompt-model-sync-001`)_
+- [ ] **R-X-3** Frontmatter has no `model:`, `model-policy:` or `reasoning-effort:`.
+      _(rule `model-pin-001`)_
       Hint: `node tools/scripts/validate-agents.mjs --only=vendor-prompting`.
-- [ ] **R-X-8** Model is not on the deprecation list.
-      _(rule `model-deprecation-001`)_
 
 ### Claude family (when prompt targets a Claude agent)
 
@@ -132,5 +122,5 @@ Apply gate from
 - APPROVED if errors == 0 AND warnings ≤ 5
 - NEEDS_REVISION otherwise
 - REJECTED if any rule violation indicates the agent will fail at
-  runtime (e.g., `frontmatter-model-style-001`,
+  runtime (e.g., `model-pin-001`,
   `claude-no-prefill-001` on a Claude 4.6+ target)

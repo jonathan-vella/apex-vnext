@@ -489,16 +489,6 @@
       }
     },
     {
-      "id": "validate-deprecated-models",
-      "script": "validate:deprecated-models",
-      "profile": "node-validation",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
       "id": "validate-extension-bloat",
       "script": "validate:extension-bloat",
       "profile": "node-validation",
@@ -542,46 +532,6 @@
       "id": "validate-instruction-checks",
       "script": "validate:instruction-checks",
       "profile": "node-validation",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
-      "id": "validate-model-catalog",
-      "script": "validate:model-catalog",
-      "profile": "node-validation",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
-      "id": "validate-model-consistency",
-      "script": "validate:model-consistency",
-      "profile": "node-validation",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
-      "id": "validate-models",
-      "script": "validate:models",
-      "profile": "node-validation",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
-      "id": "test-models",
-      "script": "test:models",
-      "profile": "node-test",
       "aliases": [],
       "retirement": {
         "status": "active",
@@ -925,8 +875,6 @@
         "lint:glob-audit",
         "lint:orphaned-content",
         "validate:vscode",
-        "validate:models",
-        "test:models",
         "validate:region-canonical",
         "test:classify-model",
         "validate:no-hardcoded-counts",

@@ -1,8 +1,6 @@
 ---
 name: APEX Requirements
 description: Gathers missing requirements decisions and submits a typed result to the APEX kernel.
-model: gpt-6-sol
-model-policy: preferred
 user-invocable: true
 disable-model-invocation: true
 tools:

@@ -1,9 +1,6 @@
 ---
 name: APEX Validator
 description: Hidden worker that requests deterministic kernel validation and returns a typed verdict.
-model: gpt-6-luna
-model-policy: required
-reasoning-effort: max
 user-invocable: false
 tools:
   - apex/taskContext

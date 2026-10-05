@@ -3,62 +3,18 @@
 # Cross-Model Rules
 
 Rules that apply regardless of model family — handoff design,
-prompt↔agent sync, language calibration, decision logging.
+language calibration, decision logging.
 
-## Rule R-X-1 — Prompt model must match target agent model
+## Rule R-X-3 — No model pins
 
-> Source: [openai/skills upgrade-guide.md](.snapshots/openai-upgrade-guide.md)
-> "Pair each model usage with its prompt surface."
+> Source: [DECISIONS.md](../../../../docs/vnext/DECISIONS.md) DECISION-033.
 
-**Rule** (`legacy-001` / `prompt-model-sync-001`): a `.prompt.md`
-file's `model:` value must equal the target agent's `model:` value.
+**Rule** (`model-pin-001`): `.agent.md` and `.prompt.md` files must not
+declare `model:`, `model-policy:` or `reasoning-effort:`. The user picks
+the session model (auto by default); pins drift from the client picker
+and fail when a model is retired.
 
-```yaml
-# .prompt.md
----
-agent: 03-Architect
-model: "Claude Opus 4.8" # MUST match agent's model:
----
-```
-
-**Verification**: `node tools/scripts/validate-agents.mjs --only=vendor-prompting`
-emits `legacy-001` warning on mismatch.
-
-## Rule R-X-2 — No redundant handoff model overrides
-
-> Source: same upgrade-guide; "do not automatically upgrade older or
-> ambiguous model usages that may be intentionally pinned."
-
-**Rule** (`legacy-002`): `handoffs[].model` should NOT be set when it
-matches the target agent's own `model:`. Redundant overrides become
-stale during model rollouts.
-
-```yaml
-# Bad
-handoffs:
-  - agent: 03-Architect
-    model: "Claude Opus 4.8" # redundant — matches Architect's own
-    prompt: "..."
-
-# Good
-handoffs:
-  - agent: 03-Architect
-    prompt: "..."
-```
-
-## Rule R-X-3 — Frontmatter model style
-
-> Source: [agent-authoring.instructions.md](../../../../customizations/.github/instructions/apex-agent-authoring.instructions.md)
-> (existing repo convention).
-
-**Rule** (`frontmatter-model-style-001`):
-
-- `.agent.md` files: exact Copilot CLI model IDs — `model: claude-opus-4.7` or an ordered list of IDs
-- `.prompt.md` files: string form — `model: "Claude Opus 4.7"`
-- Bareword form for labels with parenthetical qualifiers (e.g.,
-  `model: Claude Foo (suffix)`) is **forbidden** — YAML misparses parens.
-
-**Severity**: error. This breaks frontmatter loading entirely.
+**Severity**: error.
 
 ## Rule R-X-4 — Handoff prompt enrichment
 
@@ -126,14 +82,3 @@ governance, approval gate, non-negotiable).
 - `non-negotiable` paragraphs (explicit invariants)
 
 Outside these, prefer decision rules over absolutes.
-
-## Rule R-X-8 — Model deprecation
-
-> Source: [validate-models.mjs](../../../../tools/scripts/validate-models.mjs) (`--only=deprecated`).
-
-**Rule** (`model-deprecation-001`): agents/prompts using a deprecated
-model label get warned. Cross-references the existing deprecation
-list. New deprecations land in
-[validate-models.mjs](../../../../tools/scripts/validate-models.mjs) (`--only=deprecated`);
-this rule re-emits them as `vendor-prompting` findings for unified
-audit reports.

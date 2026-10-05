@@ -5,7 +5,7 @@
  * Combines three agent validation checks into one script:
  * 1. Frontmatter validation (was validate-agent-frontmatter.mjs)
  * 2. Agent structural checks — body size + language density (was lint-agent-checks.mjs)
- * 3. Model-prompt alignment (was lint-model-alignment.mjs)
+ * 3. Model-family checks for agents that still declare a model (fixtures only)
  *
  * @example
  * node tools/scripts/validate-agents.mjs
@@ -53,7 +53,6 @@ function parseStructuredHandoffs(content) {
 
 const MAIN_AGENT_REQUIRED = ["name", "description", "user-invocable", "tools"];
 const SUBAGENT_REQUIRED = ["name", "description", "user-invocable", "tools"];
-const RECOMMENDED_FIELDS = ["model"];
 const RETIRED_VSCODE_FIELDS = ["argument-hint", "handoffs", "agents"];
 const RETIRED_VSCODE_TOOLS = new Map([
   ["vscode/askQuestions", "ask_user"],
@@ -130,11 +129,6 @@ function runFrontmatterValidation() {
         r.error(relativePath, `Retired VS Code tool '${tool}'; use '${RETIRED_VSCODE_TOOLS.get(tool)}'`);
       }
     }
-    const expectedPolicy = isSubagent ? "required" : "preferred";
-    if (frontmatter["model-policy"] !== expectedPolicy) {
-      r.error(relativePath, `model-policy must be '${expectedPolicy}' (got: ${frontmatter["model-policy"]})`);
-    }
-
     if (isSubagent) {
       const ui = frontmatter["user-invocable"];
       if (ui !== "false" && ui !== "never" && ui !== false) {
@@ -145,12 +139,6 @@ function runFrontmatterValidation() {
       const filename = relativePath.split("/").pop();
       if (ui !== "true" && ui !== "always" && ui !== true && !ALLOWED_NON_INVOCABLE_MAIN_AGENTS.has(filename)) {
         r.warn(relativePath, `Main agent should have user-invocable: true (got: ${ui})`);
-      }
-    }
-
-    if (!isSubagent) {
-      for (const field of RECOMMENDED_FIELDS) {
-        if (!(field in frontmatter)) r.warn(relativePath, `Missing recommended field '${field}'`);
       }
     }
 
@@ -344,13 +332,12 @@ function runAgentChecks() {
 }
 
 // ============================================================================
-// Part 3: Model-Prompt Alignment (was lint-model-alignment.mjs)
+// Part 3: Model-Family Checks
 // ============================================================================
 
 /**
  * Build a Map<lowercase-agent-name, { model, path }> from getAgents().
- * Shared by Check 1 (Prompt↔Agent model sync), Check 2 (handoff override
- * redundancy), and the prompt-model-source rule in vendor-prompting.
+ * Used to resolve a prompt's family through its target custom agent.
  */
 function buildAgentNameToModel() {
   const map = new Map();
@@ -398,104 +385,16 @@ function isGptFamily(family) {
 
 export { classifyModel, isClaude, isGpt55, isGptFamily };
 
-function normalizeModel(modelStr) {
-  if (!modelStr) return "";
-  const s = Array.isArray(modelStr) ? modelStr[0] : modelStr;
-  if (!s) return "";
-  return s
-    .replace(/\s*\(copilot\)/gi, "")
-    .replace(/[[\]"']/g, "")
-    .trim()
-    .toLowerCase();
-}
-
 function countBodyLines(content) {
   return getBody(content).split("\n").length;
 }
 
-function runModelAlignment() {
-  const r = new Reporter("Model-Prompt Alignment");
+function runModelFamilyChecks() {
+  const r = new Reporter("Model-Family Checks");
   r.header();
 
-  // Check 1: Prompt file model matches target agent
-  console.log("  Check 1: Prompt ↔ Agent model sync");
-  {
-    const agentModelMap = buildAgentNameToModel();
-    const prompts = getPromptFiles();
-
-    for (const [file, prompt] of prompts) {
-      const fm = prompt.frontmatter;
-      if (!fm) continue;
-
-      r.tick();
-      const promptModel = fm.model;
-      const targetAgent = fm.agent;
-
-      if (!targetAgent || !promptModel) continue;
-
-      const agentEntry = agentModelMap.get(targetAgent.toLowerCase());
-      if (!agentEntry) continue;
-
-      const promptNorm = normalizeModel(promptModel);
-      const agentNorm = normalizeModel(agentEntry.model);
-
-      if (promptNorm && agentNorm && promptNorm !== agentNorm) {
-        r.warn(file, `prompt model "${promptModel}" does not match agent "${targetAgent}" model "${agentEntry.model}"`);
-        r.record({
-          ruleId: "legacy-001",
-          severity: "warn",
-          file,
-          message: `prompt model "${promptModel}" does not match agent "${targetAgent}" model "${agentEntry.model}"`,
-          sourceUrl:
-            "https://github.com/openai/skills/blob/724cd511c96593f642bddf13187217aa155d2554/skills/.curated/openai-docs/references/upgrade-guide.md",
-        });
-      }
-    }
-  }
-
-  // Check 2: Handoff model override redundancy
-  console.log("  Check 2: Handoff model override redundancy");
-  {
-    const agents = getAgents();
-    const agentModelMap = new Map();
-    for (const [name, entry] of buildAgentNameToModel()) {
-      agentModelMap.set(name, entry.model);
-    }
-
-    for (const [_filename, agent] of agents) {
-      const handoffs = agent.frontmatter?.handoffs;
-      if (!Array.isArray(handoffs)) continue;
-
-      r.tick();
-      const relPath = path.relative(process.cwd(), agent.path);
-
-      for (const handoff of handoffs) {
-        if (!handoff.model || !handoff.agent) continue;
-
-        const targetModel = agentModelMap.get(handoff.agent.toLowerCase());
-        if (!targetModel) continue;
-
-        const handoffNorm = normalizeModel(handoff.model);
-        const targetNorm = normalizeModel(targetModel);
-
-        if (handoffNorm === targetNorm) {
-          r.warn(
-            relPath,
-            `handoff to "${handoff.agent}" has redundant model override "${handoff.model}" (matches agent's own model)`,
-          );
-          r.record({
-            ruleId: "legacy-002",
-            severity: "warn",
-            file: relPath,
-            message: `handoff to "${handoff.agent}" has redundant model override "${handoff.model}"`,
-          });
-        }
-      }
-    }
-  }
-
-  // Check 3: Large Claude agents missing context_awareness
-  console.log("  Check 3: Claude large-agent context_awareness");
+  // Check 1: Large Claude agents missing context_awareness
+  console.log("  Check 1: Claude large-agent context_awareness");
   {
     const agents = getAgents();
 
@@ -529,10 +428,10 @@ function runModelAlignment() {
     }
   }
 
-  // Check 4: Claude non-ONE-SHOT research agents missing investigate block
+  // Check 2: Claude non-ONE-SHOT research agents missing investigate block
   const INVESTIGATE_AGENTS = ["03-architect", "05-iac-planner", "11-context-optimizer"];
 
-  console.log("  Check 4: Claude investigate_before_answering");
+  console.log("  Check 2: Claude investigate_before_answering");
   {
     const agents = getAgents();
 
@@ -565,9 +464,9 @@ function runModelAlignment() {
   r.summary();
   if (r.errors > 0) {
     overallFailed = true;
-    console.log("❌ Model-prompt alignment check FAILED\n");
+    console.log("❌ Model-family checks FAILED\n");
   } else {
-    console.log("✅ Model-prompt alignment check passed\n");
+    console.log("✅ Model-family checks passed\n");
   }
   allFindings.push(...r.findings);
 }
@@ -614,13 +513,6 @@ const VENDOR_RULES = [
       "https://github.com/openai/skills/blob/724cd511c96593f642bddf13187217aa155d2554/skills/.curated/openai-docs/references/prompting-guide.md#outcome-first-prompts-and-stopping-conditions",
   },
   {
-    id: "model-deprecation-001",
-    severity: "warn",
-    appliesTo: "both",
-    sourceUrl:
-      "https://github.com/openai/skills/blob/724cd511c96593f642bddf13187217aa155d2554/skills/.curated/openai-docs/references/upgrade-guide.md",
-  },
-  {
     id: "claude-no-prefill-001",
     severity: "warn",
     appliesTo: "both",
@@ -633,13 +525,6 @@ const VENDOR_RULES = [
     appliesTo: "agent",
     sourceUrl:
       "https://github.com/openai/skills/blob/724cd511c96593f642bddf13187217aa155d2554/skills/.curated/openai-docs/references/prompting-guide.md#outcome-first-prompts-and-stopping-conditions",
-  },
-  {
-    id: "frontmatter-model-style-001",
-    severity: "error",
-    appliesTo: "both",
-    sourceUrl:
-      "https://github.com/jonathan-vella/apex-vnext/blob/main/customizations/.github/instructions/apex-agent-authoring.instructions.md",
   },
   {
     id: "claude-output-contract-001",
@@ -663,11 +548,11 @@ const VENDOR_RULES = [
       "https://github.com/openai/skills/blob/724cd511c96593f642bddf13187217aa155d2554/skills/.curated/openai-docs/references/prompting-guide.md#personality-and-behavior",
   },
   {
-    id: "prompt-model-source-001",
+    id: "model-pin-001",
     severity: "error",
-    appliesTo: "prompt",
+    appliesTo: "both",
     sourceUrl:
-      "https://github.com/jonathan-vella/apex-vnext/blob/main/customizations/.github/instructions/apex-prompt-authoring.instructions.md",
+      "https://github.com/jonathan-vella/apex-vnext/blob/main/docs/vnext/DECISIONS.md#decision-033-support-native-windows-clients-and-deliver-apex-as-an-agent-plugin",
   },
 ];
 
@@ -834,25 +719,6 @@ function checkAbsoluteLanguageDensity(r, agent, file, family) {
   }
 }
 
-/** Check 9: model-deprecation-001 — light cross-reference */
-function checkModelDeprecation(r, agent, file, family, deprecatedSet) {
-  const m = agent.frontmatter?.model;
-  if (!m) return;
-  const norm = (Array.isArray(m) ? m[0] : m).toLowerCase();
-  for (const dep of deprecatedSet) {
-    if (norm.includes(dep.toLowerCase())) {
-      emit(
-        r,
-        "model-deprecation-001",
-        family,
-        file,
-        `Model "${m}" matches deprecated label "${dep}" — see validate-models.mjs --only=deprecated`,
-      );
-      return;
-    }
-  }
-}
-
 /** Check 10R: claude-no-prefill-001 */
 function checkClaudeNoPrefill(r, item, file, family) {
   if (!isClaude(family)) return;
@@ -885,26 +751,6 @@ function checkGpt55StopRulesNonEmpty(r, agent, file, family) {
     .filter((l) => l && !l.startsWith("<!--"));
   if (sectionBody.length === 0) {
     emit(r, "gpt55-stop-rules-non-empty-001", family, file, `# Stop rules section is empty (header only)`);
-  }
-}
-
-/** Check 12: frontmatter-model-style-001 */
-const CLI_MODEL_ID = /^[a-z0-9][a-z0-9.-]*$/u;
-
-function checkFrontmatterModelStyle(r, item, file, family, fileType) {
-  const m = item.frontmatter?.model;
-  if (m === undefined || m === null) return;
-  const invalid = (Array.isArray(m) ? m : [m]).filter((id) => typeof id !== "string" || !CLI_MODEL_ID.test(id));
-  if (fileType === "agent" && invalid.length > 0) {
-    emit(
-      r,
-      "frontmatter-model-style-001",
-      family,
-      file,
-      `.agent.md model: must use Copilot CLI model IDs, got ${invalid.join(", ")}`,
-    );
-  } else if (fileType === "prompt" && Array.isArray(m)) {
-    emit(r, "frontmatter-model-style-001", family, file, `.prompt.md model: must be string form, got array`);
   }
 }
 
@@ -946,49 +792,13 @@ function checkHandoffEnrichment(r, agent, file, family) {
   }
 }
 
-/**
- * Check 15: prompt-model-source-001
- *
- * Enforces the prompt-frontmatter HARD rule:
- *   - `agent: "<custom-agent>"` → MUST NOT declare `model:` (let it inherit).
- *   - `agent: agent` (generic) or no `agent:` → MUST declare explicit `model:`.
- *
- * Runs only on prompts. `agentNameToModel` is the lowercase-agent-name →
- * { model, path } map produced by `buildAgentNameToModel()`.
- */
-function checkPromptModelSource(r, prompt, file, agentNameToModel) {
-  const fm = prompt.frontmatter;
-  if (!fm) return;
-  const agentField = fm.agent;
-  const modelField = fm.model;
-  const isGenericAgent = !agentField || (typeof agentField === "string" && agentField.toLowerCase() === "agent");
+/** Check 15: model-pin-001 — the user picks the session model. */
+const MODEL_PIN_FIELDS = ["model", "model-policy", "reasoning-effort"];
 
-  if (isGenericAgent) {
-    if (modelField === undefined || modelField === null || modelField === "") {
-      emit(
-        r,
-        "prompt-model-source-001",
-        "any",
-        file,
-        `prompt without a custom agent must declare an explicit \`model:\` (got agent="${agentField ?? "<missing>"}")`,
-      );
-    }
-    return;
-  }
-
-  // Custom-agent target.
-  const targetKey = typeof agentField === "string" ? agentField.toLowerCase() : null;
-  const isKnownCustomAgent = targetKey !== null && agentNameToModel.has(targetKey);
-
-  if (isKnownCustomAgent && modelField !== undefined && modelField !== null && modelField !== "") {
-    emit(
-      r,
-      "prompt-model-source-001",
-      "any",
-      file,
-      `redundant \`model:\` on prompt targeting custom agent "${agentField}"; remove it and let the agent's \`model:\` apply`,
-    );
-  }
+function checkModelPin(r, item, file) {
+  const fields = MODEL_PIN_FIELDS.filter((field) => item.frontmatter && field in item.frontmatter);
+  if (fields.length === 0) return;
+  emit(r, "model-pin-001", "any", file, `remove ${fields.join(", ")}; the session model applies`);
 }
 
 /**
@@ -1031,34 +841,14 @@ function emit(r, ruleId, family, file, message) {
   });
 }
 
-/**
- * Load the deprecated-model labels by parsing
- * tools/scripts/validate-models.mjs source. Light grep — avoids
- * importing the whole script.
- */
-function loadDeprecatedModels() {
-  const file = "tools/scripts/validate-models.mjs";
-  if (!fs.existsSync(file)) return new Set();
-  const src = fs.readFileSync(file, "utf-8");
-  // Patterns like: "Claude Opus 4.6", or DEPRECATED_MODELS = [...]
-  const out = new Set();
-  const re = /["']([A-Z][A-Za-z0-9. -]+\d[A-Za-z0-9. -]*)["']/g;
-  let m;
-  while ((m = re.exec(src)) !== null) {
-    if (/^(Claude|GPT)/.test(m[1])) out.add(m[1]);
-  }
-  return out;
-}
-
 function runVendorPrompting() {
   const r = new Reporter("Vendor Prompting Rules");
   r.header();
 
   const agents = getAgents();
   const prompts = getPromptFiles();
-  const deprecated = loadDeprecatedModels();
   // lowercase-agent-name → { model, path }; used by the prompt loop to
-  // resolve effective family and enforce prompt-model-source-001.
+  // resolve effective family.
   const agentNameToModel = buildAgentNameToModel();
 
   for (const [_file, agent] of agents) {
@@ -1066,23 +856,11 @@ function runVendorPrompting() {
     const relPath = path.relative(process.cwd(), agent.path);
     const family = classifyModel(agent.frontmatter?.model);
 
-    // unknown model is itself an error (forces explicit model:)
-    if (family === "unknown" && agent.frontmatter?.model !== undefined) {
-      emit(
-        r,
-        "frontmatter-model-style-001",
-        family,
-        relPath,
-        `model "${agent.frontmatter.model}" did not classify into any known family`,
-      );
-    }
-
-    checkFrontmatterModelStyle(r, agent, relPath, family, "agent");
+    checkModelPin(r, agent, relPath);
     checkClaudeOneShotNoInvestigate(r, agent, relPath, family);
     checkGpt55Skeleton(r, agent, relPath, family);
     checkGptNoClaudeXml(r, agent, relPath, family);
     checkAbsoluteLanguageDensity(r, agent, relPath, family);
-    checkModelDeprecation(r, agent, relPath, family, deprecated);
     checkClaudeNoPrefill(r, agent, relPath, family);
     checkGpt55StopRulesNonEmpty(r, agent, relPath, family);
     checkClaudeOutputContract(r, agent, relPath, family);
@@ -1092,16 +870,10 @@ function runVendorPrompting() {
   for (const [_file, prompt] of prompts) {
     r.tick();
     const relPath = path.relative(process.cwd(), prompt.path);
-    // Resolve the prompt's effective family via its own `model:` first,
-    // then via the target custom agent's `model:`. This keeps per-prompt
-    // vendor checks active even when `model:` is intentionally omitted on
-    // prompts that target a custom agent (see prompt-model-source-001).
     const family = resolvePromptFamily(prompt, agentNameToModel);
 
-    checkFrontmatterModelStyle(r, prompt, relPath, family, "prompt");
+    checkModelPin(r, prompt, relPath);
     checkClaudeNoPrefill(r, prompt, relPath, family);
-    checkModelDeprecation(r, prompt, relPath, family, deprecated);
-    checkPromptModelSource(r, prompt, relPath, agentNameToModel);
   }
 
   r.summary();
@@ -1163,7 +935,7 @@ function listRules() {
 const PARTS = {
   frontmatter: runFrontmatterValidation,
   structural: runAgentChecks,
-  "model-alignment": runModelAlignment,
+  "model-family": runModelFamilyChecks,
   "vendor-prompting": runVendorPrompting,
 };
 

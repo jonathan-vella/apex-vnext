@@ -79,6 +79,7 @@ const CONFIG_SHAPES = {
 };
 const FORBIDDEN_TOOL = /(^|\/)(shell|terminal|filesystem|fs|edit|write|git|azure|az|bicep|terraform)(\/|$)/i;
 const RETIRED_AGENT_FIELDS = ["argument-hint", "handoffs", "agents"];
+const MODEL_PIN_FIELDS = ["model", "model-policy", "reasoning-effort"];
 const RETIRED_AGENT_TOOLS = ["vscode/askQuestions", "agent"];
 const INTERACTIVE_WEB_TOOLS = ["web_fetch"];
 const SECRET_KEY = /(secret|password|passwd|token|privateKey|clientSecret|connectionString)/i;
@@ -101,7 +102,6 @@ const ARM_MCP_READ_TOOLS = [
 
 const clone = (value) => structuredClone(value);
 const array = (value) => (Array.isArray(value) ? value : []);
-const modelIds = (value) => (typeof value === "string" ? [value] : array(value));
 const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const relative = (root, file) => path.relative(root, file).split(path.sep).join("/");
 const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));
@@ -686,13 +686,7 @@ function validateCustomizations(model, findings) {
   for (const [name, agent] of agents) {
     const frontmatter = agent.frontmatter;
     const role = roles.get(name);
-    if (
-      !frontmatter ||
-      !name ||
-      !frontmatter.description ||
-      !modelIds(frontmatter.model).length ||
-      typeof frontmatter["user-invocable"] !== "boolean"
-    )
+    if (!frontmatter || !name || !frontmatter.description || typeof frontmatter["user-invocable"] !== "boolean")
       finding(findings, "customization.frontmatter", `${agent.path} has incomplete frontmatter`, agent.path);
     if (frontmatter && "target" in frontmatter)
       finding(
@@ -703,13 +697,14 @@ function validateCustomizations(model, findings) {
       );
     if (!role)
       finding(findings, "customization.role-reference", `${name} has no manifest role`, "customizations/manifest.json");
-    if (role && !modelIds(frontmatter.model).includes(role.model))
-      finding(
-        findings,
-        "customization.model-role",
-        `${name} frontmatter model disagrees with its manifest role`,
-        agent.path,
-      );
+    for (const field of MODEL_PIN_FIELDS)
+      if (frontmatter && field in frontmatter)
+        finding(
+          findings,
+          "customization.model-pin",
+          `${name} must not declare ${field}; the session model applies`,
+          agent.path,
+        );
     const interactive = role?.interactionType === "interactive-handoff";
     if (interactive && frontmatter["user-invocable"] !== true)
       finding(findings, "customization.interactive", `${name} must be user-invocable`, agent.path);
@@ -771,8 +766,7 @@ function validateCustomizations(model, findings) {
       !frontmatter ||
       typeof frontmatter !== "object" ||
       frontmatter.target !== "github-copilot" ||
-      Array.isArray(frontmatter.model) ||
-      typeof frontmatter.model !== "string" ||
+      MODEL_PIN_FIELDS.some((field) => field in frontmatter) ||
       "handoffs" in frontmatter ||
       "agents" in frontmatter ||
       "argument-hint" in frontmatter ||

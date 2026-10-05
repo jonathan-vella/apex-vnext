@@ -175,8 +175,7 @@
       "agent": "APEX",
       "role": "coordinator",
       "supportedTargets": ["github-copilot"],
-      "interactionType": "interactive-handoff",
-      "model": "gpt-6-sol"
+      "interactionType": "interactive-handoff"
     },
     {
       "id": "requirements",
@@ -184,8 +183,7 @@
       "agent": "APEX Requirements",
       "role": "requirements",
       "supportedTargets": ["github-copilot"],
-      "interactionType": "interactive-handoff",
-      "model": "gpt-6-sol"
+      "interactionType": "interactive-handoff"
     },
     {
       "id": "architecture",
@@ -193,8 +191,7 @@
       "agent": "APEX Architect",
       "role": "architecture",
       "supportedTargets": ["github-copilot"],
-      "interactionType": "interactive-handoff",
-      "model": "gpt-6-sol"
+      "interactionType": "interactive-handoff"
     },
     {
       "id": "planning",
@@ -202,8 +199,7 @@
       "agent": "APEX Planner",
       "role": "planning",
       "supportedTargets": ["github-copilot"],
-      "interactionType": "interactive-handoff",
-      "model": "gpt-6-sol"
+      "interactionType": "interactive-handoff"
     },
     {
       "id": "operations",
@@ -211,8 +207,7 @@
       "agent": "APEX Operator",
       "role": "operations",
       "supportedTargets": ["github-copilot"],
-      "interactionType": "interactive-handoff",
-      "model": "gpt-5.6-terra"
+      "interactionType": "interactive-handoff"
     },
     {
       "id": "code-generation",
@@ -220,8 +215,7 @@
       "agent": "APEX CodeGen",
       "role": "code-generation",
       "supportedTargets": ["github-copilot"],
-      "interactionType": "autonomous-subagent",
-      "model": "gpt-6-luna"
+      "interactionType": "autonomous-subagent"
     },
     {
       "id": "review",
@@ -229,8 +223,7 @@
       "agent": "APEX Reviewer",
       "role": "review",
       "supportedTargets": ["github-copilot"],
-      "interactionType": "autonomous-subagent",
-      "model": "gpt-6-luna"
+      "interactionType": "autonomous-subagent"
     },
     {
       "id": "validation",
@@ -238,8 +231,7 @@
       "agent": "APEX Validator",
       "role": "validation",
       "supportedTargets": ["github-copilot"],
-      "interactionType": "autonomous-subagent",
-      "model": "gpt-6-luna"
+      "interactionType": "autonomous-subagent"
     }
   ],
   "invocationEdges": [

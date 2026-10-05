@@ -1,8 +1,6 @@
 ---
 name: APEX
 description: Fast coordinator for APEX status, resume, and next-step routing.
-model: gpt-6-sol
-model-policy: preferred
 user-invocable: true
 disable-model-invocation: true
 tools:

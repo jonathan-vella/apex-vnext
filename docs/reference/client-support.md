@@ -38,11 +38,9 @@ workers. CLI workers were enabled with maintainer authorization after bounded Lu
 not authorization. Kernel task, evidence, ownership and approval checks remain mandatory, and worker tool grants are
 unchanged. A directly selectable profile is not itself a security failure.
 
-The coordinator, Requirements, Architect and Planner use `gpt-6-sol`, and Operator uses
-`gpt-5.6-terra`, each with `model-policy: preferred`. CodeGen, Reviewer and Validator use `gpt-6-luna` with
-`model-policy: required` and `reasoning-effort: max`. Copilot CLI `1.0.88` honors these fields for delegated and
-directly selected agents, but a user `subagents` override can still lower a worker's effort. Historical Sol
-qualification records refer to the previous identifier; they do not qualify the new model selection.
+Managed agents carry no `model`, `model-policy` or `reasoning-effort` (DECISION-033). Every agent, including the
+hidden workers, runs on the session model the user picks; auto is the default. Historical qualification records name
+the models that were pinned when they ran; they do not qualify any other model.
 
 Ask `APEX` what is next. The `apex-next` skill names the kernel-selected owner, then delegates a hidden worker or prints
 `/agent <name>` with a scope prompt to paste after you switch. Interactive specialists run in the foreground, because

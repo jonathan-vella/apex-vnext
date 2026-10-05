@@ -9,8 +9,7 @@
  * Scope: this validator is the IDE-mapping channel. It only checks schemas
  * registered in `.vscode/settings.json` `json.schemas`. Other schemas under
  * `tools/schemas/` are loaded directly by dedicated validators
- * (e.g. `validate-models.mjs`, `validate-workflow-graph.mjs`,
- * `validate-session-state.mjs`, `validate-explorer-graph.mjs`,
+ * (e.g. `validate-workflow-graph.mjs`, `validate-session-state.mjs`, `validate-explorer-graph.mjs`,
  * `validate-governance-refs.mjs`). Both channels are intentional: this one
  * keeps the editor's red squigglies aligned with CI; the dedicated
  * validators add semantic checks beyond raw schema conformance.
