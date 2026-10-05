@@ -37,6 +37,12 @@
       "fetched_at": "2026-06-30T20:01:04.090Z",
       "sha256": "87f4ff8e5a530d8d3282044247cb8ddae857f1c89ee0735751109af2a22fda10",
       "fetch_method": "fetch-webpage"
+    },
+    {
+      "id": "apex-decision-033",
+      "vendor": "apex",
+      "url": "https://github.com/jonathan-vella/apex-vnext/blob/main/docs/vnext/DECISIONS.md#decision-033-support-native-windows-clients-and-deliver-apex-as-an-agent-plugin",
+      "ref": null
     }
   ],
   "families": [
@@ -339,8 +345,8 @@
       "severity": "error",
       "summary": "Agents and prompts must not declare model:, model-policy: or reasoning-effort:; the session model applies.",
       "rationale": "DECISION-033 removes model pins. Users pick the session model (auto by default), so pinned models drift from the client picker and break when a model is retired or unavailable.",
-      "source_id": "openai-upgrade-guide",
-      "source_anchor": "upgrade-posture",
+      "source_id": "apex-decision-033",
+      "source_anchor": "decision-033-support-native-windows-clients-and-deliver-apex-as-an-agent-plugin",
       "validator_check_id": "checkModelPin",
       "promotion_date": null,
       "family_overrides": []

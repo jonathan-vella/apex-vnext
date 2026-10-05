@@ -258,7 +258,7 @@ the PRD owns acceptance. Applicable follow-ons belong in existing phases, not a 
 | R-19: New telemetry        | Not current scope under DECISION-025; preserve utilities and reconcile executable gates.     |
 | R-20: Reviewer packs       | First batch 2: bounded evidence and exact criteria for all four unchanged review passes.     |
 | R-21: Parallel reviews     | Deferred: scheduler and head/commit semantics need a separate correctness design.            |
-| R-22: CLI workers          | Shipped in CLI; requalify in the CLI-only projection with required worker models.            |
+| R-22: CLI workers          | Shipped in CLI; requalify in the CLI-only projection on the user-selected session model.     |
 | R-23: Partial invalidation | Reject ID-only invalidation; Phase 3 reuses unchanged decisions with conservative proof.     |
 | R-24: Recommendations      | Phase 3: recommend permitted choices; never record or accept risk without confirmation.      |
 

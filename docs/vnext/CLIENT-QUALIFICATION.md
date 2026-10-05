@@ -367,8 +367,10 @@ client-capability failure is an explicit qualification gap, not permission to su
 
 On 2026-09-23, the maintainer authorized qualifying, enabling and shipping all three workers for personal candidate
 testing. Adapter `1.6.0` includes CodeGen, Reviewer and Validator in standalone CLI and combined installations without
-adding worker tools. All three profiles select `gpt-6-luna` and retain `reasoning-effort: max`; owning parents use
-`gpt-6-sol`. The earlier attempts below remain historical evidence, not the current shipping decision.
+adding worker tools. At that time all three profiles selected `gpt-6-luna` with `reasoning-effort: max`, and owning
+parents used `gpt-6-sol`. DECISION-033 later removed these model pins; workers now run on the session model the user
+picks. This attempt qualified the pinned profiles only. The earlier attempts below remain historical evidence, not the
+current shipping decision.
 
 CLI `1.0.87` session `993f7d6e-1914-4dab-8006-fbc3192a8f9a` delegated from Planner to CodeGen and Validator on Luna.
 The installed Bicep compiler executed all six required checks for the storage-only fixture; generation and validation
