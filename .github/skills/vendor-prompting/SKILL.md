@@ -48,9 +48,9 @@ I am editing or reviewing a *.agent.md / *.prompt.md ...
 │   ├── GPT-5.5                     → load references/gpt-5-prompting.md
 │   ├── GPT-5.4                     → load references/gpt-5-prompting.md (shared OpenAI cohort)
 │   ├── GPT-Codex / GPT-4o          → reviewer-only; minimal automated rules
-│   └── Unknown / missing           → ERROR: force explicit model: in frontmatter
+│   └── Unknown / missing           → family-neutral rules only (repository agents carry no model)
 │
-├── Is this a .prompt.md (single string model:) or .agent.md (array)?
+├── Is this a .prompt.md or an .agent.md?
 │   ├── prompt → load references/checklists.md "prompt" column
 │   └── agent  → load references/checklists.md "agent" column
 │
@@ -63,8 +63,9 @@ I am editing or reviewing a *.agent.md / *.prompt.md ...
 `classifyModel()` lower-cases the `model:` value and matches substrings in priority order
 to assign a family (`claude-opus` / `claude-sonnet` / `claude-haiku` / `claude` / `gpt-5.6`
 / `gpt-5.5` / `gpt-5.4` / `gpt-codex` / `gpt-4o` / `unknown`). For agents with `model:` as a list,
-the first entry decides the family; agents must use exact Copilot CLI model IDs — see rule
-`frontmatter-model-style-001` in [`rules.json`](rules.json).
+the first entry decides the family. Repository agents and prompts carry no model (DECISION-033), so they
+resolve to `unknown`; rule `model-pin-001` in [`rules.json`](rules.json) rejects `model:`, `model-policy:` and
+`reasoning-effort:`. Family detection applies to test fixtures and to audits of external prompts.
 
 Full match table, severity status per family (`enforced` / `warn-only` / `reviewer-only` /
 `out-of-scope`), and rule subsets per family live in
@@ -79,7 +80,7 @@ Load only the references your task needs. Most audits need 1-2.
 | [claude-best-practices.md](references/claude-best-practices.md) | Authoring or auditing a Claude agent                                   |
 | [gpt-5-prompting.md](references/gpt-5-prompting.md)             | Authoring or auditing a GPT-5.5 agent                                  |
 | [gpt-5-upgrade.md](references/gpt-5-upgrade.md)                 | Migrating an agent from GPT-5.4 → GPT-5.5 (prompt-style upgrade patterns) |
-| [cross-model-rules.md](references/cross-model-rules.md)         | Handoff design, prompt↔agent sync, language calibration                |
+| [cross-model-rules.md](references/cross-model-rules.md)         | Handoff design, model pins, language calibration                       |
 | [family-support.md](references/family-support.md)               | Picking a model family for a new agent                                 |
 | [checklists.md](references/checklists.md)                       | Performing a manual pass-through audit                                 |
 | [audit-procedure.md](references/audit-procedure.md)             | Executing the full 6-step audit                                        |
@@ -88,8 +89,7 @@ Load only the references your task needs. Most audits need 1-2.
 
 - **Source of truth is `rules.json`** — every rule has an ID, severity, source citation, applies-to, and validator-check binding; this skill prose only references it
 - **Model family is decided by the FIRST entry** in a model array (agents); the table in [Model-Family Detection](#model-family-detection-mirrors-validate-agentsmjs-classifymodel) is canonical
-- **`unknown` family = ERROR** — always require an explicit `model:` value that the validator can classify
-- **Bareword YAML for parenthetical model labels is forbidden** (`model: Claude Foo (suffix)` — see rule `frontmatter-model-style-001`)
+- **No model pins** — agents and prompts omit `model:`, `model-policy:` and `reasoning-effort:`; the session model applies (rule `model-pin-001`)
 - **Do NOT load this skill for routine edits** — the auto-loaded thin instruction `vendor-prompting.instructions.md` carries the hard-rule shortlist
 - **Run `npm run lint:vendor-prompting`** before opening a PR; every finding includes a `ruleId` that maps to a `rules.json` entry
 - **Verdict thresholds** — APPROVED if zero `error`s and ≤ 5 `warn`s; otherwise NEEDS_REVISION with per-rule remediation

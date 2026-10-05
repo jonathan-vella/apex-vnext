@@ -22,8 +22,8 @@ root skill and instruction, including repository-only and deferred surfaces.
 
 ## One Projection, Two Hosts
 
-Managed agents use Copilot CLI frontmatter: exact CLI model IDs, `model-policy` (`required` for workers, `preferred`
-for interactive agents) and `reasoning-effort`. Standalone Copilot CLI and the VS Code Copilot harness run the same
+Managed agents use Copilot CLI frontmatter without model pins: no `model`, `model-policy` or `reasoning-effort`. Each
+session uses the model the user picks (DECISION-033). Standalone Copilot CLI and the VS Code Copilot harness run the same
 projection; `github-copilot-vscode` remains only the evidence identity for VS Code runs. The VS Code Local projection is
 retired and archived under `.archive/vscode-projection/`.
 

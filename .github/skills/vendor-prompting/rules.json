@@ -37,6 +37,12 @@
       "fetched_at": "2026-06-30T20:01:04.090Z",
       "sha256": "87f4ff8e5a530d8d3282044247cb8ddae857f1c89ee0735751109af2a22fda10",
       "fetch_method": "fetch-webpage"
+    },
+    {
+      "id": "apex-decision-033",
+      "vendor": "apex",
+      "url": "https://github.com/jonathan-vella/apex-vnext/blob/main/docs/vnext/DECISIONS.md#decision-033-support-native-windows-clients-and-deliver-apex-as-an-agent-plugin",
+      "ref": null
     }
   ],
   "families": [
@@ -130,42 +136,10 @@
       "family": "unknown",
       "status": "enforced",
       "label_examples": [],
-      "rule_subset_note": "Unknown model classification raises an error to force explicit model: in frontmatter."
+      "rule_subset_note": "Agents and prompts without a model resolve here; only family-neutral rules apply."
     }
   ],
   "rules": [
-    {
-      "id": "legacy-001",
-      "vendor": "cross-vendor",
-      "model_families": [
-        "any"
-      ],
-      "applies_to": "prompt",
-      "severity": "warn",
-      "summary": "Prompt file model: must match its target agent's model: when both are present.",
-      "rationale": "Mismatched models cause runtime selection drift; the prompt's frontmatter model: is the source the user sees in chat.",
-      "source_id": "anthropic-prompting-best-practices",
-      "source_anchor": "model-self-knowledge",
-      "validator_check_id": "checkPromptModelSync",
-      "promotion_date": null,
-      "family_overrides": []
-    },
-    {
-      "id": "legacy-002",
-      "vendor": "cross-vendor",
-      "model_families": [
-        "any"
-      ],
-      "applies_to": "agent",
-      "severity": "warn",
-      "summary": "handoff entries should not redundantly set model: when it matches the target agent's own model.",
-      "rationale": "Redundant overrides become stale and prevent global model rollouts.",
-      "source_id": "openai-upgrade-guide",
-      "source_anchor": "upgrade-posture",
-      "validator_check_id": "checkHandoffModelOverride",
-      "promotion_date": null,
-      "family_overrides": []
-    },
     {
       "id": "legacy-003",
       "vendor": "anthropic",
@@ -274,22 +248,6 @@
       "family_overrides": []
     },
     {
-      "id": "model-deprecation-001",
-      "vendor": "cross-vendor",
-      "model_families": [
-        "any"
-      ],
-      "applies_to": "both",
-      "severity": "warn",
-      "summary": "Agents/prompts using a deprecated model label (per validate-models.mjs --only=deprecated) should be migrated.",
-      "rationale": "Deprecated models lose vendor support and security updates; migration windows are often time-bound.",
-      "source_id": "openai-upgrade-guide",
-      "source_anchor": "upgrade-workflow",
-      "validator_check_id": "checkModelDeprecation",
-      "promotion_date": null,
-      "family_overrides": []
-    },
-    {
       "id": "claude-no-prefill-001",
       "vendor": "anthropic",
       "model_families": [
@@ -323,22 +281,6 @@
       "source_id": "openai-prompting-guide",
       "source_anchor": "outcome-first-prompts-and-stopping-conditions",
       "validator_check_id": "checkGpt55StopRulesNonEmpty",
-      "promotion_date": null,
-      "family_overrides": []
-    },
-    {
-      "id": "frontmatter-model-style-001",
-      "vendor": "cross-vendor",
-      "model_families": [
-        "any"
-      ],
-      "applies_to": "both",
-      "severity": "error",
-      "summary": ".agent.md model: must use exact Copilot CLI model IDs (string or ordered list); .prompt.md must use string form.",
-      "rationale": "Copilot CLI rejects display names such as 'GPT-5.6 Terra' and fails dispatch on unknown IDs, and YAML bareword form misparses parenthetical qualifiers. Prompts keep the single-string convention.",
-      "source_id": "openai-upgrade-guide",
-      "source_anchor": "upgrade-posture",
-      "validator_check_id": "checkFrontmatterModelStyle",
       "promotion_date": null,
       "family_overrides": []
     },
@@ -394,18 +336,18 @@
       "family_overrides": []
     },
     {
-      "id": "prompt-model-source-001",
+      "id": "model-pin-001",
       "vendor": "cross-vendor",
       "model_families": [
         "any"
       ],
-      "applies_to": "prompt",
+      "applies_to": "both",
       "severity": "error",
-      "summary": "Prompts targeting a custom agent MUST NOT declare model:; prompts using agent: agent (or no agent:) MUST declare an explicit model:.",
-      "rationale": "When a prompt targets a custom agent (e.g., `agent: \"02-Requirements\"`), the agent's own model: is the source of truth — duplicating it on the prompt creates drift risk. When a prompt is generic (`agent: agent`), there is no inherited model, so an explicit model: is mandatory for the validator to classify the family. The validator resolves effective family via the target agent when the prompt omits model:.",
-      "source_id": "openai-upgrade-guide",
-      "source_anchor": "upgrade-posture",
-      "validator_check_id": "checkPromptModelSource",
+      "summary": "Agents and prompts must not declare model:, model-policy: or reasoning-effort:; the session model applies.",
+      "rationale": "DECISION-033 removes model pins. Users pick the session model (auto by default), so pinned models drift from the client picker and break when a model is retired or unavailable.",
+      "source_id": "apex-decision-033",
+      "source_anchor": "decision-033-support-native-windows-clients-and-deliver-apex-as-an-agent-plugin",
+      "validator_check_id": "checkModelPin",
       "promotion_date": null,
       "family_overrides": []
     }

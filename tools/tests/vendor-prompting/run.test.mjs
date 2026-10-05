@@ -21,12 +21,13 @@ const PROMPT_FIXTURES = path.join(__dirname, "fixtures", "prompts");
 
 /**
  * Expected rule IDs per fixture. Order does not matter; superset is allowed
- * because future rules may legitimately fire on bad fixtures.
+ * because future rules may legitimately fire on bad fixtures. Agent fixtures
+ * declare `model:` only to exercise family rules, so `model-pin-001` also fires.
  */
 const EXPECTATIONS = {
   "fixture-good-claude.agent.md": {
     mustHave: [],
-    mustNotHave: ["claude-no-prefill-001", "handoff-enrichment-001", "frontmatter-model-style-001"],
+    mustNotHave: ["claude-no-prefill-001", "handoff-enrichment-001"],
   },
   "fixture-bad-claude.agent.md": {
     mustHave: ["claude-no-prefill-001", "handoff-enrichment-001"],
@@ -43,7 +44,7 @@ const EXPECTATIONS = {
     ],
   },
   "fixture-bad-gpt55.agent.md": {
-    mustHave: ["gpt55-skeleton-001", "gpt-no-claude-xml-001", "handoff-enrichment-001"],
+    mustHave: ["gpt55-skeleton-001", "gpt-no-claude-xml-001", "handoff-enrichment-001", "model-pin-001"],
     mustNotHave: ["personality-scoping-001"],
   },
 };
@@ -55,18 +56,18 @@ const EXPECTATIONS = {
 const PROMPT_EXPECTATIONS = {
   "fixture-good-custom-agent.prompt.md": {
     mustHave: [],
-    mustNotHave: ["prompt-model-source-001", "frontmatter-model-style-001"],
+    mustNotHave: ["model-pin-001"],
   },
   "fixture-bad-custom-agent-with-model.prompt.md": {
-    mustHave: ["prompt-model-source-001"],
+    mustHave: ["model-pin-001"],
     mustNotHave: [],
   },
   "fixture-good-generic-agent.prompt.md": {
     mustHave: [],
-    mustNotHave: ["prompt-model-source-001"],
+    mustNotHave: ["model-pin-001"],
   },
-  "fixture-bad-generic-agent-no-model.prompt.md": {
-    mustHave: ["prompt-model-source-001"],
+  "fixture-bad-generic-agent-with-model.prompt.md": {
+    mustHave: ["model-pin-001"],
     mustNotHave: [],
   },
 };
@@ -82,7 +83,7 @@ async function lintFixture(filePath) {
   // For audit-grade fidelity we shell out to the CLI in JSON mode.
   // Use spawnSync (not execFileSync) so a non-zero exit code (which is
   // expected when bad fixtures fire error-severity rules like
-  // prompt-model-source-001) does not throw — we still need stdout.
+  // model-pin-001) does not throw — we still need stdout.
   const { spawnSync } = await import("node:child_process");
   const result = spawnSync("node", ["tools/scripts/validate-agents.mjs", "--only=vendor-prompting", "--format=json"], {
     encoding: "utf-8",
@@ -131,13 +132,17 @@ for (const [fixture, exp] of Object.entries(PROMPT_EXPECTATIONS)) {
 
     // Stage into tools/tests/prompts so the live validator picks it up via
     // getPromptFiles(); clean up regardless of test outcome.
-    const stagedPath = path.join("tools/tests/prompts", fixture);
+    const stagedDir = path.join("tools", "tests", "prompts");
+    const createdDir = !fs.existsSync(stagedDir);
+    fs.mkdirSync(stagedDir, { recursive: true });
+    const stagedPath = path.join(stagedDir, fixture);
     fs.copyFileSync(filePath, stagedPath);
     let findings;
     try {
       findings = await lintFixture(stagedPath);
     } finally {
       fs.unlinkSync(stagedPath);
+      if (createdDir) fs.rmSync(stagedDir, { recursive: true, force: true });
     }
 
     const ruleIds = new Set(findings.map((f) => f.ruleId));

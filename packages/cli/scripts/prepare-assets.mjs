@@ -11,8 +11,9 @@ const repositoryRoot = resolve(packageRoot, "../..");
 const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
-const CLIENT_ADAPTER_VERSION = "1.7.0";
+const CLIENT_ADAPTER_VERSION = "1.8.0";
 const RETIRED_SOURCE_FIELDS = ["argument-hint", "handoffs", "agents"];
+const MODEL_PIN_FIELDS = ["model", "model-policy", "reasoning-effort"];
 const RETIRED_SOURCE_TOOLS = ["vscode/askQuestions", "agent"];
 export const GENERATED_SHARED_FILES = [
   ".github/workflows/governance-policy-baseline.yml",
@@ -72,11 +73,8 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
   };
   for (const field of RETIRED_SOURCE_FIELDS)
     if (field in frontmatter) throw new Error(`CLI agent source must not declare ${field}`);
-  const models = Array.isArray(frontmatter.model) ? frontmatter.model : [frontmatter.model];
-  if (models.length === 0 || models.some((model) => typeof model !== "string" || model.length === 0))
-    throw new Error("CLI agent projection requires a model");
-  if (!["required", "preferred"].includes(frontmatter["model-policy"]))
-    throw new Error("CLI agent source requires model-policy: required or preferred");
+  for (const field of MODEL_PIN_FIELDS)
+    if (field in frontmatter) throw new Error(`CLI agent source must not declare ${field}; the session model applies`);
   const sourceTools = Array.isArray(frontmatter.tools) ? frontmatter.tools : [];
   const tools = [
     ...new Set(
@@ -101,9 +99,6 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
     name: frontmatter.name,
     description: frontmatter.description,
     target: "github-copilot",
-    model: frontmatter.model,
-    "model-policy": frontmatter["model-policy"],
-    ...(frontmatter["reasoning-effort"] === undefined ? {} : { "reasoning-effort": frontmatter["reasoning-effort"] }),
     "user-invocable": frontmatter["user-invocable"] ?? true,
     "disable-model-invocation": frontmatter["disable-model-invocation"] ?? false,
     tools,

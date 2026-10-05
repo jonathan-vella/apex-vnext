@@ -117,11 +117,11 @@ export function resetIndex() {
 
 /**
  * Returns a Map of all prompt files: filename → { path, content, frontmatter, body }.
- * Prompt frontmatter uses string `model:` (not array, per agent-authoring convention).
  * `body` is the markdown after the closing `---`.
  *
  * Scans every directory listed in `PROMPT_SOURCE_DIRS` (production prompts in
- * `tools/apex-prompts/` plus E2E test prompts in `tools/tests/prompts/`).
+ * `tools/apex-prompts/`, maintainer prompts in `.github/prompts/` and E2E test
+ * prompts in `tools/tests/prompts/`).
  */
 export function getPromptFiles() {
   if (_prompts) return _prompts;

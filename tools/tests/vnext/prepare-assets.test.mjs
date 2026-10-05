@@ -632,8 +632,6 @@ test("asset generator renders the CLI Requirements projection and rejects retire
   const source = `---
 name: APEX Requirements
 description: Gather requirements.
-model: gpt-6-sol
-model-policy: preferred
 user-invocable: true
 tools:
   - ask_user
@@ -649,7 +647,7 @@ Gather requirements through the kernel.
   const cli = renderClientAgentProjection(source, "github-copilot-cli");
   assert.match(cli, /\n\s+- ask_user/u);
   assert.match(cli, /\n\s+- task/u);
-  assert.match(cli, /model: gpt-6-sol\nmodel-policy: preferred/u);
+  assert.doesNotMatch(cli, /^(?:model|model-policy|reasoning-effort):/mu);
   assert.match(cli, /target: github-copilot/u);
   assert.match(cli, /disable-model-invocation: false/u);
   assert.match(cli, /collect one free-text answer/u);
@@ -668,7 +666,11 @@ Gather requirements through the kernel.
     assert.throws(render(source.replace("user-invocable:", `${field}\nuser-invocable:`)), /must not declare/u);
   for (const tool of ["vscode/askQuestions", "agent"])
     assert.throws(render(source.replace("  - ask_user", `  - ${tool}`)), /must not use/u);
-  assert.throws(render(source.replace("model-policy: preferred\n", "")), /model-policy/u);
+  for (const field of ["model: gpt-6-sol", "model-policy: preferred", "reasoning-effort: max"])
+    assert.throws(
+      render(source.replace("user-invocable:", `${field}\nuser-invocable:`)),
+      /must not declare .*session model applies/u,
+    );
   assert.throws(render(source.replace("name:", "target: github-copilot\nname:")), /must not declare target/u);
 });
 
@@ -676,8 +678,6 @@ test("CLI projection keeps hidden workers noninteractive and rejects unpinned AP
   const hidden = `---
 name: APEX Validator
 description: Validate one result.
-model: gpt-6-luna
-model-policy: required
 user-invocable: false
 disable-model-invocation: true
 tools:
@@ -746,18 +746,16 @@ test("asset generator rejects unsafe projection roots before generation", () => 
   }
 });
 
-test("APEX CLI projections carry each role's exact model and policy", async () => {
+test("APEX CLI projections leave model selection to the session", async () => {
   const manifest = JSON.parse(await readFile(join(root, "customizations/manifest.json"), "utf8"));
   const inventory = JSON.parse(await readFile(join(root, "tools/registry/copilot-cli-agent-tools.json"), "utf8"));
   for (const role of manifest.roles) {
     const source = await readFile(join(root, "customizations", role.source), "utf8");
     const rendered = renderClientAgentProjection(source, "github-copilot-cli", inventory, { delegates: false });
     const frontmatter = load(/^---\n([\s\S]*?)\n---/u.exec(rendered)[1]);
-    const worker = ["code-generation", "review", "validation"].includes(role.id);
-    assert.equal(frontmatter.model, role.model, `${role.agent} model`);
-    assert.equal(frontmatter["model-policy"], worker ? "required" : "preferred", `${role.agent} model policy`);
-    assert.equal(frontmatter["reasoning-effort"], worker ? "max" : undefined, `${role.agent} reasoning effort`);
-    if (worker) assert.equal(frontmatter.model, "gpt-6-luna");
+    assert.equal(role.model, undefined, `${role.agent} manifest model`);
+    for (const field of ["model", "model-policy", "reasoning-effort"])
+      assert.equal(frontmatter[field], undefined, `${role.agent} ${field}`);
   }
 });
 
@@ -774,8 +772,6 @@ test("CLI interactive handoffs do not grant background task delegation", () => {
   const source = `---
 name: APEX
 description: Coordinate workflow.
-model: mai-code-1.1-flash
-model-policy: preferred
 user-invocable: true
 tools:
   - ask_user

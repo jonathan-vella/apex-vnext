@@ -24,8 +24,8 @@
 ## Current Scope Note
 
 On 2026-09-23 the maintainer authorized shipping CodeGen, Reviewer and Validator to CLI for personal candidate testing
-after bounded workflow qualification. Current profiles select `gpt-6-luna` with `reasoning-effort: max`; tool permissions
-and kernel safeguards are unchanged. The [current qualification record](../CLIENT-QUALIFICATION.md#current-worker-attempt)
+after bounded workflow qualification. Profiles selected `gpt-6-luna` with `reasoning-effort: max` until DECISION-033 removed
+model pins; tool permissions and kernel safeguards are unchanged. The [current qualification record](../CLIENT-QUALIFICATION.md#current-worker-attempt)
 documents passing Bicep storage-only validation, both-track reviews, Terraform blocked handling and remaining limits.
 The model and target-membership statements below describe the earlier decision baseline, not a ban on this authorized
 enablement. Full release and paired-client acceptance remain separate.

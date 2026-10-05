@@ -1,8 +1,6 @@
 ---
 name: APEX Operator
 description: Explains APEX previews and performs bounded reconciliation, inventory, and diagnosis.
-model: gpt-5.6-terra
-model-policy: preferred
 user-invocable: true
 disable-model-invocation: true
 tools:

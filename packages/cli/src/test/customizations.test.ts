@@ -238,7 +238,7 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(await readFile(join(root, ".mcp.json"), "utf8"), /"recordInput"/u);
   const requirementsAgent = await readFile(join(root, ".github", "agents", "apex-requirements.agent.md"), "utf8");
   assert.match(requirementsAgent, /target: github-copilot/u);
-  assert.match(requirementsAgent, /model: gpt-6-sol/u);
+  assert.doesNotMatch(requirementsAgent, /^(?:model|model-policy|reasoning-effort):/mu);
   assert.match(requirementsAgent, /- ask_user/u);
   assert.match(requirementsAgent, /\n\s+- task\s*\n/u);
   assert.match(requirementsAgent, /foreground agent using `ask_user`/u);
@@ -351,8 +351,7 @@ test("init installs only the selected Copilot CLI projection and records it in t
   );
   for (const worker of ["apex-codegen.agent.md", "apex-reviewer.agent.md", "apex-validator.agent.md"]) {
     const profile = await readFile(join(root, ".github", "agents", worker), "utf8");
-    assert.match(profile, /model: gpt-6-luna/u);
-    assert.match(profile, /reasoning-effort: max/u);
+    assert.doesNotMatch(profile, /^(?:model|model-policy|reasoning-effort):/mu);
     assert.match(profile, /user-invocable: false/u);
     assert.doesNotMatch(profile, /- ask_user/u);
   }
@@ -386,7 +385,7 @@ test("init installs only the selected Copilot CLI projection and records it in t
   assert.match(await readFile(join(root, ".mcp.json"), "utf8"), /"recordInput"/u);
   assert.match(
     await readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"),
-    /model: gpt-6-luna/u,
+    /user-invocable: false/u,
   );
 });
 

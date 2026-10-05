@@ -18,13 +18,15 @@
     },
     "sources": {
       "type": "array",
-      "description": "External source documents that rules cite.",
+      "description": "Source documents that rules cite: snapshot-hashed vendor guides or APEX repository decisions.",
       "items": {
         "type": "object",
-        "required": ["id", "vendor", "url", "fetched_at", "sha256"],
+        "required": ["id", "vendor", "url"],
+        "if": { "properties": { "vendor": { "enum": ["anthropic", "openai"] } } },
+        "then": { "required": ["fetched_at", "sha256"] },
         "properties": {
           "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
-          "vendor": { "type": "string", "enum": ["anthropic", "openai"] },
+          "vendor": { "type": "string", "enum": ["anthropic", "openai", "apex"] },
           "url": { "type": "string", "format": "uri" },
           "ref": {
             "type": ["string", "null"],

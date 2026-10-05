@@ -30,9 +30,9 @@ Open the target file. Capture:
 - `tools[]` count
 - `handoffs[]` count
 
-If `model:` is missing or in bareword form (`model: Claude Opus 4.7
-(High reasoning)` without quotes/array), STOP — verdict is REJECTED.
-Frontmatter parsing is broken.
+If `model:`, `model-policy:` or `reasoning-effort:` is present, record
+`model-pin-001` (error). Repository agents omit them; the session model
+applies.
 
 ### Step 2 — Classify model family
 
