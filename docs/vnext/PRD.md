@@ -54,12 +54,12 @@ subscription so the application team can deploy its existing code.
 
 ### REQ-DIST-001: Distribution And Installation
 
-APEX ships as one Agent Plugins 1.0 plugin under DECISION-033, published from a separate vNext marketplace repository
-and pinned by tag. The plugin carries the skills, the APEX agent and hidden workers, hooks, and an MCP server that runs
-the bundled `@apexops/cli` runtime with `node` from the plugin folder; starting it must not need a registry download.
-`@apexops/cli` stays on npm for the terminal at the same exact version the plugin bundles. Clients install the plugin
-through one channel, the Copilot CLI store, which VS Code reads; installing through more than one channel is
-unsupported.
+APEX ships as one Agent Plugins 1.0 plugin under DECISION-033, published from a separate vNext marketplace repository.
+Installs and release provenance pin an immutable commit SHA; tags are release labels only. The plugin carries the
+skills, the APEX agent and hidden workers, hooks, and an MCP server that runs the bundled `@apexops/cli` runtime with
+`node` from the plugin folder; starting it must not need a registry download. `@apexops/cli` stays on npm for the
+terminal at the same exact version the plugin bundles. Clients install the plugin through one channel, the Copilot CLI
+store, which VS Code reads; installing through more than one channel is unsupported.
 
 `apex init` and bootstrap write a thin workspace projection: `.github/copilot/settings.json` with `enabledPlugins` and
 `extraKnownMarketplaces`, instructions with `applyTo` globs, the governance workflow and scripts, and `.apex/`. Init,
@@ -74,7 +74,7 @@ Provide `apex-install` and `apex-bootstrap` terminal entry points with guided Co
 deterministic implementation. These are setup operations, not another infrastructure workflow or source of approval.
 
 `apex-install` starts from a supported host (Windows 11 for VS Code and the Copilot app; Linux or WSL2 Ubuntu for
-Copilot CLI) without assuming Node, npm or APEX exists. Detect missing or incompatible prerequisites for both supported
+Copilot CLI) without assuming Node, npm or APEX exists. Detect missing or incompatible prerequisites for all three supported
 clients and both IaC tracks, show one installation plan, and obtain confirmation before installing prerequisites and
 APEX. Preserve compatible installations; require separate confirmation for incompatible replacement or privileged
 actions. Authentication remains interactive with credentials outside model-visible inputs. Verify installed versions and
@@ -334,7 +334,8 @@ answers without relying on chat history.
 - Hidden workers never ask the user questions. Their task prompts carry everything they need, because a subagent cannot
   see the calling agent's file.
 - The built-in `rubber-duck` agent performs the requirements, architecture and plan reviews under DECISION-031, and a
-  managed hook captures its output for the kernel. Other built-in helpers are advisory and never produce kernel
+  managed hook captures its output for the kernel. A `preToolUse` hook denies APEX state-changing MCP tools during
+  rubber-duck calls. Other built-in helpers are advisory and never produce kernel
   evidence, completion or approval. A managed `preToolUse` hook denies the APEX agent as a `task` target.
 - Agent files carry no `model`, `model-policy` or `reasoning-effort`; the user selects the session model.
   State-changing MCP tools are safe to call twice with the same input, and every MCP tool takes an explicit workspace

@@ -5,10 +5,10 @@ This control defines release-blocking evidence for the three supported clients u
 Code Copilot harness and the GitHub Copilot app on native Windows, and GitHub Copilot CLI on Linux and WSL2.
 Generated projection and plugin tests are necessary but do not replace live client interaction.
 
-[DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection) replaces VS Code Local with the VS Code
-Copilot harness running the single CLI projection. Since slice 4, only that projection installs, so the VS Code column
-below applies to the Copilot harness; its remaining Local mechanics are restated during the plan. The
-[planned CLI-only scenarios](#planned-cli-only-scenarios) become blocking when the plan completes.
+The release target is the [client pivot scenarios](#client-pivot-scenarios) plus the shared matrix below. Until the
+plugin ships, today's package installs the single CLI projection from
+[DECISION-029](DECISIONS.md#decision-029-ship-one-copilot-cli-projection), and the slice results below are
+exploratory history for that projection, not release evidence.
 
 Each client runs on its supported host with client local sandboxing on, without Docker or a devcontainer. Required
 outcomes follow the [PRD](PRD.md), including both environment profiles, COE reuse and conversational changes. Basic
@@ -69,8 +69,9 @@ do not build a separate benchmark harness. Record explicit gaps until implemente
 
 These scenarios belong to the [CLI-only projection plan](ROADMAP.md#cli-only-projection), closed on 2026-10-05.
 DECISION-032 retires CLIENT-021 (agent selection and scope prompts) and DECISION-033 retires CLIENT-025 (pinned worker
-models); CLIENT-031 and CLIENT-037 replace them. CLIENT-027 now applies to the plugin's `mcp.json`. The others remain
-planned acceptance in every supported client.
+models); CLIENT-031 and CLIENT-037 replace them. CLIENT-027 now applies to the plugin's `mcp.json`. CLIENT-023,
+CLIENT-024, CLIENT-026 and CLIENT-027 stay release-blocking in every supported client alongside the client pivot
+scenarios; CLIENT-022 stays deferred.
 
 | ID           | Required outcome                                                                                              | Standalone CLI | VS Code Copilot harness |
 | ------------ | ------------------------------------------------------------------------------------------------------------- | -------------- | ----------------------- |
@@ -336,8 +337,9 @@ CLIENT-017, not live VS Code or Copilot CLI agent interaction and not complete a
 2. Install the same exact plugin and package candidate through one channel.
 3. Trust only the qualification workspace. A disposable, isolated profile root may be mutated solely for the managed
    VS Code bootstrap agent scenario; do not mutate a real user profile or global MCP configuration.
-4. Turn on client local sandboxing. With it on, Allow All tool permissions are allowed; remote delegation modes stay
-   prohibited, and gate decisions still come from the maintainer.
+4. Turn on client local sandboxing and record the client-reported sandbox state in the candidate binding. Allow All
+   tool permissions are allowed only when the client reports sandboxing on; otherwise use explicit tool grants. Remote
+   delegation modes stay prohibited, and gate decisions still come from the maintainer.
 5. Record structured outcomes and content-free provenance, not raw chat or secrets.
 6. Repeat affected scenarios in every supported client after release-relevant runtime, contract, plugin, MCP, skill or
    toolchain changes; retain exact candidate binding for cross-client comparisons.

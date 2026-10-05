@@ -228,8 +228,10 @@ Maintainer direction on 2026-10-02, design settled on 2026-10-05, amends DECISIO
 `postToolUse` hook saves rubber-duck's exact output. The kernel records it in the run journal, bound to the review
 prompt hash (with a request nonce) and the reviewed artifact hash, and derives the findings from it. The calling agent
 adds dispositions only and cannot author or edit findings. A missing, edited, replayed or mismatched capture fails
-closed. Hooks only capture; they never decide. Accepted risks: rubber-duck inherits client tools and its model is not
-pinned. Slice 11 finding R9 (findings drifting across blind retries) motivates kernel capture.
+closed. Hooks only capture; they never decide. Rubber-duck inherits the caller's tools, so a managed `preToolUse` hook
+denies APEX state-changing MCP tools during rubber-duck calls; a negative test must prove that before captured output
+counts as findings. Accepted risk: its model is not pinned. Slice 11 finding R9 (findings drifting across blind retries)
+motivates kernel capture.
 
 ## DECISION-032: Use One Interactive APEX Agent
 
@@ -246,14 +248,14 @@ outcomes and the four gates are unchanged. The routing findings R1 to R3 from sl
 Maintainer direction on 2026-10-02 and 2026-10-05 supersedes DECISION-016 and DECISION-024 and amends DECISION-029.
 It replaces the parked desktop plan. Client support matches the separate apex-jon modernization:
 
-| Client                                | Host                   | Status                     |
-| ------------------------------------- | ---------------------- | -------------------------- |
-| VS Code, Copilot harness (Agent Host) | Native Windows         | Supported and qualified    |
-| GitHub Copilot app                    | Native Windows         | Supported and qualified    |
-| GitHub Copilot CLI                    | Linux and WSL2         | Supported and qualified    |
-| GitHub Copilot CLI                    | Native Windows         | Unsupported                |
-| VS Code Local harness                 | Any                    | Unsupported                |
-| VS Code or the app                    | macOS or Linux desktop | Best effort, not qualified |
+| Client                                | Host                   | Status                                  |
+| ------------------------------------- | ---------------------- | --------------------------------------- |
+| VS Code, Copilot harness (Agent Host) | Native Windows         | Supported target; qualification pending |
+| GitHub Copilot app                    | Native Windows         | Supported target; qualification pending |
+| GitHub Copilot CLI                    | Linux and WSL2         | Supported target; qualification pending |
+| GitHub Copilot CLI                    | Native Windows         | Unsupported                             |
+| VS Code Local harness                 | Any                    | Unsupported                             |
+| VS Code or the app                    | macOS or Linux desktop | Best effort, not qualified              |
 
 - **Hosts.** One host per workspace; runs do not move between a Windows client and the WSL CLI. Windows means the
   latest Windows 11 release and the one before it (25H2, 24H2), or any build where the client reports local
@@ -262,12 +264,13 @@ It replaces the parked desktop plan. Client support matches the separate apex-jo
   Outbound network stays allowed. Because the sandbox is on, clients may use Allow All tool permissions; gate decisions
   still come from the user. Azure CLI sign-in inside the sandbox is settled during qualification.
 - **Distribution.** APEX ships as one Agent Plugins 1.0 plugin: skills, the APEX agent and workers, hooks, and an MCP
-  server that runs the bundled `@apexops/cli` runtime with `node`. A separate vNext marketplace repository publishes
-  it, pinned by tag. `apex init` and bootstrap remain the onboarding path and write a thin workspace projection:
-  `.github/copilot/settings.json` with `enabledPlugins` and `extraKnownMarketplaces`, instructions with `applyTo`
-  globs, the governance workflow and scripts, and `.apex/`. The plugin installs through one channel, the Copilot CLI
-  store, which VS Code reads. `@apexops/cli` stays on npm for the terminal at the same exact version the plugin
-  bundles. Node 24 LTS is the minimum. Retiring the copied agents and skills follows the DECISION-015 gates.
+  server that runs the bundled `@apexops/cli` runtime with `node`. A separate vNext marketplace repository publishes it.
+  Installs and release provenance pin an immutable commit SHA; tags are release labels only. `apex init` and bootstrap
+  remain the onboarding path and write a thin workspace projection: `.github/copilot/settings.json` with
+  `enabledPlugins` and `extraKnownMarketplaces`, instructions with `applyTo` globs, the governance workflow and scripts,
+  and `.apex/`. The plugin installs through one channel, the Copilot CLI store, which VS Code reads. `@apexops/cli`
+  stays on npm for the terminal at the same exact version the plugin bundles. Node 24 LTS is the minimum. Retiring the
+  copied agents and skills follows the DECISION-015 gates.
 - **Models.** Agent files carry no `model`, `model-policy` or `reasoning-effort`; the user picks the session model,
   currently HydraFusion. Every state-changing MCP tool must be safe to call twice with the same input.
 - **Worktrees.** Supported. Every APEX MCP tool takes an explicit workspace path, and the server resolves the shared
