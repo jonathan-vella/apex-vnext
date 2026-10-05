@@ -611,6 +611,10 @@ test("rejects malformed assignment resource identities", () => {
     "trailing ",
     "tab\tname",
     "line\nbreak",
+    "\u0007",
+    "\u0007name",
+    "name\u0007",
+    "na\u0007me",
   ]) {
     const source = inheritedBaseline();
     source.subscriptions[subscriptionId]!.findings[0]!.assignment_id =

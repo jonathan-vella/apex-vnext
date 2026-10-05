@@ -1186,7 +1186,7 @@ test(
   },
 );
 
-for (const name of [" leading", "trailing ", "tab\tname"]) {
+for (const name of [" leading", "trailing ", "tab\tname", "\u0007", "\u0007name", "name\u0007", "na\u0007me"]) {
   test(`descendant collection rejects assignment name ${JSON.stringify(name)}`, powershellOptions, (context) => {
     const responses = routes();
     const policyId = "/providers/Microsoft.Authorization/policyDefinitions/bad-name";

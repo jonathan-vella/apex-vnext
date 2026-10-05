@@ -192,7 +192,7 @@ function scopeSegment(value: string): boolean {
 }
 
 // Policy assignment and exemption names may contain inner spaces (for example "(ArcBox) Tag resources").
-const POLICY_RESOURCE_NAME = String.raw`[^/?#%\s](?:[^/?#%\p{Cc}]*[^/?#%\s])?`;
+const POLICY_RESOURCE_NAME = String.raw`[^/?#%\s\p{Cc}](?:[^/?#%\p{Cc}]*[^/?#%\s\p{Cc}])?`;
 const POLICY_ASSIGNMENT_SUFFIX = new RegExp(
   `^/providers/microsoft\\.authorization/policyassignments/${POLICY_RESOURCE_NAME}$`,
   "iu",

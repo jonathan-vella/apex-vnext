@@ -350,7 +350,7 @@ function Process-Subscription {
 
     $base = "$ARM/subscriptions/$SubId/providers/Microsoft.Authorization"
     # Policy assignment and exemption names may contain inner spaces, for example "(ArcBox) Tag resources".
-    $POLICY_RESOURCE_NAME = '[^/?#%\s](?:[^/?#%\p{Cc}]*[^/?#%\s])?'
+    $POLICY_RESOURCE_NAME = '[^/?#%\s\p{Cc}](?:[^/?#%\p{Cc}]*[^/?#%\s\p{Cc}])?'
     $scopePattern = if ($IncludeDescendants) { "(/subscriptions/$SubId(?:/resourceGroups/[^/?#%\s]+)?(?:/providers/[^/?#%\s]+(?:/[^/?#%\s]+/[^/?#%\s]+)+)*|/providers/Microsoft.Management/managementGroups/[^/?#%\s]+)" } else { '(/subscriptions/[0-9a-f-]{36}|/providers/Microsoft.Management/managementGroups/[^/?#\s]+)' }
 
     $scopeFilter = if ($IncludeDescendants) { "" } else { '$filter=atScope()&' }
