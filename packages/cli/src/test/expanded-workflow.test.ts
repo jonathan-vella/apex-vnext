@@ -4081,6 +4081,14 @@ for (const track of ["bicep", "terraform"] as const) {
     assert.equal(await journal.head(), initialHead);
     await reachCodegen(service, runId, track, undefined, false, path, undefined, async () => {
       const beforeSelection = await journal.head();
+      await writeFile(path, "{}");
+      await assert.rejects(
+        service.selectGovernanceBaseline(path),
+        (error: unknown) =>
+          error instanceof ApexError &&
+          error.code === "APEX_VALIDATION" &&
+          /rejected: invalid-input: .*collect-governance-baseline\.ps1/u.test(error.message),
+      );
       for (const malformed of ["null", "{}", "not JSON"]) {
         await writeFile(path, malformed);
         await assert.rejects(service.selectGovernanceBaseline(path));
