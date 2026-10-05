@@ -17,8 +17,11 @@ const DEFAULT_PATHEXT = ".COM;.EXE;.BAT;.CMD";
 
 function environmentValue(env: NodeJS.ProcessEnv, name: string, platform: NodeJS.Platform): string | undefined {
   if (platform !== "win32") return env[name];
-  // Windows environment names are case-insensitive; a process may carry Path instead of PATH.
-  const key = Object.keys(env).find((candidate) => candidate.toUpperCase() === name);
+  // Windows environment names are case-insensitive. Like Node, when PATH and Path both exist use the key that sorts first,
+  // so resolution sees the same value the child process receives.
+  const key = Object.keys(env)
+    .filter((candidate) => candidate.toUpperCase() === name)
+    .sort()[0];
   return key === undefined ? undefined : env[key];
 }
 

@@ -36,6 +36,11 @@ test("Windows resolution applies PATHEXT, a mixed-case Path key and quoted PATH 
   );
 });
 
+test("Windows resolution picks duplicate environment keys the way Node passes them to the child", () => {
+  const env = { Path: "C:\\Inherited", PATH: "C:\\Program Files\\nodejs" };
+  assert.equal(resolveExecutable("npm", { ...windows, env })?.toLowerCase(), "c:\\program files\\nodejs\\npm.cmd");
+});
+
 test("Windows command scripts run through cmd.exe with one validated command line", () => {
   const plan = planLaunch(
     "az",
