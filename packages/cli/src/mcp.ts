@@ -311,7 +311,8 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
           const issues = validationIssues(
             input.error.issues.map(({ path, message }) => ({ path: `/${path.map(String).join("/")}`, message })),
           );
-          const reason = issues.length === 0 ? "Invalid tool arguments" : `Invalid tool arguments: ${issues.join("; ")}`;
+          const reason =
+            issues.length === 0 ? "Invalid tool arguments" : `Invalid tool arguments: ${issues.join("; ")}`;
           if (!SECRET_VALUE_PATTERN.test(reason)) serviceValidation = reason;
           throw new ApexError("APEX_VALIDATION", "Invalid tool arguments", EXIT_CODES.validation);
         }

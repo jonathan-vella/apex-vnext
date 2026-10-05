@@ -408,9 +408,8 @@ test("review criteria without findingIds reach the service as an empty list", as
     { criterionId: "security", outcome: "pass", rationale: "Private endpoints only.", findingIds: [] },
   ]);
   const reviewComplete = (await session.client.listTools()).tools.find(({ name }) => name === "reviewComplete")!;
-  const criterion = (
-    reviewComplete.inputSchema.properties as { criteria: { items: { required?: string[] } } }
-  ).criteria.items;
+  const criterion = (reviewComplete.inputSchema.properties as { criteria: { items: { required?: string[] } } }).criteria
+    .items;
   assert.equal(criterion.required?.includes("findingIds"), false);
 });
 
