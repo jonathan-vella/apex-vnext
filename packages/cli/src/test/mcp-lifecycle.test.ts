@@ -372,6 +372,47 @@ test("service validation reasons reach the agent while other errors stay generic
   );
 });
 
+test("input schema failures name the failing paths without invoking the service", async (context) => {
+  let calls = 0;
+  const session = await connect(context, {
+    completeReview: async () => {
+      calls += 1;
+      throw new Error("completeReview must not run");
+    },
+  });
+  const response = await session.call("reviewComplete", {
+    taskId: "task-1",
+    findings: [{ id: "FINDING-001", severity: "urgent", title: "t", detail: "d" }],
+  });
+  assert.equal(calls, 0);
+  assert.equal(response.isError, true);
+  const { error } = response.structuredContent as { error: { code: string; message: string } };
+  assert.equal(error.code, "APEX_VALIDATION");
+  assert.match(error.message, /^Invalid tool arguments: \/findings\/0\/severity /u);
+});
+
+test("review criteria without findingIds reach the service as an empty list", async (context) => {
+  let received: unknown;
+  const session = await connect(context, {
+    completeReview: async (_taskId, _findings, criteria) => {
+      received = criteria;
+      throw new ApexError("APEX_CONFLICT", "stop after capture", EXIT_CODES.conflict);
+    },
+  });
+  await session.call("reviewComplete", {
+    taskId: "task-1",
+    findings: [],
+    criteria: [{ criterionId: "security", outcome: "pass", rationale: "Private endpoints only." }],
+  });
+  assert.deepEqual(received, [
+    { criterionId: "security", outcome: "pass", rationale: "Private endpoints only.", findingIds: [] },
+  ]);
+  const reviewComplete = (await session.client.listTools()).tools.find(({ name }) => name === "reviewComplete")!;
+  const criterion = (reviewComplete.inputSchema.properties as { criteria: { items: { required?: string[] } } }).criteria
+    .items;
+  assert.equal(criterion.required?.includes("findingIds"), false);
+});
+
 test("oversized malformed arguments hit the size guard before schema parsing", { timeout: 10_000 }, async (context) => {
   let calls = 0;
   const session = await connect(context, {

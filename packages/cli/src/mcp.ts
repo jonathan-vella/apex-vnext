@@ -86,6 +86,14 @@ function assertBoundedInput(value: unknown): void {
   if (Buffer.byteLength(JSON.stringify(value)) > 4 * 1024 * 1024)
     throw new ApexError("APEX_VALIDATION", "Input budget exceeded", EXIT_CODES.validation);
 }
+function validationIssues(details: Array<{ path?: unknown; message?: unknown }>): string[] {
+  const issues: string[] = [];
+  for (const { path, message } of details) {
+    if (issues.length < 5 && !issues.some((issue) => issue.startsWith(`${String(path)} `)))
+      issues.push(`${String(path)} ${String(message)}`);
+  }
+  return issues;
+}
 const reviewFinding = z
   .object({
     id: z.string().min(1),
@@ -105,7 +113,7 @@ const reviewCriterion = z
     ]),
     outcome: z.enum(["pass", "finding", "not-applicable"]),
     rationale: z.string().min(1),
-    findingIds: z.array(z.string().min(1)),
+    findingIds: z.array(z.string().min(1)).default([]),
   })
   .strict();
 const uniqueStrings = z
@@ -299,7 +307,15 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
         if (++rateCount > 240) throw new ApexError("APEX_CONFLICT", "Call rate exceeded", EXIT_CODES.conflict);
         assertBoundedInput(args[0]);
         const input = inputSchema.safeParse(args[0]);
-        if (!input.success) throw new ApexError("APEX_VALIDATION", "Invalid tool arguments", EXIT_CODES.validation);
+        if (!input.success) {
+          const issues = validationIssues(
+            input.error.issues.map(({ path, message }) => ({ path: `/${path.map(String).join("/")}`, message })),
+          );
+          const reason =
+            issues.length === 0 ? "Invalid tool arguments" : `Invalid tool arguments: ${issues.join("; ")}`;
+          if (!SECRET_VALUE_PATTERN.test(reason)) serviceValidation = reason;
+          throw new ApexError("APEX_VALIDATION", "Invalid tool arguments", EXIT_CODES.validation);
+        }
         releaseSlot = await acquire(extra.signal);
         checkCancelled();
         let response: Awaited<ReturnType<typeof callback>>;
@@ -311,13 +327,9 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
           );
         } catch (error) {
           if (error instanceof ApexError && error.code === "APEX_VALIDATION") {
-            const issues: string[] = [];
-            for (const { path, message } of Array.isArray(error.details)
-              ? (error.details as Array<{ path?: unknown; message?: unknown }>)
-              : []) {
-              if (issues.length < 5 && !issues.some((issue) => issue.startsWith(`${String(path)} `)))
-                issues.push(`${String(path)} ${String(message)}`);
-            }
+            const issues = validationIssues(
+              Array.isArray(error.details) ? (error.details as Array<{ path?: unknown; message?: unknown }>) : [],
+            );
             const reason = issues.length === 0 ? error.message : `${error.message}: ${issues.join("; ")}`;
             if (!SECRET_VALUE_PATTERN.test(reason)) serviceValidation = reason;
           }
@@ -328,14 +340,15 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
         return response;
       } catch (error) {
         const { code } = normalizeError(error);
-        // Kernel validation reasons let agents correct typed input; guard, internal and secret-like messages stay generic.
+        // Input-schema and kernel validation reasons let agents correct typed input; guard, internal and secret-like
+        // messages stay generic.
         const message = serviceValidation === undefined ? errorMessages[code] : serviceValidation.slice(0, 1_000);
         return { ...result({ error: { code, message } }), isError: true };
       } finally {
         releaseSlot?.();
       }
     };
-    const inputJson = z.toJSONSchema(inputSchema, { target: "draft-7" });
+    const inputJson = z.toJSONSchema(inputSchema, { target: "draft-7", io: "input" });
     const wireInput = z.object({}).passthrough().default({});
     const annotations = {
       readOnlyHint: readOnlyTools.has(name),
