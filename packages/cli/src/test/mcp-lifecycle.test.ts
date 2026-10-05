@@ -13,6 +13,7 @@ import { mcpWorkspaceRoot } from "../cli.js";
 import { MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
 import { createMcpServer } from "../mcp.js";
 import { ApexError, EXIT_CODES } from "../errors.js";
+import { GovernanceBaselineError } from "@apexops/capabilities";
 import { ApexService } from "../service.js";
 import { tempRoot } from "./helpers.js";
 
@@ -411,6 +412,27 @@ test("review criteria without findingIds reach the service as an empty list", as
   const criterion = (reviewComplete.inputSchema.properties as { criteria: { items: { required?: string[] } } }).criteria
     .items;
   assert.equal(criterion.required?.includes("findingIds"), false);
+});
+
+test("raw governance baseline rejections reach the agent with their hint", async (context) => {
+  const session = await connect(context, {
+    nextTask: async () => {
+      throw new GovernanceBaselineError("incomplete");
+    },
+    status: async () => {
+      throw new GovernanceBaselineError("stale");
+    },
+  });
+  const incomplete = await session.call("nextTask");
+  assert.equal(incomplete.isError, true);
+  const { error } = incomplete.structuredContent as { error: { code: string; message: string } };
+  assert.equal(error.code, "APEX_VALIDATION");
+  assert.match(error.message, /^Governance baseline rejected: incomplete: .*-IncludeDescendants/u);
+  assertError(
+    await session.call("status"),
+    "APEX_STALE",
+    "Governance baseline rejected: stale: the baseline is too old; collect a fresh baseline",
+  );
 });
 
 test("oversized malformed arguments hit the size guard before schema parsing", { timeout: 10_000 }, async (context) => {

@@ -326,11 +326,17 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
             config.inputSchema === undefined ? [extra] : [input.data, extra],
           );
         } catch (error) {
-          if (error instanceof ApexError && error.code === "APEX_VALIDATION") {
+          const normalized = normalizeError(error);
+          const governance =
+            typeof (normalized.details as { reason?: unknown } | undefined)?.reason === "string" &&
+            (normalized.details as { reason: string }).reason.startsWith("GOVERNANCE_");
+          if (normalized.code === "APEX_VALIDATION" || governance) {
             const issues = validationIssues(
-              Array.isArray(error.details) ? (error.details as Array<{ path?: unknown; message?: unknown }>) : [],
+              Array.isArray(normalized.details)
+                ? (normalized.details as Array<{ path?: unknown; message?: unknown }>)
+                : [],
             );
-            const reason = issues.length === 0 ? error.message : `${error.message}: ${issues.join("; ")}`;
+            const reason = issues.length === 0 ? normalized.message : `${normalized.message}: ${issues.join("; ")}`;
             if (!SECRET_VALUE_PATTERN.test(reason)) serviceValidation = reason;
           }
           throw error;
