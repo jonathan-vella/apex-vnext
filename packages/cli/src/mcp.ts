@@ -86,13 +86,24 @@ function assertBoundedInput(value: unknown): void {
   if (Buffer.byteLength(JSON.stringify(value)) > 4 * 1024 * 1024)
     throw new ApexError("APEX_VALIDATION", "Input budget exceeded", EXIT_CODES.validation);
 }
-function validationIssues(details: Array<{ path?: unknown; message?: unknown }>): string[] {
-  const issues: string[] = [];
+// One line per failing field: keep the first message per path, then collapse array indexes so repeated mistakes such as
+// "/decisionRecords/*/alternatives/*/benefits Expected string" appear once with a count.
+function validationIssues(details: Array<{ path?: unknown; message?: unknown }>, limit = 8): string[] {
+  const firstByPath = new Map<string, string>();
   for (const { path, message } of details) {
-    if (issues.length < 5 && !issues.some((issue) => issue.startsWith(`${String(path)} `)))
-      issues.push(`${String(path)} ${String(message)}`);
+    if (!firstByPath.has(String(path))) firstByPath.set(String(path), String(message));
   }
-  return issues;
+  const groups = new Map<string, { path: string; message: string; count: number }>();
+  for (const [path, message] of firstByPath) {
+    const pattern = path.replace(/\/\d+(?=\/|$)/gu, "/*");
+    const group = groups.get(`${pattern}\u0000${message}`);
+    if (group === undefined) groups.set(`${pattern}\u0000${message}`, { path, message, count: 1 });
+    else Object.assign(group, { path: pattern, count: group.count + 1 });
+  }
+  const lines = [...groups.values()].map(({ path, message, count }) =>
+    count === 1 ? `${path} ${message}` : `${path} ${message} (${count} places)`,
+  );
+  return lines.length > limit ? [...lines.slice(0, limit), `${lines.length - limit} more`] : lines;
 }
 const reviewFinding = z
   .object({
@@ -348,7 +359,7 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
         const { code } = normalizeError(error);
         // Input-schema and kernel validation reasons let agents correct typed input; guard, internal and secret-like
         // messages stay generic.
-        const message = serviceValidation === undefined ? errorMessages[code] : serviceValidation.slice(0, 1_000);
+        const message = serviceValidation === undefined ? errorMessages[code] : serviceValidation.slice(0, 2_000);
         return { ...result({ error: { code, message } }), isError: true };
       } finally {
         releaseSlot?.();
@@ -630,7 +641,7 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
     "architectureComplete",
     {
       description:
-        "Complete Architecture atomically; APEX derives identity, artifact hashes, top-level requirementTraceability, and cost/SKU bindings. Each SKU and SLO decision lists its component requirementIds. policyMappings maps each governanceFindings entry from task context to a component; APEX marks findings whose resource types match no component resourceTypes not-applicable.",
+        "Complete Architecture atomically; APEX derives identity, artifact hashes, top-level requirementTraceability, and cost/SKU bindings. Each SKU and SLO decision lists its component requirementIds. policyMappings maps each governanceFindings entry from task context to a component; APEX marks findings whose resource types match no component resourceTypes not-applicable. A rejection lists every problem across all four inputs.",
       inputSchema: {
         taskId: z.string(),
         architecture: z.unknown(),

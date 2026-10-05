@@ -414,6 +414,25 @@ test("review criteria without findingIds reach the service as an empty list", as
   assert.equal(criterion.required?.includes("findingIds"), false);
 });
 
+test("repeated validation issues are grouped by field with a count", async (context) => {
+  const session = await connect(context, {
+    status: async () => {
+      throw new ApexError("APEX_VALIDATION", "architectureComplete found 4 problems", EXIT_CODES.validation, [
+        ...[0, 1, 2].map((index) => ({
+          path: `/architecture/decisionRecords/0/alternatives/${index}/benefits`,
+          message: "Expected string",
+        })),
+        { path: "/policyMappings/4/propertyPath", message: "Expected required property" },
+      ]);
+    },
+  });
+  assertError(
+    await session.call("status"),
+    "APEX_VALIDATION",
+    "architectureComplete found 4 problems: /architecture/decisionRecords/*/alternatives/*/benefits Expected string (3 places); /policyMappings/4/propertyPath Expected required property",
+  );
+});
+
 test("raw governance baseline rejections reach the agent with their hint", async (context) => {
   const session = await connect(context, {
     nextTask: async () => {

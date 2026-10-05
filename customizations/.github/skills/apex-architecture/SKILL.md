@@ -37,9 +37,10 @@ Use this skill only for an active architecture task.
    do not create a synthetic zero-price line or stop the Architecture stage solely because one meter is absent.
 6. Assume regional service/SKU availability and quota are sufficient. Do not request or validate deployment, restore,
    failover, regional, zonal, or quota evidence during Architecture.
-7. Submit `architecture`, `cost-estimate`, and `workload-decision-manifest` once through
+7. Submit `architecture`, `cost-estimate`, `workload-decision-manifest`, and `policyMappings` once through
    `apex/architectureComplete`; APEX derives identity, hashes, top-level `requirementTraceability`, and cost/SKU
-   bindings. Each SKU and SLO decision lists its component's `requirementIds`.
+   bindings. Each SKU and SLO decision lists its component's `requirementIds`. Follow the task templates' shapes,
+   including the ADR and policy-mapping examples. A rejection lists every problem; fix all of them in one resubmission.
 8. Report the derived Architecture, qualitative WAF, cost-breakdown, and uncertainty diagrams materialized in the
    Gate 2 package. These diagrams do not replace typed artifacts, pricing tables, evidence, review, or approval.
 9. Treat regional/zonal support, subscription quota, deployment, restore, failover, and unresolved retail meters as

@@ -158,6 +158,7 @@ import {
   validateInputAnswers,
   workflowValidatorOwnership,
   type JsonValue,
+  type ValidationIssue,
 } from "@apexops/kernel";
 import {
   DOCUMENT_REGISTRY,
@@ -623,6 +624,15 @@ const ARCHITECTURE_DECISIONS: readonly ArchitectureDecision[] = [
     ],
   },
 ];
+
+function architectureSubmissionError(issues: ValidationIssue[]): ApexError {
+  return new ApexError(
+    "APEX_VALIDATION",
+    `architectureComplete found ${issues.length} problem${issues.length === 1 ? "" : "s"}; fix them all before resubmitting`,
+    EXIT_CODES.validation,
+    issues,
+  );
+}
 
 export class ApexService {
   readonly root: string;
@@ -4438,64 +4448,89 @@ export class ApexService {
     if (requirementsHash === undefined)
       throw new ApexError("APEX_STALE", "Accepted Requirements are unavailable", EXIT_CODES.stale);
     const requirements = await this.objects.getJson<RequirementsV1>(requirementsHash);
+    const plainObject = (value: unknown) => value !== null && typeof value === "object" && !Array.isArray(value);
+    const rootIssues: ValidationIssue[] = [
+      ...(plainObject(architecture) ? [] : [{ path: "/architecture", message: "Expected object" }]),
+      ...(plainObject(costEstimate) ? [] : [{ path: "/costEstimate", message: "Expected object" }]),
+      ...(plainObject(decisionManifest) ? [] : [{ path: "/decisionManifest", message: "Expected object" }]),
+      ...(Array.isArray(policyMappings) ? [] : [{ path: "/policyMappings", message: "Expected array" }]),
+    ];
+    if (rootIssues.length > 0) throw architectureSubmissionError(rootIssues);
     const boundArchitecture = {
       ...architecture,
       projectId: run.projectId,
       runId: run.runId,
       sourceHashes: { ...architecture.sourceHashes, requirements: requirementsHash },
     };
-    this.assertValid("architecture", boundArchitecture);
-    this.assertValid("cost-estimate", { ...costEstimate, projectId: run.projectId, runId: run.runId });
-    this.assertValid(
-      "workload-decision-submission",
-      Object.fromEntries(Object.entries(decisionManifest).filter(([key]) => !DERIVED_DECISION_KEYS.has(key))),
-    );
-    this.assertValid("policy-property-map", {
-      schemaVersion: CONTRACT_VERSION,
-      projectId: run.projectId,
-      runId: run.runId,
-      governanceHash: "0".repeat(64),
-      mappings: policyMappings,
-    });
+    const prefixed = (prefix: string, issues: ValidationIssue[]): ValidationIssue[] =>
+      issues.map(({ path, message }) => ({ path: `${prefix}${path}`, message }));
+    const schemaIssues = [
+      ...prefixed("/architecture", this.contractIssues("architecture", boundArchitecture)),
+      ...prefixed(
+        "/costEstimate",
+        this.contractIssues("cost-estimate", { ...costEstimate, projectId: run.projectId, runId: run.runId }),
+      ),
+      ...prefixed(
+        "/decisionManifest",
+        this.contractIssues(
+          "workload-decision-submission",
+          Object.fromEntries(Object.entries(decisionManifest).filter(([key]) => !DERIVED_DECISION_KEYS.has(key))),
+        ),
+      ),
+      ...this.contractIssues("policy-property-map", {
+        schemaVersion: CONTRACT_VERSION,
+        projectId: run.projectId,
+        runId: run.runId,
+        governanceHash: "0".repeat(64),
+        mappings: policyMappings,
+      }).map(({ path, message }) => ({ path: path.replace(/^\/mappings/u, "/policyMappings"), message })),
+    ];
+    // Report every problem at once; one rejection per round trip cost slice 11 seven attempts.
+    if (schemaIssues.length > 0) throw architectureSubmissionError(schemaIssues);
+    const issues: ValidationIssue[] = [];
     const components = new Map(boundArchitecture.components.map((component) => [component.id, component]));
-    for (const decision of decisionManifest.skuDecisions) {
-      const component = components.get(decision.logicalId);
+    const componentIds = [...components.keys()];
+    const knownComponents = `known components: ${componentIds.slice(0, 12).join(", ")}${componentIds.length > 12 ? ", ..." : ""}`;
+    const decisionIssues = (
+      kind: "skuDecisions" | "sloDecisions",
+      decisions: Array<{ id: string; logicalId: string; service?: string; requirementIds: string[] }>,
+    ) =>
+      decisions.forEach((decision, index) => {
+        const path = `/decisionManifest/${kind}/${index}`;
+        const component = components.get(decision.logicalId);
+        if (component === undefined) {
+          issues.push({
+            path: `${path}/logicalId`,
+            message: `${decision.id}: "${decision.logicalId}" is not an Architecture component ID (${knownComponents})`,
+          });
+          return;
+        }
+        if (decision.service !== undefined && component.service !== decision.service)
+          issues.push({
+            path: `${path}/service`,
+            message: `${decision.id}: must equal component ${component.id} service "${component.service}"`,
+          });
+        const extra = decision.requirementIds.filter((id) => !component.requirementIds.includes(id));
+        if (extra.length > 0)
+          issues.push({
+            path: `${path}/requirementIds`,
+            message: `${decision.id}: ${extra.join(", ")} not listed on component ${component.id} (${component.requirementIds.join(", ") || "none"})`,
+          });
+      });
+    decisionIssues("skuDecisions", decisionManifest.skuDecisions);
+    decisionIssues("sloDecisions", decisionManifest.sloDecisions);
+    costEstimate.lineItems.forEach((line, index) => {
       if (
-        component === undefined ||
-        component.service !== decision.service ||
-        !decision.requirementIds.every((id) => component.requirementIds.includes(id))
-      ) {
-        throw new ApexError(
-          "APEX_VALIDATION",
-          `SKU decision ${decision.id} must match its Architecture component and requirement IDs`,
-          EXIT_CODES.validation,
-        );
-      }
-    }
-    for (const decision of decisionManifest.sloDecisions) {
-      const component = components.get(decision.logicalId);
-      if (component === undefined || !decision.requirementIds.every((id) => component.requirementIds.includes(id))) {
-        throw new ApexError(
-          "APEX_VALIDATION",
-          `SLO decision ${decision.id} must reference one Architecture component and its requirement IDs`,
-          EXIT_CODES.validation,
-        );
-      }
-    }
-    if (
-      costEstimate.lineItems.some(
-        (line) =>
-          /\bunpriced\b/iu.test(line.sku) ||
-          line.source.uri.startsWith("urn:apex:arm-mcp:pricing-unavailable") ||
-          /schema placeholder/iu.test(line.uncertainty.basis),
+        /\bunpriced\b/iu.test(line.sku) ||
+        line.source.uri.startsWith("urn:apex:arm-mcp:pricing-unavailable") ||
+        /schema placeholder/iu.test(line.uncertainty.basis)
       )
-    ) {
-      throw new ApexError(
-        "APEX_VALIDATION",
-        "Current ARM MCP pricing evidence is required; do not submit UNPRICED or zero-placeholder cost lines",
-        EXIT_CODES.validation,
-      );
-    }
+        issues.push({
+          path: `/costEstimate/lineItems/${index}`,
+          message:
+            "Current ARM MCP pricing evidence is required; move an unpriced SKU to unpricedItems instead of a placeholder line",
+        });
+    });
     const boundCostEstimate = {
       ...costEstimate,
       projectId: run.projectId,
@@ -4524,13 +4559,11 @@ export class ApexService {
           !(boundCostEstimate.unpricedItems ?? []).some(({ id }) => id === decision.logicalId),
       )
       .map(({ logicalId }) => logicalId);
-    if (missingCostLines.length > 0) {
-      throw new ApexError(
-        "APEX_VALIDATION",
-        `Cost lines are required for Architecture components: ${missingCostLines.join(", ")}`,
-        EXIT_CODES.validation,
-      );
-    }
+    if (missingCostLines.length > 0)
+      issues.push({
+        path: "/costEstimate/lineItems",
+        message: `Cost lines or unpricedItems are required for Architecture components: ${missingCostLines.join(", ")}`,
+      });
     const requiredIds = requirements.requirements
       .filter(({ priority, status }) => priority === "must" && status === "confirmed")
       .map(({ id }) => id)
@@ -4547,13 +4580,14 @@ export class ApexService {
     const incompleteRequirements = requirementTraceability
       .filter(({ skuDecisionIds, sloDecisionIds }) => skuDecisionIds.length === 0 || sloDecisionIds.length === 0)
       .map(({ requirementId }) => requirementId);
-    if (incompleteRequirements.length > 0) {
-      throw new ApexError(
-        "APEX_VALIDATION",
-        `Confirmed must requirements need both SKU and SLO decisions: ${incompleteRequirements.join(", ")}`,
-        EXIT_CODES.validation,
-      );
-    }
+    if (incompleteRequirements.length > 0)
+      issues.push({
+        path: "/decisionManifest",
+        message: `Confirmed must requirements need both SKU and SLO decisions: ${incompleteRequirements.join(", ")}`,
+      });
+    const policyMap = await this.completePolicyMap(run, events, policyMappings);
+    issues.push(...(await this.policyMapCoverageIssues(run, events, policyMap, boundArchitecture)));
+    if (issues.length > 0) throw architectureSubmissionError(issues);
     const boundDecisionManifest = {
       ...decisionManifest,
       projectId: run.projectId,
@@ -4568,10 +4602,7 @@ export class ApexService {
       { kind: "architecture", value: boundArchitecture },
       { kind: "cost-estimate", value: boundCostEstimate },
       { kind: "workload-decision-manifest", value: boundDecisionManifest },
-      {
-        kind: "policy-property-map",
-        value: await this.completePolicyMap(run, events, policyMappings),
-      },
+      { kind: "policy-property-map", value: policyMap },
     ]);
   }
 
@@ -8018,6 +8049,40 @@ export class ApexService {
           },
         ],
         decisions: ["Describe one decision, rationale, alternatives, and consequences."],
+        decisionRecords: [
+          {
+            id: "ADR-0001",
+            title: "Decision title",
+            context: "Problem, constraints, and accepted requirements that force a choice",
+            decision: "The chosen option and why",
+            requirementIds: ["REQUIREMENT_ID"],
+            alternatives: [
+              {
+                option: "Chosen option",
+                benefits: "One sentence string, not a list",
+                drawbacks: "One sentence string, not a list",
+                rejectionReason: "Selected; state why it beats the alternatives",
+              },
+              {
+                option: "Rejected option",
+                benefits: "One sentence string, not a list",
+                drawbacks: "One sentence string, not a list",
+                rejectionReason: "Why it was rejected",
+              },
+            ],
+            positiveConsequences: ["Positive consequence"],
+            negativeConsequences: ["Negative consequence"],
+            wafImpacts: {
+              security: "Impact",
+              reliability: "Impact",
+              "performance-efficiency": "Impact",
+              "cost-optimization": "Impact",
+              "operational-excellence": "Impact",
+            },
+            complianceConsiderations: "Compliance considerations",
+            implementationNotes: "Implementation notes",
+          },
+        ],
         risks: ["Describe one risk, impact, mitigation, and owner."],
         wellArchitectedAssessment: {
           framework: "azure-well-architected-framework",
@@ -8156,7 +8221,30 @@ export class ApexService {
         projectId: run.projectId,
         runId: run.runId,
         governanceHash: this.acceptedArtifactHashes(events)["governance-constraints"] ?? "0".repeat(64),
-        mappings: [],
+        mappings:
+          taskType === "architecture"
+            ? [
+                {
+                  policyAssignmentId: "ASSIGNMENT_ID_FROM_GOVERNANCE_FINDINGS",
+                  policyDefinitionId: "DEFINITION_ID_FROM_GOVERNANCE_FINDINGS",
+                  policyDefinitionReferenceId: "REFERENCE_ID_WHEN_THE_FINDING_HAS_ONE",
+                  effect: "deny",
+                  logicalResourceId: "COMPONENT_ID",
+                  propertyPath: "properties.publicNetworkAccess",
+                  expectedValue: "Disabled",
+                  disposition: "planned",
+                },
+                {
+                  policyAssignmentId: "ASSIGNMENT_ID_FROM_GOVERNANCE_FINDINGS",
+                  policyDefinitionId: "DEFINITION_ID_FROM_GOVERNANCE_FINDINGS",
+                  effect: "deny",
+                  logicalResourceId: "COMPONENT_ID",
+                  propertyPath: "PROPERTY_PATH_STILL_REQUIRED_FOR_NOT_APPLICABLE",
+                  disposition: "not-applicable",
+                  reason: "Why this policy does not apply to the design",
+                },
+              ]
+            : [],
       };
     }
     if (kind === "environment-inputs") {
@@ -8930,15 +9018,29 @@ export class ApexService {
     policyMap: PolicyPropertyMapV1,
     architecture: ArchitectureV1,
   ): Promise<void> {
-    const fail = (message: string): never => {
-      throw new ApexError("APEX_VALIDATION", message, EXIT_CODES.validation);
-    };
+    const issues = await this.policyMapCoverageIssues(run, events, policyMap, architecture);
+    if (issues.length > 0)
+      throw new ApexError("APEX_VALIDATION", issues.map(({ message }) => message).join("; "), EXIT_CODES.validation);
+  }
+
+  private async policyMapCoverageIssues(
+    run: RunConfigV1,
+    events: EventV1[],
+    policyMap: PolicyPropertyMapV1,
+    architecture: ArchitectureV1,
+  ): Promise<ValidationIssue[]> {
+    const issues: ValidationIssue[] = [];
     if (policyMap.governanceHash !== this.artifactHash(events, "governance-constraints"))
-      fail("Policy property map does not bind accepted governance constraints");
+      return [
+        { path: "/policyMappings", message: "Policy property map does not bind accepted governance constraints" },
+      ];
     const components = new Set(architecture.components.map(({ id }) => id));
-    const designed = new Set(
-      architecture.components.flatMap(({ resourceTypes }) => resourceTypes.map((type) => type.toLowerCase())),
-    );
+    const designedTypes = [
+      ...new Map(
+        architecture.components.flatMap(({ resourceTypes }) => resourceTypes.map((type) => [type.toLowerCase(), type])),
+      ).values(),
+    ];
+    const designed = new Set(designedTypes.map((type) => type.toLowerCase()));
     const findings = new Map(
       (await this.enforcingGovernanceFindings(run, events))
         .filter(
@@ -8954,26 +9056,43 @@ export class ApexService {
               : { policyDefinitionReferenceId: finding.policyDefinitionReferenceId }),
             effect: finding.effect,
           }),
-          finding.displayName,
+          finding,
         ]),
     );
     const seen = new Set<string>();
-    for (const mapping of policyMap.mappings) {
+    policyMap.mappings.forEach((mapping, index) => {
+      const path = `/policyMappings/${index}`;
       const key = this.policyMappingKey(mapping);
-      const label = findings.get(key) ?? mapping.policyAssignmentId;
-      if (seen.has(key)) fail(`Policy mapping is duplicated: ${label}`);
+      const label = findings.get(key)?.displayName ?? mapping.policyAssignmentId;
+      if (seen.has(key)) issues.push({ path, message: `Policy mapping is duplicated: ${label}` });
       seen.add(key);
-      if (mapping.disposition === "exempt") fail(`Reported exemptions are not verified: ${label}`);
+      if (mapping.disposition === "exempt")
+        issues.push({ path: `${path}/disposition`, message: `Reported exemptions are not verified: ${label}` });
       if (mapping.disposition === "not-applicable") {
-        if (mapping.reason === undefined) fail(`Not-applicable policy mapping needs a reason: ${label}`);
+        if (mapping.reason === undefined)
+          issues.push({ path: `${path}/reason`, message: `Not-applicable policy mapping needs a reason: ${label}` });
       } else if (!components.has(mapping.logicalResourceId))
-        fail(`Policy mapping must name an Architecture component: ${label}`);
+        issues.push({
+          path: `${path}/logicalResourceId`,
+          message: `Policy mapping must name an Architecture component: ${label}`,
+        });
+    });
+    const missing = [...findings].filter(([key]) => !seen.has(key)).map(([, finding]) => finding);
+    if (missing.length > 0) {
+      const examples = missing.slice(0, 5).map((finding) => {
+        const reference =
+          finding.policyDefinitionReferenceId === undefined ? "" : `, reference ${finding.policyDefinitionReferenceId}`;
+        return `${finding.displayName} (assignment ${finding.assignmentId.split("/").at(-1)}${reference}, effect ${finding.effect})`;
+      });
+      issues.push({
+        path: "/policyMappings",
+        message:
+          `Policy mappings are required for ${missing.length} enforcing findings; read them with apex/readTaskInput ` +
+          `inputHash "${GOVERNANCE_FINDINGS_SELECTOR}${designedTypes.join(",")}" and map each one, or mark it ` +
+          `not-applicable with a reason. Missing: ${examples.join("; ")}`,
+      });
     }
-    const missing = [...findings].filter(([key]) => !seen.has(key)).map(([, name]) => name);
-    if (missing.length > 0)
-      fail(
-        `Policy mappings are required for ${missing.length} enforcing findings, for example: ${missing.slice(0, 5).join("; ")}`,
-      );
+    return issues;
   }
 
   private policyValidationInput(
@@ -9878,15 +9997,22 @@ export class ApexService {
   }
 
   private assertValid(name: string, value: unknown): void {
+    const issues = this.contractIssues(name, value);
+    if (issues.length > 0)
+      throw new ApexError("APEX_VALIDATION", `${name} validation failed`, EXIT_CODES.validation, issues);
+  }
+
+  private contractIssues(name: string, value: unknown): ValidationIssue[] {
     const result = this.validators.validate(name, value);
     const issues = result.issues.filter((issue) => !issue.message.startsWith("Unknown format 'date"));
     const invalidDateTimes = name.startsWith("schema:") || !name.includes(":") ? this.invalidDateTimes(value) : [];
-    if (issues.length > 0 || invalidDateTimes.length > 0) {
-      throw new ApexError("APEX_VALIDATION", `${name} validation failed`, EXIT_CODES.validation, [
-        ...issues,
-        ...invalidDateTimes.map((path) => ({ path, message: "Invalid ISO date-time" })),
-      ]);
-    }
+    return [
+      ...issues,
+      ...invalidDateTimes.map((path) => ({
+        path,
+        message: "Invalid date-time; use UTC with milliseconds, for example 2026-10-02T13:37:00.000Z",
+      })),
+    ];
   }
 
   private invalidDateTimes(value: unknown, path = ""): string[] {
