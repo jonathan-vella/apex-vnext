@@ -7804,15 +7804,25 @@ export class ApexService {
   }
 
   private async acquireRunWriterLease(run: RunConfigV1): Promise<void> {
+    await this.refreshWorkspacePath();
     await this.runRepository(run).acquireWriterLease(this.writerLeaseOwner());
   }
 
   private async releaseRunWriterLeaseIfOwned(run: RunConfigV1): Promise<void> {
     try {
+      await this.refreshWorkspacePath();
       await this.runRepository(run).releaseWriterLease(this.writerLeaseOwner());
     } catch (error) {
       if (error instanceof RunWriterConflictError) return;
       throw error;
+    }
+  }
+
+  private async refreshWorkspacePath(): Promise<void> {
+    try {
+      this.workspacePath = await realpath(this.workspacePath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
   }
 
