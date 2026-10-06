@@ -174,6 +174,27 @@ test("keeps native read tools off hidden workers", () => {
   assert.ok(!hasRule(planner, "customization.worker-read-tool"));
 });
 
+test("rejects unknown managed agent tool names while accepting the central inventory", () => {
+  const unknownResult = mutate((model) => {
+    model.customization.agents
+      .find(({ frontmatter }) => frontmatter.name === "APEX Planner")
+      .frontmatter.tools.push("definitely_not_a_tool");
+  });
+  assert.ok(hasRule(unknownResult, "customization.unknown-tool"));
+
+  const inventoryResult = mutate((model) => {
+    const planner = model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX Planner");
+    planner.frontmatter.tools = [
+      ...Object.values(model.customization.toolInventory.interactiveTools),
+      ...model.customization.toolInventory.agentReadTools,
+      "web_fetch",
+      "azure-resource-manager-mcp/get_retail_prices",
+    ];
+  });
+  assert.ok(!hasRule(inventoryResult, "customization.unknown-tool"));
+  assert.ok(!hasRule(inventoryResult, "customization.mcp-tool"));
+});
+
 test("rejects ask_user on an autonomous subagent", () => {
   const result = mutate((model) => {
     model.customization.agents
@@ -181,6 +202,37 @@ test("rejects ask_user on an autonomous subagent", () => {
       .frontmatter.tools.push("ask_user");
   });
   assert.ok(hasRule(result, "customization.subagent-questions"));
+});
+
+test("rejects ask_user argument prescriptions in managed guidance and generated projections", () => {
+  const managedResult = mutate((model) => {
+    model.customization.guidance.push({
+      path: ".github/instructions/bad.instructions.md",
+      content: "Call `ask_user` with `question` and `choices` parameters.",
+    });
+  });
+  assert.ok(hasRule(managedResult, "customization.ask-user-arguments"));
+
+  assert.ok(
+    !hasRule(
+      mutate(() => {}),
+      "customization.ask-user-arguments",
+    ),
+  );
+});
+
+test("rejects worker prompts that rely on caller context or omit taskContext delegation guidance", () => {
+  const workerResult = mutate((model) => {
+    model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX Reviewer").content +=
+      "\nSee the coordinator instructions for the review criteria.\n";
+  });
+  assert.ok(hasRule(workerResult, "customization.worker-context"));
+
+  const parentResult = mutate((model) => {
+    const apex = model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX");
+    apex.content = apex.content.replaceAll("apex/taskContext", "apex/status");
+  });
+  assert.ok(hasRule(parentResult, "customization.worker-context"));
 });
 
 test("rejects retired VS Code agent fields and tools", () => {

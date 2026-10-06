@@ -2,8 +2,7 @@
 
 # Cross-Model Rules
 
-Rules that apply regardless of model family — handoff design,
-language calibration, decision logging.
+Family-neutral rules for handoff design, language calibration and decision logging.
 
 ## Rule R-X-3 — No model pins
 

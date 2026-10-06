@@ -1,151 +1,70 @@
 ---
 name: vendor-prompting
-description: '**ANALYSIS SKILL** — Audit-grade reference for Anthropic Claude and OpenAI GPT-5.5 prompting best practices. WHEN: "claude prompting", "gpt-5.5 prompting", "audit agent", "review prompt", "vendor best practices", "anthropic best practices", "openai prompting". DO NOT USE FOR: routine prompt edits where rules are already known, generic markdown style (markdown.instructions.md).'
+description: '**ANALYSIS SKILL** — Audit-grade reference for vendor prompting best practices and APEX prompt hygiene. WHEN: "audit agent", "review prompt", "vendor best practices", "anthropic best practices", "openai prompting". DO NOT USE FOR: routine prompt edits where rules are already known, generic markdown style.'
 license: MIT
 ---
 
 # Vendor Prompting Best Practices
 
-Audit-grade reference for the prompting patterns published by Anthropic
-(Claude family) and OpenAI (GPT-5.5 family). Used to author **and** audit
-`.agent.md` and `.prompt.md` files in this repository.
+Audit-grade reference for vendor prompting patterns and repository-neutral prompt hygiene. Repository agents and prompts
+do not pin a model, so automated validator rules are family-neutral.
 
-The machine-readable source of truth is
-[rules.json](rules.json) — every rule has an ID, source citation,
-severity, applies-to, and validator-check binding. The skill prose, the
-thin enforcement instruction
-[vendor-prompting.instructions.md](../../../customizations/.github/instructions/apex-prompt-authoring.instructions.md),
-and `validate-agents.mjs` all reference rule IDs from that file.
-
----
+The machine-readable source of truth is [rules.json](rules.json). Every rule has an ID, source citation, severity,
+applies-to value, and validator-check binding. `validate-agents.mjs` emits those same rule IDs.
 
 ## When to Use This Skill
 
-- Authoring a new `.agent.md` or `.prompt.md` and wanting the right
-  vendor patterns up front.
-- Auditing an existing agent against vendor best practices (the
-  audit procedure is in [audit-procedure.md](references/audit-procedure.md)).
-- Investigating a finding from `npm run lint:vendor-prompting` —
-  every finding includes a `ruleId` that maps to a rule in
-  [rules.json](rules.json) and back to a reference here.
-- Choosing the right model family for a new agent (decision rules in
-  [family-support.md](references/family-support.md)).
+- Auditing an existing `.agent.md` or `.prompt.md` against vendor prompting best practices.
+- Investigating a finding from `npm run lint:vendor-prompting`.
+- Reviewing an external prompt that mentions vendor-specific patterns.
 
-**Do NOT load this skill** for routine edits where the format is
-already known. The thin instruction
-[vendor-prompting.instructions.md](../../../customizations/.github/instructions/apex-prompt-authoring.instructions.md)
-auto-loads on `*.agent.md` / `*.prompt.md` edits and carries the
-hard-rule shortlist.
+Do not load this skill for routine edits where the format is already known. The thin prompt-authoring instruction
+contains the hard-rule shortlist for ordinary `.agent.md` and `.prompt.md` edits.
 
 ## Decision Tree
 
 ```text
 I am editing or reviewing a *.agent.md / *.prompt.md ...
-├── Which model is in the frontmatter?
-│   ├── Claude Opus / Claude Sonnet → load references/claude-best-practices.md
-│   ├── Claude Haiku                → load references/claude-best-practices.md (warn-only)
-│   ├── GPT-5.6                     → load references/gpt-5-prompting.md (shared OpenAI cohort)
-│   ├── GPT-5.5                     → load references/gpt-5-prompting.md
-│   ├── GPT-5.4                     → load references/gpt-5-prompting.md (shared OpenAI cohort)
-│   ├── GPT-Codex / GPT-4o          → reviewer-only; minimal automated rules
-│   └── Unknown / missing           → family-neutral rules only (repository agents carry no model)
-│
-├── Is this a .prompt.md or an .agent.md?
-│   ├── prompt → load references/checklists.md "prompt" column
-│   └── agent  → load references/checklists.md "agent" column
-│
-└── Want the full audit procedure (5-15 min, produces written report)?
-    → load references/audit-procedure.md and assets/audit-template.md
+├── Need automated rule details?
+│   └── Read rules.json and cross-model-rules.md.
+├── Need a manual checklist?
+│   └── Read checklists.md.
+├── Need vendor background?
+│   ├── Anthropic patterns → read claude-best-practices.md.
+│   └── OpenAI patterns    → read gpt-5-prompting.md.
+└── Need a full written audit?
+    └── Read audit-procedure.md and assets/audit-template.md.
 ```
-
-## Model-Family Detection
-
-`classifyModel()` lower-cases the `model:` value and matches substrings in priority order
-to assign a family (`claude-opus` / `claude-sonnet` / `claude-haiku` / `claude` / `gpt-5.6`
-/ `gpt-5.5` / `gpt-5.4` / `gpt-codex` / `gpt-4o` / `unknown`). For agents with `model:` as a list,
-the first entry decides the family. Repository agents and prompts carry no model (DECISION-033), so they
-resolve to `unknown`; rule `model-pin-001` in [`rules.json`](rules.json) rejects `model:`, `model-policy:` and
-`reasoning-effort:`. Family detection applies to test fixtures and to audits of external prompts.
-
-Full match table, severity status per family (`enforced` / `warn-only` / `reviewer-only` /
-`out-of-scope`), and rule subsets per family live in
-[`references/family-support.md`](references/family-support.md).
 
 ## Reference Index
 
-Load only the references your task needs. Most audits need 1-2.
-
-| Reference                                                       | Load when                                                              |
-| --------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| [claude-best-practices.md](references/claude-best-practices.md) | Authoring or auditing a Claude agent                                   |
-| [gpt-5-prompting.md](references/gpt-5-prompting.md)             | Authoring or auditing a GPT-5.5 agent                                  |
-| [gpt-5-upgrade.md](references/gpt-5-upgrade.md)                 | Migrating an agent from GPT-5.4 → GPT-5.5 (prompt-style upgrade patterns) |
-| [cross-model-rules.md](references/cross-model-rules.md)         | Handoff design, model pins, language calibration                       |
-| [family-support.md](references/family-support.md)               | Picking a model family for a new agent                                 |
-| [checklists.md](references/checklists.md)                       | Performing a manual pass-through audit                                 |
-| [audit-procedure.md](references/audit-procedure.md)             | Executing the full 6-step audit                                        |
+| Reference                                                       | Load when                                      |
+| --------------------------------------------------------------- | ---------------------------------------------- |
+| [cross-model-rules.md](references/cross-model-rules.md)         | Validator-backed neutral prompt hygiene rules  |
+| [checklists.md](references/checklists.md)                       | Performing a manual pass-through audit         |
+| [audit-procedure.md](references/audit-procedure.md)             | Executing the full audit procedure             |
+| [claude-best-practices.md](references/claude-best-practices.md) | Background for Anthropic prompting patterns    |
+| [gpt-5-prompting.md](references/gpt-5-prompting.md)             | Background for OpenAI prompting patterns       |
+| [gpt-5-upgrade.md](references/gpt-5-upgrade.md)                 | Background for OpenAI prompt-style migrations  |
 
 ## Rules
 
-- **Source of truth is `rules.json`** — every rule has an ID, severity, source citation, applies-to, and validator-check binding; this skill prose only references it
-- **Model family is decided by the FIRST entry** in a model array (agents); the table in [Model-Family Detection](#model-family-detection-mirrors-validate-agentsmjs-classifymodel) is canonical
-- **No model pins** — agents and prompts omit `model:`, `model-policy:` and `reasoning-effort:`; the session model applies (rule `model-pin-001`)
-- **Do NOT load this skill for routine edits** — the auto-loaded thin instruction `vendor-prompting.instructions.md` carries the hard-rule shortlist
-- **Run `npm run lint:vendor-prompting`** before opening a PR; every finding includes a `ruleId` that maps to a `rules.json` entry
-- **Verdict thresholds** — APPROVED if zero `error`s and ≤ 5 `warn`s; otherwise NEEDS_REVISION with per-rule remediation
-- **Out of scope**: routine prompt edits where rules are already known, generic markdown style (see `markdown.instructions.md`)
+- Source of truth is [rules.json](rules.json).
+- No model pins: agents and prompts omit `model:`, `model-policy:` and `reasoning-effort:`.
+- Automated rules are family-neutral: `cross-language-density-001`, `handoff-enrichment-001`,
+  `personality-scoping-001`, and `model-pin-001`.
+- Run `npm run lint:vendor-prompting` before opening a PR that changes agent or prompt guidance.
 
 ## Steps
 
-This is the canonical audit procedure (full version with templates lives
-in [audit-procedure.md](references/audit-procedure.md)).
-
-1. **Read frontmatter** of the target `.agent.md` / `.prompt.md`.
-   Capture `name`, `model`, `user-invocable`, `agents`, `handoffs[]`.
-2. **Classify model family** using the table above. Note the family's
-   v1 status from [family-support.md](references/family-support.md).
-3. **Load the matching checklist** from
-   [checklists.md](references/checklists.md): pick the agent or prompt
-   column, then the family-specific section.
-4. **Run the validator**:
-   `node tools/scripts/validate-agents.mjs --only=vendor-prompting --format=json`
-   and filter by file path. Capture rule IDs + severities.
-5. **Manual pass**: walk the checklist. Each Yes/No carries a rule ID
-   and a verification hint (grep pattern, command, or visual cue).
-6. **Produce a report** using
-   [assets/audit-template.md](assets/audit-template.md). Combine
-   automated findings (step 4) + manual findings (step 5). Verdict =
-   APPROVED if zero `error`s and ≤ 5 `warn`s; otherwise NEEDS_REVISION
-   with per-rule remediation.
+1. Read frontmatter and capture `name`, `user-invocable`, `tools`, and `handoffs[]`.
+2. Run `node tools/scripts/validate-agents.mjs --only=vendor-prompting --format=json` and filter by file path.
+3. Load [checklists.md](references/checklists.md) for the manual pass.
+4. Produce a report using [assets/audit-template.md](assets/audit-template.md). Verdict is APPROVED if there are zero
+   errors and no unresolved warnings that affect the target workflow; otherwise return NEEDS_REVISION with per-rule
+   remediation.
 
 ## Source Citations
 
-Every rule in [rules.json](rules.json) cites the upstream source by
-`source_id`. The current source set:
-
-- **Anthropic Claude prompting best practices** — live web doc at
-  [platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices).
-  Refresh via `npm run audit:vendor-prompting`.
-- **Anthropic Claude Sonnet 5 prompting guide** — live web doc at
-  [platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5).
-  Sonnet-5-specific deltas from Sonnet 4.6 (adaptive thinking default,
-  effort/`xhigh`, new tokenizer, literal instruction following, review
-  harness coverage). Refresh via `npm run audit:vendor-prompting`.
-- **OpenAI GPT-5.5 prompting guide** — pinned to
-  `openai/skills@724cd511c96593f642bddf13187217aa155d2554`,
-  `prompting-guide.md`, sha256
-  `ecdf49b4a824a87367c7a6ec3c0218e2c5783dff951b30a101c3b6a95152aafa`.
-- **OpenAI upgrade guide** — same pin, `upgrade-guide.md`, sha256
-  `563784eb13ad1b44c3a592f940aa7ac2086ebeb97df3f4a09ba038b2f1564d39`.
-
-## Freshness
-
-Run `npm run audit:vendor-prompting` to refresh snapshots and emit a
-drift report. The fetch script
-([fetch-vendor-prompting-guides.mjs](../../../tools/scripts/fetch-vendor-prompting-guides.mjs))
-falls back from `gh api` (auth) → anonymous raw → cached committed
-prose if upstream is unavailable.
-
-When upstream changes, regenerate this skill via
-`node tools/scripts/generate-skill-digests.mjs` and update the cited
-sha256 values in [rules.json](rules.json).
+Every rule in [rules.json](rules.json) cites an upstream source by `source_id`. Vendor source snapshots remain available
+for manual audits, but model-specific classification is no longer part of the automated validator.

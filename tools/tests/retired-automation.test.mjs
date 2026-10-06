@@ -192,10 +192,13 @@ test("context guidance uses current task authority without recall checkpoints", 
   assert.equal(frontmatter["user-invocable"], "true");
   assert.match(frontmatter.description, /WHEN: explicitly invoked as \/context-management/u);
   assert.match(skill, /references to this skill are not invocation requests/u);
-  const vendorGuidance = readFileSync(".github/skills/vendor-prompting/references/claude-best-practices.md", "utf8");
   const vendorRules = JSON.parse(readFileSync(".github/skills/vendor-prompting/rules.json", "utf8"));
-  assert.match(vendorGuidance, /does not invoke the manual-only/u);
-  assert.doesNotMatch(vendorRules.rules.find(({ id }) => id === "legacy-003").rationale, /activates|routing/u);
+  assert.deepEqual(vendorRules.rules.map(({ id }) => id).sort(), [
+    "cross-language-density-001",
+    "handoff-enrichment-001",
+    "model-pin-001",
+    "personality-scoping-001",
+  ]);
   assert.doesNotMatch(skill, /apex-recall|01-Orchestrator|hard-checkpoints\.md|compression-templates\.md/u);
   assert.match(skill, /apex-context\.instructions\.md/u);
   assert.match(skill, /expiry and writer authority/u);

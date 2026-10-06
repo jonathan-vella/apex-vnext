@@ -21,31 +21,16 @@ const PROMPT_FIXTURES = path.join(__dirname, "fixtures", "prompts");
 
 /**
  * Expected rule IDs per fixture. Order does not matter; superset is allowed
- * because future rules may legitimately fire on bad fixtures. Agent fixtures
- * declare `model:` only to exercise family rules, so `model-pin-001` also fires.
+ * because future rules may legitimately fire on bad fixtures.
  */
 const EXPECTATIONS = {
-  "fixture-good-claude.agent.md": {
+  "fixture-good-neutral.agent.md": {
     mustHave: [],
-    mustNotHave: ["claude-no-prefill-001", "handoff-enrichment-001"],
+    mustNotHave: ["cross-language-density-001", "handoff-enrichment-001", "model-pin-001", "personality-scoping-001"],
   },
-  "fixture-bad-claude.agent.md": {
-    mustHave: ["claude-no-prefill-001", "handoff-enrichment-001"],
+  "fixture-bad-neutral.agent.md": {
+    mustHave: ["cross-language-density-001", "handoff-enrichment-001", "model-pin-001", "personality-scoping-001"],
     mustNotHave: [],
-  },
-  "fixture-good-gpt55.agent.md": {
-    mustHave: [],
-    mustNotHave: [
-      "gpt55-skeleton-001",
-      "gpt-no-claude-xml-001",
-      "personality-scoping-001",
-      "gpt55-stop-rules-non-empty-001",
-      "handoff-enrichment-001",
-    ],
-  },
-  "fixture-bad-gpt55.agent.md": {
-    mustHave: ["gpt55-skeleton-001", "gpt-no-claude-xml-001", "handoff-enrichment-001", "model-pin-001"],
-    mustNotHave: ["personality-scoping-001"],
   },
 };
 

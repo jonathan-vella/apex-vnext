@@ -269,16 +269,6 @@
       }
     },
     {
-      "id": "test-classify-model",
-      "script": "test:classify-model",
-      "profile": "node-test",
-      "aliases": [],
-      "retirement": {
-        "status": "active",
-        "replacementIds": []
-      }
-    },
-    {
       "id": "test-repository-validator-graph",
       "script": "test:repository-validator-graph",
       "profile": "node-test",
@@ -876,7 +866,6 @@
         "lint:orphaned-content",
         "validate:vscode",
         "validate:region-canonical",
-        "test:classify-model",
         "validate:no-hardcoded-counts",
         "validate:terminology",
         "validate:banned-phrases",
