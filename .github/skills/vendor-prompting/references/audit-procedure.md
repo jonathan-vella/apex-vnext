@@ -24,7 +24,6 @@ against vendor prompting best practices. ~10-15 minutes per agent.
 Open the target file. Capture:
 
 - `name`
-- `model` (raw value, including any quoting)
 - `user-invocable` (default `true` if missing)
 - `agents` (subagent list)
 - `tools[]` count
@@ -34,27 +33,13 @@ If `model:`, `model-policy:` or `reasoning-effort:` is present, record
 `model-pin-001` (error). Repository agents omit them; the session model
 applies.
 
-### Step 2 — Classify model family
+### Step 2 — Record target context
 
-Apply the algorithm from [SKILL.md](../SKILL.md) "Model-Family
-Detection":
-
-```python
-m = model.lower() if isinstance(model, str) else model[0].lower()
-if "claude opus" in m: family = "claude-opus"
-elif "claude sonnet" in m: family = "claude-sonnet"
-elif "claude haiku" in m: family = "claude-haiku"
-elif "claude" in m: family = "claude"
-elif "gpt-5.5" in m: family = "gpt-5.5"
-elif "gpt-5.4" in m: family = "gpt-5.4"
-elif "gpt-5.3" in m or "codex" in m: family = "gpt-codex"
-elif "gpt-4o" in m: family = "gpt-4o"
-else: family = "unknown"
-```
-
-Cross-check the family's `status` from
-[family-support.md](family-support.md). If `out-of-scope`, stop and
-record "skipped — out of scope family".
+Record any known session model, client, or vendor target supplied by
+the audit request. Repository-managed agents and prompts do not declare
+`model:`; do not add a model pin while auditing. If no target model is
+known, run only the model-neutral validator checks and any manual
+checks that are relevant to the prose being reviewed.
 
 ### Step 3 — Load matching checklist
 
@@ -62,7 +47,8 @@ Open [checklists.md](checklists.md). Use:
 
 - Agent column for `.agent.md`, prompt column for `.prompt.md`.
 - The cross-vendor section ALWAYS.
-- The family-specific section matching step 2.
+- Any vendor-specific background section relevant to the known target
+  context or prompt style.
 
 ### Step 4 — Run the validator
 
@@ -95,15 +81,15 @@ manually.
 Open [assets/audit-template.md](../assets/audit-template.md).
 Fill in:
 
-1. File path, model family, classification reasoning.
+1. File path and known target context, if any.
 2. Automated findings table (from step 4).
 3. Manual findings table (from step 5).
 4. Severity summary (counts of error / warn / info).
 5. Verdict per gate:
    - **APPROVED** if `errors == 0` AND `warnings ≤ 5`.
    - **NEEDS_REVISION** otherwise (with per-rule remediation).
-   - **REJECTED** if any rule violation will break runtime
-     (frontmatter parsing, prefill on Claude 4.6+, deprecated model).
+   - **REJECTED** if any validator finding or manual audit finding will
+     break runtime.
 
 Save to `tmp/vendor-prompting-audits/{name}-{YYYYMMDD}.md`.
 

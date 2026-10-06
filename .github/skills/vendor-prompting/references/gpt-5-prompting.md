@@ -6,22 +6,25 @@
 > sha256 `ecdf49b4a824a87367c7a6ec3c0218e2c5783dff951b30a101c3b6a95152aafa`.
 > Snapshot: [.snapshots/openai-prompting-guide.md](.snapshots/openai-prompting-guide.md).
 
-This file normalizes OpenAI's GPT-5.5 prompting guidance into rules
-consumable by `validate-agents.mjs`. Each rule references its ID in
-[rules.json](../rules.json).
+This file normalizes OpenAI's GPT-5.5 prompting guidance into manual
+audit checks and background guidance. Family-specific checks in this
+file are not automated validator rules; [rules.json](../rules.json)
+lists the retained model-neutral rules that `validate-agents.mjs`
+enforces.
 
 ## Applicable models
 
-GPT-5.5 (preferred OpenAI default for the APEX OpenAI cohort) and GPT-5.4
-(active standard-tier sibling — same prompting style; see
-[gpt-5-upgrade.md](gpt-5-upgrade.md) for voluntary GPT-5.4 → GPT-5.5 upgrade
-patterns). GPT-5.3-Codex and GPT-4o are reviewer-only.
+GPT-5.5 and GPT-5.4 share the same prompting style; see
+[gpt-5-upgrade.md](gpt-5-upgrade.md) for voluntary GPT-5.4 → GPT-5.5
+upgrade patterns. GPT-5.3-Codex and GPT-4o remain background-only audit
+contexts here. Repository-managed agents do not pin `model:`; the
+session model applies.
 
 ## Rule R-GPT-1 — Outcome-first skeleton
 
 > Source: section "Suggested prompt structure".
 
-**Rule** (`gpt55-skeleton-001`): GPT-5.5 agents must contain these
+**Manual audit check** (no automated rule): GPT-5.5 prompts should contain these
 H1 sections (order flexible, presence required):
 
 ```text
@@ -49,14 +52,12 @@ Role: [1-2 sentences defining function, context, job]
 `# Personality` is **only required** when the agent is user-facing
 (`frontmatter.user-invocable: true` AND `frontmatter.name` matches
 `/Orchestrator/i`). Internal pipeline agents (CodeGen, Governance,
-Challenger, subagents) MUST OMIT personality (rule
-`personality-scoping-001`) — OpenAI guide: "For customer-facing
+Challenger, subagents) should omit personality. Repository automation
+still enforces `personality-scoping-001` as a model-neutral rule.
+OpenAI guide: "For customer-facing
 assistants, support workflows, coaching experiences, and other
 conversational products, define both personality and collaboration
 style."
-
-**Severity**: warn until 2026-09-01, then error (encoded in
-`promotion_date`).
 
 ## Rule R-GPT-2 — Stop rules must be non-empty
 
@@ -64,7 +65,7 @@ style."
 > "Add explicit stopping conditions ... Define missing-evidence
 > behavior".
 
-**Rule** (`gpt55-stop-rules-non-empty-001`): the body under
+**Manual audit check** (no automated rule): the body under
 `# Stop rules` must contain ≥1 non-blank, non-comment line before the
 next H1. An empty section is misleading scaffolding.
 
@@ -89,7 +90,7 @@ absolute; judgment calls become decision rules.
 > is steered with markdown sections. The guide does not use
 > Anthropic-style XML structuring.
 
-**Rule** (`gpt-no-claude-xml-001`): GPT-family agents MUST NOT
+**Manual audit check** (no automated rule): GPT-family prompts should not
 contain Claude-specific XML blocks
 (`<investigate_before_answering>`, `<context_awareness>`,
 `<scope_fencing>`, `<empty_result_recovery>`, `<subagent_budget>`,
@@ -168,8 +169,8 @@ hit this case today — listed for awareness.
 ## Cross-references
 
 - [gpt-5-upgrade.md](gpt-5-upgrade.md) — migrating from GPT-5.4.
-- [claude-best-practices.md](claude-best-practices.md) — when an
-  agent uses Claude, XML structuring replaces the skeleton.
+- [claude-best-practices.md](claude-best-practices.md) — background for
+  Claude-targeted prompt audits.
 - [cross-model-rules.md](cross-model-rules.md) — handoff and
   prompt-sync rules.
 - [audit-procedure.md](audit-procedure.md) — full audit.

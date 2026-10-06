@@ -8,10 +8,10 @@
 > (Sonnet 5 model-specific deltas) — live web docs; refresh via
 > `npm run audit:vendor-prompting`.
 
-This file normalizes Anthropic's published guidance into rules
-consumable by `validate-agents.mjs`. Each rule references its ID in
-[rules.json](../rules.json). Only patterns directly enforced by this
-repo are documented; full vendor guidance lives at the source URL.
+This file normalizes Anthropic's published guidance into manual audit
+checks and background guidance. Family-specific checks in this file are
+not automated validator rules; [rules.json](../rules.json) lists the
+retained model-neutral rules that `validate-agents.mjs` enforces.
 
 ## Applicable models
 
@@ -40,15 +40,14 @@ auto-validated (reviewer judgement). Existing repo patterns:
 > (Anthropic publishes the exact `<investigate_before_answering>`
 > snippet).
 
-**Rule** (`legacy-004`): Claude Opus / Sonnet agents whose role is to
+**Manual audit check** (no automated rule): Claude Opus / Sonnet prompts whose role is to
 research before deciding (Architect, IaC Planner, Context Optimizer)
 should include `<investigate_before_answering>`.
 
-**Counter-rule** (`claude-oneshot-001`): ONE-SHOT agents
-(Requirements, Challenger subagent — agents whose contract is "do it
-in a single round, then exit") MUST NOT include this block. The
-investigate block adds latency that conflicts with their bounded
-contract.
+**Manual counter-check** (no automated rule): ONE-SHOT prompts
+(contracts that do the work in a single round, then exit) should not
+include this block. The investigate block adds latency that conflicts
+with their bounded contract.
 
 ## Rule R-CL-3 — Context awareness on large prompts
 
@@ -56,7 +55,7 @@ contract.
 > Anthropic explicitly recommends adding context-budget guidance to
 > long system prompts.
 
-**Rule** (`legacy-003`): Claude agents whose body exceeds 350 lines
+**Manual audit check** (no automated rule): Claude prompts whose body exceeds 350 lines
 should include `<context_awareness>` for bounded task inputs and
 on-demand reads. This does not invoke the manual-only
 [context-management skill](../../context-management/SKILL.md).
@@ -70,9 +69,9 @@ on-demand reads. This does not invoke the manual-only
 > supported. On Mythos Preview, requests with prefilled assistant
 > messages return a 400 error."
 
-**Rule** (`claude-no-prefill-001`): Claude agents and prompts MUST
-NOT contain instructions to prefill the assistant turn. The
-validator regex looks for phrases like:
+**Manual audit check** (no automated rule): Claude prompts should not
+contain instructions to prefill the assistant turn. During manual
+review, look for phrases like:
 
 - "prefill the assistant"
 - "assistant prefill"
@@ -90,13 +89,13 @@ contracts (`<output_contract>`) instead of prefill.
 > Source: section "Structure prompts with XML tags" + "Control the
 > format of responses".
 
-**Rule** (`claude-output-contract-001`): Claude agents that produce
+**Manual audit check** (no automated rule): Claude prompts that produce
 a formal artifact (handoff prompts contain `agent-output/{project}/...md`
 OR the agent's name maps to a known artifact-producing role)
-MUST include an `<output_contract>` block defining the artifact
+should include an `<output_contract>` block defining the artifact
 structure.
 
-**Heuristic**: validator detects artifact-producing agents by:
+**Manual heuristic**: artifact-producing prompts often have:
 
 1. `frontmatter.handoffs[].prompt` contains `agent-output/`
 2. `frontmatter.name` matches a known artifact role (Architect,
@@ -155,8 +154,8 @@ the agent body — listed here for awareness.
 ## Rule R-CL-10 — Claude Sonnet 5 migration deltas
 
 > Source: [prompting-claude-sonnet-5](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5).
-> Applies to the `claude-sonnet` family once an agent's `model:` reads
-> `Claude Sonnet 5` (the repo's Sonnet 4.6 cohort migrated 2026-06).
+> Applies when a manual audit target is known to run on Claude Sonnet 5.
+> Repository-managed agents do not pin `model:`; the session model applies.
 
 **Reviewer hints** (not auto-validated — manual checklist items):
 
@@ -193,8 +192,8 @@ the agent body — listed here for awareness.
 
 ## Anti-patterns flagged by the repo
 
-These are XML blocks the repo uses for Claude that MUST NOT appear in
-GPT-family agents (rule `gpt-no-claude-xml-001`):
+These are XML blocks the repo uses for Claude. Treat them as a manual
+audit concern for GPT-targeted prompts; there is no automated rule:
 
 - `<investigate_before_answering>`
 - `<context_awareness>`
@@ -208,8 +207,8 @@ GPT prompts.
 
 ## Cross-references
 
-- [gpt-5-prompting.md](gpt-5-prompting.md) — when an agent uses
-  GPT-5.5, the skeleton replaces XML structuring.
+- [gpt-5-prompting.md](gpt-5-prompting.md) — background for
+  GPT-5.5-targeted prompt audits.
 - [cross-model-rules.md](cross-model-rules.md) — handoff and
   prompt-sync rules apply regardless of vendor.
 - [audit-procedure.md](audit-procedure.md) — execute the full audit.

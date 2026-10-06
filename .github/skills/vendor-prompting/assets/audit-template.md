@@ -15,17 +15,15 @@
 | Field            | Value                      |
 | ---------------- | -------------------------- |
 | `name`           | `<value>`                  |
-| `model`          | `<raw value>`              |
 | `user-invocable` | `<true / false / default>` |
 | `agents`         | `<count or list>`          |
 | `tools`          | `<count>`                  |
 | `handoffs`       | `<count>`                  |
 
-## Classification
+## Target context
 
-- **Family**: `<claude-opus | claude-sonnet | gpt-5.5 | ...>`
-- **Status (per family-support.md)**: `<enforced | warn-only | reviewer-only>`
-- **Reasoning**: `<which substring matched>`
+- **Known session model/vendor**: `<value if supplied, otherwise unknown>`
+- **Reasoning**: `<why vendor-specific manual checks apply, if any>`
 
 ## Automated findings
 
@@ -72,5 +70,5 @@ applied.
 
 - APPROVED if `errors == 0` AND `warnings ≤ 5`.
 - NEEDS_REVISION otherwise (per-rule remediation above).
-- REJECTED if any violation will break runtime (frontmatter parsing,
-  prefill on Claude 4.6+, deprecated model).
+- REJECTED if any validator finding or manual audit finding will break
+  runtime.

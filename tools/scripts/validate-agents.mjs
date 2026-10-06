@@ -5,7 +5,7 @@
  * Combines three agent validation checks into one script:
  * 1. Frontmatter validation (was validate-agent-frontmatter.mjs)
  * 2. Agent structural checks — body size + language density (was lint-agent-checks.mjs)
- * 3. Model-family checks for agents that still declare a model (fixtures only)
+ * 3. Family-neutral vendor-prompting guidance checks
  *
  * @example
  * node tools/scripts/validate-agents.mjs
@@ -332,147 +332,7 @@ function runAgentChecks() {
 }
 
 // ============================================================================
-// Part 3: Model-Family Checks
-// ============================================================================
-
-/**
- * Build a Map<lowercase-agent-name, { model, path }> from getAgents().
- * Used to resolve a prompt's family through its target custom agent.
- */
-function buildAgentNameToModel() {
-  const map = new Map();
-  for (const [, agent] of getAgents()) {
-    if (agent.frontmatter?.name) {
-      map.set(agent.frontmatter.name.toLowerCase(), {
-        model: agent.frontmatter.model,
-        path: agent.path,
-      });
-    }
-  }
-  return map;
-}
-
-function classifyModel(modelStr) {
-  if (!modelStr) return "unknown";
-  const s = Array.isArray(modelStr) ? modelStr[0] : modelStr;
-  if (!s) return "unknown";
-  const lower = s.toLowerCase();
-  if (/claude[ -]opus/u.test(lower)) return "claude-opus";
-  if (/claude[ -]sonnet/u.test(lower)) return "claude-sonnet";
-  if (/claude[ -]haiku/u.test(lower)) return "claude-haiku";
-  if (lower.includes("claude")) return "claude";
-  if (/^gpt-6-(?:sol|luna)(?:\s|$)/u.test(lower)) return "gpt-6";
-  if (lower.includes("gpt-5.6")) return "gpt-5.6";
-  if (lower.includes("gpt-5.5")) return "gpt-5.5";
-  if (lower.includes("gpt-5.4")) return "gpt-5.4";
-  if (lower.includes("gpt-5.3") || lower.includes("codex")) return "gpt-codex";
-  if (lower.includes("gpt-4o")) return "gpt-4o";
-  if (lower.includes("mai-code") || lower.includes("mai code")) return "mai-code";
-  return "unknown";
-}
-
-function isClaude(family) {
-  return family.startsWith("claude");
-}
-
-function isGpt55(family) {
-  return family === "gpt-5.5" || family === "gpt-5.6" || family === "gpt-6";
-}
-
-function isGptFamily(family) {
-  return family.startsWith("gpt-");
-}
-
-export { classifyModel, isClaude, isGpt55, isGptFamily };
-
-function countBodyLines(content) {
-  return getBody(content).split("\n").length;
-}
-
-function runModelFamilyChecks() {
-  const r = new Reporter("Model-Family Checks");
-  r.header();
-
-  // Check 1: Large Claude agents missing context_awareness
-  console.log("  Check 1: Claude large-agent context_awareness");
-  {
-    const agents = getAgents();
-
-    for (const [_filename, agent] of agents) {
-      if (!agent.frontmatter?.model) continue;
-      const family = classifyModel(agent.frontmatter.model);
-      if (!isClaude(family)) continue;
-      if (agent.isSubagent) continue;
-
-      const bodyLines = countBodyLines(agent.content);
-      if (bodyLines <= 350) continue;
-
-      r.tick();
-      const relPath = path.relative(process.cwd(), agent.path);
-      const body = getBody(agent.content);
-
-      if (!body.includes("<context_awareness>")) {
-        r.warn(
-          relPath,
-          `Claude agent has ${bodyLines} body lines but no <context_awareness> block (recommended for >350 lines)`,
-        );
-        r.record({
-          ruleId: "legacy-003",
-          severity: "warn",
-          file: relPath,
-          message: `Claude agent has ${bodyLines} body lines but no <context_awareness> block`,
-          sourceUrl:
-            "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices",
-        });
-      }
-    }
-  }
-
-  // Check 2: Claude non-ONE-SHOT research agents missing investigate block
-  const INVESTIGATE_AGENTS = ["03-architect", "05-iac-planner", "11-context-optimizer"];
-
-  console.log("  Check 2: Claude investigate_before_answering");
-  {
-    const agents = getAgents();
-
-    for (const [filename, agent] of agents) {
-      if (!agent.frontmatter?.model) continue;
-      const family = classifyModel(agent.frontmatter.model);
-      if (!isClaude(family)) continue;
-
-      const matchesKnown = INVESTIGATE_AGENTS.some((prefix) => filename.startsWith(prefix));
-      if (!matchesKnown) continue;
-
-      r.tick();
-      const relPath = path.relative(process.cwd(), agent.path);
-      const body = getBody(agent.content);
-
-      if (!body.includes("<investigate_before_answering>")) {
-        r.warn(relPath, "Claude research agent missing <investigate_before_answering> block");
-        r.record({
-          ruleId: "legacy-004",
-          severity: "warn",
-          file: relPath,
-          message: "Claude research agent missing <investigate_before_answering> block",
-          sourceUrl:
-            "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices",
-        });
-      }
-    }
-  }
-
-  r.summary();
-  if (r.errors > 0) {
-    overallFailed = true;
-    console.log("❌ Model-family checks FAILED\n");
-  } else {
-    console.log("✅ Model-family checks passed\n");
-  }
-  allFindings.push(...r.findings);
-}
-
-// ============================================================================
-// Part 4: Vendor Prompting (new — checks 5-15)
+// Part 3: Vendor Prompting
 // ============================================================================
 
 /**
@@ -481,57 +341,15 @@ function runModelFamilyChecks() {
  * that file at runtime (avoids circularity); instead `--list-rules` dumps
  * this catalog and `validate-vendor-rules.mjs` cross-checks both directions.
  *
- * Severity here is the DEFAULT; family overrides are applied at emit time.
+ * Severity here is final; rules are model neutral.
  */
 const VENDOR_RULES = [
-  {
-    id: "claude-oneshot-001",
-    severity: "warn",
-    appliesTo: "agent",
-    sourceUrl:
-      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices",
-  },
-  {
-    id: "gpt55-skeleton-001",
-    severity: "warn",
-    appliesTo: "agent",
-    sourceUrl:
-      "https://github.com/openai/skills/blob/724cd511c96593f642bddf13187217aa155d2554/skills/.curated/openai-docs/references/prompting-guide.md#suggested-prompt-structure",
-  },
-  {
-    id: "gpt-no-claude-xml-001",
-    severity: "warn",
-    appliesTo: "agent",
-    sourceUrl:
-      "https://github.com/openai/skills/blob/724cd511c96593f642bddf13187217aa155d2554/skills/.curated/openai-docs/references/prompting-guide.md",
-  },
   {
     id: "cross-language-density-001",
     severity: "info",
     appliesTo: "agent",
     sourceUrl:
       "https://github.com/openai/skills/blob/724cd511c96593f642bddf13187217aa155d2554/skills/.curated/openai-docs/references/prompting-guide.md#outcome-first-prompts-and-stopping-conditions",
-  },
-  {
-    id: "claude-no-prefill-001",
-    severity: "warn",
-    appliesTo: "both",
-    sourceUrl:
-      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices#migrating-away-from-prefilled-responses",
-  },
-  {
-    id: "gpt55-stop-rules-non-empty-001",
-    severity: "warn",
-    appliesTo: "agent",
-    sourceUrl:
-      "https://github.com/openai/skills/blob/724cd511c96593f642bddf13187217aa155d2554/skills/.curated/openai-docs/references/prompting-guide.md#outcome-first-prompts-and-stopping-conditions",
-  },
-  {
-    id: "claude-output-contract-001",
-    severity: "warn",
-    appliesTo: "agent",
-    sourceUrl:
-      "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices#structure-prompts-with-xml-tags",
   },
   {
     id: "handoff-enrichment-001",
@@ -560,142 +378,14 @@ function ruleById(id) {
   return VENDOR_RULES.find((rule) => rule.id === id);
 }
 
-const FAMILY_STATUS = {
-  "claude-opus": "enforced",
-  "claude-sonnet": "enforced",
-  "claude-haiku": "warn-only",
-  claude: "warn-only",
-  "gpt-5.6": "enforced",
-  "gpt-6": "enforced",
-  "gpt-5.5": "enforced",
-  "gpt-5.4": "deprecated",
-  "gpt-codex": "reviewer-only",
-  "gpt-4o": "reviewer-only",
-  "mai-code": "reviewer-only",
-  unknown: "enforced",
-};
-
-/** Apply family-status downgrade to a rule's default severity. */
-function effectiveSeverity(rule, family) {
-  const base = rule.severity;
-  const status = FAMILY_STATUS[family] || "enforced";
-  if (status === "reviewer-only") return "info";
-  if (status === "deprecated") return "info";
-  if (status === "warn-only") {
-    if (base === "error") return "warn";
-    return base;
-  }
-  return base;
-}
-
-/**
- * Names of agents whose contract is ONE-SHOT (single round, no investigate).
- *
- * Phase 12 (plan-simplifyChallengerReviews) — batch-mode resolution:
- *
- * `challenger-review-subagent` supports both single-lens mode (the
- * orchestrated default) and batch mode (rotating-lens passes 2+3
- * combined for deep reviews). Batch mode runs N lenses in ONE
- * subagent invocation. The strict "one-shot" semantic was preserved
- * via **Option A**: batch mode is implemented by the subagent
- * **internally** — the parent dispatches a SINGLE \`#runSubagent\` call
- * with `batch_lenses[]` and receives one `batch_results[]` response.
- * From the dispatcher's perspective it is still one-shot (one call,
- * one return). The subagent's internal lens sequencing is opaque to
- * the dispatcher.
- *
- * Therefore: no `multi-shot batch` exception is needed; the existing
- * one-shot rule continues to apply. If a future change ever exposes
- * batch-mode as N separate sub-invocations from the parent, revisit
- * this set or introduce a new `BATCH_ONE_SHOT_AGENT_NAMES` carve-out.
- */
-const ONE_SHOT_AGENT_NAMES = new Set(["02-Requirements", "challenger-review-subagent"]);
-
-/** XML blocks that are Claude-only and forbidden in GPT agents. */
-const CLAUDE_ONLY_XML = [
-  "<investigate_before_answering>",
-  "<context_awareness>",
-  "<scope_fencing>",
-  "<empty_result_recovery>",
-  "<subagent_budget>",
-  "<output_contract>",
-];
-
-/** Required H1 sections for GPT-5.5 outcome-first skeleton. */
-const GPT55_REQUIRED_SECTIONS = ["# Goal", "# Success criteria", "# Constraints", "# Output", "# Stop rules"];
-
 /** Permitted absolute-language paragraph keywords (Check 8R). */
 const PERMITTED_ABSOLUTE_CONTEXTS = [/security baseline/i, /governance/i, /approval gate/i, /non-negotiable/i];
 
 const ABSOLUTE_WORDS = ["ALWAYS", "NEVER", "MUST", "HARD RULE"];
 const ABSOLUTE_DENSITY_THRESHOLD = 0.05;
 
-const PREFILL_PATTERNS = [
-  /\bprefill the assistant\b/i,
-  /\bassistant prefill\b/i,
-  /\bprefilled response\b/i,
-  /assistant\s*:\s*\{\s*content\s*:\s*"</i,
-];
-
-/** Check 5: claude-oneshot-001 */
-function checkClaudeOneShotNoInvestigate(r, agent, file, family) {
-  if (!isClaude(family)) return;
-  const name = agent.frontmatter?.name;
-  if (!ONE_SHOT_AGENT_NAMES.has(name)) return;
-  const body = getBody(agent.content);
-  if (!body.includes("<investigate_before_answering>")) return;
-  emit(
-    r,
-    "claude-oneshot-001",
-    family,
-    file,
-    `ONE-SHOT agent "${name}" must NOT include <investigate_before_answering>`,
-  );
-}
-
-/** Check 6: gpt55-skeleton-001 */
-function checkGpt55Skeleton(r, agent, file, family) {
-  if (!isGpt55(family) && family !== "gpt-5.4") return;
-  const body = getBody(agent.content);
-  const missing = GPT55_REQUIRED_SECTIONS.filter((h) => !new RegExp(`^${h}\\b`, "m").test(body));
-  if (missing.length > 0) {
-    emit(
-      r,
-      "gpt55-skeleton-001",
-      family,
-      file,
-      `GPT-5.5 outcome-first skeleton missing sections: ${missing.join(", ")}`,
-    );
-  }
-  // Personality scoping (rule personality-scoping-001 piggybacked)
-  const ui = agent.frontmatter?.["user-invocable"];
-  const isUserFacing =
-    (ui === true || ui === "true" || ui === "always") && /Orchestrator/i.test(agent.frontmatter?.name || "");
-  const hasPersonality = /^# Personality\b/m.test(body);
-  if (hasPersonality && !isUserFacing && !agent.isSubagent) {
-    emit(
-      r,
-      "personality-scoping-001",
-      family,
-      file,
-      `# Personality block on internal pipeline agent "${agent.frontmatter?.name}" — reserve for user-facing Orchestrators`,
-    );
-  }
-}
-
-/** Check 7: gpt-no-claude-xml-001 */
-function checkGptNoClaudeXml(r, agent, file, family) {
-  if (!isGptFamily(family)) return;
-  const body = getBody(agent.content);
-  for (const xml of CLAUDE_ONLY_XML) {
-    if (body.includes(xml)) {
-      emit(r, "gpt-no-claude-xml-001", family, file, `GPT agent contains Claude-only XML block ${xml}`);
-    }
-  }
-}
-
 /** Check 8R: cross-language-density-001 */
-function checkAbsoluteLanguageDensity(r, agent, file, family) {
+function checkAbsoluteLanguageDensity(r, agent, file) {
   const body = getBody(agent.content);
   const lines = body.split("\n").filter((l) => l.trim());
   if (lines.length === 0) return;
@@ -712,67 +402,14 @@ function checkAbsoluteLanguageDensity(r, agent, file, family) {
     emit(
       r,
       "cross-language-density-001",
-      family,
       file,
       `Absolute words density ${density.toFixed(3)} (count ${count} / ${lines.length} lines) exceeds ${ABSOLUTE_DENSITY_THRESHOLD} outside permitted contexts`,
     );
   }
 }
 
-/** Check 10R: claude-no-prefill-001 */
-function checkClaudeNoPrefill(r, item, file, family) {
-  if (!isClaude(family)) return;
-  const body = item.body || getBody(item.content);
-  for (const pat of PREFILL_PATTERNS) {
-    if (pat.test(body)) {
-      emit(
-        r,
-        "claude-no-prefill-001",
-        family,
-        file,
-        `Claude agent/prompt contains prefill instruction (matched ${pat.source}) — prefill is deprecated on Claude 4.6+`,
-      );
-      return;
-    }
-  }
-}
-
-/** Check 11: gpt55-stop-rules-non-empty-001 */
-function checkGpt55StopRulesNonEmpty(r, agent, file, family) {
-  if (!isGpt55(family)) return;
-  const body = getBody(agent.content);
-  // Match section body up to the next H1 heading or the end of the document.
-  // (`$` with the `m` flag matches end-of-line; we need end-of-string here, hence the explicit alternative.)
-  const m = body.match(/^# Stop rules\s*\n([\s\S]*?)(?=^# |$(?![\s\S]))/m);
-  if (!m) return; // Missing section is caught by skeleton check
-  const sectionBody = m[1]
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith("<!--"));
-  if (sectionBody.length === 0) {
-    emit(r, "gpt55-stop-rules-non-empty-001", family, file, `# Stop rules section is empty (header only)`);
-  }
-}
-
-/** Check 13: claude-output-contract-001 */
-function checkClaudeOutputContract(r, agent, file, family) {
-  if (!isClaude(family)) return;
-  const handoffs = parseStructuredHandoffs(agent.content);
-  const isArtifactProducer = handoffs.length > 0 && handoffs.some((h) => /agent-output\//.test(h?.prompt || ""));
-  if (!isArtifactProducer) return;
-  const body = getBody(agent.content);
-  if (body.includes("<output_contract>")) return;
-  emit(
-    r,
-    "claude-output-contract-001",
-    family,
-    file,
-    `Claude artifact-producing agent missing <output_contract> block`,
-  );
-}
-
 /** Check 14: handoff-enrichment-001 */
-function checkHandoffEnrichment(r, agent, file, family) {
+function checkHandoffEnrichment(r, agent, file) {
   const handoffs = parseStructuredHandoffs(agent.content);
   if (handoffs.length === 0) return;
   for (const [i, h] of handoffs.entries()) {
@@ -781,14 +418,22 @@ function checkHandoffEnrichment(r, agent, file, family) {
     const hasOutput = /Output\s*:/i.test(h.prompt) || /agent-output\/.+\.md/i.test(h.prompt);
     if (!hasInput || !hasOutput) {
       const missing = [!hasInput && "input reference", !hasOutput && "output reference"].filter(Boolean).join(" and ");
-      emit(
-        r,
-        "handoff-enrichment-001",
-        family,
-        file,
-        `handoffs[${i}] (${h.label || h.agent || "?"}) missing ${missing}`,
-      );
+      emit(r, "handoff-enrichment-001", file, `handoffs[${i}] (${h.label || h.agent || "?"}) missing ${missing}`);
     }
+  }
+}
+
+function checkPersonalityScoping(r, agent, file) {
+  const ui = agent.frontmatter?.["user-invocable"];
+  const isUserFacing =
+    (ui === true || ui === "true" || ui === "always") && /(?:APEX|Orchestrator)/i.test(agent.frontmatter?.name || "");
+  if (/^# Personality\b/m.test(getBody(agent.content)) && !isUserFacing && !agent.isSubagent) {
+    emit(
+      r,
+      "personality-scoping-001",
+      file,
+      `# Personality block on internal pipeline agent "${agent.frontmatter?.name}" — reserve for user-facing agents`,
+    );
   }
 }
 
@@ -798,37 +443,19 @@ const MODEL_PIN_FIELDS = ["model", "model-policy", "reasoning-effort"];
 function checkModelPin(r, item, file) {
   const fields = MODEL_PIN_FIELDS.filter((field) => item.frontmatter && field in item.frontmatter);
   if (fields.length === 0) return;
-  emit(r, "model-pin-001", "any", file, `remove ${fields.join(", ")}; the session model applies`);
+  emit(r, "model-pin-001", file, `remove ${fields.join(", ")}; the session model applies`);
 }
 
 /**
- * Resolve a prompt's effective family using its own `model:` first, then
- * falling back to the target custom agent's `model:`. Generic prompts
- * (`agent: agent` or absent) classify only via their own `model:`.
+ * Emit a finding via the Reporter.
  */
-function resolvePromptFamily(prompt, agentNameToModel) {
-  const fm = prompt.frontmatter;
-  if (!fm) return "unknown";
-  if (fm.model) return classifyModel(fm.model);
-  const agentField = fm.agent;
-  if (!agentField || (typeof agentField === "string" && agentField.toLowerCase() === "agent")) {
-    return "unknown";
-  }
-  const entry = agentNameToModel.get(agentField.toLowerCase());
-  if (!entry) return "unknown";
-  return classifyModel(entry.model);
-}
-
-/**
- * Emit a finding via the Reporter, applying family-severity overrides.
- */
-function emit(r, ruleId, family, file, message) {
+function emit(r, ruleId, file, message) {
   const rule = ruleById(ruleId);
   if (!rule) {
     r.warn(file, `[unregistered rule ${ruleId}] ${message}`);
     return;
   }
-  const sev = effectiveSeverity(rule, family);
+  const sev = rule.severity;
   if (sev === "error") r.error(file, `[${ruleId}] ${message}`);
   else if (sev === "warn") r.warn(file, `[${ruleId}] ${message}`);
   else r.info(file, `[${ruleId}] ${message}`);
@@ -847,33 +474,22 @@ function runVendorPrompting() {
 
   const agents = getAgents();
   const prompts = getPromptFiles();
-  // lowercase-agent-name → { model, path }; used by the prompt loop to
-  // resolve effective family.
-  const agentNameToModel = buildAgentNameToModel();
 
   for (const [_file, agent] of agents) {
     r.tick();
     const relPath = path.relative(process.cwd(), agent.path);
-    const family = classifyModel(agent.frontmatter?.model);
 
     checkModelPin(r, agent, relPath);
-    checkClaudeOneShotNoInvestigate(r, agent, relPath, family);
-    checkGpt55Skeleton(r, agent, relPath, family);
-    checkGptNoClaudeXml(r, agent, relPath, family);
-    checkAbsoluteLanguageDensity(r, agent, relPath, family);
-    checkClaudeNoPrefill(r, agent, relPath, family);
-    checkGpt55StopRulesNonEmpty(r, agent, relPath, family);
-    checkClaudeOutputContract(r, agent, relPath, family);
-    checkHandoffEnrichment(r, agent, relPath, family);
+    checkAbsoluteLanguageDensity(r, agent, relPath);
+    checkHandoffEnrichment(r, agent, relPath);
+    checkPersonalityScoping(r, agent, relPath);
   }
 
   for (const [_file, prompt] of prompts) {
     r.tick();
     const relPath = path.relative(process.cwd(), prompt.path);
-    const family = resolvePromptFamily(prompt, agentNameToModel);
 
     checkModelPin(r, prompt, relPath);
-    checkClaudeNoPrefill(r, prompt, relPath, family);
   }
 
   r.summary();
@@ -913,10 +529,10 @@ function listRules() {
   const inlineIds = new Set(VENDOR_RULES.map((r) => r.id));
   const registryIds = new Set(registry.rules.map((r) => r.id));
   const inlineOnly = [...inlineIds].filter((id) => !registryIds.has(id));
-  const registryOnly = [...registryIds].filter((id) => !inlineIds.has(id) && !id.startsWith("legacy-"));
+  const registryOnly = [...registryIds].filter((id) => !inlineIds.has(id));
   console.log("\nCross-check vs rules.json (vendor-prompting only — workflow-handoff rules intentionally separate):");
   if (inlineOnly.length === 0 && registryOnly.length === 0) {
-    console.log("  ✅ inline catalog and rules.json are in sync (legacy-* rules excluded)");
+    console.log("  ✅ inline catalog and rules.json are in sync");
   } else {
     if (inlineOnly.length > 0) {
       console.log(`  ❌ in inline catalog but missing from rules.json: ${inlineOnly.join(", ")}`);
@@ -935,7 +551,6 @@ function listRules() {
 const PARTS = {
   frontmatter: runFrontmatterValidation,
   structural: runAgentChecks,
-  "model-family": runModelFamilyChecks,
   "vendor-prompting": runVendorPrompting,
 };
 

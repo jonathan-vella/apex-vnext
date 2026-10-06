@@ -5,7 +5,7 @@
 Copy-paste reviewer checklists. Each item has:
 
 - A Yes/No question
-- Its `rules.json` rule ID
+- Its validator rule ID or manual-audit status
 - A verification hint (grep pattern, command, or visual cue)
 
 Two parallel checklists: agent (`*.agent.md`) and prompt
@@ -32,48 +32,48 @@ Two parallel checklists: agent (`*.agent.md`) and prompt
 ### Claude family (Opus / Sonnet / Haiku)
 
 - [ ] **R-CL-3** If body > 350 lines, includes `<context_awareness>`.
-      _(rule `legacy-003`)_
+      _(manual audit check; no automated rule)_
       Hint: `wc -l <file>` and `grep "<context_awareness>" <file>`.
 - [ ] **R-CL-2** Research agents (Architect, IaC Planner,
       Context Optimizer) include `<investigate_before_answering>`.
-      _(rule `legacy-004`)_
+      _(manual audit check; no automated rule)_
       Hint: `grep "<investigate_before_answering>" <file>`.
 - [ ] **R-CL-2 counter** ONE-SHOT agents (Requirements, Challenger
       subagent) DO NOT include `<investigate_before_answering>`.
-      _(rule `claude-oneshot-001`)_
+      _(manual audit check; no automated rule)_
 - [ ] **R-CL-4** No prefill instructions ("prefill the assistant",
       "assistant prefill", "prefilled response").
-      _(rule `claude-no-prefill-001`)_
+      _(manual audit check; no automated rule)_
       Hint: `grep -iE "prefill|prefilled" <file>`.
 - [ ] **R-CL-5** Artifact-producing agents include `<output_contract>`.
-      _(rule `claude-output-contract-001`)_
+      _(manual audit check; no automated rule)_
       Hint: `grep -E "agent-output/" <file>` then
       `grep "<output_contract>" <file>`.
 - [ ] **R-CL-1** Few-shot examples wrapped in `<example>` tags
-      (reviewer-only).
+      (manual audit check; no automated rule).
       Hint: `grep -E "Example|<example>" <file>`.
 
 ### GPT-5.5 family
 
 - [ ] **R-GPT-1** All outcome-first skeleton sections present:
       `# Goal`, `# Success criteria`, `# Constraints`, `# Output`,
-      `# Stop rules`. _(rule `gpt55-skeleton-001`)_
+      `# Stop rules`. _(manual audit check; no automated rule)_
       Hint:
       `grep -E "^# (Goal|Success criteria|Constraints|Output|Stop rules)" <file>`.
 - [ ] **R-GPT-1** `# Personality` present ONLY if user-facing
       Orchestrator. _(rule `personality-scoping-001`)_
       Hint: check `frontmatter.user-invocable` and `frontmatter.name`.
 - [ ] **R-GPT-2** `# Stop rules` body is non-empty.
-      _(rule `gpt55-stop-rules-non-empty-001`)_
+      _(manual audit check; no automated rule)_
       Hint: read the section; reject if only contains the heading.
 - [ ] **R-GPT-4** No Claude-only XML blocks present
       (`<investigate_before_answering>`, `<context_awareness>`,
       `<scope_fencing>`, `<empty_result_recovery>`,
       `<subagent_budget>`, `<output_contract>`).
-      _(rule `gpt-no-claude-xml-001`)_
+      _(manual audit check; no automated rule)_
       Hint: `grep -E "<investigate_before_answering>|<context_awareness>|<scope_fencing>|<empty_result_recovery>|<subagent_budget>|<output_contract>" <file>`.
 - [ ] **R-GPT-6** Retrieval-heavy agents embed an explicit retrieval
-      budget (reviewer-only).
+      budget (manual audit check; no automated rule).
 
 ### Decision logging
 
@@ -92,7 +92,7 @@ Two parallel checklists: agent (`*.agent.md`) and prompt
 ### Claude family (when prompt targets a Claude agent)
 
 - [ ] **R-CL-4** No prefill instructions.
-      _(rule `claude-no-prefill-001`)_
+      _(manual audit check; no automated rule)_
 
 ### GPT-5.5 family (when prompt targets a GPT-5.5 agent)
 
@@ -107,7 +107,7 @@ After completing both columns, fill in:
 
 ```text
 File:            <path>
-Model family:    <claude-opus | claude-sonnet | gpt-5.5 | ...>
+Target context:  <known session model/vendor, if relevant>
 Errors:          <count>      ← rule IDs at severity error
 Warnings:        <count>      ← rule IDs at severity warn
 Info:            <count>      ← rule IDs at severity info
@@ -122,5 +122,5 @@ Apply gate from
 - APPROVED if errors == 0 AND warnings ≤ 5
 - NEEDS_REVISION otherwise
 - REJECTED if any rule violation indicates the agent will fail at
-  runtime (e.g., `model-pin-001`,
-  `claude-no-prefill-001` on a Claude 4.6+ target)
+  runtime, such as `model-pin-001` or a manual audit finding that maps
+  to a known target-model runtime failure.

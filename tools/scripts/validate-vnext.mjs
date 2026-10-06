@@ -81,7 +81,7 @@ const FORBIDDEN_TOOL = /(^|\/)(shell|terminal|filesystem|fs|edit|write|git|azure
 const RETIRED_AGENT_FIELDS = ["argument-hint", "handoffs", "agents"];
 const MODEL_PIN_FIELDS = ["model", "model-policy", "reasoning-effort"];
 const RETIRED_AGENT_TOOLS = ["vscode/askQuestions", "agent"];
-const INTERACTIVE_WEB_TOOLS = ["web_fetch"];
+const EXPLICIT_WEB_TOOLS = ["web_fetch"];
 const SECRET_KEY = /(secret|password|passwd|token|privateKey|clientSecret|connectionString)/i;
 const SOURCE_IMPORT = /(?:from\s+|import\s*\()["']([^"']+)["']/g;
 const ARM_MCP_ENDPOINT = "https://mcp.management.azure.com";
@@ -99,6 +99,39 @@ const ARM_MCP_READ_TOOLS = [
   "get_benefit_recommendations",
   "list_reservation_transactions",
 ];
+const ASK_USER_ARGUMENT_SYNTAX = [
+  {
+    name: "question",
+    pattern:
+      /(?:\bquestion\s*:|["'`]question["'`]\s*:|["'`]question["'`]\s+(?:argument|parameter|field|property|key)s?\b)/iu,
+  },
+  {
+    name: "choices",
+    pattern:
+      /(?:\bchoices\s*:|["'`]choices["'`]\s*:|["'`]choices["'`]\s+(?:argument|parameter|field|property|key)s?\b)/iu,
+  },
+  {
+    name: "message",
+    pattern:
+      /(?:\bmessage\s*:|["'`]message["'`]\s*:|["'`]message["'`]\s+(?:argument|parameter|field|property|key)s?\b)/iu,
+  },
+  { name: "requestedSchema", pattern: /\brequestedSchema\b/u },
+  {
+    name: "multiSelect",
+    pattern:
+      /(?:\bmultiSelect\s*:|["'`]multiSelect["'`]\s*:|["'`]multiSelect["'`]\s+(?:argument|parameter|field|property|key)s?\b)/u,
+  },
+];
+const NEGATIVE_MULTISELECT_PARAMETER =
+  /\b(?:never|do not|don't|without)\b[^.\n]{0,80}\b(?:pass|provide|set|send|use)\b[^.\n]{0,80}\b`?multiSelect`?\b[^.\n]{0,80}\bparameters?\b/iu;
+const KERNEL_MULTISELECT_QUESTION = /\bkernel question\b[^.\n]{0,120}\bmultiSelect\s*:\s*true\b/iu;
+const WORKER_CONTEXT_RELIANCE = [
+  /\b(?:see|read|follow|refer to|use|rely on)\s+(?:the\s+)?(?:coordinator|parent|caller|calling)\s+(?:agent\s+)?(?:instructions|file|context|prompt|chat)\b/iu,
+  /\bas (?:described|stated|defined)\s+in\s+(?:the\s+)?(?:APEX|coordinator|parent|caller|calling)\s+(?:agent|instructions|file|prompt)\b/iu,
+  /\b(?:from|using|based on)\s+(?:the\s+)?chat history\b/iu,
+  /\b(?:parent|caller|calling)\s+(?:agent\s+)?(?:instructions|file|prompt)\b/iu,
+];
+const NEGATED_CONTEXT_RELIANCE = /\b(?:do not|don't|never|cannot|can't|not|without)\b/iu;
 
 const clone = (value) => structuredClone(value);
 const array = (value) => (Array.isArray(value) ? value : []);
@@ -112,6 +145,58 @@ const walk = (directory, predicate = () => true) => {
     return entry.isDirectory() ? walk(file, predicate) : predicate(file) ? [file] : [];
   });
 };
+
+function markdownFiles(root) {
+  return walk(root, (file) => file.endsWith(".md"));
+}
+
+function findAskUserArgumentPrescription(content) {
+  for (const block of content.split(/\r?\n\s*\r?\n/u)) {
+    const text = block.replace(/\s+/gu, " ").trim();
+    if (!/\bask_user\b/u.test(text)) continue;
+    const askUserIndex = text.search(/\bask_user\b/u);
+    for (const { name, pattern } of ASK_USER_ARGUMENT_SYNTAX) {
+      const match = pattern.exec(text);
+      if (!match) continue;
+      if (name === "multiSelect" && NEGATIVE_MULTISELECT_PARAMETER.test(text)) continue;
+      if (name === "multiSelect" && match.index < askUserIndex && KERNEL_MULTISELECT_QUESTION.test(text)) continue;
+      return text;
+    }
+  }
+  return null;
+}
+
+function matchIsNegated(line, matchIndex) {
+  const prefix = line.slice(Math.max(0, matchIndex - 80), matchIndex);
+  const currentClause = prefix.split(/[.;:]/u).at(-1) ?? prefix;
+  return NEGATED_CONTEXT_RELIANCE.test(currentClause);
+}
+
+function findWorkerContextReliance(content) {
+  for (const rawLine of content.split(/\r?\n/u)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    for (const pattern of WORKER_CONTEXT_RELIANCE) {
+      const match = pattern.exec(line);
+      if (match && !matchIsNegated(line, match.index)) return line;
+    }
+  }
+  return null;
+}
+
+function hasTaskContextDelegationGuidance(content) {
+  const text = content.replace(/\s+/gu, " ");
+  const patterns = [
+    /\b(?:worker|delegate|scope prompt|task\.taskId|taskId)\b.{0,240}\b(?:call|read|fetch|use)\b.{0,80}\b(?:apex\/taskContext|taskContext|kernel task context)\b/iu,
+    /\b(?:call|read|fetch|use)\b.{0,80}\b(?:apex\/taskContext|taskContext|kernel task context)\b.{0,240}\b(?:worker|delegate|task\.taskId|taskId)\b/iu,
+  ];
+  return patterns.some((pattern) => {
+    const match = pattern.exec(text);
+    if (!match) return false;
+    const instructionIndex = match[0].search(/\b(?:call|read|fetch|use)\b/iu);
+    return !matchIsNegated(match[0], instructionIndex);
+  });
+}
 
 function parseScalar(text) {
   const value = text.trim();
@@ -210,6 +295,10 @@ export function loadRepositoryModel(root = process.cwd()) {
     path.join(root, "customizations", ".github", "skills"),
     (file) => path.basename(file) === "SKILL.md",
   );
+  const managedGuidanceFiles = [
+    ...markdownFiles(path.join(root, "customizations", ".github", "skills")),
+    ...markdownFiles(path.join(root, "customizations", ".github", "instructions")),
+  ];
   const schemaDirectory = path.join(root, "packages", "contracts", "schemas");
   const schemaFiles = walk(schemaDirectory, (file) => file.endsWith(".schema.json"));
   const contractSource = readFileSync(path.join(root, "packages", "contracts", "src", "index.ts"), "utf8");
@@ -234,7 +323,12 @@ export function loadRepositoryModel(root = process.cwd()) {
         content: readFileSync(file, "utf8"),
         frontmatter: parseFrontmatter(readFileSync(file, "utf8")),
       })),
+      guidance: managedGuidanceFiles.map((file) => ({
+        path: relative(path.join(root, "customizations"), file),
+        content: readFileSync(file, "utf8"),
+      })),
       cliMcp: readJson(path.join(root, "customizations", ".mcp.json")),
+      toolInventory: readJson(path.join(root, "tools", "registry", "copilot-cli-agent-tools.json")),
     },
     contracts: {
       registry: parseContractRegistry(contractSource),
@@ -672,6 +766,12 @@ function validateCustomizations(model, findings) {
     ...model.mcpTools.map((tool) => `apex/${tool}`),
     ...ARM_MCP_READ_TOOLS.map((tool) => `azure-resource-manager-mcp/${tool}`),
   ]);
+  const inventory = customization.toolInventory;
+  const clientAgentTools = new Set([
+    ...array(inventory.agentReadTools),
+    ...Object.values(object(inventory.interactiveTools) ? inventory.interactiveTools : {}),
+  ]);
+  const explicitWebTools = new Set(EXPLICIT_WEB_TOOLS);
   for (const skill of customization.skills)
     if (!skill.frontmatter?.name || !skill.frontmatter?.description)
       finding(
@@ -680,9 +780,16 @@ function validateCustomizations(model, findings) {
         `${skill.path} needs name and description frontmatter`,
         skill.path,
       );
-  const agentReadTools = array(
-    readJson(path.join(model.root, "tools", "registry", "copilot-cli-agent-tools.json")).agentReadTools,
-  );
+  for (const item of [...customization.agents, ...customization.guidance]) {
+    const prescribed = findAskUserArgumentPrescription(item.content);
+    if (prescribed)
+      finding(
+        findings,
+        "customization.ask-user-arguments",
+        `${item.path} prescribes ask_user argument names; name the tool and desired interaction, not client-specific parameters: ${prescribed}`,
+        item.path,
+      );
+  }
   for (const [name, agent] of agents) {
     const frontmatter = agent.frontmatter;
     const role = roles.get(name);
@@ -719,8 +826,29 @@ function validateCustomizations(model, findings) {
       if (frontmatter && field in frontmatter)
         finding(findings, "customization.retired-field", `${name} uses retired VS Code field ${field}`, agent.path);
     for (const tool of array(frontmatter.tools)) {
-      if (tool === "task" || tool === "ask_user") continue;
-      if (INTERACTIVE_WEB_TOOLS.includes(tool)) {
+      if (typeof tool !== "string") {
+        finding(findings, "customization.unknown-tool", `${name} references a non-string tool entry`, agent.path);
+        continue;
+      }
+      if (RETIRED_AGENT_TOOLS.includes(tool)) {
+        finding(findings, "customization.retired-field", `${name} uses retired VS Code tool ${tool}`, agent.path);
+        continue;
+      }
+      if (FORBIDDEN_TOOL.test(tool)) {
+        finding(findings, "customization.forbidden-tool", `${name} references forbidden tool ${tool}`, agent.path);
+        continue;
+      }
+      if (clientAgentTools.has(tool)) {
+        if (!interactive && array(inventory.agentReadTools).includes(tool))
+          finding(
+            findings,
+            "customization.worker-read-tool",
+            `${name} is a hidden worker and cannot hold native read tool ${tool}`,
+            agent.path,
+          );
+        continue;
+      }
+      if (explicitWebTools.has(tool)) {
         if (!interactive)
           finding(
             findings,
@@ -730,32 +858,61 @@ function validateCustomizations(model, findings) {
           );
         continue;
       }
-      if (agentReadTools.includes(tool)) {
-        if (!interactive)
-          finding(
-            findings,
-            "customization.worker-read-tool",
-            `${name} is a hidden worker and cannot hold native read tool ${tool}`,
-            agent.path,
-          );
-        continue;
-      }
-      if (RETIRED_AGENT_TOOLS.includes(tool))
-        finding(findings, "customization.retired-field", `${name} uses retired VS Code tool ${tool}`, agent.path);
-      else if (FORBIDDEN_TOOL.test(tool))
-        finding(findings, "customization.forbidden-tool", `${name} references forbidden tool ${tool}`, agent.path);
-      else if (!allowedMcp.has(tool))
+      if (allowedMcp.has(tool)) continue;
+      if (tool.includes("/"))
         finding(findings, "customization.mcp-tool", `${name} references unknown MCP tool ${tool}`, agent.path);
+      else finding(findings, "customization.unknown-tool", `${name} references unknown tool ${tool}`, agent.path);
+    }
+    if (role?.interactionType === "autonomous-subagent") {
+      const reliance = findWorkerContextReliance(agent.content);
+      if (reliance)
+        finding(
+          findings,
+          "customization.worker-context",
+          `${name} relies on caller-visible context instead of its kernel task context: ${reliance}`,
+          agent.path,
+        );
     }
   }
 
   const declaredEdges = array(customization.manifest.invocationEdges);
+  const subagentParents = new Set(declaredEdges.filter(({ type }) => type === "subagent").map(({ from }) => from));
+  for (const [name, agent] of agents) {
+    if (!subagentParents.has(name) || !array(agent.frontmatter?.tools).includes(inventory.interactiveTools.delegate)) {
+      continue;
+    }
+    const reliance = findWorkerContextReliance(agent.content);
+    if (reliance)
+      finding(
+        findings,
+        "customization.worker-context",
+        `${name} delegation guidance relies on caller-visible context: ${reliance}`,
+        agent.path,
+      );
+    if (!hasTaskContextDelegationGuidance(agent.content))
+      finding(
+        findings,
+        "customization.worker-context",
+        `${name} delegates hidden workers without instructing that kernel task context comes from apex/taskContext`,
+        agent.path,
+      );
+  }
+
   const cliRoot = path.join(model.root, "packages", "cli", "assets", "client-projections", "github-copilot-cli");
   const cliAgents = walk(path.join(cliRoot, ".github", "agents"), (file) => file.endsWith(".agent.md"));
   for (const file of cliAgents) {
     const projectionPath = relative(cliRoot, file);
     const repositoryPath = relative(model.root, file);
-    const { frontmatter, error } = parseProjectionFrontmatter(readFileSync(file, "utf8"));
+    const content = readFileSync(file, "utf8");
+    const prescribed = findAskUserArgumentPrescription(content);
+    if (prescribed)
+      finding(
+        findings,
+        "customization.ask-user-arguments",
+        `${repositoryPath} prescribes ask_user argument names; generated mechanics must stay client-neutral: ${prescribed}`,
+        repositoryPath,
+      );
+    const { frontmatter, error } = parseProjectionFrontmatter(content);
     if (error) {
       finding(findings, "customization.cli-agent-frontmatter", `${repositoryPath}: ${error}`, repositoryPath);
       continue;
