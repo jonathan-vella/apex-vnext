@@ -90,6 +90,7 @@ const WRITER_LEASE_FILE = ".run-writer-lease.json";
 const MAX_WRITER_LEASE_BYTES = 64 * 1024;
 const WRITER_LEASE_LOCK_WAIT_MS = 500;
 const WRITER_LEASE_LOCK_RETRY_MS = 10;
+const TRANSIENT_LOCK_RENAME_CODES = new Set(["EPERM", "EACCES", "EBUSY"]);
 
 function lockExpiry(value: unknown): number | undefined {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
@@ -410,7 +411,8 @@ export class RunRepository {
         published = true;
         return true;
       } catch (error) {
-        if (["EEXIST", "ENOTEMPTY"].includes((error as NodeJS.ErrnoException).code ?? "")) return false;
+        const code = (error as NodeJS.ErrnoException).code ?? "";
+        if (["EEXIST", "ENOTEMPTY"].includes(code) || TRANSIENT_LOCK_RENAME_CODES.has(code)) return false;
         try {
           await lstat(this.lockPath);
           return false;
