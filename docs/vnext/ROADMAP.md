@@ -136,9 +136,9 @@ qualification.
 | DECISION-031 rubber-duck review    | `REQ-CUSTOMIZATION-001`                     | CP-16                        | CLIENT-033                                                   |
 | DECISION-032 one APEX agent        | `REQ-CUSTOMIZATION-001`, `REQ-WORKFLOW-001` | CP-13, CP-14, CP-15          | CLIENT-031, CLIENT-032, CLIENT-037                           |
 | DECISION-033 hosts and sandbox     | `REQ-HOST-001`, `REQ-COPILOT-APP-001`       | CP-01 to CP-04, CP-12, CP-20 | CLIENT-012, CLIENT-035                                       |
-| DECISION-033 plugin and onboarding | `REQ-DIST-001`, `REQ-ONBOARDING-001`        | CP-05 to CP-11, CP-19        | CLIENT-009, CLIENT-011, CLIENT-020, CLIENT-028 to CLIENT-030 |
+| DECISION-033 plugin and onboarding | `REQ-DIST-001`, `REQ-ONBOARDING-001`        | CP-05 to CP-11, CP-19, CP-22 | CLIENT-009, CLIENT-011, CLIENT-020, CLIENT-028 to CLIENT-030 |
 | DECISION-033 models and worktrees  | `REQ-CUSTOMIZATION-001`, `REQ-STATE-001`    | CP-05, CP-10, CP-14          | CLIENT-034, CLIENT-036, CLIENT-037                           |
-| Governance and content follow-ups  | `REQ-GOV-001`, `REQ-GUIDANCE-001`           | CP-17, CP-18                 | CLIENT-018                                                   |
+| Governance and content follow-ups  | `REQ-GOV-001`, `REQ-GUIDANCE-001`           | CP-17, CP-18, CP-21          | CLIENT-018                                                   |
 
 ### Client Pivot Backlog
 
@@ -164,9 +164,11 @@ qualification.
 | [CP-18](https://github.com/jonathan-vella/apex-vnext/issues/384) | Content         | Re-port the current `jonathan-vella/apex` Azure skills into the shipped `apex-azure-*` skills, keeping vNext kernel rules; record source commits in an upstream-pins ledger; delete the stale repository-root copies | Shipped skills carry the improved guidance and their lineage; no stale copies remain              |
 | [CP-19](https://github.com/jonathan-vella/apex-vnext/issues/385) | Docs            | Install, update and reset docs per host                                                                                                                                                                              | One channel per machine, Agent Host restart, Windows update lock and sandbox steps are documented |
 | [CP-20](https://github.com/jonathan-vella/apex-vnext/issues/386) | Qualification   | Three-client qualification, including sandbox, Azure sign-in, bubblewrap on WSL2 and app worktrees                                                                                                                   | CLIENT-001 to CLIENT-037 pass in their applicable clients                                         |
+| [CP-21](https://github.com/jonathan-vella/apex-vnext/issues/401) | Content         | Review the shipped skills against Anthropic's Agent Skills best practices, together with CP-18                                                                                                                       | Each guideline has a disposition; `validate:skills` checks the shipped skills                     |
+| [CP-22](https://github.com/jonathan-vella/apex-vnext/issues/402) | Plugin          | Upgrade the MCP TypeScript SDK on the v1 line; keep protocol `2025-11-25`                                                                                                                                            | SDK pin is current and MCP tests pass                                                             |
 
-Order: CP-01 to CP-04 and CP-17 and CP-18 can start now. CP-05 precedes CP-06 to CP-11. CP-13 and CP-14 precede
-CP-15 and CP-16. CP-19 and CP-20 come last.
+Order: CP-01 to CP-04 and CP-17 and CP-18 can start now. CP-05 precedes CP-06 to CP-11, and CP-22 precedes CP-06.
+CP-13 and CP-14 precede CP-15 and CP-16. CP-21 runs with CP-18. CP-19 and CP-20 come last.
 
 ## Phase 1: Align Without Rebuilding
 
