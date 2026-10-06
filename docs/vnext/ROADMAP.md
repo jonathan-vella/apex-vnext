@@ -131,14 +131,14 @@ qualification.
 
 ### Client Pivot Traceability
 
-| Decision                           | Requirement                                 | Backlog                      | Qualification                                                |
-| ---------------------------------- | ------------------------------------------- | ---------------------------- | ------------------------------------------------------------ |
-| DECISION-031 rubber-duck review    | `REQ-CUSTOMIZATION-001`                     | CP-16                        | CLIENT-033                                                   |
-| DECISION-032 one APEX agent        | `REQ-CUSTOMIZATION-001`, `REQ-WORKFLOW-001` | CP-13, CP-14, CP-15          | CLIENT-031, CLIENT-032, CLIENT-037                           |
-| DECISION-033 hosts and sandbox     | `REQ-HOST-001`, `REQ-COPILOT-APP-001`       | CP-01 to CP-04, CP-12, CP-20 | CLIENT-012, CLIENT-035                                       |
-| DECISION-033 plugin and onboarding | `REQ-DIST-001`, `REQ-ONBOARDING-001`        | CP-05 to CP-11, CP-19, CP-22 | CLIENT-009, CLIENT-011, CLIENT-020, CLIENT-028 to CLIENT-030 |
-| DECISION-033 models and worktrees  | `REQ-CUSTOMIZATION-001`, `REQ-STATE-001`    | CP-05, CP-10, CP-14          | CLIENT-034, CLIENT-036, CLIENT-037                           |
-| Governance and content follow-ups  | `REQ-GOV-001`, `REQ-GUIDANCE-001`           | CP-17, CP-18, CP-21          | CLIENT-018                                                   |
+| Decision                           | Requirement                                         | Backlog                      | Qualification                                                |
+| ---------------------------------- | --------------------------------------------------- | ---------------------------- | ------------------------------------------------------------ |
+| DECISION-031 rubber-duck review    | `REQ-CUSTOMIZATION-001`                             | CP-16                        | CLIENT-033                                                   |
+| DECISION-032 one APEX agent        | `REQ-CUSTOMIZATION-001`, `REQ-WORKFLOW-001`         | CP-13, CP-14, CP-15          | CLIENT-031, CLIENT-032, CLIENT-037                           |
+| DECISION-033 hosts and sandbox     | `REQ-HOST-001`, `REQ-COPILOT-APP-001`               | CP-01 to CP-04, CP-12, CP-20 | CLIENT-012, CLIENT-035                                       |
+| DECISION-033 plugin and onboarding | `REQ-DIST-001`, `REQ-ONBOARDING-001`, `REQ-MCP-001` | CP-05 to CP-11, CP-19, CP-22 | CLIENT-009, CLIENT-011, CLIENT-020, CLIENT-028 to CLIENT-030 |
+| DECISION-033 models and worktrees  | `REQ-CUSTOMIZATION-001`, `REQ-STATE-001`            | CP-05, CP-10, CP-14          | CLIENT-034, CLIENT-036, CLIENT-037                           |
+| Governance and content follow-ups  | `REQ-GOV-001`, `REQ-GUIDANCE-001`                   | CP-17, CP-18, CP-21          | CLIENT-018                                                   |
 
 ### Client Pivot Backlog
 
