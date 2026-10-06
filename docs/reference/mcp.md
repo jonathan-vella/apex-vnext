@@ -55,8 +55,10 @@ Proposals are inert: they do not mutate instructions, policy, or runtime behavio
 
 ## Response Contracts
 
-APEX currently pins TypeScript SDK 1.29.0, supporting MCP versions through 2025-11-25. It does not claim support for
-the 2026-07-28 protocol. Initialization/version negotiation is handled by the SDK; stdio stdout is protocol-only.
+APEX pins TypeScript SDK 1.32.1 (`@modelcontextprotocol/sdk`, v1 line), supporting MCP versions through 2025-11-25.
+It does not claim support for the 2026-07-28 protocol, which ships in the separate v2 packages
+`@modelcontextprotocol/server` and `@modelcontextprotocol/client`. Initialization/version negotiation is handled by the
+SDK; stdio stdout is protocol-only.
 
 Successful responses include an object in `structuredContent` and the same JSON serialized in a text content block.
 Existing object results are unchanged. Non-object service results use these envelopes:
