@@ -40,7 +40,9 @@ active and loads the mapped skill, or delegates one hidden worker.
    | `deployment-approver`                | `apex-operations`                |
    | `inventory-operator`                 | `apex-operations`                |
    | `diagnostician`                      | `apex-operations`                |
+   | `diagnostic-operator`                | `apex-operations`                |
    | `quality-owner`                      | `apex-operations`                |
+   | `quality-evaluator`                  | `apex-operations`                |
    | reviewer tasks or review roles       | worker `APEX Reviewer`           |
    | `request.intake`                     | `apex-requirements`              |
    | `request.decision`                   | `apex-architecture`              |

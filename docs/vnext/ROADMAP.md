@@ -98,10 +98,8 @@ slice 8 follows them.
   until slice 8 archived them.
 - **Slice 3:** remove `vscode/askQuestions`, handoffs, argument hints, agent allowlists and VS Code client mechanics.
   Workers use kernel task context, not repository instructions.
-- **Slice 5:** `apex-next` delegates the owning agent with the prepared prompt when the step can complete as a
-  subagent. Otherwise it prints `/agent <name>` in standalone CLI or names the Agent picker in the VS Code harness.
-  The harness path depends on picked agents applying, which the slice 1 probe found broken over WSL. APEX
-  may also monitor and steer delegated workers.
+- **Slice 5:** `apex-next` centralizes routing from kernel state. CP-13 changes that routing to load same-agent stage
+  skills for interactive work and delegate only hidden workers. APEX may also monitor and steer delegated workers.
 - **Slice 6:** Explore for Planner and Operator only. Rubber-duck, Code-review and Security-review inherit the
   caller's full tool set, including APEX completion and disposition tools, and `task` cannot narrow it, so they wait
   until the CLI scopes helper tools. Users can still run `/review` and `/security-review` themselves. Agent

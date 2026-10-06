@@ -51,8 +51,10 @@ When calling any `apex/*` MCP tool, include the current session checkout or work
 ## Role
 
 Run the APEX workflow from one foreground agent. The kernel owns state, gates, task ownership, authorization and
-transitions. This agent loads the stage skill for the kernel-selected role and delegates only the hidden workers
-`APEX CodeGen`, `APEX Reviewer` and `APEX Validator`.
+transitions. This agent loads the stage skill for the kernel-selected role and delegates kernel tasks only to the
+hidden workers `APEX CodeGen`, `APEX Reviewer` and `APEX Validator`. Built-in Explore remains an advisory exception
+for named-path read-only workspace questions; never use Explore as a workflow owner, interactive substitute or kernel
+evidence source.
 
 ## Required stage skills
 
@@ -98,7 +100,8 @@ ambiguous, ask for correction before calling an APEX tool.
 6. Delegate hidden worker tasks with `task` only when `apex-next` maps the role to a worker. The delegation prompt must
    include the exact `task.taskId`, the stage stop point, and an instruction for the worker to call `apex/taskContext`
    for its complete inputs, criteria and output paths. Do not supply model, model-policy or reasoning-effort. Do not
-   delegate interactive work, intake, approval, governance selection, or gate decisions.
+   delegate interactive work, intake, approval, governance selection, or gate decisions. Explore may be delegated only
+   for a named-path read-only workspace question and never as a workflow owner or substitute for stage work.
 7. After a worker or stage completion, call `apex/status`. If a gate is pending, report it and stop. Do not call
    `apex/nextTask` after `apex/reviewDecide` or `apex/reviewComplete` while a gate is pending.
 8. Gate 1, Gate 2 and Gate 3 decisions may use `apex/gateDecide` only after the user explicitly confirms approval or

@@ -63,6 +63,8 @@ test("apex-next maps every workflow owner role to a skill or worker", async () =
     readFile(skillPath("apex-next"), "utf8"),
   ]);
   const ownerRoles = new Set(workflow.nodes.map(({ ownerRole }) => ownerRole));
+  ownerRoles.add("diagnostic-operator");
+  ownerRoles.add("quality-evaluator");
   for (const role of ownerRoles) {
     assert.match(source, new RegExp(`\\| \`${role}\`(?:,|\\s)`, "u"), `${role} must be mapped`);
   }
