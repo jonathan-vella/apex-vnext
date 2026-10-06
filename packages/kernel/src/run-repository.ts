@@ -1,5 +1,5 @@
 import type { RunConfigV1 } from "@apexops/contracts";
-import { constants } from "node:fs";
+import { constants, realpathSync } from "node:fs";
 import { lstat, mkdir, mkdtemp, open, readFile, rm } from "node:fs/promises";
 import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -132,8 +132,17 @@ function writerLeaseExpiry(value: unknown): number | undefined {
 }
 
 function sameWorkspace(left: string, right: string): boolean {
-  const resolvedLeft = resolve(left);
-  const resolvedRight = resolve(right);
+  const canonical = (path: string) => {
+    const resolved = resolve(path);
+    try {
+      return realpathSync(resolved);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return resolved;
+      throw error;
+    }
+  };
+  const resolvedLeft = canonical(left);
+  const resolvedRight = canonical(right);
   return process.platform === "win32"
     ? resolvedLeft.toLocaleLowerCase() === resolvedRight.toLocaleLowerCase()
     : resolvedLeft === resolvedRight;

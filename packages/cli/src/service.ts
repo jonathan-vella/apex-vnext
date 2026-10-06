@@ -183,7 +183,7 @@ import {
   renderWafAssessmentDiagram,
   type DiagramSource,
 } from "@apexops/renderers";
-import { constants } from "node:fs";
+import { constants, realpathSync } from "node:fs";
 import { cp, lstat, mkdir, open, readFile, readdir, realpath, rm, stat } from "node:fs/promises";
 import { userInfo } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -223,6 +223,16 @@ function sameResolvedPath(left: string, right: string): boolean {
 
 function portableRelativePath(root: string, destination: string): string {
   return relative(root, destination).split(sep).join("/");
+}
+
+function canonicalWorkspacePath(path: string): string {
+  const resolved = resolve(path);
+  try {
+    return realpathSync(resolved);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return resolved;
+    throw error;
+  }
 }
 
 interface Selection {
@@ -678,7 +688,7 @@ export class ApexService {
 
   constructor(root: string, options: ServiceOptions = {}) {
     this.root = resolve(root);
-    this.workspacePath = resolve(options.workspacePath ?? root);
+    this.workspacePath = canonicalWorkspacePath(options.workspacePath ?? root);
     this.clock = options.clock ?? (() => new Date());
     this.idSource = options.idSource ?? (() => crypto.randomUUID());
     this.writerLeaseTtlMs = options.writerLeaseTtlMs;
@@ -709,7 +719,7 @@ export class ApexService {
   }
 
   setWorkspacePath(workspacePath: string): void {
-    this.workspacePath = resolve(workspacePath);
+    this.workspacePath = canonicalWorkspacePath(workspacePath);
   }
 
   async improvementObserve(input: {
