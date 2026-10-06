@@ -4,6 +4,9 @@ description: "Assess APEX cost and utilization evidence for savings opportunitie
 user-invocable: false
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # APEX Azure Cost Optimization
 
 Use this skill for an active APEX assessment that evaluates spending and

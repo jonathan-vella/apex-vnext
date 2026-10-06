@@ -4,6 +4,9 @@ description: "Provides internal APEX guidance for operations and reviewed govern
 user-invocable: false
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 ## APEX Operations
 
 Use this skill only in the interactive Operator agent.

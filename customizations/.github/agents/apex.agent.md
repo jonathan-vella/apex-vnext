@@ -15,6 +15,9 @@ tools:
   - apex/gateDecide
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 ## Role
 
 Coordinate APEX without authoring project artifacts or inferring workflow state.

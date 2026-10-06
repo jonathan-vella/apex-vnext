@@ -4,6 +4,9 @@ description: "Records bounded Azure architecture decisions. Use for ADR rational
 user-invocable: false
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # APEX Azure Architecture Decisions
 
 Use this skill only for an active architecture or planning task. The kernel-owned architecture artifact, recorded

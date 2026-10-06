@@ -3,6 +3,9 @@ name: apex-bicep-patterns
 description: "Apply approved Bicep architecture patterns to APEX implementation intent. Use for AVM composition, private endpoints, networking, diagnostics, and CodeGen acceptance."
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # APEX Bicep Patterns
 
 Use this skill for an active Bicep-bound planning or CodeGen task. It describes approved intent and acceptance criteria;

@@ -26,6 +26,7 @@ export interface RunRepositoryOptions {
   clock?: () => Date;
   idSource?: () => string;
   lockTtlMs?: number;
+  writerLeaseTtlMs?: number;
   faultInjector?: (stage: RunTransactionStage) => void | Promise<void>;
 }
 
@@ -51,8 +52,44 @@ interface MutationLockSnapshot {
   recoveryId: string;
 }
 
+interface RunWriterLeaseSnapshot {
+  metadata: RunWriterLease;
+  expiresAt: number;
+}
+
+export interface RunWriterLeaseOwner {
+  workspacePath: string;
+  sessionId?: string;
+}
+
+export interface RunWriterLease {
+  version: 1;
+  workspacePath: string;
+  host: string;
+  pid: number;
+  sessionId: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export class RunWriterConflictError extends Error {
+  readonly code = "APEX_WRITER_CONFLICT";
+
+  constructor(
+    readonly ownerWorktree: string,
+    readonly expiresAt: string,
+  ) {
+    super(`Run writer lease is held by ${ownerWorktree} until ${expiresAt}`);
+    this.name = "RunWriterConflictError";
+  }
+}
+
 const LOCK_METADATA_FILE = "metadata.json";
 const MAX_LOCK_METADATA_BYTES = 64 * 1024;
+const WRITER_LEASE_FILE = ".run-writer-lease.json";
+const MAX_WRITER_LEASE_BYTES = 64 * 1024;
+const WRITER_LEASE_LOCK_WAIT_MS = 500;
+const WRITER_LEASE_LOCK_RETRY_MS = 10;
 
 function lockExpiry(value: unknown): number | undefined {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
@@ -72,14 +109,49 @@ function lockExpiry(value: unknown): number | undefined {
     : undefined;
 }
 
+function writerLeaseExpiry(value: unknown): number | undefined {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const lease = value as Partial<RunWriterLease>;
+  const createdAt = Date.parse(lease.createdAt ?? "");
+  const expiresAt = Date.parse(lease.expiresAt ?? "");
+  return lease.version === 1 &&
+    typeof lease.workspacePath === "string" &&
+    lease.workspacePath.length > 0 &&
+    Number.isInteger(lease.pid) &&
+    Number(lease.pid) > 0 &&
+    typeof lease.host === "string" &&
+    lease.host.length > 0 &&
+    typeof lease.sessionId === "string" &&
+    lease.sessionId.length > 0 &&
+    Number.isFinite(createdAt) &&
+    Number.isFinite(expiresAt) &&
+    expiresAt >= createdAt
+    ? expiresAt
+    : undefined;
+}
+
+function sameWorkspace(left: string, right: string): boolean {
+  const resolvedLeft = resolve(left);
+  const resolvedRight = resolve(right);
+  return process.platform === "win32"
+    ? resolvedLeft.toLocaleLowerCase() === resolvedRight.toLocaleLowerCase()
+    : resolvedLeft === resolvedRight;
+}
+
+async function sleep(milliseconds: number): Promise<void> {
+  await new Promise((done) => setTimeout(done, milliseconds));
+}
+
 export class RunRepository {
   private readonly runPath: string;
   private readonly lockPath: string;
   private readonly retiredLockPath: string;
   private readonly intentPath: string;
+  private readonly writerLeasePath: string;
   private readonly clock: () => Date;
   private readonly idSource: () => string;
   private readonly lockTtlMs: number;
+  private readonly writerLeaseTtlMs: number;
   private readonly faultInjector?: RunRepositoryOptions["faultInjector"];
   readonly journal: EventJournal;
 
@@ -89,9 +161,11 @@ export class RunRepository {
     this.lockPath = join(directory, ".run-mutation.lock");
     this.retiredLockPath = join(directory, ".run-mutation.retired");
     this.intentPath = join(directory, ".run-transaction.json");
+    this.writerLeasePath = join(directory, WRITER_LEASE_FILE);
     this.clock = options.clock ?? (() => new Date());
     this.idSource = options.idSource ?? (() => crypto.randomUUID());
     this.lockTtlMs = options.lockTtlMs ?? 30_000;
+    this.writerLeaseTtlMs = options.writerLeaseTtlMs ?? 120_000;
     this.faultInjector = options.faultInjector;
     this.journal = new EventJournal(join(directory, "journal"));
   }
@@ -117,6 +191,7 @@ export class RunRepository {
           `Stale journal head: expected ${String(input.expectedJournalHead)}, found ${String(journalHead)}`,
         );
       }
+
       const next = input.update(structuredClone(current));
       if (next.projectId !== current.projectId || next.runId !== current.runId)
         throw new Error("Run identity cannot change");
@@ -144,6 +219,65 @@ export class RunRepository {
       await rm(this.intentPath, { force: true });
       await this.faultInjector?.("cleanup");
       return { run: next, runHash: afterHash, eventHash: event.hash };
+    });
+  }
+
+  async acquireWriterLease(owner: RunWriterLeaseOwner): Promise<RunWriterLease> {
+    const workspacePath = resolve(owner.workspacePath);
+    const conflictFromPublishedLease = async () => {
+      const existing = await this.readWriterLease();
+      if (
+        existing !== undefined &&
+        existing.expiresAt > this.clock().getTime() &&
+        !sameWorkspace(existing.metadata.workspacePath, workspacePath)
+      ) {
+        return new RunWriterConflictError(existing.metadata.workspacePath, existing.metadata.expiresAt);
+      }
+      return undefined;
+    };
+    return this.withLock(
+      async () => {
+        const now = this.clock();
+        const existing = await this.readWriterLease();
+        if (
+          existing !== undefined &&
+          existing.expiresAt > now.getTime() &&
+          !sameWorkspace(existing.metadata.workspacePath, workspacePath)
+        ) {
+          throw new RunWriterConflictError(existing.metadata.workspacePath, existing.metadata.expiresAt);
+        }
+        const lease: RunWriterLease = {
+          version: 1,
+          workspacePath,
+          host: hostname(),
+          pid: process.pid,
+          sessionId: owner.sessionId ?? this.idSource(),
+          createdAt:
+            existing !== undefined && sameWorkspace(existing.metadata.workspacePath, workspacePath)
+              ? existing.metadata.createdAt
+              : now.toISOString(),
+          expiresAt: new Date(now.getTime() + this.writerLeaseTtlMs).toISOString(),
+        };
+        await atomicWriteJson(this.writerLeasePath, lease);
+        return lease;
+      },
+      { onContention: conflictFromPublishedLease, waitMs: WRITER_LEASE_LOCK_WAIT_MS },
+    );
+  }
+
+  async releaseWriterLease(owner: RunWriterLeaseOwner): Promise<boolean> {
+    const workspacePath = resolve(owner.workspacePath);
+    return this.withLock(async () => {
+      const existing = await this.readWriterLease();
+      if (existing === undefined) return false;
+      if (
+        existing.expiresAt > this.clock().getTime() &&
+        !sameWorkspace(existing.metadata.workspacePath, workspacePath)
+      ) {
+        throw new RunWriterConflictError(existing.metadata.workspacePath, existing.metadata.expiresAt);
+      }
+      await rm(this.writerLeasePath, { force: true });
+      return true;
     });
   }
 
@@ -175,7 +309,34 @@ export class RunRepository {
     return JSON.parse(await readFile(this.runPath, "utf8")) as RunConfigV1;
   }
 
-  private async withLock<T>(operation: () => Promise<T>): Promise<T> {
+  private async readWriterLease(): Promise<RunWriterLeaseSnapshot | undefined> {
+    let stat;
+    try {
+      stat = await lstat(this.writerLeasePath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      throw error;
+    }
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_WRITER_LEASE_BYTES) {
+      throw new Error("Run writer lease metadata is unsafe");
+    }
+    const bytes = await readFile(this.writerLeasePath);
+    if (bytes.byteLength > MAX_WRITER_LEASE_BYTES) throw new Error("Run writer lease metadata is unsafe");
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(bytes.toString("utf8")) as unknown;
+    } catch (error) {
+      throw new Error("Run writer lease metadata is unreadable", { cause: error });
+    }
+    const expiresAt = writerLeaseExpiry(parsed);
+    if (expiresAt === undefined) throw new Error("Run writer lease metadata is unreadable");
+    return { metadata: parsed as RunWriterLease, expiresAt };
+  }
+
+  private async withLock<T>(
+    operation: () => Promise<T>,
+    options: { onContention?: () => Promise<Error | undefined>; waitMs?: number } = {},
+  ): Promise<T> {
     await mkdir(dirname(this.lockPath), { recursive: true });
     const token = this.idSource();
     const createdAt = this.clock();
@@ -191,6 +352,20 @@ export class RunRepository {
       const existing = await this.readLock();
       if (existing === undefined) continue;
       if (existing.expiresAt > this.clock().getTime() || this.ownerMayBeAlive(existing.metadata)) {
+        const deadline = Date.now() + (options.waitMs ?? 0);
+        for (;;) {
+          const contention = await options.onContention?.();
+          if (contention !== undefined) throw contention;
+          if (Date.now() >= deadline) break;
+          await sleep(WRITER_LEASE_LOCK_RETRY_MS);
+          if (await this.acquireLock(metadata)) break;
+          const current = await this.readLock();
+          if (current === undefined) continue;
+          if (current.expiresAt <= this.clock().getTime() && !this.ownerMayBeAlive(current.metadata)) {
+            if (await this.retireLock(current.recoveryId)) continue;
+          }
+        }
+        if (await this.readLock().then((current) => current?.metadata.token === token)) break;
         throw new Error("Run mutation is already in progress");
       }
       if (!(await this.retireLock(existing.recoveryId))) throw new Error("Run mutation is already in progress");

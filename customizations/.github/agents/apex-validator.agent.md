@@ -8,6 +8,9 @@ tools:
   - apex/completeTask
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # Goal
 
 Run the deterministic validation set named in the active worker task and return a traceable, human-readable evidence

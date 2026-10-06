@@ -1078,7 +1078,10 @@ test("native validation receipts are source-bound, runtime-owned and distinguish
     await server.connect(serverTransport);
     await client.connect(clientTransport);
     try {
-      const response = await client.callTool({ name: "validateTask", arguments: { taskId: validationTask } });
+      const response = await client.callTool({
+        name: "validateTask",
+        arguments: { workspace: service.root, taskId: validationTask },
+      });
       assert.notEqual(response.isError, true);
       const result = response.structuredContent as Record<string, unknown>;
       assert.equal(result.valid, false);
@@ -3313,6 +3316,7 @@ test("MCP completeTask accepts an output bundle", async () => {
   const response = await client.callTool({
     name: "completeTask",
     arguments: {
+      workspace: service.root,
       taskId: issued.task.taskId,
       outputs: [{ kind: "requirements", value: requirements() }],
     },

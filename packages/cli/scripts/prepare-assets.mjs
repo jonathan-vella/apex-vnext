@@ -11,7 +11,10 @@ const repositoryRoot = resolve(packageRoot, "../..");
 const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
-const CLIENT_ADAPTER_VERSION = "1.8.1";
+const CLIENT_ADAPTER_VERSION = "1.9.0";
+export const ASSET_GENERATION_LOCK_ENV = "APEX_ASSET_GENERATION_LOCK_HELD";
+const ASSET_GENERATION_LOCK_TTL_MS = 5 * 60 * 1000;
+const ASSET_GENERATION_LOCK_RETRY_MS = 50;
 const RETIRED_SOURCE_FIELDS = ["argument-hint", "handoffs", "agents"];
 const MODEL_PIN_FIELDS = ["model", "model-policy", "reasoning-effort"];
 const RETIRED_SOURCE_TOOLS = ["vscode/askQuestions", "agent"];
@@ -24,6 +27,55 @@ const PROJECTION_TARGETS = new Map([["github-copilot-cli", "github-copilot"]]);
 
 function bytewise(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
+}
+
+async function sleep(milliseconds) {
+  await new Promise((done) => setTimeout(done, milliseconds));
+}
+
+export async function acquireAssetGenerationLock() {
+  const lockPath = join(packageRoot, ".prepare-assets.lock");
+  const deadline = Date.now() + ASSET_GENERATION_LOCK_TTL_MS;
+  const token = crypto.randomUUID();
+  for (;;) {
+    try {
+      await mkdir(lockPath);
+      await writeFile(
+        join(lockPath, "metadata.json"),
+        `${JSON.stringify({
+          token,
+          pid: process.pid,
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + ASSET_GENERATION_LOCK_TTL_MS).toISOString(),
+        })}\n`,
+      );
+      let released = false;
+      return async () => {
+        if (released) return;
+        released = true;
+        try {
+          const metadata = JSON.parse(await readFile(join(lockPath, "metadata.json"), "utf8"));
+          if (metadata.token !== token) return;
+        } catch {
+          return;
+        }
+        await rm(lockPath, { recursive: true, force: true });
+      };
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+      if (Date.now() >= deadline)
+        throw new Error(`Timed out waiting for asset generation lock: ${lockPath}`, { cause: error });
+      let expired = false;
+      try {
+        const metadata = JSON.parse(await readFile(join(lockPath, "metadata.json"), "utf8"));
+        expired = Date.parse(metadata.expiresAt ?? "") <= Date.now();
+      } catch {
+        // Unreadable metadata may be a concurrent writer; keep waiting until the deadline.
+      }
+      if (expired) await rm(lockPath, { recursive: true, force: true });
+      else await sleep(ASSET_GENERATION_LOCK_RETRY_MS);
+    }
+  }
 }
 
 function portablePath(path) {
@@ -678,4 +730,14 @@ async function prepareAssets() {
   await writeFile(join(assetsRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await prepareAssets();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  if (process.env[ASSET_GENERATION_LOCK_ENV] === "1") await prepareAssets();
+  else {
+    const release = await acquireAssetGenerationLock();
+    try {
+      await prepareAssets();
+    } finally {
+      await release();
+    }
+  }
+}

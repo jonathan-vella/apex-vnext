@@ -123,6 +123,7 @@ const approval = {
 type ToolName = keyof typeof MCP_OUTPUT_SCHEMAS;
 const fixtures: Record<ToolName, Record<string, unknown>> = {
   status,
+  releaseWriter: { released: true, projectId: "demo", runId: "run-1" },
   capabilityList: { packs: [capability] },
   capabilityStatus: capability,
   nextTask: { status: "task", task },
@@ -372,6 +373,8 @@ test("output schema coverage matches every registered MCP tool", async () => {
       assert.equal(tool.outputSchema?.type, "object", tool.name);
       assert.equal(tool.inputSchema.type, "object", tool.name);
       assert.equal(tool.inputSchema.additionalProperties, false, tool.name);
+      assert.ok(tool.inputSchema.properties?.workspace, tool.name);
+      assert.ok(tool.inputSchema.required?.includes("workspace"), tool.name);
       const readOnly = tool.name === "status" || tool.name === "projectList";
       assert.equal(tool.annotations?.readOnlyHint, readOnly, tool.name);
       assert.equal(tool.annotations?.idempotentHint, readOnly, tool.name);
@@ -388,18 +391,28 @@ test("output schema coverage matches every registered MCP tool", async () => {
     assert.match(nextTask.description!, /not retry-safe/i);
     const gateDecide = tools.find(({ name }) => name === "gateDecide")!;
     const validateGate = new Ajv({ strict: false }).compile(gateDecide.inputSchema);
-    for (const gate of [1, 2, 3]) assert.equal(validateGate({ gate, decision: "approved", confirm: true }), true);
-    assert.equal(validateGate({ gate: 4, decision: "approved", confirm: true }), false);
+    for (const gate of [1, 2, 3])
+      assert.equal(validateGate({ workspace: "/workspace", gate, decision: "approved", confirm: true }), true);
+    assert.equal(validateGate({ workspace: "/workspace", gate: 4, decision: "approved", confirm: true }), false);
     for (const name of ["stageArtifact", "validateTask"]) {
       const validate = new Ajv({ strict: false }).compile(tools.find((tool) => tool.name === name)!.inputSchema);
-      assert.equal(validate({ taskId: "task-1", kind: "requirements" }), false);
+      assert.equal(validate({ workspace: "/workspace", taskId: "task-1", kind: "requirements" }), false);
       assert.equal(
-        validate({ taskId: "task-1", kind: "requirements", value: {}, outputs: [{ kind: "requirements", value: {} }] }),
+        validate({
+          workspace: "/workspace",
+          taskId: "task-1",
+          kind: "requirements",
+          value: {},
+          outputs: [{ kind: "requirements", value: {} }],
+        }),
         false,
       );
-      assert.equal(validate({ taskId: "task-1", kind: "requirements", value: {} }), true);
-      assert.equal(validate({ taskId: "task-1", outputs: [{ kind: "requirements", value: {} }] }), true);
-      assert.equal(validate({ taskId: "task-1" }), name === "validateTask");
+      assert.equal(validate({ workspace: "/workspace", taskId: "task-1", kind: "requirements", value: {} }), true);
+      assert.equal(
+        validate({ workspace: "/workspace", taskId: "task-1", outputs: [{ kind: "requirements", value: {} }] }),
+        true,
+      );
+      assert.equal(validate({ workspace: "/workspace", taskId: "task-1" }), name === "validateTask");
     }
   } finally {
     await client.close();
@@ -439,6 +452,7 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
   }[keyof ApexService];
   const cases: Record<ToolName, { method: ServiceMethod; input: Record<string, unknown>; args: unknown[] }> = {
     status: { method: "status", input: {}, args: [] },
+    releaseWriter: { method: "releaseWriter", input: {}, args: [] },
     capabilityList: { method: "capabilityList", input: {}, args: [] },
     capabilityStatus: { method: "capabilityStatus", input: { pack: "test" }, args: ["test"] },
     nextTask: { method: "nextTask", input: {}, args: [] },
@@ -495,6 +509,7 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
     },
   };
   const service = new ApexService(await tempRoot());
+  const workspace = service.root;
   const responses = { ...fixtures };
   const calls: Array<{ method: keyof ApexService; args: unknown[] }> = [];
   let failure: { method: keyof ApexService; error: Error } | undefined;
@@ -546,7 +561,7 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
       args = [cases[name].args],
     ) => {
       calls.length = 0;
-      const response = await client.callTool({ name, arguments: input });
+      const response = await client.callTool({ name, arguments: { workspace, ...input } });
       invoked.add(name);
       assert.equal(response.isError, undefined, `${name}: ${JSON.stringify(response)}`);
       assert.deepEqual(response.structuredContent, expected, name);
@@ -565,10 +580,11 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
     };
     for (const name of Object.keys(cases) as ToolName[]) await check(name, fixtures[name]);
     assert.deepEqual([...invoked].sort(), names);
-    for (const tool of tools.filter((tool) => Object.keys(tool.inputSchema.properties ?? {}).length === 0)) {
-      const response = await client.callTool({ name: tool.name });
-      assert.equal(response.isError, undefined, tool.name);
-      assert.deepEqual(response.structuredContent, fixtures[tool.name as ToolName]);
+    for (const tool of tools) {
+      assert.ok(tool.inputSchema.properties?.workspace, tool.name);
+      assert.ok(tool.inputSchema.required?.includes("workspace"), tool.name);
+      const response = await client.callTool({ name: tool.name, arguments: cases[tool.name as ToolName].input });
+      assert.equal(response.isError, true, tool.name);
     }
     for (const [name, value] of validVariants) {
       if (name === "stageArtifact") continue;
@@ -615,7 +631,7 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
       for (const name of Object.keys(cases) as ToolName[]) {
         calls.length = 0;
         failure = { method: cases[name].method, error };
-        const response = await client.callTool({ name, arguments: cases[name].input });
+        const response = await client.callTool({ name, arguments: { workspace, ...cases[name].input } });
         invoked.add(name);
         const expected = { error: { code, message } };
         assert.equal(response.isError, true, name);
@@ -639,8 +655,8 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
     for (const [name, input] of [
       ...Object.entries(cases)
         .filter(([, { input }]) => Object.keys(input).length === 0)
-        .map(([name]) => [name, { unexpected: true }]),
-      ["gateDecide", { gate: 4, decision: "approved", confirm: true }],
+        .map(([name]) => [name, { workspace, unexpected: true }]),
+      ["gateDecide", { workspace, gate: 4, decision: "approved", confirm: true }],
     ] as Array<[ToolName, Record<string, unknown>]>) {
       calls.length = 0;
       const response = await client.callTool({ name, arguments: input });

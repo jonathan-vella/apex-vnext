@@ -143,6 +143,7 @@ import {
   ObjectStore,
   ProjectStore,
   RunRepository,
+  RunWriterConflictError,
   ValidatorRegistry,
   WriterTransferStore,
   WorkflowEngine,
@@ -315,6 +316,8 @@ export interface ReviewDecision {
 export interface ServiceOptions {
   clock?: () => Date;
   idSource?: () => string;
+  workspacePath?: string;
+  writerLeaseTtlMs?: number;
   providers?: Partial<Record<"fake" | "bicep" | "terraform", IacProvider>>;
   architectureAvailabilityAdapter?: (evidence: ArchitectureAvailabilityV1) => Promise<void>;
   executableChecker?: (executable: string) => Promise<boolean>;
@@ -640,6 +643,7 @@ export class ApexService {
   readonly root: string;
   private readonly clock: () => Date;
   private readonly idSource: () => string;
+  private readonly writerLeaseTtlMs: number | undefined;
   private readonly projects: ProjectStore;
   private readonly objects: ObjectStore;
   private readonly cache: ContentCache;
@@ -653,11 +657,14 @@ export class ApexService {
   private readonly improvementPolicy: ImprovementPolicyV1 | undefined;
   private improvementRuntime?: ImprovementStore;
   private requirementsDocumentTemplate?: Promise<{ content: string; hash: string }>;
+  private workspacePath: string;
 
   constructor(root: string, options: ServiceOptions = {}) {
     this.root = resolve(root);
+    this.workspacePath = resolve(options.workspacePath ?? root);
     this.clock = options.clock ?? (() => new Date());
     this.idSource = options.idSource ?? (() => crypto.randomUUID());
+    this.writerLeaseTtlMs = options.writerLeaseTtlMs;
     this.projects = new ProjectStore(this.root, this.clock, this.idSource);
     this.objects = new ObjectStore(this.root);
     this.cache = new ContentCache(this.root);
@@ -684,6 +691,10 @@ export class ApexService {
     this.improvementPolicy = options.improvementPolicy;
   }
 
+  setWorkspacePath(workspacePath: string): void {
+    this.workspacePath = resolve(workspacePath);
+  }
+
   async improvementObserve(input: {
     taskId?: string;
     observedAt?: string;
@@ -694,6 +705,7 @@ export class ApexService {
     evidenceRefs: string[];
   }): Promise<{ observation: ImprovementObservationV1; deduplicated: boolean }> {
     const run = await this.currentRun();
+    await this.acquireRunWriterLease(run);
     return (await this.improvements(run)).observe({ projectId: run.projectId, runId: run.runId, ...input });
   }
 
@@ -705,6 +717,7 @@ export class ApexService {
 
   async improvementScan(): Promise<unknown> {
     const run = await this.currentRun();
+    await this.acquireRunWriterLease(run);
     return (await this.improvements(run)).scan(run.projectId);
   }
 
@@ -721,6 +734,7 @@ export class ApexService {
     externalRef?: string;
   }): Promise<ImprovementDecisionV1> {
     const run = await this.currentRun();
+    await this.acquireRunWriterLease(run);
     return (await this.improvements(run)).decide({ projectId: run.projectId, ...input });
   }
 
@@ -731,12 +745,14 @@ export class ApexService {
     if (observation === undefined || observation.projectId !== run.projectId) {
       throw new ApexError("APEX_NOT_FOUND", "Improvement observation not found", EXIT_CODES.notFound);
     }
+    await this.acquireRunWriterLease(run);
     await store.deleteObservation(observationId);
     return { deleted: observationId };
   }
 
   async improvementPrune(): Promise<{ observations: number; decisions: number }> {
     const run = await this.currentRun();
+    await this.acquireRunWriterLease(run);
     return (await this.improvements(run)).prune();
   }
 
@@ -1697,6 +1713,7 @@ export class ApexService {
 
   async update(customizationsSource?: string): Promise<{ updated: string[] }> {
     const selection = (await this.workspaceHasNoProjects()) ? undefined : await this.selection();
+    if (selection !== undefined) await this.acquireRunWriterLease(await this.run(selection, { readOnly: true }));
     await this.ensureLocalGitBoundary();
     const assets = await resolveBundledAssets();
     const previousRuntimeLock = JSON.parse(
@@ -1907,6 +1924,11 @@ export class ApexService {
     await this.assertSafeExistingPath(projectDirectory, runDirectory);
     const runIds = await readdir(runDirectory);
     for (const runId of runIds) {
+      if (Value.Check(RunIdSchema, runId)) {
+        await this.acquireRunWriterLease(await this.run({ projectId, runId }, { readOnly: true }));
+      }
+    }
+    for (const runId of runIds) {
       const workDirectory = join(this.root, ".apex", "work", runId);
       if (await this.pathExistsLstat(workDirectory)) {
         await this.assertSafeExistingPath(join(this.root, ".apex"), workDirectory);
@@ -1925,6 +1947,7 @@ export class ApexService {
     const selectedRun = runId ?? (await this.latestRun(projectId));
     await this.projects.getRun(projectId, selectedRun);
     const selection = { projectId, runId: selectedRun };
+    await this.acquireRunWriterLease(await this.run(selection, { readOnly: true }));
     await this.writeSelection(selection);
     await this.append(await this.run(selection), "selection.changed", selection);
     return selection;
@@ -2323,6 +2346,12 @@ export class ApexService {
       };
     }
     return this.status();
+  }
+
+  async releaseWriter(): Promise<{ released: boolean; projectId: string; runId: string }> {
+    const run = await this.currentRun();
+    const released = await this.runRepository(run).releaseWriterLease(this.writerLeaseOwner());
+    return { released, projectId: run.projectId, runId: run.runId };
   }
 
   async status(): Promise<{
@@ -2848,6 +2877,7 @@ export class ApexService {
     if (bytes.byteLength > task.maxOutputBytes) {
       throw new ApexError("APEX_VALIDATION", "Task output exceeds its size limit", EXIT_CODES.validation);
     }
+    await this.acquireRunWriterLease(run);
     const directory = join(this.root, ".apex", "work", run.runId, taskId);
     const path = join(directory, `${output.kind}.json`);
     await mkdir(directory, { recursive: true });
@@ -3552,6 +3582,7 @@ export class ApexService {
             observedAt: selection.constraints.discoveredAt,
           }
         : undefined;
+    await this.acquireRunWriterLease(run);
     if (governanceHash !== undefined && !refreshing) {
       const governance = await this.objects.getJson<GovernanceConstraintsV1>(governanceHash);
       if (governance.constraintsRef.uri !== `apex-object:${governance.constraintsRef.digest}`)
@@ -3737,6 +3768,7 @@ export class ApexService {
       if (error instanceof GovernanceBaselineError) throw governanceBaselineApexError(error, "reference");
       throw error;
     }
+    await this.acquireRunWriterLease(run);
     const digest = await this.objects.putJson({ ...selection.snapshot, projectId: run.projectId, runId: run.runId });
     const constraints = {
       ...selection.constraints,
@@ -3795,6 +3827,7 @@ export class ApexService {
     const hash = sha256Bytes(bytes);
     if (expectedSha !== undefined && expectedSha !== hash)
       throw new ApexError("APEX_STALE", "Staged content hash does not match expected SHA", EXIT_CODES.stale);
+    await this.acquireRunWriterLease(run);
     let idempotent = false;
     if (await this.exists(path)) {
       const entry = await lstat(path);
@@ -4043,6 +4076,7 @@ export class ApexService {
         throw new ApexError("APEX_STALE", "Validation writer or run changed", EXIT_CODES.stale);
       assertTaskCurrent(task, (await this.journal(current).head())!, current.ownerEpoch, this.clock);
       await this.assertCurrentWriterAuthority(current, transfers);
+      await this.acquireRunWriterLease(current);
       const receiptHash = await this.objects.putJson(receipt);
       const executed = new Set<string>(receipt.commands.map(({ validatorId }) => validatorId));
       if (
@@ -4362,6 +4396,7 @@ export class ApexService {
           EXIT_CODES.conflict,
         );
     }
+    await this.acquireRunWriterLease(run);
     const candidateHash = await this.objects.putJson(candidate);
     const proposalHash = await this.objects.putJson(proposal);
     const payload = {
@@ -4726,6 +4761,7 @@ export class ApexService {
     const completionHead = await this.journal(run).head();
     if (completionHead === null) throw new ApexError("APEX_STALE", "Task journal is empty", EXIT_CODES.stale);
     assertTaskCurrent(task, completionHead, run.ownerEpoch, this.clock);
+    await this.acquireRunWriterLease(run);
     const outputHashes: Partial<Record<ArtifactKind, string>> = {};
     for (const output of outputs) outputHashes[output.kind] = await this.objects.putJson(output.value);
     const requirementsOutput = outputs.find(({ kind }) => kind === "requirements");
@@ -5849,6 +5885,7 @@ export class ApexService {
         throw new ApexError("APEX_STALE", "Approval authority expired before it could be recorded", EXIT_CODES.stale);
       }
     }
+    await this.acquireRunWriterLease(run);
     const approvalHash = await this.objects.putJson(approval);
     const updated = {
       ...run,
@@ -6083,6 +6120,7 @@ export class ApexService {
         intendedExecutionRecipientIdentity,
         policyReceipt === undefined ? undefined : nativePolicyValidationBinding(policyReceipt),
       );
+      await this.acquireRunWriterLease(run);
       const previewObjectHash = await this.objects.putJson(preview);
       const attestationHash = attestation === undefined ? undefined : await this.objects.putJson(attestation);
       const policyValidationHash = policyReceipt === undefined ? undefined : await this.objects.putJson(policyReceipt);
@@ -6145,6 +6183,7 @@ export class ApexService {
       undefined,
       intendedExecutionRecipientIdentity,
     );
+    await this.acquireRunWriterLease(run);
     const previewObjectHash = await this.objects.putJson(preview);
     await this.append(run, "preview.requested", {
       provider: options.provider,
@@ -6469,6 +6508,7 @@ export class ApexService {
       updatedAt: now,
     };
     this.assertValid("operation", operation);
+    await this.acquireRunWriterLease(run);
     const operationHash = await this.objects.putJson(operation);
     const inventory: ResourceInventoryV1 = {
       schemaVersion: CONTRACT_VERSION,
@@ -6556,6 +6596,7 @@ export class ApexService {
         EXIT_CODES.validation,
       );
     }
+    await this.acquireRunWriterLease(run);
     const operationHash = await this.objects.putJson(operation);
     const inventory = await provider.inventory(run.projectId, run.runId);
     this.assertValid("inventory", inventory);
@@ -6612,6 +6653,7 @@ export class ApexService {
     const sourceEvents = await this.journal(source).replay();
     if (![1, 2, 3].every((gate) => this.gateApproved(source, gate)))
       throw new ApexError("APEX_AUTHORIZATION", "Promotion requires approved Gates 1-3", EXIT_CODES.authorization);
+    await this.acquireRunWriterLease(source);
     const promoted = await this.projects.createRun(source.projectId, {
       environment,
       targetScope,
@@ -6970,13 +7012,15 @@ export class ApexService {
       }
       value = availability;
     }
+    const run = await this.currentRun();
+    await this.acquireRunWriterLease(run);
     const accepted = await store.accept({
       kind: input.kind,
       contentType: input.contentType,
       value,
       required: input.required,
     });
-    await this.append(await this.currentRun(), "evidence.accepted", {
+    await this.append(run, "evidence.accepted", {
       kind: input.kind,
       contentType: input.contentType,
       status: accepted.status,
@@ -7282,6 +7326,7 @@ export class ApexService {
       this.clock,
       this.idSource,
     );
+    await this.acquireRunWriterLease(run);
     await atomicWriteJson(
       join(this.projects.runDirectory(run.projectId, run.runId), "tasks", `${task.taskId}.json`),
       task,
@@ -7323,6 +7368,7 @@ export class ApexService {
   ): Promise<void> {
     const repository = this.runRepository(before);
     try {
+      await this.acquireRunWriterLease(before);
       await repository.mutate({
         expectedRunHash: sha256Json(before),
         ...(expectedJournalHead === undefined ? {} : { expectedJournalHead }),
@@ -7626,6 +7672,7 @@ export class ApexService {
     payload: JsonValue,
     expectedHead?: string | null,
   ): Promise<EventV1> {
+    await this.acquireRunWriterLease(run);
     const journal = this.journal(run);
     return await journal.append({
       eventId: this.idSource(),
@@ -7725,7 +7772,25 @@ export class ApexService {
     return new RunRepository(this.projects.runDirectory(selection.projectId, selection.runId), {
       clock: this.clock,
       idSource: this.idSource,
+      ...(this.writerLeaseTtlMs === undefined ? {} : { writerLeaseTtlMs: this.writerLeaseTtlMs }),
     });
+  }
+
+  private async acquireRunWriterLease(run: RunConfigV1): Promise<void> {
+    await this.runRepository(run).acquireWriterLease(this.writerLeaseOwner());
+  }
+
+  private async releaseRunWriterLeaseIfOwned(run: RunConfigV1): Promise<void> {
+    try {
+      await this.runRepository(run).releaseWriterLease(this.writerLeaseOwner());
+    } catch (error) {
+      if (error instanceof RunWriterConflictError) return;
+      throw error;
+    }
+  }
+
+  private writerLeaseOwner(): { workspacePath: string; sessionId: string } {
+    return { workspacePath: this.workspacePath, sessionId: `${process.pid}` };
   }
   private async selection(): Promise<Selection> {
     return JSON.parse(await readFile(join(this.root, ".apex", "config.json"), "utf8")) as Selection;
@@ -9810,7 +9875,10 @@ export class ApexService {
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): Promise<Awaited<ReturnType<EventJournal["replay"]>>> {
     events = this.governanceWorkflowEvents(events);
-    if (events.some(({ type }) => type === "workflow.completed")) return events;
+    if (events.some(({ type }) => type === "workflow.completed")) {
+      await this.releaseRunWriterLeaseIfOwned(run);
+      return events;
+    }
     const workflow = await this.lockedWorkflowEngine(run);
     const artifactAliases: Readonly<Record<string, string>> = {
       requirements: "requirements-v1",
@@ -9910,6 +9978,7 @@ export class ApexService {
       executedValidatorIds: [...context.executedValidatorIds],
       simulatedOmittedValidatorIds: [...context.simulatedOmittedValidatorIds],
     });
+    await this.releaseRunWriterLeaseIfOwned(run);
     return this.journal(run).replay();
   }
 

@@ -36,6 +36,7 @@
   "mcpSelectorFormat": "{server}/{operation}",
   "verifiedSelectors": [
     "apex/status",
+    "apex/releaseWriter",
     "apex/capabilityList",
     "apex/capabilityStatus",
     "apex/nextTask",
@@ -73,6 +74,7 @@
   ],
   "operationIds": [
     "status",
+    "releaseWriter",
     "capabilityList",
     "capabilityStatus",
     "nextTask",

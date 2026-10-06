@@ -40,6 +40,8 @@ function contract(schema: TObject | TUnion<TObject[]>): z.ZodObject {
             "APEX_USAGE",
             "APEX_NOT_FOUND",
             "APEX_CONFLICT",
+            "APEX_WRITER_CONFLICT",
+            "APEX_WORKSPACE_UNSUPPORTED",
             "APEX_VALIDATION",
             "APEX_STALE",
             "APEX_AUTHORIZATION",
@@ -176,6 +178,13 @@ export const MCP_OUTPUT_SCHEMAS = {
         nextAction: NonEmptyStringSchema,
       }),
     ]),
+  ),
+  releaseWriter: contract(
+    object({
+      released: Type.Boolean(),
+      projectId: NonEmptyStringSchema,
+      runId: NonEmptyStringSchema,
+    }),
   ),
   capabilityList: contract(object({ packs: Type.Array(capability) })),
   capabilityStatus: contract(capability),

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { NativeBicepProvider, NativeTerraformProvider, ProcessRunner, type IacProvider } from "@apexops/capabilities";
 import {
   CONTRACT_VERSION,
@@ -21,18 +21,21 @@ import {
   renderQualityScorecardEvaluation,
   type ScorecardMeasurement,
 } from "@apexops/renderers";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { ApexError, EXIT_CODES, normalizeError } from "./errors.js";
 import { dependencyRevision as calculateDependencyRevision } from "./dependency-revision.js";
 import { resolveBundledAssets } from "./assets.js";
 import { assertTargetScope } from "./target-scope.js";
-import { serveMcp } from "./mcp.js";
+import { serveMcp, type McpServiceResolver } from "./mcp.js";
 import { createFileProviderRuntime, hashTerraformConfiguration, hashTerraformLockFile } from "./provider-runtime.js";
 import { exportProviderTransfer, importProviderTransfer } from "./provider-transfer.js";
 import { ApexService, type ServiceOptions, type TaskOutput } from "./service.js";
 import { exportStateTransfer, importStateTransfer } from "./state-transfer.js";
 import { APEX_VERSION } from "./version.js";
 import { interactiveBootstrap } from "./bootstrap-wizard.js";
+import { mcpWorkspaceRoot, resolveMcpWorkspace } from "./workspace-root.js";
+
+export { mcpWorkspaceRoot, resolveMcpWorkspace } from "./workspace-root.js";
 
 type FlagValue = string | string[] | boolean;
 type Flags = Record<string, FlagValue>;
@@ -418,22 +421,14 @@ async function qualityStatus(root: string): Promise<QualityEvaluationArtifact> {
   }
 }
 
-// A session may start below the workspace root; stop at the repository boundary so an unrelated parent is never used.
-export async function mcpWorkspaceRoot(start: string): Promise<string> {
-  for (let directory = resolve(start); ; directory = dirname(directory)) {
-    const apex = await lstat(join(directory, ".apex")).catch(() => undefined);
-    if (apex?.isDirectory() === true) return directory;
-    const repository = await lstat(join(directory, ".git")).catch(() => undefined);
-    if (repository !== undefined || dirname(directory) === directory) return start;
-  }
-}
-
-export async function execute(argv: string[], root = process.cwd(), options: ServiceOptions = {}): Promise<unknown> {
-  const { words, flags } = parse(argv);
-  const command = words.join(" ");
-  if (command === "mcp serve") root = await mcpWorkspaceRoot(root);
+export async function createApexService(
+  root: string,
+  flags: Flags = {},
+  command = "",
+  options: ServiceOptions = {},
+): Promise<ApexService> {
   const runner = new ProcessRunner();
-  const service = new ApexService(root, {
+  return new ApexService(root, {
     ...options,
     providers: { ...options.providers, ...(await configuredProviders(root, flags)) },
     azureAuthStatus:
@@ -457,7 +452,33 @@ export async function execute(argv: string[], root = process.cwd(), options: Ser
         }
       }),
   });
+}
+
+export async function execute(argv: string[], root = process.cwd(), options: ServiceOptions = {}): Promise<unknown> {
+  const { words, flags } = parse(argv);
+  const command = words.join(" ");
+  if (command === "mcp serve") root = await realpath(await mcpWorkspaceRoot(root));
+  const service = await createApexService(root, flags, command, options);
   switch (command) {
+    case "mcp serve": {
+      const cache = new Map<string, ApexService>([[service.root, service]]);
+      const resolver: McpServiceResolver = {
+        defaultService: service,
+        resolve: async (workspace) => {
+          const resolved = await resolveMcpWorkspace(workspace);
+          let resolvedService = cache.get(resolved.root);
+          if (resolvedService === undefined) {
+            resolvedService = await createApexService(resolved.root, flags, command, {
+              ...options,
+              workspacePath: resolved.workspace,
+            });
+            cache.set(resolved.root, resolvedService);
+          }
+          return { service: resolvedService, workspace: resolved.workspace };
+        },
+      };
+      return serveMcp(resolver);
+    }
     case "version": {
       const assets = await resolveBundledAssets();
       return {

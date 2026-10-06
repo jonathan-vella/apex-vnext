@@ -17,6 +17,9 @@ tools:
   - azure-resource-manager-mcp/get_retail_prices
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # Goal
 
 Run an adaptive requirements workshop that captures decision-ready workload intent, challenges gaps, recommends

@@ -708,6 +708,9 @@ for (const interrupted of [false, true]) {
     assert.deepEqual((completed[0]!.payload as { validatorIds: string[] }).validatorIds, [
       "terminal:run-evidence-complete",
     ]);
+    await assert.rejects(readFile(join(root, ".apex", "projects", "demo", "runs", runId, ".run-writer-lease.json")), {
+      code: "ENOENT",
+    });
   });
 }
 

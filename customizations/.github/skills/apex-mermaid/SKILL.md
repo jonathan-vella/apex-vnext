@@ -4,6 +4,9 @@ description: "Requests safe inline Mermaid for supported APEX Markdown slots. Us
 user-invocable: false
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # APEX Inline Mermaid
 
 The current APEX document registry declares no Mermaid-capable slots. Do not request or emit an inline Mermaid fence

@@ -10,6 +10,7 @@ APEX server with independent state.
 | Tool                   | Purpose                                                                                       |
 | ---------------------- | --------------------------------------------------------------------------------------------- |
 | `status`               | Read selected project and run status.                                                         |
+| `releaseWriter`        | Release this workspace's writer lease for the selected run.                                   |
 | `nextTask`             | Get the next input, review decision, task, or terminal status.                                |
 | `taskContext`          | Read context for the exact task ID returned by `nextTask`.                                    |
 | `readTaskInput`        | Read externalized active-task context in bounded chunks.                                      |
@@ -70,7 +71,7 @@ Existing object results are unchanged. Non-object service results use these enve
 | `stageArtifact` with `outputs` | `{ "artifacts": [] }`    |
 
 Single-artifact staging still returns its existing artifact object. Bundle staging is not an atomic completion;
-use `completeTask` for atomic output acceptance. All 34 tools advertise output schemas derived from the canonical
+use `completeTask` for atomic output acceptance. All 35 tools advertise output schemas derived from the canonical
 contracts and explicit adapter envelopes. Success and structured error branches are validated, including by SDK clients.
 See [REQ-MCP-001](../vnext/PRD.md#req-mcp-001-predictable-tool-contracts) for acceptance.
 
@@ -86,8 +87,10 @@ refresh stale state and avoid blindly retrying mutations; an error does not impl
 ## Inputs And Lifecycle
 
 Tool arguments are strict objects: unknown fields and ambiguous staging forms are rejected before service invocation.
-Parameterless tools accept omitted arguments or `{}`. Stage a single `kind`/`value` or a nonempty `outputs` bundle,
-never both. Bundle kinds must be unique; bundles have at most 32 items. Validation-only calls may omit both forms.
+Every tool requires `workspace`, an absolute path to the current checkout or git worktree. The server resolves git
+worktrees through their common directory so they share the main checkout's `.apex/` state; non-git folders keep the
+nearest existing `.apex/` ancestor behavior. Stage a single `kind`/`value` or a nonempty `outputs` bundle, never both.
+Bundle kinds must be unique; bundles have at most 32 items. Validation-only calls may omit both forms.
 
 The adapter limits argument and structured-result JSON to 4 MiB, depth 64 and 100,000 nodes. These are transport-facing
 safeguards, not replacements for smaller locked task/evidence budgets. Each server permits 240 tool calls per minute
@@ -98,6 +101,9 @@ An active mutation is allowed to settle; cancellation is not rollback. Staging/v
 between items and preserve already-written items on later failure. The adapter never retries mutations automatically.
 Long-running underlying operations retain their own bounded process/provider timeouts. After interruption, reconnect
 and inspect authoritative state before deciding whether to resubmit; do not treat a missing reply as proof of no commit.
+The first worktree to write a run holds a short run-writer lease. Other worktrees may read, but writes return
+`APEX_WRITER_CONFLICT` naming the owning worktree until the owner releases the lease with `releaseWriter`, the run
+reaches a terminal state, or the lease expires (default 2 minutes after the owner's last write).
 
 `status` and `projectList` are read-only and carry corresponding read-only/idempotent hints. Status refuses pending
 transaction recovery instead of writing it. Explicit advancement/final completion owns terminal bookkeeping. Other

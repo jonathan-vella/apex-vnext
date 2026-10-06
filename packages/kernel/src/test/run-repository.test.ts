@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
 import { hostname, tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
-import { ProjectStore, RunRepository } from "../index.js";
+import { ProjectStore, RunRepository, RunWriterConflictError } from "../index.js";
 
 test("run repository CAS permits one mutation and rejects a racing stale hash", async () => {
   const root = await mkdtemp(join(tmpdir(), "apex-run-repository-"));
@@ -259,3 +259,85 @@ for (const stage of ["intent", "journal", "run", "cleanup"] as const) {
     assert.equal(events.length, committed ? 1 : 0);
   });
 }
+
+async function writerLeaseFixture(now: { value: Date }) {
+  const root = await mkdtemp(join(tmpdir(), "apex-run-writer-lease-"));
+  const store = new ProjectStore(
+    root,
+    () => now.value,
+    () => "run-1",
+  );
+  await store.initializeProject({
+    projectId: "demo",
+    displayName: "Demo",
+    defaultIacTool: "bicep",
+    riskOwner: "partner",
+  });
+  await store.createRun("demo", { environment: "dev", targetScope: "scope", runtimeLockHash: "a".repeat(64) });
+  const directory = store.runDirectory("demo", "run-1");
+  return { directory, repository: new RunRepository(directory, { clock: () => now.value, writerLeaseTtlMs: 1_000 }) };
+}
+
+test("run writer lease acquires, renews, rejects a second writer, and releases", async () => {
+  const now = { value: new Date("2026-01-01T00:00:00.000Z") };
+  const { repository } = await writerLeaseFixture(now);
+  const owner = { workspacePath: "/workspace/main", sessionId: "session-a" };
+  const other = { workspacePath: "/workspace/worktree", sessionId: "session-b" };
+  const initial = await repository.acquireWriterLease(owner);
+  assert.equal(initial.workspacePath, resolve(owner.workspacePath));
+  assert.equal(initial.createdAt, "2026-01-01T00:00:00.000Z");
+  assert.equal(initial.expiresAt, "2026-01-01T00:00:01.000Z");
+
+  now.value = new Date("2026-01-01T00:00:00.500Z");
+  const renewed = await repository.acquireWriterLease(owner);
+  assert.equal(renewed.createdAt, initial.createdAt);
+  assert.equal(renewed.expiresAt, "2026-01-01T00:00:01.500Z");
+  await assert.rejects(
+    repository.acquireWriterLease(other),
+    (error: unknown) =>
+      error instanceof RunWriterConflictError &&
+      error.code === "APEX_WRITER_CONFLICT" &&
+      error.ownerWorktree === resolve(owner.workspacePath),
+  );
+  await assert.rejects(repository.releaseWriterLease(other), RunWriterConflictError);
+  assert.equal(await repository.releaseWriterLease(owner), true);
+  assert.equal(await repository.releaseWriterLease(owner), false);
+});
+
+test("run writer lease expires and can be taken over by another worktree", async () => {
+  const now = { value: new Date("2026-01-01T00:00:00.000Z") };
+  const { repository } = await writerLeaseFixture(now);
+  await repository.acquireWriterLease({ workspacePath: "/workspace/main", sessionId: "session-a" });
+  now.value = new Date("2026-01-01T00:00:01.001Z");
+  const takeover = await repository.acquireWriterLease({
+    workspacePath: "/workspace/worktree",
+    sessionId: "session-b",
+  });
+  assert.equal(takeover.workspacePath, resolve("/workspace/worktree"));
+  assert.equal(takeover.createdAt, "2026-01-01T00:00:01.001Z");
+});
+
+test("run writer lease publication remains readable under contention", async () => {
+  const now = { value: new Date("2026-01-01T00:00:00.000Z") };
+  const { directory, repository } = await writerLeaseFixture(now);
+  const attempts = await Promise.allSettled(
+    Array.from({ length: 32 }, (_, index) =>
+      repository.acquireWriterLease({
+        workspacePath: index % 2 === 0 ? "/workspace/main" : "/workspace/worktree",
+        sessionId: `session-${index}`,
+      }),
+    ),
+  );
+  assert.ok(attempts.some((attempt) => attempt.status === "fulfilled"));
+  for (const attempt of attempts) {
+    if (attempt.status === "rejected") {
+      assert.ok(attempt.reason instanceof RunWriterConflictError);
+    }
+  }
+  const lease = JSON.parse(await readFile(join(directory, ".run-writer-lease.json"), "utf8")) as {
+    workspacePath?: unknown;
+    expiresAt?: unknown;
+  };
+  assert.equal(typeof lease.workspacePath, "string");
+  assert.equal(typeof lease.expiresAt, "string");
+});

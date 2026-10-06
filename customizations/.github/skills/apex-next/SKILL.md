@@ -3,6 +3,9 @@ name: apex-next
 description: "Names the kernel-selected next APEX step and its owning agent, then delegates a hidden worker or prints the agent selection step and a scope prompt. Use for what's next, continue, or routing after a stage."
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 ## APEX Next
 
 Route the next APEX step from kernel state. The kernel selects the owner; this skill names it and moves the work there.

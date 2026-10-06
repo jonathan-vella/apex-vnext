@@ -83,7 +83,14 @@ function safeRelativePath(path: string): boolean {
 }
 
 function prohibitedStatePath(path: string): boolean {
-  if (path.split("/").some((part) => part.startsWith(".run-mutation.") || part === ".run-transaction.json")) {
+  if (
+    path
+      .split("/")
+      .some(
+        (part) =>
+          part.startsWith(".run-mutation.") || part === ".run-transaction.json" || part === ".run-writer-lease.json",
+      )
+  ) {
     return true;
   }
   return /(?:^|\/)(?:credentials?(?:\.json)?|terraform\.tfstate(?:\.[^/]*)?|[^/]+\.tfplan(?:\.enc)?|state-plans?)(?:\/|$)/i.test(
@@ -163,6 +170,7 @@ async function walkRegularFiles(root: string, directory = root): Promise<string[
     const path = join(directory, entry.name);
     if (entry.isSymbolicLink()) throw new Error(`State transfer source contains a symlink: ${path}`);
     if (directory === root) {
+      if (entry.name === ".run-writer-lease.json") continue;
       if (entry.name === ".run-mutation.lock" || entry.name === ".run-transaction.json") {
         throw new Error("State transfer requires a quiescent run without pending mutation recovery");
       }

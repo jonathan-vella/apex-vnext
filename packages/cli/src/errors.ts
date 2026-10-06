@@ -1,4 +1,5 @@
 import { GovernanceBaselineError } from "@apexops/capabilities";
+import { RunWriterConflictError } from "@apexops/kernel";
 
 export const EXIT_CODES = {
   success: 0,
@@ -15,6 +16,8 @@ export type ApexErrorCode =
   | "APEX_USAGE"
   | "APEX_NOT_FOUND"
   | "APEX_CONFLICT"
+  | "APEX_WRITER_CONFLICT"
+  | "APEX_WORKSPACE_UNSUPPORTED"
   | "APEX_VALIDATION"
   | "APEX_STALE"
   | "APEX_AUTHORIZATION"
@@ -36,6 +39,15 @@ export class ApexError extends Error {
 export function normalizeError(error: unknown): ApexError {
   if (error instanceof ApexError) return error;
   if (error instanceof GovernanceBaselineError) return governanceBaselineApexError(error);
+  if (error instanceof RunWriterConflictError) {
+    return new ApexError(
+      "APEX_WRITER_CONFLICT",
+      `${error.message}; retry from that worktree, release the writer lease there, or wait for it to expire`,
+      EXIT_CODES.conflict,
+      { ownerWorktree: error.ownerWorktree, expiresAt: error.expiresAt },
+      { cause: error },
+    );
+  }
   if (error instanceof Error && /expired|stale/i.test(error.message)) {
     return new ApexError("APEX_STALE", error.message, EXIT_CODES.stale, undefined, { cause: error });
   }

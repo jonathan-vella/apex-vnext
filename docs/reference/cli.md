@@ -217,16 +217,16 @@ provide their named bounded operations.
 
 ## Exit Codes
 
-| Code | Error                |
-| ---: | -------------------- |
-|    0 | Success              |
-|    2 | `APEX_USAGE`         |
-|    3 | `APEX_NOT_FOUND`     |
-|    4 | `APEX_CONFLICT`      |
-|    5 | `APEX_VALIDATION`    |
-|    6 | `APEX_STALE`         |
-|    7 | `APEX_AUTHORIZATION` |
-|   10 | `APEX_INTERNAL`      |
+| Code | Error                                           |
+| ---: | ----------------------------------------------- |
+|    0 | Success                                         |
+|    2 | `APEX_USAGE`                                    |
+|    3 | `APEX_NOT_FOUND`                                |
+|    4 | `APEX_CONFLICT`, `APEX_WRITER_CONFLICT`         |
+|    5 | `APEX_VALIDATION`, `APEX_WORKSPACE_UNSUPPORTED` |
+|    6 | `APEX_STALE`                                    |
+|    7 | `APEX_AUTHORIZATION`                            |
+|   10 | `APEX_INTERNAL`                                 |
 
 ## Authority
 
