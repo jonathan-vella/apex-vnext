@@ -33,8 +33,8 @@ This is a plan, not evidence that any new capability works.
 
 ## Custom Agents, Not Built-In Plan Mode
 
-APEX Planner is not the app's built-in Plan mode. It needs authorized write operations such as `apex/planComplete`.
-Retain each custom agent's declared tools and kernel authorization boundaries.
+APEX Planning guidance is not the app's built-in Plan mode. It needs authorized write operations such as
+`apex/planComplete`. Retain the custom agent's declared tools and kernel authorization boundaries.
 Built-in Plan-mode qualification and a mode-specific read-only MCP mechanism are not required.
 Correct the earlier WSL-first requirement wording and remove any contrary app-mode assumptions during phase 1.
 

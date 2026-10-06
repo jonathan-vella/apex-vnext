@@ -190,11 +190,11 @@ workflows. Kernel authority, typed outcomes, the four review passes and human ga
 
 After the slice 1 probes on 2026-09-23, the maintainer settled slices 5 to 8. The read-only context sidekick is
 deferred until a Copilot CLI release launches custom sidekicks. Multi-choice input uses native `ask_user` checkboxes
-where offered and numbered selection otherwise. Planner, Operator, Architect and Reviewer get read-only file tools so
-built-in helpers can read, and Reviewer gets `task`. Validator may run `bicep` and `terraform` pre-checks only through
-a shell limited to those commands. The VS Code installation lifecycle tests and client-comparison tooling are
+where offered and numbered selection otherwise. The foreground APEX agent has read-only file tools and `task` so it
+can delegate hidden workers and advisory Explore. Validator may run `bicep` and `terraform` pre-checks only through a
+shell limited to those commands. The VS Code installation lifecycle tests and client-comparison tooling are
 retargeted to the VS Code Copilot harness; only Local-only tests are archived. For slice 5 the maintainer retired the
-rule that a subagent may not use a costlier model tier than its parent, so the coordinator delegates CodeGen, Reviewer
+rule that a subagent may not use a costlier model tier than its parent, so APEX delegates CodeGen, Reviewer
 and Validator through `apex-next`. Under the maintainer's standing rule to take the recommended option while away,
 slice 6 ships only Explore: the other review helpers inherit the caller's APEX completion and disposition tools, and
 agent frontmatter cannot limit Validator's shell, so Validator gets none. For slice 7, checkbox answers that map

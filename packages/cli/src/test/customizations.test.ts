@@ -78,16 +78,24 @@ test("init installs bundled customizations and runtime config by default", async
     await readFile(join(root, ".github", "agents", "apex-validator.agent.md"), "utf8"),
     /target: github-copilot/u,
   );
-  const requirementsAgent = await readFile(join(root, ".github", "agents", "apex-requirements.agent.md"), "utf8");
-  assert.match(requirementsAgent, /Immediately call `apex\/nextTask` after submitting requirements/u);
-  assert.match(requirementsAgent, /invoke `APEX Reviewer` through the active client's delegation tool/u);
-  assert.match(requirementsAgent, /^tools:\n(?: {2}- .+\n)*? {2}- task\n/mu);
-  assert.doesNotMatch(requirementsAgent, /^agents:/mu);
-  for (const owner of ["apex-requirements", "apex-architect", "apex-planner"]) {
-    const agent = await readFile(join(root, ".github", "agents", `${owner}.agent.md`), "utf8");
-    assert.match(agent, /call `apex\/status`[.;]\s+[Ii]f a gate is pending, report it\s+and stop/u, owner);
-    assert.doesNotMatch(agent, /reviewDecide`[^\n]*then call `apex\/nextTask`/u, owner);
-  }
+  const installedAgents = (await readdir(join(root, ".github", "agents"))).sort();
+  assert.deepEqual(installedAgents, [
+    "apex-codegen.agent.md",
+    "apex-reviewer.agent.md",
+    "apex-validator.agent.md",
+    "apex.agent.md",
+  ]);
+  const apexAgent = await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8");
+  assert.match(apexAgent, /Route through the `apex-next` skill in this same APEX agent/u);
+  assert.match(apexAgent, /Reuse values the user already stated/u);
+  assert.match(apexAgent, /Carry the user's requested outcome/u);
+  assert.match(apexAgent, /If a gate is pending, report it and stop/u);
+  assert.match(apexAgent, /while a gate is pending/u);
+  assert.match(apexAgent, /- apex\/requirementsComplete/u);
+  assert.match(apexAgent, /- apex\/architectureComplete/u);
+  assert.match(apexAgent, /- apex\/planComplete/u);
+  assert.match(apexAgent, /- apex\/preview/u);
+  assert.match(apexAgent, /- azure-resource-manager-mcp\/get_retail_prices/u);
   await readFile(join(root, ".mcp.json"));
   assert.match(
     await readFile(join(root, ".github", "instructions", "apex-agent-authoring.instructions.md"), "utf8"),
@@ -236,47 +244,87 @@ test("init installs only the selected Copilot CLI projection and records it in t
   for (const retired of [join(".vscode", "mcp.json"), join(".github", "mcp.json")])
     await assert.rejects(readFile(join(root, retired), "utf8"), /ENOENT/u);
   assert.match(await readFile(join(root, ".mcp.json"), "utf8"), /"recordInput"/u);
-  const requirementsAgent = await readFile(join(root, ".github", "agents", "apex-requirements.agent.md"), "utf8");
-  assert.match(requirementsAgent, /target: github-copilot/u);
-  assert.doesNotMatch(requirementsAgent, /^(?:model|model-policy|reasoning-effort):/mu);
-  assert.match(requirementsAgent, /- ask_user/u);
-  assert.match(requirementsAgent, /\n\s+- task\s*\n/u);
-  assert.match(requirementsAgent, /foreground agent using `ask_user`/u);
-  assert.doesNotMatch(requirementsAgent, /vscode\/askQuestions|handoffs:|agents:/u);
-  const plannerAgent = await readFile(join(root, ".github", "agents", "apex-planner.agent.md"), "utf8");
-  assert.match(plannerAgent, /- apex\/planComplete/u);
-  assert.match(plannerAgent, /kernel derives the canonical intent hash/u);
+  const installedAgents = (await readdir(join(root, ".github", "agents"))).sort();
+  assert.deepEqual(installedAgents, [
+    "apex-codegen.agent.md",
+    "apex-reviewer.agent.md",
+    "apex-validator.agent.md",
+    "apex.agent.md",
+  ]);
   assert.match(
     await readFile(join(root, ".github", "instructions", "apex-agent-authoring.instructions.md"), "utf8"),
     /APEX Agent Boundaries/u,
   );
-  const coordinatorAgent = await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8");
-  assert.match(coordinatorAgent, /- apex\/projectCreate/u);
-  assert.match(
-    coordinatorAgent,
-    /target scope \(`local`, or a full `\/subscriptions\/<id>\/resourceGroups\/<name>` path\)/u,
-  );
-  assert.match(coordinatorAgent, /never derive them from the request text or offer a default/u);
-  assert.doesNotMatch(coordinatorAgent, /Do not ask for target scope/u);
-  assert.match(coordinatorAgent, /- apex\/gateDecide/u);
-  assert.match(coordinatorAgent, /Use `ask_user` only for project lifecycle or routing choices, never intake/u);
-  assert.match(coordinatorAgent, /Route through the `apex-next` skill/u);
-  assert.match(coordinatorAgent, /\n\s+- task\s*\n/u);
-  assert.match(coordinatorAgent, /request\.intake`, the destination is exactly `APEX Requirements`/u);
+  const apexAgent = await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8");
+  const apexTools = [...apexAgent.matchAll(/^  - (.+)$/gmu)].map(([, tool]) => tool);
+  assert.deepEqual(apexTools, [
+    "ask_user",
+    "task",
+    "view",
+    "glob",
+    "rg",
+    "web_fetch",
+    "apex/status",
+    "apex/releaseWriter",
+    "apex/nextTask",
+    "apex/projectCreate",
+    "apex/projectList",
+    "apex/projectUse",
+    "apex/projectDelete",
+    "apex/recordInput",
+    "apex/taskContext",
+    "apex/readTaskInput",
+    "apex/requirementsComplete",
+    "apex/architectureComplete",
+    "apex/planComplete",
+    "apex/completeTask",
+    "apex/reviewDecide",
+    "apex/gateDecide",
+    "apex/governanceImport",
+    "apex/governanceSelect",
+    "apex/preview",
+    "apex/reconcile",
+    "apex/inventory",
+    "apex/diagnose",
+    "azure-resource-manager-mcp/get_retail_prices",
+    "azure-resource-manager-mcp/query_costs",
+    "azure-resource-manager-mcp/query_aks_costs",
+    "azure-resource-manager-mcp/forecast_costs",
+    "azure-resource-manager-mcp/list_dimensions",
+    "azure-resource-manager-mcp/list_budgets",
+    "azure-resource-manager-mcp/get_budget",
+    "azure-resource-manager-mcp/list_alerts",
+    "azure-resource-manager-mcp/list_benefit_utilization",
+    "azure-resource-manager-mcp/get_benefit_recommendations",
+    "azure-resource-manager-mcp/list_reservation_transactions",
+  ]);
+  assert.match(apexAgent, /target: github-copilot/u);
+  assert.doesNotMatch(apexAgent, /^(?:model|model-policy|reasoning-effort):/mu);
+  assert.match(apexAgent, /- ask_user/u);
+  assert.match(apexAgent, /\n\s+- task\s*\n/u);
+  assert.doesNotMatch(apexAgent, /vscode\/askQuestions|handoffs:|agents:/u);
+  assert.match(apexAgent, /- apex\/projectCreate/u);
+  assert.match(apexAgent, /- apex\/requirementsComplete/u);
+  assert.match(apexAgent, /- apex\/architectureComplete/u);
+  assert.match(apexAgent, /- apex\/planComplete/u);
+  assert.match(apexAgent, /Reuse project values the user already stated.*Ask only for missing project values/su);
+  assert.match(apexAgent, /never invent, default or silently\s+substitute project ID/u);
+  assert.match(apexAgent, /Carry the user's requested outcome, stop point and prohibited operations/u);
+  assert.match(apexAgent, /Do not print `\/agent` switches/u);
+  assert.match(apexAgent, /several values, use native\s+checkboxes/u);
+  assert.match(apexAgent, /numbered options in the exact kernel order/u);
+  assert.match(apexAgent, /If a gate is pending, report it and stop/u);
+  assert.match(apexAgent, /Do not call\s+`apex\/nextTask` after `apex\/reviewDecide` or `apex\/reviewComplete`/u);
+  assert.match(apexAgent, /worker to call `apex\/taskContext`/u);
+  assert.match(apexAgent, /- apex\/gateDecide/u);
   assert.match(await readFile(join(root, ".github", "skills", "apex-next", "SKILL.md"), "utf8"), /^name: apex-next$/mu);
-  assert.match(coordinatorAgent, /replace the active project.*apex\/projectCreate.*apex\/projectDelete/su);
-  assert.match(coordinatorAgent, /If creation does not succeed, stop and report its result/u);
-  assert.match(coordinatorAgent, /After a\s+successful creation, ask for explicit confirmation/u);
-  assert.match(coordinatorAgent, /deleting the only project is rejected/u);
-  assert.match(coordinatorAgent, /compact workflow dashboard/u);
-  assert.match(coordinatorAgent, /agent-output\/<project>\/<run>\//u);
-  assert.match(coordinatorAgent, /--decision <approved\|rejected>/u);
-  assert.match(coordinatorAgent, /--recipient <RECIPIENT_ID>/u);
-  assert.match(coordinatorAgent, /call `apex\/gateDecide` with that gate, decision, and `confirm: true`/u);
-  assert.match(
-    coordinatorAgent,
-    /never auto-invoke an interactive specialist, author\s+artifacts, approve a gate, or deploy/u,
-  );
+  const apexNext = await readFile(join(root, ".github", "skills", "apex-next", "SKILL.md"), "utf8");
+  assert.match(apexNext, /No `\/agent` switching/u);
+  assert.match(apexNext, /\| `requirements`\s+\| `apex-requirements`/u);
+  assert.match(apexNext, /\| `quality-owner`\s+\| `apex-operations`/u);
+  assert.match(apexNext, /reviewer tasks or review roles\s+\| worker `APEX Reviewer`/u);
+  const planningSkill = await readFile(join(root, ".github", "skills", "apex-planning", "SKILL.md"), "utf8");
+  assert.match(planningSkill, /kernel derives the canonical intent hash/u);
   assert.match(
     await readFile(join(root, ".github", "skills", "apex-azure-defaults", "SKILL.md"), "utf8"),
     /APEX Azure Defaults/u,

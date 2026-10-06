@@ -987,19 +987,18 @@ test("a retired VS Code install stops until init explicitly selects the CLI proj
     execute(["init", "--project", "demo", "--risk-owner", "partner", "--target", "local"], root),
     retired,
   );
-  const edited = join(root, ".github/agents/apex-planner.agent.md");
+  const edited = join(root, ".github/agents/apex.agent.md");
   await writeFile(edited, "Manual edit\n");
   await assert.rejects(execute(["init", "--client", "github-copilot-cli"], root), (error: ApexError) => {
     const details = error.details as { removed: string[]; conflicts: string[] };
     assert.equal(error.code, "APEX_CONFLICT");
-    assert.ok(details.removed.includes(".github/agents/apex.agent.md"));
-    assert.deepEqual(details.conflicts, [".github/agents/apex-planner.agent.md"]);
+    assert.deepEqual(details.conflicts, [".github/agents/apex.agent.md"]);
     return true;
   });
   await assert.rejects(service.update(), retired);
   await rm(edited);
   const replaced = (await execute(["init", "--client", "github-copilot-cli"], root)) as { installed: string[] };
-  assert.ok(replaced.installed.includes(".github/agents/apex-planner.agent.md"));
+  assert.ok(replaced.installed.includes(".github/agents/apex.agent.md"));
   assert.equal(JSON.parse(await readFile(selectionPath, "utf8")).clientId, "github-copilot-cli");
   assert.equal((await service.status()).run.runId, before.run.runId);
   await service.update();

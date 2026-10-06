@@ -1,6 +1,6 @@
 ---
 name: apex-architecture
-description: "Provides internal APEX architecture guidance for traceable WAF, identity, network, recovery, and cost decisions."
+description: "Provides internal APEX architecture guidance for traceable WAF, governance, identity, network, recovery and cost decisions."
 user-invocable: false
 ---
 
@@ -9,51 +9,72 @@ When calling any `apex/*` MCP tool, include the current session checkout or work
 
 ## APEX Architecture
 
-Use this skill only for an active architecture task.
+Use this skill only when the kernel routes the active foreground `APEX` agent to an architecture decision request,
+review or task.
 
 ## Prerequisites
 
 - Requirements and recorded architecture decisions are projected by `apex/taskContext`.
-- Accepted requirements and recorded Architecture decisions are available.
-- Pricing is retrieved directly through the Architect's declared read-only ARM MCP tool. Kernel task capability grants
-   do not represent ARM MCP availability.
+- Governance findings are accepted or imported before Architecture; Architecture maps policies but does not collect
+  baselines.
+- Pricing is retrieved directly through the declared read-only ARM MCP pricing tool. Kernel capability grants do not
+  represent ARM MCP availability.
 
 ## Workflow
 
-1. Use only accepted requirements and current task-context evidence. Trace each proposed resource and decision to
-   projected requirements, evidence references, and required SLO or workload decisions where supplied.
-2. Complete the task template's qualitative assessment for Security, Reliability, Cost Optimization, Operational
-   Excellence, and Performance Efficiency. Bind every pillar to accepted requirements and evidence; do not derive
-   numeric scores.
-   Treat performance and scale values as later-validated goals. Missing or unverified measurement boundaries, latency,
-   scale, or capacity-test feasibility are not Architecture blockers and may produce at most an info check-later note.
-   Availability and recovery targets, including RTO/RPO, remain real architecture requirements.
-3. Keep identity, networking, diagnostics, recovery, data, and lifecycle decisions explicit.
-   For decisions requiring an ADR, include `architecture.decisionRecords`: a stable `ADR-NNNN` ID, title, context,
-   decision, accepted requirement IDs, at least two considered alternatives with benefits/drawbacks/rejection reasons,
-   positive and negative consequences, all five `wafImpacts`, compliance considerations and implementation notes.
-   Reuse recorded rationale; missing information remains an unresolved decision, never invented renderer content.
-4. Present user-owned choices only when `apex/nextTask` returns `needs_input`; record them through `apex/recordInput`
-   before reading the architecture task context.
-5. Call `azure-resource-manager-mcp/get_retail_prices` after selecting candidate SKUs. Do not infer unavailability from
-   task capability grants. Record a well-scoped no-result query as an explicit partial estimate `unpricedItems` entry;
-   do not create a synthetic zero-price line or stop the Architecture stage solely because one meter is absent.
-6. Assume regional service/SKU availability and quota are sufficient. Do not request or validate deployment, restore,
-   failover, regional, zonal, or quota evidence during Architecture.
-7. Submit `architecture`, `cost-estimate`, `workload-decision-manifest`, and `policyMappings` once through
-   `apex/architectureComplete`; APEX derives identity, hashes, top-level `requirementTraceability`, and cost/SKU
-   bindings. Each SKU and SLO decision lists its component's `requirementIds`. Follow the task templates' shapes,
-   including the ADR and policy-mapping examples. A rejection lists every problem; fix all of them in one resubmission.
-8. Report the derived Architecture, qualitative WAF, cost-breakdown, and uncertainty diagrams materialized in the
-   Gate 2 package. These diagrams do not replace typed artifacts, pricing tables, evidence, review, or approval.
-9. Treat regional/zonal support, subscription quota, deployment, restore, failover, and unresolved retail meters as
-   non-gating documentation assumptions. Do not create checks or findings for them.
-
-## Output
-
-Return the kernel result, unresolved decisions, and evidence references supplied by the task envelope.
+1. Call `apex/status`, then `apex/nextTask` only when status leaves runnable Architecture work. For `needs_input`, ask
+   the returned decision questions in chat, explain viable alternatives and material consequences, then submit answers
+   through `apex/recordInput`. Do not request task context for an input request.
+2. For `status=task`, read `apex/taskContext` with the exact task ID. If the result is externalized, use
+   `apex/readTaskInput` until the bounded context is complete. Use its inputs, decisions, evidence and output templates
+   as authoritative; ask targeted follow-ups only for unresolved user-owned decisions.
+3. Evaluate Security, Reliability, Performance Efficiency, Cost Optimization and Operational Excellence. Submit the
+   qualitative `wellArchitectedAssessment` shape from the task template, including status, accepted requirements,
+   evidence references, recommendations and trade-offs for every pillar. Treat performance and scale numbers as later
+   validation goals; missing measurement boundaries, unverified latency, scale feasibility and capacity-test detail are
+   not Architecture blockers.
+4. Keep identity, networking, diagnostics, recovery, data and lifecycle decisions explicit. For material alternatives,
+   include decision records with stable IDs, context, decision, accepted requirement IDs, at least two alternatives,
+   consequences, WAF impacts, compliance considerations and implementation notes.
+5. After selecting candidate SKUs, call `azure-resource-manager-mcp/get_retail_prices` directly for every cost line.
+   Do not infer pricing unavailability from APEX task grants. A well-scoped no-result query becomes a partial estimate
+   and `unpricedItems` entry with attempted timestamp and reason. Never submit synthetic zero prices, placeholders or
+   invented prices through `apex/architectureComplete`.
+6. Design against accepted governance. Every Architecture component lists the ARM resource types it deploys. Read
+   relevant governance findings with `apex/readTaskInput` using the task-context input hash for those designed types.
+   Map each applicable finding in `policyMappings` with assignment, definition, reference ID, effect, logical resource,
+   property path, expected value where known and disposition: `satisfied`, `planned`, `blocked` or
+   `not-applicable` with a factual reason. Never mark `exempt`.
+7. Assume selected Azure services and SKUs are regionally available and quota is sufficient. Mention material regional,
+   zonal, recovery or capacity assumptions in documentation when useful; do not request, validate, gate or create
+   findings for regional support, quota, deployment, restore, failover or unresolved retail meters.
+8. Submit `architecture`, `cost-estimate`, `workload-decision-manifest` and `policyMappings` atomically through
+   `apex/architectureComplete`. APEX derives identity, artifact hashes, top-level requirement traceability and
+   cost/SKU bindings. Before submitting, check common rejection causes: WAF statuses use the allowed values; dates use
+   UTC milliseconds; ADR alternative fields are strings; policy mappings have property paths; and SKU decision
+   logical IDs match component IDs.
+9. Report the read-only Gate 2 package under `agent-output/<project>/<run>/architecture/`, including Architecture,
+   WAF, cost breakdown, uncertainty diagrams, assessment, SKU comparison and challenger findings. Diagrams are derived
+   views, not gate evidence.
+10. When an architecture review worker task appears, delegate `APEX Reviewer` with the exact `task.taskId` and tell the
+    worker to call `apex/taskContext`. For `needs_review`, do not request task context or invoke the Reviewer again.
+    Present findings in one decision panel and submit permitted decisions through `apex/reviewDecide`. Automatically
+    dismiss findings that only request regional, zonal, quota, deployment, restore, failover or complete pricing checks.
+11. For a `policy-refresh` task after Gate 2, start from the `policy-property-map` template in task context. Decide only
+    rows listed in `governanceFindings`, submit the complete map through `apex/completeTask`, and let blocked rows
+    reopen Architecture and Gate 2.
+12. After `apex/reviewDecide`, call `apex/status`. If Gate 2 is pending, report it and stop. Do not call
+    `apex/nextTask` while a gate is pending. If the user's scope permits approval and the user explicitly approves or
+    rejects Gate 2, call `apex/gateDecide` with `confirm: true`.
 
 ## Boundaries
 
-Do not claim an evidence shape, freshness duration, external provider result, or gate outcome beyond the task envelope
-and kernel result. Do not emit secret values; preserve only typed references accepted by the current contract.
+The kernel is authoritative for accepted requirements, governance completeness, task state, review findings and gates.
+Write only through APEX MCP. ARM MCP access is read-only; do not call mutation, deployment or filesystem tools. Use
+current evidence for service lifecycle, availability, quotas and pricing. Generated review files are read-only
+projections of accepted state.
+
+## Output
+
+Return the kernel result, user-confirmed recommendation, evidence posture, review-package location, unresolved
+decisions and the reason for stopping. Do not claim gate readiness unless the kernel reports it.

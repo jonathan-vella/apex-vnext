@@ -31,7 +31,7 @@ const matrix = (overrides = {}) => ({
       source: "source-skill",
       disposition: "consumer",
       consumerSkill: "consumer-skill",
-      owner: "APEX Architect",
+      owner: "APEX",
       lifecycle: "complete",
       resourceDispositions: [resource()],
     },
@@ -148,7 +148,7 @@ test("accepts a target owned by a consumer mapping declared later", () => {
     source: "later-source",
     disposition: "consumer",
     consumerSkill: "later-consumer",
-    owner: "APEX Planner",
+    owner: "APEX",
     lifecycle: "planned",
     resourceDispositions: [],
   });

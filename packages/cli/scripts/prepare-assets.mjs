@@ -11,7 +11,7 @@ const repositoryRoot = resolve(packageRoot, "../..");
 const assetsRoot = join(packageRoot, "assets");
 const LOCK_DOMAIN = "apex-bundled-assets-v1\0";
 const PROJECTION_DOMAIN = "apex-client-projection-v1\0";
-const CLIENT_ADAPTER_VERSION = "1.9.0";
+const CLIENT_ADAPTER_VERSION = "1.10.0";
 export const ASSET_GENERATION_LOCK_ENV = "APEX_ASSET_GENERATION_LOCK_HELD";
 const ASSET_GENERATION_LOCK_TTL_MS = 5 * 60 * 1000;
 const ASSET_GENERATION_LOCK_RETRY_MS = 50;
@@ -160,7 +160,7 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
     (inventory.agentReadTools ?? []).every((tool) => tools.includes(tool));
   const mechanics = [
     frontmatter.name === "APEX"
-      ? `Route through the \`apex-next\` skill. Use \`${inventory.interactiveTools.delegate}\` only for the hidden workers it names, never for interactive intake, and do not substitute Explore. Use \`${inventory.interactiveTools.askUser}\` only for project lifecycle or routing choices, never intake.`
+      ? `Route through the \`apex-next\` skill in this same APEX agent. Use \`${inventory.interactiveTools.delegate}\` only for the hidden workers it names, never for interactive intake, gates or governance choices, and do not substitute Explore. Use \`${inventory.interactiveTools.askUser}\` for project lifecycle choices and kernel-owned input or review decisions. Reuse values the user already stated, ask only for missing values, and never invent defaults.`
       : tools.includes(inventory.interactiveTools.askUser)
         ? `Use \`${inventory.interactiveTools.askUser}\` for kernel-owned input requests.`
         : null,
@@ -173,8 +173,8 @@ export function renderClientAgentProjection(source, clientId, toolInventory, opt
     frontmatter.name !== "APEX" && tools.includes(inventory.interactiveTools.askUser)
       ? `Run user-facing questions as the foreground agent using \`${inventory.interactiveTools.askUser}\`, not as a delegated background task. For another interactive stage, use the \`apex-next\` skill to print its selection step and scope prompt; do not delegate interactive work through \`${inventory.interactiveTools.delegate}\`. If the question tool is unavailable, report the limitation and stop without claiming answers were recorded.`
       : null,
-    frontmatter.name !== "APEX" && tools.includes(inventory.interactiveTools.askUser)
-      ? `For a kernel question with \`multiSelect: true\`, use \`${inventory.interactiveTools.askUser}\` checkboxes when it offers an array field: offer the exact kernel option values as its choices and map the returned text back to those exact values; when every value matches, the checkbox answer needs no further confirmation. Otherwise, number every exact kernel option in its original order and collect one free-text answer through \`${inventory.interactiveTools.askUser}\` asking for the numbers. Resolve each number to its option; request correction for out-of-range, duplicate, non-numeric, empty, or ambiguous entries instead of dropping values, guessing aliases, selecting defaults, or applying recommendations. Then show the resolved selection as an array in kernel order and use \`${inventory.interactiveTools.askUser}\` to request explicit confirmation or correction. A correction requires a fresh confirmation of the complete set. Call \`apex/recordInput\` only after the checkbox answer or confirmation, preserving the request ID, expected head, owner epoch, array value shape, other submitted answers, and the user's stop boundary. Cancellation means no submission; stale-request rejection requires fresh kernel input and confirmation, not replay. Never pass unsupported \`multiSelect\` parameters or silently replace multiple selection with a single-choice answer. If free-text input or confirmation is unavailable, report the limitation and stop. Either way the kernel validates the values; this changes only input collection.`
+    tools.includes(inventory.interactiveTools.askUser)
+      ? `For a kernel question that allows several values, use \`${inventory.interactiveTools.askUser}\` checkboxes when the client offers them: offer the exact kernel option values and map the returned text back to those exact values; when every value matches, the checkbox answer needs no further confirmation. Otherwise, number every exact kernel option in its original order and collect one free-text answer through \`${inventory.interactiveTools.askUser}\` asking for the numbers. Resolve each number to its option; request correction for out-of-range, duplicate, non-numeric, empty, or ambiguous entries instead of dropping values, guessing aliases, selecting defaults, or applying recommendations. Then show the resolved selection as an array in kernel order and use \`${inventory.interactiveTools.askUser}\` to request explicit confirmation or correction. A correction requires a fresh confirmation of the complete set. Call \`apex/recordInput\` only after the checkbox answer or confirmation, preserving the request ID, expected head, owner epoch, array value shape, other submitted answers, and the user's stop boundary. Cancellation means no submission; stale-request rejection requires fresh kernel input and confirmation, not replay. Never pass unsupported question-tool parameters or silently replace multiple selection with a single-choice answer. If free-text input or confirmation is unavailable, report the limitation and stop. Either way the kernel validates the values; this changes only input collection.`
       : null,
   ].filter(Boolean);
   return serializeAgent(

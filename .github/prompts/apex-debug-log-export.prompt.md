@@ -180,7 +180,7 @@ custom-agent activity in `main.jsonl`:
 # File-path tokens (e.g. "customizations/.github/agents/apex.agent.md")
 mapfile -t AGENT_FILES < <(ls -1 customizations/.github/agents/*.agent.md 2>/dev/null)
 
-# Managed role names (e.g. "APEX", "APEX Requirements", ...)
+# Managed role names (e.g. "APEX", "APEX CodeGen", ...)
 mapfile -t AGENT_KEYS < <(node -e "const m=require('./customizations/manifest.json'); console.log(m.roles.map((role)=>role.agent).join('\n'))" 2>/dev/null)
 
 # Combined alternation regex for grep.

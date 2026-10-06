@@ -223,60 +223,43 @@ test("managed role projections retain required tools and exclude unrelated grant
   const manifest = JSON.parse(await readFile(join(root, "customizations/manifest.json"), "utf8"));
   const arm = JSON.parse(await readFile(join(root, "tools/registry/arm-mcp-cost-pricing.v1.json"), "utf8"));
   const requiredApex = {
-    coordinator: ["status", "nextTask", "projectCreate", "projectList", "projectUse", "projectDelete", "gateDecide"],
-    requirements: [
+    coordinator: [
       "status",
+      "releaseWriter",
       "nextTask",
+      "projectCreate",
+      "projectList",
+      "projectUse",
+      "projectDelete",
       "recordInput",
       "taskContext",
       "readTaskInput",
       "requirementsComplete",
-      "reviewDecide",
-      "gateDecide",
-    ],
-    architecture: [
-      "status",
-      "nextTask",
-      "recordInput",
-      "taskContext",
-      "readTaskInput",
       "architectureComplete",
+      "planComplete",
       "completeTask",
       "reviewDecide",
       "gateDecide",
-    ],
-    planning: ["status", "nextTask", "taskContext", "readTaskInput", "planComplete", "reviewDecide", "gateDecide"],
-    operations: [
-      "status",
-      "releaseWriter",
-      "nextTask",
-      "taskContext",
       "governanceImport",
       "governanceSelect",
-      "recordInput",
       "preview",
       "reconcile",
       "inventory",
       "diagnose",
-      "completeTask",
     ],
     "code-generation": ["taskContext", "stageFile", "generateIac", "completeTask"],
     review: ["taskContext", "readTaskInput", "reviewComplete"],
     validation: ["taskContext", "validateTask", "completeTask"],
   };
   const requiredArm = {
-    coordinator: [],
-    requirements: ["get_retail_prices"],
-    architecture: ["get_retail_prices"],
-    planning: [],
-    operations: arm.managedPolicy.candidateReadAllowlist,
+    coordinator: arm.managedPolicy.candidateReadAllowlist,
     "code-generation": [],
     review: [],
     validation: [],
   };
   const readTools = ["view", "glob", "rg"];
-  const explorers = ["planning", "operations"];
-  const webTools = { planning: ["web_fetch"] };
+  const explorers = ["coordinator"];
+  const webTools = { coordinator: ["web_fetch"] };
   assert.deepEqual(manifest.roles.map(({ id }) => id).sort(), Object.keys(requiredApex).sort());
   for (const client of ["github-copilot-cli"]) {
     for (const role of manifest.roles) {
@@ -291,9 +274,8 @@ test("managed role projections retain required tools and exclude unrelated grant
       const content = await readFile(path, "utf8");
       const metadata = load(content.match(/^---\r?\n([\s\S]*?)\r?\n---/u)[1]);
       const label = `${client}/${role.id}`;
-      if (role.id === "operations") {
-        assert.match(content, /apex\/governanceImport.*only the local `path`/u, label);
-        assert.match(content, /Never read or paste baseline bytes/u, label);
+      if (role.id === "coordinator") {
+        assert.match(content, /apex\/governanceImport/u, label);
       }
       const apexTools = requiredApex[role.id].map((tool) => `apex/${tool}`);
       const armTools = requiredArm[role.id].map((tool) => `azure-resource-manager-mcp/${tool}`);
@@ -355,51 +337,31 @@ test("managed role projections retain required tools and exclude unrelated grant
 
 test("managed routing distinguishes input, review dispositions, and exact task context", async () => {
   await execFile(process.execPath, ["packages/cli/scripts/prepare-assets.mjs"], { cwd: root });
-  const agents = ["apex", "apex-requirements", "apex-architect", "apex-planner", "apex-operator"];
-  const skills = ["apex-workflow", "apex-next", "apex-requirements", "apex-operations"];
+  const agents = ["apex"];
+  const skills = [
+    "apex-workflow",
+    "apex-next",
+    "apex-requirements",
+    "apex-architecture",
+    "apex-planning",
+    "apex-operations",
+  ];
   for (const client of ["github-copilot-cli"]) {
     const projection = join(root, "packages/cli/assets/client-projections", client);
-    const coordinator = await readFile(join(projection, ".github/agents/apex.agent.md"), "utf8");
-    const mechanics = coordinator.split("<!-- apex-shared-body -->")[0];
-    assert.match(mechanics, /never intake/);
-    assert.match(coordinator, /exactly `APEX Requirements`, never Explore or a generic agent/);
-    assert.match(coordinator, /exact stop point, and prohibited operations into the scope prompt/);
-    assert.match(coordinator, /Route every next step through the `apex-next` skill/);
-    assert.match(coordinator, /Never use `session_store_sql`, SQL, session-history searches/);
-    assert.match(coordinator, /Do not ask the user which role should handle it/);
-    assert.match(coordinator, /status-only request calls `apex\/status` once and stops/);
+    const apex = await readFile(join(projection, ".github/agents/apex.agent.md"), "utf8");
+    const mechanics = apex.split("<!-- apex-shared-body -->")[0];
+    assert.match(mechanics, /same APEX agent/);
+    assert.match(mechanics, /kernel-owned input or review decisions/);
+    assert.match(apex, /Carry the user's requested outcome, stop point and prohibited operations/);
+    assert.match(apex, /Route the `apex\/status` or `apex\/nextTask` result through `apex-next`/);
+    assert.match(apex, /Do not print `\/agent` switches/);
+    assert.match(apex, /Never use `session_store_sql`, SQL, session-history searches/);
+    assert.match(apex, /Reuse project values the user already stated/);
+    assert.match(apex, /Do not call\s+`apex\/nextTask` after `apex\/reviewDecide` or `apex\/reviewComplete`/u);
     if (client === "github-copilot-cli") {
       assert.match(mechanics, /Route through the `apex-next` skill/);
-      assert.doesNotMatch(mechanics, /for declared worker delegation/);
       assert.match(mechanics, /Use `task` only for the hidden workers it names, never for interactive intake/);
     }
-    const requirements = await readFile(join(projection, ".github/agents/apex-requirements.agent.md"), "utf8");
-    const submission = requirements.indexOf(
-      "After the user answers a panel and any required fallback confirmation is complete, call `apex/recordInput`",
-    );
-    const acknowledgment = requirements.indexOf("Wait for `recorded: true` with the same request ID");
-    assert.ok(submission > 0 && acknowledgment > submission);
-    for (const field of ["schemaVersion", "requestId", "expectedHead", "ownerEpoch", "questionId", "value"]) {
-      assert.ok(requirements.slice(submission, acknowledgment).includes(field), `Missing submission field ${field}`);
-    }
-    assert.match(requirements, /question-tool response is not kernel\s+acceptance/);
-    assert.match(requirements, /Never silently replace an invalid value with a default recommendation/);
-    if (client === "github-copilot-cli") {
-      assert.match(requirements, /foreground agent using `ask_user`, not as a delegated background task/);
-      assert.match(requirements, /If the question tool is unavailable, report the limitation and stop/);
-    }
-    assert.match(requirements, /intake-only check ending at task context, stop here/);
-    assert.ok(requirements.indexOf("# Requested Scope") < requirements.indexOf("# Success criteria"));
-    assert.match(requirements, /handoff prompt or button cannot broaden the original request/);
-    assert.match(requirements, /If the original scope is unavailable, default to intake/);
-    assert.match(
-      requirements,
-      /Do not call `requirementsComplete`, request another task, delegate review, ask Proceed\/Revise, or call `gateDecide`/,
-    );
-    assert.match(requirements, /no-gate-approvals request, never ask for approval/);
-    assert.match(requirements, /Do not ask supplemental owner-assignment questions/);
-    assert.match(requirements, /Recommendations are proposed, not confirmed requirements or compliance evidence/);
-    assert.doesNotMatch(requirements, /Acknowledge and assign|ask only for the responsible role/);
     const reviewer = await readFile(join(projection, ".github/agents/apex-reviewer.agent.md"), "utf8");
     assert.match(reviewer, /Do not create blocking findings or\s+owner-assignment requests solely/);
     assert.match(reviewer, /violated\s+Azure Policy constraints/);
@@ -416,31 +378,27 @@ test("managed routing distinguishes input, review dispositions, and exact task c
       const content = await readFile(join(projection, relative), "utf8");
       assert.equal(content, await readFile(join(root, "customizations", relative), "utf8"));
       if (skill === "apex-operations") {
-        assert.match(content, /apex\/governanceImport.*\{ "path": "<local-baseline-path>" \}.*only/u);
-        assert.match(content, /apex governance import --path <local-baseline-path>/u);
-        assert.match(content, /Import happens before Architecture, which maps the policies/u);
+        assert.match(content, /For governance candidate selection, call `apex\/governanceSelect`/u);
+        assert.match(content, /Return the service's `outputHash` and `summary`, never baseline bytes/u);
+        assert.match(content, /never approve Gate 4 through chat/u);
       }
       if (skill === "apex-requirements") {
-        assert.match(content, /If scope is unavailable, stop after intake\s+and task context/);
-        assert.match(content, /Only for explicitly requested full Requirements completion/);
-        assert.match(content, /stop without an approval question/);
-        assert.match(content, /instead of asking\s+supplemental owner questions/);
-        assert.doesNotMatch(content, /ask for a responsible\s+role/);
+        assert.match(content, /Use this skill only when the kernel routes the active foreground `APEX` agent/u);
+        assert.match(content, /intake-only scope, stop after the matching intake context/u);
+        assert.match(content, /Never invent a project value/u);
+        assert.match(content, /Performance and scale: check later/u);
+        assert.match(content, /Recommendations are proposed, not confirmed requirements/u);
       }
       if (skill === "apex-workflow") {
         assert.match(content, /status-only request, report that result and stop/);
         assert.match(content, /route the next step with the `apex-next` skill/);
       }
       if (skill === "apex-next") {
-        assert.match(content, /Do not ask the user to choose a role or search session history/);
-        assert.match(content, /Delegate it with `task` and the scope prompt/);
-        assert.match(content, /Never delegate an interactive owner/);
-        assert.match(content, /Copilot CLI: `\/agent apex-requirements`/);
-        assert.match(content, /in the Agent picker/);
-        assert.match(content, /If the original scope is\s+unavailable, limit continuation to intake/);
-        assert.match(content, /Do not claim the switch, answer acceptance or task creation/);
-        assert.match(content, /`request\.intake\.ordinal` of `request\.intake\.total`/);
-        assert.match(content, /continues through every\s+remaining intake round, each with its own kernel request ID/);
+        assert.match(content, /Do not ask the user to choose a role and do not search\s+session history/u);
+        assert.match(content, /No `\/agent` switching/u);
+        assert.match(content, /Continue in the same foreground `APEX` agent/u);
+        assert.match(content, /\| `quality-owner`\s+\| `apex-operations`/u);
+        assert.match(content, /Never delegate intake, user questions, gate decisions/u);
       }
       for (const state of ["needs_input", "needs_review", "status=task", "task.taskId"]) {
         assert.ok(content.includes(state), `${client}/${skill}: missing ${state} routing`);
@@ -615,7 +573,7 @@ test("asset generator accepts a role supported by only one client target", () =>
 });
 
 test("delegation is enabled only when a destination is supported by the client", () => {
-  const parent = { agent: "APEX Planner", supportedTargets: ["github-copilot"] };
+  const parent = { agent: "APEX", supportedTargets: ["github-copilot"] };
   const worker = { agent: "APEX CodeGen", supportedTargets: ["github-copilot"] };
   const edges = [{ from: parent.agent, to: worker.agent, type: "subagent" }];
   assert.equal(roleDelegatesOnClient(parent, "github-copilot-cli", [parent, worker], edges), true);
@@ -629,10 +587,10 @@ test("delegation is enabled only when a destination is supported by the client",
   );
 });
 
-test("asset generator renders the CLI Requirements projection and rejects retired VS Code fields", () => {
+test("asset generator renders the CLI APEX projection and rejects retired VS Code fields", () => {
   const source = `---
-name: APEX Requirements
-description: Gather requirements.
+name: APEX
+description: Run workflow.
 user-invocable: true
 tools:
   - ask_user
@@ -652,7 +610,7 @@ Gather requirements through the kernel.
   assert.match(cli, /target: github-copilot/u);
   assert.match(cli, /disable-model-invocation: false/u);
   assert.match(cli, /collect one free-text answer/u);
-  assert.match(cli, /use `ask_user` checkboxes when it offers an array field/u);
+  assert.match(cli, /use `ask_user` checkboxes when the client offers them/u);
   assert.match(cli, /number every exact kernel option in its original order/u);
   assert.match(cli, /request correction for out-of-range, duplicate, non-numeric, empty, or ambiguous entries/u);
   assert.match(cli, /when every value matches, the checkbox answer needs no further confirmation/u);
@@ -660,7 +618,7 @@ Gather requirements through the kernel.
   assert.match(cli, /A correction requires a fresh confirmation of the complete set/u);
   assert.match(cli, /only after the checkbox answer or confirmation/u);
   assert.match(cli, /Cancellation means no submission/u);
-  assert.match(cli, /Never pass unsupported `multiSelect` parameters/u);
+  assert.match(cli, /Never pass unsupported question-tool parameters/u);
   assert.match(cli, /<!-- apex-shared-body -->\n+## Role\n\nGather requirements through the kernel\./u);
   const render = (text) => () => renderClientAgentProjection(text, "github-copilot-cli");
   for (const field of ["argument-hint: Describe the workload", "agents: [APEX Reviewer]", "handoffs: []"])
@@ -760,7 +718,7 @@ test("APEX CLI projections leave model selection to the session", async () => {
   }
 });
 
-test("CLI interactive handoffs do not grant background task delegation", () => {
+test("retired interactive handoffs do not grant background task delegation", () => {
   const coordinator = { agent: "APEX", supportedTargets: ["github-copilot"] };
   const requirements = { agent: "APEX Requirements", supportedTargets: ["github-copilot"] };
   const delegates = roleDelegatesOnClient(
@@ -794,7 +752,7 @@ Coordinate.
     { delegates },
   );
   assert.doesNotMatch(rendered, /\n\s+- task/u);
-  assert.doesNotMatch(rendered, /collect one free-text answer/u);
+  assert.match(rendered, /collect one free-text answer/u);
   assert.match(rendered, /Route through the `apex-next` skill/);
 });
 

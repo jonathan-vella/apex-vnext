@@ -48,10 +48,10 @@ The promoted run remains in the same project and is selected automatically. It i
 evidence; it always needs its own code generation, validation, preview, and Gate 4 approval. Repeat for production
 with its production target. Return to a prior environment with `apex project use --project payments --run RUN_ID`.
 
-Use the APEX coordinator in Copilot CLI (`copilot --agent apex`) as the normal interactive entry point; the VS Code
-Copilot harness runs the same agents. Ask it what is next: the `apex-next` skill names the owning agent and either
-delegates a hidden worker or prints `/agent <name>` with a scope prompt. Direct CLI commands remain useful for
-inspection and bounded operations.
+Use the `APEX` agent in Copilot CLI (`copilot --agent apex`) as the normal interactive entry point; the VS Code
+Copilot harness runs the same projection. Ask it what is next: the `apex-next` skill maps the kernel owner role to a
+stage skill in the same agent or delegates a hidden worker. Direct CLI commands remain useful for inspection and
+bounded operations.
 
 ## Handle Input Before Tasks
 
@@ -66,12 +66,12 @@ Architecture selection, SKU decisions, and implementation stay with later workfl
 
 ## Complete Creative Stages
 
-The coordinator hands work to interactive specialists:
+The APEX agent completes interactive stages by loading the matching stage skill:
 
 1. Requirements gathers workload outcomes and constraints.
-2. Architect resolves design, cost, governance, assumptions and risk decisions.
-3. Planner produces track-neutral implementation intent, binding, and environment inputs.
-4. Operator handles preview, approval, deployment, recovery, and evidence.
+2. Architecture resolves design, cost, governance, assumptions and risk decisions.
+3. Planning produces track-neutral implementation intent, binding, and environment inputs.
+4. Operations handles preview, approval, deployment, recovery, and evidence.
 
 Specialists delegate bounded code generation, review, and validation tasks when supported. Review findings return as a
 single decision panel; permitted risk acceptance is time-bound, while revision creates a fresh artifact and review.
