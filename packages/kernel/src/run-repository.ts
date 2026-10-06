@@ -1,11 +1,11 @@
 import type { RunConfigV1 } from "@apexops/contracts";
 import { constants } from "node:fs";
-import { lstat, mkdir, mkdtemp, open, readFile, rename, rm } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, open, readFile, rm } from "node:fs/promises";
 import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { canonicalJsonBytes, sha256Bytes, sha256Json, type JsonValue } from "./canonical.js";
 import { EventJournal, type AppendEventInput } from "./event-journal.js";
-import { atomicWriteJson } from "./files.js";
+import { atomicWriteJson, renameWithRetry } from "./files.js";
 
 export interface RunMutation {
   expectedRunHash: string;
@@ -406,7 +406,7 @@ export class RunRepository {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       }
       try {
-        await rename(staging, this.lockPath);
+        await renameWithRetry(staging, this.lockPath);
         published = true;
         return true;
       } catch (error) {
@@ -537,7 +537,7 @@ export class RunRepository {
       throw new Error("Run mutation retired-lock directory is unsafe");
     }
     try {
-      await rename(this.lockPath, join(this.retiredLockPath, recoveryId));
+      await renameWithRetry(this.lockPath, join(this.retiredLockPath, recoveryId));
       return true;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
