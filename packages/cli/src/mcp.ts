@@ -1,12 +1,13 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { lstatSync } from "node:fs";
 import { realpath } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import { ApexService, SUPPORTED_ARTIFACT_KINDS } from "./service.js";
 import { APEX_VERSION } from "./version.js";
-import { ApexError, EXIT_CODES, normalizeError, type ApexErrorCode } from "./errors.js";
+import { ApexError, EXIT_CODES, normalizeError, remediationForApexError, type ApexErrorCode } from "./errors.js";
 import { SECRET_VALUE_PATTERN } from "@apexops/contracts";
 import { MCP_OUTPUT_SCHEMAS } from "./mcp-output-schemas.js";
 import { TARGET_SCOPE_HINT, TARGET_SCOPE_PATTERN } from "./target-scope.js";
@@ -24,7 +25,43 @@ const errorMessages: Record<ApexErrorCode, string> = {
   APEX_STALE: "Task is stale or expired; refresh status before retrying.",
   APEX_AUTHORIZATION:
     "Operation is not authorized in the current workflow state; check status and approval requirements.",
+  APEX_CURSOR_INVALID: "Cursor is invalid for this tool, workspace, or server session.",
+  APEX_RESULT_TOO_LARGE: "MCP result exceeded the bounded result size and cannot be paged safely.",
   APEX_INTERNAL: "APEX could not complete the operation.",
+};
+
+export const MCP_SERVER_INSTRUCTIONS = [
+  "APEX is a governed Azure workload lifecycle server; the kernel owns state, gates, authorization, and evidence.",
+  "Every tool call must include workspace as an absolute checkout or git worktree path.",
+  "Call status first, then use returned task, run, expected head, and owner epoch values exactly.",
+  "Do not retry mutations blindly after timeout, cancellation, or conflict; refresh status and confirm intent first.",
+  "Use ask_user for human approvals, risk decisions, missing inputs, and any choice the kernel requires.",
+  "Large read results may include nextCursor; call the same tool with the same workspace and cursor until it is absent.",
+].join(" ");
+
+export const MCP_MAX_SERIALIZED_RESULT_BYTES = 64 * 1024;
+
+const cursorInput = z.string().min(1).max(4096).optional();
+const mcpCursorSecret = randomBytes(32);
+
+const pagePaths: Partial<Record<keyof typeof MCP_OUTPUT_SCHEMAS, readonly string[]>> = {
+  taskContext: ["inputs"],
+  readTaskInput: ["content"],
+  projectList: ["projects"],
+  preview: ["markdown"],
+  inventory: ["resources"],
+  improvementObservations: ["observations"],
+  improvementProposals: ["proposals"],
+  render: ["markdown"],
+};
+
+type CursorPayload = {
+  v: 1;
+  tool: string;
+  workspace: string;
+  hash: string;
+  path: string[];
+  offset: number;
 };
 
 export interface McpServiceResolver {
@@ -142,6 +179,133 @@ function assertBoundedInput(value: unknown): void {
   }
   if (Buffer.byteLength(JSON.stringify(value)) > 4 * 1024 * 1024)
     throw new ApexError("APEX_VALIDATION", "Input budget exceeded", EXIT_CODES.validation);
+}
+
+const serializedBytes = (value: unknown) => Buffer.byteLength(JSON.stringify(value), "utf8");
+const resultHash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+
+function cursorError(message: string): ApexError {
+  return new ApexError("APEX_CURSOR_INVALID", message, EXIT_CODES.validation);
+}
+
+function tooLargeError(tool: string): ApexError {
+  return new ApexError(
+    "APEX_RESULT_TOO_LARGE",
+    `${tool} returned more than ${MCP_MAX_SERIALIZED_RESULT_BYTES} serialized bytes and no safe page fits`,
+    EXIT_CODES.validation,
+  );
+}
+
+function encodeCursor(payload: CursorPayload): string {
+  const body = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  const mac = createHmac("sha256", mcpCursorSecret).update(body).digest("base64url");
+  return `${body}.${mac}`;
+}
+
+function decodeCursor(cursor: string): CursorPayload {
+  const [body, mac, extra] = cursor.split(".");
+  if (body === undefined || mac === undefined || extra !== undefined) throw cursorError("Malformed cursor");
+  const expected = createHmac("sha256", mcpCursorSecret).update(body).digest();
+  const actual = Buffer.from(mac, "base64url");
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) throw cursorError("Tampered cursor");
+  let decoded: CursorPayload;
+  try {
+    decoded = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as CursorPayload;
+  } catch {
+    throw cursorError("Malformed cursor payload");
+  }
+  if (
+    decoded === null ||
+    decoded.v !== 1 ||
+    typeof decoded.tool !== "string" ||
+    typeof decoded.workspace !== "string" ||
+    !/^[0-9a-f]{64}$/u.test(decoded.hash) ||
+    !Array.isArray(decoded.path) ||
+    decoded.path.some((entry) => typeof entry !== "string") ||
+    !Number.isSafeInteger(decoded.offset) ||
+    decoded.offset < 0
+  ) {
+    throw cursorError("Invalid cursor payload");
+  }
+  return decoded;
+}
+
+function getPageTarget(value: Record<string, unknown>, path: readonly string[]): unknown {
+  let target: unknown = value;
+  for (const segment of path) {
+    if (target === null || typeof target !== "object" || Array.isArray(target)) return undefined;
+    target = (target as Record<string, unknown>)[segment];
+  }
+  return target;
+}
+
+function withPageTarget(
+  value: Record<string, unknown>,
+  path: readonly string[],
+  page: string | unknown[],
+): Record<string, unknown> {
+  const copy = structuredClone(value) as Record<string, unknown>;
+  let target: Record<string, unknown> = copy;
+  for (const segment of path.slice(0, -1)) target = target[segment] as Record<string, unknown>;
+  target[path.at(-1)!] = page;
+  return copy;
+}
+
+function applyResultPaging(
+  tool: string,
+  workspace: string,
+  input: Record<string, unknown>,
+  value: Record<string, unknown>,
+): Record<string, unknown> {
+  const path = pagePaths[tool as keyof typeof MCP_OUTPUT_SCHEMAS];
+  const cursor = input.cursor;
+  if (cursor !== undefined && typeof cursor !== "string") throw cursorError("Cursor must be a string");
+  if (path === undefined) {
+    if (cursor !== undefined) throw cursorError("Tool does not accept cursors");
+    if (serializedBytes(value) > MCP_MAX_SERIALIZED_RESULT_BYTES) throw tooLargeError(tool);
+    return value;
+  }
+  if (cursor === undefined && serializedBytes(value) <= MCP_MAX_SERIALIZED_RESULT_BYTES) return value;
+  const hash = resultHash(value);
+  const payload =
+    cursor === undefined ? { v: 1 as const, tool, workspace, hash, path: [...path], offset: 0 } : decodeCursor(cursor);
+  if (payload.tool !== tool || payload.workspace !== workspace || payload.path.join("/") !== path.join("/")) {
+    throw cursorError("Cursor belongs to a different tool, workspace, or result path");
+  }
+  if (payload.hash !== hash) {
+    throw new ApexError(
+      "APEX_STALE",
+      "Cursor result state changed before paging completed",
+      EXIT_CODES.stale,
+      undefined,
+    );
+  }
+  const target = getPageTarget(value, path);
+  if (typeof target !== "string" && !Array.isArray(target)) throw tooLargeError(tool);
+  const total = target.length;
+  if (total === 0) throw tooLargeError(tool);
+  if (payload.offset >= total) throw cursorError("Cursor offset is outside the current result");
+  let best: Record<string, unknown> | undefined;
+  let low = 1;
+  let high = total - payload.offset;
+  while (low <= high) {
+    const count = Math.floor((low + high) / 2);
+    const end = payload.offset + count;
+    const page = typeof target === "string" ? target.slice(payload.offset, end) : target.slice(payload.offset, end);
+    const nextCursor = end < total ? encodeCursor({ ...payload, offset: end }) : undefined;
+    const candidate = {
+      ...withPageTarget(value, path, page),
+      ...(nextCursor === undefined ? {} : { nextCursor }),
+    };
+    if (serializedBytes(candidate) <= MCP_MAX_SERIALIZED_RESULT_BYTES) {
+      best = candidate;
+      low = count + 1;
+    } else {
+      high = count - 1;
+    }
+  }
+  if (best === undefined) throw tooLargeError(tool);
+  return best;
 }
 // One line per failing field: keep the first message per path, then collapse array indexes so repeated mistakes such as
 // "/decisionRecords/*/alternatives/*/benefits Expected string" appear once with a count.
@@ -311,7 +475,7 @@ export function createMcpServer(
   const queueTimeoutMs = options.queueTimeoutMs ?? 30_000;
   if (!Number.isSafeInteger(queueTimeoutMs) || queueTimeoutMs < 1 || queueTimeoutMs > 30_000)
     throw new Error("Invalid MCP queue timeout");
-  const server = new McpServer({ name: "apex", version: APEX_VERSION });
+  const server = new McpServer({ name: "apex", version: APEX_VERSION }, { instructions: MCP_SERVER_INSTRUCTIONS });
   const result = (value: unknown) => {
     if (value === null || typeof value !== "object" || Array.isArray(value))
       throw new Error("MCP success results require an object envelope");
@@ -435,6 +599,14 @@ export function createMcpServer(
           }
           throw error;
         }
+        if (response.structuredContent === undefined) throw new Error("MCP success results require structuredContent");
+        response.structuredContent = applyResultPaging(
+          name,
+          resolved.workspace,
+          toolInput,
+          response.structuredContent as Record<string, unknown>,
+        );
+        response.content = [{ type: "text", text: JSON.stringify(response.structuredContent) }];
         assertBoundedInput(response.structuredContent);
         if (!outputSchema.safeParse(response.structuredContent).success) throw new Error("Invalid MCP result contract");
         return response;
@@ -451,7 +623,10 @@ export function createMcpServer(
         // Input-schema and kernel validation reasons let agents correct typed input; guard, internal and secret-like
         // messages stay generic.
         const message = serviceValidation === undefined ? errorMessages[code] : serviceValidation.slice(0, 2_000);
-        return { ...result({ error: { code, message } }), isError: true };
+        return {
+          ...result({ error: { code, message, remediation: remediationForApexError(normalized) } }),
+          isError: true,
+        };
       } finally {
         releaseSlot?.();
       }
@@ -505,7 +680,7 @@ export function createMcpServer(
     "taskContext",
     {
       description: "Read context only for the exact task.taskId returned by nextTask with status=task.",
-      inputSchema: { taskId: z.string() },
+      inputSchema: { taskId: z.string(), cursor: cursorInput },
     },
     async ({ taskId }) => result(await service.taskContext(taskId)),
   );
@@ -518,6 +693,7 @@ export function createMcpServer(
         taskId: z.string(),
         offset: z.number().int().nonnegative().optional(),
         limit: z.number().int().min(1).max(6_000).optional(),
+        cursor: cursorInput,
         inputHash: z
           .union([
             z.string().regex(/^[0-9a-f]{64}$/u),
@@ -573,8 +749,10 @@ export function createMcpServer(
     },
     async (input) => result(await service.createProject(input as Parameters<typeof service.createProject>[0])),
   );
-  server.registerTool("projectList", { description: "List projects in the current workspace" }, async () =>
-    result({ projects: await service.listProjects() }),
+  server.registerTool(
+    "projectList",
+    { description: "List projects in the current workspace", inputSchema: { cursor: cursorInput } },
+    async () => result({ projects: await service.listProjects() }),
   );
   server.registerTool(
     "projectUse",
@@ -787,8 +965,10 @@ export function createMcpServer(
         ),
       ),
   );
-  server.registerTool("preview", { description: "Read the current operator-created deployment preview" }, async () =>
-    result({ markdown: await service.currentPreview() }),
+  server.registerTool(
+    "preview",
+    { description: "Read the current operator-created deployment preview", inputSchema: { cursor: cursorInput } },
+    async () => result({ markdown: await service.currentPreview() }),
   );
   server.registerTool(
     "reconcile",
@@ -797,7 +977,10 @@ export function createMcpServer(
   );
   server.registerTool(
     "inventory",
-    { description: "Run the bounded inventory operation for the selected run and return its evidence." },
+    {
+      description: "Run the bounded inventory operation for the selected run and return its evidence.",
+      inputSchema: { cursor: cursorInput },
+    },
     async () => result(await service.inventory()),
   );
   server.registerTool(
@@ -846,11 +1029,15 @@ export function createMcpServer(
         }),
       ),
   );
-  server.registerTool("improvementObservations", { description: "Read bounded observations" }, async () =>
-    result({ observations: await service.improvementObservations() }),
+  server.registerTool(
+    "improvementObservations",
+    { description: "Read bounded observations", inputSchema: { cursor: cursorInput } },
+    async () => result({ observations: await service.improvementObservations() }),
   );
-  server.registerTool("improvementProposals", { description: "Read inert improvement proposals" }, async () =>
-    result({ proposals: await service.improvementProposals() }),
+  server.registerTool(
+    "improvementProposals",
+    { description: "Read inert improvement proposals", inputSchema: { cursor: cursorInput } },
+    async () => result({ proposals: await service.improvementProposals() }),
   );
   server.registerTool(
     "render",
@@ -870,6 +1057,7 @@ export function createMcpServer(
           "architecture-decisions",
           "operations-runbook",
         ]),
+        cursor: cursorInput,
       },
       outputSchema: z.object({ markdown: z.string() }).strict(),
     },

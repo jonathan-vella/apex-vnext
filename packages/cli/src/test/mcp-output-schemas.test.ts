@@ -9,7 +9,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
 import { createMcpServer } from "../mcp.js";
 import { ApexService } from "../service.js";
-import { ApexError, EXIT_CODES } from "../errors.js";
+import { ApexError, EXIT_CODES, normalizeError, remediationForApexError } from "../errors.js";
 import { nextTaskAfterInput, requirements, tempRoot } from "./helpers.js";
 
 const hash = "a".repeat(64);
@@ -351,10 +351,19 @@ const invalidVariants: Array<[ToolName, Record<string, unknown>]> = [
 test("canonical inventory contract remains precise after the Zod bridge", () => {
   const { $schema: _dialect, ...schema } = z.toJSONSchema(MCP_OUTPUT_SCHEMAS.inventory);
   const { $id: _id, ...canonical } = JSON.parse(JSON.stringify(ResourceInventoryV1Schema));
-  assert.deepEqual(schema.anyOf?.[0], canonical);
+  const inventoryBranch = structuredClone(schema.anyOf?.[0]);
+  assert.ok(inventoryBranch?.properties);
+  delete inventoryBranch.properties.nextCursor;
+  assert.deepEqual(inventoryBranch, canonical);
   assert.equal(MCP_OUTPUT_SCHEMAS.inventory.safeParse({}).success, false);
   assert.equal(
-    MCP_OUTPUT_SCHEMAS.inventory.safeParse({ error: { code: "APEX_STALE", message: "Refresh status" } }).success,
+    MCP_OUTPUT_SCHEMAS.inventory.safeParse({
+      error: {
+        code: "APEX_STALE",
+        message: "Refresh status",
+        remediation: "Call status to refresh state.",
+      },
+    }).success,
     true,
   );
 });
@@ -633,7 +642,7 @@ test("actual MCP handlers wrap service fixtures and sanitize failures for every 
         failure = { method: cases[name].method, error };
         const response = await client.callTool({ name, arguments: { workspace, ...cases[name].input } });
         invoked.add(name);
-        const expected = { error: { code, message } };
+        const expected = { error: { code, message, remediation: remediationForApexError(normalizeError(error)) } };
         assert.equal(response.isError, true, name);
         assert.deepEqual(response.structuredContent, expected, name);
         assert.deepEqual(response.content, [{ type: "text", text: JSON.stringify(expected) }], name);
@@ -721,7 +730,14 @@ test("SDK publishes and enforces all result contracts while bypassing error resu
       assert.equal((await client.callTool({ name })).isError, true, name);
     }
     isError = true;
-    responses.status = { error: { code: "APEX_STALE", message: "Task is stale" } };
+    responses.status = {
+      error: {
+        code: "APEX_STALE",
+        message: "Task is stale",
+        remediation:
+          "Call status to refresh state and use the latest expected head, epoch, task, or cursor before retrying.",
+      },
+    };
     const error = await client.callTool({ name: "status" });
     assert.equal(error.isError, true);
     assert.deepEqual(error.structuredContent, responses.status);

@@ -30,9 +30,12 @@ const artifactHashes = object(
   Object.fromEntries(SUPPORTED_ARTIFACT_KINDS.map((kind) => [kind, Type.Optional(Sha256Schema)])),
 );
 
-function contract(schema: TObject | TUnion<TObject[]>): z.ZodObject {
+function contract(schema: TObject | TUnion<TObject[]>, options: { pageable?: boolean } = {}): z.ZodObject {
+  const successBranches = (schema.anyOf as TObject[] | undefined) ?? [schema as TObject];
   schema = Type.Union([
-    ...((schema.anyOf as TObject[] | undefined) ?? [schema as TObject]),
+    ...(options.pageable
+      ? successBranches.map((branch) => object({ ...branch.properties, nextCursor: Type.Optional(Type.String()) }))
+      : successBranches),
     object({
       error: object({
         code: Type.Union(
@@ -45,10 +48,13 @@ function contract(schema: TObject | TUnion<TObject[]>): z.ZodObject {
             "APEX_VALIDATION",
             "APEX_STALE",
             "APEX_AUTHORIZATION",
+            "APEX_CURSOR_INVALID",
+            "APEX_RESULT_TOO_LARGE",
             "APEX_INTERNAL",
           ].map((code) => Type.Literal(code)),
         ),
         message: Type.String(),
+        remediation: Type.String(),
       }),
     }),
   ]);
@@ -58,9 +64,18 @@ function contract(schema: TObject | TUnion<TObject[]>): z.ZodObject {
       ? schema
       : object(
           Object.fromEntries(
-            [...new Set(branches.flatMap((branch) => Object.keys(branch.properties)))].map((key) => [
+            [
+              ...new Set([
+                ...branches.flatMap((branch) => Object.keys(branch.properties)),
+                ...(options.pageable ? ["nextCursor"] : []),
+              ]),
+            ].map((key) => [
               key,
-              Type.Optional(Type.Union(branches.flatMap((branch) => branch.properties[key] ?? []))),
+              Type.Optional(
+                key === "nextCursor"
+                  ? Type.String()
+                  : Type.Union(branches.flatMap((branch) => branch.properties[key] ?? [])),
+              ),
             ]),
           ),
         );
@@ -230,6 +245,7 @@ export const MCP_OUTPUT_SCHEMAS = {
       status: Type.Union([Type.Literal("completed"), Type.Literal("active")]),
       blockers: strings,
     }),
+    { pageable: true },
   ),
   readTaskInput: contract(
     object({
@@ -239,6 +255,7 @@ export const MCP_OUTPUT_SCHEMAS = {
       nextOffset: Type.Optional(count),
       outputTemplate: Type.Optional(Type.Unknown()),
     }),
+    { pageable: true },
   ),
   recordInput: contract(object({ recorded: Type.Literal(true), requestId: NonEmptyStringSchema })),
   governanceImport: contract(object({ outputHash: Sha256Schema, summary: Type.String() })),
@@ -257,6 +274,7 @@ export const MCP_OUTPUT_SCHEMAS = {
   projectCreate: contract(selection),
   projectList: contract(
     object({ projects: Type.Array(object({ projectId: NonEmptyStringSchema, displayName: Type.String() })) }),
+    { pageable: true },
   ),
   projectUse: contract(selection),
   projectDelete: contract(object({ deleted: NonEmptyStringSchema, selected: Type.Optional(selection) })),
@@ -299,14 +317,16 @@ export const MCP_OUTPUT_SCHEMAS = {
   architectureComplete: contract(completion),
   reviewComplete: contract(completion),
   planComplete: contract(completion),
-  preview: contract(object({ markdown: Type.String() })),
-  inventory: contract(ResourceInventoryV1Schema),
+  preview: contract(object({ markdown: Type.String() }), { pageable: true }),
+  inventory: contract(ResourceInventoryV1Schema, { pageable: true }),
   reconcile: contract(ResourceInventoryV1Schema),
   diagnose: contract(object({ status, doctor })),
   improvementObserve: contract(object({ observation: ImprovementObservationV1Schema, deduplicated: Type.Boolean() })),
-  improvementObservations: contract(object({ observations: Type.Array(ImprovementObservationV1Schema) })),
-  improvementProposals: contract(object({ proposals: Type.Array(ImprovementProposalV1Schema) })),
-  render: contract(object({ markdown: Type.String() })),
+  improvementObservations: contract(object({ observations: Type.Array(ImprovementObservationV1Schema) }), {
+    pageable: true,
+  }),
+  improvementProposals: contract(object({ proposals: Type.Array(ImprovementProposalV1Schema) }), { pageable: true }),
+  render: contract(object({ markdown: Type.String() }), { pageable: true }),
   promote: contract(RunConfigV1Schema),
   doctor: contract(doctor),
   submitEvidence: contract(
