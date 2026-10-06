@@ -212,6 +212,14 @@ test("rejects ask_user on an autonomous subagent", () => {
   assert.ok(hasRule(result, "customization.subagent-questions"));
 });
 
+test("rejects web_fetch agents without the global fetch guard", () => {
+  const result = mutate((model) => {
+    const apex = model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX");
+    apex.content = apex.content.replace("registry.terraform.io", "registry.example.invalid");
+  });
+  assert.ok(hasRule(result, "customization.web-fetch-guard"));
+});
+
 test("rejects ask_user argument prescriptions in managed guidance and generated projections", () => {
   const managedResult = mutate((model) => {
     model.customization.guidance.push({

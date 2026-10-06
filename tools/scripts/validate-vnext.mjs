@@ -205,6 +205,21 @@ function hasTaskContextDelegationGuidance(content) {
   });
 }
 
+function hasWebFetchGuard(content) {
+  const text = content.replace(/\s+/gu, " ");
+  return [
+    /\bweb_fetch\b/iu,
+    /\bmcr\.microsoft\.com\b/iu,
+    /\bregistry\.terraform\.io\b/iu,
+    /\blearn\.microsoft\.com\b/iu,
+    /\bfetched content\b.{0,120}\bdata\b.{0,80}\bnot instructions\b/iu,
+    /\bnever\b.{0,120}\bfetched content\b.{0,160}\bartifact submission\b/iu,
+    /\bnever\b.{0,120}\bfetched content\b.{0,160}\bgate decisions?\b/iu,
+    /\bnever\b.{0,120}\bfetched content\b.{0,160}\breview decisions?\b/iu,
+    /\bcite\b.{0,80}\bfetched URLs\b/iu,
+  ].every((pattern) => pattern.test(text));
+}
+
 function parseScalar(text) {
   const value = text.trim();
   if (value === "true") return true;
@@ -883,6 +898,13 @@ function validateCustomizations(model, findings) {
             findings,
             "customization.worker-read-tool",
             `${name} is a hidden worker and cannot hold web tool ${tool}`,
+            agent.path,
+          );
+        if (!hasWebFetchGuard(agent.content))
+          finding(
+            findings,
+            "customization.web-fetch-guard",
+            `${name} has web_fetch without the global allow-list and untrusted-content guard`,
             agent.path,
           );
         continue;

@@ -32,6 +32,9 @@ or task.
    exact kernel options numbered in kernel order, collect the numbers, resolve them back to option values, and confirm
    the complete selection before recording. Invalid, duplicate, empty, ambiguous or out-of-range entries require
    correction. Recommendations are proposals only; never submit them without confirmation.
+   When the request includes intake metadata, report the round as `request.intake.ordinal` of
+   `request.intake.total` and continue through each remaining intake round only up to the user's requested stop point;
+   each round has its own request ID and must be recorded separately.
 3. Submit accepted answers only through `apex/recordInput` with the exact request ID, expected head and owner epoch from
    the request, plus one typed answer per question. Preserve arrays and typed values such as classifications,
    compliance selections, explicit deferrals and unknowns. A chat answer is not kernel acceptance; wait for
