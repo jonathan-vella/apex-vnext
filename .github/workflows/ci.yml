@@ -72,3 +72,36 @@ jobs:
       - name: Qualify APEX vNext
         if: steps.scope.outputs.docs_only != 'true'
         run: npm run qualify:vnext
+
+  windows-package-tests:
+    name: windows-2025 package tests
+    runs-on: windows-2025
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: ./.github/actions/setup-node-repo
+
+      - name: Prepare CLI assets
+        shell: bash
+        run: npm run prepare:assets --workspace @apexops/cli
+
+      - name: Build kernel, capabilities and CLI
+        shell: bash
+        run: |
+          npm run build --workspace @apexops/kernel
+          npm run build --workspace @apexops/capabilities
+          npm run build --workspace @apexops/cli
+
+      - name: Test kernel, capabilities and CLI
+        shell: bash
+        run: |
+          (cd packages/kernel && node --test dist/test/*.test.js)
+          (cd packages/capabilities && node --test dist/test/*.test.js)
+          (cd packages/cli && node --test dist/test/*.test.js)

@@ -397,14 +397,35 @@ export function validateGithubWorkflowContract({ contract, schema, workflowTexts
   }
 
   const ci = values.get("ci");
-  if (ci?.jobs?.ci?.name !== "ci" || Object.keys(ci?.jobs ?? {}).join() !== "ci") {
-    errors.push("ci workflow must preserve the required vNext job without retired external jobs");
+  const ciJobIds = Object.keys(ci?.jobs ?? {});
+  if (ci?.jobs?.ci?.name !== "ci" || JSON.stringify(ciJobIds) !== JSON.stringify(["ci", "windows-package-tests"])) {
+    errors.push("ci workflow must preserve the required vNext and Windows package-test jobs");
   }
   const ciSteps = Array.isArray(ci?.jobs?.ci?.steps) ? ci.jobs.ci.steps : [];
   const pythonSetup = ciSteps.filter((step) => step?.uses === "./.github/actions/setup-python-validation");
   const pythonCommands = ciSteps.filter((step) => ["npm run lint:python", "npm run test:python"].includes(step?.run));
   if (pythonSetup.length !== 1 || pythonCommands.length !== 2) {
     errors.push("ci workflow must retain pinned Python lint and test coverage");
+  }
+  const windowsJob = ci?.jobs?.["windows-package-tests"];
+  const windowsSteps = Array.isArray(windowsJob?.steps) ? windowsJob.steps : [];
+  const windowsScripts = windowsSteps.map((step) => String(step?.run ?? "")).join("\n");
+  if (
+    windowsJob?.name !== "windows-2025 package tests" ||
+    windowsJob?.["runs-on"] !== "windows-2025" ||
+    windowsJob?.permissions?.contents !== "read" ||
+    windowsJob?.["timeout-minutes"] !== 90 ||
+    !windowsSteps.some((step) => step?.uses === "./.github/actions/setup-node-repo") ||
+    !windowsSteps.filter((step) => step?.run !== undefined).every((step) => step?.shell === "bash") ||
+    !windowsScripts.includes("npm run prepare:assets --workspace @apexops/cli") ||
+    !windowsScripts.includes("npm run build --workspace @apexops/kernel") ||
+    !windowsScripts.includes("npm run build --workspace @apexops/capabilities") ||
+    !windowsScripts.includes("npm run build --workspace @apexops/cli") ||
+    !windowsScripts.includes("(cd packages/kernel && node --test dist/test/*.test.js)") ||
+    !windowsScripts.includes("(cd packages/capabilities && node --test dist/test/*.test.js)") ||
+    !windowsScripts.includes("(cd packages/cli && node --test dist/test/*.test.js)")
+  ) {
+    errors.push("ci workflow must retain the windows-2025 kernel, capabilities and CLI test lane");
   }
 
   for (const [workflowId, jobId] of [
