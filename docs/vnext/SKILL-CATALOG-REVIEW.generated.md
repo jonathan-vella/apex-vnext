@@ -15,29 +15,29 @@ Live provider and paired-client qualification are not run by this artifact or it
 | Source skill               | Matrix disposition | Consumer target              | Canonical owner                           | Lifecycle    | Capability | Renderer   | Live qualification |
 | -------------------------- | ------------------ | ---------------------------- | ----------------------------------------- | ------------ | ---------- | ---------- | ------------------ |
 | apex-unslop                | repository-only    | not-declared                 | Repository documentation maintainers      | not-declared | not-proven | not-proven | not-run            |
-| azure-adr                  | consumer           | apex-azure-adr               | APEX Architect                            | complete     | not-proven | not-proven | not-run            |
+| azure-adr                  | consumer           | apex-azure-adr               | APEX                                      | complete     | not-proven | not-proven | not-run            |
 | azure-artifacts            | consumer           | apex-artifacts               | kernel renderer                           | complete     | not-proven | not-proven | not-run            |
 | azure-bicep-patterns       | consumer           | apex-bicep-patterns          | APEX CodeGen                              | complete     | not-proven | not-proven | not-run            |
 | azure-compliance           | consumer           | apex-azure-compliance        | APEX Validator                            | complete     | not-proven | not-proven | not-run            |
-| azure-compute              | consumer           | apex-azure-compute           | APEX Architect                            | complete     | not-proven | not-proven | not-run            |
-| azure-cost-optimization    | consumer           | apex-azure-cost-optimization | APEX Architect and Operator               | complete     | not-proven | not-proven | not-run            |
-| azure-defaults             | consumer           | apex-azure-defaults          | APEX Architect and Planner                | complete     | not-proven | not-proven | not-run            |
-| azure-deploy               | consumer           | apex-azure-deploy            | APEX Operator                             | complete     | not-proven | not-proven | not-run            |
-| azure-diagnostics          | consumer           | apex-azure-diagnostics       | APEX Operator                             | complete     | not-proven | not-proven | not-run            |
+| azure-compute              | consumer           | apex-azure-compute           | APEX                                      | complete     | not-proven | not-proven | not-run            |
+| azure-cost-optimization    | consumer           | apex-azure-cost-optimization | APEX                                      | complete     | not-proven | not-proven | not-run            |
+| azure-defaults             | consumer           | apex-azure-defaults          | APEX                                      | complete     | not-proven | not-proven | not-run            |
+| azure-deploy               | consumer           | apex-azure-deploy            | APEX                                      | complete     | not-proven | not-proven | not-run            |
+| azure-diagnostics          | consumer           | apex-azure-diagnostics       | APEX                                      | complete     | not-proven | not-proven | not-run            |
 | azure-governance-discovery | consumer           | apex-azure-governance        | governance capability pack                | complete     | not-proven | not-proven | not-run            |
-| azure-kusto                | consumer           | apex-azure-kusto             | APEX Operator                             | complete     | not-proven | not-proven | not-run            |
-| azure-prepare              | consumer           | apex-azure-prepare           | APEX Architect and Planner                | complete     | not-proven | not-proven | not-run            |
-| azure-quotas               | consumer           | apex-azure-quotas            | APEX Architect                            | complete     | not-proven | not-proven | not-run            |
-| azure-rbac                 | consumer           | apex-azure-rbac              | APEX Architect and Planner                | complete     | not-proven | not-proven | not-run            |
-| azure-resources            | consumer           | apex-azure-resources         | APEX Operator                             | complete     | not-proven | not-proven | not-run            |
-| azure-storage              | consumer           | apex-azure-storage           | APEX Architect and Planner                | complete     | not-proven | not-proven | not-run            |
+| azure-kusto                | consumer           | apex-azure-kusto             | APEX                                      | complete     | not-proven | not-proven | not-run            |
+| azure-prepare              | consumer           | apex-azure-prepare           | APEX                                      | complete     | not-proven | not-proven | not-run            |
+| azure-quotas               | consumer           | apex-azure-quotas            | APEX                                      | complete     | not-proven | not-proven | not-run            |
+| azure-rbac                 | consumer           | apex-azure-rbac              | APEX                                      | complete     | not-proven | not-proven | not-run            |
+| azure-resources            | consumer           | apex-azure-resources         | APEX                                      | complete     | not-proven | not-proven | not-run            |
+| azure-storage              | consumer           | apex-azure-storage           | APEX                                      | complete     | not-proven | not-proven | not-run            |
 | azure-validate             | consumer           | apex-azure-validate          | APEX Validator                            | complete     | not-proven | not-proven | not-run            |
 | context-management         | repository-only    | not-declared                 | repository authoring validation           | not-declared | not-proven | not-proven | not-run            |
 | docs-writer                | repository-only    | not-declared                 | documentation maintainers                 | not-declared | not-proven | not-proven | not-run            |
-| entra-app-registration     | consumer           | apex-entra-app-registration  | APEX Architect and Planner                | complete     | not-proven | not-proven | not-run            |
+| entra-app-registration     | consumer           | apex-entra-app-registration  | APEX                                      | complete     | not-proven | not-proven | not-run            |
 | github-operations          | repository-only    | not-declared                 | repository maintainers                    | not-declared | not-proven | not-proven | not-run            |
 | golden-principles          | repository-only    | not-declared                 | kernel contracts and policy               | not-declared | not-proven | not-proven | not-run            |
-| iac-common                 | consumer           | apex-azure-deploy            | APEX Operator and Validator               | complete     | not-proven | not-proven | not-run            |
+| iac-common                 | consumer           | apex-azure-deploy            | APEX and Validator                        | complete     | not-proven | not-proven | not-run            |
 | mermaid                    | consumer           | apex-mermaid                 | kernel renderer                           | complete     | not-proven | not-proven | not-run            |
 | microsoft-docs             | consumer           | apex-microsoft-docs          | client-qualified documentation capability | complete     | not-proven | not-proven | not-run            |
 | python-diagrams            | deferred           | not-declared                 | future typed diagram renderer capability  | not-declared | not-proven | not-proven | not-run            |

@@ -79,6 +79,13 @@ const CONFIG_SHAPES = {
 };
 const FORBIDDEN_TOOL = /(^|\/)(shell|terminal|filesystem|fs|edit|write|git|azure|az|bicep|terraform)(\/|$)/i;
 const RETIRED_AGENT_FIELDS = ["argument-hint", "handoffs", "agents"];
+const RETIRED_INTERACTIVE_AGENTS = new Set(["APEX Requirements", "APEX Architect", "APEX Planner", "APEX Operator"]);
+const RETIRED_INTERACTIVE_AGENT_SOURCES = new Set([
+  ".github/agents/apex-requirements.agent.md",
+  ".github/agents/apex-architect.agent.md",
+  ".github/agents/apex-planner.agent.md",
+  ".github/agents/apex-operator.agent.md",
+]);
 const MODEL_PIN_FIELDS = ["model", "model-policy", "reasoning-effort"];
 const RETIRED_AGENT_TOOLS = ["vscode/askQuestions", "agent"];
 const EXPLICIT_WEB_TOOLS = ["web_fetch"];
@@ -739,6 +746,26 @@ function validateCustomizations(model, findings) {
     );
   const manifestRoles = array(customization.manifest.roles);
   const roleAgents = manifestRoles.map(({ agent }) => agent);
+  const interactiveRoles = manifestRoles.filter(({ interactionType }) => interactionType === "interactive-handoff");
+  if (
+    interactiveRoles.length !== 1 ||
+    interactiveRoles[0]?.agent !== "APEX" ||
+    interactiveRoles[0]?.source !== ".github/agents/apex.agent.md"
+  )
+    finding(
+      findings,
+      "customization.single-interactive-agent",
+      "Managed customizations must expose exactly one user-facing APEX agent",
+      "customizations/manifest.json",
+    );
+  for (const role of manifestRoles)
+    if (RETIRED_INTERACTIVE_AGENTS.has(role.agent) || RETIRED_INTERACTIVE_AGENT_SOURCES.has(role.source))
+      finding(
+        findings,
+        "customization.retired-agent",
+        `Retired interactive specialist ${role.agent} must not be declared`,
+        "customizations/manifest.json",
+      );
   if (roleAgents.length !== new Set(roleAgents).size) {
     finding(
       findings,
@@ -795,6 +822,8 @@ function validateCustomizations(model, findings) {
     const role = roles.get(name);
     if (!frontmatter || !name || !frontmatter.description || typeof frontmatter["user-invocable"] !== "boolean")
       finding(findings, "customization.frontmatter", `${agent.path} has incomplete frontmatter`, agent.path);
+    if (RETIRED_INTERACTIVE_AGENTS.has(name) || RETIRED_INTERACTIVE_AGENT_SOURCES.has(agent.path))
+      finding(findings, "customization.retired-agent", `${name} is a retired interactive specialist`, agent.path);
     if (frontmatter && "target" in frontmatter)
       finding(
         findings,
@@ -876,6 +905,22 @@ function validateCustomizations(model, findings) {
   }
 
   const declaredEdges = array(customization.manifest.invocationEdges);
+  const expectedWorkerEdges = new Set([
+    "APEX\0APEX CodeGen\0subagent",
+    "APEX\0APEX Reviewer\0subagent",
+    "APEX\0APEX Validator\0subagent",
+  ]);
+  const actualWorkerEdges = new Set(declaredEdges.map(({ from, to, type }) => `${from}\0${to}\0${type}`));
+  if (
+    actualWorkerEdges.size !== expectedWorkerEdges.size ||
+    [...expectedWorkerEdges].some((edge) => !actualWorkerEdges.has(edge))
+  )
+    finding(
+      findings,
+      "customization.cli-delegation",
+      "APEX must delegate exactly to the hidden CodeGen, Reviewer and Validator workers",
+      "customizations/manifest.json",
+    );
   const subagentParents = new Set(declaredEdges.filter(({ type }) => type === "subagent").map(({ from }) => from));
   for (const [name, agent] of agents) {
     if (!subagentParents.has(name) || !array(agent.frontmatter?.tools).includes(inventory.interactiveTools.delegate)) {
@@ -1004,6 +1049,13 @@ function validateCustomizations(model, findings) {
         findings,
         "customization.interactive-edge",
         `${edge.from} -> ${edge.to} must be a handoff`,
+        "customizations/manifest.json",
+      );
+    if (edge.type === "handoff")
+      finding(
+        findings,
+        "customization.handoff-edge",
+        `Interactive handoff edge ${edge.from} -> ${edge.to} is retired`,
         "customizations/manifest.json",
       );
   }

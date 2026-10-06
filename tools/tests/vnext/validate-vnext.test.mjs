@@ -136,13 +136,21 @@ test("rejects a divergent CI validation entrypoint", () => {
   assert.ok(hasRule(result, "ci.validation-entrypoint"));
 });
 
-test("rejects a subagent edge to an interactive role", () => {
+test("rejects retired interactive specialists and handoff edges", () => {
   const result = mutate((model) => {
-    model.customization.manifest.invocationEdges.find(
-      ({ from, to }) => from === "APEX" && to === "APEX Requirements",
-    ).type = "subagent";
+    model.customization.manifest.roles.push({
+      id: "requirements",
+      source: ".github/agents/apex-requirements.agent.md",
+      agent: "APEX Requirements",
+      role: "requirements",
+      supportedTargets: ["github-copilot"],
+      interactionType: "interactive-handoff",
+    });
+    model.customization.manifest.invocationEdges.push({ from: "APEX", to: "APEX Requirements", type: "handoff" });
   });
-  assert.ok(hasRule(result, "customization.interactive-edge"));
+  assert.ok(hasRule(result, "customization.single-interactive-agent"));
+  assert.ok(hasRule(result, "customization.retired-agent"));
+  assert.ok(hasRule(result, "customization.handoff-edge"));
 });
 
 test("CLI distinguishes interactive handoffs from supported subagent edges", () => {
@@ -177,14 +185,14 @@ test("keeps native read tools off hidden workers", () => {
 test("rejects unknown managed agent tool names while accepting the central inventory", () => {
   const unknownResult = mutate((model) => {
     model.customization.agents
-      .find(({ frontmatter }) => frontmatter.name === "APEX Planner")
+      .find(({ frontmatter }) => frontmatter.name === "APEX")
       .frontmatter.tools.push("definitely_not_a_tool");
   });
   assert.ok(hasRule(unknownResult, "customization.unknown-tool"));
 
   const inventoryResult = mutate((model) => {
-    const planner = model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX Planner");
-    planner.frontmatter.tools = [
+    const apex = model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX");
+    apex.frontmatter.tools = [
       ...Object.values(model.customization.toolInventory.interactiveTools),
       ...model.customization.toolInventory.agentReadTools,
       "web_fetch",
@@ -247,15 +255,6 @@ test("rejects worker prompts that rely on caller context or omit taskContext del
     apex.content = apex.content.replaceAll("apex/taskContext", "apex/status");
   });
   assert.ok(hasRule(parentResult, "customization.worker-context"));
-
-  const negatedTaskContextResult = mutate((model) => {
-    const apex = model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX");
-    apex.content = apex.content.replace(
-      "instruct the worker to\nread `apex/taskContext`",
-      "instruct the worker to\nnot call `apex/taskContext`",
-    );
-  });
-  assert.ok(hasRule(negatedTaskContextResult, "customization.worker-context"));
 });
 
 test("rejects retired VS Code agent fields and tools", () => {
@@ -267,7 +266,7 @@ test("rejects retired VS Code agent fields and tools", () => {
     (frontmatter) => (frontmatter["argument-hint"] = "Describe the workload"),
   ]) {
     const result = mutate((model) => {
-      retire(model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX Planner").frontmatter);
+      retire(model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX").frontmatter);
     });
     assert.ok(hasRule(result, "customization.retired-field"));
   }

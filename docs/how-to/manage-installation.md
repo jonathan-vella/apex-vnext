@@ -51,8 +51,8 @@ npx apex version --json
 ```
 
 Initialize the workspace with `apex init`. It installs the Copilot CLI projection and `.mcp.json`, which standalone
-Copilot CLI and the VS Code Copilot harness both use; `github-copilot-cli` is the only client value. Start the
-coordinator with `copilot --agent apex`.
+Copilot CLI and the VS Code Copilot harness both use; `github-copilot-cli` is the only client value. Start APEX with
+`copilot --agent apex`.
 
 For an approved registry release, follow [Publish npm Packages](publish-npm.md) before using the published bootstrap
 route.

@@ -1,6 +1,6 @@
 ---
 name: apex-next
-description: "Names the kernel-selected next APEX step and its owning agent, then delegates a hidden worker or prints the agent selection step and a scope prompt. Use for what's next, continue, or routing after a stage."
+description: "Routes the next APEX kernel step inside the same APEX agent by mapping owner roles to stage skills or hidden workers."
 ---
 
 When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
@@ -8,67 +8,69 @@ When calling any `apex/*` MCP tool, include the current session checkout or work
 
 ## APEX Next
 
-Route the next APEX step from kernel state. The kernel selects the owner; this skill names it and moves the work there.
+Route the next APEX step from kernel state. The kernel selects the owner role; the foreground `APEX` agent remains
+active and loads the mapped skill, or delegates one hidden worker.
 
 ## Prerequisites
 
-- The workspace has the APEX CLI and MCP server configured, and a project is selected.
+- The workspace has the APEX CLI and MCP server configured.
+- A project is selected unless the current operation is project listing, creation, selection, replacement or deletion.
 
 ## Workflow
 
-1. Call `apex/status`. For a status-only request, report it and stop. If status reports no project, blockers, a
-   pending gate or a terminal run, report that kernel state and stop.
-2. Call `apex/nextTask` once. Do not call it again for the same unanswered request or unresolved review, and do not
-   poll.
-3. Name the owner from the result. Do not ask the user to choose a role or search session history.
+1. Call `apex/status` first. For a status-only request, no selected project, a pending gate, a blocker, or a terminal
+   run, report the kernel state and stop.
+2. Call `apex/nextTask` only after status leaves runnable work for the selected project. Do not call it again for the
+   same unanswered input request or unresolved review, and do not poll.
+3. Map the kernel result to a same-agent skill or hidden worker. Do not ask the user to choose a role and do not search
+   session history.
 
-   | Kernel result                                      | Owner                                                   |
-   | -------------------------------------------------- | ------------------------------------------------------- |
-   | `status=needs_input` with `request.intake`         | `apex-requirements`                                     |
-   | `status=needs_input` with `request.decision`       | `apex-architect`                                        |
-   | `status=needs_input` with `request.governance`     | `apex-operator`                                         |
-   | `status=needs_review` with `review.gate` 1, 2 or 3 | `apex-requirements`, `apex-architect` or `apex-planner` |
-   | `status=task`                                      | the `task.role` owner below                             |
+   | Kernel result or `ownerRole`         | Same-agent skill or worker       |
+   | ------------------------------------ | -------------------------------- |
+   | `coordinator`                        | `apex-workflow`                  |
+   | `requirements`                       | `apex-requirements`              |
+   | `approver`                           | `apex-workflow`                  |
+   | `governance-operator`                | `apex-operations`                |
+   | `architect`                          | `apex-architecture`              |
+   | `planner`                            | `apex-planning`                  |
+   | `bicep-codegen`                      | worker `APEX CodeGen`            |
+   | `terraform-codegen`                  | worker `APEX CodeGen`            |
+   | `validator`                          | worker `APEX Validator`          |
+   | `deployment-operator`                | `apex-operations`                |
+   | `deployment-approver`                | `apex-operations`                |
+   | `inventory-operator`                 | `apex-operations`                |
+   | `diagnostician`                      | `apex-operations`                |
+   | `quality-owner`                      | `apex-operations`                |
+   | reviewer tasks or review roles       | worker `APEX Reviewer`           |
+   | `request.intake`                     | `apex-requirements`              |
+   | `request.decision`                   | `apex-architecture`              |
+   | `request.governance`                 | `apex-operations`                |
+   | `needs_review` for Gate 1            | `apex-requirements`              |
+   | `needs_review` for Gate 2            | `apex-architecture`              |
+   | `needs_review` for Gate 3            | `apex-planning`                  |
 
-   | `task.role`                                  | Owner                   |
-   | -------------------------------------------- | ----------------------- |
-   | `requirements`                               | `apex-requirements`     |
-   | `architect`                                  | `apex-architect`        |
-   | `planner`                                    | `apex-planner`          |
-   | `governance-operator`, `diagnostic-operator` | `apex-operator`         |
-   | `reviewer`                                   | worker `APEX Reviewer`  |
-   | `bicep-codegen`, `terraform-codegen`         | worker `APEX CodeGen`   |
-   | `validator`                                  | worker `APEX Validator` |
-
-   For any other result or role, report it and stop.
-4. Write the scope prompt for the owner's current task only: the owner, the exact `request.requestId`,
-   `review.reviewHash` or `task.taskId`, and the user's requested outcome, exact stop point and prohibited operations,
-   verbatim. For a worker task, include the exact `task.taskId` and instruct the worker to call `apex/taskContext` for
-   the complete task inputs, criteria, and output paths. Do not carry later-stage prerequisites, such as
-   governance-discovery evidence, into an earlier owner task.
-   If the original scope is unavailable, limit continuation to intake or the owner's task context.
-   For `request.intake`, state the round as `request.intake.ordinal` of `request.intake.total` and say that the owner
-   continues through every remaining intake round, each with its own kernel request ID, up to the user's stop point.
-5. A worker completes as a subagent. Delegate it with `task` and the scope prompt, report its result, then call
-   `apex/status`. If `task` is unavailable, report the pending worker task and stop.
-6. If the active agent is already the named interactive owner, continue with the current `nextTask` result instead of
-   printing a switch instruction. Otherwise, an interactive owner needs the foreground because only it can ask
-   questions, including a `status=task` result for `apex-requirements`, `apex-architect`, `apex-planner` or
-   `apex-operator`. Print its selection step and the scope prompt, then stop:
-   - Copilot CLI: `/agent apex-requirements`, using the owner's agent name from the table.
-   - VS Code Copilot harness: choose the agent, such as **APEX Requirements**, in the Agent picker.
-
-   State that routing is pending until the user switches. Do not claim the switch, answer acceptance or task creation.
+   Treat `status=needs_input`, `status=needs_review`, `status=task` and the exact `task.taskId` as authoritative
+   result shapes; never coerce one shape into another.
+   If a role or result is not mapped, report the unmapped role and stop; do not invent an owner.
+4. Continue in the same foreground `APEX` agent for every same-agent skill. Load the mapped skill and carry the user's
+   requested outcome, exact stop point and prohibited operations verbatim. Continue only until that requested outcome
+   reaches its next stop point.
+5. For a worker task, delegate through `task` with the exact `task.taskId`. Tell the worker to call
+   `apex/taskContext` with that task ID for complete inputs, acceptance criteria and output paths. Include the user's
+   requested outcome and stop boundary. Do not provide model, model-policy or reasoning-effort.
+6. After worker completion or same-agent stage completion, call `apex/status`. If a gate is pending, report it and stop.
+   Never call `apex/nextTask` after `apex/reviewDecide` or `apex/reviewComplete` while a gate is pending.
 
 ## Boundaries
 
-- The kernel owns state, gates, task ownership and transitions. A delegated worker never approves a gate.
-- Delegate only the workers above. Never delegate an interactive owner, and never substitute Explore or a
-  general-purpose agent for the owner.
-- Never collect, answer, summarize or record the owner's questions, and never replace invalid choices with defaults.
+- No `/agent` switching, Agent picker directions, copyable specialist prompts or interactive specialist handoffs.
+- Delegate only `APEX CodeGen`, `APEX Reviewer` and `APEX Validator`.
+- Never delegate intake, user questions, gate decisions, governance selection, or any other interactive work.
+- Never collect, answer, summarize or record a question unless the kernel returned it to the active `APEX` agent.
+- Never replace invalid choices with defaults or recommendations.
 - Never use `session_store_sql`, SQL, session-history searches or tool discovery to route work.
 
 ## Output
 
-Report the owner and either the worker result or the selection step. Put the ready-to-paste scope prompt in a fenced
-`text` code block so the user can copy plain text after switching.
+Report the mapped skill or worker, the kernel task/request/review identifier, the carried stop point, and the next
+action. If the requested outcome is complete, summarize and stop.

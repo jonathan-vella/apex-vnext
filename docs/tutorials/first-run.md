@@ -74,9 +74,9 @@ tutorial because it checks Azure CLI authentication.
 npx apex task next --json
 ```
 
-A new project normally needs requirements input. Start Copilot CLI with `copilot --agent apex` and ask the coordinator
-to continue the project. It reads kernel state, names the specialist that owns the next step, and prints the
-`/agent <name>` command and a scope prompt to paste after you switch.
+A new project normally needs requirements input. Start Copilot CLI with `copilot --agent apex` and ask APEX to
+continue the project. It reads kernel state, loads the same-agent stage skill for the next step, and stops at the next
+gate or user-owned question.
 
 Do not edit `.apex` directly or infer progress from chat history.
 

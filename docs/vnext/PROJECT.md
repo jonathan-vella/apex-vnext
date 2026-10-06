@@ -36,10 +36,11 @@ and the VS Code Copilot harness, which runs CLI-format agents. The VS Code Local
 DECISION-015 gates with an archive under `.archive/vscode-projection/`. An `apex-next` skill replaces handoffs, advisory
 built-in helpers join the workflow, and the context sidekick is deferred. Work proceeds on `feat/cli-projection`
 (PR #350) per the [CLI-only projection plan](ROADMAP.md#cli-only-projection); slices 1 to 10 and 12 are done, so
-`apex init` installs only the CLI projection, managed agent sources use CLI frontmatter, the coordinator routes
-through `apex-next`, and VS Code Local is archived. Slice 11 is partial: standalone CLI reached Gate 2 on a local
-target and four defects were fixed ([results](CLIENT-QUALIFICATION.md#slice-11-standalone-attempt)). A clean full
-standalone run with maintainer gate approvals and VS Code harness qualification remain before RISK-014 and RISK-015
+`apex init` installs only the CLI projection, managed agent sources use CLI frontmatter, APEX routes through
+`apex-next` in one foreground agent, and VS Code Local is archived. Slice 11 is partial: standalone CLI reached Gate 2
+on a local target and four defects were fixed
+([results](CLIENT-QUALIFICATION.md#slice-11-standalone-attempt)). A clean full standalone run with maintainer gate
+approvals and VS Code harness qualification remain before RISK-014 and RISK-015
 close; [issue #348](https://github.com/jonathan-vella/apex-vnext/issues/348) tracks them.
 
 The maintainer parked all standalone desktop-app work on 2026-09-21; DECISION-033 makes the app a supported client
@@ -155,7 +156,7 @@ and permissions remain unchanged.
 
 Bootstrap now separates repository readiness from project creation: the wizard has no project ID, environment, workload
 target or IaC questions. Managed clients/runtime can be installed and verified with zero projects; CLI/MCP status returns
-`needs_project` and the coordinator gathers the first project's details afterward. Target-bound central-baseline checks
+`needs_project` and APEX gathers the first project's details afterward. Target-bound central-baseline checks
 are deferred rather than manufacturing a project to run them. Explicit project creation remains a separate operation.
 
 Existing approved identities now have a bounded governance provisioning preview and separately confirmed executor.

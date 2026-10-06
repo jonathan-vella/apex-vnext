@@ -9,11 +9,11 @@ const root = resolve(import.meta.dirname, "../../..");
 const execFile = promisify(execFileCallback);
 const skills = [
   ["apex-workflow", "apex.agent.md"],
-  ["apex-requirements", "apex-requirements.agent.md"],
-  ["apex-architecture", "apex-architect.agent.md"],
-  ["apex-planning", "apex-planner.agent.md"],
+  ["apex-requirements", "apex.agent.md"],
+  ["apex-architecture", "apex.agent.md"],
+  ["apex-planning", "apex.agent.md"],
   ["apex-codegen", "apex-codegen.agent.md"],
-  ["apex-operations", "apex-operator.agent.md"],
+  ["apex-operations", "apex.agent.md"],
 ];
 
 const skillPath = (skill) => resolve(root, "customizations", ".github", "skills", skill, "SKILL.md");
@@ -53,6 +53,31 @@ test("apex-next is a packaged, user-invocable routing skill used by the coordina
   }
   assert.ok(manifest.managedFiles.includes(".github/skills/apex-next/SKILL.md"), "apex-next must be packaged");
   assert.match(coordinator, /\.github\/skills\/apex-next\/SKILL\.md/u);
+  assert.doesNotMatch(source, /\/agent\s/u);
+  assert.doesNotMatch(source, /ready-to-paste scope prompt/u);
+});
+
+test("apex-next maps every workflow owner role to a skill or worker", async () => {
+  const [workflow, source] = await Promise.all([
+    readFile(resolve(root, "config", "workflow.v1.json"), "utf8").then(JSON.parse),
+    readFile(skillPath("apex-next"), "utf8"),
+  ]);
+  const ownerRoles = new Set(workflow.nodes.map(({ ownerRole }) => ownerRole));
+  for (const role of ownerRoles) {
+    assert.match(source, new RegExp(`\\| \`${role}\`(?:,|\\s)`, "u"), `${role} must be mapped`);
+  }
+  for (const target of [
+    "apex-workflow",
+    "apex-requirements",
+    "apex-architecture",
+    "apex-planning",
+    "apex-operations",
+    "APEX CodeGen",
+    "APEX Validator",
+    "APEX Reviewer",
+  ]) {
+    assert.match(source, new RegExp(target, "u"), `${target} must be present`);
+  }
 });
 
 test("native skills are copied to the bundle and the CLI projection", async () => {

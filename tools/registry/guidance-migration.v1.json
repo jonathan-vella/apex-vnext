@@ -11,7 +11,7 @@
       "source": "azure-adr",
       "disposition": "consumer",
       "consumerSkill": "apex-azure-adr",
-      "owner": "APEX Architect",
+      "owner": "APEX",
       "lifecycle": "complete",
       "resourceDispositions": [
         {
@@ -621,7 +621,7 @@
       "source": "azure-compute",
       "disposition": "consumer",
       "consumerSkill": "apex-azure-compute",
-      "owner": "APEX Architect",
+      "owner": "APEX",
       "lifecycle": "complete",
       "resourceDispositions": [
         {
@@ -666,7 +666,7 @@
       "source": "azure-cost-optimization",
       "disposition": "consumer",
       "consumerSkill": "apex-azure-cost-optimization",
-      "owner": "APEX Architect and Operator",
+      "owner": "APEX",
       "lifecycle": "complete",
       "resourceDispositions": [
         {
@@ -775,7 +775,7 @@
       "source": "azure-defaults",
       "disposition": "consumer",
       "consumerSkill": "apex-azure-defaults",
-      "owner": "APEX Architect and Planner",
+      "owner": "APEX",
       "lifecycle": "complete",
       "resourceDispositions": [
         {
@@ -864,7 +864,7 @@
       "source": "azure-deploy",
       "disposition": "consumer",
       "consumerSkill": "apex-azure-deploy",
-      "owner": "APEX Operator",
+      "owner": "APEX",
       "lifecycle": "complete",
       "resourceDispositions": [
         {
@@ -1223,7 +1223,7 @@
       "source": "azure-diagnostics",
       "disposition": "consumer",
       "consumerSkill": "apex-azure-diagnostics",
-      "owner": "APEX Operator",
+      "owner": "APEX",
       "lifecycle": "complete",
       "resourceDispositions": [
         {
@@ -1310,7 +1310,7 @@
       "source": "azure-kusto",
       "disposition": "consumer",
       "consumerSkill": "apex-azure-kusto",
-      "owner": "APEX Operator",
+      "owner": "APEX",
       "lifecycle": "complete",
       "resourceDispositions": [
         {
@@ -1338,7 +1338,7 @@
       "source": "azure-prepare",
       "disposition": "consumer",
       "consumerSkill": "apex-azure-prepare",
-      "owner": "APEX Architect and Planner",
+      "owner": "APEX",
       "lifecycle": "complete",
       "resourceDispositions": [
         {
@@ -2307,7 +2307,7 @@
       "source": "azure-quotas",
       "disposition": "consumer",
       "consumerSkill": "apex-azure-quotas",
-      "owner": "APEX Architect",
+      "owner": "APEX",
       "lifecycle": "complete",
       "resourceDispositions": [
         {
@@ -2364,7 +2364,7 @@
       "source": "azure-rbac",
       "disposition": "consumer",
       "consumerSkill": "apex-azure-rbac",
-      "owner": "APEX Architect and Planner",
+      "owner": "APEX",
       "lifecycle": "complete",
       "resourceDispositions": []
     },
@@ -2372,7 +2372,7 @@
       "source": "azure-resources",
       "disposition": "consumer",
       "consumerSkill": "apex-azure-resources",
-      "owner": "APEX Operator",
+      "owner": "APEX",
       "lifecycle": "complete",
       "resourceDispositions": [
         {
@@ -2429,7 +2429,7 @@
       "source": "azure-storage",
       "disposition": "consumer",
       "consumerSkill": "apex-azure-storage",
-      "owner": "APEX Architect and Planner",
+      "owner": "APEX",
       "lifecycle": "complete",
       "resourceDispositions": [
         {
@@ -2711,7 +2711,7 @@
       "source": "entra-app-registration",
       "disposition": "consumer",
       "consumerSkill": "apex-entra-app-registration",
-      "owner": "APEX Architect and Planner",
+      "owner": "APEX",
       "lifecycle": "complete",
       "resourceDispositions": [
         {
@@ -2892,7 +2892,7 @@
       "source": "iac-common",
       "disposition": "consumer",
       "consumerSkill": "apex-azure-deploy",
-      "owner": "APEX Operator and Validator",
+      "owner": "APEX and Validator",
       "lifecycle": "complete",
       "resourceDispositions": [
         {

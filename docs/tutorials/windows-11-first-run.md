@@ -109,7 +109,7 @@ consumer requirement; resolve missing access with the platform owner rather than
 
 ## Continue Safely
 
-Use the visible APEX coordinator to capture requirements. APEX will not deploy resources from this tutorial. Preview,
+Use the visible `APEX` agent to capture requirements. APEX will not deploy resources from this tutorial. Preview,
 approval, and deployment are separate governed steps.
 
 ## Related

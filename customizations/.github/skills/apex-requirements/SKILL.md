@@ -1,6 +1,6 @@
 ---
 name: apex-requirements
-description: "Provides internal APEX requirements guidance for typed intake, scope, constraints, and budget."
+description: "Provides internal APEX requirements guidance for typed intake, scope, constraints, service preferences and Gate 1."
 user-invocable: false
 ---
 
@@ -9,60 +9,69 @@ When calling any `apex/*` MCP tool, include the current session checkout or work
 
 ## APEX Requirements
 
-Use this skill only for an active requirements task.
+Use this skill only when the kernel routes the active foreground `APEX` agent to a requirements input request, review
+or task.
 
 ## Prerequisites
 
-- The kernel returns a requirements input request, review, or task; task context is read only for `status=task`.
-- The interactive Requirements agent is active when user input may be needed.
+- Call `apex/status` first, then `apex/nextTask` only when status leaves runnable requirements work.
+- Task context is read only for `status=task` with a requirements task ID.
 - The kernel's returned input request is the authoritative requirements question catalog.
-- Apply the user's scope before this workflow. A handoff cannot expand it. If scope is unavailable, stop after intake
-   and task context. For status-only, call `apex/status` once and stop. Do not search session history to infer permission.
+- Apply the user's requested outcome and stop point before work begins. A prior handoff cannot expand scope. For
+  intake-only scope, stop after the matching intake context and do not submit artifacts, start review or ask for
+  approval.
 
 ## Workflow
 
-1. Call `apex/nextTask`. Validate that a returned `task` is owned by the requirements role before reading its context.
-2. When it returns `needs_input`, use its `intake` metadata and `questions` exactly as returned; do not maintain a
-   separate client-side question list.
-3. Ask the returned questions through the active client projection's question mechanism. Record each response as a
-   supplied value, typed unknown, explicit deferral with its owner, or omit an optional performance/scale answer to let
-   the kernel record `Performance and scale: check later (validated at a later stage)`. Never replace an unknown
-   with an inferred value.
-4. Submit that request only through `apex/recordInput`, preserving its request ID, expected journal head, and owner
-   epoch. Include `schemaVersion` and one `{ questionId, value }` entry per question. A question-tool response is not
-   acceptance: wait for `recorded: true` with the same request ID before advancing. Never call `nextTask` in place of
-   submitting the collected answers.
-5. After accepted input, call `apex/nextTask` again. Handle `needs_review` through the findings panel and
-   `apex/reviewDecide`, not by polling or requesting task context. Only `status=task` supplies `task.taskId`; read
-   `apex/taskContext` with that exact ID only for a requirements task, otherwise route to its owning role.
-   Honor an intake-only stop boundary here, before submitting an artifact or starting review.
-6. Treat service questions in the workload panel as a preference boundary. Present the kernel recommendation, then
-   capture retained, prohibited, and preferred services, SKU preferences, and environment overrides without selecting
-   architecture, SKUs, or implementation details.
-7. Only for explicitly requested full Requirements completion, submit the task-context-defined output through
-   `apex/requirementsComplete`, invoke the required Reviewer, and handle
-   `needs_review` through one native findings panel and `apex/reviewDecide`. Populate existing narrative fields with
-   labeled recommendations for access/ingress/DNS and GDPR data lifecycle instead of asking
-   supplemental owner questions. Treat performance and scale values as later-validated goals; missing values are
-   check-later notes, not follow-ups. Include retention, deletion, data-subject handling and telemetry minimization
-   as proposals, not confirmed commitments. Do not invent assigned owners, accepted risk or compliance evidence.
-   For accept-risk, show `owner: <project risk owner>, expires in 90 days`, draft the rationale, and ask only for
-   confirmation; do not ask for owner or expiry.
-   Actual policy/security conflicts remain blocking. Existing blocking findings require the normal correction/review
-   path, not automatic disposition.
-8. After a clean or fully dispositioned review, ask for explicit Gate 1 approval only if the user's scope permits it.
-   For a no-gate-approvals request, report the pending gate and stop without an approval question. Otherwise call
-   `apex/gateDecide` only after the user chooses Proceed, then continue to Architecture if requested.
-
-The kernel catalog and its versioned input contracts are authoritative. Do not choose architecture, SKUs, or
-implementation details while gathering requirements.
+1. Reuse facts the user already supplied in the current request. Present matching supplied facts as recommended
+   confirmations when the kernel asks for them; do not make the user retype them, and do not record them until the user
+   confirms or corrects them. Ask only for missing values. Never invent a project value, target, environment, IaC tool,
+   service preference, budget posture, unknown, deferral, owner, risk acceptance or approval.
+2. For `status=needs_input`, ask every returned question through `ask_user` in chat. Use native single-select or
+   multi-select controls without adding or reordering kernel options. If native multi-select is unavailable, show the
+   exact kernel options numbered in kernel order, collect the numbers, resolve them back to option values, and confirm
+   the complete selection before recording. Invalid, duplicate, empty, ambiguous or out-of-range entries require
+   correction. Recommendations are proposals only; never submit them without confirmation.
+3. Submit accepted answers only through `apex/recordInput` with the exact request ID, expected head and owner epoch from
+   the request, plus one typed answer per question. Preserve arrays and typed values such as classifications,
+   compliance selections, explicit deferrals and unknowns. A chat answer is not kernel acceptance; wait for
+   `recorded: true` before advancing.
+4. After accepted input, call `apex/nextTask` again. Do not poll unresolved input or review. For `needs_review`, present
+   the findings in one decision panel and submit permitted decisions through `apex/reviewDecide`.
+5. For `status=task`, call `apex/taskContext` with the exact `task.taskId`. If the context is externalized, read it in
+   bounded chunks through `apex/readTaskInput`. Use `taskContext.recordedInput` and `outputTemplates` as the complete
+   contract; do not read repository schemas or session history.
+6. Build the requirements output with business context, measurable success criteria, non-functional requirements,
+   security/compliance posture, budget and operations posture, regional constraints and candidate-service rationale for
+   Architecture. Treat stated performance and scale values as later-validated goals. If none are provided, record
+   `Performance and scale: check later (validated at a later stage)` rather than asking supplemental questions.
+7. Treat Azure services as candidates. Recommend viable compute, data, integration, identity and observability options
+   with concise fit and trade-off rationale, but never record a service or SKU as an Architecture decision. Capture
+   retained, prohibited or preferred services, SKU constraints or an explicit no-preference position.
+8. Populate narrative recommendations for access, ingress, DNS, personal-data inventory, retention/deletion,
+   data-subject handling and telemetry minimization. Recommendations are proposed, not confirmed requirements,
+   assigned owners or compliance evidence.
+9. Submit the typed requirements artifact through `apex/requirementsComplete`. Report the materialized read-only Gate 1
+   review package under `agent-output/<project>/<run>/`, including requirements, recommendations, SKU preferences and
+   challenger findings.
+10. Immediately call `apex/nextTask` after submitting requirements. When it returns a requirements review worker task,
+    delegate `APEX Reviewer` with the exact `task.taskId` and tell the worker to call `apex/taskContext`. If the worker
+    is unavailable, report the pending review task and stop.
+11. When `needs_review` returns, do not request task context or invoke the Reviewer again. For accept-risk, show
+    `owner: <project risk owner>, expires in 90 days`, draft the rationale and ask only for confirmation. Existing
+    blocking findings require the normal correction and fresh review path; do not automatically acknowledge, dismiss or
+    accept risk.
+12. After `apex/reviewDecide`, call `apex/status`. If Gate 1 is pending, report it and stop. Do not call
+    `apex/nextTask` while a gate is pending. If the user's scope permits approval and the user explicitly approves or
+    rejects Gate 1, call `apex/gateDecide` with `confirm: true`.
 
 ## Boundaries
 
-Do not read task context for `needs_input`, `needs_review`, a task owned by another role, or a stale task ID.
-Treat `APEX_STALE` as a fresh-status requirement, and return kernel validation or authorization errors without
-fabricating a requirements result.
+Do not read task context for `needs_input`, `needs_review`, a stale task ID, or a task owned by another role. Write only
+through APEX MCP. ARM MCP access is read-only and only supports indicative pricing when the user asks for it. Generated
+review projections are derived from accepted state and are never editable authority.
 
 ## Output
 
-Return the kernel result plus any unresolved user-owned fields.
+Return the kernel result, review-package location, candidate-service rationale, challenger findings, unresolved
+user-owned fields and the reason for stopping.
