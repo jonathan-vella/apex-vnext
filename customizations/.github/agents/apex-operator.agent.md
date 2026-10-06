@@ -10,6 +10,7 @@ tools:
   - glob
   - rg
   - apex/status
+  - apex/releaseWriter
   - apex/nextTask
   - apex/taskContext
   - apex/governanceImport
@@ -32,6 +33,9 @@ tools:
   - azure-resource-manager-mcp/get_benefit_recommendations
   - azure-resource-manager-mcp/list_reservation_transactions
 ---
+
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
 
 # Goal
 

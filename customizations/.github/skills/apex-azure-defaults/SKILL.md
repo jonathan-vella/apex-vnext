@@ -4,6 +4,9 @@ description: "Applies projected Azure defaults safely in APEX decisions. Use for
 user-invocable: false
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # APEX Azure Defaults
 
 Use this skill only for an active APEX task. Accepted governance constraints and runtime configuration are

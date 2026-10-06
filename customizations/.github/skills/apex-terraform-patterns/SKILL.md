@@ -4,6 +4,9 @@ description: "Apply approved Terraform architecture intent in APEX. Use for hub-
 user-invocable: false
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # APEX Terraform Patterns
 
 Use this skill for an active Terraform-bound planning or CodeGen task. It records approved architecture intent and

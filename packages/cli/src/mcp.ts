@@ -1,6 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { lstatSync } from "node:fs";
+import { isAbsolute, resolve } from "node:path";
 import { ApexService, SUPPORTED_ARTIFACT_KINDS } from "./service.js";
 import { APEX_VERSION } from "./version.js";
 import { ApexError, EXIT_CODES, normalizeError, type ApexErrorCode } from "./errors.js";
@@ -13,12 +15,48 @@ const errorMessages: Record<ApexErrorCode, string> = {
   APEX_USAGE: "Invalid operation arguments; check the tool input contract.",
   APEX_NOT_FOUND: "Requested APEX state was not found; refresh status and check the identifier.",
   APEX_CONFLICT: "The operation conflicts with current state; refresh status before retrying.",
+  APEX_WRITER_CONFLICT: "Another worktree owns this run's writer lease; retry from that worktree or release the lease.",
+  APEX_WORKSPACE_UNSUPPORTED:
+    "The workspace path cannot be resolved to a supported APEX checkout; use a non-bare checkout or worktree.",
   APEX_VALIDATION: "APEX validation failed; check the supplied input against the current task contract.",
   APEX_STALE: "Task is stale or expired; refresh status before retrying.",
   APEX_AUTHORIZATION:
     "Operation is not authorized in the current workflow state; check status and approval requirements.",
   APEX_INTERNAL: "APEX could not complete the operation.",
 };
+
+export interface McpServiceResolver {
+  defaultService: ApexService;
+  resolve(workspace: string): Promise<{ service: ApexService; workspace: string }>;
+}
+
+function serviceResolver(serviceOrResolver: ApexService | McpServiceResolver): McpServiceResolver {
+  if (
+    typeof (serviceOrResolver as McpServiceResolver).resolve === "function" &&
+    (serviceOrResolver as McpServiceResolver).defaultService !== undefined
+  ) {
+    return serviceOrResolver as McpServiceResolver;
+  }
+  const service = serviceOrResolver as ApexService;
+  return {
+    defaultService: service,
+    resolve: async (workspace) => ({ service, workspace: resolve(workspace) }),
+  };
+}
+
+const workspaceInput = z.string().superRefine((workspace, context) => {
+  if (!isAbsolute(workspace)) {
+    context.addIssue({ code: "custom", message: "workspace must be an absolute path" });
+    return;
+  }
+  try {
+    if (!lstatSync(workspace).isDirectory()) {
+      context.addIssue({ code: "custom", message: "workspace must be an existing directory" });
+    }
+  } catch {
+    context.addIssue({ code: "custom", message: "workspace must be an existing directory" });
+  }
+});
 
 const artifactKind = z.enum(
   SUPPORTED_ARTIFACT_KINDS as [
@@ -238,7 +276,19 @@ const normalizeOutputs = (outputs: z.infer<typeof taskOutput>[]) =>
     ...(summary === undefined ? {} : { summary }),
   }));
 
-export function createMcpServer(service: ApexService, options: { queueTimeoutMs?: number } = {}): McpServer {
+export function createMcpServer(
+  serviceOrResolver: ApexService | McpServiceResolver,
+  options: { queueTimeoutMs?: number } = {},
+): McpServer {
+  const services = serviceResolver(serviceOrResolver);
+  let activeService = services.defaultService;
+  const service: ApexService = new Proxy(services.defaultService, {
+    get(target, property, receiver) {
+      const actual = activeService ?? target;
+      const value = Reflect.get(actual, property, receiver);
+      return typeof value === "function" ? value.bind(actual) : value;
+    },
+  });
   const queueTimeoutMs = options.queueTimeoutMs ?? 30_000;
   if (!Number.isSafeInteger(queueTimeoutMs) || queueTimeoutMs < 1 || queueTimeoutMs > 30_000)
     throw new Error("Invalid MCP queue timeout");
@@ -296,12 +346,16 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
   server.registerTool = (name, config, callback) => {
     const outputSchema = MCP_OUTPUT_SCHEMAS[name as keyof typeof MCP_OUTPUT_SCHEMAS];
     if (outputSchema === undefined) throw new Error(`Missing output schema for ${name}`);
-    const inputSchema =
+    const originalInputSchema =
       config.inputSchema === undefined
         ? z.object({}).strict()
         : config.inputSchema instanceof z.ZodObject
           ? config.inputSchema.strict().meta(config.inputSchema.meta() ?? {})
           : z.object(config.inputSchema as z.ZodRawShape).strict();
+    const inputSchema = originalInputSchema
+      .extend({ workspace: workspaceInput })
+      .strict()
+      .meta(originalInputSchema.meta() ?? {});
     const guarded = async (...args: Parameters<typeof callback>) => {
       const extra = args.at(-1) as { signal?: AbortSignal };
       const checkCancelled = () => {
@@ -329,12 +383,16 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
         }
         releaseSlot = await acquire(extra.signal);
         checkCancelled();
+        const { workspace, ...toolInput } = input.data as { workspace: string } & Record<string, unknown>;
+        const resolved = await services.resolve(workspace);
+        resolved.service.setWorkspacePath?.(resolved.workspace);
+        activeService = resolved.service;
         let response: Awaited<ReturnType<typeof callback>>;
         try {
           response = await Reflect.apply(
             callback,
             undefined,
-            config.inputSchema === undefined ? [extra] : [input.data, extra],
+            config.inputSchema === undefined ? [extra] : [toolInput, extra],
           );
         } catch (error) {
           const normalized = normalizeError(error);
@@ -349,6 +407,9 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
             );
             const reason = issues.length === 0 ? normalized.message : `${normalized.message}: ${issues.join("; ")}`;
             if (!SECRET_VALUE_PATTERN.test(reason)) serviceValidation = reason;
+          }
+          if (normalized.code === "APEX_WRITER_CONFLICT" && !SECRET_VALUE_PATTERN.test(normalized.message)) {
+            serviceValidation = normalized.message;
           }
           throw error;
         }
@@ -388,6 +449,11 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
   };
   server.registerTool("status", { description: "Read selected APEX run status" }, async () =>
     result(await service.workspaceStatus()),
+  );
+  server.registerTool(
+    "releaseWriter",
+    { description: "Release this workspace's writer lease for the selected run." },
+    async () => result(await service.releaseWriter()),
   );
   server.registerTool("capabilityList", { description: "Read capability pack availability" }, async () =>
     result({ packs: await service.capabilityList() }),
@@ -820,6 +886,6 @@ export function createMcpServer(service: ApexService, options: { queueTimeoutMs?
   return server;
 }
 
-export async function serveMcp(service: ApexService): Promise<void> {
-  await createMcpServer(service).connect(new StdioServerTransport());
+export async function serveMcp(serviceOrResolver: ApexService | McpServiceResolver): Promise<void> {
+  await createMcpServer(serviceOrResolver).connect(new StdioServerTransport());
 }

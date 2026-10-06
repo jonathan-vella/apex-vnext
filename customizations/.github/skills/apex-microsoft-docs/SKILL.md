@@ -3,6 +3,9 @@ name: apex-microsoft-docs
 description: "Researches official Microsoft documentation for APEX decisions. Use for Microsoft Learn concepts, limits, version support, WAF and architecture guidance, configuration, tutorials, and official code samples with cited evidence."
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # APEX Microsoft Documentation
 
 Use this skill only for an active APEX architecture or planning task that needs current official Microsoft guidance.

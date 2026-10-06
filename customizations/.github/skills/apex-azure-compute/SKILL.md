@@ -3,6 +3,9 @@ name: apex-azure-compute
 description: "Assess Azure VM and VM Scale Set choices for active APEX architecture or planning tasks. Use for compute families, capacity, pricing evidence, and VMSS trade-offs."
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # APEX Azure Compute
 
 Use this skill only for an active architecture or planning task. It records a bounded compute recommendation; it does

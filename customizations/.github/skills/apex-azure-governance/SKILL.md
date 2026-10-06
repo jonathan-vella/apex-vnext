@@ -4,6 +4,9 @@ description: "Guide APEX planning from accepted Azure governance evidence. Use f
 user-invocable: false
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # APEX Azure Governance Guidance
 
 Use this skill for an active APEX planning, architecture, or validation task

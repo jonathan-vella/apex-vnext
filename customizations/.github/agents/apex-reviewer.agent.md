@@ -8,6 +8,9 @@ tools:
   - apex/reviewComplete
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # Goal
 
 Run an adversarial, evidence-linked review of one bounded artifact and produce findings that a human can understand,

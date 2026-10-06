@@ -31,6 +31,7 @@ This file is generated from [packages/cli/src/mcp.ts](../../packages/cli/src/mcp
 - `readTaskInput`
 - `reconcile`
 - `recordInput`
+- `releaseWriter`
 - `render`
 - `requirementsComplete`
 - `reviewComplete`

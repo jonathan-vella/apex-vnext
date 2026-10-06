@@ -9,6 +9,9 @@ tools:
   - apex/completeTask
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # Goal
 
 Generate only the assigned IaC batch and return a traceable handoff that validation and human review can inspect.

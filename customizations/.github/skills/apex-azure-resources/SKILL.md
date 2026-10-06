@@ -4,6 +4,9 @@ description: "Guide APEX analysis from accepted Azure inventory evidence. Use fo
 user-invocable: false
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # APEX Azure Resource Inventory Guidance
 
 Use this skill for an active APEX task that needs a bounded view of existing

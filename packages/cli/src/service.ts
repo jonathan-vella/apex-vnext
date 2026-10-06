@@ -315,6 +315,8 @@ export interface ReviewDecision {
 export interface ServiceOptions {
   clock?: () => Date;
   idSource?: () => string;
+  workspacePath?: string;
+  writerLeaseTtlMs?: number;
   providers?: Partial<Record<"fake" | "bicep" | "terraform", IacProvider>>;
   architectureAvailabilityAdapter?: (evidence: ArchitectureAvailabilityV1) => Promise<void>;
   executableChecker?: (executable: string) => Promise<boolean>;
@@ -640,6 +642,7 @@ export class ApexService {
   readonly root: string;
   private readonly clock: () => Date;
   private readonly idSource: () => string;
+  private readonly writerLeaseTtlMs: number | undefined;
   private readonly projects: ProjectStore;
   private readonly objects: ObjectStore;
   private readonly cache: ContentCache;
@@ -653,11 +656,14 @@ export class ApexService {
   private readonly improvementPolicy: ImprovementPolicyV1 | undefined;
   private improvementRuntime?: ImprovementStore;
   private requirementsDocumentTemplate?: Promise<{ content: string; hash: string }>;
+  private workspacePath: string;
 
   constructor(root: string, options: ServiceOptions = {}) {
     this.root = resolve(root);
+    this.workspacePath = resolve(options.workspacePath ?? root);
     this.clock = options.clock ?? (() => new Date());
     this.idSource = options.idSource ?? (() => crypto.randomUUID());
+    this.writerLeaseTtlMs = options.writerLeaseTtlMs;
     this.projects = new ProjectStore(this.root, this.clock, this.idSource);
     this.objects = new ObjectStore(this.root);
     this.cache = new ContentCache(this.root);
@@ -682,6 +688,10 @@ export class ApexService {
     this.customizationFailureInjector = options.customizationFailureInjector;
     this.processRunner = options.processRunner ?? new ProcessRunner();
     this.improvementPolicy = options.improvementPolicy;
+  }
+
+  setWorkspacePath(workspacePath: string): void {
+    this.workspacePath = resolve(workspacePath);
   }
 
   async improvementObserve(input: {
@@ -2323,6 +2333,12 @@ export class ApexService {
       };
     }
     return this.status();
+  }
+
+  async releaseWriter(): Promise<{ released: boolean; projectId: string; runId: string }> {
+    const run = await this.currentRun();
+    const released = await this.runRepository(run).releaseWriterLease(this.writerLeaseOwner());
+    return { released, projectId: run.projectId, runId: run.runId };
   }
 
   async status(): Promise<{
@@ -7323,6 +7339,7 @@ export class ApexService {
   ): Promise<void> {
     const repository = this.runRepository(before);
     try {
+      await repository.acquireWriterLease(this.writerLeaseOwner());
       await repository.mutate({
         expectedRunHash: sha256Json(before),
         ...(expectedJournalHead === undefined ? {} : { expectedJournalHead }),
@@ -7626,6 +7643,7 @@ export class ApexService {
     payload: JsonValue,
     expectedHead?: string | null,
   ): Promise<EventV1> {
+    await this.runRepository(run).acquireWriterLease(this.writerLeaseOwner());
     const journal = this.journal(run);
     return await journal.append({
       eventId: this.idSource(),
@@ -7725,7 +7743,12 @@ export class ApexService {
     return new RunRepository(this.projects.runDirectory(selection.projectId, selection.runId), {
       clock: this.clock,
       idSource: this.idSource,
+      ...(this.writerLeaseTtlMs === undefined ? {} : { writerLeaseTtlMs: this.writerLeaseTtlMs }),
     });
+  }
+
+  private writerLeaseOwner(): { workspacePath: string; sessionId: string } {
+    return { workspacePath: this.workspacePath, sessionId: `${process.pid}` };
   }
   private async selection(): Promise<Selection> {
     return JSON.parse(await readFile(join(this.root, ".apex", "config.json"), "utf8")) as Selection;

@@ -1,23 +1,25 @@
 import assert from "node:assert/strict";
-import type { ChildProcess } from "node:child_process";
-import { mkdir, symlink } from "node:fs/promises";
+import { execFile, type ChildProcess } from "node:child_process";
+import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
+import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { JSONRPCMessageSchema, SUPPORTED_PROTOCOL_VERSIONS } from "@modelcontextprotocol/sdk/types.js";
-import { mcpWorkspaceRoot } from "../cli.js";
+import { mcpWorkspaceRoot, resolveMcpWorkspace } from "../cli.js";
 import { MCP_OUTPUT_SCHEMAS } from "../mcp-output-schemas.js";
-import { createMcpServer } from "../mcp.js";
+import { createMcpServer, type McpServiceResolver } from "../mcp.js";
 import { ApexError, EXIT_CODES } from "../errors.js";
 import { GovernanceBaselineError } from "@apexops/capabilities";
 import { ApexService } from "../service.js";
 import { tempRoot } from "./helpers.js";
 
 const hash = "a".repeat(64);
+const execFileAsync = promisify(execFile);
 const input = {
   schemaVersion: "1.0.0",
   requestId: "request-1",
@@ -70,13 +72,14 @@ async function connect(
     client,
     server,
     service,
+    workspace: service.root,
     block() {
       const gate = deferred();
       releases.push(gate.resolve);
       return gate;
     },
     call(name: string, args: Record<string, unknown> = {}, signal?: AbortSignal) {
-      const request = client.callTool({ name, arguments: args }, undefined, {
+      const request = client.callTool({ name, arguments: { workspace: service.root, ...args } }, undefined, {
         timeout: 3_000,
         ...(signal === undefined ? {} : { signal }),
       });
@@ -89,7 +92,7 @@ async function connect(
 
 test("unknown no-argument and raw-shape arguments never invoke the service", { timeout: 10_000 }, async (context) => {
   let calls = 0;
-  const { client } = await connect(context, {
+  const { client, workspace } = await connect(context, {
     status: async () => {
       calls += 1;
       throw new Error("status must not run");
@@ -100,8 +103,8 @@ test("unknown no-argument and raw-shape arguments never invoke the service", { t
     },
   });
   for (const request of [
-    { name: "status", arguments: { unexpected: true } },
-    { name: "render", arguments: { kind: "status", unexpected: true } },
+    { name: "status", arguments: { workspace, unexpected: true } },
+    { name: "render", arguments: { workspace, kind: "status", unexpected: true } },
   ]) {
     assert.equal((await client.callTool(request)).isError, true);
   }
@@ -625,7 +628,7 @@ test(
     const { tools } = await client.listTools();
     assert.equal(tools.length, Object.keys(MCP_OUTPUT_SCHEMAS).length);
     assert.ok(tools.every((tool) => tool.outputSchema?.type === "object"));
-    const response = await client.callTool({ name: "status", arguments: {} });
+    const response = await client.callTool({ name: "status", arguments: { workspace: root } });
     assert.deepEqual(assertSuccess("status", response), expected);
     await client.close();
     assert.deepEqual(await exited.promise, { code: 0, signal: null }, stderr);
@@ -639,7 +642,7 @@ test(
 
 test("invalid staging forms are rejected before staging", { timeout: 10_000 }, async (context) => {
   let calls = 0;
-  const { client } = await connect(context, {
+  const { client, workspace } = await connect(context, {
     stageArtifact: async () => {
       calls += 1;
       throw new Error("stageArtifact must not run");
@@ -660,7 +663,10 @@ test("invalid staging forms are rejected before staging", { timeout: 10_000 }, a
     { ...output, unexpected: true },
   ];
   for (const args of invalid) {
-    const response = await client.callTool({ name: "stageArtifact", arguments: { taskId: "task-1", ...args } });
+    const response = await client.callTool({
+      name: "stageArtifact",
+      arguments: { workspace, taskId: "task-1", ...args },
+    });
     assert.equal(response.isError, true, JSON.stringify(args));
   }
   assert.equal(calls, 0);
@@ -684,4 +690,77 @@ test("MCP serve finds the APEX workspace from a subdirectory without leaving the
   assert.equal(await mcpWorkspaceRoot(join(linked, "sub")), join(linked, "sub"));
   const outside = await tempRoot();
   assert.equal(await mcpWorkspaceRoot(outside), outside);
+});
+
+test("MCP workspace resolution shares APEX state across git worktrees and enforces one writer", async (context) => {
+  const root = await tempRoot();
+  const main = join(root, "main");
+  const worktree = join(root, "worktree");
+  await mkdir(main);
+  await execFileAsync("git", ["init", main]);
+  await execFileAsync("git", ["-C", main, "config", "user.email", "apex@example.test"]);
+  await execFileAsync("git", ["-C", main, "config", "user.name", "APEX Test"]);
+  await writeFile(join(main, "README.md"), "# Demo\n", "utf8");
+  await execFileAsync("git", ["-C", main, "add", "README.md"]);
+  await execFileAsync("git", ["-C", main, "commit", "-m", "initial"]);
+  await execFileAsync("git", ["-C", main, "worktree", "add", worktree]);
+
+  const now = { value: new Date("2026-01-01T00:00:00.000Z") };
+  const cache = new Map<string, ApexService>();
+  const serviceFor = (workspaceRoot: string) => {
+    let service = cache.get(workspaceRoot);
+    if (service === undefined) {
+      service = new ApexService(workspaceRoot, {
+        clock: () => now.value,
+        writerLeaseTtlMs: 1_000,
+        executableChecker: async () => false,
+        azureAuthStatus: async () => ({ authenticated: false, detail: "Offline lifecycle test" }),
+      });
+      cache.set(workspaceRoot, service);
+    }
+    return service;
+  };
+  const resolvedMain = await resolveMcpWorkspace(main);
+  const resolvedWorktree = await resolveMcpWorkspace(worktree);
+  assert.equal(resolvedMain.root, main);
+  assert.equal(resolvedWorktree.root, main);
+  const resolver: McpServiceResolver = {
+    defaultService: serviceFor(main),
+    resolve: async (workspace) => {
+      const resolved = await resolveMcpWorkspace(workspace);
+      return { service: serviceFor(resolved.root), workspace: resolved.workspace };
+    },
+  };
+  await serviceFor(main).init({ projectId: "demo", riskOwner: "partner" });
+  const server = createMcpServer(resolver);
+  const client = new Client({ name: "worktree-test", version: "1.0.0" });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  context.after(async () => {
+    await client.close();
+    await server.close();
+  });
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+
+  const worktreeStatus = assertSuccess(
+    "status",
+    await client.callTool({ name: "status", arguments: { workspace: worktree } }),
+  ) as { run: { projectId: string } };
+  assert.equal(worktreeStatus.run.projectId, "demo");
+  assertError(
+    await client.callTool({ name: "nextTask", arguments: { workspace: worktree } }),
+    "APEX_WRITER_CONFLICT",
+    "Run writer lease is held by " +
+      `${main} until 2026-01-01T00:00:01.000Z; retry from that worktree, release the writer lease there, or wait for it to expire`,
+  );
+  assert.equal((await client.callTool({ name: "projectList", arguments: { workspace: worktree } })).isError, undefined);
+  now.value = new Date("2026-01-01T00:00:01.001Z");
+  assertSuccess("nextTask", await client.callTool({ name: "nextTask", arguments: { workspace: worktree } }));
+
+  const missing = await client.callTool({ name: "status", arguments: {} });
+  assert.equal(missing.isError, true);
+  assert.match(JSON.stringify(missing.structuredContent), /\/workspace/u);
+  const relative = await client.callTool({ name: "status", arguments: { workspace: "relative" } });
+  assert.equal(relative.isError, true);
+  assert.match(JSON.stringify(relative.structuredContent), /\/workspace/u);
 });

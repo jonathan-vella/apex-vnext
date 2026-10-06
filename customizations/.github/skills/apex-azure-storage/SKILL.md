@@ -3,6 +3,9 @@ name: apex-azure-storage
 description: "Select secure Azure Storage services, tiers, redundancy, and lifecycle intent for active APEX architecture and planning tasks."
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # APEX Azure Storage
 
 Use this skill only for an active architecture or planning task. It records storage service and security intent; it does

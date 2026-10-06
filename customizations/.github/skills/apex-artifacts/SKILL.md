@@ -4,6 +4,9 @@ description: "Presents accepted APEX typed artifacts as bounded Markdown views. 
 user-invocable: false
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # APEX Artifact Presentations
 
 Present accepted typed artifacts without creating a second source of truth. The artifact schema, accepted values,

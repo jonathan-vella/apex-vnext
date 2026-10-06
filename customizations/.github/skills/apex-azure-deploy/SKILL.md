@@ -4,6 +4,9 @@ description: "Explain approved APEX Azure deployment previews and lifecycle outc
 user-invocable: false
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # APEX Azure Deployment Guidance
 
 Use this skill only for an active operator or deployment task. It explains the exact kernel-provided approved preview,

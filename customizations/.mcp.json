@@ -7,6 +7,7 @@
       "env": {},
       "tools": [
         "status",
+        "releaseWriter",
         "capabilityList",
         "capabilityStatus",
         "nextTask",

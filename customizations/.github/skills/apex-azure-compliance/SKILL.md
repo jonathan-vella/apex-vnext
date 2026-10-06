@@ -4,6 +4,9 @@ description: "Assess APEX compliance and security evidence. Use for posture find
 user-invocable: false
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # APEX Azure Compliance Assessment
 
 Use this skill for an active APEX task that evaluates accepted posture evidence.

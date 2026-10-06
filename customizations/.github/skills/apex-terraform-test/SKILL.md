@@ -4,6 +4,9 @@ description: "Design receipt-gated Terraform test intent in APEX. Use for unit a
 user-invocable: false
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # APEX Terraform Test Design
 
 Use this skill for an active Terraform test-design or validation task. It specifies coverage and assertion intent;

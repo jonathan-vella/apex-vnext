@@ -4,6 +4,9 @@ description: "Guide APEX capacity planning from accepted Azure quota evidence. U
 user-invocable: false
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # APEX Azure Quota Guidance
 
 Use this skill for an active APEX planning or validation task that needs a

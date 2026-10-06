@@ -19,6 +19,9 @@ tools:
   - apex/gateDecide
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # Goal
 
 Create a traceable implementation plan, IaC binding, and environment-input contract that a human can review before

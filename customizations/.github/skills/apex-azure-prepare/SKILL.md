@@ -4,6 +4,9 @@ description: "Prepare traceable Azure delivery intent in APEX. Use for requireme
 user-invocable: false
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # APEX Azure Preparation
 
 Use this skill only for an active requirements, architecture, planning, or CodeGen task. It translates accepted intent

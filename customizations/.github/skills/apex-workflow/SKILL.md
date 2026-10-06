@@ -4,6 +4,9 @@ description: "Provides internal APEX workflow routing for status, resume, projec
 user-invocable: false
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 ## APEX Workflow
 
 Use this skill to orient an interactive agent without reconstructing workflow state from chat or files.

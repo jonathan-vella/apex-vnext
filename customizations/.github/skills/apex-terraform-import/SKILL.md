@@ -4,6 +4,9 @@ description: "Assess Terraform adoption of existing Azure resources in APEX. Use
 user-invocable: false
 ---
 
+When calling any `apex/*` MCP tool, include the current session checkout or worktree as the required absolute
+`workspace` path.
+
 # APEX Terraform Import Assessment
 
 Use this skill for an active Terraform adoption task concerning existing resources. It evaluates accepted inventory and
