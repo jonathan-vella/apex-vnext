@@ -60,10 +60,10 @@ export class ObjectStore {
     if (create) {
       await mkdir(this.root, { recursive: true });
     }
-    const root = await realpath(this.root);
-    if (root !== this.root) {
+    if ((await lstat(this.root)).isSymbolicLink()) {
       throw new Error("Object store root must not be a symlink");
     }
+    const root = await realpath(this.root);
     const path = join(root, hash.slice(0, 2), hash.slice(2));
     if (create) {
       await mkdir(dirname(path), { recursive: true });

@@ -1,11 +1,11 @@
 import type { RunConfigV1 } from "@apexops/contracts";
-import { constants } from "node:fs";
-import { lstat, mkdir, mkdtemp, open, readFile, rename, rm } from "node:fs/promises";
+import { constants, realpathSync } from "node:fs";
+import { lstat, mkdir, mkdtemp, open, readFile, rm } from "node:fs/promises";
 import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { canonicalJsonBytes, sha256Bytes, sha256Json, type JsonValue } from "./canonical.js";
 import { EventJournal, type AppendEventInput } from "./event-journal.js";
-import { atomicWriteJson } from "./files.js";
+import { atomicWriteJson, renameWithRetry } from "./files.js";
 
 export interface RunMutation {
   expectedRunHash: string;
@@ -90,6 +90,7 @@ const WRITER_LEASE_FILE = ".run-writer-lease.json";
 const MAX_WRITER_LEASE_BYTES = 64 * 1024;
 const WRITER_LEASE_LOCK_WAIT_MS = 500;
 const WRITER_LEASE_LOCK_RETRY_MS = 10;
+const TRANSIENT_LOCK_RENAME_CODES = new Set(["EPERM", "EACCES", "EBUSY"]);
 
 function lockExpiry(value: unknown): number | undefined {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
@@ -131,8 +132,17 @@ function writerLeaseExpiry(value: unknown): number | undefined {
 }
 
 function sameWorkspace(left: string, right: string): boolean {
-  const resolvedLeft = resolve(left);
-  const resolvedRight = resolve(right);
+  const canonical = (path: string) => {
+    const resolved = resolve(path);
+    try {
+      return realpathSync(resolved);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return resolved;
+      throw error;
+    }
+  };
+  const resolvedLeft = canonical(left);
+  const resolvedRight = canonical(right);
   return process.platform === "win32"
     ? resolvedLeft.toLocaleLowerCase() === resolvedRight.toLocaleLowerCase()
     : resolvedLeft === resolvedRight;
@@ -406,11 +416,12 @@ export class RunRepository {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       }
       try {
-        await rename(staging, this.lockPath);
+        await renameWithRetry(staging, this.lockPath);
         published = true;
         return true;
       } catch (error) {
-        if (["EEXIST", "ENOTEMPTY"].includes((error as NodeJS.ErrnoException).code ?? "")) return false;
+        const code = (error as NodeJS.ErrnoException).code ?? "";
+        if (["EEXIST", "ENOTEMPTY"].includes(code) || TRANSIENT_LOCK_RENAME_CODES.has(code)) return false;
         try {
           await lstat(this.lockPath);
           return false;
@@ -537,7 +548,7 @@ export class RunRepository {
       throw new Error("Run mutation retired-lock directory is unsafe");
     }
     try {
-      await rename(this.lockPath, join(this.retiredLockPath, recoveryId));
+      await renameWithRetry(this.lockPath, join(this.retiredLockPath, recoveryId));
       return true;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;

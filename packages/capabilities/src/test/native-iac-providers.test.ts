@@ -64,6 +64,10 @@ const authority: CurrentDeploymentAuthority = {
   recipientIdentity: "writer@example.com",
 };
 
+async function assertPosixMode(path: string, expectedMode: number): Promise<void> {
+  if (process.platform !== "win32") assert.equal((await stat(path)).mode & 0o777, expectedMode);
+}
+
 function request(overrides: Partial<PreviewRequest> = {}): PreviewRequest {
   return {
     projectId: "project",
@@ -985,7 +989,7 @@ for (const track of ["bicep", "terraform"] as const) {
       assert.notEqual(process.cwd, fixture.root);
       assert.equal(await readFile(join(process.cwd!, nestedPath), "utf8"), nestedContent);
       assert.deepEqual((await readdir(process.cwd!)).sort(), [fixture.sourceFile, "modules"].sort());
-      assert.equal((await stat(process.cwd!)).mode & 0o777, 0o700);
+      await assertPosixMode(process.cwd!, 0o700);
       assert.equal((await stat(join(process.cwd!, nestedPath))).nlink, 1);
     };
     const provider = fixture.makeProvider();
@@ -2319,7 +2323,7 @@ test("local reference plan transport authenticates metadata, recipient, expiry, 
 
   const handle = await transport.decryptToRestrictiveTemp(encrypted, key, authority.recipientIdentity);
   context.after(async () => handle.dispose());
-  assert.equal((await stat(handle.path)).mode & 0o777, 0o600);
+  await assertPosixMode(handle.path, 0o600);
   assert.equal((await readFile(handle.path)).toString(), "saved-plan");
   await handle.dispose();
 

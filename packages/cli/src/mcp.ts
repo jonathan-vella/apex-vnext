@@ -917,5 +917,29 @@ export function createMcpServer(
 }
 
 export async function serveMcp(serviceOrResolver: ApexService | McpServiceResolver): Promise<void> {
-  await createMcpServer(serviceOrResolver).connect(new StdioServerTransport());
+  const server = createMcpServer(serviceOrResolver);
+  await server.connect(new StdioServerTransport());
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      process.stdin.off("end", close);
+      process.stdin.off("close", close);
+      process.stdin.off("error", fail);
+    };
+    const finish = (action: () => Promise<void>) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      action().then(resolve, reject);
+    };
+    const close = () => finish(() => server.close());
+    const fail = (error: Error) =>
+      finish(async () => {
+        await server.close();
+        throw error;
+      });
+    process.stdin.once("end", close);
+    process.stdin.once("close", close);
+    process.stdin.once("error", fail);
+  });
 }

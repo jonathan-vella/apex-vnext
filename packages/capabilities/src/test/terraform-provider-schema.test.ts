@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import test from "node:test";
 import { ProcessRunnerError } from "../process-runner.js";
 import {
@@ -285,20 +285,25 @@ test("waits for both bounded metadata operations before returning failure", asyn
 
 test("strips ambient Terraform argument injection from spawned metadata commands", async () => {
   const directory = await mkdtemp(join(tmpdir(), "apex-terraform-metadata-"));
-  const executable = join(directory, "terraform");
+  const executable = join(directory, process.platform === "win32" ? "terraform.cmd" : "terraform");
+  const scriptPath = process.platform === "win32" ? join(directory, "terraform.js") : executable;
   const script = `#!/usr/bin/env node
 if (Object.keys(process.env).some((key) => key.toUpperCase().startsWith("TF_CLI_ARGS"))) process.exit(91);
 const schema = ${JSON.stringify(fixture.schema)};
 const version = ${JSON.stringify(fixture.version)};
 process.stdout.write(JSON.stringify(process.argv[2] === "providers" ? schema : version));
 `;
-  await writeFile(executable, script, "utf8");
-  await chmod(executable, 0o700);
+  await writeFile(scriptPath, script, "utf8");
+  if (process.platform === "win32") {
+    await writeFile(executable, `@echo off\r\n"${process.execPath}" "%~dp0terraform.js" %*\r\n`, "utf8");
+  } else {
+    await chmod(executable, 0o700);
+  }
   const priorPath = process.env.PATH;
   const priorArgs = process.env.TF_CLI_ARGS;
   const priorVersionArgs = process.env.TF_CLI_ARGS_version;
   try {
-    process.env.PATH = `${directory}:${priorPath ?? ""}`;
+    process.env.PATH = [directory, priorPath].filter((entry): entry is string => entry !== undefined).join(delimiter);
     process.env.TF_CLI_ARGS = "-no-color";
     process.env.TF_CLI_ARGS_version = "-invalid";
     const result = await new TerraformProviderIntrospection().inspect(directory);

@@ -22,7 +22,18 @@ export async function tempRoot(): Promise<string> {
   return root;
 }
 
-after(async () => Promise.all(roots.map((root) => rm(root, { recursive: true, force: true }))));
+after(async () =>
+  Promise.all(
+    roots.map((root) =>
+      rm(root, {
+        recursive: true,
+        force: true,
+        maxRetries: process.platform === "win32" ? 10 : 0,
+        retryDelay: 100,
+      }),
+    ),
+  ),
+);
 
 export async function writeJson(path: string, value: unknown): Promise<void> {
   await mkdir(join(path, ".."), { recursive: true });

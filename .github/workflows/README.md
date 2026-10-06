@@ -7,7 +7,7 @@
 
 | Workflow                                                                     | Trigger                                        | Purpose                                                                                                | Side effects                                                                                          |
 | ---------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| [`ci.yml`](ci.yml)                                                           | PR + push to `main`                            | Required code check: formatting, Node validators, hook tests, and deterministic vNext qualification (skipped for docs-only PRs). | None — fails the PR on regression.                                                                    |
+| [`ci.yml`](ci.yml)                                                           | PR + push to `main`                            | Required code check: formatting, Node validators, hook tests, deterministic vNext qualification (skipped for docs-only PRs), and Windows package tests. | None — fails the PR on regression.                                                                    |
 | [`branch-enforcement.yml`](branch-enforcement.yml)                           | PR to `main`                                   | Runs canonical branch naming and strict file-scope policy so PRs stay reviewable.                      | None — fails the PR on violation.                                                                     |
 | [`docs.yml`](docs.yml)                                                       | PR + push to `main` (Markdown)                 | Validate documentation links and freshness; required CI owns Markdown lint.                            | None - fails on documentation regression.                                                             |
 | [`governance-policy-baseline.yml`](governance-policy-baseline.yml)           | Weekly Mon 05:00 UTC + manual                  | Refresh `.github/data/governance-policy-baseline.json` from a live subscription.                       | Opens a PR (manual review + merge required) when baseline drifts.                                     |
@@ -16,7 +16,8 @@
 | [`weekly-maintenance.yml`](weekly-maintenance.yml)                           | Weekly Mon 06:00 UTC + manual                  | Consolidated data-refresh + audit umbrella — see [Weekly Maintenance](#weekly-maintenance) below.      | Opens PRs (refresh jobs, manual merge) + GitHub issues (audit jobs).                                  |
 
 Devcontainer CI and obsolete long-lived branch maintenance are retired. Ordinary feature integration uses reviewed
-pull requests and the required CI checks. Windows development uses WSL2; no retired workflow is an execution authority.
+pull requests and the required CI checks. Native Windows client support is covered by the
+`windows-2025 package tests` CI job; no retired workflow is an execution authority.
 
 ## Updating Action Pins
 

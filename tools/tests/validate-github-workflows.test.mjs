@@ -110,7 +110,7 @@ test("rejects required vNext context drift", () => {
 
   const errors = validate(mutate(".github/workflows/ci.yml", "    name: ci", "    name: renamed-ci"));
   assert.ok(errors.some((error) => error.includes("job/check name drift")));
-  assert.ok(errors.some((error) => error.includes("required vNext job")));
+  assert.ok(errors.some((error) => error.includes("required vNext and Windows package-test jobs")));
   const extra = structuredClone(contract);
   extra.expectedRequiredContexts.push("retired-external-check");
   assert.ok(validate(workflowTexts, extra).some((error) => error.includes("status contexts drift")));
@@ -241,6 +241,38 @@ test("rejects protected Python lane and canonical Terraform pin drift", () => {
     const staleTerraform = mutate(path, "          terraform_version: 1.16.3", "          terraform_version: 1.15.8");
     const errors = validate(staleTerraform, rebaseline(path, staleTerraform));
     assert.ok(errors.some((error) => error.includes("must install the canonical Terraform version")));
+  }
+});
+
+test("rejects Windows package-test lane weakening after rebaselining", () => {
+  const ciPath = ".github/workflows/ci.yml";
+  for (const [search, replacement, expected] of [
+    ["  windows-package-tests:", "  windows-tests:", "required vNext and Windows package-test jobs"],
+    ["    runs-on: windows-2025", "    runs-on: windows-latest", "windows-2025 kernel, capabilities and CLI test lane"],
+    ["    timeout-minutes: 90", "    timeout-minutes: 30", "windows-2025 kernel, capabilities and CLI test lane"],
+    [
+      "      - name: Prepare CLI assets\n        shell: bash\n        run: npm run prepare:assets --workspace @apexops/cli\n\n",
+      "",
+      "windows-2025 kernel, capabilities and CLI test lane",
+    ],
+    [
+      "          npm run build --workspace @apexops/capabilities\n",
+      "",
+      "windows-2025 kernel, capabilities and CLI test lane",
+    ],
+    [
+      "          (cd packages/cli && node --test dist/test/*.test.js)\n",
+      "",
+      "windows-2025 kernel, capabilities and CLI test lane",
+    ],
+    ["        shell: bash", "", "windows-2025 kernel, capabilities and CLI test lane"],
+  ]) {
+    const texts = mutate(ciPath, search, replacement);
+    const errors = validate(texts, rebaseline(ciPath, texts));
+    assert.ok(
+      errors.some((error) => error.includes(expected)),
+      `expected ${expected} for ${search}`,
+    );
   }
 });
 

@@ -422,8 +422,10 @@ test("provider import rejects symlinks and conflicts, and permits byte-identical
   const imported = await importProviderTransfer(destination, fixture.envelope, "ci-apply", () => instant);
   assert.deepEqual(await importProviderTransfer(destination, fixture.envelope, "ci-apply", () => instant), imported);
   const runtime = join(destination, ".apex", "local", "provider-runtime");
-  assert.equal((await lstat(join(runtime, "bindings", `${hashes.preview}.json`))).mode & 0o777, 0o600);
-  assert.equal((await lstat(join(runtime, "bindings"))).mode & 0o777, 0o700);
+  if (process.platform !== "win32") {
+    assert.equal((await lstat(join(runtime, "bindings", `${hashes.preview}.json`))).mode & 0o777, 0o600);
+    assert.equal((await lstat(join(runtime, "bindings"))).mode & 0o777, 0o700);
+  }
   assert.equal((await readFile(join(runtime, "plan-transport.key"))).byteLength, 32);
 
   const conflict = await tempRoot();

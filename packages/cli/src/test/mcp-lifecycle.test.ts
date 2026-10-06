@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile, type ChildProcess } from "node:child_process";
-import { mkdir, readdir, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, realpath, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
@@ -723,6 +723,8 @@ test("MCP workspace resolution shares APEX state across git worktrees and enforc
   await execFileAsync("git", ["-C", main, "worktree", "add", worktree]);
 
   const now = { value: new Date("2026-01-01T00:00:00.000Z") };
+  const canonicalMain = await realpath(main);
+  const canonicalWorktree = await realpath(worktree);
   const cache = new Map<string, ApexService>();
   const serviceFor = (workspaceRoot: string) => {
     let service = cache.get(workspaceRoot);
@@ -739,8 +741,10 @@ test("MCP workspace resolution shares APEX state across git worktrees and enforc
   };
   const resolvedMain = await resolveMcpWorkspace(main);
   const resolvedWorktree = await resolveMcpWorkspace(worktree);
-  assert.equal(resolvedMain.root, main);
-  assert.equal(resolvedWorktree.root, main);
+  assert.equal(resolvedMain.root, canonicalMain);
+  assert.equal(resolvedMain.workspace, canonicalMain);
+  assert.equal(resolvedWorktree.root, canonicalMain);
+  assert.equal(resolvedWorktree.workspace, canonicalWorktree);
   const resolver: McpServiceResolver = {
     defaultService: serviceFor(main),
     resolve: async (workspace) => {
@@ -768,7 +772,7 @@ test("MCP workspace resolution shares APEX state across git worktrees and enforc
     await client.callTool({ name: "nextTask", arguments: { workspace: worktree } }),
     "APEX_WRITER_CONFLICT",
     "Run writer lease is held by " +
-      `${main} until 2026-01-01T00:00:01.000Z; retry from that worktree, release the writer lease there, or wait for it to expire`,
+      `${canonicalMain} until 2026-01-01T00:00:01.000Z; retry from that worktree, release the writer lease there, or wait for it to expire`,
   );
   assert.equal((await client.callTool({ name: "projectList", arguments: { workspace: worktree } })).isError, undefined);
   now.value = new Date("2026-01-01T00:00:01.001Z");
@@ -841,7 +845,7 @@ test("MCP workspace resolution shares APEX state across git worktrees and enforc
     }),
     "APEX_WRITER_CONFLICT",
     "Run writer lease is held by " +
-      `${worktree} until 2026-01-01T00:00:02.001Z; retry from that worktree, release the writer lease there, or wait for it to expire`,
+      `${canonicalWorktree} until 2026-01-01T00:00:02.001Z; retry from that worktree, release the writer lease there, or wait for it to expire`,
   );
   await assert.rejects(readdir(join(main, ".apex", "work")), { code: "ENOENT" });
 

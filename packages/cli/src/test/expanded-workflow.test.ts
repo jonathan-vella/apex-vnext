@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdir, readFile, readdir, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { platform } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -281,7 +282,10 @@ test("governance baseline reader rejects parent swaps before and after reading",
       }
       return assertSafe(...args);
     };
-    await assert.rejects(service["readGovernanceBaselineBytes"]("parent/baseline.json"), { code: "APEX_VALIDATION" });
+    await assert.rejects(service["readGovernanceBaselineBytes"]("parent/baseline.json"), (error: unknown) => {
+      const code = (error as NodeJS.ErrnoException | { code?: string }).code;
+      return code === "APEX_VALIDATION" || (platform() === "win32" && code === "EPERM");
+    });
   }
 });
 
