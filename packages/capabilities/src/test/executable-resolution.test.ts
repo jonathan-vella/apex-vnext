@@ -74,11 +74,16 @@ test("Windows executables and unresolved names launch directly without a shell",
 });
 
 test("POSIX resolution finds executables on PATH and skips non-executable files", () => {
-  const env = { PATH: `/nonexistent:${dirname(process.execPath)}` };
-  assert.equal(resolveExecutable("node", { platform: "linux", env }), process.execPath.replace(/\/[^/]+$/u, "/node"));
-  assert.equal(resolveExecutable(process.execPath, { platform: "linux", env: {} }), process.execPath);
+  const env = { PATH: "/not-executable:/tools" };
+  const isExecutableFile = (path: string) => path === "/tools/node";
+  assert.equal(resolveExecutable("node", { platform: "linux", env, isExecutableFile }), "/tools/node");
+  assert.equal(resolveExecutable("/tools/node", { platform: "linux", env: {}, isExecutableFile }), "/tools/node");
   assert.equal(resolveExecutable("definitely-not-a-real-apex-tool", { platform: "linux", env }), undefined);
-  assert.deepEqual(planLaunch("node", ["-v"], { platform: "linux", env }).args, ["-v"]);
+  assert.deepEqual(planLaunch("node", ["-v"], { platform: "linux", env, isExecutableFile }), {
+    command: "/tools/node",
+    args: ["-v"],
+    windowsVerbatimArguments: false,
+  });
 });
 
 test("process runner resolves bare names from the request environment and reports unsafe arguments", async () => {

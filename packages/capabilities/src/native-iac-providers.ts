@@ -169,6 +169,11 @@ interface GeneratedSourceSnapshot {
   readonly fileContents: ReadonlyMap<string, Buffer>;
 }
 
+function pathEscapes(parent: string, child: string): boolean {
+  const relation = relative(parent, child);
+  return relation === "" || relation === ".." || relation.startsWith(`..${sep}`) || isAbsolute(relation);
+}
+
 function sourceBindingError(): IacProviderError {
   return new IacProviderError(
     "PREVIEW_HASH_MISMATCH",
@@ -185,9 +190,10 @@ async function readGeneratedSource(
     const rootPath = resolve(source.rootPath);
     if (!isAbsolute(source.rootPath) || !/^[a-f0-9]{64}$/.test(source.treeHash)) throw sourceBindingError();
     const rootStat = await lstat(rootPath);
-    if (!rootStat.isDirectory() || rootStat.isSymbolicLink() || (await realpath(rootPath)) !== rootPath) {
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) {
       throw sourceBindingError();
     }
+    const rootRealPath = await realpath(rootPath);
     let bytes = 0;
     let entries = 0;
     const files: Array<{ path: string; content: string }> = [];
@@ -199,7 +205,7 @@ async function readGeneratedSource(
       for await (const entry of handle) {
         if (++entries > 4096) throw sourceBindingError();
         const filePath = resolve(directory, entry.name);
-        if (!filePath.startsWith(`${rootPath}${sep}`) || (await realpath(filePath)) !== filePath) {
+        if (pathEscapes(rootPath, filePath) || pathEscapes(rootRealPath, await realpath(filePath))) {
           throw sourceBindingError();
         }
         const metadata = await lstat(filePath);

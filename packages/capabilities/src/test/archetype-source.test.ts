@@ -316,6 +316,10 @@ test("archetype inspection rejects secrets, collisions, binary and oversized sel
     "executable",
   ] as const) {
     await context.test(scenario, async (child) => {
+      if (scenario === "collision" && process.platform === "win32") {
+        child.skip("Windows filesystems cannot create case-only path collision fixtures");
+        return;
+      }
       const root = await mkdtemp(join(tmpdir(), "apex-archetype-reject-"));
       child.after(() => rm(root, { recursive: true, force: true }));
       const git = (...args: string[]) => execute("git", ["-C", root, ...args]);
