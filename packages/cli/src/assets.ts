@@ -84,6 +84,15 @@ function portablePath(path: string): string {
   return path.split(sep).join("/");
 }
 
+function comparablePath(path: string): string {
+  const resolved = resolve(path);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
+function samePath(left: string, right: string): boolean {
+  return comparablePath(left) === comparablePath(right);
+}
+
 function safeRelativePath(path: string): boolean {
   return (
     path.length > 0 &&
@@ -108,10 +117,12 @@ export async function readBundledFile(
   beforeOpen: () => Promise<void> = async () => {},
   expectedIdentity?: { dev: bigint; ino: bigint },
 ): Promise<Buffer> {
-  const path = resolve(root, relativePath);
-  assertContained(root, path);
+  const absoluteRoot = resolve(root);
+  const path = resolve(absoluteRoot, relativePath);
+  assertContained(absoluteRoot, path);
+  const canonicalRoot = await realpath(absoluteRoot);
   const resolved = await realpath(path);
-  assertContained(root, resolved);
+  assertContained(canonicalRoot, resolved);
   const initialMetadata = await lstat(path, { bigint: true });
   const identity = expectedIdentity ?? { dev: initialMetadata.dev, ino: initialMetadata.ino };
   if (initialMetadata.isSymbolicLink() || !initialMetadata.isFile()) {
@@ -134,8 +145,8 @@ export async function readBundledFile(
     }
     const descriptorPath = process.platform === "linux" ? `/proc/self/fd/${handle.fd}` : path;
     const openedPath = await realpath(descriptorPath);
-    assertContained(root, openedPath);
-    if (openedPath !== resolved) {
+    assertContained(canonicalRoot, openedPath);
+    if (!samePath(openedPath, resolved)) {
       throw new Error(`Bundled asset path changed during verification: ${relativePath}`);
     }
     return await handle.readFile();

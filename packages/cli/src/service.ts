@@ -208,6 +208,23 @@ const TASK_TTL_MS = 24 * 60 * 60 * 1000;
 const PREVIEW_TTL_MS = 24 * 60 * 60 * 1000;
 const APEX_GITIGNORE = "/cache/\n/local/\n/work/\n/runtime/capability-packs/\n";
 
+function isContainedPath(root: string, destination: string): boolean {
+  const child = relative(resolve(root), resolve(destination));
+  return child === "" || (child !== ".." && !child.startsWith(`..${sep}`) && !isAbsolute(child));
+}
+
+function sameResolvedPath(left: string, right: string): boolean {
+  const normalize = (path: string) => {
+    const resolved = resolve(path);
+    return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+  };
+  return normalize(left) === normalize(right);
+}
+
+function portableRelativePath(root: string, destination: string): string {
+  return relative(root, destination).split(sep).join("/");
+}
+
 interface Selection {
   projectId: ProjectId;
   runId: RunId;
@@ -2914,8 +2931,8 @@ export class ApexService {
         const currentPath = await lstat(sourcePath);
         const current = await handle.stat();
         if (
-          actual !== canonicalSource ||
-          !actual.startsWith(`${canonicalRoot}${sep}`) ||
+          !sameResolvedPath(actual, canonicalSource) ||
+          !isContainedPath(canonicalRoot, actual) ||
           [currentPath, current].some(
             (entry) =>
               !entry.isFile() ||
@@ -10430,7 +10447,7 @@ export class ApexService {
             /^[0-9a-f]{64}$/.test(hash),
           );
           return {
-            id: `managed:${relative(this.root, destination)}`,
+            id: `managed:${portableRelativePath(this.root, destination)}`,
             ok: hashesValid && actual === file.currentHash,
             value: actual,
             remedy: "Run doctor --fix --yes to reinstall bundled managed files",
@@ -10718,7 +10735,7 @@ export class ApexService {
   private async assertSafeDestination(root: string, destination: string): Promise<void> {
     const resolvedRoot = resolve(root);
     const resolvedDestination = resolve(destination);
-    if (resolvedDestination !== resolvedRoot && !resolvedDestination.startsWith(`${resolvedRoot}${sep}`))
+    if (!isContainedPath(resolvedRoot, resolvedDestination))
       throw new ApexError("APEX_VALIDATION", "Managed destination escapes its root", EXIT_CODES.validation);
     let current = resolvedRoot;
     if (await this.pathExistsLstat(current)) await this.assertSafeExistingPath(resolvedRoot, current);
@@ -10735,7 +10752,7 @@ export class ApexService {
       throw new ApexError("APEX_VALIDATION", `Managed path contains a symlink: ${path}`, EXIT_CODES.validation);
     const actual = await realpath(path);
     const actualRoot = await realpath(root);
-    if (actual !== actualRoot && !actual.startsWith(`${actualRoot}${sep}`))
+    if (!isContainedPath(actualRoot, actual))
       throw new ApexError("APEX_VALIDATION", `Managed path escapes its root: ${path}`, EXIT_CODES.validation);
   }
 
