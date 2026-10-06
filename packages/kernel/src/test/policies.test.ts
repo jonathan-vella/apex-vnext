@@ -56,7 +56,7 @@ test("evidence redacts structural secrets, deduplicates, enforces budgets, and q
     required: false,
   });
   assert.equal(quarantined.status, "quarantined");
-  assert.match(quarantined.quarantinePath!, /\.apex\/local\/quarantine/);
+  assert.match(quarantined.quarantinePath!, /[\\/]\.apex[\\/]local[\\/]quarantine[\\/]/);
   const malformed = await store.accept({
     kind: "log",
     contentType: "text/plain",
