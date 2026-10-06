@@ -60,6 +60,11 @@ function assertError(response: Awaited<ReturnType<Client["callTool"]>>, code: st
   return structured.error;
 }
 
+function resultEnvelopeBytes(structuredContent: Record<string, unknown>): number {
+  const text = JSON.stringify(structuredContent);
+  return Buffer.byteLength(JSON.stringify({ content: [{ type: "text", text }], structuredContent }), "utf8");
+}
+
 async function connect(
   context: TestContext,
   overrides: Partial<ApexService> = {},
@@ -166,7 +171,7 @@ test("pageable read tools traverse large results with opaque cursors", async (co
       "projectList",
       await session.call("projectList", cursor === undefined ? {} : { cursor }),
     ) as { projects: typeof projects; nextCursor?: string };
-    assert.ok(Buffer.byteLength(JSON.stringify(page), "utf8") <= MCP_MAX_SERIALIZED_RESULT_BYTES);
+    assert.ok(resultEnvelopeBytes(page) <= MCP_MAX_SERIALIZED_RESULT_BYTES);
     collected.push(...page.projects);
     cursor = page.nextCursor;
     pages += 1;
@@ -187,7 +192,7 @@ test("large markdown read results are paged and reconstruct the full document", 
       "render",
       await session.call("render", { kind: "status", ...(cursor === undefined ? {} : { cursor }) }),
     ) as { markdown: string; nextCursor?: string };
-    assert.ok(Buffer.byteLength(JSON.stringify(page), "utf8") <= MCP_MAX_SERIALIZED_RESULT_BYTES);
+    assert.ok(resultEnvelopeBytes(page) <= MCP_MAX_SERIALIZED_RESULT_BYTES);
     rebuilt += page.markdown;
     cursor = page.nextCursor;
   } while (cursor !== undefined);
@@ -230,6 +235,14 @@ test("paging cursors fail closed when tampered, stale, or bound elsewhere", asyn
   const tampered = `${first.nextCursor.startsWith("a") ? "b" : "a"}${first.nextCursor.slice(1)}`;
   assertError(
     await client.callTool({ name: "projectList", arguments: { workspace: workspaceA, cursor: tampered } }),
+    "APEX_CURSOR_INVALID",
+    "Cursor is invalid for this tool, workspace, or server session.",
+  );
+  assertError(
+    await client.callTool({
+      name: "projectList",
+      arguments: { workspace: workspaceA, cursor: `${first.nextCursor}!` },
+    }),
     "APEX_CURSOR_INVALID",
     "Cursor is invalid for this tool, workspace, or server session.",
   );

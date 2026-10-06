@@ -97,14 +97,14 @@ malformed JSON-RPC requests and unknown methods remain SDK concerns. Clients mus
 `remediation`, refresh stale state and avoid blindly retrying mutations; an error does not imply that all side effects
 were rolled back.
 
-Read tools that can return large collections or documents cap serialized responses at 64 KiB. The cap leaves room under
-common host/client message budgets while preventing token-heavy accidental full-document transfers. Paging-capable tools
-return the normal result shape with a partial top-level field plus `nextCursor`; call the same tool with the same
-`workspace` and `cursor` until `nextCursor` is absent, appending the paged string or array field in order. Cursors are
-opaque, signed for the server process, and bound to tool, workspace, result path, and a hash of the source result. A
-tampered, cross-tool, cross-workspace, or stale cursor fails closed with a stable APEX error and remediation. Mutation
-results are never paged; an oversized non-pageable result fails with `APEX_RESULT_TOO_LARGE` instead of silent
-truncation.
+Read tools that can return large collections or documents cap the complete serialized MCP result envelope at 64 KiB.
+The cap leaves room under common host/client message budgets while preventing token-heavy accidental full-document
+transfers. Paging-capable tools return the normal result shape with a partial top-level field plus `nextCursor`; call the
+same tool with the same `workspace` and `cursor` until `nextCursor` is absent, appending the paged string or array field
+in order. Cursors are opaque, signed for the server process, and bound to tool, workspace, result path, and a hash of
+the source result. A tampered, cross-tool, cross-workspace, or stale cursor fails closed with a stable APEX error and
+remediation. Mutation results are never paged; an oversized non-pageable result fails with `APEX_RESULT_TOO_LARGE`
+instead of silent truncation.
 
 | Tool                      | Paged field    |
 | ------------------------- | -------------- |

@@ -181,7 +181,16 @@ function assertBoundedInput(value: unknown): void {
     throw new ApexError("APEX_VALIDATION", "Input budget exceeded", EXIT_CODES.validation);
 }
 
-const serializedBytes = (value: unknown) => Buffer.byteLength(JSON.stringify(value), "utf8");
+const resultEnvelopeBytes = (structuredContent: Record<string, unknown>) => {
+  const text = JSON.stringify(structuredContent);
+  return Buffer.byteLength(
+    JSON.stringify({
+      content: [{ type: "text", text }],
+      structuredContent,
+    }),
+    "utf8",
+  );
+};
 const resultHash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
 function cursorError(message: string): ApexError {
@@ -202,15 +211,23 @@ function encodeCursor(payload: CursorPayload): string {
   return `${body}.${mac}`;
 }
 
+function decodeBase64urlCursorPart(value: string, part: string): Buffer {
+  if (value === "" || !/^[A-Za-z0-9_-]+$/u.test(value)) throw cursorError(`Malformed cursor ${part}`);
+  const decoded = Buffer.from(value, "base64url");
+  if (decoded.toString("base64url") !== value) throw cursorError(`Non-canonical cursor ${part}`);
+  return decoded;
+}
+
 function decodeCursor(cursor: string): CursorPayload {
   const [body, mac, extra] = cursor.split(".");
   if (body === undefined || mac === undefined || extra !== undefined) throw cursorError("Malformed cursor");
+  const rawBody = decodeBase64urlCursorPart(body, "payload");
   const expected = createHmac("sha256", mcpCursorSecret).update(body).digest();
-  const actual = Buffer.from(mac, "base64url");
+  const actual = decodeBase64urlCursorPart(mac, "signature");
   if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) throw cursorError("Tampered cursor");
   let decoded: CursorPayload;
   try {
-    decoded = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as CursorPayload;
+    decoded = JSON.parse(rawBody.toString("utf8")) as CursorPayload;
   } catch {
     throw cursorError("Malformed cursor payload");
   }
@@ -262,10 +279,10 @@ function applyResultPaging(
   if (cursor !== undefined && typeof cursor !== "string") throw cursorError("Cursor must be a string");
   if (path === undefined) {
     if (cursor !== undefined) throw cursorError("Tool does not accept cursors");
-    if (serializedBytes(value) > MCP_MAX_SERIALIZED_RESULT_BYTES) throw tooLargeError(tool);
+    if (resultEnvelopeBytes(value) > MCP_MAX_SERIALIZED_RESULT_BYTES) throw tooLargeError(tool);
     return value;
   }
-  if (cursor === undefined && serializedBytes(value) <= MCP_MAX_SERIALIZED_RESULT_BYTES) return value;
+  if (cursor === undefined && resultEnvelopeBytes(value) <= MCP_MAX_SERIALIZED_RESULT_BYTES) return value;
   const hash = resultHash(value);
   const payload =
     cursor === undefined ? { v: 1 as const, tool, workspace, hash, path: [...path], offset: 0 } : decodeCursor(cursor);
@@ -297,7 +314,7 @@ function applyResultPaging(
       ...withPageTarget(value, path, page),
       ...(nextCursor === undefined ? {} : { nextCursor }),
     };
-    if (serializedBytes(candidate) <= MCP_MAX_SERIALIZED_RESULT_BYTES) {
+    if (resultEnvelopeBytes(candidate) <= MCP_MAX_SERIALIZED_RESULT_BYTES) {
       best = candidate;
       low = count + 1;
     } else {
