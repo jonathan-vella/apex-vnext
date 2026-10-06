@@ -213,6 +213,14 @@ test("rejects ask_user argument prescriptions in managed guidance and generated 
   });
   assert.ok(hasRule(managedResult, "customization.ask-user-arguments"));
 
+  const wrappedResult = mutate((model) => {
+    model.customization.guidance.push({
+      path: ".github/instructions/wrapped-bad.instructions.md",
+      content: "Call `ask_user`\nwith `message` and `requestedSchema` arguments.",
+    });
+  });
+  assert.ok(hasRule(wrappedResult, "customization.ask-user-arguments"));
+
   assert.ok(
     !hasRule(
       mutate(() => {}),
@@ -228,11 +236,26 @@ test("rejects worker prompts that rely on caller context or omit taskContext del
   });
   assert.ok(hasRule(workerResult, "customization.worker-context"));
 
+  const unrelatedNegationResult = mutate((model) => {
+    model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX Reviewer").content +=
+      "\nDo not guess; see the coordinator instructions for the review criteria.\n";
+  });
+  assert.ok(hasRule(unrelatedNegationResult, "customization.worker-context"));
+
   const parentResult = mutate((model) => {
     const apex = model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX");
     apex.content = apex.content.replaceAll("apex/taskContext", "apex/status");
   });
   assert.ok(hasRule(parentResult, "customization.worker-context"));
+
+  const negatedTaskContextResult = mutate((model) => {
+    const apex = model.customization.agents.find(({ frontmatter }) => frontmatter.name === "APEX");
+    apex.content = apex.content.replace(
+      "instruct the worker to\nread `apex/taskContext`",
+      "instruct the worker to\nnot call `apex/taskContext`",
+    );
+  });
+  assert.ok(hasRule(negatedTaskContextResult, "customization.worker-context"));
 });
 
 test("rejects retired VS Code agent fields and tools", () => {

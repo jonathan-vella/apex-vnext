@@ -151,32 +151,51 @@ function markdownFiles(root) {
 }
 
 function findAskUserArgumentPrescription(content) {
-  for (const rawLine of content.split(/\r?\n/u)) {
-    const line = rawLine.trim();
-    if (!/\bask_user\b/u.test(line)) continue;
-    const askUserIndex = line.search(/\bask_user\b/u);
+  for (const block of content.split(/\r?\n\s*\r?\n/u)) {
+    const text = block.replace(/\s+/gu, " ").trim();
+    if (!/\bask_user\b/u.test(text)) continue;
+    const askUserIndex = text.search(/\bask_user\b/u);
     for (const { name, pattern } of ASK_USER_ARGUMENT_SYNTAX) {
-      const match = pattern.exec(line);
+      const match = pattern.exec(text);
       if (!match) continue;
-      if (name === "multiSelect" && NEGATIVE_MULTISELECT_PARAMETER.test(line)) continue;
-      if (name === "multiSelect" && match.index < askUserIndex && KERNEL_MULTISELECT_QUESTION.test(line)) continue;
-      return line;
+      if (name === "multiSelect" && NEGATIVE_MULTISELECT_PARAMETER.test(text)) continue;
+      if (name === "multiSelect" && match.index < askUserIndex && KERNEL_MULTISELECT_QUESTION.test(text)) continue;
+      return text;
     }
   }
   return null;
 }
 
+function matchIsNegated(line, matchIndex) {
+  const prefix = line.slice(Math.max(0, matchIndex - 80), matchIndex);
+  const currentClause = prefix.split(/[.;:]/u).at(-1) ?? prefix;
+  return NEGATED_CONTEXT_RELIANCE.test(currentClause);
+}
+
 function findWorkerContextReliance(content) {
   for (const rawLine of content.split(/\r?\n/u)) {
     const line = rawLine.trim();
-    if (!line || NEGATED_CONTEXT_RELIANCE.test(line)) continue;
-    if (WORKER_CONTEXT_RELIANCE.some((pattern) => pattern.test(line))) return line;
+    if (!line) continue;
+    for (const pattern of WORKER_CONTEXT_RELIANCE) {
+      const match = pattern.exec(line);
+      if (match && !matchIsNegated(line, match.index)) return line;
+    }
   }
   return null;
 }
 
 function hasTaskContextDelegationGuidance(content) {
-  return /\b(?:apex\/taskContext|taskContext|kernel task context)\b/u.test(content);
+  const text = content.replace(/\s+/gu, " ");
+  const patterns = [
+    /\b(?:worker|delegate|scope prompt|task\.taskId|taskId)\b.{0,240}\b(?:call|read|fetch|use)\b.{0,80}\b(?:apex\/taskContext|taskContext|kernel task context)\b/iu,
+    /\b(?:call|read|fetch|use)\b.{0,80}\b(?:apex\/taskContext|taskContext|kernel task context)\b.{0,240}\b(?:worker|delegate|task\.taskId|taskId)\b/iu,
+  ];
+  return patterns.some((pattern) => {
+    const match = pattern.exec(text);
+    if (!match) return false;
+    const instructionIndex = match[0].search(/\b(?:call|read|fetch|use)\b/iu);
+    return !matchIsNegated(match[0], instructionIndex);
+  });
 }
 
 function parseScalar(text) {
