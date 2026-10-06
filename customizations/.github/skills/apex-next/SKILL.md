@@ -42,8 +42,8 @@ Route the next APEX step from kernel state. The kernel selects the owner; this s
    `review.reviewHash` or `task.taskId`, and the user's requested outcome, exact stop point and prohibited operations,
    verbatim. For a worker task, include the exact `task.taskId` and instruct the worker to call `apex/taskContext` for
    the complete task inputs, criteria, and output paths. Do not carry later-stage prerequisites, such as
-   governance-discovery evidence, into an earlier owner task. If the original scope is unavailable, limit continuation
-   to intake or the owner's task context.
+   governance-discovery evidence, into an earlier owner task.
+   If the original scope is unavailable, limit continuation to intake or the owner's task context.
    For `request.intake`, state the round as `request.intake.ordinal` of `request.intake.total` and say that the owner
    continues through every remaining intake round, each with its own kernel request ID, up to the user's stop point.
 5. A worker completes as a subagent. Delegate it with `task` and the scope prompt, report its result, then call

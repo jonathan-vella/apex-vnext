@@ -25,8 +25,9 @@ Route every next step through the `apex-next` skill (`.github/skills/apex-next/S
 owner, delegates hidden workers through `task`, and otherwise prints the agent selection step and a ready-to-paste scope
 prompt inside a fenced `text` code block. Worker scope prompts carry the exact `task.taskId` and instruct the worker to
 read `apex/taskContext` for all task inputs, criteria, and output paths. If the current agent already owns the next
-task, continue instead of asking the user to switch agents. The kernel already selected the owner. Do not ask the user
-which role should handle it, present a routing questionnaire, or simulate a handoff through `ask_user`.
+task, continue instead of asking the user to switch agents. The kernel already selected the owner.
+Do not ask the user which role should handle it, present a routing questionnaire, or simulate a handoff through
+`ask_user`.
 Never use `session_store_sql`, SQL, session-history searches, or tool discovery to route work.
 
 For `request.intake`, the destination is exactly `APEX Requirements`, never Explore or a generic agent. Do not ask,
