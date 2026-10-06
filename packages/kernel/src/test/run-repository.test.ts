@@ -331,10 +331,7 @@ test("run writer lease publication remains readable under contention", async () 
   assert.ok(attempts.some((attempt) => attempt.status === "fulfilled"));
   for (const attempt of attempts) {
     if (attempt.status === "rejected") {
-      assert.ok(
-        attempt.reason instanceof RunWriterConflictError ||
-          (attempt.reason instanceof Error && /Run mutation is already in progress/u.test(attempt.reason.message)),
-      );
+      assert.ok(attempt.reason instanceof RunWriterConflictError);
     }
   }
   const lease = JSON.parse(await readFile(join(directory, ".run-writer-lease.json"), "utf8")) as {

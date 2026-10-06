@@ -248,6 +248,7 @@ test("managed role projections retain required tools and exclude unrelated grant
     planning: ["status", "nextTask", "taskContext", "readTaskInput", "planComplete", "reviewDecide", "gateDecide"],
     operations: [
       "status",
+      "releaseWriter",
       "nextTask",
       "taskContext",
       "governanceImport",

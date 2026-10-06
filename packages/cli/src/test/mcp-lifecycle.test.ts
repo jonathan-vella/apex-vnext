@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile, type ChildProcess } from "node:child_process";
-import { mkdir, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
@@ -16,7 +16,7 @@ import { createMcpServer, type McpServiceResolver } from "../mcp.js";
 import { ApexError, EXIT_CODES } from "../errors.js";
 import { GovernanceBaselineError } from "@apexops/capabilities";
 import { ApexService } from "../service.js";
-import { tempRoot } from "./helpers.js";
+import { requirements, tempRoot } from "./helpers.js";
 
 const hash = "a".repeat(64);
 const execFileAsync = promisify(execFile);
@@ -395,6 +395,23 @@ test("input schema failures name the failing paths without invoking the service"
   assert.match(error.message, /^Invalid tool arguments: \/findings\/0\/severity /u);
 });
 
+test("single-service MCP servers fail closed when the workspace resolves elsewhere", async (context) => {
+  let calls = 0;
+  const session = await connect(context, {
+    status: async () => {
+      calls += 1;
+      throw new Error("status must not run for mismatched workspace");
+    },
+  });
+  const otherWorkspace = await tempRoot();
+  const response = await session.client.callTool({ name: "status", arguments: { workspace: otherWorkspace } });
+  assert.equal(response.isError, true);
+  const { error } = response.structuredContent as { error: { code: string; message: string } };
+  assert.equal(error.code, "APEX_WORKSPACE_UNSUPPORTED");
+  assert.match(error.message, /bound to/u);
+  assert.equal(calls, 0);
+});
+
 test("review criteria without findingIds reach the service as an empty list", async (context) => {
   let received: unknown;
   const session = await connect(context, {
@@ -755,7 +772,78 @@ test("MCP workspace resolution shares APEX state across git worktrees and enforc
   );
   assert.equal((await client.callTool({ name: "projectList", arguments: { workspace: worktree } })).isError, undefined);
   now.value = new Date("2026-01-01T00:00:01.001Z");
-  assertSuccess("nextTask", await client.callTool({ name: "nextTask", arguments: { workspace: worktree } }));
+  let issued = assertSuccess(
+    "nextTask",
+    await client.callTool({ name: "nextTask", arguments: { workspace: worktree } }),
+  ) as {
+    status: string;
+    request?: {
+      requestId: string;
+      expectedHead: string;
+      ownerEpoch: number;
+      questions: Array<{
+        id: string;
+        multiSelect?: boolean;
+        options?: string[];
+        valueType?: string;
+      }>;
+    };
+    task?: { taskId: string };
+  };
+  for (let index = 0; issued.status === "needs_input" && index < 10; index += 1) {
+    assert.ok(issued.request);
+    assertSuccess(
+      "recordInput",
+      await client.callTool({
+        name: "recordInput",
+        arguments: {
+          workspace: worktree,
+          schemaVersion: "1.0.0",
+          requestId: issued.request.requestId,
+          expectedHead: issued.request.expectedHead,
+          ownerEpoch: issued.request.ownerEpoch,
+          answers: issued.request.questions.map(({ id, multiSelect, options, valueType }) => ({
+            questionId: id,
+            value:
+              valueType === "budget"
+                ? { kind: "budget", amount: 250, currency: "USD", cadence: "monthly" }
+                : valueType === "recovery"
+                  ? { kind: "recovery", rtoMinutes: 60, rpoMinutes: 15 }
+                  : valueType === "data-classification"
+                    ? { kind: "data-classification", classification: "internal" }
+                    : valueType === "compliance"
+                      ? { kind: "compliance", scopes: ["gdpr"] }
+                      : options === undefined
+                        ? `test-${id}`
+                        : multiSelect === true
+                          ? [options[0]!]
+                          : options[0]!,
+          })),
+        },
+      }),
+    );
+    issued = assertSuccess(
+      "nextTask",
+      await client.callTool({ name: "nextTask", arguments: { workspace: worktree } }),
+    ) as typeof issued;
+  }
+  assert.equal(issued.status, "task");
+  assert.ok(issued.task?.taskId);
+  assertError(
+    await client.callTool({
+      name: "stageArtifact",
+      arguments: {
+        workspace: main,
+        taskId: issued.task.taskId,
+        kind: "requirements",
+        value: requirements("demo"),
+      },
+    }),
+    "APEX_WRITER_CONFLICT",
+    "Run writer lease is held by " +
+      `${worktree} until 2026-01-01T00:00:02.001Z; retry from that worktree, release the writer lease there, or wait for it to expire`,
+  );
+  await assert.rejects(readdir(join(main, ".apex", "work")), { code: "ENOENT" });
 
   const missing = await client.callTool({ name: "status", arguments: {} });
   assert.equal(missing.isError, true);

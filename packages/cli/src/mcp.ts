@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { lstatSync } from "node:fs";
+import { realpath } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import { ApexService, SUPPORTED_ARTIFACT_KINDS } from "./service.js";
 import { APEX_VERSION } from "./version.js";
@@ -10,6 +11,7 @@ import { SECRET_VALUE_PATTERN } from "@apexops/contracts";
 import { MCP_OUTPUT_SCHEMAS } from "./mcp-output-schemas.js";
 import { TARGET_SCOPE_HINT, TARGET_SCOPE_PATTERN } from "./target-scope.js";
 import { ListToolsRequestSchema, type Tool } from "@modelcontextprotocol/sdk/types.js";
+import { resolveMcpWorkspace } from "./workspace-root.js";
 
 const errorMessages: Record<ApexErrorCode, string> = {
   APEX_USAGE: "Invalid operation arguments; check the tool input contract.",
@@ -40,7 +42,24 @@ function serviceResolver(serviceOrResolver: ApexService | McpServiceResolver): M
   const service = serviceOrResolver as ApexService;
   return {
     defaultService: service,
-    resolve: async (workspace) => ({ service, workspace: resolve(workspace) }),
+    resolve: async (workspace) => {
+      const resolved = await resolveMcpWorkspace(workspace);
+      const serviceRoot = await realpath(service.root);
+      const requestedRoot = resolve(resolved.root);
+      const boundRoot = resolve(serviceRoot);
+      const matches =
+        process.platform === "win32"
+          ? requestedRoot.toLocaleLowerCase() === boundRoot.toLocaleLowerCase()
+          : requestedRoot === boundRoot;
+      if (!matches) {
+        throw new ApexError(
+          "APEX_WORKSPACE_UNSUPPORTED",
+          `Workspace ${resolved.workspace} resolves to ${requestedRoot}, but this MCP server is bound to ${boundRoot}; start the server with a workspace-aware service resolver for multi-worktree use`,
+          EXIT_CODES.validation,
+        );
+      }
+      return { service, workspace: resolved.workspace };
+    },
   };
 }
 
@@ -411,13 +430,24 @@ export function createMcpServer(
           if (normalized.code === "APEX_WRITER_CONFLICT" && !SECRET_VALUE_PATTERN.test(normalized.message)) {
             serviceValidation = normalized.message;
           }
+          if (normalized.code === "APEX_WORKSPACE_UNSUPPORTED" && !SECRET_VALUE_PATTERN.test(normalized.message)) {
+            serviceValidation = normalized.message;
+          }
           throw error;
         }
         assertBoundedInput(response.structuredContent);
         if (!outputSchema.safeParse(response.structuredContent).success) throw new Error("Invalid MCP result contract");
         return response;
       } catch (error) {
-        const { code } = normalizeError(error);
+        const normalized = normalizeError(error);
+        const { code } = normalized;
+        if (
+          serviceValidation === undefined &&
+          (code === "APEX_WRITER_CONFLICT" || code === "APEX_WORKSPACE_UNSUPPORTED") &&
+          !SECRET_VALUE_PATTERN.test(normalized.message)
+        ) {
+          serviceValidation = normalized.message;
+        }
         // Input-schema and kernel validation reasons let agents correct typed input; guard, internal and secret-like
         // messages stay generic.
         const message = serviceValidation === undefined ? errorMessages[code] : serviceValidation.slice(0, 2_000);

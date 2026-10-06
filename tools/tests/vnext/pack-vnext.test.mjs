@@ -7,6 +7,10 @@ import { spawn } from "node:child_process";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { parseNpmPackResult, releaseSbomArguments } from "../../scripts/pack-vnext.mjs";
+import {
+  acquireAssetGenerationLock,
+  ASSET_GENERATION_LOCK_ENV,
+} from "../../../packages/cli/scripts/prepare-assets.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
 const resistantProcessTree = join(import.meta.dirname, "fixtures", "resistant-process-tree.mjs");
@@ -18,19 +22,20 @@ const defaultMaxOutputBytes = 1_048_576;
 test("governance package payload installs and updates the CLI projection without cloud activation", async (context) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "apex-governance-pack-"));
   context.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const releaseAssets = await acquireAssetGenerationLock();
+  context.after(releaseAssets);
   const packed = parseNpmPackResult(
     (
-      await run("npm", [
-        "pack",
-        "--workspace=@apexops/cli",
-        "--ignore-scripts",
-        "--json",
-        "--pack-destination",
-        temporaryRoot,
-      ])
+      await run(
+        "npm",
+        ["pack", "--workspace=@apexops/cli", "--ignore-scripts", "--json", "--pack-destination", temporaryRoot],
+        root,
+        { env: { [ASSET_GENERATION_LOCK_ENV]: "1" } },
+      )
     ).stdout,
     "@apexops/cli",
   );
+  await releaseAssets();
   const paths = [
     ".github/workflows/governance-policy-baseline.yml",
     "tools/scripts/collect-governance-baseline.ps1",
@@ -255,6 +260,7 @@ function run(command, args, cwd = root, options = {}) {
     const child = spawn(command, args, {
       cwd,
       detached: process.platform !== "win32",
+      env: options.env === undefined ? process.env : { ...process.env, ...options.env },
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -409,8 +415,14 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     run(command, args, cwd, { ...options, signal: context.signal });
   const outputDirectory = join(temporaryRoot, "packages");
   const secondOutputDirectory = join(temporaryRoot, "packages-repeat");
-  await runInTest(process.execPath, [packScript, "--output-dir", outputDirectory]);
-  await runInTest(process.execPath, [packScript, "--output-dir", secondOutputDirectory]);
+  const releaseAssets = await acquireAssetGenerationLock();
+  context.after(releaseAssets);
+  await runInTest(process.execPath, [packScript, "--output-dir", outputDirectory], root, {
+    env: { [ASSET_GENERATION_LOCK_ENV]: "1" },
+  });
+  await runInTest(process.execPath, [packScript, "--output-dir", secondOutputDirectory], root, {
+    env: { [ASSET_GENERATION_LOCK_ENV]: "1" },
+  });
 
   const outputFiles = (await readdir(outputDirectory)).sort();
   assert.deepEqual((await readdir(secondOutputDirectory)).sort(), outputFiles);
@@ -430,7 +442,11 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     assert.equal(entry.sha256, createHash("sha256").update(bytes).digest("hex"));
 
     const dryRun = parseNpmPackResult(
-      (await runInTest("npm", ["pack", "--workspace", entry.package, "--json", "--dry-run"])).stdout,
+      (
+        await runInTest("npm", ["pack", "--workspace", entry.package, "--json", "--dry-run"], root, {
+          env: { [ASSET_GENERATION_LOCK_ENV]: "1" },
+        })
+      ).stdout,
       entry.package,
     );
     const expectedFiles = dryRun.files.map(({ path }) => path).sort();
@@ -442,6 +458,7 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     assert.deepEqual(actualFiles, expectedFiles, `${entry.package} dry-run inventory differs from its tarball`);
     assert.ok(actualFiles.includes("README.md"), `${entry.package} tarball must include README.md`);
   }
+  await releaseAssets();
 
   for (const securityEntry of Object.values(release.security)) {
     const bytes = await readFile(join(outputDirectory, securityEntry.file));
@@ -578,7 +595,7 @@ test("packs and clean-installs the vNext runtime reproducibly", { timeout: 240_0
     assert.ok(
       tools.tools.find(({ name }) => name === "render").inputSchema.properties.kind.enum.includes("deployment-guide"),
     );
-    const status = await mcpClient.callTool({ name: "status", arguments: {} });
+    const status = await mcpClient.callTool({ name: "status", arguments: { workspace: sessionDirectory } });
     assert.equal(status.isError, undefined);
     assert.equal(status.structuredContent.run.projectId, "demo");
   } finally {
