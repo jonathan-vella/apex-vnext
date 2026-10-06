@@ -102,7 +102,8 @@ between items and preserve already-written items on later failure. The adapter n
 Long-running underlying operations retain their own bounded process/provider timeouts. After interruption, reconnect
 and inspect authoritative state before deciding whether to resubmit; do not treat a missing reply as proof of no commit.
 The first worktree to write a run holds a short run-writer lease. Other worktrees may read, but writes return
-`APEX_WRITER_CONFLICT` with the owning worktree until the owner writes again, releases the lease, or the lease expires.
+`APEX_WRITER_CONFLICT` naming the owning worktree until the owner releases the lease with `releaseWriter`, the run
+reaches a terminal state, or the lease expires (default 2 minutes after the owner's last write).
 
 `status` and `projectList` are read-only and carry corresponding read-only/idempotent hints. Status refuses pending
 transaction recovery instead of writing it. Explicit advancement/final completion owns terminal bookkeeping. Other

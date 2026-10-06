@@ -143,6 +143,7 @@ import {
   ObjectStore,
   ProjectStore,
   RunRepository,
+  RunWriterConflictError,
   ValidatorRegistry,
   WriterTransferStore,
   WorkflowEngine,
@@ -7779,6 +7780,15 @@ export class ApexService {
     await this.runRepository(run).acquireWriterLease(this.writerLeaseOwner());
   }
 
+  private async releaseRunWriterLeaseIfOwned(run: RunConfigV1): Promise<void> {
+    try {
+      await this.runRepository(run).releaseWriterLease(this.writerLeaseOwner());
+    } catch (error) {
+      if (error instanceof RunWriterConflictError) return;
+      throw error;
+    }
+  }
+
   private writerLeaseOwner(): { workspacePath: string; sessionId: string } {
     return { workspacePath: this.workspacePath, sessionId: `${process.pid}` };
   }
@@ -9865,7 +9875,10 @@ export class ApexService {
     events: Awaited<ReturnType<EventJournal["replay"]>>,
   ): Promise<Awaited<ReturnType<EventJournal["replay"]>>> {
     events = this.governanceWorkflowEvents(events);
-    if (events.some(({ type }) => type === "workflow.completed")) return events;
+    if (events.some(({ type }) => type === "workflow.completed")) {
+      await this.releaseRunWriterLeaseIfOwned(run);
+      return events;
+    }
     const workflow = await this.lockedWorkflowEngine(run);
     const artifactAliases: Readonly<Record<string, string>> = {
       requirements: "requirements-v1",
@@ -9965,6 +9978,7 @@ export class ApexService {
       executedValidatorIds: [...context.executedValidatorIds],
       simulatedOmittedValidatorIds: [...context.simulatedOmittedValidatorIds],
     });
+    await this.releaseRunWriterLeaseIfOwned(run);
     return this.journal(run).replay();
   }
 
