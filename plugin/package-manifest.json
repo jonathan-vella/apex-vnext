@@ -1,0 +1,42 @@
+{
+  "$schema": "./package-manifest.schema.json",
+  "schemaVersion": "1.0.0",
+  "outputDirectory": "dist/apex-plugin",
+  "plugin": {
+    "source": "plugin/plugin.json",
+    "target": "plugin.json",
+    "versionFrom": "packages/cli/package.json"
+  },
+  "mcp": {
+    "source": "plugin/mcp.json",
+    "target": "mcp.json",
+    "server": "apex",
+    "command": "node",
+    "entry": "${PLUGIN_ROOT}/mcp/apex.mjs"
+  },
+  "agents": {
+    "sourceRoot": "customizations/.github/agents",
+    "targetRoot": "com.github.copilot/agents"
+  },
+  "skills": {
+    "sourceRoot": "customizations/.github/skills",
+    "targetRoot": "skills"
+  },
+  "hooks": {
+    "sourceRoot": "plugin/hooks",
+    "targetRoot": "com.github.copilot/hooks",
+    "entries": []
+  },
+  "assets": {
+    "sourceRoot": "packages/cli/assets",
+    "targetRoot": "assets"
+  },
+  "runtime": {
+    "targetRoot": "runtime/node_modules",
+    "workspacePackages": ["contracts", "kernel", "capabilities", "renderers", "cli"],
+    "entry": {
+      "source": "plugin/mcp/apex.mjs",
+      "target": "mcp/apex.mjs"
+    }
+  }
+}

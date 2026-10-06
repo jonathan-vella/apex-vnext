@@ -27,6 +27,20 @@ npm run pack:vnext
 
 The command writes matching package tarballs and `release-manifest.json` under `dist/vnext-packages/`.
 
+## Build The Agent Plugin Package
+
+Candidate plugin packaging is manifest-driven from `plugin/package-manifest.json`:
+
+```bash
+npm run build:plugin
+npm run test:plugin
+```
+
+The build writes the Agent Plugins 1.0 layout under `dist/apex-plugin/`, including `plugin.json`, `mcp.json`,
+`skills/`, `com.github.copilot/agents/`, `mcp/apex.mjs`, plugin-level `assets/`, and the bundled `@apexops/cli`
+runtime under `runtime/node_modules/`. The MCP server is launched with `node ${PLUGIN_ROOT}/mcp/apex.mjs`; the runtime
+does not require `npm` or a registry download after the package is built.
+
 ## Create A Consumer Repository
 
 ```bash

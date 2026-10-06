@@ -79,6 +79,16 @@
       }
     },
     {
+      "id": "build-plugin",
+      "script": "build:plugin",
+      "profile": "build",
+      "aliases": [],
+      "retirement": {
+        "status": "active",
+        "replacementIds": []
+      }
+    },
+    {
       "id": "lint-bicep-fmt",
       "script": "lint:bicep-fmt",
       "profile": "external-lint",
@@ -411,6 +421,16 @@
     {
       "id": "test-retired-automation",
       "script": "test:retired-automation",
+      "profile": "node-test",
+      "aliases": [],
+      "retirement": {
+        "status": "active",
+        "replacementIds": []
+      }
+    },
+    {
+      "id": "test-plugin",
+      "script": "test:plugin",
       "profile": "node-test",
       "aliases": [],
       "retirement": {
@@ -892,6 +912,7 @@
         "test:diagram-semantics",
         "test:retired-automation",
         "validate:policy-precheck",
+        "test:plugin",
         "lint:safe-shell"
       ],
       "continueOnError": false,

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "apex",
+  "description": "APEX vNext managed Azure workflow agent, skills, workers, hooks, and MCP runtime.",
+  "author": {
+    "name": "Jonathan Vella",
+    "url": "https://github.com/jonathan-vella"
+  },
+  "repository": "https://github.com/jonathan-vella/apex-vnext",
+  "license": "MIT",
+  "keywords": ["apex", "azure", "agent-plugin", "infrastructure-as-code"]
+}
