@@ -5,6 +5,7 @@ import { SECRET_FIELD_PATTERN, SECRET_VALUE_PATTERN } from "@apexops/contracts";
 import {
   EventJournal,
   REPEAT_GUARD_FILE,
+  REPEAT_LOCK_FILE,
   atomicWriteBytes,
   canonicalJsonBytes,
   sha256Bytes,
@@ -92,7 +93,8 @@ function prohibitedStatePath(path: string): boolean {
           part.startsWith(".run-mutation.") ||
           part === ".run-transaction.json" ||
           part === ".run-writer-lease.json" ||
-          part === REPEAT_GUARD_FILE,
+          part === REPEAT_GUARD_FILE ||
+          part === REPEAT_LOCK_FILE,
       )
   ) {
     return true;
@@ -175,7 +177,7 @@ async function walkRegularFiles(root: string, directory = root): Promise<string[
     if (entry.isSymbolicLink()) throw new Error(`State transfer source contains a symlink: ${path}`);
     if (directory === root) {
       // The writer lease and repeat records describe this machine's worktrees and are never transferred.
-      if (entry.name === ".run-writer-lease.json" || entry.name === REPEAT_GUARD_FILE) continue;
+      if ([".run-writer-lease.json", REPEAT_GUARD_FILE, REPEAT_LOCK_FILE].includes(entry.name)) continue;
       if (entry.name === ".run-mutation.lock" || entry.name === ".run-transaction.json") {
         throw new Error("State transfer requires a quiescent run without pending mutation recovery");
       }

@@ -149,6 +149,7 @@ import {
   WorkflowEngine,
   assertTaskCurrent,
   executeRepeatSafe,
+  RepeatGuardBusyError,
   repeatStateToken,
   type RepeatScope,
   atomicWriteBytes,
@@ -2476,7 +2477,7 @@ export class ApexService {
     const files = Object.fromEntries(
       Object.entries(bindings).map(([name, binding]) => [name, binding?.sha256 ?? null]),
     );
-    const outcome = await executeRepeatSafe(
+    const outcome = await executeRepeatSafe<T>(
       {
         operation: call.operation,
         workspace: workspacePath,
@@ -2501,7 +2502,11 @@ export class ApexService {
         idSource: this.idSource,
         ...(this.repeatWindowMs === undefined ? {} : { windowMs: this.repeatWindowMs }),
       },
-    );
+    ).catch((error: unknown) => {
+      if (error instanceof RepeatGuardBusyError)
+        throw new ApexError("APEX_CONFLICT", error.message, EXIT_CODES.conflict, undefined, error);
+      throw error;
+    });
     return outcome.value;
   }
 
@@ -2514,6 +2519,7 @@ export class ApexService {
       throw error;
     }
     const state = await this.runRepository(selection).repeatState();
+    const files = await this.repeatFilesSignature(selection);
     let projects: string[];
     try {
       projects = await readdir(join(this.root, ".apex", "projects"));
@@ -2526,8 +2532,51 @@ export class ApexService {
       projectId: selection.projectId,
       runId: selection.runId,
       ownerEpoch: state.ownerEpoch,
-      state: repeatStateToken({ selection, projects, ...state }),
+      state: repeatStateToken({ selection, projects, ...state, files }),
     };
+  }
+
+  /**
+   * Stat signature of the files guarded operations read outside the run journal: the run's staged work tree and the
+   * latest generated source tree. Any edit changes a file's ctime, so an external edit makes an identical call new.
+   */
+  private async repeatFilesSignature(selection: Selection): Promise<string> {
+    const events = await this.journal(selection as RunConfigV1).replay();
+    const generated = events.findLast(
+      (event) =>
+        event.type === "task.completed" &&
+        typeof (event.payload as { artifactHashes?: Record<string, unknown> }).artifactHashes?.["iac-handoff"] ===
+          "string",
+    );
+    const handoffHash = (generated?.payload as { artifactHashes?: Record<string, string> } | undefined)
+      ?.artifactHashes?.["iac-handoff"];
+    const roots = [join(this.root, ".apex", "work", selection.runId)];
+    if (handoffHash !== undefined)
+      roots.push(resolve(this.root, (await this.objects.getJson<IacHandoffV1>(handoffHash)).rootPath));
+    const entries: string[] = [];
+    const walk = async (root: string, directory: string): Promise<void> => {
+      let names: string[];
+      try {
+        names = (await readdir(directory)).sort();
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+        throw error;
+      }
+      for (const name of names) {
+        const path = join(directory, name);
+        const entry = await lstat(path, { bigint: true });
+        if (entries.length >= 20_000) throw new Error("Repeat file signature exceeds its entry budget");
+        entries.push(
+          [relative(root, path), entry.mode, entry.ino, entry.size, entry.mtimeNs, entry.ctimeNs].join("\u0000"),
+        );
+        if (entry.isDirectory()) await walk(root, path);
+      }
+    };
+    for (const root of roots) {
+      entries.push(`root\u0000${root}`);
+      await walk(root, root);
+    }
+    return sha256Json(entries);
   }
 
   /** Content hash plus the inode, size and change times that any later modification of the file would alter. */

@@ -1,6 +1,7 @@
 import type { EventV1, ProjectId, RunId } from "@apexops/contracts";
 import { constants } from "node:fs";
-import { lstat, open } from "node:fs/promises";
+import { lstat, open, readFile, rm } from "node:fs/promises";
+import { hostname } from "node:os";
 import { join, resolve } from "node:path";
 import { sha256Json, sha256Text } from "./canonical.js";
 import { EventJournal } from "./event-journal.js";
@@ -12,6 +13,11 @@ export const REPEAT_GUARD_FILE = ".repeat-guard.json";
 /** Run-scoped, hash-chained audit journal of answered repeats. Separate from the run journal, whose head it keeps. */
 export const REPEAT_JOURNAL_DIRECTORY = "repeats";
 export const REPEAT_EVENT_TYPE = "call.repeated";
+/** Run-scoped lock serializing guarded calls across processes from record lookup through record publication. */
+export const REPEAT_LOCK_FILE = ".repeat-guard.lock";
+export const DEFAULT_REPEAT_LOCK_WAIT_MS = 30_000;
+const REPEAT_LOCK_RETRY_MS = 25;
+const FOREIGN_REPEAT_LOCK_STALE_MS = 60 * 60 * 1000;
 export const DEFAULT_REPEAT_WINDOW_MS = 10 * 60 * 1000;
 export const MAX_REPEAT_RECORDS = 16;
 export const MAX_REPEAT_RESULT_BYTES = 64 * 1024;
@@ -35,6 +41,8 @@ export interface RepeatStateInput {
   runHash: string;
   journalHead: string | null;
   writer: string | null;
+  /** Signature of mutable files the run's operations read, such as staged work and generated source trees. */
+  files?: string | null;
 }
 
 /** The selected run a call applies to, with the state token that decides the repeat window. */
@@ -66,6 +74,16 @@ export interface RepeatSafeOptions {
   idSource?: () => string;
   windowMs?: number;
   maxRecords?: number;
+  /** Longest wait for another process's guarded call on the same run before failing with {@link RepeatGuardBusyError}. */
+  lockWaitMs?: number;
+}
+
+/** Another process is running a guarded call on the same run; the caller should refresh state and retry later. */
+export class RepeatGuardBusyError extends Error {
+  constructor() {
+    super("Another state-changing call on this run is still in progress");
+    this.name = "RepeatGuardBusyError";
+  }
 }
 
 export interface RepeatSafeOutcome<T> {
@@ -116,7 +134,8 @@ export function repeatFingerprint(callHash: string, state: string | null): strin
 
 /**
  * State token for the repeat window. It changes whenever the selection, the project set, the selected run document,
- * its journal head or its writer lease holder changes; lease expiry renewals do not change it.
+ * its journal head, its writer lease holder or the signature of its mutable files changes; lease expiry renewals do
+ * not change it.
  */
 export function repeatStateToken(input: RepeatStateInput): string {
   return sha256Json({
@@ -126,6 +145,7 @@ export function repeatStateToken(input: RepeatStateInput): string {
     runHash: input.runHash,
     journalHead: input.journalHead,
     writer: input.writer,
+    files: input.files ?? null,
   });
 }
 
@@ -246,11 +266,89 @@ async function storeRepeatRecord(
   await atomicWriteJson(join(scope.runDirectory, REPEAT_GUARD_FILE), { version: 1, records });
 }
 
+interface RepeatLock {
+  token: string;
+  pid: number;
+  host: string;
+  createdAt: string;
+}
+
+function repeatLockStale(lock: Partial<RepeatLock> | undefined, now: number): boolean {
+  if (lock === undefined || typeof lock.pid !== "number" || typeof lock.host !== "string") return true;
+  if (lock.host !== hostname()) return now - Date.parse(lock.createdAt ?? "") > FOREIGN_REPEAT_LOCK_STALE_MS;
+  try {
+    process.kill(lock.pid, 0);
+    return false;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "ESRCH";
+  }
+}
+
+async function readRepeatLock(path: string): Promise<{ bytes: string; lock?: Partial<RepeatLock> } | undefined> {
+  let bytes: string;
+  try {
+    bytes = await readFile(path, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  }
+  try {
+    return { bytes, lock: JSON.parse(bytes) as Partial<RepeatLock> };
+  } catch {
+    return { bytes };
+  }
+}
+
+/**
+ * Holds the run's repeat lock while `operation` runs. The lock is a separate file from the run mutation lock, which the
+ * operation itself may take, so lock order is always repeat lock then mutation lock. A lock left by a process that no
+ * longer runs on this host is recovered; a live holder is waited for up to `waitMs`.
+ */
+async function withRepeatLock<T>(
+  runDirectory: string,
+  idSource: () => string,
+  waitMs: number,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const path = join(runDirectory, REPEAT_LOCK_FILE);
+  const token = idSource();
+  const metadata: RepeatLock = { token, pid: process.pid, host: hostname(), createdAt: new Date().toISOString() };
+  const deadline = Date.now() + waitMs;
+  for (;;) {
+    try {
+      const handle = await open(path, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
+      try {
+        await handle.writeFile(JSON.stringify(metadata));
+      } finally {
+        await handle.close();
+      }
+      break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    }
+    const current = await readRepeatLock(path);
+    if (current !== undefined && repeatLockStale(current.lock, Date.now())) {
+      // Remove the stale lock only if it is still the one judged stale.
+      if ((await readRepeatLock(path))?.bytes === current.bytes) await rm(path, { force: true });
+      continue;
+    }
+    if (Date.now() >= deadline) throw new RepeatGuardBusyError();
+    await new Promise((done) => setTimeout(done, REPEAT_LOCK_RETRY_MS));
+  }
+  try {
+    return await operation();
+  } finally {
+    const current = await readRepeatLock(path).catch(() => undefined);
+    if (current?.lock?.token === token) await rm(path, { force: true });
+  }
+}
+
 /**
  * Executes a state-changing call at most once per run state. An identical call (same operation, worktree and
  * arguments) made while the selected run is unchanged since the original succeeded, and within the window, returns the
  * original serialized result and appends a `call.repeated` audit event instead of executing again. Any intervening
- * state change, an expired window, a failed original call or a missing record makes the call a new request.
+ * state change, an expired window, a failed original call or a missing record makes the call a new request. Guarded
+ * calls on the same run are serialized across processes from record lookup through record publication.
  */
 export async function executeRepeatSafe<T extends object>(
   call: RepeatCall,
@@ -264,7 +362,28 @@ export async function executeRepeatSafe<T extends object>(
   if (!Number.isSafeInteger(windowMs) || windowMs < 1) throw new RangeError("Repeat window must be positive");
   if (!Number.isSafeInteger(maxRecords) || maxRecords < 1 || maxRecords > MAX_REPEAT_RECORDS)
     throw new RangeError(`Repeat records must be an integer from 1 to ${MAX_REPEAT_RECORDS}`);
+  const lockWaitMs = options.lockWaitMs ?? DEFAULT_REPEAT_LOCK_WAIT_MS;
+  if (!Number.isSafeInteger(lockWaitMs) || lockWaitMs < 0)
+    throw new RangeError("Repeat lock wait must not be negative");
   const callHash = repeatCallHash(call);
+  const target = await hooks.scope().catch(() => undefined);
+  // Without a selected run there is nothing to deduplicate against, so the call runs under normal kernel checks.
+  if (target === undefined)
+    return { value: await hooks.execute(), repeated: false, fingerprint: repeatFingerprint(callHash, null) };
+  return withRepeatLock(target.runDirectory, idSource, lockWaitMs, () =>
+    guardedCall(call, callHash, hooks, clock, idSource, windowMs, maxRecords),
+  );
+}
+
+async function guardedCall<T extends object>(
+  call: RepeatCall,
+  callHash: string,
+  hooks: RepeatSafeHooks<T>,
+  clock: () => Date,
+  idSource: () => string,
+  windowMs: number,
+  maxRecords: number,
+): Promise<RepeatSafeOutcome<T>> {
   const before = await hooks.scope().catch(() => undefined);
   const fingerprint = repeatFingerprint(callHash, before?.state ?? null);
   if (before !== undefined) {

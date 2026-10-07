@@ -330,17 +330,21 @@ export class RunRepository {
    * recovered first, so the snapshot reflects committed state.
    */
   async repeatState(): Promise<RunRepeatState> {
-    return this.withLock(async () => {
-      await this.recover();
-      const run = await this.readRaw();
-      const lease = await this.readWriterLease();
-      return {
-        runHash: sha256Json(run as unknown as JsonValue),
-        journalHead: await this.journal.head(),
-        ownerEpoch: run.ownerEpoch,
-        writer: lease === undefined ? null : canonicalWorktreePath(lease.metadata.workspacePath),
-      };
-    });
+    return this.withLock(
+      async () => {
+        await this.recover();
+        const run = await this.readRaw();
+        const lease = await this.readWriterLease();
+        return {
+          runHash: sha256Json(run as unknown as JsonValue),
+          journalHead: await this.journal.head(),
+          ownerEpoch: run.ownerEpoch,
+          writer: lease === undefined ? null : canonicalWorktreePath(lease.metadata.workspacePath),
+        };
+      },
+      // Concurrent guarded calls read this state at once; wait out a short mutation instead of failing on contention.
+      { waitMs: this.writerLeaseLockWaitMs },
+    );
   }
 
   /** Rejects with the writer conflict when another worktree holds a live lease; never writes the lease. */

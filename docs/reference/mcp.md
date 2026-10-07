@@ -205,8 +205,12 @@ For a `repeat-guarded` tool, the kernel identifies a call by the tool name, the 
 case-folded on Windows) and the validated arguments as canonical JSON with sorted keys and undefined members dropped.
 `governanceImport` and `governanceSelect` add the SHA-256 of the referenced file, so an edited baseline is a new call;
 a result is not stored when that file changed while the call ran.
-The run state is a hash of the selection, the project set, the selected run document, its journal head and the writer
-lease holder (lease renewals do not change it). The recorded fingerprint binds the call to the state it applied to.
+The run state is a hash of the selection, the project set, the selected run document, its journal head, the writer
+lease holder (lease renewals do not change it) and a stat signature of the run's staged work tree and latest generated
+source tree, so an external edit to staged or generated files also makes an identical call new. The recorded fingerprint
+binds the call to the state it applied to. Guarded calls on one run are serialized across processes by a run-scoped
+`.repeat-guard.lock` from record lookup through record publication; a caller that waits more than 30 seconds for another
+process's call gets `APEX_CONFLICT`, and a lock left by a process that no longer runs is recovered.
 
 An identical call is answered from the original result only when all of these hold:
 
@@ -225,8 +229,8 @@ head, records no new gate decision or evidence, and appends a hash-chained `call
 separate `repeats/` journal. Records live in the run's `.repeat-guard.json`, written atomically, so they survive an
 `apex mcp serve` restart. The file holds at most 16 records with results of at most 64 KiB each; records whose post-call
 state differs from the current state are dropped on every write because they can never match again. A malformed record
-file disables replay instead of returning a forged result. State transfer excludes the record file and carries the
-audit journal.
+file disables replay instead of returning a forged result. State transfer excludes the record and lock files and
+carries the audit journal.
 
 ## Authority
 

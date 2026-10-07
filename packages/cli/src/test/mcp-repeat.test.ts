@@ -285,6 +285,42 @@ test("a governance file replaced while the call runs never binds the result to o
   assert.equal(invocations, 3);
 });
 
+test("an external edit to staged work makes an identical call a new request", async (context) => {
+  const { service, runDirectory, journal } = await initializedWorkspace();
+  const { run } = await service.status();
+  const staged = join(service.root, ".apex", "work", run.runId, "task-1", "code", "main.bicep");
+  let invocations = 0;
+  context.mock.method(service, "stageFile", async () => {
+    invocations += 1;
+    if (invocations === 1) {
+      await mkdir(join(staged, ".."), { recursive: true });
+      await writeFile(staged, "{}");
+      await journal.append({
+        eventId: crypto.randomUUID(),
+        projectId: run.projectId,
+        runId: run.runId,
+        type: "file.staged",
+        timestamp: new Date().toISOString(),
+        ownerEpoch: run.ownerEpoch,
+        expectedHead: await journal.head(),
+        payload: { path: "main.bicep" },
+      });
+    }
+    return serviceValue("stageFile");
+  });
+  const { client } = await connect(context, service, "repeat-staged-edit");
+  const call = () =>
+    client.callTool({ name: "stageFile", arguments: { workspace: service.root, ...duplicateCases.stageFile.input } });
+  const first = await call();
+  assertSuccess(first, "stageFile");
+  assertSameResult(await call(), first, "stageFile");
+  assert.equal(invocations, 1);
+  await writeFile(staged, "{ /* edited */ }");
+  assertSuccess(await call(), "stageFile");
+  assert.equal(invocations, 2);
+  assert.equal((await readRepeatEvents(runDirectory)).length, 1);
+});
+
 test("read tools are never answered from a stored result", async (context) => {
   const { service, runDirectory } = await initializedWorkspace();
   const invocations = new Map<string, number>();

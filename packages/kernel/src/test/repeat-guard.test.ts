@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
@@ -10,6 +10,8 @@ import {
   ProjectStore,
   REPEAT_EVENT_TYPE,
   REPEAT_GUARD_FILE,
+  REPEAT_LOCK_FILE,
+  RepeatGuardBusyError,
   RunRepository,
   RunWriterConflictError,
   executeRepeatSafe,
@@ -266,6 +268,53 @@ test("repeat events keep the caller's worktree spelling while Windows identity i
     (await readRepeatEvents(runDirectory)).map(({ payload }) => (payload as { workspace: string }).workspace),
     [worktree, worktree.toLowerCase()],
   );
+});
+
+test("concurrent identical calls from separate processes execute once", async () => {
+  const { runDirectory, repository, worktree, scope, appendRunEvent } = await fixture();
+  let executions = 0;
+  const run = () =>
+    executeRepeatSafe(
+      { operation: "projectUse", workspace: worktree, arguments: { projectId: "demo" } },
+      {
+        scope,
+        assertReplayAllowed: async () => repository.assertWriterAvailable({ workspacePath: worktree }),
+        execute: async () => {
+          executions += 1;
+          await new Promise((done) => setTimeout(done, 50));
+          await appendRunEvent("selection.changed");
+          return { selected: true };
+        },
+      },
+    );
+  const outcomes = await Promise.all([run(), run(), run()]);
+  assert.equal(executions, 1);
+  assert.deepEqual(outcomes.map(({ repeated }) => repeated).sort(), [false, true, true]);
+  assert.equal((await repository.journal.replay()).filter(({ type }) => type === "selection.changed").length, 1);
+  await assert.rejects(readFile(join(runDirectory, REPEAT_LOCK_FILE)), { code: "ENOENT" });
+});
+
+test("a live repeat lock makes callers wait and fail closed; a dead holder's lock is recovered", async () => {
+  const { runDirectory, worktree, scope } = await fixture();
+  const call = (lockWaitMs: number) =>
+    executeRepeatSafe(
+      { operation: "projectUse", workspace: worktree, arguments: {} },
+      { scope, assertReplayAllowed: async () => undefined, execute: async () => ({ ok: true }) },
+      { lockWaitMs },
+    );
+  const lock = join(runDirectory, REPEAT_LOCK_FILE);
+  await writeFile(
+    lock,
+    JSON.stringify({ token: "live", pid: process.pid, host: hostname(), createdAt: new Date().toISOString() }),
+  );
+  await assert.rejects(call(60), RepeatGuardBusyError);
+  await writeFile(
+    lock,
+    JSON.stringify({ token: "dead", pid: 2 ** 22 + 7, host: hostname(), createdAt: new Date().toISOString() }),
+  );
+  assert.equal((await call(0)).repeated, false);
+  await writeFile(lock, "not json");
+  assert.equal((await call(0)).repeated, true);
 });
 
 test("a call whose identity changed while it ran is returned but not stored", async () => {
