@@ -469,6 +469,16 @@
       }
     },
     {
+      "id": "test-plugin-install",
+      "script": "test:plugin-install",
+      "profile": "external-test",
+      "aliases": [],
+      "retirement": {
+        "status": "active",
+        "replacementIds": []
+      }
+    },
+    {
       "id": "validate-agents",
       "script": "validate:agents",
       "profile": "node-validation",
