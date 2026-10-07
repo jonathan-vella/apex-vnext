@@ -31,8 +31,9 @@ Agent and skill sources did not move. They stay in `customizations/.github/agent
 
 For one consumer workspace, run `apex customizations rollback` right after the update that retired the copies. It
 restores the previous bundle from `.apex/customization-bases/`, including the copied agents, skills and `.mcp.json`,
-and leaves edited copies untouched. To stay on the thick projection, pin the previous `@apexops/cli` release and set
-`"apex@apex-plugins": false` in `.github/copilot/settings.json` so the plugin and the copies do not both load.
+removes the unedited `.github/copilot/settings.json` so the repository no longer enables the plugin, and leaves edited
+copies untouched. An edited settings file is reported as a conflict and the previous lock is not restored until you
+move it. To stay on the thick projection, pin the previous `@apexops/cli` release.
 
 For the product, restoring the thick projection reverses part of DECISION-033 and needs a new maintainer decision:
 

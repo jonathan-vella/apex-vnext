@@ -256,6 +256,8 @@ test("update retires untouched thick-projection copies and keeps edited ones as 
 
   const rollback = await service.rollbackCustomizations();
   assert.deepEqual(rollback.conflicts, []);
+  assert.deepEqual(rollback.removed, [".github/copilot/settings.json"]);
+  await assert.rejects(lstat(join(root, ".github", "copilot", "settings.json")), { code: "ENOENT" });
   assert.equal(
     await readFile(join(root, ".github", "agents", "apex.agent.md"), "utf8"),
     THICK_COPIES[".github/agents/apex.agent.md"],

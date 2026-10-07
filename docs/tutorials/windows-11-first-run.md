@@ -63,7 +63,7 @@ For Terraform, replace `--iac bicep` with `--iac terraform`. The initialized wor
 `.apex/`.
 
 Start Copilot CLI in the same directory with `copilot --agent apex` and continue the project. Ask APEX what is next at
-any point; it names the owning agent and prints `/agent <name>` with a scope prompt to paste after you switch.
+any point; it reads kernel state, continues in the same APEX agent and delegates only to its hidden workers.
 
 ## Verify The Workspace
 

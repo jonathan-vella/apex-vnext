@@ -159,8 +159,9 @@ npx apex customizations rollback --json
 npx apex doctor --json
 ```
 
-Rollback restores the prior managed bundle. It does not downgrade persisted contracts, project journals, or deployment
-evidence. Restore package and `.apex` state from a matching checkpoint if a package rollback is required.
+Rollback restores the prior managed bundle and removes unedited files only the current bundle installed; it reports
+edited ones as conflicts. It does not downgrade persisted contracts, project journals, or deployment evidence. Restore
+package and `.apex` state from a matching checkpoint if a package rollback is required.
 
 ## Uninstall Or Reinstall
 

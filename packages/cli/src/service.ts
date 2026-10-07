@@ -1798,7 +1798,7 @@ export class ApexService {
     return { updated, retired, conflicts };
   }
 
-  async rollbackCustomizations(): Promise<{ restored: string[]; conflicts: string[] }> {
+  async rollbackCustomizations(): Promise<{ restored: string[]; removed: string[]; conflicts: string[] }> {
     await this.recoverCustomizationTransaction();
     const lockPath = join(this.root, ".apex", "customizations.lock.json");
     const current = JSON.parse(await readFile(lockPath, "utf8")) as CustomizationLock;
@@ -1811,6 +1811,7 @@ export class ApexService {
     await this.assertSafeExistingPath(this.root, previousPath);
     const previous = JSON.parse(await readFile(previousPath, "utf8")) as CustomizationLock;
     const restored: string[] = [];
+    const removed: string[] = [];
     const conflicts: string[] = [];
     const retained = new Set((current.externallyManaged?.retained ?? []).map(({ path }) => path));
     for (const [root, desired, installed] of [
@@ -1852,9 +1853,25 @@ export class ApexService {
         } else await atomicWriteBytes(destination, incoming);
         restored.push(file.path);
       }
+      // Files only the current bundle installed, such as the plugin settings after a thin migration, leave with it.
+      for (const file of installed.filter(({ path }) => !desired.some((wanted) => wanted.path === path))) {
+        if (!this.safeManagedRelativePath(file.path)) {
+          throw new ApexError("APEX_VALIDATION", "Managed customization path is unsafe", EXIT_CODES.validation);
+        }
+        const destination = resolve(root, file.path);
+        await this.assertSafeDestination(root, destination);
+        if (!(await this.pathExistsLstat(destination))) continue;
+        const localHash = sha256Bytes(await readFile(destination));
+        if (localHash !== file.currentHash && localHash !== file.baseHash) {
+          conflicts.push(file.path);
+          continue;
+        }
+        await rm(destination);
+        removed.push(file.path);
+      }
     }
     if (conflicts.length === 0) await atomicWriteJson(lockPath, previous);
-    return { restored, conflicts };
+    return { restored, removed, conflicts };
   }
 
   async uninstallCustomizations(): Promise<{ removed: string[]; conflicts: string[] }> {
