@@ -2,8 +2,10 @@
 
 > [Current Version](../../VERSION.md) | Read and bounded-write tools exposed by the APEX MCP server.
 
-Run `apex mcp serve` over standard input/output. Client projections configure this server; users should not add a second
-APEX server with independent state.
+The `apex` plugin starts this server as `apex` with `node ${PLUGIN_ROOT}/mcp/apex.mjs`, the bundled `@apexops/cli`
+runtime. `apex mcp serve` runs the same server over standard input/output from the terminal CLI for scripts and tests.
+Do not register it as a second MCP server in a client that already loads the plugin; one APEX server per session
+avoids duplicate tools and independent state.
 
 The `apex` plugin also declares `apex-azure-pricing`, the remote Azure Resource Manager MCP server with the
 `CostManagement` and `Pricing` toolsets. Agents reference its tools as `apex-azure-pricing/<tool>`. A managed
