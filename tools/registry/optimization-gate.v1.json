@@ -88,7 +88,7 @@
       "consumers": ["Copilot CLI", "VS Code Copilot harness", "GitHub Copilot app"],
       "paths": [],
       "prefixes": ["plugin/"],
-      "proofCommands": ["npm run test:plugin"]
+      "proofCommands": ["npm run test:plugin", "npm run test:publish-plugin"]
     },
     {
       "id": "runtime-configuration",

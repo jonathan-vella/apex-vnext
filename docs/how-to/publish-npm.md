@@ -60,6 +60,40 @@ npx apex version --json
 Continue with the [installation guide](manage-installation.md). Do not claim client or cloud
 qualification merely because npm publication succeeds.
 
+## Publish The Plugin
+
+The `apex` Agent Plugins package is published to the
+[apex-plugins marketplace](https://github.com/jonathan-vella/apex-plugins) through a reviewed pull request in that
+repository. The plugin version is the `@apexops/cli` version, so publish the CLI to npm first. Every plugin release
+needs a `## [<version>]` section in `plugin/CHANGELOG.md`.
+
+Clone the marketplace beside this repository, then run the dry run from a clean checkout of the merged release commit:
+
+```bash
+gh repo clone jonathan-vella/apex-plugins ../apex-plugins
+npm run publish:plugin
+```
+
+The dry run builds the plugin and prints the plan: version, source commit SHA, tree hash, files and every check.
+It changes nothing except the gitignored `dist/` build output. Run `npm run publish:plugin -- --apply` when every check
+passes. `--apply` refuses unless:
+
+- the working tree is clean before and after the build;
+- `HEAD` is on `origin/main`, or equals `--release-commit <sha>` and is on an `origin` branch;
+- `plugin/CHANGELOG.md` has a section for the version;
+- npm has `@apexops/cli` at that version, and the CLI inputs (`packages/`, `customizations/`, `config/`,
+  `package-lock.json`) are unchanged since its `gitHead`;
+- the marketplace clone (`--marketplace-dir`, default `../apex-plugins`) is clean and its `origin/main` has a
+  marketplace manifest;
+- the version is newer than the marketplace's `apex` version and `release/apex-<version>` is unused;
+- the fresh build's tree hash matches `dist/apex-plugin.sha256`.
+
+It then creates `release/apex-<version>` from the marketplace's `origin/main`. It replaces `plugins/apex/` with the
+built tree and updates `.github/plugin/marketplace.json`. It records the source commit, bundled CLI and tree hash in
+`.github/plugin/provenance.json`, pushes only that branch and opens a pull request with `gh`. It never merges, pushes
+to `main` or creates tags. The marketplace `validate` check recomputes the tree hash before you merge. The source
+commit SHA is the pin. Tags are release labels only.
+
 ## Related
 
 - [Qualify A Candidate](qualify-candidate.md) - run deterministic qualification before publication.
