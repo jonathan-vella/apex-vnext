@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { renameWithRetry } from "../index.js";
+import { readPublishedFile, renameWithRetry } from "../index.js";
 
 function flakyRename(failures: string[]) {
   const calls: Array<[string, string]> = [];
@@ -50,5 +50,106 @@ test("renameWithRetry rejects attempt budgets outside 1 to 10", async () => {
       renameWithRetry("a.tmp", "a", { platform: "win32", attempts, rename: async () => {}, sleep: async () => {} }),
       RangeError,
     );
+  }
+});
+
+function flakyPublishedFile(failures: Array<{ at: "lstat" | "readFile"; code: string }>, contents = "{}") {
+  const calls: string[] = [];
+  const fail = (at: "lstat" | "readFile") => {
+    calls.push(at);
+    if (failures[0]?.at !== at) return;
+    const { code } = failures.shift()!;
+    throw Object.assign(new Error(code), { code });
+  };
+  return {
+    calls,
+    lstat: async () => {
+      fail("lstat");
+      return { isFile: () => true, isSymbolicLink: () => false, size: Buffer.byteLength(contents) };
+    },
+    readFile: async () => {
+      fail("readFile");
+      return Buffer.from(contents);
+    },
+  };
+}
+
+test("readPublishedFile retries Windows sharing violations and a file replaced mid-read", async () => {
+  const flaky = flakyPublishedFile([
+    { at: "lstat", code: "EBUSY" },
+    { at: "readFile", code: "EPERM" },
+    { at: "readFile", code: "ENOENT" },
+    { at: "readFile", code: "EACCES" },
+  ]);
+  const sleeps: number[] = [];
+  const bytes = await readPublishedFile("lease.json", {
+    maxBytes: 64,
+    label: "Lease",
+    platform: "win32",
+    lstat: flaky.lstat,
+    readFile: flaky.readFile,
+    sleep: async (milliseconds) => void sleeps.push(milliseconds),
+  });
+  assert.equal(bytes?.toString("utf8"), "{}");
+  assert.deepEqual(sleeps, [10, 20, 40, 80]);
+  assert.deepEqual(flaky.calls, [
+    "lstat",
+    "lstat",
+    "readFile",
+    "lstat",
+    "readFile",
+    "lstat",
+    "readFile",
+    "lstat",
+    "readFile",
+  ]);
+});
+
+test("readPublishedFile reports absence only from lstat and never turns a transient failure into absence", async () => {
+  const absent = flakyPublishedFile([{ at: "lstat", code: "ENOENT" }]);
+  assert.equal(
+    await readPublishedFile("lease.json", { maxBytes: 64, label: "Lease", platform: "win32", ...absent }),
+    undefined,
+  );
+  assert.deepEqual(absent.calls, ["lstat"]);
+  const exhausted = flakyPublishedFile(Array.from({ length: 5 }, () => ({ at: "readFile" as const, code: "EPERM" })));
+  await assert.rejects(
+    readPublishedFile("lease.json", {
+      maxBytes: 64,
+      label: "Lease",
+      platform: "win32",
+      attempts: 3,
+      ...exhausted,
+      sleep: async () => {},
+    }),
+    { code: "EPERM" },
+  );
+  assert.equal(exhausted.calls.filter((call) => call === "readFile").length, 3);
+  const linux = flakyPublishedFile([{ at: "readFile", code: "EPERM" }]);
+  await assert.rejects(readPublishedFile("lease.json", { maxBytes: 64, label: "Lease", platform: "linux", ...linux }), {
+    code: "EPERM",
+  });
+  assert.deepEqual(linux.calls, ["lstat", "readFile"]);
+  const replaced = flakyPublishedFile([{ at: "readFile", code: "ENOENT" }]);
+  assert.equal(
+    (
+      await readPublishedFile("lease.json", {
+        maxBytes: 64,
+        label: "Lease",
+        platform: "linux",
+        ...replaced,
+        sleep: async () => {},
+      })
+    )?.toString("utf8"),
+    "{}",
+  );
+  const oversized = flakyPublishedFile([], "x".repeat(65));
+  await assert.rejects(
+    readPublishedFile("lease.json", { maxBytes: 64, label: "Lease", platform: "win32", ...oversized }),
+    /Lease is unsafe/u,
+  );
+  assert.deepEqual(oversized.calls, ["lstat"]);
+  for (const attempts of [0, 11, 1.5]) {
+    await assert.rejects(readPublishedFile("lease.json", { maxBytes: 64, label: "Lease", attempts }), RangeError);
   }
 });

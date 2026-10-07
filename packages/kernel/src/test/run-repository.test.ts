@@ -328,16 +328,68 @@ test("run writer lease publication remains readable under contention", async () 
       }),
     ),
   );
-  assert.ok(attempts.some((attempt) => attempt.status === "fulfilled"));
+  const owners = new Set(
+    attempts.flatMap((attempt) => (attempt.status === "fulfilled" ? [attempt.value.workspacePath] : [])),
+  );
+  assert.equal(owners.size, 1, "an unexpired lease must never change workspace under contention");
   for (const attempt of attempts) {
     if (attempt.status === "rejected") {
-      assert.ok(attempt.reason instanceof RunWriterConflictError);
+      assert.ok(attempt.reason instanceof RunWriterConflictError, String(attempt.reason));
     }
   }
   const lease = JSON.parse(await readFile(join(directory, ".run-writer-lease.json"), "utf8")) as {
     workspacePath?: unknown;
     expiresAt?: unknown;
   };
-  assert.equal(typeof lease.workspacePath, "string");
+  assert.equal(lease.workspacePath, [...owners][0]);
   assert.equal(typeof lease.expiresAt, "string");
+});
+
+test("run writer lease renewal waits out a slow mutation lock holder instead of failing", async () => {
+  const now = { value: new Date("2026-01-01T00:00:00.000Z") };
+  const { directory, repository } = await writerLeaseFixture(now);
+  const owner = { workspacePath: "/workspace/main", sessionId: "session-a" };
+  await repository.acquireWriterLease(owner);
+  let entered!: () => void;
+  const holding = new Promise<void>((done) => (entered = done));
+  // Hold the run mutation lock longer than the former 500 ms writer-lease wait budget, as a slow Windows lock
+  // cycle (or a queue of same-workspace renewals) does under contention.
+  const holder = new RunRepository(directory, {
+    clock: () => now.value,
+    writerLeaseTtlMs: 1_000,
+    faultInjector: async (stage) => {
+      if (stage !== "intent") return;
+      entered();
+      await new Promise((done) => setTimeout(done, 1_200));
+    },
+  });
+  const mutation = holder.mutate({
+    expectedRunHash: await holder.hash(),
+    event: {
+      eventId: "event-slow-holder",
+      projectId: "demo",
+      runId: "run-1",
+      type: "owner-changed",
+      timestamp: "2026-01-01T00:01:00.000Z",
+      ownerEpoch: 2,
+      payload: {},
+    },
+    update: (run) => ({ ...run, ownerEpoch: 2 }),
+  });
+  await holding;
+  let released = false;
+  void mutation.then(
+    () => (released = true),
+    () => (released = true),
+  );
+  await assert.rejects(
+    repository.acquireWriterLease({ workspacePath: "/workspace/worktree", sessionId: "session-b" }),
+    RunWriterConflictError,
+  );
+  assert.equal(released, false, "another worktree must fail fast with a typed conflict while the lock is held");
+  now.value = new Date("2026-01-01T00:00:00.500Z");
+  const renewed = await repository.acquireWriterLease(owner);
+  assert.equal(renewed.workspacePath, resolve(owner.workspacePath));
+  assert.equal(renewed.expiresAt, "2026-01-01T00:00:01.500Z");
+  await mutation;
 });
