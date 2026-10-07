@@ -1,7 +1,7 @@
 import type { EventV1, ProjectId, RunId } from "@apexops/contracts";
 import { constants } from "node:fs";
 import { lstat, open } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { sha256Json, sha256Text } from "./canonical.js";
 import { EventJournal } from "./event-journal.js";
 import { atomicWriteJson } from "./files.js";
@@ -212,7 +212,8 @@ async function appendRepeatEvent(
         expectedHead: await journal.head(),
         payload: {
           operation: record.operation,
-          workspace: canonicalWorktreePath(call.workspace),
+          // Record the worktree as the caller sees it; the case-folded comparison key belongs only in callHash.
+          workspace: resolve(call.workspace),
           callHash: record.callHash,
           fingerprint,
           originalFingerprint: record.fingerprint,

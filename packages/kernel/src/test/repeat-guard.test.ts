@@ -244,6 +244,30 @@ test("failed calls are not recorded and a repeat re-runs normal checks", async (
   assert.equal(executions(), 2);
 });
 
+test("repeat events keep the caller's worktree spelling while Windows identity is case-insensitive", async (context) => {
+  const { runDirectory, root, scope } = await fixture();
+  const worktree = join(root, "WorkTree-Upper");
+  await mkdir(worktree);
+  // Simulate Windows: canonical worktree keys are case-folded, but audit records must not be.
+  const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
+  Object.defineProperty(process, "platform", { ...platform, value: "win32" });
+  context.after(() => Object.defineProperty(process, "platform", platform));
+  let executions = 0;
+  const run = (workspace: string) =>
+    executeRepeatSafe(
+      { operation: "projectUse", workspace, arguments: { projectId: "demo" } },
+      { scope, assertReplayAllowed: async () => undefined, execute: async () => ({ executions: ++executions }) },
+    );
+  assert.equal((await run(worktree)).repeated, false);
+  assert.equal((await run(worktree)).repeated, true);
+  assert.equal((await run(worktree.toLowerCase())).repeated, true);
+  assert.equal(executions, 1);
+  assert.deepEqual(
+    (await readRepeatEvents(runDirectory)).map(({ payload }) => (payload as { workspace: string }).workspace),
+    [worktree, worktree.toLowerCase()],
+  );
+});
+
 test("a call whose identity changed while it ran is returned but not stored", async () => {
   const { runDirectory, repository, worktree, scope } = await fixture();
   let executions = 0;
